@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from django_service_specs.dispatch.dispatch_error import DispatchError
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.types.dispatch_error import DispatchError
 
 
 def test_carries_a_copy_of_the_detail_tree() -> None:

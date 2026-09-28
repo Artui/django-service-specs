@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
-from django_service_specs.dispatch.dispatch_error import DispatchError
+from django_service_specs.types.dispatch_error import DispatchError
 
 
 class InvalidArguments(DispatchError):

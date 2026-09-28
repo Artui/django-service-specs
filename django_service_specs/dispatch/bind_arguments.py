@@ -5,11 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 
 if TYPE_CHECKING:
-    from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
 
 
@@ -56,16 +57,6 @@ def bind_arguments(
             problem at once, and a Validator is only reached with well-shaped
             arguments.
     """
-    # Imported here rather than at the top, because hoisted either one closes
-    # an import cycle: this package's ``__init__`` re-exports this function,
-    # and both modules reach this package back through one of its leaves -
-    # ``check_arguments`` for ``UnknownArguments``, the spec modules for
-    # ``Validator``. The package root imports every subpackage, so the cycle
-    # fails the first import of anything in the package, and the whole suite
-    # fails at collection if either line moves up.
-    from django_service_specs.parameters.check_arguments import check_arguments
-    from django_service_specs.specs.selector_spec import SelectorSpec
-
     checked = check_arguments(spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked

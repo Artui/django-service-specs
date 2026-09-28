@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django_service_specs.dispatch.dispatch_error import DispatchError
+from django_service_specs.types.dispatch_error import DispatchError
 
 
 def test_message_defaults_and_is_the_exception_text() -> None:
