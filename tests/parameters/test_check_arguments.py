@@ -98,17 +98,17 @@ def test_a_default_of_none_is_a_real_default() -> None:
 @pytest.mark.parametrize(
     ("json_type", "value", "message"),
     [
-        ("integer", True, "Expected integer, got boolean."),
-        ("number", False, "Expected number, got boolean."),
-        ("integer", 1.5, "Expected integer, got number."),
-        ("integer", "3", "Expected integer, got string."),
-        ("string", 3, "Expected string, got integer."),
-        ("boolean", "true", "Expected boolean, got string."),
-        ("boolean", 1, "Expected boolean, got integer."),
-        ("array", "a,b", "Expected array, got string."),
-        ("array", {"a": 1}, "Expected array, got object."),
-        ("object", ["a"], "Expected object, got array."),
-        ("integer", Decimal("3"), "Expected integer, got Decimal."),
+        ("integer", True, "Expected an integer."),
+        ("number", False, "Expected a number."),
+        ("integer", 1.5, "Expected an integer."),
+        ("integer", "3", "Expected an integer."),
+        ("string", 3, "Expected a string."),
+        ("boolean", "true", "Expected a boolean."),
+        ("boolean", 1, "Expected a boolean."),
+        ("array", "a,b", "Expected an array."),
+        ("array", {"a": 1}, "Expected an array."),
+        ("object", ["a"], "Expected an object."),
+        ("integer", Decimal("3"), "Expected an integer."),
     ],
 )
 def test_refuses_a_value_of_another_json_type(json_type: str, value: Any, message: str) -> None:
@@ -152,12 +152,13 @@ def test_a_decimal_accepts_a_string_or_a_json_number(value: Any) -> None:
     assert check_arguments(DECIMAL, {"price": value}) == {"price": value}
 
 
-@pytest.mark.parametrize(("value", "actual"), [(True, "boolean"), (["9.99"], "array")])
-def test_a_decimal_refuses_what_is_neither_a_string_nor_a_number(value: Any, actual: str) -> None:
+@pytest.mark.parametrize("value", [True, ["9.99"]])
+def test_a_decimal_refuses_what_is_neither_a_string_nor_a_number(value: Any) -> None:
     # A boolean would parse - Decimal(True) is 1 - so the type message, not the
     # parse message, is what proves the type check answered.
-    message = f"Expected a decimal string or number, got {actual}."
+    message = "Expected a decimal string or a number."
     assert refusal(DECIMAL, {"price": value}) == {"price": [message]}
+    assert message != NOT_A_NUMBER
 
 
 @pytest.mark.parametrize("value", ["abc", "", "NaN", "Infinity", "-inf"])
@@ -201,7 +202,7 @@ def test_a_date_is_what_djangos_parser_reads() -> None:
 
 
 def test_a_formatted_string_is_type_checked_before_it_is_parsed() -> None:
-    assert refusal(DATE, {"on": 20240131}) == {"on": ["Expected string, got integer."]}
+    assert refusal(DATE, {"on": 20240131}) == {"on": ["Expected a string."]}
 
 
 # --- choices ---------------------------------------------------------------------------
@@ -211,7 +212,7 @@ STATUS = one(Parameter("status", "string", choices=("draft", "published")))
 
 def test_a_value_of_the_right_type_outside_the_choices_is_refused() -> None:
     assert refusal(STATUS, {"status": "archived"}) == {
-        "status": ["Value 'archived' is not a valid choice."]
+        "status": ["Select a valid choice. archived is not one of the available choices."]
     }
 
 
@@ -224,7 +225,7 @@ def test_the_type_check_answers_before_the_choices() -> None:
     # stands between a boolean and an integer choice.
     params = one(Parameter("rank", "integer", choices=(1, 2)))
     detail = refusal(params, {"rank": True})
-    assert detail == {"rank": ["Expected integer, got boolean."]}
+    assert detail == {"rank": ["Expected an integer."]}
     assert "valid choice" not in str(detail)
 
 
@@ -250,9 +251,9 @@ def test_a_flat_array_checks_each_element_and_addresses_only_the_failures() -> N
     params = one(Parameter("ids", "array", items="integer"))
     assert refusal(params, {"ids": [1, "2", 3, True, None]}) == {
         "ids": {
-            1: ["Expected integer, got string."],
-            3: ["Expected integer, got boolean."],
-            4: ["Expected integer, got null."],
+            1: ["Expected an integer."],
+            3: ["Expected an integer."],
+            4: ["Expected an integer."],
         }
     }
 
@@ -261,7 +262,7 @@ def test_an_arrays_choices_constrain_each_element() -> None:
     params = one(Parameter("tags", "array", items="string", choices=("a", "b")))
     assert check_arguments(params, {"tags": ["b", "a"]}) == {"tags": ["b", "a"]}
     assert refusal(params, {"tags": ["a", "c"]}) == {
-        "tags": {1: ["Value 'c' is not a valid choice."]}
+        "tags": {1: ["Select a valid choice. c is not one of the available choices."]}
     }
 
 
@@ -288,8 +289,8 @@ def test_a_row_that_is_not_an_object_is_refused_under_non_field_errors_in_the_ro
     detail = refusal(AUTHOR, {"name": "Le Guin", "books": ["Lathe", None]})
     assert detail == {
         "books": {
-            0: {NON_FIELD_ERRORS: ["Expected object, got string."]},
-            1: {NON_FIELD_ERRORS: ["Expected object, got null."]},
+            0: {NON_FIELD_ERRORS: ["Expected an object."]},
+            1: {NON_FIELD_ERRORS: ["Expected an object."]},
         }
     }
 
@@ -302,7 +303,7 @@ def test_an_object_inside_a_row_is_checked_two_levels_down() -> None:
     ]
     assert refusal(AUTHOR, {"name": "Le Guin", "books": books}) == {
         "books": {
-            0: {"publisher": ["Expected object, got string."]},
+            0: {"publisher": ["Expected an object."]},
             1: {"publisher": {"name": [REQUIRED]}},
         }
     }
@@ -310,13 +311,11 @@ def test_an_object_inside_a_row_is_checked_two_levels_down() -> None:
 
 def test_an_object_parameter_given_a_non_mapping_is_a_type_error_at_the_field() -> None:
     params = one(Parameter("publisher", "object", fields=PUBLISHER))
-    assert refusal(params, {"publisher": ["Scribner"]}) == {
-        "publisher": ["Expected object, got array."]
-    }
+    assert refusal(params, {"publisher": ["Scribner"]}) == {"publisher": ["Expected an object."]}
 
 
 def test_arguments_that_are_not_a_mapping_are_refused_at_the_root() -> None:
-    assert refusal(AUTHOR, ["Le Guin"]) == {NON_FIELD_ERRORS: ["Expected object, got array."]}
+    assert refusal(AUTHOR, ["Le Guin"]) == {NON_FIELD_ERRORS: ["Expected an object."]}
 
 
 # --- the closed argument set ---------------------------------------------------------------------
@@ -361,7 +360,7 @@ def test_ignore_drops_an_undeclared_key_at_every_level_and_leaves_the_input_alon
 def test_ignore_still_refuses_what_is_declared_and_wrong() -> None:
     arguments = {"name": 3, "tenant": "acme"}
     assert refusal(AUTHOR, arguments, unknown_arguments=UnknownArguments.IGNORE) == {
-        "name": ["Expected string, got integer."]
+        "name": ["Expected a string."]
     }
 
 
@@ -389,9 +388,9 @@ def test_every_problem_is_reported_in_one_tree() -> None:
         "name": [REQUIRED],
         "tenant": [UNKNOWN],
         "books": {
-            0: {"title": ["Expected string, got integer."]},
+            0: {"title": ["Expected a string."]},
             2: {"publisher": {"name": [NULL]}, "tenant": [UNKNOWN]},
-            3: {NON_FIELD_ERRORS: ["Expected object, got integer."]},
+            3: {NON_FIELD_ERRORS: ["Expected an object."]},
         },
     }
 

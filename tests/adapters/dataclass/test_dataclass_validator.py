@@ -11,6 +11,7 @@ from django.test import override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -335,18 +336,23 @@ def test_a_value_outside_the_choices_is_refused(overrides: dict, detail: dict) -
 @pytest.mark.parametrize(
     "argument",
     [
-        # The JSON type check. A Decimal is the case only it answers: its str
+        # A Decimal is the case only the JSON type check answers: its str
         # parses, so without the check a value no wire carries would pass,
         # where a date-time object is refused for not being a string.
         Decimal("1.5"),
         True,
         [1],
-        # The parse, and then finiteness.
-        "twelve",
-        "NaN",
-        "Infinity",
     ],
 )
+def test_a_decimal_that_is_neither_a_string_nor_a_number_is_refused(argument: Any) -> None:
+    # The type check's own message, which the parse below never produces, so
+    # this names the check that answered.
+    assert _refusal(_Price, {"price": argument}) == {
+        "price": ["Expected a decimal string or a number."]
+    }
+
+
+@pytest.mark.parametrize("argument", ["twelve", "NaN", "Infinity"])
 def test_a_decimal_that_is_not_a_finite_number_is_refused(argument: Any) -> None:
     assert _refusal(_Price, {"price": argument}) == {"price": ["Enter a number."]}
 
@@ -436,3 +442,28 @@ def test_messages_are_translated_when_raised() -> None:
     with translation.override("fr"):
         detail = _refusal(_Price, {})
     assert detail == {"price": ["Ce champ est obligatoire."]}
+
+
+@dataclass
+class _Typed:
+    count: int
+    price: Decimal
+    status: Status
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [{"count": "3"}, {"price": True}, {"status": "archived"}],
+    ids=["type", "decimal", "choice"],
+)
+def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
+    arguments: dict[str, Any],
+) -> None:
+    # Dispatch puts the shape check in front of the Validator, so a caller of
+    # dispatch only ever reads the first; a caller of ``validate()`` reads the
+    # second. One fault should read the same to both.
+    valid = {"count": 1, "price": "1.5", "status": Status.values[0]}
+    validator = DataclassValidator(_Typed)
+    with pytest.raises(InvalidArguments) as shape:
+        check_arguments(validator.parameters(), {**valid, **arguments})
+    assert shape.value.detail == _refusal(_Typed, {**valid, **arguments})

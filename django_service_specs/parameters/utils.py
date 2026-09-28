@@ -1,16 +1,17 @@
-"""The detail tree every refusal of arguments carries, and the helpers that build one.
+"""The spellings every refusal of arguments shares: a node's own message key, and a wrong type.
 
 [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
-documents the tree's shape. These helpers exist so that everything producing
+documents the tree these go into. They live here so that everything producing
 one - the shape check, ``coerce_flat``, a relation write re-rooting a row's
-refusal - builds the same shape, rather than each spelling its own and a
-transport learning three.
+refusal, an adapter's Validator - spells them the same way, rather than each
+its own and a transport learning several.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from typing import Any, Final
+from typing import Final
+
+from django.utils.translation import gettext
 
 NON_FIELD_ERRORS: Final = "non_field_errors"
 """The key a message about a node itself sits under, beside its fields' messages.
@@ -21,46 +22,25 @@ Django's and DRF's spelling of the same idea, so a transport rendering either's
 errors reads the kernel's without a translation table."""
 
 
-def nest_detail(path: Sequence[str | int], detail: Any) -> dict[Any, Any]:
-    """Root ``detail`` under ``path``: a child's refusal, addressed from its parent.
+def expected_type(json_type: str) -> str:
+    """The refusal of a value that is not ``json_type``, as one sentence a translator sees whole.
 
-    ``nest_detail(("books", 1), {"title": ["..."]})`` is
-    ``{"books": {1: {"title": ["..."]}}}``. A message list with no path left to
-    hang it on is a message about the root itself, so it goes under
-    ``NON_FIELD_ERRORS`` rather than making the tree a list, which
-    ``InvalidArguments`` could not carry.
+    ``"decimal"`` is the one key that is not a JSON type: the format arrives as
+    a string or a number, so its refusal names both.
+
+    One sentence per type rather than ``"Expected %(type)s"``, because an
+    interpolated JSON type name would reach a translated sentence
+    untranslated. The shape check and the Validators the adapters build share
+    this one table, so a caller reads the same refusal whichever of them
+    answered. Built on each call, because a translation looked up at import
+    time needs configured settings before the package can be imported at all.
     """
-    node = detail
-    for key in reversed(path):
-        node = {key: node}
-    if not isinstance(node, Mapping):
-        return {NON_FIELD_ERRORS: list(node)}
-    return dict(node)
-
-
-def merge_detail(first: Mapping[Any, Any], second: Mapping[Any, Any]) -> dict[Any, Any]:
-    """One tree holding every message of both, and neither input modified.
-
-    Where both trees reach one key, two message lists are concatenated, first's
-    messages first, and two subtrees merge recursively. Where a message list
-    meets a subtree - a field refused as a whole by one producer and inside by
-    another - the list moves under ``NON_FIELD_ERRORS`` in the subtree, which is
-    where a message about that node sits. Nothing is dropped either way: the
-    point of a tree is that the caller sees every problem at once.
-    """
-    merged = dict(first)
-    for key, value in second.items():
-        merged[key] = _merge_node(merged[key], value) if key in merged else value
-    return merged
-
-
-def _merge_node(first: Any, second: Any) -> Any:
-    # Either side may be the subtree; test_merge_detail_moves_a_message_list_meeting_a_subtree_under_non_field_errors
-    # merges both ways round, which is what holds each condition.
-    if isinstance(first, Mapping) or isinstance(second, Mapping):
-        return merge_detail(_as_tree(first), _as_tree(second))
-    return [*first, *second]
-
-
-def _as_tree(node: Any) -> Mapping[Any, Any]:
-    return node if isinstance(node, Mapping) else {NON_FIELD_ERRORS: node}
+    return {
+        "string": gettext("Expected a string."),
+        "integer": gettext("Expected an integer."),
+        "number": gettext("Expected a number."),
+        "boolean": gettext("Expected a boolean."),
+        "array": gettext("Expected an array."),
+        "object": gettext("Expected an object."),
+        "decimal": gettext("Expected a decimal string or a number."),
+    }[json_type]

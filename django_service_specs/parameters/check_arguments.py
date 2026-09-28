@@ -12,7 +12,7 @@ from django.utils.translation import gettext
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
@@ -33,10 +33,6 @@ _PYTHON_TYPES: dict[str, type | tuple[type, ...]] = {
 """What each JSON type arrives as once a transport has decoded it. An ``int`` is a
 number, because JSON has one numeric type and ``3`` is a valid number. ``bool``
 is handled before this table is read, since it subclasses ``int``."""
-
-_JSON_TYPE_ORDER = ("boolean", "integer", "number", "string", "array", "object")
-"""The order a value's JSON type is named in: ``boolean`` before ``integer`` for
-the subclass, ``integer`` before ``number`` so ``3`` is called what it is."""
 
 _DATE_PARSERS: dict[str, Callable[[str], object]] = {
     "date-time": parse_datetime,
@@ -98,7 +94,7 @@ def check_arguments(
     if not isinstance(arguments, Mapping):
         # A JSON-RPC caller controls the whole ``arguments`` value, so a list
         # there is a caller's mistake to refuse, not a crash to raise.
-        raise InvalidArguments({NON_FIELD_ERRORS: [_expected("object", arguments)]})
+        raise InvalidArguments({NON_FIELD_ERRORS: [expected_type("object")]})
     cleaned, errors = _check_object(parameters, arguments, policy)
     if errors:
         raise InvalidArguments(errors)
@@ -148,7 +144,7 @@ def _check_value(param: Parameter, value: Any, policy: UnknownArguments) -> tupl
             policy=policy,
         )
     if not _is_json_type("array", value):
-        return None, [_expected("array", value)]
+        return None, [expected_type("array")]
     items = param.items
     rows: Parameters | None
     if isinstance(items, Parameters):
@@ -202,7 +198,10 @@ def _check_one(
         if errors:
             return None, errors
     if choices is not None and value not in choices:
-        return None, [gettext("Value %(value)r is not a valid choice.") % {"value": value}]
+        return None, [
+            gettext("Select a valid choice. %(value)s is not one of the available choices.")
+            % {"value": value}
+        ]
     return value, None
 
 
@@ -210,9 +209,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
     if fmt == "decimal":
         # A boolean is neither, although Python makes it an int: see _is_json_type.
         if not (_is_json_type("string", value) or _is_json_type("number", value)):
-            return gettext("Expected a decimal string or number, got %(actual)s.") % {
-                "actual": _json_type_of(value)
-            }
+            return expected_type("decimal")
         try:
             finite = Decimal(value).is_finite()
         except InvalidOperation:
@@ -221,7 +218,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
         return None if finite else gettext("Enter a number.")
     # The first condition is held by test_an_array_with_no_items_accepts_any_element.
     if json_type is not None and not _is_json_type(json_type, value):
-        return _expected(json_type, value)
+        return expected_type(json_type)
     if fmt is None:
         return None
     try:
@@ -244,20 +241,3 @@ def _is_json_type(json_type: str, value: Any) -> bool:
     if isinstance(value, bool):
         return json_type == "boolean"
     return isinstance(value, _PYTHON_TYPES[json_type])
-
-
-def _json_type_of(value: Any) -> str:
-    """The value's JSON type, to name it in a message; a Python type name otherwise."""
-    if value is None:
-        return "null"
-    return next(
-        (name for name in _JSON_TYPE_ORDER if _is_json_type(name, value)),
-        type(value).__name__,
-    )
-
-
-def _expected(json_type: str, value: Any) -> str:
-    return gettext("Expected %(expected)s, got %(actual)s.") % {
-        "expected": json_type,
-        "actual": _json_type_of(value),
-    }
