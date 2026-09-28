@@ -60,6 +60,17 @@ Non-negotiable. They keep the package navigable.
    directory. `types/` is the one standing subpackage, for value-shape carriers.
    There is no `exceptions/`: an exception lives in the subpackage that raises
    it.
+8. **`types/` imports nothing else in the package, and that is load-bearing.**
+   Any import of a submodule runs its package's `__init__` first, and a
+   subpackage's `__init__` re-exports its whole surface. So a module that
+   every subpackage imports must sit in a package whose `__init__` pulls in
+   nothing: put it anywhere else and the first leaf to import it loads a
+   pipeline that imports that leaf back, half-initialized. That is why
+   `DispatchError` - the base every refusal before the run shares, and raised
+   by nobody directly - lives in `types/` rather than `dispatch/`: there, the
+   first `NotPermitted` to load pulled in `dispatch()`, which needs
+   `authorize`, which needs `NotPermitted`. A function-local import would
+   hide that cycle rather than remove it.
 
 ## Naming the concepts
 

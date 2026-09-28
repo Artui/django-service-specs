@@ -1,0 +1,118 @@
+# API reference
+
+Everything below is exported from `django_service_specs` directly, and from the
+subpackage it is listed under. Import from the package root in application
+code; the subpackage paths are where each name is defined.
+
+## Specs
+
+::: django_service_specs.specs.service_spec.ServiceSpec
+::: django_service_specs.specs.selector_spec.SelectorSpec
+::: django_service_specs.specs.selector_kind.SelectorKind
+
+## Parameters
+
+::: django_service_specs.parameters.parameter.Parameter
+::: django_service_specs.parameters.parameters.Parameters
+::: django_service_specs.parameters.check_arguments.check_arguments
+::: django_service_specs.parameters.coerce_flat.coerce_flat
+::: django_service_specs.parameters.invalid_arguments.InvalidArguments
+
+## Validation
+
+::: django_service_specs.validation.validator.Validator
+::: django_service_specs.validation.validation_context.ValidationContext
+::: django_service_specs.validation.unknown_arguments.UnknownArguments
+
+## Output
+
+::: django_service_specs.output.presenter.Presenter
+::: django_service_specs.output.output.Output
+::: django_service_specs.output.output_field.OutputField
+::: django_service_specs.output.field_marking.FieldMarking
+::: django_service_specs.output.field_audience.FieldAudience
+
+## Dataclass adapters
+
+::: django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator
+::: django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter
+
+## Dispatch
+
+::: django_service_specs.dispatch.dispatch.dispatch
+::: django_service_specs.dispatch.adispatch.adispatch
+::: django_service_specs.dispatch.dispatch_result.DispatchResult
+::: django_service_specs.dispatch.present.present
+::: django_service_specs.dispatch.apresent.apresent
+::: django_service_specs.dispatch.bind_arguments.bind_arguments
+
+## Authorization
+
+::: django_service_specs.authorization.permission_check.PermissionCheck
+::: django_service_specs.authorization.unrestricted.Unrestricted
+::: django_service_specs.authorization.grant.Grant
+::: django_service_specs.authorization.authorize.authorize
+::: django_service_specs.authorization.authorize_target.authorize_target
+::: django_service_specs.authorization.resolve_principal.resolve_principal
+::: django_service_specs.authorization.not_permitted.NotPermitted
+::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
+
+## Services
+
+::: django_service_specs.services.run_service.run_service
+::: django_service_specs.services.arun_service.arun_service
+::: django_service_specs.services.is_async.is_async
+::: django_service_specs.services.service_error.ServiceError
+::: django_service_specs.services.service_validation_error.ServiceValidationError
+::: django_service_specs.services.service_conflict.ServiceConflict
+::: django_service_specs.services.service_not_found.ServiceNotFound
+
+## Pool
+
+::: django_service_specs.pool.pool_seeds.PoolSeeds
+::: django_service_specs.pool.pool_seeds.DEFAULT_POOL_SEEDS
+::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
+::: django_service_specs.pool.base_pool.base_pool
+::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
+
+## Mutations
+
+::: django_service_specs.mutations.create_from_input.create_from_input
+::: django_service_specs.mutations.acreate_from_input.acreate_from_input
+::: django_service_specs.mutations.update_from_input.update_from_input
+::: django_service_specs.mutations.aupdate_from_input.aupdate_from_input
+::: django_service_specs.mutations.apply_input.apply_input
+::: django_service_specs.mutations.delete_relations.delete_relations
+::: django_service_specs.mutations.adelete_relations.adelete_relations
+::: django_service_specs.mutations.change_result.ChangeResult
+::: django_service_specs.mutations.field_change.FieldChange
+::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
+::: django_service_specs.mutations.related_object_change.RelatedObjectChange
+::: django_service_specs.mutations.relation_outcome.RelationOutcome
+
+## Relations
+
+::: django_service_specs.relations.relation_spec.RelationSpec
+::: django_service_specs.relations.child_spec.ChildSpec
+::: django_service_specs.relations.forward_relation_spec.ForwardRelationSpec
+::: django_service_specs.relations.reverse_one_to_one_spec.ReverseOneToOneSpec
+::: django_service_specs.relations.many_to_many_spec.ManyToManySpec
+::: django_service_specs.relations.generic_relation_spec.GenericRelationSpec
+::: django_service_specs.relations.relation_mode.RelationMode
+::: django_service_specs.relations.relation_orphan.RelationOrphan
+::: django_service_specs.relations.relation_phase.RelationPhase
+
+## Registry
+
+::: django_service_specs.registry.spec_registry.SpecRegistry
+::: django_service_specs.registry.registered_spec.RegisteredSpec
+
+## Selectors
+
+::: django_service_specs.selectors.shape_queryset.shape_queryset
+
+## Types
+
+::: django_service_specs.types.dispatch_error.DispatchError
+::: django_service_specs.types.unset.UNSET
+::: django_service_specs.types.unset.UnsetType
