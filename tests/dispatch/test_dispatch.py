@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import F, Value
 from django.db.models.functions import Concat
@@ -664,3 +665,34 @@ def test_authorize_is_what_refuses_an_undeclared_spec(ada: Any) -> None:
         dispatch(spec, principal=ada, arguments={})
 
     assert str(caught.value) == str(expected.value)
+
+
+def _user_by_pk(*, pk: int) -> Any:
+    return get_user_model()._default_manager.filter(pk=pk)
+
+
+@pytest.mark.django_db
+def test_a_service_s_target_is_presented_with_the_relations_it_wrote() -> None:
+    # The instance selector prefetches the notes; the service adds one and
+    # returns its target. Without clearing the target's prefetch cache, the
+    # value would still list the notes as they were before the write.
+    owner = make_user("prolific")
+    Note.objects.create(owner=owner, title="first")
+
+    def add_note(*, instance: Any, title: str) -> Any:
+        Note.objects.create(owner=instance, title=title)
+        return instance
+
+    spec = ServiceSpec(
+        service=add_note,
+        permissions=OPEN,
+        validator=Titled(),
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=_user_by_pk,
+            reads=PK,
+            prefetch_related=["notes"],
+        ),
+    )
+    outcome = dispatch(spec, principal=owner, arguments={"pk": owner.pk, "title": "second"})
+    assert sorted(note.title for note in outcome.value.notes.all()) == ["first", "second"]

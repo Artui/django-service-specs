@@ -284,6 +284,14 @@ def finish_service(
     not happen. So the value is ``None`` under ``kind="instance"``, whether the
     selector returned nothing or raised ``DoesNotExist``.
     """
+    # The row the service changed may carry a prefetch taken before the change:
+    # a service that rewrites a relation and returns its target would then be
+    # presented with the relation as it was. Only the target is cleared; an
+    # output selector's re-read carries its own prefetch on purpose. A
+    # collection target has no cache to clear, so the ``getattr`` is a no-op
+    # there rather than a type check.
+    if getattr(prepared.target, "_prefetched_objects_cache", None):
+        prepared.target._prefetched_objects_cache = {}
     output_spec = spec.output_selector_spec
     value = result
     kind: Literal["instance", "list"] = "instance"
