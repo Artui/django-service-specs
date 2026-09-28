@@ -1,3 +1,163 @@
-"""Models for the relations_app tests."""
+"""Test models exercising the full surface area of the mutation helpers."""
 
 from __future__ import annotations
+
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
+from django.db import models
+
+
+class Tag(models.Model):
+    name = models.CharField(max_length=50)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Author(models.Model):
+    name = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Timestamped(models.Model):
+    title = models.CharField(max_length=100)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Post(models.Model):
+    title = models.CharField(max_length=200)
+    body = models.TextField(default="")
+    published = models.BooleanField(default=False)
+    views = models.IntegerField(default=0)
+    author = models.ForeignKey(
+        Author,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="posts",
+    )
+    tags = models.ManyToManyField(Tag, blank=True, related_name="posts")
+
+    class Meta:
+        app_label = "relations_app"
+
+
+# --- nested-write fixtures ----------------------------------------------
+#
+# Catalog ──< Section ──< Item        (non-nullable FKs → orphans DELETE)
+#         └─< Note                     (nullable FK     → orphans UNLINK)
+# Section.tags is an m2m so a ChildSpec.m2m callback can be exercised.
+
+
+class Catalog(models.Model):
+    name = models.CharField(max_length=100)
+    attachments = GenericRelation("relations_app.Attachment")
+    annotations = GenericRelation(
+        "relations_app.Annotation",
+        content_type_field="kind",
+        object_id_field="row_id",
+    )
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Section(models.Model):
+    catalog = models.ForeignKey(Catalog, on_delete=models.CASCADE, related_name="sections")
+    title = models.CharField(max_length=100)
+    tags = models.ManyToManyField(Tag, blank=True, related_name="sections")
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Item(models.Model):
+    section = models.ForeignKey(Section, on_delete=models.CASCADE, related_name="items")
+    label = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Note(models.Model):
+    catalog = models.ForeignKey(
+        Catalog,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="notes",
+    )
+    body = models.CharField(max_length=200)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+# --- singular relation fixtures ------------------------------------------
+#
+# Post.author       forward FK,   nullable  → may be cleared
+# Profile.author    forward O2O,  nullable  → and Author.profile in reverse,
+#                                             whose nullable FK unlinks
+# Cover.catalog     non-nullable  → Catalog.cover in reverse deletes instead
+
+
+class Profile(models.Model):
+    author = models.OneToOneField(
+        Author,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="profile",
+    )
+    bio = models.CharField(max_length=200, default="")
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Cover(models.Model):
+    catalog = models.OneToOneField(Catalog, on_delete=models.CASCADE, related_name="cover")
+    image = models.CharField(max_length=200, default="")
+
+    class Meta:
+        app_label = "relations_app"
+
+
+# --- generic-relation fixtures -------------------------------------------
+#
+# Attachment  non-nullable link -> orphans DELETE
+# Annotation  nullable link     -> orphans UNLINK
+# Both hang off Catalog, so one parent exercises the pair.
+
+
+class Attachment(models.Model):
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    owner = GenericForeignKey("content_type", "object_id")
+    label = models.CharField(max_length=100)
+
+    class Meta:
+        app_label = "relations_app"
+
+
+class Annotation(models.Model):
+    # Spelled with non-default column names, so the spec's
+    # content_type_field / object_id_field are exercised rather than assumed.
+    kind = models.ForeignKey(
+        ContentType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    row_id = models.PositiveIntegerField(null=True, blank=True)
+    owner = GenericForeignKey("kind", "row_id")
+    text = models.CharField(max_length=200)
+
+    class Meta:
+        app_label = "relations_app"
