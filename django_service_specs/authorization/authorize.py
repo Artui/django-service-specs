@@ -46,9 +46,13 @@ def authorize(
             return grant
         raise NotPermitted("The grant does not cover this spec and principal.")
     if spec.permissions is None:
+        # Named by its run rather than by ``repr(spec)``: a frozen dataclass
+        # repr prints every field, which buries the one name that says which
+        # declaration to fix.
+        run = getattr(spec, "service", None) or getattr(spec, "selector", None)
         raise ImproperlyConfigured(
-            f"{spec} declares no permissions. Pass permissions=[Unrestricted()] to mean "
-            "that anyone may run it."
+            f"The {type(spec).__name__} for {getattr(run, '__qualname__', run)!s} declares "
+            "no permissions. Pass permissions=[Unrestricted()] to mean that anyone may run it."
         )
     for check in spec.permissions:
         if not check.has_permission(principal, spec):

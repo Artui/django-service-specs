@@ -31,7 +31,9 @@ def test_a_non_covering_grant_raises_not_permitted() -> None:
 
 def test_no_grant_and_no_declared_permissions_raises_improperly_configured() -> None:
     spec, principal = _spec(None), object()
-    with pytest.raises(ImproperlyConfigured, match="Unrestricted"):
+    with pytest.raises(
+        ImproperlyConfigured, match=r"(?s)for .* declares no permissions.*Unrestricted"
+    ):
         authorize(spec, principal)
 
 
