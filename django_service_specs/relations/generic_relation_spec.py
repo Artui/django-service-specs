@@ -67,7 +67,7 @@ class GenericRelationSpec(RelationSpec):
             and **deletes** otherwise; ``"unlink"`` and ``"delete"`` state it
             instead of deriving it, and ``"unlink"`` raises at write time unless
             both columns can hold ``NULL``. The rule also governs the
-            delete cascade.
+            delete cascade ([`delete_relations`][django_service_specs.mutations.delete_relations.delete_relations]).
         field_map: Forwarded to the row's own ``create_from_input`` /
             ``update_from_input`` call. It shapes that **write** and nothing
             else: matching and the primary-key guard both read the row

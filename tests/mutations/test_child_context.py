@@ -15,7 +15,7 @@ from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from tests.relations_app.models import Catalog, Item, Note, Section
 
@@ -79,12 +79,12 @@ class TestSyncHelpersIgnoreContext:
         assert change.updated == (keep.pk,)
         assert change.deleted == (orphan.pk,)
 
-    def test_delete_relations(self) -> None:
+    def test_cascade_owned(self) -> None:
         catalog = Catalog.objects.create(name="c")
         section = Section.objects.create(catalog=catalog, title="s")
         Item.objects.create(section=section, label="i")
         note = Note.objects.create(catalog=catalog, body="n")
-        deltas, _ = delete_relations(
+        deltas, _ = cascade_owned(
             catalog,
             {
                 "sections": ChildSpec(
@@ -130,11 +130,11 @@ class TestAsyncHelpersIgnoreContext:
         )
         assert not await Section.objects.filter(pk=orphan.pk).aexists()
 
-    async def test_adelete_relations(self) -> None:
+    async def test_acascade_owned(self) -> None:
         catalog = await Catalog.objects.acreate(name="c")
         section = await Section.objects.acreate(catalog=catalog, title="s")
         await Item.objects.acreate(section=section, label="i")
-        deltas, _ = await adelete_relations(
+        deltas, _ = await acascade_owned(
             catalog,
             {
                 "sections": ChildSpec(

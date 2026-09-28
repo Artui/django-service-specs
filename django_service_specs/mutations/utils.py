@@ -212,7 +212,7 @@ def changes_for_create(new_values: dict[str, Any]) -> tuple[FieldChange, ...]:
     )
 
 
-def _auto_now_field_names(instance: Model) -> tuple[str, ...]:
+def auto_now_field_names(instance: Model) -> tuple[str, ...]:
     """Return the names of all ``auto_now=True`` fields on the model."""
     return tuple(
         f.name for f in instance._meta.concrete_fields if hasattr(f, "auto_now") and f.auto_now
@@ -1750,7 +1750,7 @@ async def _aremove_orphans(
     return removals
 
 
-def delete_relations(
+def cascade_owned(
     parent: Model,
     relations: Mapping[str, RelationSpec],
     *,
@@ -1797,13 +1797,13 @@ def delete_relations(
     return (tuple(collections), tuple(singular))
 
 
-async def adelete_relations(
+async def acascade_owned(
     parent: Model,
     relations: Mapping[str, RelationSpec],
     *,
     context: Mapping[str, Any] | None = None,
 ) -> tuple[tuple[ChildCollectionChange, ...], tuple[RelatedObjectChange, ...]]:
-    """Async variant of ``delete_relations`` — same rule, awaited."""
+    """Async variant of ``cascade_owned`` — same rule, awaited."""
     collections: list[ChildCollectionChange] = []
     singular: list[RelatedObjectChange] = []
     for relation, spec in relations.items():
@@ -1825,7 +1825,7 @@ async def adelete_relations(
         else:
             raise _unknown_relation_kind(relation, spec)
         collections.append(collection)
-        # For the reason ``delete_relations`` gives.
+        # For the reason ``cascade_owned`` gives.
         sync_collection_cache(parent, collection, spec)
     return (tuple(collections), tuple(singular))
 
@@ -1842,7 +1842,7 @@ def _delete_owned_collection(
     nested = relation_map(spec.relations)
     removals: list[tuple[RelationOutcome, Any]] = []
     for child in getattr(parent, relation).all():
-        delete_relations(child, nested, context=context)
+        cascade_owned(child, nested, context=context)
         removals.append(
             _remove_one_child(child, spec, parent=parent, context=context, unlink=unlink)
         )
@@ -1861,7 +1861,7 @@ async def _adelete_owned_collection(
     nested = relation_map(spec.relations)
     removals: list[tuple[RelationOutcome, Any]] = []
     async for child in getattr(parent, relation).all():
-        await adelete_relations(child, nested, context=context)
+        await acascade_owned(child, nested, context=context)
         removals.append(
             await _aremove_one_child(
                 child, spec, relation=relation, parent=parent, context=context, unlink=unlink
@@ -1881,7 +1881,7 @@ def _delete_owned_row(
     row = spec.model.objects.filter(**{spec.fk: parent}).first()
     if row is None:
         return RelatedObjectChange(relation=relation)
-    delete_relations(row, relation_map(spec.relations), context=context)
+    cascade_owned(row, relation_map(spec.relations), context=context)
     status, pk = _remove_one_child(
         row, spec, parent=parent, context=context, unlink=_unlinks_orphans(spec, relation=relation)
     )
@@ -1899,7 +1899,7 @@ async def _adelete_owned_row(
     row = await spec.model.objects.filter(**{spec.fk: parent}).afirst()
     if row is None:
         return RelatedObjectChange(relation=relation)
-    await adelete_relations(row, relation_map(spec.relations), context=context)
+    await acascade_owned(row, relation_map(spec.relations), context=context)
     status, pk = await _aremove_one_child(
         row,
         spec,

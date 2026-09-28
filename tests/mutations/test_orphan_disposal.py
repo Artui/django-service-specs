@@ -16,7 +16,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
 from django_service_specs.relations.relation_orphan import RelationOrphan
@@ -195,7 +195,7 @@ class TestTheCascadeDisposesTheSameWay:
         catalog = Catalog.objects.create(name="c")
         note = Note.objects.create(catalog=catalog, body="n")
 
-        deltas, _ = delete_relations(catalog, _notes(orphan="delete"))
+        deltas, _ = cascade_owned(catalog, _notes(orphan="delete"))
 
         assert not Note.objects.filter(pk=note.pk).exists()
         assert deltas[0].deleted == (note.pk,)
@@ -204,7 +204,7 @@ class TestTheCascadeDisposesTheSameWay:
         catalog = Catalog.objects.create(name="c")
         note = Note.objects.create(catalog=catalog, body="n")
 
-        deltas, _ = delete_relations(catalog, _notes())
+        deltas, _ = cascade_owned(catalog, _notes())
 
         note.refresh_from_db()
         assert note.catalog_id is None
@@ -214,7 +214,7 @@ class TestTheCascadeDisposesTheSameWay:
         author = Author.objects.create(name="a")
         profile = Profile.objects.create(author=author, bio="b")
 
-        _, singular = delete_relations(
+        _, singular = cascade_owned(
             author,
             {"profile": ReverseOneToOneSpec(model=Profile, fk="author", orphan="delete")},
         )
@@ -227,7 +227,7 @@ class TestTheCascadeDisposesTheSameWay:
         Section.objects.create(catalog=catalog, title="s")
 
         with pytest.raises(ImproperlyConfigured, match="Section.catalog"):
-            delete_relations(catalog, _sections(orphan="unlink"))
+            cascade_owned(catalog, _sections(orphan="unlink"))
 
 
 @pytest.mark.django_db(transaction=True)
@@ -254,7 +254,7 @@ class TestTheAsyncPathDisposesIdentically:
         catalog = await Catalog.objects.acreate(name="c")
         note = await Note.objects.acreate(catalog=catalog, body="n")
 
-        deltas, _ = await adelete_relations(catalog, _notes(orphan="delete"))
+        deltas, _ = await acascade_owned(catalog, _notes(orphan="delete"))
 
         assert not await Note.objects.filter(pk=note.pk).aexists()
         assert deltas[0].deleted == (note.pk,)
@@ -263,7 +263,7 @@ class TestTheAsyncPathDisposesIdentically:
         author = await Author.objects.acreate(name="a")
         profile = await Profile.objects.acreate(author=author, bio="b")
 
-        _, singular = await adelete_relations(
+        _, singular = await acascade_owned(
             author,
             {"profile": ReverseOneToOneSpec(model=Profile, fk="author", orphan="delete")},
         )

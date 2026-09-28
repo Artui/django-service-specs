@@ -21,7 +21,7 @@ from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.relation_mode import RelationMode
@@ -425,7 +425,7 @@ class TestReverseOneToOne:
         catalog = Catalog.objects.create(name="c")
         cover = Cover.objects.create(catalog=catalog, image="i")
 
-        collections, singular = delete_relations(
+        collections, singular = cascade_owned(
             catalog, {"cover": ReverseOneToOneSpec(model=Cover, fk="catalog")}
         )
 
@@ -672,7 +672,7 @@ class TestAsyncSingularRelations:
         catalog = await Catalog.objects.acreate(name="c")
         cover = await Cover.objects.acreate(catalog=catalog, image="i")
 
-        _, singular = await adelete_relations(
+        _, singular = await acascade_owned(
             catalog, {"cover": ReverseOneToOneSpec(model=Cover, fk="catalog")}
         )
 

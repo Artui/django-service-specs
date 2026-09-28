@@ -98,8 +98,8 @@ class ChildSpec(RelationSpec):
             the spec changing. ``"unlink"`` against a non-nullable FK raises
             ``ImproperlyConfigured`` when the
             relation is written, since there is no link to blank. The same rule
-            governs the delete cascade,
-            which disposes of the same rows.
+            governs the delete cascade
+            ([`delete_relations`][django_service_specs.mutations.delete_relations.delete_relations]), which disposes of the same rows.
         field_map: Forwarded to the per-child ``create_from_input`` /
             ``update_from_input`` call, exactly as for the parent. It shapes that **write** and nothing else: matching, the
             primary-key guard and the parent link all read the row exactly as
@@ -132,7 +132,7 @@ class ChildSpec(RelationSpec):
         delete_service: Called as
             ``delete_service(*, instance, parent, **extras)``, replacing the
             unlink-or-delete rule for that row — both for orphan removal and
-            for the delete cascade. The
+            for the delete cascade ([`delete_relations`][django_service_specs.mutations.delete_relations.delete_relations]). The
             loop can no longer tell an unlink from a delete, so the pk is
             reported under
             ``ChildCollectionChange.removed``

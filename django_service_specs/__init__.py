@@ -17,11 +17,13 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.present import present
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
+from django_service_specs.mutations.adelete_relations import adelete_relations
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.change_result import ChangeResult
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
 from django_service_specs.mutations.create_from_input import create_from_input
+from django_service_specs.mutations.delete_relations import delete_relations
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
@@ -120,6 +122,7 @@ __all__ = [
     "Validator",
     "__version__",
     "acreate_from_input",
+    "adelete_relations",
     "adispatch",
     "apply_input",
     "apresent",
@@ -132,6 +135,7 @@ __all__ = [
     "check_arguments",
     "coerce_flat",
     "create_from_input",
+    "delete_relations",
     "dispatch",
     "is_async",
     "present",

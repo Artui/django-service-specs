@@ -21,8 +21,12 @@ runs, and the helpers own persistence only.
 - [`apply_input(instance, data)`][django_service_specs.mutations.apply_input.apply_input]
   sets the changed fields without saving, for a service that wants to see what
   the input would change before deciding to persist.
-- [`acreate_from_input`][django_service_specs.mutations.acreate_from_input.acreate_from_input]
-  and [`aupdate_from_input`][django_service_specs.mutations.aupdate_from_input.aupdate_from_input]
+- [`delete_relations(instance, relations=...)`][django_service_specs.mutations.delete_relations.delete_relations]
+  disposes of the rows `instance` owns, before a delete service removes
+  `instance` itself. See [Deleting](#deleting).
+- [`acreate_from_input`][django_service_specs.mutations.acreate_from_input.acreate_from_input],
+  [`aupdate_from_input`][django_service_specs.mutations.aupdate_from_input.aupdate_from_input]
+  and [`adelete_relations`][django_service_specs.mutations.adelete_relations.adelete_relations]
   are the async forms, for an `async def` service.
 
 `data` is a dataclass, a mapping, or an object with a `__dict__` - usually the
@@ -182,6 +186,40 @@ Every helper returns a
   and the `pk` it is about. `get_relation_change(name)` finds one.
 
 A `ChangeResult` is falsy when nothing changed.
+
+## Deleting
+
+A delete service that has to take a row's related rows with it calls
+`delete_relations` with the same map the writes use, then deletes the row:
+
+```python
+--8<--
+docs/examples/deleting.py:delete
+--8<--
+```
+
+The database's own cascade would remove these books as well, and report
+nothing. The helper matters where the database will not cascade, or should
+not be the one to:
+
+- **A `PROTECT` foreign key**, which refuses the parent's delete while a child
+  row exists.
+- **A soft delete**, which removes no row, so Django never cascades through it.
+  The instance outlives its cascade, and its cached relations are brought in
+  line with the removal, so it renders without the rows it lost.
+- **A row service**: a spec's `delete_service` sees each row go, which a
+  database cascade never calls.
+- **A report**: the returned `ChangeResult` names every row disposed of, as the
+  example returns them.
+
+The rule is the one a write follows when it removes a row, applied to every
+row the instance owns. A child, generic or reverse one-to-one row is disposed
+of after its own declared relations, so a non-nullable grandchild goes first,
+and each is deleted, unlinked or handed to its `delete_service` by the spec's
+`orphan` setting. A many-to-many loses its membership and its target rows
+survive. A forward relation is reported `untouched`: the row it points at is
+not the instance's, and refusing it would make a map that is right for writing
+impossible to cascade.
 
 ## Errors from a nested write
 

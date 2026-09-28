@@ -55,6 +55,7 @@ from docs.examples import (
     arguments,
     async_dispatch,
     declaring,
+    deleting,
     dispatching,
     quickstart,
     registry,
@@ -508,6 +509,15 @@ class TestRelations:
             }
         }
         assert Book.objects.filter(author=author).count() == 2
+
+    def test_a_delete_cascades_through_the_same_map_and_names_each_row(self, ada: Any) -> None:
+        author = self._create(ada).value
+        books = tuple(sorted(author.books.values_list("pk", flat=True)))
+        result = dispatch(deleting.delete_author_spec, principal=ada, arguments={"pk": author.pk})
+        assert result.kind == "instance"
+        assert tuple(sorted(result.value)) == books
+        assert not Author.objects.filter(pk=author.pk).exists()
+        assert not Book.objects.filter(pk__in=books).exists()
 
 
 class TestRegistry:

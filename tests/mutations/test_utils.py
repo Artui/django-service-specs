@@ -8,7 +8,7 @@ import pytest
 from django.core.exceptions import ObjectDoesNotExist
 
 from django_service_specs.mutations.utils import (
-    _auto_now_field_names,
+    auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
     filter_input,
@@ -107,13 +107,13 @@ class TestM2mTargetPks:
 
 class TestAutoNowFieldNames:
     def test_returns_auto_now_fields(self) -> None:
-        assert _auto_now_field_names(Timestamped()) == ("updated_at",)
+        assert auto_now_field_names(Timestamped()) == ("updated_at",)
 
     def test_excludes_auto_now_add(self) -> None:
-        assert "created_at" not in _auto_now_field_names(Timestamped())
+        assert "created_at" not in auto_now_field_names(Timestamped())
 
     def test_model_without_auto_now(self) -> None:
-        assert _auto_now_field_names(Author()) == ()
+        assert auto_now_field_names(Author()) == ()
 
 
 class TestResolveUpdateFields:

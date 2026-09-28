@@ -60,7 +60,7 @@ class ReverseOneToOneSpec(RelationSpec):
             instead, and ``"unlink"`` against a non-nullable ``fk`` raises
             ``ImproperlyConfigured`` at write time.
             It covers both removals there are: the ``None`` case above and the
-            delete cascade.
+            delete cascade ([`delete_relations`][django_service_specs.mutations.delete_relations.delete_relations]).
         field_map: Forwarded to the row's own ``create_from_input`` /
             ``update_from_input`` call. It shapes that **write** and nothing
             else: the row is found through ``fk`` and the parent link is

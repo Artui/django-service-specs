@@ -82,6 +82,8 @@ code; the subpackage paths are where each name is defined.
 ::: django_service_specs.mutations.update_from_input.update_from_input
 ::: django_service_specs.mutations.aupdate_from_input.aupdate_from_input
 ::: django_service_specs.mutations.apply_input.apply_input
+::: django_service_specs.mutations.delete_relations.delete_relations
+::: django_service_specs.mutations.adelete_relations.adelete_relations
 ::: django_service_specs.mutations.change_result.ChangeResult
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange

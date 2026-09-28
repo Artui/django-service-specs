@@ -10,7 +10,7 @@ from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from tests.relations_app.models import Catalog, Item, Note, Section, Tag
@@ -214,7 +214,7 @@ class TestDeleteChildren:
         section = Section.objects.create(catalog=catalog, title="s")
         item = Item.objects.create(section=section, label="i")
         note = Note.objects.create(catalog=catalog, body="n")
-        deltas, _ = delete_relations(
+        deltas, _ = cascade_owned(
             catalog,
             {
                 _SECTIONS: ChildSpec(
@@ -343,14 +343,14 @@ class TestWhatAPrefetchedCollectionReads:
         assert [t.name for t in result.instance.tags.all()] == ["new"]
 
     def test_a_soft_deleted_parent_outlives_its_own_cascade(self) -> None:
-        # delete_relations does not delete the parent, and a soft_delete flow
+        # cascade_owned does not delete the parent, and a soft_delete flow
         # renders exactly that row afterwards.
         catalog = Catalog.objects.create(name="c")
         Section.objects.create(catalog=catalog, title="s")
         catalog = Catalog.objects.prefetch_related(_SECTIONS).get()
         assert catalog.sections.count() == 1
 
-        delete_relations(catalog, _spec())
+        cascade_owned(catalog, _spec())
 
         assert list(catalog.sections.all()) == []
 
@@ -443,12 +443,12 @@ class TestAsyncChildren:
         )
         assert "renamed" in [s.title async for s in updated.instance.sections.all()]
 
-    async def test_adelete_relations_recursive(self) -> None:
+    async def test_acascade_owned_recursive(self) -> None:
         catalog = await Catalog.objects.acreate(name="c")
         section = await Section.objects.acreate(catalog=catalog, title="s")
         await Item.objects.acreate(section=section, label="i")
         note = await Note.objects.acreate(catalog=catalog, body="n")
-        deltas, _ = await adelete_relations(
+        deltas, _ = await acascade_owned(
             catalog,
             {
                 _SECTIONS: ChildSpec(

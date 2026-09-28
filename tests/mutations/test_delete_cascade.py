@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
@@ -46,7 +46,7 @@ class TestWhatTheParentOwnsGoes:
         attachment = catalog.attachments.create(label="a")
         annotation = catalog.annotations.create(text="n")
 
-        collections, singular = delete_relations(
+        collections, singular = cascade_owned(
             catalog,
             {
                 "attachments": GenericRelationSpec(model=Attachment),
@@ -68,7 +68,7 @@ class TestWhatTheParentOwnsGoes:
         author = Author.objects.create(name="a")
         profile = Profile.objects.create(author=author, bio="b")
 
-        _, singular = delete_relations(
+        _, singular = cascade_owned(
             author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")}
         )
 
@@ -80,7 +80,7 @@ class TestWhatTheParentOwnsGoes:
     def test_a_reverse_one_to_one_the_parent_does_not_have_is_untouched(self) -> None:
         author = Author.objects.create(name="a")
 
-        _, singular = delete_relations(
+        _, singular = cascade_owned(
             author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")}
         )
 
@@ -97,7 +97,7 @@ class TestWhatTheParentOwnsGoes:
         section = Section.objects.create(catalog=catalog, title="s")
         item = Item.objects.create(section=section, label="i")
 
-        delete_relations(
+        cascade_owned(
             catalog,
             {
                 "sections": ChildSpec(
@@ -109,7 +109,7 @@ class TestWhatTheParentOwnsGoes:
         )
         # The singular kind follows its own tree the same way, and a spec that
         # declares none is the ordinary case rather than a separate branch.
-        delete_relations(author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")})
+        cascade_owned(author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")})
 
         assert not Item.objects.filter(pk=item.pk).exists()
         assert not Section.objects.filter(pk=section.pk).exists()
@@ -126,7 +126,7 @@ class TestWhatTheParentOnlyPointsAtStays:
         post.tags.add(tag)
         other.tags.add(tag)
 
-        collections, _ = delete_relations(post, {"tags": ManyToManySpec(model=Tag)})
+        collections, _ = cascade_owned(post, {"tags": ManyToManySpec(model=Tag)})
 
         assert collections[0].unlinked == (tag.pk,)
         assert (collections[0].deleted, collections[0].removed) == ((), ())
@@ -138,7 +138,7 @@ class TestWhatTheParentOnlyPointsAtStays:
         author = Author.objects.create(name="a")
         post = Post.objects.create(title="t", author=author)
 
-        _, singular = delete_relations(post, {"author": ForwardRelationSpec(model=Author)})
+        _, singular = cascade_owned(post, {"author": ForwardRelationSpec(model=Author)})
 
         assert (singular[0].relation, singular[0].outcome) == ("author", "untouched")
         assert not singular[0]
@@ -150,7 +150,7 @@ class TestWhatTheParentOnlyPointsAtStays:
         catalog = Catalog.objects.create(name="c")
 
         with pytest.raises(ImproperlyConfigured, match=r"relations\['mystery'\]: _UnknownKind"):
-            delete_relations(catalog, {"mystery": _UnknownKind()})
+            cascade_owned(catalog, {"mystery": _UnknownKind()})
 
 
 @pytest.mark.django_db(transaction=True)
@@ -163,7 +163,7 @@ class TestTheAsyncCascadeFollowsTheSameRule:
         tag = await Tag.objects.acreate(name="shared")
         await section.tags.aadd(tag)
 
-        collections, singular = await adelete_relations(
+        collections, singular = await acascade_owned(
             catalog,
             {
                 "sections": ChildSpec(
@@ -190,7 +190,7 @@ class TestTheAsyncCascadeFollowsTheSameRule:
             label="a", content_type=await _content_type(Catalog), object_id=catalog.pk
         )
 
-        collections, singular = await adelete_relations(
+        collections, singular = await acascade_owned(
             catalog,
             {
                 "attachments": GenericRelationSpec(model=Attachment),
@@ -205,7 +205,7 @@ class TestTheAsyncCascadeFollowsTheSameRule:
     async def test_a_reverse_one_to_one_the_parent_does_not_have(self) -> None:
         author = await Author.objects.acreate(name="a")
 
-        _, singular = await adelete_relations(
+        _, singular = await acascade_owned(
             author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")}
         )
 
@@ -215,7 +215,7 @@ class TestTheAsyncCascadeFollowsTheSameRule:
         catalog = await Catalog.objects.acreate(name="c")
 
         with pytest.raises(ImproperlyConfigured, match=r"relations\['mystery'\]"):
-            await adelete_relations(catalog, {"mystery": _UnknownKind()})
+            await acascade_owned(catalog, {"mystery": _UnknownKind()})
 
 
 async def _content_type(model: type[Any]) -> Any:

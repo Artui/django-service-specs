@@ -53,13 +53,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declaring an argument by that name is refused rather than left to meet the
   seed in one pool.
 - Relation writes: `ChildSpec`, `ForwardRelationSpec`, `ReverseOneToOneSpec`,
-  `ManyToManySpec` and `GenericRelationSpec`, applied by `create_from_input()`,
-  `update_from_input()`, `apply_input()` and their async forms, with a
-  `ChangeResult` describing what changed. A row's refusal, a
-  `ServiceValidationError` or an `InvalidArguments`, is re-rooted under its own
-  address and keeps its class, and Django's own write failures on a row become
-  `InvalidArguments` there. Any other error raised by a row service, a `scope`
-  or an `m2m` callable passes through untouched, at any depth, and so does an
+  `ManyToManySpec` and `GenericRelationSpec`, declared in one `relations=` map
+  and applied by `create_from_input()`, `update_from_input()` and their async
+  forms, with a `ChangeResult` describing what changed. Each spec takes its
+  required fields by position and everything else by keyword. `apply_input()`
+  sets a row's changed fields without saving.
+- `delete_relations()` and `adelete_relations()`: the cascade a delete service
+  runs before removing a row, through the same map the writes use, where the
+  database will not cascade or should not be the one to - a `PROTECT` key, a
+  soft delete, a row service that must see each row go. Owned rows are
+  disposed of by each spec's `orphan` rule, a many-to-many loses only its
+  membership, and a forward relation is left alone.
+- A relation write refuses at the row. A `ServiceValidationError` or an
+  `InvalidArguments` from a row is re-rooted under the row's address and keeps
+  its class, and Django's own write failures on a row become `InvalidArguments`
+  there. Any other error raised by a row service, a `scope` or an `m2m`
+  callable passes through untouched, at any depth, and so does an
   `IntegrityError`.
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.

@@ -8,11 +8,11 @@ from typing import Any
 
 from django_service_specs.mutations.change_result import ChangeResult, ModelT
 from django_service_specs.mutations.utils import (
-    _auto_now_field_names,
     aapply_forward_relations,
     aapply_m2m,
     aapply_relations,
     am2m_changes,
+    auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
     extract_relation_data,
@@ -60,7 +60,7 @@ async def aupdate_from_input(
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=False)
     changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
     save_fields: list[str] | None = resolve_update_fields(
-        update_fields, changed_field_names, _auto_now_field_names(instance)
+        update_fields, changed_field_names, auto_now_field_names(instance)
     )
     if field_changes or update_fields is False:
         if save_fields is None:

@@ -17,7 +17,7 @@ from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import adelete_relations, delete_relations
+from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.services.run_service import run_service
 from tests.relations_app.models import Catalog, Item, Note, Section
@@ -223,7 +223,7 @@ class TestDeleteService:
         def archive(*, instance: Section, parent: Any, user: Any) -> None:
             archived.append((instance.pk, parent, user))
 
-        deltas, _ = delete_relations(
+        deltas, _ = cascade_owned(
             catalog,
             {
                 "sections": ChildSpec(
@@ -363,7 +363,7 @@ class TestAsyncChildServices:
         await orphan.arefresh_from_db()
         assert orphan.catalog_id == catalog.pk
 
-        deltas, _ = await adelete_relations(
+        deltas, _ = await acascade_owned(
             catalog,
             {"notes": ChildSpec(model=Note, fk="catalog", delete_service=archive)},
             context={},
@@ -430,4 +430,4 @@ class TestTheAsyncLoopRefusesASyncSlot:
         with pytest.raises(
             ImproperlyConfigured, match=r"relations\['notes'\]: delete_service is a sync callable"
         ):
-            await adelete_relations(catalog, notes, context={})
+            await acascade_owned(catalog, notes, context={})
