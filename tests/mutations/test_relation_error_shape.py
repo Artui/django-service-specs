@@ -1,6 +1,6 @@
 """A collection's row error has the tree ``InvalidArguments`` documents.
 
-A caller validating rows and writing them through ``children=`` receives both
+A caller validating rows and writing them through ``relations=`` receives both
 refusals from one dispatch, so the two have to agree on how a failing row is
 addressed: keyed by its ``int`` index, only the rows that failed, and a message
 about the row itself under ``non_field_errors`` inside it. There is one form,
@@ -37,7 +37,7 @@ class TestTheTreeIsTheKernelsOwn:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": _ROWS},
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section, fk="catalog", create_service=_refuses_the_rude_row
                     )

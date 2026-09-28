@@ -16,12 +16,11 @@ from django_service_specs.mutations.utils import (
     extract_relation_data,
     filter_input,
     m2m_changes,
-    merge_relations,
     reject_m2m_overlap,
+    relation_map,
     resolve_update_fields,
     sync_relation_cache,
 )
-from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -33,7 +32,6 @@ def update_from_input(
     exclude_fields: list[str] | None = None,
     m2m: dict[str, Any] | None = None,
     update_fields: bool | list[str] = True,
-    children: Mapping[str, ChildSpec] | None = None,
     relations: Mapping[str, RelationSpec] | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> ChangeResult[ModelT]:
@@ -46,13 +44,14 @@ def update_from_input(
     perform a full save, or an explicit list to control exactly which columns
     are written (no auto-injection in that case).
 
-    ``m2m`` assigns many-to-many rows that already exist;
+    ``m2m`` assigns many-to-many rows that already exist, and only where the set
+    of primary keys differs from the current one;
     [`ManyToManySpec`][django_service_specs.relations.many_to_many_spec.ManyToManySpec]
     in ``relations`` writes the target rows from the payload instead. A relation named
     by both is refused rather than written twice.
 
-    ``relations`` maps a relation name to the spec for its kind (``children``
-    is the reverse-FK alias). The nested payload from ``data[relation]`` is
+    ``relations`` maps a relation name to the spec for its kind, one map for
+    every kind. The nested payload from ``data[relation]`` is
     reconciled with what is already there — create / update / orphan-remove per
     the spec — and a relation the input omits is left untouched. Kinds are
     written in the order their class dictates, so a forward foreign key is
@@ -65,13 +64,12 @@ def update_from_input(
     related object is replaced with the row that was written — and dropped where
     the write removed it — rather than left holding pre-write values.
 
-    ``context`` is an **opaque** mapping forwarded verbatim into the pool of any
-    per-child service a
-    [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] declares; this
+    ``context`` is an **opaque** mapping forwarded verbatim into the pool of every
+    row service and ``scope`` callable the relation specs declare; this
     helper never reads it. See
     [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input].
     """
-    relation_specs = merge_relations(children, relations)
+    relation_specs = relation_map(relations)
     reject_m2m_overlap(m2m, relation_specs)
     raw: dict[str, Any] = coerce_to_dict(data)
     relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)

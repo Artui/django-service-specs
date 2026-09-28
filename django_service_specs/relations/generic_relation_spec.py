@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Any, ClassVar
 
 from django.db.models import Model
 
-from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.relation_mode import RelationMode
 from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
@@ -60,26 +59,6 @@ class GenericRelationSpec(RelationSpec):
             [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] states.
         mode: ``"replace"`` (the default) removes the rows the incoming set
             leaves out, ``"merge"`` upserts only.
-        field_map: Forwarded to the row's own ``create_from_input`` /
-            ``update_from_input`` call. It shapes that **write** and nothing
-            else: matching and the primary-key guard both read the row
-            exactly as it arrived, so renaming a key here does not change
-            which row the payload matches.
-        exclude_fields: Forwarded likewise. Excluding the ``match_key`` does not stop the row
-            matching on it, and a matched row's primary key is dropped from
-            the write for you, so there is no need to name it here.
-        m2m: Forwarded likewise.
-        children: Forwarded likewise.
-        relations: Forwarded likewise.
-        create_service: Optional service replacing that call, with the contract
-            [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] states; its ``data``
-            already carries both link columns. Declaring it alongside the
-            row-shaping fields above raises at construction.
-        update_service: The same; returning ``None`` means "use the in-memory
-            instance".
-        delete_service: Replaces the unlink-or-delete rule below, so the outcome
-            is reported as ``"removed"`` and an explicit ``orphan`` beside it
-            raises.
         orphan: What removing a row *does* —
             [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec]'s rule applied to the
             pair of link columns rather than to one, since half a link is not a
@@ -89,25 +68,44 @@ class GenericRelationSpec(RelationSpec):
             instead of deriving it, and ``"unlink"`` raises at write time unless
             both columns can hold ``NULL``. The rule also governs the
             delete cascade.
+        field_map: Forwarded to the row's own ``create_from_input`` /
+            ``update_from_input`` call. It shapes that **write** and nothing
+            else: matching and the primary-key guard both read the row
+            exactly as it arrived, so renaming a key here does not change
+            which row the payload matches.
+        exclude_fields: Forwarded likewise. Excluding the ``match_key`` does not stop the row
+            matching on it, and a matched row's primary key is dropped from
+            the write for you, so there is no need to name it here.
+        m2m: Forwarded likewise.
+        relations: Forwarded likewise — the row's own relations, of any kind.
+        create_service: Optional service replacing that call, with the contract
+            [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] states; its ``data``
+            already carries both link columns. Declaring it alongside the
+            row-shaping fields above raises at construction.
+        update_service: The same; returning ``None`` means "use the in-memory
+            instance".
+        delete_service: Replaces the unlink-or-delete rule above, so the outcome
+            is reported as ``"removed"`` and an explicit ``orphan`` beside it
+            raises.
     """
 
     write_phase: ClassVar[RelationPhase] = RelationPhase.GENERIC
 
     model: type[Model]
+    # Every option is keyword-only, for the reason ``RelationSpec`` gives.
+    _: KW_ONLY
     content_type_field: str = "content_type"
     object_id_field: str = "object_id"
     match_key: str = "pk"
     mode: RelationMode | str = RelationMode.REPLACE
+    orphan: RelationOrphan | str = RelationOrphan.AUTO
     field_map: dict[str, str] | None = None
     exclude_fields: list[str] | None = None
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None
-    children: Mapping[str, ChildSpec] | None = None
     relations: Mapping[str, RelationSpec] | None = None
     create_service: Callable[..., Any] | None = None
     update_service: Callable[..., Any] | None = None
     delete_service: Callable[..., Any] | None = None
-    # Declared last, for the reason given on ``ChildSpec``.
-    orphan: RelationOrphan | str = RelationOrphan.AUTO
 
     def __post_init__(self) -> None:
         validate_pk_field_map(
@@ -130,7 +128,6 @@ class GenericRelationSpec(RelationSpec):
                 "field_map": self.field_map,
                 "exclude_fields": self.exclude_fields,
                 "m2m": self.m2m,
-                "children": self.children,
                 "relations": self.relations,
             },
         )

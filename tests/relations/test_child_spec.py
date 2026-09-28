@@ -21,7 +21,7 @@ class TestChildSpec:
         assert spec.mode == "replace"
         assert spec.orphan == "auto"
         assert spec.m2m is None
-        assert spec.children is None
+        assert spec.relations is None
 
     def test_merge_mode_allowed(self) -> None:
         assert ChildSpec(model=Section, fk="catalog", mode="merge").mode == "merge"
@@ -45,16 +45,16 @@ class TestChildSpec:
 class TestServiceReplacesTheHelper:
     """A row service and the knobs configuring the helper call it replaces."""
 
-    def test_create_service_with_children_is_refused(self) -> None:
+    def test_create_service_with_nested_relations_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured) as excinfo:
             ChildSpec(
                 model=Section,
                 fk="catalog",
                 create_service=_service,
-                children={"items": ChildSpec(model=Item, fk="section")},
+                relations={"items": ChildSpec(model=Item, fk="section")},
             )
         message = str(excinfo.value)
-        assert "ChildSpec: create_service declared alongside children" in message
+        assert "ChildSpec: create_service declared alongside relations" in message
         assert "silently ignored" in message
         # The remedy names both directions, and says what is *not* affected.
         assert "drop the service" in message
@@ -76,7 +76,7 @@ class TestServiceReplacesTheHelper:
             {"field_map": {"heading": "title"}},
             {"exclude_fields": ["title"]},
             {"m2m": lambda row: {}},
-            {"children": {"items": ChildSpec(model=Item, fk="section")}},
+            {"relations": {"items": ChildSpec(model=Item, fk="section")}},
         ):
             with pytest.raises(ImproperlyConfigured):
                 ChildSpec(model=Section, fk="catalog", create_service=_service, **knob)
@@ -102,7 +102,7 @@ class TestServiceReplacesTheHelper:
             fk="catalog",
             delete_service=_service,
             field_map={"heading": "title"},
-            children={"items": ChildSpec(model=Item, fk="section")},
+            relations={"items": ChildSpec(model=Item, fk="section")},
         )
         assert spec.delete_service is _service
 

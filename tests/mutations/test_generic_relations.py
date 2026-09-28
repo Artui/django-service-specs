@@ -104,7 +104,7 @@ class TestTheParentsContentTypeAndKeyAreInjected:
                     model=Section,
                     fk="catalog",
                     m2m=lambda row: {"tags": [tag]},
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
         )

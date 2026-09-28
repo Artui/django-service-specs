@@ -10,10 +10,12 @@ class RelationOutcome(str, Enum):
     [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
     reports.
 
-    A collection reports four tuples of primary keys, which is the honest shape
+    A collection reports five tuples of primary keys, which is the honest shape
     for many rows and a poor one for a relation that holds exactly one: every
-    tuple would be empty or a one-tuple, and "which of the four is non-empty" is
-    a worse way to say what happened than saying it.
+    tuple would be empty or a one-tuple, and "which of the five is non-empty" is
+    a worse way to say what happened than saying it. So only the one-row kinds
+    report an outcome — a forward relation and a reverse one-to-one — and a
+    collection, many-to-many included, reports its tuples.
 
     Inheriting from ``str`` keeps the value JSON-serializable and lets a caller
     compare against the plain string, matching
@@ -21,10 +23,12 @@ class RelationOutcome(str, Enum):
     """
 
     UNTOUCHED = "untouched"
-    """The input omitted the relation, or asked to clear one already empty.
+    """Nothing was written to the relation.
 
-    Nothing was read or written, and this is what :meth:`RelatedObjectChange.
-    __bool__` reports as falsy.
+    The input omitted it, or set a reverse one-to-one that holds no row to
+    ``None``. It is the one outcome for which a
+    [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
+    is falsy.
     """
 
     CREATED = "created"
@@ -36,23 +40,29 @@ class RelationOutcome(str, Enum):
     CLEARED = "cleared"
     """A forward relation was set to ``None``.
 
-    The parent's foreign-key column changed and the row it used to point at was
-    not touched, because a forward target is not owned by the parent and may be
-    shared. The change carries no primary key: nothing happened to a row.
+    The parent's foreign-key column is assigned ``None`` and the row it pointed
+    at, if any, is not touched, because a forward target is not owned by the
+    parent and may be shared. The change carries no primary key: nothing
+    happened to a row. It is reported whether or not the column held a value;
+    whether the column moved is ``ChangeResult.changes``' to say.
     """
 
     UNLINKED = "unlinked"
-    """A reverse row's foreign key was set to ``None``.
+    """A reverse one-to-one row was kept and its foreign key set to ``None``.
 
-    Because the foreign key is nullable, mirroring ``on_delete=SET_NULL``. Also
-    what a dropped many-to-many member reports, since the target is shared and
-    only the membership went.
+    Mirroring ``on_delete=SET_NULL``. The spec's ``orphan`` decides between this
+    and ``DELETED``: ``"unlink"`` always, ``"auto"`` when the foreign key is
+    nullable. A member a many-to-many drops is not reported here: that kind is a
+    collection, so the member's pk lands in
+    [`ChildCollectionChange.unlinked`][django_service_specs.mutations.child_collection_change.ChildCollectionChange].
     """
 
     DELETED = "deleted"
-    """A reverse row was deleted, because its foreign key is not nullable.
+    """A reverse one-to-one row was deleted.
 
-    Mirroring ``on_delete=CASCADE``.
+    Mirroring ``on_delete=CASCADE``. The spec's ``orphan`` decides between this
+    and ``UNLINKED``: ``"delete"`` always, whether or not the foreign key could
+    have been blanked, and ``"auto"`` when it is not nullable.
     """
 
     REMOVED = "removed"

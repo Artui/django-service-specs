@@ -27,7 +27,9 @@ class RelationSpec:
 
     Subclasses are frozen dataclasses; this base deliberately declares no
     fields, so each kind spells out its own and no kind inherits a knob that
-    means nothing for it.
+    means nothing for it. Each takes its required fields positionally and every
+    option by keyword only, so ``ChildSpec(Book, "author", mode="merge")`` names
+    what it sets and an option added to a kind moves no other argument.
     """
 
     write_phase: ClassVar[RelationPhase]

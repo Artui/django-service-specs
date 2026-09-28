@@ -33,11 +33,11 @@ class TestCreateChildren:
                     {"title": "s1", "items": [{"label": "i1"}, {"label": "i2"}]},
                 ],
             },
-            children={
+            relations={
                 _SECTIONS: ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
         )
@@ -56,7 +56,7 @@ class TestCreateChildren:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s", "tags": [tag.pk]}]},
-            children={
+            relations={
                 _SECTIONS: ChildSpec(
                     model=Section,
                     fk="catalog",
@@ -75,7 +75,7 @@ class TestCreateChildren:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children={
+            relations={
                 _SECTIONS: ChildSpec(model=Section, fk="catalog", m2m={"tags": [tag]}),
             },
         )
@@ -89,7 +89,7 @@ class TestCreateChildren:
         update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "renamed"}]},
-            children={
+            relations={
                 _SECTIONS: ChildSpec(model=Section, fk="catalog", m2m={"tags": [tag]}),
             },
         )
@@ -97,7 +97,7 @@ class TestCreateChildren:
         assert list(section.tags.all()) == [tag]
 
     def test_omitted_relation_creates_nothing(self) -> None:
-        result = create_from_input(Catalog, {"name": "c"}, children=_spec())
+        result = create_from_input(Catalog, {"name": "c"}, relations=_spec())
         assert result.instance.sections.count() == 0
         assert not result.get_child_change("sections")
 
@@ -111,7 +111,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": keep.pk, "title": "kept"}, {"title": "new"}]},
-            children=_spec(),
+            relations=_spec(),
         )
         keep.refresh_from_db()
         assert keep.title == "kept"
@@ -130,7 +130,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"notes": [{"pk": keep.pk, "body": "keep"}]},
-            children={"notes": ChildSpec(model=Note, fk="catalog")},
+            relations={"notes": ChildSpec(model=Note, fk="catalog")},
         )
         orphan.refresh_from_db()
         assert orphan.catalog_id is None  # nullable → unlinked
@@ -143,13 +143,13 @@ class TestUpdateReplace:
     def test_empty_list_removes_all(self) -> None:
         catalog = Catalog.objects.create(name="c")
         Section.objects.create(catalog=catalog, title="a")
-        update_from_input(catalog, {"sections": []}, children=_spec())
+        update_from_input(catalog, {"sections": []}, relations=_spec())
         assert catalog.sections.count() == 0
 
     def test_omitted_relation_left_untouched(self) -> None:
         catalog = Catalog.objects.create(name="c")
         Section.objects.create(catalog=catalog, title="a")
-        result = update_from_input(catalog, {"name": "c2"}, children=_spec())
+        result = update_from_input(catalog, {"name": "c2"}, relations=_spec())
         assert catalog.sections.count() == 1
         catalog.refresh_from_db()
         assert catalog.name == "c2"
@@ -161,7 +161,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"sections": [{"title": "alpha"}]},
-            children=_spec(match_key="title"),
+            relations=_spec(match_key="title"),
         )
         assert catalog.sections.count() == 1  # matched by title → updated, not duplicated
         change = result.get_child_change("sections")
@@ -171,7 +171,7 @@ class TestUpdateReplace:
     def test_children_only_change_is_truthy(self) -> None:
         catalog = Catalog.objects.create(name="c")
         result = update_from_input(
-            catalog, {"name": "c", "sections": [{"title": "s"}]}, children=_spec()
+            catalog, {"name": "c", "sections": [{"title": "s"}]}, relations=_spec()
         )
         assert result.changes == ()  # name unchanged
         assert bool(result) is True  # but a child was created
@@ -181,7 +181,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"sections": [], "notes": []},
-            children={
+            relations={
                 "sections": ChildSpec(model=Section, fk="catalog"),
                 "notes": ChildSpec(model=Note, fk="catalog"),
             },
@@ -198,7 +198,7 @@ class TestUpdateMerge:
         catalog = Catalog.objects.create(name="c")
         orphan = Section.objects.create(catalog=catalog, title="orphan")
         result = update_from_input(
-            catalog, {"sections": [{"title": "new"}]}, children=_spec(mode="merge")
+            catalog, {"sections": [{"title": "new"}]}, relations=_spec(mode="merge")
         )
         assert Section.objects.filter(pk=orphan.pk).exists()  # merge never deletes
         change = result.get_child_change("sections")
@@ -220,7 +220,7 @@ class TestDeleteChildren:
                 _SECTIONS: ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
                 "notes": ChildSpec(model=Note, fk="catalog"),
             },
@@ -252,7 +252,7 @@ class TestWhatAPrefetchedCollectionReads:
         assert [s.title for s in catalog.sections.all()] == ["old"]
 
         result = update_from_input(
-            catalog, {"sections": [{"title": "new"}]}, children=_spec(mode="merge")
+            catalog, {"sections": [{"title": "new"}]}, relations=_spec(mode="merge")
         )
 
         assert sorted(s.title for s in result.instance.sections.all()) == ["new", "old"]
@@ -265,7 +265,7 @@ class TestWhatAPrefetchedCollectionReads:
         assert catalog.sections.count() == 2
 
         result = update_from_input(
-            catalog, {"sections": [{"pk": keep.pk, "title": "keep"}]}, children=_spec()
+            catalog, {"sections": [{"pk": keep.pk, "title": "keep"}]}, relations=_spec()
         )
 
         assert [s.title for s in result.instance.sections.all()] == ["keep"]
@@ -282,7 +282,7 @@ class TestWhatAPrefetchedCollectionReads:
         assert [s.title for s in catalog.sections.all()] == ["old"]
 
         result = update_from_input(
-            catalog, {"sections": [{"pk": section.pk, "title": "new"}]}, children=_spec()
+            catalog, {"sections": [{"pk": section.pk, "title": "new"}]}, relations=_spec()
         )
 
         with django_assert_num_queries(0):
@@ -294,7 +294,7 @@ class TestWhatAPrefetchedCollectionReads:
         catalog = Catalog.objects.prefetch_related(_SECTIONS).get()
         assert [s.title for s in catalog.sections.all()] == ["old"]
 
-        result = update_from_input(catalog, {"name": "c2"}, children=_spec())
+        result = update_from_input(catalog, {"name": "c2"}, relations=_spec())
 
         with django_assert_num_queries(0):
             assert [s.title for s in result.instance.sections.all()] == ["old"]
@@ -317,7 +317,7 @@ class TestWhatAPrefetchedCollectionReads:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "new"}]},
-            children=_spec(update_service=rename),
+            relations=_spec(update_service=rename),
         )
 
         assert [s.title for s in result.instance.sections.all()] == ["new"]
@@ -367,13 +367,13 @@ class TestAsyncChildren:
                     {"title": "s", "tags": [tag.pk], "items": [{"label": "i"}]},
                 ],
             },
-            children={
+            relations={
                 _SECTIONS: ChildSpec(
                     model=Section,
                     fk="catalog",
                     exclude_fields=["tags"],
                     m2m=lambda row: {"tags": row.get("tags", [])},
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
         )
@@ -393,7 +393,7 @@ class TestAsyncChildren:
                 "sections": [{"pk": keep.pk, "title": "kept"}, {"title": "new"}],
                 "notes": [],
             },
-            children={
+            relations={
                 _SECTIONS: ChildSpec(model=Section, fk="catalog"),
                 "notes": ChildSpec(model=Note, fk="catalog"),
             },
@@ -410,14 +410,14 @@ class TestAsyncChildren:
         catalog = await Catalog.objects.acreate(name="c")
         orphan = await Section.objects.acreate(catalog=catalog, title="orphan")
         await aupdate_from_input(
-            catalog, {"sections": [{"title": "new"}]}, children=_spec(mode="merge")
+            catalog, {"sections": [{"title": "new"}]}, relations=_spec(mode="merge")
         )
         assert await Section.objects.filter(pk=orphan.pk).aexists()
 
     async def test_aupdate_omitted_relation_untouched(self) -> None:
         catalog = await Catalog.objects.acreate(name="c")
         await Section.objects.acreate(catalog=catalog, title="a")
-        await aupdate_from_input(catalog, {"name": "c2"}, children=_spec())
+        await aupdate_from_input(catalog, {"name": "c2"}, relations=_spec())
         assert await catalog.sections.acount() == 1
 
     async def test_a_prefetched_collection_reads_what_was_written(self) -> None:
@@ -429,7 +429,7 @@ class TestAsyncChildren:
         assert [s.title async for s in catalog.sections.all()] == ["old"]
 
         added = await aupdate_from_input(
-            catalog, {"sections": [{"title": "new"}]}, children=_spec(mode="merge")
+            catalog, {"sections": [{"title": "new"}]}, relations=_spec(mode="merge")
         )
         assert sorted([s.title async for s in added.instance.sections.all()]) == ["new", "old"]
 
@@ -439,7 +439,7 @@ class TestAsyncChildren:
         updated = await aupdate_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "renamed"}]},
-            children=_spec(mode="merge"),
+            relations=_spec(mode="merge"),
         )
         assert "renamed" in [s.title async for s in updated.instance.sections.all()]
 
@@ -454,7 +454,7 @@ class TestAsyncChildren:
                 _SECTIONS: ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
                 "notes": ChildSpec(model=Note, fk="catalog"),
             },

@@ -91,7 +91,7 @@ class TestACollectionSaysWhichRow:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "ok"}, {"title": "rude"}, {"title": "fine"}]},
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section,
                         fk="catalog",
@@ -111,7 +111,7 @@ class TestACollectionSaysWhichRow:
             update_from_input(
                 catalog,
                 {"sections": [{"title": "new"}, {"pk": section.pk, "title": "rude"}]},
-                children={
+                relations={
                     "sections": ChildSpec(model=Section, fk="catalog", update_service=_refuses())
                 },
             )
@@ -206,7 +206,7 @@ class TestASingularRelationSaysItsName:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "rude"}]},
-                children={
+                relations={
                     "sections": ChildSpec(model=Section, fk="catalog", create_service=_refuses())
                 },
             )
@@ -223,11 +223,11 @@ class TestTheNamesNest:
                     "name": "c",
                     "sections": [{"title": "s", "items": [{"label": "ok"}, {"label": "rude"}]}],
                 },
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section,
                         fk="catalog",
-                        children={
+                        relations={
                             "items": ChildSpec(
                                 model=Item,
                                 fk="section",
@@ -251,7 +251,7 @@ class TestTheNamesNest:
             update_from_input(
                 catalog,
                 {"sections": [{"pk": 4242, "title": "t"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
         detail = excinfo.value.detail
         assert isinstance(detail, dict)
@@ -271,11 +271,11 @@ class TestTheNamesNest:
                         {"title": "b", "items": [{"label": "ok"}, {"pk": 4242, "label": "x"}]},
                     ],
                 },
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section,
                         fk="catalog",
-                        children={"items": ChildSpec(model=Item, fk="section")},
+                        relations={"items": ChildSpec(model=Item, fk="section")},
                     )
                 },
             )
@@ -305,7 +305,7 @@ class TestAnUnmatchedReferenceSaysWhichRow:
             update_from_input(
                 catalog,
                 {"sections": [{"title": "new"}, {"pk": stranger.pk, "title": "mine"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
         detail = excinfo.value.detail
         assert isinstance(detail, dict)
@@ -322,7 +322,7 @@ class TestAnUnmatchedReferenceSaysWhichRow:
             await aupdate_from_input(
                 catalog,
                 {"sections": [{"title": "new"}, {"pk": stranger.pk, "title": "mine"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
         detail = excinfo.value.detail
         assert isinstance(detail, dict)
@@ -370,7 +370,7 @@ class TestWhatTheServiceSaidSurvives:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t"}]},
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section, fk="catalog", create_service=_refuses("Too rude.")
                     )
@@ -406,7 +406,7 @@ class TestWhatTheServiceSaidSurvives:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t"}]},
-                children={
+                relations={
                     "sections": ChildSpec(model=Section, fk="catalog", create_service=service)
                 },
             )
@@ -420,7 +420,7 @@ class TestWhatTheServiceSaidSurvives:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t"}]},
-                children={
+                relations={
                     "sections": ChildSpec(model=Section, fk="catalog", create_service=service)
                 },
             )
@@ -433,7 +433,7 @@ class TestTheAsyncPathReportsIdentically:
             await acreate_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "ok"}, {"title": "rude"}]},
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section,
                         fk="catalog",
@@ -469,11 +469,11 @@ class TestTheAsyncPathReportsIdentically:
                     "name": "c",
                     "sections": [{"title": "s", "items": [{"label": "ok"}, {"label": "rude"}]}],
                 },
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section,
                         fk="catalog",
-                        children={
+                        relations={
                             "items": ChildSpec(
                                 model=Item,
                                 fk="section",
@@ -503,7 +503,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "ok"}, {"title": "t", "bogus": 1}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
         assert list(excinfo.value.detail["sections"]) == [1]
@@ -517,7 +517,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             create_from_input(
                 Author,
                 {"name": "a", "posts": [{"title": "t", "published": "maybe"}]},
-                children={"posts": ChildSpec(model=Post, fk="author")},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
             )
 
         [message] = excinfo.value.detail["posts"][0]["non_field_errors"]
@@ -535,7 +535,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
         assert excinfo.value.detail == {"sections": {0: {"title": ["Not this one."]}}}
@@ -552,7 +552,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
         assert excinfo.value is conflict
@@ -564,7 +564,7 @@ def _nested_items(**item_spec: Any) -> dict[str, ChildSpec]:
         "sections": ChildSpec(
             model=Section,
             fk="catalog",
-            children={"items": ChildSpec(model=Item, fk="section", **item_spec)},
+            relations={"items": ChildSpec(model=Item, fk="section", **item_spec)},
         )
     }
 
@@ -590,7 +590,7 @@ class TestCallerCodeIsNeverTranslated:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "s", "items": [{"label": "i"}]}]},
-                children=_nested_items(create_service=service),
+                relations=_nested_items(create_service=service),
             )
 
         assert excinfo.value is bug
@@ -608,7 +608,7 @@ class TestCallerCodeIsNeverTranslated:
             update_from_input(
                 catalog,
                 {"sections": [{"pk": section.pk, "items": [{"label": "i"}]}]},
-                children=_nested_items(create_service=service),
+                relations=_nested_items(create_service=service),
             )
 
         assert excinfo.value is bug
@@ -624,7 +624,7 @@ class TestCallerCodeIsNeverTranslated:
             create_from_input(
                 Author,
                 {"name": "a", "posts": [{"title": "p", "tags": [{"pk": tag.pk}]}]},
-                children={
+                relations={
                     "posts": ChildSpec(
                         model=Post,
                         fk="author",
@@ -648,7 +648,7 @@ class TestCallerCodeIsNeverTranslated:
                 relations={
                     "author": ForwardRelationSpec(
                         model=Author,
-                        children={"posts": ChildSpec(model=Post, fk="author", m2m=m2m)},
+                        relations={"posts": ChildSpec(model=Post, fk="author", m2m=m2m)},
                     )
                 },
             )
@@ -668,7 +668,7 @@ class TestTheAsyncPathLeavesCallerCodeAlone:
             await acreate_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "s", "items": [{"label": "i"}]}]},
-                children=_nested_items(create_service=service),
+                relations=_nested_items(create_service=service),
             )
 
         assert excinfo.value is bug
@@ -685,7 +685,7 @@ class TestTheAsyncPathLeavesCallerCodeAlone:
             await aupdate_from_input(
                 catalog,
                 {"sections": [{"pk": section.pk, "items": [{"label": "i"}]}]},
-                children=_nested_items(create_service=service),
+                relations=_nested_items(create_service=service),
             )
 
         assert excinfo.value is bug
@@ -697,7 +697,7 @@ class TestTheAsyncPathLeavesCallerCodeAlone:
             await acreate_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "t", "bogus": 1}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
         [message] = excinfo.value.detail["sections"][0]["non_field_errors"]

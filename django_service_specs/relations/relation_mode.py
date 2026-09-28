@@ -13,9 +13,8 @@ class RelationMode(str, Enum):
     business — a child row is unlinked or deleted, a many-to-many target is only
     dropped from the relation — but *when* it happens is this one flag.
 
-    Inheriting from ``str`` keeps the value JSON-serializable and means the
-    plain strings this field accepted before it was an enum still work, in a
-    comparison and as an argument.
+    Inheriting from ``str`` keeps the value JSON-serializable and means a plain
+    string works wherever the member does, in a comparison and as an argument.
     """
 
     REPLACE = "replace"

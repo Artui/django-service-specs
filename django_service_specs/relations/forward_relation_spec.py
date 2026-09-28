@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Any, ClassVar
 
 from django.db.models import Model, QuerySet
 
-from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.utils import (
@@ -91,8 +90,7 @@ class ForwardRelationSpec(RelationSpec):
             matching on it, and a matched row's primary key is dropped from
             the write for you, so there is no need to name it here.
         m2m: Forwarded likewise — the target's own many-to-many assignments.
-        children: Forwarded likewise.
-        relations: Forwarded likewise.
+        relations: Forwarded likewise — the target's own relations, of any kind.
         create_service: Optional service replacing that call, for a target whose
             write has behaviour of its own. It receives ``data`` plus the caller
             context — but **no ``parent``**: a forward target is written before
@@ -106,12 +104,13 @@ class ForwardRelationSpec(RelationSpec):
     write_phase: ClassVar[RelationPhase] = RelationPhase.FORWARD
 
     model: type[Model]
+    # Every option is keyword-only, for the reason ``RelationSpec`` gives.
+    _: KW_ONLY
     match_key: str = "pk"
     scope: QuerySet[Any] | Callable[..., QuerySet[Any]] | None = None
     field_map: dict[str, str] | None = None
     exclude_fields: list[str] | None = None
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None
-    children: Mapping[str, ChildSpec] | None = None
     relations: Mapping[str, RelationSpec] | None = None
     create_service: Callable[..., Any] | None = None
     update_service: Callable[..., Any] | None = None
@@ -133,7 +132,6 @@ class ForwardRelationSpec(RelationSpec):
                 "field_map": self.field_map,
                 "exclude_fields": self.exclude_fields,
                 "m2m": self.m2m,
-                "children": self.children,
                 "relations": self.relations,
             },
         )

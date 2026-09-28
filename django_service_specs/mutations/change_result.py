@@ -24,21 +24,28 @@ class ChangeResult(Generic[ModelT]):
     /
     [`acreate_from_input`][django_service_specs.mutations.acreate_from_input.acreate_from_input].
     ``changes`` records every field whose value actually differed from its prior value
-    (or from ``UNSET`` for creates). ``children`` carries one
-    [`ChildCollectionChange`][django_service_specs.mutations.child_collection_change.ChildCollectionChange]
-    per reverse-FK collection written via the ``children=`` argument — empty for the
-    common no-nested-write case.
+    (or from ``UNSET`` for creates).
 
+    Every relation declared in ``relations=`` reports in one of two fields, chosen by
+    the relation's shape. ``children`` carries one
+    [`ChildCollectionChange`][django_service_specs.mutations.child_collection_change.ChildCollectionChange]
+    per **collection**: a reverse-FK
+    [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec], a
+    [`GenericRelationSpec`][django_service_specs.relations.generic_relation_spec.GenericRelationSpec]
+    and a
+    [`ManyToManySpec`][django_service_specs.relations.many_to_many_spec.ManyToManySpec].
     ``relations`` carries one
     [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
-    per **singular** relation written via ``relations=`` (forward FK / one-to-one,
-    reverse one-to-one). The split is by shape, not by keyword: a collection reports
-    tuples of pks and a one-row relation reports an outcome, so they are different
-    carriers, and a reverse-FK collection declared through ``relations=`` still reports
-    under ``children`` exactly as it does through ``children=``. A forward relation
-    shows up **twice** and means two different things — here as the row that was created
-    or matched, and in ``changes`` as the parent's foreign-key column, which only
-    appears if it actually changed.
+    per **one-row** relation: a
+    [`ForwardRelationSpec`][django_service_specs.relations.forward_relation_spec.ForwardRelationSpec]
+    and a
+    [`ReverseOneToOneSpec`][django_service_specs.relations.reverse_one_to_one_spec.ReverseOneToOneSpec].
+    A collection reports tuples of pks and a one-row relation reports an outcome, so
+    they are different carriers. Both are empty when no relation is declared, and a
+    declared relation the input omits still gets its entry, reporting nothing.
+    A forward relation shows up **twice** and means two different things — here as
+    what happened to the row it points at, and in ``changes`` as the parent's
+    foreign-key column, which only appears if it actually changed.
 
     The class is generic over the concrete model type: callers that pass
     ``Author`` into a mutation helper get back a ``ChangeResult[Author]``

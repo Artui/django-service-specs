@@ -37,8 +37,8 @@ def validate_relation_orphan(orphan: str, *, delete_service: Any, label: str) ->
 
     A ``delete_service`` replaces the unlink-or-delete rule outright, so an
     explicit ``orphan`` beside one would decide nothing and be silently ignored.
-    ``AUTO`` is exempt because it states nothing — it is what every spec written
-    before the field existed carries.
+    ``AUTO`` is exempt because it states nothing — it is the default, carried by
+    every spec that does not mention ``orphan`` at all.
     """
     if orphan not in VALID_RELATION_ORPHANS:
         raise ValueError(f"{label}.orphan must be one of {VALID_RELATION_ORPHANS}; got {orphan!r}.")

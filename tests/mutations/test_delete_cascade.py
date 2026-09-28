@@ -88,9 +88,9 @@ class TestWhatTheParentOwnsGoes:
         assert singular[0].outcome == "untouched"
 
     def test_the_rows_own_relations_go_first(self) -> None:
-        # A grandchild declared through relations= is cascaded exactly as one
-        # declared through children=: the cascade follows the same tree the
-        # write path does.
+        # A grandchild declared in the child spec's relations= goes before the
+        # child it points at: the cascade follows the same tree the write path
+        # does.
         author = Author.objects.create(name="a")
         profile = Profile.objects.create(author=author, bio="b")
         catalog = Catalog.objects.create(name="c")
@@ -169,8 +169,10 @@ class TestTheAsyncCascadeFollowsTheSameRule:
                 "sections": ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
-                    relations={"tags": ManyToManySpec(model=Tag)},
+                    relations={
+                        "items": ChildSpec(model=Item, fk="section"),
+                        "tags": ManyToManySpec(model=Tag),
+                    },
                 ),
                 "cover": ReverseOneToOneSpec(model=Cover, fk="catalog"),
             },

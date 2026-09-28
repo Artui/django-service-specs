@@ -1,8 +1,8 @@
 """The relation taxonomy: one map, one ordering rule, one driver.
 
-``children=`` keeps meaning what it shipped meaning, ``relations=`` says the
-same thing for every kind, and the order rows are written in comes off the spec
-*class* — never off the order the mapping happens to be spelled in.
+``relations=`` is the one map for every kind, and the order rows are written in
+comes off the spec *class* — never off the order the mapping happens to be
+spelled in.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.mutations.utils import (
     POST_SAVE_PHASES,
-    merge_relations,
     post_save_relations,
+    relation_map,
     relations_in_phase,
 )
 from django_service_specs.relations.child_spec import ChildSpec
@@ -81,45 +81,24 @@ class TestWriteOrderComesOffTheClass:
 
 
 class TestOneMap:
-    def test_children_is_the_reverse_fk_alias(self) -> None:
-        assert merge_relations({"sections": _SECTIONS}, None) == {"sections": _SECTIONS}
-        assert merge_relations(None, {"sections": _SECTIONS}) == {"sections": _SECTIONS}
+    def test_no_map_is_no_relations(self) -> None:
+        assert relation_map(None) == {}
 
-    def test_both_maps_combine(self) -> None:
-        assert merge_relations({"sections": _SECTIONS}, {"notes": _NOTES}) == {
-            "sections": _SECTIONS,
-            "notes": _NOTES,
-        }
-
-    def test_neither_is_no_relations(self) -> None:
-        assert merge_relations(None, None) == {}
-
-    def test_a_name_in_both_maps_is_refused(self) -> None:
-        with pytest.raises(ImproperlyConfigured) as excinfo:
-            merge_relations({"sections": _SECTIONS}, {"sections": _SECTIONS})
-        message = str(excinfo.value)
-        assert "relations['sections'] is also declared in children=" in message
-        assert "not a second pass" in message
-
-    def test_a_non_spec_value_is_refused_by_the_keyword_it_came_from(self) -> None:
+    def test_a_non_spec_value_is_refused_naming_the_relation(self) -> None:
         with pytest.raises(ImproperlyConfigured, match=r"relations\['sections'\] is a dict"):
-            merge_relations(None, {"sections": {"model": Section}})  # type: ignore[arg-type]
-        with pytest.raises(ImproperlyConfigured, match=r"children\['sections'\] is a str"):
-            merge_relations({"sections": "Section"}, None)  # type: ignore[arg-type]
+            relation_map({"sections": {"model": Section}})  # type: ignore[arg-type]
+        with pytest.raises(ImproperlyConfigured, match=r"relations\['sections'\] is a str"):
+            relation_map({"sections": "Section"})  # type: ignore[arg-type]
 
 
 @pytest.mark.django_db
 class TestTheDriverIsTheSameOnEveryPath:
-    def test_relations_writes_what_children_writes_on_create(self) -> None:
+    def test_relations_writes_a_child_collection_on_create(self) -> None:
         payload: dict[str, Any] = {"name": "c", "sections": [{"title": "s"}]}
-        by_alias = create_from_input(Catalog, dict(payload), children={"sections": _SECTIONS})
-        by_map = create_from_input(Catalog, dict(payload), relations={"sections": _SECTIONS})
-        assert by_alias.get_child_change("sections").created == (
-            by_alias.instance.sections.get().pk,
-        )
-        assert by_map.get_child_change("sections").created == (by_map.instance.sections.get().pk,)
+        result = create_from_input(Catalog, payload, relations={"sections": _SECTIONS})
+        assert result.get_child_change("sections").created == (result.instance.sections.get().pk,)
 
-    def test_relations_writes_what_children_writes_on_update(self) -> None:
+    def test_relations_writes_a_child_collection_on_update(self) -> None:
         catalog = Catalog.objects.create(name="c")
         section = Section.objects.create(catalog=catalog, title="old")
         result = update_from_input(
@@ -131,12 +110,11 @@ class TestTheDriverIsTheSameOnEveryPath:
         section.refresh_from_db()
         assert section.title == "new"
 
-    def test_both_keywords_at_once(self) -> None:
+    def test_two_collections_in_one_map(self) -> None:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}], "notes": [{"body": "n"}]},
-            children={"sections": _SECTIONS},
-            relations={"notes": _NOTES},
+            relations={"sections": _SECTIONS, "notes": _NOTES},
         )
         assert result.instance.sections.count() == 1
         assert result.instance.notes.count() == 1
@@ -151,7 +129,7 @@ class TestTheDriverIsTheSameOnEveryPath:
         with pytest.raises(ImproperlyConfigured, match=r"relations\['owner'\]: _ForwardKind"):
             create_from_input(Catalog, {"name": "c"}, relations={"owner": _ForwardKind()})
 
-    def test_a_grandchild_map_may_be_declared_as_relations(self) -> None:
+    def test_a_grandchild_is_declared_in_the_childs_relations(self) -> None:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s", "items": [{"label": "i"}]}]},
@@ -169,7 +147,7 @@ class TestTheDriverIsTheSameOnEveryPath:
 
 @pytest.mark.django_db(transaction=True)
 class TestTheDriverIsTheSameOnTheAsyncPath:
-    async def test_relations_writes_what_children_writes(self) -> None:
+    async def test_relations_writes_a_child_collection(self) -> None:
         result = await acreate_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},

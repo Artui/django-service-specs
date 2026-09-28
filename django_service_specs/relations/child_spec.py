@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Any, ClassVar
 
 from django.db.models import Model
@@ -33,10 +33,10 @@ class ChildSpec(RelationSpec):
     [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]
     /
     [`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input]
-    (and their async siblings) — or in ``children=``, which is the same map under the
-    reverse-FK kind's own name. The incoming child rows are read from ``data[relation_name]``; each child
-    is persisted by running it back through the same mutation helpers, so scalar / m2m /
-    nested semantics compose recursively. The whole parent + children write runs inside
+    (and their async siblings). The incoming child rows are read from
+    ``data[relation_name]``; each child is persisted by running it back through
+    the same mutation helpers, so scalar / m2m / nested semantics compose
+    recursively. The whole parent + children write runs inside
     the service's atomic block; validating the arguments stays with the spec's Validator,
     which dispatch runs before the service — the helper owns persistence only.
 
@@ -57,9 +57,9 @@ class ChildSpec(RelationSpec):
     slot, before it runs.
 
     A declared slot owns that row **entirely**: ``field_map``,
-    ``exclude_fields``, ``m2m`` and the nested ``children`` / ``relations``
-    maps configure the default mutation-helper call, so a ``create_service`` /
-    ``update_service`` standing in for it makes them dead configuration.
+    ``exclude_fields``, ``m2m`` and the nested ``relations`` map configure the
+    default mutation-helper call, so a ``create_service`` / ``update_service``
+    standing in for it makes them dead configuration.
     Declaring both raises
     ``ImproperlyConfigured`` at construction rather
     than dropping them quietly. ``delete_service`` is exempt — it replaces the
@@ -87,6 +87,19 @@ class ChildSpec(RelationSpec):
         mode: ``"replace"`` matches incoming to existing, creates new, updates
             matched, and removes orphans (existing children absent from the
             incoming set); ``"merge"`` upserts only and never removes.
+        orphan: What removing an orphan *does*, where ``mode`` says whether one
+            is removed at all. ``"auto"`` derives it from the schema:
+            **unlinked** (its ``fk`` set to ``None``) when the FK is nullable,
+            else **deleted**, mirroring ``on_delete=SET_NULL`` vs ``CASCADE``.
+            ``"unlink"`` and ``"delete"`` say it outright, for a spec that means
+            one of them rather than whichever the column happens to allow — a
+            later migration adding ``null=True`` would otherwise turn a
+            destructive ``"replace"`` into a non-destructive one with nothing in
+            the spec changing. ``"unlink"`` against a non-nullable FK raises
+            ``ImproperlyConfigured`` when the
+            relation is written, since there is no link to blank. The same rule
+            governs the delete cascade,
+            which disposes of the same rows.
         field_map: Forwarded to the per-child ``create_from_input`` /
             ``update_from_input`` call, exactly as for the parent. It shapes that **write** and nothing else: matching, the
             primary-key guard and the parent link all read the row exactly as
@@ -95,15 +108,16 @@ class ChildSpec(RelationSpec):
         exclude_fields: Forwarded to the per-child call, as ``field_map`` is. Excluding the ``match_key`` does not stop the row
             matching on it, and a matched row's primary key is dropped from
             the write for you, so there is no need to name it here.
-        m2m: Callable ``(child_row) -> mapping`` deriving the child's
-            many-to-many assignments from its incoming row — the per-child
-            analogue of the helpers' own ``m2m=``.
-        children: Nested ``{relation_name: ChildSpec}`` map for grandchildren;
-            recursion follows the declared tree, so depth is bounded by how
-            deeply you nest specs.
-        relations: The same nesting for every other relation kind — a
+        m2m: The child's own many-to-many assignments — the per-child analogue
+            of the helpers' ``m2m=``, and like it, rows that already exist. A
+            static mapping (``{"tags": [tag1, tag2]}``) gives every child the
+            same; a callable ``(child_row) -> mapping`` derives them from each
+            incoming row.
+        relations: The child's own relations, of any kind — a
             ``{relation_name: RelationSpec}`` map applied to each child row
-            exactly as the top-level ``relations=`` is applied to the parent.
+            exactly as the top-level ``relations=`` is applied to the parent,
+            so a ``ChildSpec`` here writes grandchildren. Recursion follows the
+            declared tree, so depth is bounded by how deeply you nest specs.
         create_service: Per-row service replacing the default mutation-helper
             call, for a child whose write has real behaviour (side effects,
             derived columns, events, an external call). Called as
@@ -125,38 +139,24 @@ class ChildSpec(RelationSpec):
             rather than guessed into one of the two. It *is* the disposal, so
             declaring it beside an explicit ``orphan`` raises at construction:
             the flag would decide nothing.
-        orphan: What removing an orphan *does*, where ``mode`` says whether one
-            is removed at all. ``"auto"`` derives it from the schema:
-            **unlinked** (its ``fk`` set to ``None``) when the FK is nullable,
-            else **deleted**, mirroring ``on_delete=SET_NULL`` vs ``CASCADE``.
-            ``"unlink"`` and ``"delete"`` say it outright, for a spec that means
-            one of them rather than whichever the column happens to allow — a
-            later migration adding ``null=True`` would otherwise turn a
-            destructive ``"replace"`` into a non-destructive one with nothing in
-            the spec changing. ``"unlink"`` against a non-nullable FK raises
-            ``ImproperlyConfigured`` when the
-            relation is written, since there is no link to blank. The same rule
-            governs the delete cascade,
-            which disposes of the same rows.
     """
 
     write_phase: ClassVar[RelationPhase] = RelationPhase.REVERSE
 
     model: type[Model]
     fk: str
+    # Every option is keyword-only, for the reason ``RelationSpec`` gives.
+    _: KW_ONLY
     match_key: str = "pk"
     mode: RelationMode | str = RelationMode.REPLACE
+    orphan: RelationOrphan | str = RelationOrphan.AUTO
     field_map: dict[str, str] | None = None
     exclude_fields: list[str] | None = None
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None
-    children: Mapping[str, ChildSpec] | None = None
     relations: Mapping[str, RelationSpec] | None = None
     create_service: Callable[..., Any] | None = None
     update_service: Callable[..., Any] | None = None
     delete_service: Callable[..., Any] | None = None
-    # Declared last, beneath the services it is checked against, so adding it
-    # does not renumber the positional arguments of a spec class that shipped.
-    orphan: RelationOrphan | str = RelationOrphan.AUTO
 
     def __post_init__(self) -> None:
         validate_pk_field_map(
@@ -177,7 +177,6 @@ class ChildSpec(RelationSpec):
                 "field_map": self.field_map,
                 "exclude_fields": self.exclude_fields,
                 "m2m": self.m2m,
-                "children": self.children,
                 "relations": self.relations,
             },
         )

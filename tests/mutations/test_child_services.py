@@ -41,7 +41,7 @@ class TestCreateService:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children=_sections(create_service=create_section),
+            relations=_sections(create_service=create_section),
             context={"user": _USER, "progress": "reporter"},
         )
         catalog = result.instance
@@ -65,7 +65,7 @@ class TestCreateService:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children=_sections(create_service=create_section),
+            relations=_sections(create_service=create_section),
             context={"data": "hijacked", "parent": "hijacked", "instance": "hijacked"},
         )
         assert seen["data"] == {"title": "s", "catalog": result.instance}
@@ -81,7 +81,7 @@ class TestCreateService:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children=_sections(create_service=create_section),
+            relations=_sections(create_service=create_section),
             context={"user": _USER, "tenant": object()},
         )
         assert result.instance.sections.get().title == "s"
@@ -97,7 +97,7 @@ class TestCreateService:
         update_from_input(
             catalog,
             {"sections": [{"title": "new"}]},
-            children=_sections(create_service=create_section),
+            relations=_sections(create_service=create_section),
         )
         assert calls == [catalog]
         assert catalog.sections.get().title == "new"
@@ -120,7 +120,7 @@ class TestUpdateService:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "new"}]},
-            children=_sections(update_service=update_section),
+            relations=_sections(update_service=update_section),
             context={"user": _USER},
         )
         assert seen["user"] == _USER
@@ -142,7 +142,7 @@ class TestUpdateService:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "new"}]},
-            children=_sections(update_service=update_section),
+            relations=_sections(update_service=update_section),
         )
         assert result.get_child_change("sections").updated == (section.pk,)
         section.refresh_from_db()
@@ -159,7 +159,7 @@ class TestUpdateService:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": section.pk}, {"pk": replacement.pk}]},
-            children=_sections(update_service=update_section, mode="merge"),
+            relations=_sections(update_service=update_section, mode="merge"),
         )
         assert result.get_child_change("sections").updated == (replacement.pk, replacement.pk)
 
@@ -174,7 +174,7 @@ class TestUpdateService:
         update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "new"}]},
-            children=_sections(update_service=update_section),
+            relations=_sections(update_service=update_section),
             context={"instance": "hijacked", "data": "hijacked", "parent": "hijacked"},
         )
         assert seen["instance"] == section
@@ -198,7 +198,7 @@ class TestDeleteService:
         result = update_from_input(
             catalog,
             {"notes": []},
-            children={"notes": ChildSpec(model=Note, fk="catalog", delete_service=archive)},
+            relations={"notes": ChildSpec(model=Note, fk="catalog", delete_service=archive)},
             context={"user": _USER},
         )
         assert seen["user"] == _USER
@@ -230,7 +230,7 @@ class TestDeleteService:
                     model=Section,
                     fk="catalog",
                     delete_service=archive,
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
             context={"user": _USER},
@@ -260,7 +260,7 @@ class TestNoSavepointPerRow:
             create_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "s"}]},
-                children=_sections(create_service=create_section),
+                relations=_sections(create_service=create_section),
             )
             # The contrast: what an ``atomic=True`` invocation would have cost.
             run_service(probe, {}, atomic=True)
@@ -281,7 +281,7 @@ class TestAsyncChildServices:
         result = await acreate_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children=_sections(create_service=create_section),
+            relations=_sections(create_service=create_section),
             context={"user": _USER, "data": "hijacked", "parent": "hijacked"},
         )
         catalog = result.instance
@@ -303,7 +303,7 @@ class TestAsyncChildServices:
             await acreate_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "s"}]},
-                children=_sections(create_service=create_section),
+                relations=_sections(create_service=create_section),
             )
         assert await Section.objects.acount() == 1
 
@@ -321,7 +321,7 @@ class TestAsyncChildServices:
         result = await aupdate_from_input(
             catalog,
             {"sections": [{"pk": section.pk}]},
-            children=_sections(update_service=update_section),
+            relations=_sections(update_service=update_section),
             context={"user": _USER, "instance": "hijacked"},
         )
         assert seen["instance"] == section
@@ -340,7 +340,7 @@ class TestAsyncChildServices:
         result = await aupdate_from_input(
             catalog,
             {"sections": [{"pk": section.pk}]},
-            children=_sections(update_service=update_section, mode="merge"),
+            relations=_sections(update_service=update_section, mode="merge"),
         )
         assert result.get_child_change("sections").updated == (section.pk,)
 
@@ -355,7 +355,7 @@ class TestAsyncChildServices:
         result = await aupdate_from_input(
             catalog,
             {"notes": []},
-            children={"notes": ChildSpec(model=Note, fk="catalog", delete_service=archive)},
+            relations={"notes": ChildSpec(model=Note, fk="catalog", delete_service=archive)},
         )
         assert archived == [(orphan.pk, catalog)]
         assert result.get_child_change("notes").removed == (orphan.pk,)
@@ -395,7 +395,7 @@ class TestTheAsyncLoopRefusesASyncSlot:
             await acreate_from_input(
                 Catalog,
                 {"name": "c", "sections": [{"title": "s"}]},
-                children=_sections(create_service=create_section),
+                relations=_sections(create_service=create_section),
             )
         assert ran == []
 
@@ -413,7 +413,7 @@ class TestTheAsyncLoopRefusesASyncSlot:
             await aupdate_from_input(
                 catalog,
                 {"sections": [{"pk": section.pk, "title": "t"}]},
-                children=_sections(update_service=update_section, mode="merge"),
+                relations=_sections(update_service=update_section, mode="merge"),
             )
 
     async def test_a_delete_service(self) -> None:
@@ -426,7 +426,7 @@ class TestTheAsyncLoopRefusesASyncSlot:
         with pytest.raises(
             ImproperlyConfigured, match=r"relations\['notes'\]: delete_service is a sync callable"
         ):
-            await aupdate_from_input(catalog, {"notes": []}, children=notes)
+            await aupdate_from_input(catalog, {"notes": []}, relations=notes)
         with pytest.raises(
             ImproperlyConfigured, match=r"relations\['notes'\]: delete_service is a sync callable"
         ):

@@ -73,7 +73,7 @@ class TestAMatchedRowMayCarryItsOwnKey:
         update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "renamed"}]},
-            children={"sections": ChildSpec(model=Section, fk="catalog")},
+            relations={"sections": ChildSpec(model=Section, fk="catalog")},
         )
 
         section.refresh_from_db()
@@ -134,7 +134,7 @@ class TestTheAsyncWritersAgree:
             await aupdate_from_input(
                 author,
                 {"posts": [{"pk": post.pk, "views": "not-a-number"}]},
-                children={"posts": ChildSpec(model=Post, fk="author")},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
             )
 
         [message] = excinfo.value.detail["posts"][0]["non_field_errors"]
@@ -160,7 +160,7 @@ class TestOnlyTheKeyIsDropped:
         update_from_input(
             catalog,
             {"sections": [{"title": "original"}, {"title": "second"}]},
-            children={"sections": ChildSpec(model=Section, fk="catalog", match_key="title")},
+            relations={"sections": ChildSpec(model=Section, fk="catalog", match_key="title")},
         )
 
         section.refresh_from_db()
@@ -197,7 +197,7 @@ class TestOnlyTheKeyIsDropped:
             update_from_input(
                 catalog,
                 {"sections": [{"pk": 4242, "title": "x"}]},
-                children={"sections": ChildSpec(model=Section, fk="catalog")},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
         assert "did not match" in str(excinfo.value.detail)
@@ -251,7 +251,7 @@ class TestAFieldMapOntoTheKeyIsRefusedWhereItWouldBeUnreachable:
         update_from_input(
             catalog,
             {"sections": [{"title": "s", "ident": section.pk}]},
-            children={
+            relations={
                 "sections": ChildSpec(
                     model=Section, fk="catalog", match_key="title", field_map={"ident": "pk"}
                 )
@@ -279,7 +279,7 @@ class TestARowsWriteFailsAsThatRow:
             update_from_input(
                 author,
                 {"posts": [{"title": "a"}, {"title": "b", "views": "not-a-number"}]},
-                children={"posts": ChildSpec(model=Post, fk="author")},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
             )
 
         detail = excinfo.value.detail
@@ -299,7 +299,7 @@ class TestARowsWriteFailsAsThatRow:
             update_from_input(
                 author,
                 {"posts": [{"pk": post.pk, "views": "not-a-number"}]},
-                children={"posts": ChildSpec(model=Post, fk="author")},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
             )
 
         [message] = excinfo.value.detail["posts"][0]["non_field_errors"]
@@ -318,7 +318,7 @@ class TestARowsWriteFailsAsThatRow:
             update_from_input(
                 catalog,
                 {"sections": [{"pk": section.pk, "title": "renamed"}]},
-                children={
+                relations={
                     "sections": ChildSpec(
                         model=Section, fk="catalog", update_service=update_service
                     )

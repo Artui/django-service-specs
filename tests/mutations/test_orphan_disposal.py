@@ -49,7 +49,7 @@ class TestTheDerivedRuleIsUnchanged:
         catalog = Catalog.objects.create(name="c")
         note = Note.objects.create(catalog=catalog, body="orphan")
 
-        result = update_from_input(catalog, {"notes": []}, children=_notes())
+        result = update_from_input(catalog, {"notes": []}, relations=_notes())
 
         note.refresh_from_db()
         assert note.catalog_id is None
@@ -59,7 +59,7 @@ class TestTheDerivedRuleIsUnchanged:
         catalog = Catalog.objects.create(name="c")
         section = Section.objects.create(catalog=catalog, title="orphan")
 
-        result = update_from_input(catalog, {"sections": []}, children=_sections())
+        result = update_from_input(catalog, {"sections": []}, relations=_sections())
 
         assert not Section.objects.filter(pk=section.pk).exists()
         assert result.get_child_change("sections").deleted == (section.pk,)
@@ -72,7 +72,7 @@ class TestStatingItOverridesTheDerivation:
         note = Note.objects.create(catalog=catalog, body="orphan")
 
         result = update_from_input(
-            catalog, {"notes": []}, children=_notes(orphan=RelationOrphan.DELETE)
+            catalog, {"notes": []}, relations=_notes(orphan=RelationOrphan.DELETE)
         )
 
         # The FK is nullable, so the derived rule would have unlinked it.
@@ -84,7 +84,7 @@ class TestStatingItOverridesTheDerivation:
         catalog = Catalog.objects.create(name="c")
         note = Note.objects.create(catalog=catalog, body="orphan")
 
-        update_from_input(catalog, {"notes": []}, children=_notes(orphan="delete"))
+        update_from_input(catalog, {"notes": []}, relations=_notes(orphan="delete"))
 
         assert not Note.objects.filter(pk=note.pk).exists()
 
@@ -92,7 +92,7 @@ class TestStatingItOverridesTheDerivation:
         catalog = Catalog.objects.create(name="c")
         note = Note.objects.create(catalog=catalog, body="orphan")
 
-        result = update_from_input(catalog, {"notes": []}, children=_notes(orphan="unlink"))
+        result = update_from_input(catalog, {"notes": []}, relations=_notes(orphan="unlink"))
 
         note.refresh_from_db()
         assert note.catalog_id is None
@@ -140,7 +140,7 @@ class TestUnlinkNeedsALinkItCanBlank:
         section = Section.objects.create(catalog=catalog, title="orphan")
 
         with pytest.raises(ImproperlyConfigured) as excinfo:
-            update_from_input(catalog, {"sections": []}, children=_sections(orphan="unlink"))
+            update_from_input(catalog, {"sections": []}, relations=_sections(orphan="unlink"))
 
         message = str(excinfo.value)
         assert "relations['sections']" in message  # the relation
@@ -183,7 +183,7 @@ class TestUnlinkNeedsALinkItCanBlank:
         section = Section.objects.create(catalog=catalog, title="kept")
 
         update_from_input(
-            catalog, {"sections": []}, children=_sections(mode="merge", orphan="unlink")
+            catalog, {"sections": []}, relations=_sections(mode="merge", orphan="unlink")
         )
 
         assert Section.objects.filter(pk=section.pk).exists()
@@ -236,7 +236,7 @@ class TestTheAsyncPathDisposesIdentically:
         catalog = await Catalog.objects.acreate(name="c")
         note = await Note.objects.acreate(catalog=catalog, body="orphan")
 
-        result = await aupdate_from_input(catalog, {"notes": []}, children=_notes(orphan="delete"))
+        result = await aupdate_from_input(catalog, {"notes": []}, relations=_notes(orphan="delete"))
 
         assert not await Note.objects.filter(pk=note.pk).aexists()
         assert result.get_child_change("notes").deleted == (note.pk,)
@@ -246,7 +246,9 @@ class TestTheAsyncPathDisposesIdentically:
         await Section.objects.acreate(catalog=catalog, title="s")
 
         with pytest.raises(ImproperlyConfigured, match="Section.catalog"):
-            await aupdate_from_input(catalog, {"sections": []}, children=_sections(orphan="unlink"))
+            await aupdate_from_input(
+                catalog, {"sections": []}, relations=_sections(orphan="unlink")
+            )
 
     async def test_the_cascade_follows_the_flag(self) -> None:
         catalog = await Catalog.objects.acreate(name="c")

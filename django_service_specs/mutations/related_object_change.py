@@ -15,8 +15,8 @@ class RelatedObjectChange:
     Carried in ``ChangeResult.relations``, one entry per singular relation declared in
     ``relations=`` — a forward foreign key / one-to-one, or a reverse one-to-one.
     [`ChildCollectionChange`][django_service_specs.mutations.child_collection_change.ChildCollectionChange]'s
-    four pk *tuples* cannot report a one-row relation honestly: every one of them would
-    be either empty or a one-tuple, and "which of the four is non-empty" is a worse way
+    five pk *tuples* cannot report a one-row relation honestly: every one of them would
+    be either empty or a one-tuple, and "which of the five is non-empty" is a worse way
     to say "what happened" than saying it. So a singular relation reports one
     ``outcome`` and one ``pk``.
 

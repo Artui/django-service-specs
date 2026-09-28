@@ -33,9 +33,8 @@ onto model fields and `exclude_fields` drops keys. `m2m={name: rows}` assigns
 many-to-many rows **that already exist**; writing the target rows from the
 payload is a `ManyToManySpec`, and naming one relation in both is refused.
 
-`relations={name: spec}` declares the related rows, one spec per relation.
-`children=` is the same map restricted to `ChildSpec`, and a name in both is
-refused.
+`relations={name: spec}` declares the related rows, one spec per relation,
+and is the one map for every kind of relation.
 
 ## A worked example
 
@@ -89,6 +88,9 @@ What each call does:
 | [`GenericRelationSpec`][django_service_specs.relations.generic_relation_spec.GenericRelationSpec] | A `GenericRelation`: rows linked by content type and id | The `GenericRelation` on the parent | After the reverse kinds |
 | [`ManyToManySpec`][django_service_specs.relations.many_to_many_spec.ManyToManySpec] | Target rows from payloads, then the membership | Either side's accessor (`"tags"` for `Post.tags`) | Last |
 
+Each spec takes its required fields positionally and every option by keyword:
+`ChildSpec(Book, "author", mode="merge")`.
+
 The order is a property of the kind, not of how the `relations=` mapping is
 spelled: a forward target has to exist before the parent is saved, and a
 membership needs both rows saved.
@@ -130,7 +132,8 @@ schema: a nullable link is set to `None` (**unlinked**, like
 `"unlink"` and `"delete"` say it outright, for a spec that means one of them:
 under `"auto"`, a later migration adding `null=True` would turn a destructive
 `"replace"` into a non-destructive one with nothing in the spec changing. A
-many-to-many target is shared, so a dropped member only loses its membership.
+many-to-many target is shared, so a dropped member only loses its membership,
+and is reported as `unlinked`.
 
 A many-to-many with a custom `through` model is not covered: the helpers let
 Django write the through row, which cannot carry the extra columns a custom
@@ -151,7 +154,7 @@ declares `user` and passes `context={"user": user}` on to the helper.
 
 Row services run with `atomic=False`, inside the transaction the operation
 already holds. Declaring one beside the shaping options it replaces
-(`field_map`, `exclude_fields`, `m2m`, nested `children` or `relations`) is
+(`field_map`, `exclude_fields`, `m2m`, nested `relations`) is
 refused at construction, because they would configure nothing. A
 `delete_service` owns the disposal, so its rows are reported as `removed`
 rather than guessed into `deleted` or `unlinked`. In the async helpers, a row
@@ -168,11 +171,13 @@ Every helper returns a
   `UNSET` on a create. `changed_fields` lists their names.
 - `children`: a
   [`ChildCollectionChange`][django_service_specs.mutations.child_collection_change.ChildCollectionChange]
-  per collection, holding the primary keys `created`, `updated`, `deleted`,
-  `unlinked` and `removed`. `get_child_change(name)` finds one.
+  per collection - a child, generic or many-to-many relation - holding the
+  primary keys `created`, `updated`, `deleted`, `unlinked` and `removed`.
+  `get_child_change(name)` finds one.
 - `relations`: a
   [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
-  per one-row relation, holding one
+  per one-row relation - a forward relation or a reverse one-to-one - holding
+  one
   [`RelationOutcome`][django_service_specs.mutations.relation_outcome.RelationOutcome]
   and the `pk` it is about. `get_relation_change(name)` finds one.
 

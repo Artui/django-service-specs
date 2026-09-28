@@ -26,7 +26,7 @@ _JUNK: dict[str, Any] = {
     "data": "not-the-payload",
     "instance": "not-an-instance",
     "parent": "not-the-parent",
-    "children": "not-a-spec-map",
+    "relations": "not-a-spec-map",
     "model": "not-a-model",
     "m2m": "not-a-mapping",
     "field_map": "not-a-map",
@@ -56,7 +56,7 @@ class TestSyncHelpersIgnoreContext:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            children=_SECTIONS,
+            relations=_SECTIONS,
             context=_JUNK,
         )
         assert result.instance.sections.get().title == "s"
@@ -68,7 +68,7 @@ class TestSyncHelpersIgnoreContext:
         result = update_from_input(
             catalog,
             {"sections": [{"pk": keep.pk, "title": "kept"}, {"title": "new"}]},
-            children=_SECTIONS,
+            relations=_SECTIONS,
             context=_JUNK,
         )
         keep.refresh_from_db()
@@ -90,7 +90,7 @@ class TestSyncHelpersIgnoreContext:
                 "sections": ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
                 "notes": ChildSpec(model=Note, fk="catalog"),
             },
@@ -110,11 +110,11 @@ class TestAsyncHelpersIgnoreContext:
         result = await acreate_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s", "items": [{"label": "i"}]}]},
-            children={
+            relations={
                 "sections": ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
             context=_JUNK,
@@ -126,7 +126,7 @@ class TestAsyncHelpersIgnoreContext:
         catalog = await Catalog.objects.acreate(name="c")
         orphan = await Section.objects.acreate(catalog=catalog, title="orphan")
         await aupdate_from_input(
-            catalog, {"sections": [{"title": "new"}]}, children=_SECTIONS, context=_JUNK
+            catalog, {"sections": [{"title": "new"}]}, relations=_SECTIONS, context=_JUNK
         )
         assert not await Section.objects.filter(pk=orphan.pk).aexists()
 
@@ -140,7 +140,7 @@ class TestAsyncHelpersIgnoreContext:
                 "sections": ChildSpec(
                     model=Section,
                     fk="catalog",
-                    children={"items": ChildSpec(model=Item, fk="section")},
+                    relations={"items": ChildSpec(model=Item, fk="section")},
                 ),
             },
             context=_JUNK,

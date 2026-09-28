@@ -254,28 +254,24 @@ POST_SAVE_PHASES: tuple[RelationPhase, ...] = (
 )
 
 
-def merge_relations(
-    children: Mapping[str, ChildSpec] | None,
-    relations: Mapping[str, RelationSpec] | None,
-) -> dict[str, RelationSpec]:
-    """Fold the ``children=`` reverse-FK alias and ``relations=`` into one map."""
-    merged: dict[str, RelationSpec] = {}
-    for keyword, declared in (("children", children), ("relations", relations)):
-        for name, spec in (declared or {}).items():
-            if name in merged:
-                raise ImproperlyConfigured(
-                    f"relations[{name!r}] is also declared in children=. A relation is "
-                    "written once, so declare it in one map or the other — children= "
-                    "is the reverse-FK alias for relations=, not a second pass."
-                )
-            if not isinstance(spec, RelationSpec):
-                raise ImproperlyConfigured(
-                    f"{keyword}[{name!r}] is a {type(spec).__name__}, which is not a "
-                    "relation spec. Declare the relation with the spec class for its "
-                    "kind, so the write order can be read off the class."
-                )
-            merged[name] = spec
-    return merged
+def relation_map(relations: Mapping[str, RelationSpec] | None) -> dict[str, RelationSpec]:
+    """A ``relations=`` map as a plain ``dict``, refusing any value that is not a spec.
+
+    The driver orders the map by ``write_phase``, which only a ``RelationSpec``
+    carries, so a mapping or a model class declared in its place would otherwise
+    fail as an ``AttributeError`` naming no relation. Every map the helpers read
+    passes through here — the caller's own and each spec's nested ``relations`` —
+    so the delete cascade refuses exactly what the write path refuses.
+    """
+    specs: dict[str, RelationSpec] = dict(relations or {})
+    for name, spec in specs.items():
+        if not isinstance(spec, RelationSpec):
+            raise ImproperlyConfigured(
+                f"relations[{name!r}] is a {type(spec).__name__}, which is not a "
+                "relation spec. Declare the relation with the spec class for its "
+                "kind, so the write order can be read off the class."
+            )
+    return specs
 
 
 def reject_m2m_overlap(
@@ -1137,7 +1133,7 @@ def _unknown_relation_kind(relation: str, spec: RelationSpec) -> ImproperlyConfi
     return ImproperlyConfigured(
         f"relations[{relation!r}]: {type(spec).__name__} is not a relation kind this "
         "library knows how to write or remove. Declare the relation with one of the "
-        "shipped spec classes."
+        "spec classes in django_service_specs.relations."
     )
 
 
@@ -1418,7 +1414,6 @@ def _create_row(
             field_map=spec.field_map,
             exclude_fields=spec.exclude_fields,
             m2m=m2m,
-            children=spec.children,
             relations=spec.relations,
             context=context,
         ).instance
@@ -1459,7 +1454,6 @@ async def _acreate_row(
             field_map=spec.field_map,
             exclude_fields=spec.exclude_fields,
             m2m=m2m,
-            children=spec.children,
             relations=spec.relations,
             context=context,
         )
@@ -1503,7 +1497,6 @@ def _update_row(
             field_map=spec.field_map,
             exclude_fields=_matched_row_exclude_fields(spec),
             m2m=m2m,
-            children=spec.children,
             relations=spec.relations,
             context=context,
         )
@@ -1546,7 +1539,6 @@ async def _aupdate_row(
             field_map=spec.field_map,
             exclude_fields=_matched_row_exclude_fields(spec),
             m2m=m2m,
-            children=spec.children,
             relations=spec.relations,
             context=context,
         )
@@ -1847,7 +1839,7 @@ def _delete_owned_collection(
 ) -> ChildCollectionChange:
     """Remove every row of one owned collection, its own relations first."""
     unlink = _unlinks_orphans(spec, relation=relation)
-    nested = merge_relations(spec.children, spec.relations)
+    nested = relation_map(spec.relations)
     removals: list[tuple[RelationOutcome, Any]] = []
     for child in getattr(parent, relation).all():
         delete_relations(child, nested, context=context)
@@ -1866,7 +1858,7 @@ async def _adelete_owned_collection(
 ) -> ChildCollectionChange:
     """Async variant of ``_delete_owned_collection``."""
     unlink = _unlinks_orphans(spec, relation=relation)
-    nested = merge_relations(spec.children, spec.relations)
+    nested = relation_map(spec.relations)
     removals: list[tuple[RelationOutcome, Any]] = []
     async for child in getattr(parent, relation).all():
         await adelete_relations(child, nested, context=context)
@@ -1889,7 +1881,7 @@ def _delete_owned_row(
     row = spec.model.objects.filter(**{spec.fk: parent}).first()
     if row is None:
         return RelatedObjectChange(relation=relation)
-    delete_relations(row, merge_relations(spec.children, spec.relations), context=context)
+    delete_relations(row, relation_map(spec.relations), context=context)
     status, pk = _remove_one_child(
         row, spec, parent=parent, context=context, unlink=_unlinks_orphans(spec, relation=relation)
     )
@@ -1907,7 +1899,7 @@ async def _adelete_owned_row(
     row = await spec.model.objects.filter(**{spec.fk: parent}).afirst()
     if row is None:
         return RelatedObjectChange(relation=relation)
-    await adelete_relations(row, merge_relations(spec.children, spec.relations), context=context)
+    await adelete_relations(row, relation_map(spec.relations), context=context)
     status, pk = await _aremove_one_child(
         row,
         spec,

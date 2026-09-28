@@ -16,10 +16,9 @@ from django_service_specs.mutations.utils import (
     coerce_to_dict,
     extract_relation_data,
     filter_input,
-    merge_relations,
     reject_m2m_overlap,
+    relation_map,
 )
-from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -30,14 +29,13 @@ async def acreate_from_input(
     field_map: dict[str, str] | None = None,
     exclude_fields: list[str] | None = None,
     m2m: dict[str, Any] | None = None,
-    children: Mapping[str, ChildSpec] | None = None,
     relations: Mapping[str, RelationSpec] | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> ChangeResult[ModelT]:
     """Async sibling of
     [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]
     using ``asave()``/``aset()``."""
-    relation_specs = merge_relations(children, relations)
+    relation_specs = relation_map(relations)
     reject_m2m_overlap(m2m, relation_specs)
     raw: dict[str, Any] = coerce_to_dict(data)
     relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)

@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import KW_ONLY, dataclass
 from typing import Any, ClassVar
 
 from django.db.models import Model
 
-from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
@@ -53,26 +52,6 @@ class ReverseOneToOneSpec(RelationSpec):
         fk: The name of that model's field pointing at the parent (``"author"``
             for ``Profile.author``). Set automatically on creation, and the
             field whose nullability decides unlink-versus-delete by default.
-        field_map: Forwarded to the row's own ``create_from_input`` /
-            ``update_from_input`` call. It shapes that **write** and nothing
-            else: the row is found through ``fk`` and the parent link is
-            written onto it raw, neither of them reading this map.
-        exclude_fields: Forwarded likewise. Shaping configures the row's
-            **write** only; the row itself is found through ``fk``, and a
-            matched row's primary key is dropped from the write for you.
-        m2m: Forwarded likewise.
-        children: Forwarded likewise.
-        relations: Forwarded likewise.
-        create_service: Optional service replacing that call for the row, with
-            the contract [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] states: it
-            receives ``parent``, and its ``data`` already carries the ``fk``.
-            Declaring it alongside the row-shaping fields above raises at
-            construction.
-        update_service: The same; returning ``None`` means "use the in-memory
-            instance".
-        delete_service: Replaces the unlink-or-delete rule below, so the outcome
-            is reported as ``"removed"`` — the only thing still known — and an
-            explicit ``orphan`` beside it raises.
         orphan: What removing the row *does*, by
             [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec]'s rule: ``"auto"`` (the
             default) derives it from ``fk`` — **unlinked** when that field is
@@ -82,22 +61,41 @@ class ReverseOneToOneSpec(RelationSpec):
             ``ImproperlyConfigured`` at write time.
             It covers both removals there are: the ``None`` case above and the
             delete cascade.
+        field_map: Forwarded to the row's own ``create_from_input`` /
+            ``update_from_input`` call. It shapes that **write** and nothing
+            else: the row is found through ``fk`` and the parent link is
+            written onto it raw, neither of them reading this map.
+        exclude_fields: Forwarded likewise. Shaping configures the row's
+            **write** only; the row itself is found through ``fk``, and a
+            matched row's primary key is dropped from the write for you.
+        m2m: Forwarded likewise.
+        relations: Forwarded likewise — the row's own relations, of any kind.
+        create_service: Optional service replacing that call for the row, with
+            the contract [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] states: it
+            receives ``parent``, and its ``data`` already carries the ``fk``.
+            Declaring it alongside the row-shaping fields above raises at
+            construction.
+        update_service: The same; returning ``None`` means "use the in-memory
+            instance".
+        delete_service: Replaces the unlink-or-delete rule above, so the outcome
+            is reported as ``"removed"`` — the only thing still known — and an
+            explicit ``orphan`` beside it raises.
     """
 
     write_phase: ClassVar[RelationPhase] = RelationPhase.REVERSE
 
     model: type[Model]
     fk: str
+    # Every option is keyword-only, for the reason ``RelationSpec`` gives.
+    _: KW_ONLY
+    orphan: RelationOrphan | str = RelationOrphan.AUTO
     field_map: dict[str, str] | None = None
     exclude_fields: list[str] | None = None
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None
-    children: Mapping[str, ChildSpec] | None = None
     relations: Mapping[str, RelationSpec] | None = None
     create_service: Callable[..., Any] | None = None
     update_service: Callable[..., Any] | None = None
     delete_service: Callable[..., Any] | None = None
-    # Declared last, for the reason given on ``ChildSpec``.
-    orphan: RelationOrphan | str = RelationOrphan.AUTO
 
     def __post_init__(self) -> None:
         validate_relation_orphan(
@@ -113,7 +111,6 @@ class ReverseOneToOneSpec(RelationSpec):
                 "field_map": self.field_map,
                 "exclude_fields": self.exclude_fields,
                 "m2m": self.m2m,
-                "children": self.children,
                 "relations": self.relations,
             },
         )

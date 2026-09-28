@@ -14,12 +14,12 @@ class RelationOrphan(str, Enum):
     ``RelationMode`` answers *when* a row is let go at all, and the two are
     independent knobs on purpose.
 
-    The default derives the answer from the schema, as it always has. The other
-    two exist because a derived answer is not a stated one: whether the link can
-    hold ``NULL`` is a fact about a column, and a migration adding ``null=True``
-    later would silently turn a ``replace`` that deleted into one that unlinks,
-    with nothing in the spec — or in its tests — changing to say so. A spec that
-    means to delete says so.
+    The default derives the answer from the schema. The other two exist because
+    a derived answer is not a stated one: whether the link can hold ``NULL`` is
+    a fact about a column, and a migration adding ``null=True`` later would
+    silently turn a ``replace`` that deleted into one that unlinks, with nothing
+    in the spec — or in its tests — changing to say so. A spec that means to
+    delete says so.
 
     Inheriting from ``str`` keeps the value JSON-serializable and means a plain
     string works wherever the member does, matching ``RelationMode`` and

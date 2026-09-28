@@ -8,28 +8,45 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ChildCollectionChange:
-    """What a nested write did to one reverse-FK child collection.
+    """What a nested write did to one relation that holds a collection.
 
-    Carried in ``ChangeResult.children``, one
-    entry per ``children=`` relation. The tuples hold child **primary keys**:
+    Carried in ``ChangeResult.children``, one entry per collection declared in
+    ``relations=``: a reverse-FK
+    [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec], a
+    [`GenericRelationSpec`][django_service_specs.relations.generic_relation_spec.GenericRelationSpec]
+    or a
+    [`ManyToManySpec`][django_service_specs.relations.many_to_many_spec.ManyToManySpec].
+    A relation holding one row reports a
+    [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
+    instead. The tuples hold row **primary keys**:
 
-    - **``created``** — children inserted.
-    - **``updated``** — existing children whose row was updated (matched by the
-      [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec]'s ``match_key``).
-    - **``deleted``** — orphaned children removed because their FK is
-      non-nullable.
-    - **``unlinked``** — orphaned children detached (FK set to ``None``) because
-      their FK is nullable.
-    - **``removed``** — children handed to the spec's ``delete_service``.
+    - **``created``** — rows inserted.
+    - **``updated``** — rows that already existed, matched by the spec's
+      ``match_key`` and written: among the parent's own rows for a child or
+      generic collection, inside ``scope`` for a many-to-many.
+    - **``deleted``** — rows the relation let go and deleted.
+    - **``unlinked``** — rows the relation let go and kept, with their link to
+      the parent set to ``None``.
+    - **``removed``** — rows handed to the spec's ``delete_service``.
       Deliberately a fifth tuple rather than a reuse of ``deleted``: once a
       service owns the row, the loop no longer knows whether it was deleted,
       archived, unlinked or left standing, and folding those into ``deleted``
       would report a guess as fact. What the loop does know is that the row
       left the relation and a service decided the rest.
 
-    ``updated`` records every matched child the helper ran through
-    ``update_from_input``, regardless of whether that child's own columns
-    actually changed.
+    Whether a row let go is ``deleted`` or ``unlinked`` is the spec's ``orphan``
+    ([`RelationOrphan`][django_service_specs.relations.relation_orphan.RelationOrphan]),
+    not the column alone: ``"delete"`` always deletes; ``"unlink"`` always unlinks,
+    and is refused where the link cannot hold ``NULL``; ``"auto"``, the default,
+    unlinks when it can — both columns, for a generic relation — and deletes when
+    it cannot. A many-to-many target is shared, so a member ``"replace"`` drops
+    only loses its membership and is always ``unlinked``; that kind has no
+    ``orphan`` and no ``delete_service``, and its ``deleted`` and ``removed`` stay
+    empty.
+
+    ``updated`` records every matched row the write ran through
+    ``update_from_input`` or the spec's ``update_service``, whether or not that
+    row's own columns actually changed.
     """
 
     relation: str
