@@ -13,20 +13,16 @@ A service contract for Django: declare an operation's parameters, permission
 check, validation and output once, and dispatch it from any transport - an HTTP
 view, an MCP tool, an agent tool, a management command or a background task.
 
-Django is the base and the only dependency. Django REST Framework becomes one
-adapter among several rather than a requirement, so a project with business
+Django is the base and the only dependency. Django REST Framework is **not a
+dependency**, and nothing in the package imports it, so a project with business
 logic and no API framework can hand its operations to an agent, a command or a
-queue without adopting one.
-
-**Status:** early. The public API may still change between minor releases,
-and every change is recorded in the [changelog](CHANGELOG.md).
-
-Django REST Framework is **not a dependency**, and nothing in the package
-imports it. A project with business logic and no API framework dispatches its
-operations to an agent, a command or a queue with Django alone.
+queue with Django alone.
 [`djangorestframework-services`](https://github.com/Artui/djangorestframework-services)
 will depend on this package and become its DRF adapter; this package will
 never depend on it.
+
+**Status:** early. The public API may still change between minor releases,
+and every change is recorded in the [changelog](CHANGELOG.md).
 
 ## Install
 
@@ -61,7 +57,7 @@ from django_service_specs import (
     dispatch,
     present,
 )
-from tests.dispatch_app.models import Note  # a title, and an owner who is a user
+from notes.models import Note  # a title, and an owner who is a user
 
 
 @dataclass
@@ -116,7 +112,8 @@ for the note's owner, `None` when there is no note 1, and raises `NotPermitted`
 for anyone else. The same `rename_note_spec` can be dispatched from an HTTP
 view, an MCP tool, a management command or a task: each supplies a principal
 and the arguments, and answers the result in its own terms. This code is
-`docs/examples/quickstart.py`, and the test suite runs it.
+`docs/examples/quickstart.py`, where `Note` comes from the test suite's own
+app, and the test suite runs it.
 
 ## The order dispatch runs in
 
@@ -134,8 +131,9 @@ write and a read:
 5. **Validation.** The Validator, with the resolved row in its context, so an
    update's uniqueness check can exclude the row being updated.
 6. **The run.** The service, inside `transaction.atomic()` unless the spec
-   says `atomic=False`, then the output selector if one is declared. A read stops after step four: its selector is
-   its run.
+   says `atomic=False`, then the output selector if one is declared.
+
+A read stops after step four: its selector is its run.
 
 `present()` renders the result afterwards, and only when the transport asks,
 so one that hands the row to a template never pays for rendering it.

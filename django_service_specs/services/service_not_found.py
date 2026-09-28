@@ -12,9 +12,9 @@ class ServiceNotFound(ServiceError):
     state, so a client should stop asking rather than try again differently.
 
         def move_event(*, user, data):
-            event = Event.objects.filter(owner=user, pk=data.event_id).first()
+            event = Event.objects.filter(owner=user, pk=data["event_id"]).first()
             if event is None:
-                raise ServiceNotFound(f"No event {data.event_id}.")
+                raise ServiceNotFound(f"No event {data['event_id']}.")
 
     **Say the same thing for "absent" and "not yours."** Answering a permission
     refusal for a row the caller cannot see confirms that it exists, which is

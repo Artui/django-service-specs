@@ -128,7 +128,13 @@ class TestQuickstart:
         block = re.search(r"```python\n(.*?)```", after, re.DOTALL)
         assert block is not None
         example = section(ROOT / "docs" / "examples" / "quickstart.py", "quickstart")
-        assert block.group(1).strip() == example.strip()
+        # One line differs, on purpose: the example imports its model from the
+        # suite's own app, and the README names an app a reader would have.
+        # Swapping exactly that line keeps every other byte checked.
+        run_from = "from tests.dispatch_app.models import Note"
+        shown_as = "from notes.models import Note"
+        assert example.count(run_from) == 1
+        assert block.group(1).strip() == example.replace(run_from, shown_as).strip()
 
 
 class TestDeclaring:

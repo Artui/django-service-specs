@@ -14,8 +14,8 @@ class ServiceConflict(ServiceError):
     which says "understood, and still not doing it" with no such implication.
 
         def slot_is_free(*, user, data):
-            if Event.objects.filter(owner=user, day=data.day, hour=data.hour).exists():
-                raise ServiceConflict(f"{data.day} at {data.hour}:00 is taken.")
+            if Event.objects.filter(owner=user, day=data["day"], hour=data["hour"]).exists():
+                raise ServiceConflict(f"{data['day']} at {data['hour']}:00 is taken.")
 
     A transport that has never heard of this type still handles a
     ``ServiceError``, and one that wants to do better matches on the class. It

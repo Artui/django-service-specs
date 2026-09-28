@@ -111,6 +111,7 @@ class PoolSeeds:
 DEFAULT_POOL_SEEDS: PoolSeeds = PoolSeeds()
 """The empty registry every dispatch entry point falls back to.
 
-A project that registers nothing gets exactly the behaviour that existed before
-this type: the seven built-in seeds, and nothing else.
+A project that registers nothing gets the pool dispatch builds on its own: the
+principal as ``user``, and each step's own values (``data``, ``instance``,
+``collection``, ``result``, ``queryset``) where that step has them.
 """

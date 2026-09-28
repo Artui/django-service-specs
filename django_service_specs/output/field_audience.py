@@ -34,4 +34,7 @@ class FieldAudience(str, Enum):
     never re-spelled by a choice's display - a handle is somebody else's input."""
 
     HIDDEN = "hidden"
-    """Plumbing. Dropped from what an audience projection shows."""
+    """Plumbing. Left out of what an agent audience is shown.
+
+    The kernel declares the marking and applies none: leaving the field out is
+    the job of the transport that renders for that audience."""

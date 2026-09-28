@@ -30,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `Validator` and `ValidationContext`, with `DataclassValidator` and
   `DataclassPresenter` as the reference adapters: plain dataclasses, nested
   ones and lists of them, `Decimal`, `datetime`, `date`, `Literal`, `Enum` and
-  Django's `Choices`. An offset-less date-time is made aware in `TIME_ZONE`, as
-  Django's forms do. `bind_arguments()` runs the shape check and the Validator
-  for a transport that binds input itself.
+  Django's `Choices`. With `USE_TZ` on, an offset-less date-time is made aware
+  in the current time zone, as Django's forms do. `bind_arguments()` runs the
+  shape check and the Validator for a transport that binds input itself.
 - `PermissionCheck`, with `Unrestricted()` as the explicit allow. An operation
   that declares no permission check is refused at registration and at dispatch,
   because off HTTP there is no view whose policy it could inherit. A transport
@@ -55,10 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Relation writes: `ChildSpec`, `ForwardRelationSpec`, `ReverseOneToOneSpec`,
   `ManyToManySpec` and `GenericRelationSpec`, applied by `create_from_input()`,
   `update_from_input()`, `apply_input()` and their async forms, with a
-  `ChangeResult` describing what changed. A row's refusal is re-rooted under
-  its own address, and Django's own write failures on a row become
-  `InvalidArguments` there; an error raised by a row service, a `scope` or an
-  `m2m` callable passes through untouched, at any depth.
+  `ChangeResult` describing what changed. A row's refusal, a
+  `ServiceValidationError` or an `InvalidArguments`, is re-rooted under its own
+  address and keeps its class, and Django's own write failures on a row become
+  `InvalidArguments` there. Any other error raised by a row service, a `scope`
+  or an `m2m` callable passes through untouched, at any depth, and so does an
+  `IntegrityError`.
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 

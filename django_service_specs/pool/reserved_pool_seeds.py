@@ -11,9 +11,9 @@ RESERVED_POOL_SEEDS: Final[frozenset[str]] = frozenset(
 
 ``user`` is the principal, ``data`` the validated values, ``instance`` and
 ``collection`` the resolved target, ``result`` the service's return (in an
-output selector's pool) and ``queryset`` what ``extend_queryset`` shapes. The
-names are the ones every existing service callable in the family already
-declares, so a callable written for one runs on the other unchanged.
+output selector's pool) and ``queryset`` what ``extend_queryset`` shapes. They
+are the names ``djangorestframework-services`` seeds for the same values, so a
+callable written for it runs under this kernel unchanged.
 
 ``progress`` has no value yet and is reserved anyway, so that seeding it later
 is additive: reserving a name after a spec has declared a parameter by it would

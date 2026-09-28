@@ -13,10 +13,11 @@ class FieldMarking:
 
     Carried on the [`OutputField`][django_service_specs.output.output_field.OutputField]
     it marks, so it belongs to the declaration of what an operation returns
-    rather than to whichever library rendered it. That is what lets one
-    projection work over a dataclass, a pydantic model and a DRF serializer
-    alike: each adapter reads its own library's declaration into ``Output``,
-    marking included, and the projection reads only ``Output``.
+    rather than to whichever library rendered it. That is what lets a
+    transport's projection for an audience work over a dataclass, a pydantic
+    model and a DRF serializer alike: each adapter reads its own library's
+    declaration into ``Output``, marking included, and the projection reads
+    only ``Output``. The kernel carries the marking and applies none of it.
 
     The marking lives on the **field**, not in a list beside the output. That is
     what lets it travel into a nested output with no hoisting rule, and what
