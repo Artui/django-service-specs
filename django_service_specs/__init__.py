@@ -10,8 +10,12 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.present import present
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
@@ -116,7 +120,9 @@ __all__ = [
     "Validator",
     "__version__",
     "acreate_from_input",
+    "adispatch",
     "apply_input",
+    "apresent",
     "arun_service",
     "aupdate_from_input",
     "authorize",
@@ -126,7 +132,9 @@ __all__ = [
     "check_arguments",
     "coerce_flat",
     "create_from_input",
+    "dispatch",
     "is_async",
+    "present",
     "resolve_callable_kwargs",
     "resolve_principal",
     "run_service",

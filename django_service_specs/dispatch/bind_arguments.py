@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from django_service_specs.dispatch.utils import validate_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
-from django_service_specs.validation.validation_context import ValidationContext
 
 if TYPE_CHECKING:
     from django_service_specs.specs.service_spec import ServiceSpec
@@ -60,9 +60,5 @@ def bind_arguments(
     checked = check_arguments(spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked
-    validator = spec.validator
-    if validator is None:
-        return {}
-    declared = validator.parameters().names()
-    own = {name: value for name, value in checked.items() if name in declared}
-    return validator.validate(own, ValidationContext(principal, target))
+    # The step dispatch takes, the same function: the two cannot drift apart.
+    return validate_arguments(spec, checked, principal=principal, target=target)
