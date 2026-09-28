@@ -23,19 +23,20 @@ class PoolSeeds:
     clock, a feature-flag reader — has no channel, because off HTTP there is no
     ``request`` for it to hang off. This is that channel.
 
-    A registration contributes three things, through two mechanisms:
+    A registration contributes two things:
 
     - **the value**, resolved into every pool
       [`base_pool`][django_service_specs.pool.base_pool.base_pool] builds;
-    - **reservation** — client input named after a seed is stripped from the
-      spread, so a caller cannot outrank the project's value;
-    - **exemption** from unknown-argument accounting, so declaring a seed does
-      not make ``UnknownArguments.REJECT`` start refusing calls that name it.
+    - **reservation**: dispatch refuses a spec whose Parameters declare the
+      name, and a Validator that returns a value under it, so an argument never
+      meets a seed in one pool. A caller sending the name is then refused as an
+      unknown argument, or dropped under ``UnknownArguments.IGNORE``, like any
+      other name the spec does not declare.
 
-    The last two are one mechanism — ``reserved`` — and the reason they travel
-    together is that either alone is a trap. A seed with a value and no
-    reservation is client-controlled on a selector, where no validator stands in
-    front of the spread; a reserved name with no value makes a callable that
+    The reason the two travel together is that either alone is a trap. A seed
+    with a value and no reservation shares the pool with an argument of the
+    same name, and which of the two a callable receives would depend on
+    spreading order; a reserved name with no value makes a callable that
     declares it fail with a ``TypeError`` instead.
 
     Immutable, and ``extend`` returns a **new** registry rather than mutating, so
@@ -88,11 +89,10 @@ class PoolSeeds:
 
     @property
     def reserved(self) -> frozenset[str]:
-        """Every name client input may not occupy: the dispatcher's plus these.
+        """Every name an argument may not occupy: the dispatcher's plus these.
 
-        The four places that strip or exempt a name read this rather than
-        ``RESERVED_POOL_SEEDS`` directly, which is what makes a registered seed
-        as protected as a built-in one.
+        Dispatch reads this rather than ``RESERVED_POOL_SEEDS`` directly, which
+        is what makes a registered seed as protected as a built-in one.
         """
         return RESERVED_POOL_SEEDS | self.names
 

@@ -43,11 +43,10 @@ def base_pool(
     ([`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds]), resolved
     into every pool this builds. It is the **supported** way to add an entry,
     and the difference from spreading one through ``**extra`` is not
-    convenience: a registered name is also reserved, so client input cannot
-    occupy it, and is exempt from unknown-argument accounting. An ``**extra``
-    entry gets neither — which on a selector, where no validator stands in
-    front of the spread, means a caller can supply it. Spread an entry that is
-    genuinely per-call; register one that is ambient.
+    convenience: a registered name is also reserved, so dispatch refuses a spec
+    that declares an argument by that name rather than letting the two meet in
+    one pool. An ``**extra`` entry has no such protection. Spread an entry that
+    is genuinely per-call; register one that is ambient.
     """
     pool: dict[str, Any] = {
         "user": user,
