@@ -4,6 +4,10 @@ Everything below is exported from `django_service_specs` directly, and from the
 subpackage it is listed under. Import from the package root in application
 code; the subpackage paths are where each name is defined.
 
+The pydantic adapters are the one exception. pydantic is an optional extra,
+so they are exported from `django_service_specs.adapters.pydantic` alone, and
+importing the package root never imports pydantic.
+
 ## Specs
 
 ::: django_service_specs.specs.service_spec.ServiceSpec
@@ -47,6 +51,14 @@ code; the subpackage paths are where each name is defined.
 ## Forms adapter
 
 ::: django_service_specs.adapters.forms.form_validator.FormValidator
+
+## Pydantic adapters
+
+Installed with the `pydantic` extra and imported from
+`django_service_specs.adapters.pydantic`.
+
+::: django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator
+::: django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter
 
 ## Dispatch
 

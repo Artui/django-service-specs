@@ -96,6 +96,8 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   transports.
 - [The forms adapter](forms.md): a Django form class, `ModelForm` included,
   as the Validator.
+- [The pydantic adapter](pydantic.md): a pydantic model as the Validator and
+  the Presenter, with the `pydantic` extra.
 - [JSON Schema](schema.md): the input and output schema a transport
   describes an operation with.
 - [API reference](reference.md): every public name.

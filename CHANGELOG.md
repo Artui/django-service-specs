@@ -26,6 +26,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   closes and leaves a defaulted parameter out of `required`; the output schema
   is an array for a list, and nullable wherever the operation may return
   nothing. Each is flat, with no `$defs` or `$ref`.
+- A pydantic adapter, with the `pydantic` extra: `PydanticValidator` and
+  `PydanticPresenter` read a model into `Parameters` and `Output` from the
+  same annotation table as the dataclass adapters, so a model and a dataclass
+  declaring one field declare one parameter. Aliases are read as pydantic
+  reads and writes them, and pydantic's refusals come back in the kernel's
+  error tree, addressed by parameter name. A model that contains itself is
+  described four levels deep and validated in full. The presenter reads rows,
+  related managers, objects and mappings through `model_dump`. Both are
+  exported from `django_service_specs.adapters.pydantic` alone: the package
+  root never imports pydantic. Needs pydantic 2.11 or later.
 
 ### Changed
 - `OutputField` refuses a `format` on anything but a string, as `Parameter`

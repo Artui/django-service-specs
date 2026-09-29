@@ -18,6 +18,7 @@ import json
 import pickle
 import re
 from pathlib import Path
+from types import ModuleType
 from typing import Any
 
 import pytest
@@ -64,6 +65,7 @@ from docs.examples import (
 )
 from tests.adapter_app.models import Author, Book
 from tests.dispatch_app.models import Note
+from tests.test_init import OPTIONAL_LIBRARY_ADAPTERS
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -569,12 +571,24 @@ def _documented() -> list[tuple[str, str]]:
     return [(path.rsplit(".", 1)[1], path) for path in paths]
 
 
+def _exporter(path: str) -> ModuleType:
+    """Where a documented name is public: its optional adapter's subpackage, else the root."""
+    for adapter in OPTIONAL_LIBRARY_ADAPTERS:
+        if path.startswith(f"{adapter}."):
+            return importlib.import_module(adapter)
+    return django_service_specs
+
+
 class TestReference:
     def test_every_public_name_has_a_reference_entry(self) -> None:
+        # The root's names and, since the root cannot re-export them, each
+        # optional-library adapter's own: public all the same.
         public = set(django_service_specs.__all__) - {"__version__"}
+        for adapter in OPTIONAL_LIBRARY_ADAPTERS:
+            public |= set(importlib.import_module(adapter).__all__)
         assert sorted(name for name, _ in _documented()) == sorted(public)
 
     def test_every_entry_names_the_object_the_package_exports(self) -> None:
         for name, path in _documented():
             module = importlib.import_module(path.rpartition(".")[0])
-            assert getattr(module, name) is getattr(django_service_specs, name)
+            assert getattr(module, name) is getattr(_exporter(path), name)
