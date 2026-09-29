@@ -11,6 +11,10 @@ What each library adds on top - a nested dataclass or a nested model, a cycle
 refused or a cycle bounded - is read in its own adapter. Nothing here imports a
 validation library, so the dataclass adapter uses it without importing
 pydantic.
+
+The forms adapter reads field instances rather than annotations and shares
+only ``scalar_type``: a typed choice field's values take their JSON type from
+it, exactly as a ``Literal``'s do.
 """
 
 from __future__ import annotations

@@ -12,6 +12,7 @@ from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 
+from django_service_specs.adapters.utils import scalar_type
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -329,7 +330,7 @@ def _choices(field: forms.ChoiceField, *, where: str) -> tuple[str, tuple[Any, .
         return "string", tuple(str(value) for value in values)
     # With no values left the form refuses every non-empty value, and a string
     # is what every choice field takes.
-    found = {_json_type(value) for value in values} or {"string"}
+    found = {scalar_type(value) for value in values} or {"string"}
     json_type = found.pop() if len(found) == 1 else None
     if json_type is None:
         raise ImproperlyConfigured(
@@ -369,20 +370,3 @@ def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | 
         f"{where}: matches rows on {opts.label}.{key.name}, a {type(key).__name__}, "
         "which has no JSON type this adapter can declare."
     )
-
-
-def _json_type(value: Any) -> str | None:
-    """The JSON type of a scalar value, or ``None`` for anything else.
-
-    ``bool`` first: it subclasses ``int``, and ``true`` is not an integer on
-    any wire this kernel has.
-    """
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, int):
-        return "integer"
-    if isinstance(value, float):
-        return "number"
-    if isinstance(value, str):
-        return "string"
-    return None
