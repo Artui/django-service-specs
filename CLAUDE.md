@@ -114,6 +114,13 @@ Each of these reads as an oversight and is not.
 - **An operation with no declared permission check is refused at
   registration.** Off HTTP there is no view to inherit a policy from, so an
   explicit allow exists for an operation that means it.
+- **An adapter over an optional library is not exported from the root.** The
+  root re-exports every other subpackage's `__all__`, adapters included, and
+  `tests/test_init.py` enforces it. The pydantic adapter is the exception
+  because re-exporting it would import pydantic for every consumer and fail
+  for each one who never installed the extra. The exemption is one named set
+  in that test, which also proves in a fresh interpreter that the root
+  imports no such library; the reference test reads the same set.
 - **Target resolution runs before validation.** The validator's context
   carries the resolved row, because an update's uniqueness check has to
   exclude the row being updated. Class-level authorization runs before either,
