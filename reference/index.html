@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://artui.github.io/django-service-specs/reference/">
       
       
-        <link rel="prev" href="../registry/">
+        <link rel="prev" href="../schema/">
       
       
       
@@ -405,6 +405,87 @@
     
   
     The registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The forms adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pydantic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The pydantic adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Schema
   
 
     
@@ -1050,6 +1131,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.spec_input_schema.spec_input_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec_input_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.spec_output_schema.spec_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.parameters_schema.parameters_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.output_schema.output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dataclass-adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1124,6 +1260,145 @@
         
           <li class="md-nav__item">
   <a href="#django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter.present" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        present
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#forms-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forms adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FormValidator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FormValidator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator.parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator.validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pydantic-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pydantic adapters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PydanticValidator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PydanticValidator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PydanticPresenter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PydanticPresenter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.present" class="md-nav__link">
     <span class="md-ellipsis">
       
         present
@@ -2821,6 +3096,61 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#json-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        JSON Schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.spec_input_schema.spec_input_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec_input_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.spec_output_schema.spec_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        spec_output_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.parameters_schema.parameters_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.schema.output_schema.output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output_schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#dataclass-adapters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2895,6 +3225,145 @@
         
           <li class="md-nav__item">
   <a href="#django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter.present" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        present
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#forms-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Forms adapter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FormValidator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="FormValidator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator.parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_validator.FormValidator.validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pydantic-adapters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pydantic adapters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PydanticValidator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PydanticValidator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        parameters
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PydanticPresenter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="PydanticPresenter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.present" class="md-nav__link">
     <span class="md-ellipsis">
       
         present
@@ -4020,6 +4489,9 @@
 <p>Everything below is exported from <code>django_service_specs</code> directly, and from the
 subpackage it is listed under. Import from the package root in application
 code; the subpackage paths are where each name is defined.</p>
+<p>The pydantic adapters are the one exception. pydantic is an optional extra,
+so they are exported from <code>django_service_specs.adapters.pydantic</code> alone, and
+importing the package root never imports pydantic.</p>
 <h2 id="specs">Specs<a class="headerlink" href="#specs" title="Permanent link">&para;</a></h2>
 
 
@@ -5927,6 +6399,214 @@ the job of the transport that renders for that audience.</p>
 
     </div>
 
+</div><h2 id="json-schema">JSON Schema<a class="headerlink" href="#json-schema" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.spec_input_schema.spec_input_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">spec_input_schema</span>
+
+
+<a href="#django_service_specs.schema.spec_input_schema.spec_input_schema" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">spec_input_schema</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p><a class="autorefs autorefs-internal" title="parameters_schema" href="#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a> over <code>spec.parameters()</code>.</p>
+<p>The whole argument set dispatch checks: a selector spec's <code>reads</code>, or a
+service spec's target selector's <code>reads</code> followed by its Validator's
+parameters. Pass the <code>unknown_arguments</code> the transport dispatches with,
+because the schema closes the argument set exactly when dispatch does.</p>
+<p>Read on every call, as <code>parameters()</code> is, so a Validator reading a
+model-backed declaration is asked only once the app registry is ready.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.spec_output_schema.spec_output_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">spec_output_schema</span>
+
+
+<a href="#django_service_specs.schema.spec_output_schema.spec_output_schema" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">spec_output_schema</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The JSON Schema of what <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> returns for <code>spec</code>.</p>
+<p><code>None</code> when <code>spec.output()</code> is <code>None</code>: a spec with no presenter
+declares nothing about what it returns, and a shape invented for it would
+be a guess every client then trusts.</p>
+<p>Otherwise the item's <a class="autorefs autorefs-internal" title="output_schema" href="#django_service_specs.schema.output_schema.output_schema"><code>output_schema</code></a>,
+shaped by what dispatch returns for this kind of spec:</p>
+<ul>
+<li><strong>A LIST selector spec</strong>, or a service spec whose output selector is a
+  LIST, presents every row: <code>{"type": "array", "items": &lt;item&gt;}</code>.</li>
+<li><strong>A RETRIEVE selector spec with <code>allow_none</code></strong> presents <code>None</code> for a
+  missing row, so the item's type gains <code>"null"</code>. Without <code>allow_none</code>
+  a missing row is not-found, which a transport answers in its own terms
+  and never presents, so the item stays as it is.</li>
+<li><strong>A service spec whose output selector is a RETRIEVE</strong> gains <code>"null"</code>
+  whatever its <code>allow_none</code> says: once the service has run, a re-read
+  that finds nothing is <code>None</code> rather than not-found, because reporting
+  not-found would tell the caller a committed write did not happen.</li>
+<li><strong>A service spec with no output selector</strong> presents what the service
+  returned, described by its presenter as the item. Whether a service may
+  return <code>None</code> is not in its declaration, so it is not stated.</li>
+</ul>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.parameters_schema.parameters_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">parameters_schema</span>
+
+
+<a href="#django_service_specs.schema.parameters_schema.parameters_schema" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">parameters_schema</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">parameters</span><span class="p">:</span> <span class="n">Parameters</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The JSON Schema object an argument set must satisfy, read from <code>parameters</code>.</p>
+<p>One dialect whichever library declared the parameters, because every
+adapter reads its library into <a class="autorefs autorefs-internal" title="Parameters
+
+
+  
+      dataclass
+  " href="#django_service_specs.parameters.parameters.Parameters"><code>Parameters</code></a>
+and this reads only that. The policy is <strong>precise</strong>: never false, and not
+incomplete where the declaration knows. What it still leaves out is what a
+Parameter does not carry.</p>
+<ul>
+<li><strong>An object</strong> is <code>{"type": "object", "properties": {...}}</code>, with
+  <code>"required"</code> listing, in declaration order, the names the shape check
+  refuses when absent - a required parameter with no declared default,
+  since one with a default is not refused - and left out when there are none.</li>
+<li><strong><code>"additionalProperties": false</code> is emitted under <code>REJECT</code> only</strong>, and
+  at exactly the levels <a class="autorefs autorefs-internal" title="check_arguments" href="#django_service_specs.parameters.check_arguments.check_arguments"><code>check_arguments</code></a>
+  closes: the top, every object parameter that declares <code>fields</code>, and
+  every row of an array whose <code>items</code> are Parameters - an empty
+  declaration included, since it refuses every key. Under <code>IGNORE</code> an
+  undeclared key is accepted and dropped, so stating <code>false</code> there
+  would refuse a call that runs.</li>
+<li><strong>An object parameter with no <code>fields</code></strong> is <code>{"type": "object"}</code>: what
+  is still known, constraining nothing a valid call could fail. It is also
+  the node an adapter truncates a recursive declaration to.</li>
+<li><strong>An array</strong> is <code>{"type": "array", "items": ...}</code>: a type name's
+  <code>{"type": t}</code>, the object schema of its rows, or <code>{}</code> for an array
+  that declares no <code>items</code> and accepts any element.</li>
+<li><strong>A scalar</strong> is <code>{"type": t}</code> with its <code>"format"</code> when it declares one.
+  A decimal is therefore <code>{"type": "string", "format": "decimal"}</code>: the
+  form every decimal validator reads without a binary float's rounding.
+  The shape check also accepts a JSON number, which this does not advertise.</li>
+<li><strong>Nullable</strong> makes the type <code>[t, "null"]</code>, on objects and arrays too.</li>
+<li><strong>Choices</strong> are an <code>"enum"</code> beside the <code>"type"</code> the parameter
+  declares. On an array they go on <code>items</code>, because the shape check
+  applies them to each element. A nullable parameter's enum gains <code>None</code>
+  when its choices do not list it, since an enum claims the whole set of
+  accepted values; an array's items never do, because a null element is
+  refused whether or not the array itself may be null.</li>
+<li><strong>A default</strong> is emitted when one is declared and survives JSON encoding;
+  a <code>Decimal</code>, a date or a callable is left out rather than misstated. So
+  is a choice set holding such a value, since listing only some of the
+  accepted values would be false.</li>
+<li><strong><code>help</code></strong> becomes <code>"description"</code>.</li>
+</ul>
+<p>Nothing else, deliberately. No <code>title</code>, because a Parameter has no label.
+No <code>$defs</code> or <code>$ref</code> ever: most MCP clients refuse a schema with a
+reference in it, so every schema is flat and self-contained, however deep
+the declaration nests. No <code>$schema</code> key, which a transport adds if its
+wire wants one. And no bounds (<code>maxLength</code>, <code>minimum</code>), which
+Parameters does not carry yet; the Validator enforces them.</p>
+<p>Every call builds a new schema, so a transport may add its own keys to the
+result without reaching the declaration or another transport's copy.
+Defaults and choice values are placed in it as declared, not copied.</p>
+<p><code>unknown_arguments</code> accepts the policy's plain value as well, and a value
+that is neither raises <code>ValueError</code> here rather than quietly describing
+one policy or the other.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.schema.output_schema.output_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">output_schema</span>
+
+
+<a href="#django_service_specs.schema.output_schema.output_schema" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">output_schema</span><span class="p">(</span><span class="n">output</span><span class="p">:</span> <span class="n">Output</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The JSON Schema object of one presented item, read from <code>output</code>.</p>
+<p>One item: whether the operation returns a list of them, or may return
+<code>None</code> instead, is the spec's to say, and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+wraps this accordingly. The dialect is the input side's, with the
+differences a description of what came back needs:</p>
+<ul>
+<li><strong>An object</strong> is <code>{"type": "object", "properties": {...}}</code>, with
+  <code>"required"</code> listing the fields whose <code>always_present</code> is true, in
+  declaration order, and left out when there are none. <code>required</code> says
+  the key is there, not that its value is non-null.</li>
+<li><strong>No <code>additionalProperties</code>.</strong> Output is not a closed set a caller can
+  get wrong, and a transport may add keys of its own to what it sends.</li>
+<li><strong>A field</strong> states its type, <code>[t, "null"]</code> when nullable, its
+  <code>"format"</code> when it declares one, and <code>"title"</code> from its <code>label</code>
+  when it has one. Adapters set a label only where the author wrote one,
+  so a title is never a field name restated in worse English.</li>
+<li><strong>Nesting</strong> is as on input: <code>fields</code> make an object schema, an
+  object with none is <code>{"type": "object"}</code>, and an array's <code>items</code> are
+  <code>{"type": t}</code>, a nested item's object schema, or <code>{}</code> when undeclared.</li>
+<li><strong>Choices</strong> are <code>(value, display)</code> pairs. When every display is just
+  <code>str(value)</code> they are an <code>"enum"</code> of the values, since a title
+  restating the constant teaches nothing. Otherwise they are a <code>"oneOf"</code>
+  of <code>{"const": value, "title": display}</code>, so the human phrasing travels
+  with each value; <code>title</code> constrains nothing, and the accepted set stays
+  exactly the constants. The <code>"type"</code> is stated either way. A nullable
+  field adds <code>None</code> (<code>{"const": None}</code> in a <code>oneOf</code>) when its choices
+  do not list it, because both forms claim the whole set of values. On an
+  array the choices describe each element and go on <code>items</code>. A choice
+  set holding a value JSON cannot carry is left out whole.</li>
+</ul>
+<p><code>marking</code> is <strong>not</strong> emitted. Showing a field to an agent audience, or
+leaving it out, is a projection over this schema, and projection is not
+the kernel's yet; the kernel declares a marking and applies none, which is
+why a <code>HIDDEN</code> field is described here like any other.</p>
+<p>As on input: no <code>$defs</code> or <code>$ref</code>, no <code>$schema</code> key, and a new
+schema on every call.</p>
+
+
+    </div>
+
 </div><h2 id="dataclass-adapters">Dataclass adapters<a class="headerlink" href="#dataclass-adapters" title="Permanent link">&para;</a></h2>
 
 
@@ -5965,8 +6645,9 @@ types and builds the instance, nested dataclasses included.</p>
   share. An <code>Enum</code> decodes to the member.</li>
 <li><code>list[X]</code>: an array; <code>list[SomeDataclass]</code> is an array of rows, each
   declared as nested Parameters. For any other element, <code>Parameter.items</code>
-  can hold only its JSON type, so a list of decimals or of choices is
-  declared as an array of strings, and the rest is decoded here.</li>
+  can hold only its JSON type, so a list of decimals is declared as an
+  array of strings and decoded here. A list of choices declares them on
+  the array, where they constrain each element.</li>
 <li>a dataclass: an object, with its own fields as nested Parameters.</li>
 <li><code>X | UnsetType</code>: the argument may be left out, with or without a
   default, and the field then holds <code>UNSET</code> rather than a value a
@@ -6168,6 +6849,468 @@ label, translated when <code>output()</code> is called; a plain <code>Enum</code
     <div class="doc doc-contents ">
 
         <p>One value's declared fields, read by attribute and encoded to JSON-like data.</p>
+<p><code>None</code> is presented as <code>None</code>: it is JSON's null, not a row whose
+every attribute is missing.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="forms-adapter">Forms adapter<a class="headerlink" href="#forms-adapter" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.adapters.forms.form_validator.FormValidator" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">FormValidator</span>
+
+
+<a href="#django_service_specs.adapters.forms.form_validator.FormValidator" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Validator (django_service_specs.validation.validator.Validator)" href="#django_service_specs.validation.validator.Validator">Validator</a></code></p>
+
+
+
+        <p>A Validator whose declaration is a Django form class.</p>
+<p><code>parameters()</code> reads the form's class-level fields, <code>base_fields</code>, in
+declaration order; <code>validate()</code> binds the arguments to a new form and
+returns what it cleaned. Every rule the form states stays the form's to
+enforce - its fields' validators, <code>clean_&lt;field&gt;()</code>, <code>clean()</code> and, on
+a <code>ModelForm</code>, the model's own validation and uniqueness checks - and the
+shape check in front of it enforces what the declaration can see.</p>
+<p>The fields it reads, and what each declares, the first match winning:</p>
+<ul>
+<li><code>BooleanField</code> and <code>NullBooleanField</code>: a <code>boolean</code>.</li>
+<li><code>DecimalField</code>: a <code>string</code> in the <code>decimal</code> format, which takes a
+  JSON number as well. <code>FloatField</code>: a <code>number</code>. <code>IntegerField</code>: an
+  <code>integer</code>.</li>
+<li><code>DateTimeField</code> and <code>DateField</code>: a <code>string</code> in the <code>date-time</code> or
+  <code>date</code> format. <code>TimeField</code> and <code>DurationField</code>: a <code>string</code>.</li>
+<li><code>ChoiceField</code>: choices, with the empty choice dropped and option
+  groups flattened. A plain one cleans with <code>str</code> and matches the
+  string against each choice's <code>str</code>, so it takes a <code>string</code> and its
+  choices are declared as strings, whatever type they were written in. A
+  <code>TypedChoiceField</code> takes the JSON type all of its values share. A
+  choice set given as a callable is computed per form and may query, so
+  it is not read: the field is a <code>string</code> with no choices, which every
+  choice field accepts, and the form checks the choice.</li>
+<li><code>MultipleChoiceField</code> and <code>TypedMultipleChoiceField</code>: an array of
+  that, whose choices constrain each element.</li>
+<li><code>ModelChoiceField</code>: the JSON type of the model field it matches rows
+  on - its <code>to_field_name</code>, or the primary key - and no choices, since
+  they are rows and reading them would query. <code>ModelMultipleChoiceField</code>:
+  an array of that. They validate to the row, and to a queryset of rows.</li>
+<li>any other <code>CharField</code> (email, URL, slug, UUID, regex, IP address): a
+  <code>string</code>.</li>
+</ul>
+<p>Refused with <code>ImproperlyConfigured</code>, naming the form, the field and its
+class: a <code>FileField</code> or <code>ImageField</code>, a <code>JSONField</code>, a
+<code>MultiValueField</code> such as <code>SplitDateTimeField</code>, a <code>ComboField</code>, any
+field the list does not cover, and a <code>ModelChoiceField</code> with no queryset
+or matching rows on a model field with no JSON type. The declaration is read at
+construction, so a form that cannot be described fails where the spec is
+written; nothing in it queries or needs a translation, so building a spec
+at import time is safe. <code>help</code> is the exception, and is read from
+<code>help_text</code> on each <code>parameters()</code> call, in the language active then.</p>
+<p>What the Parameters say about presence is what the form does:</p>
+<ul>
+<li><code>required</code> is the field's own <code>required</code>. For a <code>BooleanField</code> that
+  is a statement about presence too: an absent checkbox cleans to
+  <code>False</code>, which a required one refuses, as it refuses <code>false</code>.
+  A <code>NullBooleanField</code> is never required, whatever it says, because its
+  validation is empty and it takes an absent value as <code>None</code>.</li>
+<li><code>nullable</code> is <code>not required</code>, and always true for a
+  <code>NullBooleanField</code>. A form reads <code>None</code> as an empty value for every
+  field, so an optional field takes <code>null</code> and cleans it to its empty
+  value, and a required one refuses it.</li>
+<li><code>default</code> is always
+  <a class="autorefs autorefs-internal" title="UNSET
+
+
+  
+      module-attribute
+  " href="#django_service_specs.types.unset.UNSET"><code>UNSET</code></a>: a field's <code>initial</code>
+  is what an unbound form displays, and a bound form cleans an absent
+  optional field to its empty value, never to its initial.</li>
+</ul>
+<p><strong>The types are JSON's, and do not cross.</strong> A form reads its data as an
+HTML post's strings, so it also takes a value of another type through
+<code>str</code> - a number for a <code>CharField</code>, <code>1</code> for the choice <code>"1"</code> -
+and the shape check refuses one, as it does for every declaration: a
+caller sends the declared type. The empty choice is the other case: an
+optional choice field reads <code>""</code> as no value, and a caller sends
+<code>null</code> for that instead.</p>
+<p><strong>Declare the fields on the class.</strong> A field a form adds or changes in its
+own <code>__init__</code> is not in <code>base_fields</code>, so it is not described, and
+under <code>UnknownArguments.REJECT</code> the closed argument set refuses its key
+before the form is built. A field declared <code>disabled</code> is not a
+parameter either: the form ignores what a caller sends for it and cleans
+its <code>initial</code>, which <code>validate()</code> returns with the rest.</p>
+<p><strong>A <code>ModelForm</code> is bound to a copy of the target.</strong> When the
+<a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
+carries a row of the form's model, the form is built with
+<code>instance=</code> a shallow copy of it, so its uniqueness checks exclude the
+row being updated. It is a copy because a <code>ModelForm</code> writes the cleaned
+values onto its instance while it validates: handed the target itself, it
+would change the row the service receives before the service runs, and a
+helper that saves only what changed, such as
+<a class="autorefs autorefs-internal" title="update_from_input" href="#django_service_specs.mutations.update_from_input.update_from_input"><code>update_from_input</code></a>,
+would find nothing to save. Any other target - the queryset a collection
+selector resolves, or none - binds the form as a create. The form is built
+from <code>data=</code> and <code>instance=</code> alone, so one whose <code>__init__</code> requires
+more, such as the signed-in user, cannot be used as it is.</p>
+<p>A refusal is one
+<a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>
+carrying the form's own errors and messages, <code>{field: [messages]}</code>, with
+the form-wide ones Django keeps under <code>"__all__"</code> moved to
+<code>non_field_errors</code>, the key every other refusal uses. An argument no
+field declares is ignored by the form, as Django ignores any key it has
+no field for: the closed argument set in front of it is what refuses one.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.forms.form_validator.FormValidator.parameters" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">parameters</span>
+
+
+<a href="#django_service_specs.adapters.forms.form_validator.FormValidator.parameters" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">parameters</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Parameters</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The form's class-level fields, in declaration order, as Parameters. Never queries.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.forms.form_validator.FormValidator.validate" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validate</span>
+
+
+<a href="#django_service_specs.adapters.forms.form_validator.FormValidator.validate" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">validate</span><span class="p">(</span><span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">context</span><span class="p">:</span> <span class="n">ValidationContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The form's <code>cleaned_data</code>, or <code>InvalidArguments</code> carrying its errors.</p>
+<p>A <code>ModelChoiceField</code> cleans to the row and a
+<code>ModelMultipleChoiceField</code> to a queryset, which is what the service
+receives.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="pydantic-adapters">Pydantic adapters<a class="headerlink" href="#pydantic-adapters" title="Permanent link">&para;</a></h2>
+<p>Installed with the <code>pydantic</code> extra and imported from
+<code>django_service_specs.adapters.pydantic</code>.</p>
+
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PydanticValidator</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Validator (django_service_specs.validation.validator.Validator)" href="#django_service_specs.validation.validator.Validator">Validator</a></code></p>
+
+
+
+        <p>A Validator whose declaration is a pydantic model.</p>
+<p><code>parameters()</code> reads the model's fields into Parameters, and
+<code>validate()</code> hands the arguments to the model: pydantic builds the
+instance, nested models included, and its own validators run as they would
+for any other caller.</p>
+<p>The annotations are read as
+<a class="autorefs autorefs-internal" title="DataclassValidator" href="#django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator"><code>DataclassValidator</code></a>
+reads them, from one shared table, so a model and a dataclass declaring
+the same field declare the same parameter: <code>str</code>, <code>int</code>, <code>float</code>,
+<code>bool</code>; <code>Decimal</code>, <code>datetime</code> and <code>date</code> as strings with their
+format; <code>X | None</code> as nullable; <code>Literal[...]</code> and an <code>Enum</code> as
+choices; <code>Annotated</code> looked through; and <code>list[X]</code> of any of these.
+On top of those:</p>
+<ul>
+<li>a nested model is an object with its own fields as nested Parameters,
+  and <code>list[SomeModel]</code> an array of rows;</li>
+<li><code>dict[str, X]</code> is an object with no declared fields, whose values are
+  pydantic's to validate;</li>
+<li>a model that contains itself is described four times on one path
+  (<code>MAX_APPEARANCES</code> in the adapter's <code>utils</code>), and deeper levels as
+  an object with no fields. pydantic still validates every level.</li>
+</ul>
+<p><code>Any</code>, a union of two types, <code>UnsetType</code>, a <code>RootModel</code> and anything
+else without one JSON type is refused with <code>ImproperlyConfigured</code> naming
+the model and the field, never read as a string.</p>
+<p><strong>Names.</strong> A parameter is named for the key pydantic validates by: the
+field's <code>validation_alias</code> when it is a string, else its <code>alias</code>, else
+its name (the name alone when the model sets <code>validate_by_alias=False</code>).
+An <code>AliasPath</code> or <code>AliasChoices</code> is not one name, and is refused.
+<code>validate()</code> returns the values keyed by the <strong>field name</strong> whatever the
+wire called them, because that is the keyword the service is called with.</p>
+<p><code>required</code> is pydantic's own <code>is_required()</code>. The default is reported
+when JSON carries it as itself; a <code>default_factory</code>, or a default such
+as a <code>Decimal</code> or a date, is not reported, and the field is optional
+all the same. <code>help</code> is the field's <code>description</code>.</p>
+<p><strong>A row that updates must declare its key</strong>, as with the dataclass
+adapter: <code>pk: int | None = None</code> on the row's model, or no incoming row
+matches an existing one and every update replaces every row.</p>
+<p><strong>Refusals keep pydantic's words</strong>, addressed by path into the kernel's
+tree: <code>{"books": {1: {"title": ["..."]}}}</code>, with a row's index as an
+<code>int</code>. A message about a model itself - its <code>model_validator</code> refusing
+- sits under <code>non_field_errors</code> inside that model, or at the top for the
+model being validated. The kernel's shape check runs first and refuses a
+wrong JSON type in the kernel's words, so pydantic's are what a caller
+reads for its own rules: bounds, patterns, validators.</p>
+<p><strong>Time zones are pydantic's</strong>: an offset-less date-time stays naive, where
+<code>DataclassValidator</code> makes it aware as Django's forms do. Declare the
+offset, or convert in the service.</p>
+<p>The declaration is read at construction, so an unmappable field fails
+where the spec is written. A model whose annotations named a class not yet
+defined when it was built is completed first, as pydantic completes it on
+first use.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.parameters" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">parameters</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.parameters" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">parameters</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Parameters</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The model's fields as Parameters, named as pydantic validates them. Never queries.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validate" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validate</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validate" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">validate</span><span class="p">(</span><span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">context</span><span class="p">:</span> <span class="n">ValidationContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Every field's validated value, keyed by field name, or <code>InvalidArguments</code>.</p>
+<p>The context reaches pydantic's validators as <code>info.context</code>, a dict
+with <code>"principal"</code> and <code>"target"</code>, so a validator can check a
+value against the caller or the row being updated. Nested values stay
+model instances, which is what the mutation helpers read a row from.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PydanticPresenter</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="Presenter (django_service_specs.output.presenter.Presenter)" href="#django_service_specs.output.presenter.Presenter">Presenter</a></code></p>
+
+
+
+        <p>An operation's output declared as a pydantic model, rendered by that model.</p>
+<p><code>output()</code> reads the fields as
+<a class="autorefs autorefs-internal" title="PydanticValidator" href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator"><code>PydanticValidator</code></a>
+does, so one model declares the same types going in and coming out, and
+adds what only the output side has:</p>
+<ul>
+<li>each field is named for the key <code>model_dump(by_alias=True)</code> emits:
+  its <code>serialization_alias</code>, else its <code>alias</code>, else its name;</li>
+<li>fields declared <code>exclude=True</code> are not output, and each
+  <code>computed_field</code> is, after the fields, typed by its return annotation;</li>
+<li>every field is <code>always_present</code>, because <code>model_dump</code> emits every
+  key, except one with an <code>exclude_if</code>, which may be dropped;</li>
+<li><code>label</code> is the field's <code>title</code> when the author set one, and <code>None</code>
+  otherwise: pydantic invents no label, and a reader can title-case a
+  name as well as an adapter;</li>
+<li>choices are (value, display) pairs: a Django <code>Choices</code> enum supplies
+  its label, translated when <code>output()</code> is called, and a plain <code>Enum</code>
+  or a <code>Literal</code> has no display of its own, so the value's <code>str</code>
+  stands in;</li>
+<li>a <code>FieldMarking</code> is declared in the field's <code>Annotated</code> metadata:
+  <code>id: Annotated[int, FieldMarking.handle()]</code>.</li>
+</ul>
+<p><code>present(value)</code> renders with the model itself, so its serializers and
+its JSON encoding are what a caller receives. The value may be an instance
+of the model, a model row, any object carrying the same names, or a
+mapping keyed by field name. Anything but an instance is read one declared
+field at a time, by attribute or by key, and the model validates what was
+read: a related collection may be a manager, read through <code>.all()</code> so a
+prefetch is used when there is one, where pydantic's own
+<code>from_attributes</code> would fail on it. A field the value does not carry is
+left to the model's default.</p>
+<p>A value that does not fit the model raises pydantic's <code>ValidationError</code>
+as it is. What is presented is the operation's own value rather than a
+caller's, so a mismatch is a defect in the operation, not a refusal to
+report.</p>
+<p>The declaration is read at construction, as the validator's is.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.output" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">output</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.output" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">output</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Output</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The model's output fields, then its computed fields, as an Output. Never queries.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.present" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">present</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_presenter.PydanticPresenter.present" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">present</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One value, validated by the model and dumped as JSON data by alias.</p>
 <p><code>None</code> is presented as <code>None</code>: it is JSON's null, not a row whose
 every attribute is missing.</p>
 

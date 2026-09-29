@@ -17,6 +17,14 @@
          <lastmod>2026-09-29</lastmod>
     </url>
     <url>
+         <loc>https://artui.github.io/django-service-specs/forms/</loc>
+         <lastmod>2026-09-29</lastmod>
+    </url>
+    <url>
+         <loc>https://artui.github.io/django-service-specs/pydantic/</loc>
+         <lastmod>2026-09-29</lastmod>
+    </url>
+    <url>
          <loc>https://artui.github.io/django-service-specs/reference/</loc>
          <lastmod>2026-09-29</lastmod>
     </url>
@@ -26,6 +34,10 @@
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/relations/</loc>
+         <lastmod>2026-09-29</lastmod>
+    </url>
+    <url>
+         <loc>https://artui.github.io/django-service-specs/schema/</loc>
          <lastmod>2026-09-29</lastmod>
     </url>
 </urlset>
