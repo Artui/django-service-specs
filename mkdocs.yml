@@ -5,6 +5,15 @@ repo_url: https://github.com/Artui/django-service-specs
 repo_name: Artui/django-service-specs
 edit_uri: edit/main/docs/
 
+# docs/ is also a Python package, so the suite imports and runs every example
+# as docs.examples.<name>. The pages take those sources through snippets, read
+# from disk, so neither the sources nor their bytecode belong in the site. Keep
+# this narrow: the release job writes coverage.json here for the README badge
+# and relies on MkDocs copying it. tests/docs/test_site.py holds both halves.
+exclude_docs: |
+  *.py
+  __pycache__/
+
 theme:
   name: material
   palette:
