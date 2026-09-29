@@ -209,6 +209,36 @@ class TestChoices:
             "items": {"type": "string", "oneOf": [{"const": "r", "title": "Red"}]},
         }
 
+    def test_a_nullable_element_admits_null_in_its_items_and_its_choices(self) -> None:
+        tags = OutputField(
+            "tags", "array", items="string", choices=[("r", "Red")], items_nullable=True
+        )
+        sizes = OutputField(
+            "sizes", "array", items="integer", choices=[(1, "1")], items_nullable=True
+        )
+
+        # The array itself stays non-null: the two are independent.
+        assert one(tags) == {
+            "type": "array",
+            "items": {
+                "type": ["string", "null"],
+                "oneOf": [{"const": "r", "title": "Red"}, {"const": None}],
+            },
+        }
+        assert one(sizes)["items"] == {"type": ["integer", "null"], "enum": [1, None]}
+
+    def test_a_nullable_nested_item_admits_null_beside_its_properties(self) -> None:
+        publishers = OutputField("publishers", "array", items=PUBLISHER, items_nullable=True)
+
+        assert one(publishers) == {
+            "type": "array",
+            "items": {
+                "type": ["object", "null"],
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+        }
+
     def test_choices_json_cannot_carry_are_left_out_whole(self) -> None:
         rate = OutputField(
             "rate", "string", format="decimal", choices=[("1", "1"), (Decimal("2"), "2")]

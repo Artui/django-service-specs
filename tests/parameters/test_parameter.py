@@ -22,6 +22,7 @@ def test_defaults() -> None:
         None,
     )
     assert p.default is UNSET
+    assert p.items_nullable is False
 
 
 def test_choices_are_normalized_to_a_tuple() -> None:
@@ -37,6 +38,9 @@ def test_choices_are_normalized_to_a_tuple() -> None:
         ({"type": "string", "items": "string"}, "items describes an array's element"),
         ({"type": "array", "items": "str"}, "items 'str' is not a JSON type"),
         ({"type": "array", "fields": ROW}, "fields describes an object's own parameters"),
+        # An undeclared element admits anything, null included, so saying so
+        # again describes nothing a reader could act on.
+        ({"type": "array", "items_nullable": True}, "items_nullable describes a declared element"),
     ],
 )
 def test_refuses_a_declaration_no_reader_can_act_on(kwargs: dict, message: str) -> None:
@@ -55,3 +59,8 @@ def test_nested_is_an_objects_fields_or_an_arrays_rows() -> None:
 
 def test_a_format_on_a_string_is_kept() -> None:
     assert Parameter("price", "string", format="decimal").format == "decimal"
+
+
+def test_an_arrays_declared_element_may_be_nullable() -> None:
+    assert Parameter("scores", "array", items="integer", items_nullable=True).items_nullable
+    assert Parameter("books", "array", items=ROW, items_nullable=True).items_nullable

@@ -19,6 +19,7 @@ def test_defaults() -> None:
         None,
     )
     assert f.always_present is True
+    assert f.items_nullable is False
 
 
 def test_choices_are_value_and_display_pairs() -> None:
@@ -36,6 +37,7 @@ def test_choices_are_value_and_display_pairs() -> None:
         ({"type": "number", "format": "decimal"}, "a format describes a string"),
         ({"type": "string", "fields": Output()}, "fields describes an object"),
         ({"type": "string", "items": "string"}, "items describes an array"),
+        ({"type": "array", "items_nullable": True}, "items_nullable describes a declared element"),
         ({"type": "string", "choices": ["d", "p"]}, "choices are \\(value, display\\) pairs"),
     ],
 )
@@ -52,3 +54,9 @@ def test_nesting_is_legal_where_the_type_allows_it() -> None:
 
 def test_a_format_on_a_string_is_kept() -> None:
     assert OutputField("price", "string", format="decimal").format == "decimal"
+
+
+def test_an_arrays_declared_element_may_be_nullable() -> None:
+    inner = Output((OutputField("name", "string"),))
+    assert OutputField("scores", "array", items="integer", items_nullable=True).items_nullable
+    assert OutputField("books", "array", items=inner, items_nullable=True).items_nullable

@@ -333,3 +333,27 @@ def test_a_list_of_choices_declares_their_pairs_for_each_element() -> None:
     assert output.get("modes").choices == (("fast", "fast"), ("slow", "slow"))
     assert output.get("colours").choices == (("red", "red"), ("blue", "blue"))
     assert output.get("statuses").choices == (("draft", "Draft"), ("published", "Published"))
+
+
+@dataclass
+class _Gaps:
+    scores: list[int | None]
+    addresses: list[Address | None]
+    tags: list[str]
+
+
+def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> None:
+    output = DataclassPresenter(_Gaps).output()
+    assert [(f.name, f.items_nullable, f.nullable) for f in output] == [
+        ("scores", True, False),
+        ("addresses", True, False),
+        ("tags", False, False),
+    ]
+    presented = DataclassPresenter(_Gaps).present(
+        _Gaps(scores=[1, None], addresses=[None, Address(city="Oslo")], tags=[])
+    )
+    assert presented == {
+        "scores": [1, None],
+        "addresses": [None, {"city": "Oslo", "postcode": None}],
+        "tags": [],
+    }

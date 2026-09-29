@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 
+from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -156,3 +158,16 @@ def test_the_validators_refusal_reaches_the_caller() -> None:
         bind_arguments(spec, {"title": "Taken"}, principal=PRINCIPAL)
     assert caught.value.detail == {"title": ["A book with this title already exists."]}
     assert len(validator.calls) == 1
+
+
+@dataclass
+class _Scores:
+    scores: list[int | None]
+
+
+def test_a_null_element_the_validator_takes_reaches_it() -> None:
+    # The shape check answers first, so an element it could not see as nullable
+    # was refused before the Validator that accepts it was ever asked.
+    spec = ServiceSpec(service=service, validator=DataclassValidator(_Scores))
+    bound = bind_arguments(spec, {"scores": [1, None]}, principal=PRINCIPAL)
+    assert bound == {"scores": [1, None]}

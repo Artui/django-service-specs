@@ -37,7 +37,8 @@ class PydanticValidator(Validator):
     the same field declare the same parameter: ``str``, ``int``, ``float``,
     ``bool``; ``Decimal``, ``datetime`` and ``date`` as strings with their
     format; ``X | None`` as nullable; ``Literal[...]`` and an ``Enum`` as
-    choices; ``Annotated`` looked through; and ``list[X]`` of any of these.
+    choices; ``Annotated`` looked through; and ``list[X]`` of any of these,
+    where ``list[X | None]`` makes the element nullable and not the array.
     On top of those:
 
     - a nested model is an object with its own fields as nested Parameters,
@@ -126,6 +127,9 @@ def _parameter(fs: FieldShape) -> Parameter:
         required=fs.required,
         format=shape.format,
         items=_items(shape.items),
+        # ``list[X | None]``: the element's own nullability, which the array's
+        # is not. Declared, or the shape check refuses the null the library takes.
+        items_nullable=shape.items is not None and shape.items.nullable,
         fields=None if shape.fields is None else _parameters(shape.fields),
         # A list's choices are its element's: an array's choices constrain each
         # element, and ``items`` can hold only the element's JSON type.

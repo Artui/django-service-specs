@@ -266,6 +266,25 @@ def test_an_arrays_choices_constrain_each_element() -> None:
     }
 
 
+def test_a_null_element_is_kept_where_the_element_is_nullable() -> None:
+    # A gap in the list, as ``list[int | None]`` holds one: kept at its index
+    # and read against neither the element's type nor its choices, while every
+    # other element still is.
+    params = one(Parameter("ids", "array", items="integer", items_nullable=True, choices=(1, 2)))
+    assert check_arguments(params, {"ids": [1, None, 2]}) == {"ids": [1, None, 2]}
+    assert refusal(params, {"ids": [None, "2", 3]}) == {
+        "ids": {
+            1: ["Expected an integer."],
+            2: ["Select a valid choice. 3 is not one of the available choices."],
+        }
+    }
+
+
+def test_a_nullable_element_leaves_the_array_itself_not_nullable() -> None:
+    params = one(Parameter("ids", "array", items="integer", items_nullable=True))
+    assert refusal(params, {"ids": None}) == {"ids": [NULL]}
+
+
 def test_an_array_with_no_items_accepts_any_element() -> None:
     # Holds the ``json_type is not None`` condition in ``_type_problem``.
     params = one(Parameter("anything", "array"))
@@ -292,6 +311,17 @@ def test_a_row_that_is_not_an_object_is_refused_under_non_field_errors_in_the_ro
             0: {NON_FIELD_ERRORS: ["Expected an object."]},
             1: {NON_FIELD_ERRORS: ["Expected an object."]},
         }
+    }
+
+
+def test_a_null_row_is_kept_where_the_rows_are_nullable() -> None:
+    params = one(Parameter("books", "array", items=BOOK, items_nullable=True))
+    assert check_arguments(params, {"books": [{"title": "Lathe"}, None]}) == {
+        "books": [{"title": "Lathe"}, None]
+    }
+    # A row that is there is still checked and closed.
+    assert refusal(params, {"books": [None, {"isbn": "1"}]}) == {
+        "books": {1: {"title": [REQUIRED]}}
     }
 
 

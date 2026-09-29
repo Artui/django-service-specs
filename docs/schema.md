@@ -145,13 +145,15 @@ contradict, and states everything the declaration knows.
 
 - **Nullable is stated for every node**, objects and arrays included, as a
   type list: `["string", "null"]`. Parameters carries `nullable` whichever
-  library declared the field, so the schema does not depend on it.
+  library declared the field, so the schema does not depend on it. An
+  array's element states its own, from `items_nullable`, on `items`: the
+  array and its elements may each be null or not, independently.
 - **An enum lists every accepted value.** An enum claims to be the whole set,
   so leaving a value out is a falsehood rather than an omission. A nullable
   parameter with choices therefore lists `null` among them, because the shape
   check accepts a null before it reads the choices. An array's choices
-  constrain each element, so they sit on `items`, and never gain `null` there:
-  a null element is refused whether or not the array itself may be null.
+  constrain each element, so they sit on `items`, and gain `null` there by
+  the element's nullability alone, never by the array's.
 - **`required` lists what the shape check refuses when absent**: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it
