@@ -121,6 +121,10 @@ the same declaration.
   is refused by the declaration rather than reaching a constructor.
 - **`choices`**, **`nullable`** and **`required`** mean what they say.
   `choices` on an array constrains each element.
+- **`items_nullable`** is the element's own nullability, as `list[int | None]`
+  declares it: whether a `null` may stand where an element would. It is
+  independent of `nullable`, which is the array's, and it needs `items`,
+  since an undeclared element admits anything already.
 - **`default`** is [`UNSET`][django_service_specs.types.unset.UNSET] when none
   is declared, so a default of `None` stays a real default. It is reported, not
   applied: whether an omitted argument arrives as its default is the validating
@@ -181,7 +185,7 @@ docs/examples/declaring.py:validator
 | --- | --- |
 | `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. |
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number. |
-| `X \| None` | Nullable. |
+| `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. |
 | `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. |
 | a dataclass | An object, with its fields as nested Parameters. |

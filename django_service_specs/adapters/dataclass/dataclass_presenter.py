@@ -88,6 +88,9 @@ def _output_field(fs: FieldShape) -> OutputField:
         marking=fs.marking,
         fields=None if shape.fields is None else _output(shape.fields),
         items=_items(shape.items),
+        # ``list[X | None]``: the element's own nullability, which the array's
+        # is not. Declared, or the shape check refuses the null the library takes.
+        items_nullable=shape.items is not None and shape.items.nullable,
     )
 
 

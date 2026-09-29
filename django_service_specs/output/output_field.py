@@ -34,8 +34,9 @@ class OutputField:
       schema lists only always-present keys as required.
     - ``marking``: how an agent audience is shown the field.
 
-    ``fields`` and ``items`` describe a nested object and an array's element, as
-    on ``Parameter``.
+    ``fields`` and ``items`` describe a nested object and an array's element,
+    and ``items_nullable`` whether a ``null`` may stand in for an element, as on
+    ``Parameter``.
     """
 
     name: str
@@ -49,6 +50,7 @@ class OutputField:
     marking: FieldMarking | None = None
     fields: Output | None = None
     items: str | Output | None = None
+    items_nullable: bool = False
 
     def __post_init__(self) -> None:
         where = f"OutputField {self.name!r}"
@@ -72,6 +74,10 @@ class OutputField:
             raise ImproperlyConfigured(f"{where}: fields describes an object's own fields.")
         if self.items is not None and self.type != "array":
             raise ImproperlyConfigured(f"{where}: items describes an array's element.")
+        if self.items_nullable and self.items is None:
+            raise ImproperlyConfigured(
+                f"{where}: items_nullable describes a declared element; declare items."
+            )
         if self.choices is not None:
             pairs = tuple(tuple(pair) for pair in self.choices)
             if any(len(pair) != 2 for pair in pairs):

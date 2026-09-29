@@ -31,6 +31,7 @@ def output_schema(output: Output) -> dict[str, Any]:
     - **Nesting** is as on input: ``fields`` make an object schema, an
       object with none is ``{"type": "object"}``, and an array's ``items`` are
       ``{"type": t}``, a nested item's object schema, or ``{}`` when undeclared.
+      ``items_nullable`` makes the item's type ``[t, "null"]``.
     - **Choices** are ``(value, display)`` pairs. When every display is just
       ``str(value)`` they are an ``"enum"`` of the values, since a title
       restating the constant teaches nothing. Otherwise they are a ``"oneOf"``
@@ -39,7 +40,8 @@ def output_schema(output: Output) -> dict[str, Any]:
       exactly the constants. The ``"type"`` is stated either way. A nullable
       field adds ``None`` (``{"const": None}`` in a ``oneOf``) when its choices
       do not list it, because both forms claim the whole set of values. On an
-      array the choices describe each element and go on ``items``. A choice
+      array the choices describe each element and go on ``items``, widened
+      by ``items_nullable`` rather than the array's own nullability. A choice
       set holding a value JSON cannot carry is left out whole.
 
     ``marking`` is **not** emitted. Showing a field to an agent audience, or
@@ -97,8 +99,13 @@ def _items_schema(field: OutputField) -> dict[str, Any]:
     else:
         schema = {"type": items}
     if field.choices is not None:
-        # Not widened with null: the array's nullability is the array's own.
-        schema.update(_choice_keywords(field.choices, nullable=False))
+        # Widened with null by the element's nullability, never the array's,
+        # which describes the array.
+        schema.update(_choice_keywords(field.choices, nullable=field.items_nullable))
+    if field.items_nullable:
+        # ``OutputField`` refuses ``items_nullable`` without ``items``, so the
+        # element is typed and ``allow_null`` has a type to widen.
+        schema = allow_null(schema)
     return schema
 
 

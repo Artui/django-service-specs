@@ -486,3 +486,47 @@ def test_a_list_of_choices_declares_them_for_each_element() -> None:
         ("colours", "string", ("red", "blue")),
         ("statuses", "string", ("draft", "published")),
     ]
+
+
+@dataclass
+class _Gaps:
+    scores: list[int | None]
+    addresses: list[Address | None]
+    modes: list[Literal["fast", None]]
+    tags: list[str]
+
+
+def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> None:
+    params = DataclassValidator(_Gaps).parameters()
+    assert [(p.name, p.items_nullable, p.nullable) for p in params] == [
+        ("scores", True, False),
+        ("addresses", True, False),
+        # ``Literal["fast", None]`` spells a nullable choice: the null is the
+        # element's to take, and the choices keep only the values.
+        ("modes", True, False),
+        ("tags", False, False),
+    ]
+    modes = params.get("modes")
+    assert modes is not None and modes.choices == ("fast",)
+
+
+def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
+    # Dispatch runs the shape check before the Validator, so a null element the
+    # declaration did not call nullable was refused before this adapter saw it.
+    params = DataclassValidator(_Gaps).parameters()
+    arguments = {
+        "scores": [1, None],
+        "addresses": [None, {"city": "Oslo"}],
+        "modes": [None, "fast"],
+        "tags": ["a"],
+    }
+    values = DataclassValidator(_Gaps).validate(check_arguments(params, arguments), CONTEXT)
+    assert values == {
+        "scores": [1, None],
+        "addresses": [None, Address(city="Oslo")],
+        "modes": [None, "fast"],
+        "tags": ["a"],
+    }
+    with pytest.raises(InvalidArguments) as caught:
+        check_arguments(params, {**arguments, "tags": [None]})
+    assert caught.value.detail == {"tags": {0: ["Expected a string."]}}

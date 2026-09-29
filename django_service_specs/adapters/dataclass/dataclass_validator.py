@@ -49,7 +49,9 @@ class DataclassValidator(Validator):
       types, so ``true`` is not an ``int``.
     - ``Decimal``, ``datetime``, ``date``: a string, with the format it decodes
       from. A decimal takes a JSON number too, as every decimal validator does.
-    - ``X | None``: nullable.
+    - ``X | None``: nullable. Inside a list, ``list[X | None]``, it is the
+      element that is, declared as ``items_nullable`` and not as the array's
+      own nullability.
     - ``Literal[...]`` and an ``Enum`` (Django's ``TextChoices`` and
       ``IntegerChoices`` included): choices, of the JSON type the values
       share. An ``Enum`` decodes to the member.
@@ -149,6 +151,9 @@ def _parameter(fs: FieldShape) -> Parameter:
         required=fs.required,
         format=shape.format,
         items=_items(shape.items),
+        # ``list[X | None]``: the element's own nullability, which the array's
+        # is not. Declared, or the shape check refuses the null the library takes.
+        items_nullable=shape.items is not None and shape.items.nullable,
         fields=None if shape.fields is None else _parameters(shape.fields),
         # A list's choices are its element's: an array's choices constrain each
         # element, and ``items`` can hold only the element's JSON type.

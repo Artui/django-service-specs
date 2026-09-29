@@ -53,7 +53,7 @@ same parameter:
 | --- | --- |
 | `str`, `int`, `float`, `bool` | Their JSON types. |
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. |
-| `X \| None` | Nullable. |
+| `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. |
 | `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. |
 | a model | An object, with its fields as nested Parameters. |

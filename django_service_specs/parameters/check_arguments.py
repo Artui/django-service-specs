@@ -154,6 +154,16 @@ def _check_value(param: Parameter, value: Any, policy: UnknownArguments) -> tupl
     cleaned: list[Any] = []
     errors: dict[int, Any] = {}
     for index, element in enumerate(value):
+        # A gap the declaration allows, as ``list[int | None]`` holds one: kept at
+        # its index and read against neither the element's type nor its choices,
+        # as a nullable parameter's own null is not. One branch to coverage: the
+        # first condition is held by
+        # test_a_null_element_is_kept_where_the_element_is_nullable (its ``3``),
+        # the second by
+        # test_a_flat_array_checks_each_element_and_addresses_only_the_failures.
+        if element is None and param.items_nullable:
+            cleaned.append(None)
+            continue
         checked, detail = _check_one(
             element_type,
             element,

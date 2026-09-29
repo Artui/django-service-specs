@@ -428,3 +428,63 @@ def test_a_list_of_choices_declares_them_for_each_element() -> None:
         ("colours", "string", ("red", "blue")),
         ("statuses", "string", ("draft", "published")),
     ]
+
+
+class _Gaps(BaseModel):
+    scores: list[int | None]
+    addresses: list[Address | None]
+    modes: list[Literal["fast", None]]
+    tags: list[str]
+
+
+class _Sparse(BaseModel):
+    """A tree whose child lists may hold a gap, down past the appearance bound."""
+
+    name: str
+    children: list[_Sparse | None] = []
+
+
+def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> None:
+    params = PydanticValidator(_Gaps).parameters()
+    assert [(p.name, p.items_nullable, p.nullable) for p in params] == [
+        ("scores", True, False),
+        ("addresses", True, False),
+        ("modes", True, False),
+        ("tags", False, False),
+    ]
+    modes = params.get("modes")
+    assert modes is not None and modes.choices == ("fast",)
+
+
+def test_a_truncated_row_keeps_its_nullability() -> None:
+    # Past the bound a row is declared as an object with no fields, and a gap
+    # in the list is still pydantic's to accept, so it stays declared.
+    children = PydanticValidator(_Sparse).parameters().get("children")
+    for _ in range(3):
+        assert children is not None and isinstance(children.items, Parameters)
+        assert children.items_nullable
+        children = children.items.get("children")
+    assert children is not None
+    assert (children.items, children.items_nullable) == ("object", True)
+
+
+def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
+    # Dispatch runs the shape check before the Validator, so a null element the
+    # declaration did not call nullable was refused before this adapter saw it.
+    params = PydanticValidator(_Gaps).parameters()
+    arguments = {
+        "scores": [1, None],
+        "addresses": [None, {"city": "Oslo"}],
+        "modes": [None, "fast"],
+        "tags": ["a"],
+    }
+    values = PydanticValidator(_Gaps).validate(check_arguments(params, arguments), CONTEXT)
+    assert values == {
+        "scores": [1, None],
+        "addresses": [None, Address(city="Oslo")],
+        "modes": [None, "fast"],
+        "tags": ["a"],
+    }
+    with pytest.raises(InvalidArguments) as caught:
+        check_arguments(params, {**arguments, "tags": [None]})
+    assert caught.value.detail == {"tags": {0: ["Expected a string."]}}

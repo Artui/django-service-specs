@@ -286,7 +286,7 @@ class TestChoices:
     def test_a_nullable_arrays_items_do_not_admit_null(self) -> None:
         tags = Parameter("tags", "array", items="string", choices=["red"], nullable=True)
 
-        # Null is the array's to take, never an element's.
+        # Null is the array's to take, and an element's only where items_nullable says so.
         assert check_arguments(Parameters.of(tags), {"tags": None}) == {"tags": None}
         assert refused(Parameters.of(tags), {"tags": [None]}) == {
             "tags": {0: ["Expected a string."]}
@@ -294,6 +294,35 @@ class TestChoices:
         assert one(tags) == {
             "type": ["array", "null"],
             "items": {"type": "string", "enum": ["red"]},
+        }
+
+    def test_a_nullable_element_admits_null_in_its_items_and_its_enum(self) -> None:
+        ids = Parameter("ids", "array", items="integer", items_nullable=True, choices=[1, 2])
+
+        # The shape check keeps a null element without reading the choices, so an
+        # enum that did not list it would refuse a call that runs.
+        assert check_arguments(Parameters.of(ids), {"ids": [1, None]}) == {"ids": [1, None]}
+        assert one(ids) == {
+            "type": "array",
+            "items": {"type": ["integer", "null"], "enum": [1, 2, None]},
+        }
+
+    def test_a_nullable_elements_choices_that_list_null_list_it_once(self) -> None:
+        ids = Parameter("ids", "array", items="integer", items_nullable=True, choices=[1, None])
+
+        assert one(ids)["items"] == {"type": ["integer", "null"], "enum": [1, None]}
+
+    def test_a_nullable_row_admits_null_beside_its_properties(self) -> None:
+        publishers = Parameter("publishers", "array", items=PUBLISHER, items_nullable=True)
+
+        assert one(publishers) == {
+            "type": "array",
+            "items": {
+                "type": ["object", "null"],
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+                "additionalProperties": False,
+            },
         }
 
     def test_an_untyped_arrays_choices_are_an_enum_with_no_type(self) -> None:

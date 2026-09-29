@@ -13,6 +13,7 @@ from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
 from django.db.models import Model
+from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
 from django_service_specs.mutations.field_change import FieldChange
@@ -1240,6 +1241,27 @@ async def _awrite_reverse_one_to_one(
     return RelatedObjectChange(relation=relation, outcome=outcome, pk=row.pk)
 
 
+def _collection_rows(items: Any, *, relation: str) -> list[dict[str, Any]]:
+    """A collection's incoming rows as mappings, refusing a null row before any write.
+
+    Materialized, not streamed: a row's error names its position in the
+    incoming set, so the set needs a length before the first write.
+
+    A null row is refused, every one of them at once, because ``coerce_to_dict``
+    reads ``None`` as an empty mapping: here that is a row created from nothing
+    or matched on nothing. A declaration may allow the gap (``list[Row | None]``
+    passes the shape check), and nothing in a relation spec says what one
+    stands for, so it is refused rather than guessed at. The message is Django's
+    own, which its catalog translates.
+    """
+    rows = list(items or [])
+    nulls = [index for index, row in enumerate(rows) if row is None]
+    if nulls:
+        message = gettext("This field cannot be null.")
+        raise InvalidArguments({relation: {i: {NON_FIELD_ERRORS: [message]} for i in nulls}})
+    return [coerce_to_dict(row) for row in rows]
+
+
 def _write_owned_collection(
     parent: Model,
     items: Any,
@@ -1265,9 +1287,7 @@ def _write_owned_collection(
     created_pks: list[Any] = []
     updated_pks: list[Any] = []
     matched: set[Any] = set()
-    # Materialized, not streamed: a row's error names its position in the
-    # incoming set, so the set needs a length before the first write.
-    rows: list[dict[str, Any]] = [coerce_to_dict(i) for i in (items or [])]
+    rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
         child_m2m = _resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
@@ -1329,8 +1349,7 @@ def _write_m2m_relation(
     created_pks: list[Any] = []
     updated_pks: list[Any] = []
     targets: list[Any] = []
-    # Materialized for the reason ``_write_owned_collection`` gives.
-    rows: list[dict[str, Any]] = [coerce_to_dict(i) for i in (items or [])]
+    rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
         row_m2m = _resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
@@ -1634,8 +1653,7 @@ async def _awrite_owned_collection(
     created_pks: list[Any] = []
     updated_pks: list[Any] = []
     matched: set[Any] = set()
-    # Materialized for the reason ``_write_owned_collection`` gives.
-    rows: list[dict[str, Any]] = [coerce_to_dict(i) for i in (items or [])]
+    rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
         child_m2m = _resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
@@ -1690,8 +1708,7 @@ async def _awrite_m2m_relation(
     created_pks: list[Any] = []
     updated_pks: list[Any] = []
     targets: list[Any] = []
-    # Materialized for the reason ``_write_owned_collection`` gives.
-    rows: list[dict[str, Any]] = [coerce_to_dict(i) for i in (items or [])]
+    rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
         row_m2m = _resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)

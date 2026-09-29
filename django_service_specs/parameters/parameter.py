@@ -42,6 +42,13 @@ class Parameter:
     write declare its rows: an author with its books says what a book is, where
     a flat ``items="object"`` would say nothing and let a malformed row through.
 
+    ``nullable`` is the parameter's own: whether the argument may be ``null``.
+    ``items_nullable`` is its element's: whether a ``null`` may stand in the
+    array where an element would, as in ``list[int | None]``. The two are
+    independent, because a list that may be absent and a list that may hold
+    gaps are different declarations, and an array with no declared ``items``
+    admits a ``null`` element already.
+
     ``default`` is [`UNSET`][django_service_specs.types.unset.UNSET] when none is
     declared, so a default of ``None`` stays a real default. It is reported, not
     applied: whether an omitted argument arrives as the default, as ``None`` or
@@ -58,6 +65,7 @@ class Parameter:
     required: bool = False
     format: str | None = None
     items: str | Parameters | None = None
+    items_nullable: bool = False
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
     default: Any = UNSET
@@ -90,6 +98,10 @@ class Parameter:
                     f"{where}: items {self.items!r} is not a JSON type; "
                     "pass a type name or the Parameters of an object."
                 )
+        if self.items_nullable and self.items is None:
+            raise ImproperlyConfigured(
+                f"{where}: items_nullable describes a declared element; declare items."
+            )
         if self.fields is not None and self.type != "object":
             raise ImproperlyConfigured(f"{where}: fields describes an object's own parameters.")
         if self.choices is not None:

@@ -45,13 +45,14 @@ def parameters_schema(
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
       The shape check also accepts a JSON number, which this does not advertise.
-    - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too.
+    - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too,
+      and ``items_nullable`` does the same to an array's ``items``.
     - **Choices** are an ``"enum"`` beside the ``"type"`` the parameter
       declares. On an array they go on ``items``, because the shape check
       applies them to each element. A nullable parameter's enum gains ``None``
       when its choices do not list it, since an enum claims the whole set of
-      accepted values; an array's items never do, because a null element is
-      refused whether or not the array itself may be null.
+      accepted values. An array's items do so by ``items_nullable`` alone,
+      whether or not the array itself may be null.
     - **A default** is emitted when one is declared and survives JSON encoding;
       a ``Decimal``, a date or a callable is left out rather than misstated. So
       is a choice set holding such a value, since listing only some of the
@@ -141,12 +142,17 @@ def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
     else:
         schema = {"type": items}
     if param.choices is not None:
-        # Never widened with null: the shape check refuses a null element of a
-        # typed array, whatever the array's own nullability, and an untyped
-        # element admits null only when the choices list it.
-        enum = _enum(param.choices, nullable=False)
+        # Widened with null by the element's nullability and never the array's:
+        # the shape check keeps a null element only where ``items_nullable``
+        # says so, and does so before it reads the choices. An untyped element
+        # admits null only when the choices list it.
+        enum = _enum(param.choices, nullable=param.items_nullable)
         if enum is not None:
             schema["enum"] = enum
+    if param.items_nullable:
+        # ``Parameter`` refuses ``items_nullable`` without ``items``, so the
+        # element is typed and ``allow_null`` has a type to widen.
+        schema = allow_null(schema)
     return schema
 
 

@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `items_nullable` on `Parameter` and `OutputField`: whether a `null` may
+  stand where an array's element would, as `list[int | None]` declares it.
+  It is independent of `nullable`, which remains the array's own, and it
+  needs a declared `items`. The dataclass and pydantic adapters set it from
+  the element's annotation, the shape check keeps a null element where it is
+  set, and both schemas state it on `items`, choices included.
+
+### Fixed
+- An operation declaring `list[X | None]` refused every null element before
+  its Validator ran, although both adapters accept one: the declaration had
+  no way to say the element was nullable, so the shape check read a gap as a
+  wrong type. The output schema claimed the same elements were never null.
+- A collection relation (child, generic or many-to-many) wrote a `null` row
+  as a row with no fields, created or matched on nothing. It is now refused
+  with `"This field cannot be null."` under that row's `non_field_errors`,
+  every null row at once and before any row is written.
+
 ## [0.2.0] — 2026-09-29
 
 ### Added

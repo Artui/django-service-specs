@@ -115,7 +115,11 @@ How each kind reads its value:
 - **A collection** (child, generic, many-to-many) is reconciled: incoming rows
   are matched to existing ones by `match_key` (`"pk"` by default), matched rows
   are updated, the rest are created, and in `"replace"` mode the existing rows
-  the input left out are removed. `"merge"` mode only upserts.
+  the input left out are removed. `"merge"` mode only upserts. A `null` row
+  is refused, every one of them and before any row is written, with
+  `"This field cannot be null."` under the row's `non_field_errors`: a
+  declaration may let one through (`list[Row | None]`), and nothing in a
+  relation spec says what it stands for.
 
 ### Matching, scope and orphans
 

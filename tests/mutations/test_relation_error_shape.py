@@ -14,11 +14,13 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.utils import _RowPath
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
-from tests.relations_app.models import Catalog, Section
+from django_service_specs.relations.many_to_many_spec import ManyToManySpec
+from tests.relations_app.models import Catalog, Post, Section, Tag
 
 _RUDE: dict[str, Any] = {"title": ["Too rude."]}
 _ROWS: list[dict[str, Any]] = [{"title": "ok"}, {"title": "rude"}, {"title": "fine"}]
@@ -83,3 +85,54 @@ class TestWhereARowsErrorLands:
         inner = {"items": {0: {"non_field_errors": ["No."]}}}
 
         assert _RowPath("sections", 3).namespace(inner) == {"sections": {3: inner}}
+
+
+_NULL: dict[str, Any] = {"non_field_errors": ["This field cannot be null."]}
+_SECTIONS = {"sections": ChildSpec(model=Section, fk="catalog")}
+_TAGS = {"tags": ManyToManySpec(model=Tag)}
+
+
+@pytest.mark.django_db
+class TestANullRowIsRefusedBeforeAnythingIsWritten:
+    """A declaration may let a null row through (``list[Row | None]``), and nothing
+    in a relation spec says what one stands for. Read as a row, it was an empty
+    mapping: a row created from nothing, or matched on nothing."""
+
+    def test_in_an_owned_collection(self) -> None:
+        rows = [{"title": "a"}, None, {"title": "b"}, None]
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(Catalog, {"name": "c", "sections": rows}, relations=_SECTIONS)
+
+        # Every null row, and none of the others: the refusal comes before the
+        # first write, so the row at index 0 was not written either.
+        assert excinfo.value.detail == {"sections": {1: _NULL, 3: _NULL}}
+        assert not Section.objects.exists()
+
+    def test_in_a_many_to_many(self) -> None:
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Post, {"title": "t", "tags": [{"name": "orm"}, None]}, relations=_TAGS
+            )
+
+        assert excinfo.value.detail == {"tags": {1: _NULL}}
+        assert not Tag.objects.exists()
+
+
+@pytest.mark.django_db(transaction=True)
+class TestANullRowIsRefusedBeforeAnythingIsWrittenAsync:
+    async def test_in_an_owned_collection(self) -> None:
+        rows = [{"title": "a"}, None]
+        with pytest.raises(InvalidArguments) as excinfo:
+            await acreate_from_input(Catalog, {"name": "c", "sections": rows}, relations=_SECTIONS)
+
+        assert excinfo.value.detail == {"sections": {1: _NULL}}
+        assert not await Section.objects.aexists()
+
+    async def test_in_a_many_to_many(self) -> None:
+        with pytest.raises(InvalidArguments) as excinfo:
+            await acreate_from_input(
+                Post, {"title": "t", "tags": [None, {"name": "orm"}]}, relations=_TAGS
+            )
+
+        assert excinfo.value.detail == {"tags": {0: _NULL}}
+        assert not await Tag.objects.aexists()
