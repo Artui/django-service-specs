@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from django import forms
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import Http404, HttpResponse
 from django.urls import path, reverse_lazy
@@ -108,6 +109,25 @@ class Throttled(DispatchError):
     """A dispatch refusal no row of the ladder names, as a later release might add."""
 
 
+class UserForm(forms.ModelForm):
+    """An update of a row with a unique field, as a profile page is."""
+
+    class Meta:
+        model = get_user_model()
+        fields = ["username", "first_name"]
+
+
+class AssignForm(forms.Form):
+    """A form whose own validation reads rows: a choice among the users."""
+
+    title = forms.CharField()
+    assignee = forms.ModelChoiceField(queryset=get_user_model().objects.all(), required=False)
+
+
+def user_by_pk(pk: int, **pool: Any) -> Any:
+    return get_user_model().objects.filter(pk=pk).first()
+
+
 def entry_spec(returns: Any = None, **kwargs: Any) -> ServiceSpec:
     """A write validated by ``EntryForm``, whose service records what it received."""
     kwargs.setdefault("permissions", OPEN)
@@ -122,6 +142,18 @@ def row_spec(**kwargs: Any) -> ServiceSpec:
             kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK
         ),
         **kwargs,
+    )
+
+
+def user_spec(service: Any) -> ServiceSpec:
+    """An update of the user the route names, validated by ``UserForm``."""
+    return ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        validator=FormValidator(UserForm),
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=user_by_pk, reads=PK
+        ),
     )
 
 
@@ -386,6 +418,43 @@ class TestRefusals:
             400,
             {"count": [WHOLE], "__all__": [f"pk: {WHOLE}"]},
         )
+
+    def test_an_update_page_never_calls_its_own_unchanged_value_taken(self, ada: Any) -> None:
+        # The page's own form is bound to no row, so its uniqueness check
+        # counted ada's username against her; the Validator's form is bound to
+        # her row and passed it. The service's refusal is the page's only error.
+        def busy(**pool: Any) -> None:
+            raise ServiceConflict("Busy.")
+
+        response = post(
+            form_view(user_spec(busy)), ada, {"username": "ada", "first_name": "Ada"}, pk=ada.pk
+        )
+        assert (response.status_code, refused(response)) == (409, {"__all__": ["Busy."]})
+
+    def test_an_update_pages_validator_refusal_is_all_it_shows(self, ada: Any) -> None:
+        view = form_view(user_spec(lambda **pool: None))
+        response = post(view, ada, {"username": "ada", "first_name": "x" * 200}, pk=ada.pk)
+        assert (response.status_code, refused(response)) == (
+            400,
+            {"first_name": ["Ensure this value has at most 150 characters (it has 200)."]},
+        )
+
+    def test_a_principal_the_spec_refuses_learns_no_row_from_a_malformed_post(
+        self, ada: Any
+    ) -> None:
+        # A well-formed post is refused 403. A malformed one is refused by the
+        # shape check, which runs before any permission check, and the page's
+        # own form then answered for the rows it read: whether a pk was one.
+        spec = ServiceSpec(
+            service=lambda **pool: None, permissions=[Refuse()], validator=FormValidator(AssignForm)
+        )
+        view = form_view(spec)
+        with pytest.raises(PermissionDenied):
+            post(view, ada, {"title": "Hi", "assignee": str(ada.pk)})
+        answers = [
+            refused(post(view, ada, {"title": "", "assignee": pk})) for pk in (str(ada.pk), "99999")
+        ]
+        assert answers == [{"title": [REQUIRED]}, {"title": [REQUIRED]}]
 
     def test_the_route_wins_a_clash_with_the_form(self, ada: Any) -> None:
         spec = entry_spec()

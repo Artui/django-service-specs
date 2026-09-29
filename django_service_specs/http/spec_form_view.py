@@ -97,9 +97,8 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     - **A refusal of the arguments** - ``InvalidArguments``, or a
       ``ServiceValidationError`` - re-renders the bound form at 400 with the
       refusal placed on it by
-      [`add_argument_errors`][django_service_specs.http.add_argument_errors.add_argument_errors],
-      beside the form's own errors and never duplicating one. A service's
-      string or list detail is about the whole form.
+      [`add_argument_errors`][django_service_specs.http.add_argument_errors.add_argument_errors].
+      A service's string or list detail is about the whole form.
     - **Any other refusal** re-renders it with the message as a non-field
       error: ``ServiceConflict`` at 409, any other ``ServiceError`` at 422, any
       other ``DispatchError`` at 400. The statuses are ``error_response``'s, so
@@ -108,6 +107,15 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     - ``NotPermitted`` and ``PrincipalUnavailable`` raise Django's
       ``PermissionDenied``, and a not-found result or ``ServiceNotFound``
       raises ``Http404``, for the host's own 403 and 404 pages.
+
+    **A re-rendered form carries the refusal and nothing else**: the page says
+    what dispatch decided. The page's own form is bound to no row, and after
+    a shape-check refusal it would validate for a principal no permission
+    check has yet admitted, so its own errors are not shown. Shown, they told
+    an update page that an unchanged unique value was taken, and told a
+    principal the spec refuses which rows exist. After a shape-check refusal,
+    then, the form's further checks - a length, ``clean()``, uniqueness -
+    answer the next post rather than this one.
 
     ``as_view()`` refuses, when the URLconf is imported, a view with no
     ``ServiceSpec``, a spec whose Validator is not a ``FormValidator``, and a
@@ -208,7 +216,18 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     def _render_refused(
         self, form: forms.BaseForm, detail: Mapping[Any, Any], *, status: int
     ) -> HttpResponse:
-        """The page again, the bound form carrying ``detail`` beside its own errors."""
+        """The page again, the bound form carrying ``detail`` and nothing else.
+
+        The page says what dispatch decided, and nothing the page's own form
+        would add. That form is bound to no row, and after a shape-check
+        refusal it would validate for a principal no permission check has yet
+        admitted: its own errors told an update page that an unchanged unique
+        value was taken, and told a principal the spec refuses which rows
+        exist. Django's ``add_error`` needs the form cleaned first, so its
+        validation runs, and its errors are cleared before the refusal is
+        placed.
+        """
+        form.errors.clear()
         add_argument_errors(form, detail)
         return self.render_to_response(self.get_context_data(form=form), status=status)
 

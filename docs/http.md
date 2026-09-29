@@ -265,7 +265,15 @@ created. A refusal:
 
 The first two rows place the refusal on the form, and a service's string or
 list detail is about the whole form. Every other re-rendered refusal is its
-message, among the form's non-field errors. The statuses are
+message, among the form's non-field errors. **The re-rendered form carries
+the refusal and nothing else**, so the page says what dispatch decided. The
+page's own form is bound to no row, and after a shape-check refusal it would
+validate for a principal no permission check has yet admitted: its own errors
+would tell an update page that an unchanged unique value was taken, and tell
+a principal the spec refuses which rows exist. So after a shape-check
+refusal - a required field left blank, a date that does not parse - the
+form's further checks, such as a length, `clean()` or uniqueness, answer the
+next post rather than this one. The statuses are
 [`error_response`](#refusals)'s, so a client reading a refused post - htmx,
 or Turbo, which will not render a failed post answered 200 - reads it the
 same way it reads the JSON views.
@@ -278,9 +286,9 @@ only** in this release.
 ### A refusal, placed on the form
 
 [`add_argument_errors`][django_service_specs.http.add_argument_errors.add_argument_errors]
-is how the view places a refusal, and a hand-written view with its own bound
-form can call it the same way. It uses Django's public `form.add_error`, beside
-the form's own errors:
+is how the view places a refusal, on a form whose own errors it has cleared,
+and a hand-written view with its own bound form can call it the same way. It
+uses Django's public `form.add_error`, beside whatever errors the form carries:
 
 - **A key naming one of the form's fields** puts its messages on that field.
 - `non_field_errors`, and Django's own `"__all__"`, go to the form's non-field
