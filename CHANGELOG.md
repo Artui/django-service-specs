@@ -44,6 +44,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the output never holds.
 
 ### Fixed
+- The dataclass adapters declare a list of choices - `list[Literal[...]]`, a
+  list of an `Enum` or of Django `Choices` - with its choices, which constrain
+  each element. They declared a plain array of strings, so the shape check
+  passed any string on to the Validator and a JSON Schema left the choices
+  out.
+- On Python 3.10, `DataclassValidator` names a refused parametrized generic
+  as it was written, `set[int]` rather than `set`.
 - The docs site no longer publishes the example sources and their bytecode
   beside its pages. `docs/` is also a Python package, so the suite can run
   every example, and MkDocs copied its `.py` files and `__pycache__` into the

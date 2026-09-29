@@ -145,11 +145,14 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (typing.Any, "Any"),
         (object, "object"),
         (bytes, "bytes"),
-        (dict[str, int], "dict"),
+        # A parametrized generic as it was written, which Python 3.10 would
+        # otherwise print as its bare class.
+        (dict[str, int], "dict[str, int]"),
+        (set[int], "set[int]"),
         # Unparameterised: there is no element to declare.
         (list, "list"),
         (typing.List, "typing.List"),  # noqa: UP006
-        (tuple[int, ...], "tuple"),
+        (tuple[int, ...], "tuple[int, ...]"),
         # A union of two types has no single JSON type; nor does None alone.
         (int | str, "int | str"),
         (None, "None"),

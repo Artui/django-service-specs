@@ -242,7 +242,13 @@ def _choice_type(values: tuple[Any, ...], annotation: Any, *, where: str) -> str
 
 
 def _unmappable(annotation: Any, *, where: str) -> ImproperlyConfigured:
-    name = annotation.__qualname__ if isinstance(annotation, type) else repr(annotation)
+    # A class by its name, and anything else - a parametrized generic included,
+    # which Python 3.10 also counts as a ``type`` - as it was written. The
+    # second condition decides only there, where the ``set[int]`` row of
+    # test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation
+    # holds it.
+    plain = isinstance(annotation, type) and typing.get_origin(annotation) is None
+    name = annotation.__qualname__ if plain else repr(annotation)
     return ImproperlyConfigured(
         f"{where}: {name} has no JSON type this adapter can declare. Use {_SUPPORTED}."
     )
