@@ -56,10 +56,18 @@ class OutputField:
             raise ImproperlyConfigured(
                 f"{where}: type {self.type!r} is not a JSON type; use one of {sorted(JSON_TYPES)}."
             )
-        if self.format is not None and self.format not in FORMATS:
-            raise ImproperlyConfigured(
-                f"{where}: format {self.format!r} is not one of {sorted(FORMATS)}."
-            )
+        if self.format is not None:
+            if self.format not in FORMATS:
+                raise ImproperlyConfigured(
+                    f"{where}: format {self.format!r} is not one of {sorted(FORMATS)}."
+                )
+            # As on Parameter: every format names what a string decodes into,
+            # and a schema states it beside the type, so on any other type it
+            # would describe a value the output never holds.
+            if self.type != "string":
+                raise ImproperlyConfigured(
+                    f"{where}: a format describes a string; this field is {self.type!r}."
+                )
         if self.fields is not None and self.type != "object":
             raise ImproperlyConfigured(f"{where}: fields describes an object's own fields.")
         if self.items is not None and self.type != "array":
