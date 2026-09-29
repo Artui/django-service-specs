@@ -74,6 +74,15 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     always unbound: showing an update's current row as its initial data is a
     page of its own, which this view does not build.
 
+    **POST runs that check first too**, before the post is read. A refused
+    post is answered with the page again, and dispatch's shape check comes
+    before its own permission check, so without it a principal the spec
+    refuses would be shown the page - every row a choice field lists, and
+    ``extra_context`` - by posting a malformed form. The
+    [`Grant`][django_service_specs.authorization.grant.Grant] it returns goes
+    to dispatch, so the class-level check runs once; the object-level check
+    is still dispatch's, on the row it resolves.
+
     **POST** binds the form to the post and reads the arguments through its
     own widgets - a checkbox is ``True`` or ``False``, a multi-select a list -
     because that is how Django reads a form, and a flat reading refuses a
@@ -109,13 +118,11 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
       raises ``Http404``, for the host's own 403 and 404 pages.
 
     **A re-rendered form carries the refusal and nothing else**: the page says
-    what dispatch decided. The page's own form is bound to no row, and after
-    a shape-check refusal it would validate for a principal no permission
-    check has yet admitted, so its own errors are not shown. Shown, they told
-    an update page that an unchanged unique value was taken, and told a
-    principal the spec refuses which rows exist. After a shape-check refusal,
-    then, the form's further checks - a length, ``clean()``, uniqueness -
-    answer the next post rather than this one.
+    what dispatch decided. The page's own form is bound to no row, so its own
+    errors are not shown: its uniqueness check would tell an update page that
+    an unchanged unique value was taken. After a shape-check refusal, then,
+    the form's further checks - a length, ``clean()``, uniqueness - answer the
+    next post rather than this one.
 
     ``as_view()`` refuses, when the URLconf is imported, a view with no
     ``ServiceSpec``, a spec whose Validator is not a ``FormValidator``, and a
@@ -166,14 +173,21 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
         spec = self.served_spec()
         form = _form_class(spec)(data=request.POST, files=request.FILES)
         try:
-            # The principal first, as ``read_request`` reads it, so a
-            # deactivated account is refused before its post is read.
+            # The principal and the class-level check before the post is read,
+            # as ``get`` runs them. Re-rendering a refused post offers the
+            # page, and dispatch's shape check runs before its own permission
+            # check: a principal the spec refuses was otherwise answered a
+            # malformed post with the page, every row a choice field lists
+            # included. The grant hands dispatch the check already made, so it
+            # runs once; it leaves the object-level check to dispatch.
             principal = request_principal(request)
+            grant = authorize(spec, principal)
             arguments = _form_arguments(form, spec.parameters(), kwargs)
             result = dispatch(
                 spec,
                 principal=principal,
                 arguments=arguments,
+                grant=grant,
                 pool_seeds=self.pool_seeds,
                 unknown_arguments=self.unknown_arguments,
             )
@@ -219,11 +233,10 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
         """The page again, the bound form carrying ``detail`` and nothing else.
 
         The page says what dispatch decided, and nothing the page's own form
-        would add. That form is bound to no row, and after a shape-check
-        refusal it would validate for a principal no permission check has yet
-        admitted: its own errors told an update page that an unchanged unique
-        value was taken, and told a principal the spec refuses which rows
-        exist. Django's ``add_error`` needs the form cleaned first, so its
+        would add. That form is bound to no row, so its own errors are not
+        shown: its uniqueness check told an update page that an unchanged
+        unique value was taken, where the Validator's form, bound to the row,
+        passed it. Django's ``add_error`` needs the form cleaned first, so its
         validation runs, and its errors are cleared before the refusal is
         placed.
         """

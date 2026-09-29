@@ -220,8 +220,15 @@ principal the post would refuse: an anonymous visitor above gets Django's own
 unbound; showing an update's current row as its initial data is a page of its
 own, which this view does not build.
 
-**POST** binds the form to the post and reads the arguments **through the
-form's own widgets**, which is how Django reads a form:
+**POST runs the same check first**, before it reads the post. A refused post
+is answered with the page again, and dispatch's shape check comes before its
+own permission check, so without it a principal the spec refuses would be
+shown the page - every row a choice field lists, and `extra_context` - by
+posting a malformed form. The `Grant` the check returns goes to dispatch, so
+it runs once; the object-level check is still dispatch's.
+
+**POST** then binds the form to the post and reads the arguments **through
+the form's own widgets**, which is how Django reads a form:
 
 - A checkbox is `True` or `False` and a multi-select a list, where a flat
   reading would refuse a checkbox's `"on"`. Only the form's fields are read,
@@ -267,10 +274,8 @@ The first two rows place the refusal on the form, and a service's string or
 list detail is about the whole form. Every other re-rendered refusal is its
 message, among the form's non-field errors. **The re-rendered form carries
 the refusal and nothing else**, so the page says what dispatch decided. The
-page's own form is bound to no row, and after a shape-check refusal it would
-validate for a principal no permission check has yet admitted: its own errors
-would tell an update page that an unchanged unique value was taken, and tell
-a principal the spec refuses which rows exist. So after a shape-check
+page's own form is bound to no row, so its own errors would tell an update
+page that an unchanged unique value was taken. So after a shape-check
 refusal - a required field left blank, a date that does not parse - the
 form's further checks, such as a length, `clean()` or uniqueness, answer the
 next post rather than this one. The statuses are

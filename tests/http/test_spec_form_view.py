@@ -24,6 +24,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.http.spec_form_view import SpecFormView
 from django_service_specs.services.service_conflict import ServiceConflict
@@ -122,6 +123,17 @@ class AssignForm(forms.Form):
 
     title = forms.CharField()
     assignee = forms.ModelChoiceField(queryset=get_user_model().objects.all(), required=False)
+
+
+class Counted(PermissionCheck):
+    """Admits every principal, counting each class-level check."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.calls += 1
+        return True
 
 
 def user_by_pk(pk: int, **pool: Any) -> Any:
@@ -439,22 +451,26 @@ class TestRefusals:
             {"first_name": ["Ensure this value has at most 150 characters (it has 200)."]},
         )
 
-    def test_a_principal_the_spec_refuses_learns_no_row_from_a_malformed_post(
-        self, ada: Any
+    def test_a_principal_the_spec_refuses_is_never_shown_the_page(
+        self, ada: Any, django_assert_num_queries: Any
     ) -> None:
-        # A well-formed post is refused 403. A malformed one is refused by the
-        # shape check, which runs before any permission check, and the page's
-        # own form then answered for the rows it read: whether a pk was one.
+        # Dispatch's shape check runs before its permission check, so a
+        # malformed post from a refused principal was answered with the page:
+        # every user the choice field lists, and which pk was one of them.
+        # Refused before the post is read, it queries nothing.
         spec = ServiceSpec(
             service=lambda **pool: None, permissions=[Refuse()], validator=FormValidator(AssignForm)
         )
-        view = form_view(spec)
-        with pytest.raises(PermissionDenied):
-            post(view, ada, {"title": "Hi", "assignee": str(ada.pk)})
-        answers = [
-            refused(post(view, ada, {"title": "", "assignee": pk})) for pk in (str(ada.pk), "99999")
-        ]
-        assert answers == [{"title": [REQUIRED]}, {"title": [REQUIRED]}]
+        with django_assert_num_queries(0), pytest.raises(PermissionDenied):
+            post(form_view(spec), ada, {"title": "", "assignee": "99999"})
+
+    def test_the_class_level_check_runs_once(self, ada: Any) -> None:
+        # The view runs it before reading the post and hands dispatch the
+        # grant, rather than dispatch running it a second time.
+        check = Counted()
+        spec = entry_spec(permissions=[check])
+        assert post(form_view(spec), ada, {"title": "Hi"}).status_code == 302
+        assert check.calls == 1
 
     def test_the_route_wins_a_clash_with_the_form(self, ada: Any) -> None:
         spec = entry_spec()

@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecFormView`: a `ServiceSpec` whose Validator is a `FormValidator`, served
   as the page its form is. GET runs the spec's class-level permission check
   and renders `template_name` with an unbound `form`, `view` and `spec`. POST
+  runs the same check before it reads the post, since a refused post is
+  answered with the page and dispatch's shape check comes before its own
+  permission check, and hands dispatch the grant so the check runs once. It
   reads the post through the form's own widgets, so a checkbox is a boolean
   and a multi-select a list, and neither the CSRF token nor a submit button
   is an argument; a blank field is absent, and a number, date or date-time in
@@ -66,9 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   success redirects to `get_success_url(result)`, `success_url` by default;
   a refusal re-renders the bound form carrying that refusal and none of the
   form's own errors, at `error_response`'s status, since the page's form is
-  bound to no row and may be validating for a principal no check has
-  admitted. A denial or a missing row is Django's own `PermissionDenied` or
-  `Http404`.
+  bound to no row and its uniqueness check would call an update's unchanged
+  value taken. A denial or a missing row is Django's own `PermissionDenied`
+  or `Http404`.
   `as_view()` refuses a view with no `ServiceSpec`, no `FormValidator` or
   nowhere to redirect. Sync only.
 - `add_argument_errors`: a refusal tree placed on a bound form with
