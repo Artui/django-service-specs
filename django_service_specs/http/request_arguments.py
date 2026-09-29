@@ -201,7 +201,8 @@ def _refuse_constant(constant: str) -> NoReturn:
     No JSON encoder writes one, and ``coerce_flat`` refuses the same values on
     the flat route. DRF's parser refuses them too, in its default strict mode.
     An overflowing literal such as ``1e400`` is well-formed and decodes to an
-    infinity all the same; the shape check refuses that one, at its address,
-    so a Validator sees neither.
+    infinity all the same; the shape check refuses that one at its address
+    wherever the declaration reaches. Inside a free-form object nothing is
+    declared, so there it is the Validator's, as every other rule is.
     """
     raise ValueError(f"{constant} is not JSON.")

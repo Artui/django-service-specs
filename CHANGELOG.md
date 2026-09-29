@@ -81,11 +81,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prefixed with its dotted path.
 
 ### Fixed
-- The shape check refuses NaN and the infinities wherever a value stands,
-  with `"Enter a number."` at the value's address, as it already did for a
-  decimal. No JSON value is one, but Python's decoder reads an overflowing
-  literal such as `1e400` as an infinity, so a JSON body carrying one
-  reached the Validator, and so could a Python caller's.
+- The shape check refuses NaN and the infinities wherever the declaration
+  reaches, with `"Enter a number."` at the value's address, as it already did
+  for a decimal. JSON has no spelling for either, so they are outside the
+  number type rather than a stricter check. Python's decoder reads an
+  overflowing literal such as `1e400` as an infinity, so a JSON body
+  carrying one reached the Validator, and so could a Python caller's. A
+  free-form object's contents stay its Validator's, as for every other rule.
 - `FormValidator` read a decimal argument with three places through the
   active locale when its field was localized, so under a locale whose
   thousands separator is a dot, `"1.500"` validated as 1500. A number
