@@ -163,6 +163,18 @@ The subclasses of `ServiceError` are matched before `ServiceError` itself, or
 the base class swallows them. A transport that has never heard of
 `ServiceConflict` still handles it as a `ServiceError`.
 
+Every 400 is a field map, whichever family refused: a service's string or
+list detail goes under `non_field_errors`, where a message about the input as
+a whole sits in an `InvalidArguments` tree too. A service's own refusal that
+names no field (`ServiceError` itself) is a 422: the request was understood
+and refused, which is not the same as malformed.
+
+This is the ladder
+[`error_response`][django_service_specs.http.error_response.error_response]
+ships, statuses included, for a transport that answers over HTTP. They are
+djangorestframework-services' statuses, so a client of both reads one answer;
+[Serving over HTTP](http.md) has the whole of it.
+
 Configuration errors are neither family. A spec with no permission check, a
 parameter named after a pool seed, shaping declared on a selector that returns
 no queryset: each raises Django's `ImproperlyConfigured`, because it is the

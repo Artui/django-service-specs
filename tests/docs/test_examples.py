@@ -43,12 +43,14 @@ from django_service_specs import (
     SelectorSpec,
     ServiceConflict,
     ServiceError,
+    ServiceNotFound,
     ServiceSpec,
     ServiceValidationError,
     SpecRegistry,
     ValidationContext,
     coerce_flat,
     dispatch,
+    error_response,
     present,
     update_from_input,
 )
@@ -347,8 +349,23 @@ def _invalid(*, title: str) -> None:
     raise ServiceValidationError({"title": ["Too dull."]})
 
 
+def _invalid_as_a_whole(*, title: str) -> None:
+    raise ServiceValidationError("Pick another day.")
+
+
+def _missing(*, title: str) -> None:
+    raise ServiceNotFound("No such shelf.")
+
+
 def _refusing(*, title: str) -> None:
     raise ServiceError("Not today.")
+
+
+def _raising(exc: Exception) -> Any:
+    def service(*, title: str) -> None:
+        raise exc
+
+    return service
 
 
 @pytest.mark.django_db
@@ -371,9 +388,11 @@ class TestTransport:
     @pytest.mark.parametrize(
         ("service", "expected"),
         [
-            (_invalid, (422, {"title": ["Too dull."]})),
+            (_invalid, (400, {"title": ["Too dull."]})),
+            (_invalid_as_a_whole, (400, {"non_field_errors": ["Pick another day."]})),
+            (_missing, (404, {"detail": "No such shelf."})),
             (_conflicting, (409, {"detail": "'Final' is taken."})),
-            (_refusing, (400, {"detail": "Not today."})),
+            (_refusing, (422, {"detail": "Not today."})),
         ],
     )
     def test_the_operations_own_refusals(self, ada: Any, service: Any, expected: Any) -> None:
@@ -383,6 +402,36 @@ class TestTransport:
             validator=DataclassValidator(quickstart.Rename),
         )
         assert transport.answer(spec, ada, {"title": "Final"}) == expected
+
+    @pytest.mark.parametrize(
+        "refusal",
+        [
+            InvalidArguments({"title": ["Too dull."]}),
+            NotPermitted("No."),
+            PrincipalUnavailable(),
+            ServiceValidationError({"title": ["Too dull."]}),
+            ServiceValidationError("Pick another day."),
+            ServiceValidationError(["One.", "Two."]),
+            ServiceNotFound("No such shelf."),
+            ServiceConflict("Taken."),
+            ServiceError("Not today."),
+        ],
+        ids=lambda refusal: f"{type(refusal).__name__}-{refusal}",
+    )
+    def test_the_ladder_is_the_one_error_response_ships(self, ada: Any, refusal: Any) -> None:
+        # The page says so, and the arguments page's reader copies this
+        # ladder into a transport: a status that drifted from the shipped one
+        # would teach a client two answers to one refusal.
+        spec = ServiceSpec(
+            service=_raising(refusal),
+            permissions=[declaring.IsSignedIn()],
+            validator=DataclassValidator(quickstart.Rename),
+        )
+        shipped = error_response(refusal)
+        assert transport.answer(spec, ada, {"title": "Final"}) == (
+            shipped.status_code,
+            json.loads(shipped.content),
+        )
 
 
 @pytest.mark.django_db

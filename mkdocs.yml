@@ -89,6 +89,7 @@ nav:
   - Home: index.md
   - Declaring an operation: declaring.md
   - Dispatching: dispatching.md
+  - Serving over HTTP: http.md
   - Arguments and refusals: arguments.md
   - Relation writes: relations.md
   - The registry: registry.md

@@ -69,6 +69,15 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.apresent.apresent
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 
+## HTTP
+
+::: django_service_specs.http.dispatch_request.dispatch_request
+::: django_service_specs.http.adispatch_request.adispatch_request
+::: django_service_specs.http.spec_view.SpecView
+::: django_service_specs.http.async_spec_view.AsyncSpecView
+::: django_service_specs.http.request_arguments.request_arguments
+::: django_service_specs.http.error_response.error_response
+
 ## Authorization
 
 ::: django_service_specs.authorization.permission_check.PermissionCheck

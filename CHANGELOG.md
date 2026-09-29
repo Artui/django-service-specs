@@ -14,6 +14,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs a declared `items`. The dataclass and pydantic adapters set it from
   the element's annotation, the shape check keeps a null element where it is
   set, and both schemas state it on `items`, choices included.
+- `dispatch_request` and `adispatch_request`, in the new `http` subpackage: a
+  spec served from a hand-written Django view, answered as JSON with no API
+  framework in between. The principal is `request.user`, anonymous included,
+  and an authenticated account with `is_active` false is refused as
+  `PrincipalUnavailable`. A not-found result is 404; a success is the
+  presented value, bare, at the caller's `success_status`, else 204 for a
+  service with nothing to present and 200 otherwise. The async one reads the
+  request off the event loop, since `request.user` is a session query.
+- `SpecView` and `AsyncSpecView`: one spec as a class-based view. A selector
+  spec answers GET and HEAD and a service spec POST, unless `methods` names
+  others; any other method is Django's own 405 with a matching `Allow`. The
+  URL kwargs are arguments, and a view with no spec is refused by `as_view()`.
+  Nothing is exempted from CSRF: that is the host's middleware.
+- `request_arguments`: a request read as arguments. GET and HEAD read the
+  query string; any other method a JSON object body as it is, or a form or
+  multipart body, which is parsed for PUT, PATCH and DELETE too rather than
+  arriving empty. A flat source takes every value for an array parameter and
+  the last otherwise, reads a blank value for a parameter that is not a string
+  as absent, drops `csrfmiddlewaretoken`, and goes through `coerce_flat`. URL
+  kwargs are coerced and merged last, so the route wins a clash. A malformed
+  JSON body, or one that is not an object, is `InvalidArguments` under
+  `non_field_errors`; files are not arguments.
+- `error_response`: either family of refusal as JSON, at the statuses
+  djangorestframework-services answers with. `InvalidArguments` and
+  `ServiceValidationError` are 400 and both bodies are field maps, a service's
+  string or list detail under `non_field_errors`; `NotPermitted` and
+  `PrincipalUnavailable` are 403, `ServiceNotFound` 404, `ServiceConflict`
+  409, any other `ServiceError` 422, each as `{"detail": message}`. Never 401.
 
 ### Fixed
 - An operation declaring `list[X | None]` refused every null element before
@@ -24,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a row with no fields, created or matched on nothing. It is now refused
   with `"This field cannot be null."` under that row's `non_field_errors`,
   every null row at once and before any row is written.
+- The arguments page's HTTP-shaped ladder answered a `ServiceValidationError`
+  422 and a plain `ServiceError` 400, the reverse of the statuses
+  djangorestframework-services answers, and left `ServiceNotFound` and
+  `PrincipalUnavailable` to fall through. It now answers as `error_response`
+  does, and a test holds the two to each other.
 
 ## [0.2.0] — 2026-09-29
 
