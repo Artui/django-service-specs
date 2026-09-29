@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-29
+
 ### Added
 - The kernel, whole. An operation is declared once as a `ServiceSpec` (a write)
   or a `SelectorSpec` (a read), and `dispatch()` runs it from any transport in a
@@ -73,4 +75,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.0.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Artui/django-service-specs/compare/v0.0.0...v0.1.0

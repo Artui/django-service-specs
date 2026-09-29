@@ -89,8 +89,8 @@ three, so a borrowed name is read as theirs by everyone who knows them:
 **One spelling each, so a rename is a replace.** No aliases, no
 backwards-compatible second name, no re-export under an old spelling. The same
 holds for the distribution and import names: `django-service-specs` and
-`django_service_specs` appear verbatim and nowhere derived, so renaming the
-package before its first release is a search-and-replace plus a directory move.
+`django_service_specs` appear verbatim and nowhere derived, so one search finds
+every use of either.
 
 ## Constraints that look like tidy-ups
 
@@ -217,10 +217,12 @@ make release-bump VERSION=X.Y.Z   # rewrites version.py, promotes the changelog
 The release job on `main` short-circuits to a no-op when a `vX.Y.Z` tag for the
 version in source already exists on origin, so an ordinary merge costs nothing.
 
-That guard is why the scaffold sits at `0.0.0` with a matching `v0.0.0` tag. A
-new repository has no tags at all, so without one the very first push to `main`
-reads the scaffold version as unreleased and runs a real release attempt. The
-first real release is `make release-bump VERSION=0.1.0`.
+That guard is why the tag list starts at `v0.0.0`, a version never published. A
+repository with no tags reads its version as unreleased on the first push to
+`main` and runs a real release attempt, so the scaffold sat at `0.0.0` with a
+matching tag. `0.1.0` is the first version on PyPI.
 
-One-time setup that cannot be done from a checkout: a PyPI Trusted Publisher
-pointing at this repo with workflow `release.yml` and environment `pypi`.
+Publishing goes through a PyPI Trusted Publisher that names this repo, the
+workflow `release.yml` and the environment `pypi`. It lives on PyPI rather than
+in a checkout, so renaming that workflow file or that environment breaks the
+next release and nothing here fails first.
