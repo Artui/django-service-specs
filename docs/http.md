@@ -219,7 +219,12 @@ form's own widgets**, which is how Django reads a form:
   the field's own.
 - The URL kwargs are merged last, so the route wins a clash, and typed with
   [`coerce_flat`](arguments.md#flat-transports) in the same call as
-  everything else: one refusal carries every problem.
+  everything else: one refusal carries every problem. Each is an argument,
+  so the spec declares each one. A kwarg the route captures and the spec does
+  not declare is the host's misconfiguration, wrong for every caller, so it
+  raises `ImproperlyConfigured` under either `unknown_arguments` policy - the
+  policy governs what a client sends - rather than blaming the client with a
+  refused post.
 
 Then [`dispatch`](dispatching.md). **A success redirects** to
 `get_success_url(result)`, which resolves `success_url` as Django's

@@ -86,6 +86,9 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     field's own ``to_python``, so the shape check never refuses what the form
     accepts. The URL kwargs are merged last, so the route wins a clash, as in
     [`request_arguments`][django_service_specs.http.request_arguments.request_arguments].
+    Each is an argument, so the spec declares each one: a kwarg it does not is
+    the host's misconfiguration, raised as ``ImproperlyConfigured`` under
+    either ``unknown_arguments`` policy rather than answered as a refused post.
     Then [`dispatch`][django_service_specs.dispatch.dispatch.dispatch]:
 
     - **A success** redirects to ``get_success_url(result)``: ``success_url``
@@ -266,7 +269,27 @@ def _form_arguments(
     # for ``coerce_flat`` to type by its declaration, which passes a value
     # that is not a string through untouched. The route's kwargs are coerced
     # in the same call, so one refusal carries every problem.
-    return coerce_flat(parameters, {**read, **url_kwargs})
+    return coerce_flat(parameters, {**read, **_route_arguments(parameters, url_kwargs)})
+
+
+def _route_arguments(parameters: Parameters, url_kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    """The route's kwargs as arguments, once each is one ``parameters`` declares.
+
+    Every URL kwarg is an argument, and the route is the host's, so a kwarg the
+    spec does not declare is wrong for every caller: a configuration error,
+    under either ``UnknownArguments`` policy, since the policy governs what a
+    client sends. Answering it as a refused post would blame the client.
+
+    Raises:
+        ImproperlyConfigured: naming every undeclared kwarg, sorted.
+    """
+    undeclared = sorted(set(url_kwargs) - parameters.names())
+    if undeclared:
+        raise ImproperlyConfigured(
+            f"The route captures {undeclared}, which the spec does not declare. Every URL "
+            "kwarg is an argument: declare each one on the spec, or stop the route capturing it."
+        )
+    return dict(url_kwargs)
 
 
 def _wire(field: forms.Field, value: Any) -> Any:

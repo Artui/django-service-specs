@@ -57,6 +57,10 @@ TEMPLATE = "spec_form.html"
 REQUIRED = "This field is required."
 CLOSED = "Entries are closed."
 WHOLE = "Enter a whole number."
+UNDECLARED = (
+    "The route captures {names}, which the spec does not declare. Every URL kwarg is "
+    "an argument: declare each one on the spec, or stop the route capturing it."
+)
 
 
 class EntryForm(forms.Form):
@@ -78,6 +82,14 @@ class EntryForm(forms.Form):
         if cleaned.get("title") == "shut":
             raise forms.ValidationError(CLOSED)
         return cleaned
+
+
+class WithAnExtra(EntryForm):
+    """Adds a field in ``__init__``, which is not in ``base_fields`` and so is never declared."""
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["extra"] = forms.CharField(required=False)
 
 
 class Watched(FormValidator):
@@ -363,10 +375,6 @@ class TestRefusals:
             {"count": [WHOLE], "__all__": [f"pk: {WHOLE}"]},
         )
 
-    def test_an_undeclared_url_kwarg_is_refused_under_reject(self, ada: Any) -> None:
-        response = post(form_view(entry_spec()), ada, {"title": "Hi"}, org="acme")
-        assert refused(response) == {"__all__": ["org: Unknown argument."]}
-
     def test_the_route_wins_a_clash_with_the_form(self, ada: Any) -> None:
         spec = entry_spec()
         post(form_view(spec), ada, {"title": "Hi", "colour": "red"}, colour="blue")
@@ -446,10 +454,35 @@ class TestDeniedAndMissing:
 
 class TestServing:
     def test_the_views_settings_reach_dispatch(self, ada: Any) -> None:
-        spec = entry_spec()
+        # A field the form adds in ``__init__`` is read, and FormValidator
+        # declares no parameter for it, so the policy decides what becomes of it.
+        spec = entry_spec(validator=Watched(WithAnExtra))
         view = form_view(spec, unknown_arguments=UnknownArguments.IGNORE, pool_seeds=TENANT_SEEDS)
-        assert post(view, ada, {"title": "Hi"}, org="acme").status_code == 302
+        assert post(view, ada, {"title": "Hi", "extra": "x"}).status_code == 302
         assert spec.service.calls[0]["tenant"] == "tenant-of-ada"
+
+    def test_under_reject_a_field_the_spec_does_not_declare_is_refused(self, ada: Any) -> None:
+        spec = entry_spec(validator=Watched(WithAnExtra))
+        response = post(form_view(spec), ada, {"title": "Hi", "extra": "x"})
+        assert (response.status_code, refused(response)) == (
+            400,
+            {"extra": ["Unknown argument."]},
+        )
+
+    @pytest.mark.parametrize("policy", [UnknownArguments.REJECT, UnknownArguments.IGNORE])
+    def test_a_route_capturing_an_undeclared_kwarg_is_improperly_configured(
+        self, ada: Any, policy: UnknownArguments
+    ) -> None:
+        # The route is the host's, so a kwarg the spec does not declare is
+        # wrong for every caller rather than a refusal of this one, under
+        # either policy: the policy governs what a client sends.
+        spec = entry_spec()
+        with pytest.raises(ImproperlyConfigured) as raised:
+            post(
+                form_view(spec, unknown_arguments=policy), ada, {"title": "Hi"}, zone="eu", org="a"
+            )
+        assert str(raised.value) == UNDECLARED.format(names=["org", "zone"])
+        assert spec.service.calls == []
 
     def test_a_method_it_does_not_serve_is_djangos_405(self, ada: Any) -> None:
         request = signed_in(FACTORY.put("/", data=b""), ada)

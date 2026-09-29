@@ -49,10 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a multi-select a list, and neither the CSRF token nor a submit button
   is an argument; a blank field is absent, and a number, date or date-time in
   one of the field's input formats is sent on in the form the shape check
-  reads. A success redirects to `get_success_url(result)`, `success_url` by
-  default; a refusal re-renders the bound form at `error_response`'s status,
-  and a denial or a missing row is Django's own `PermissionDenied` or
-  `Http404`. `as_view()` refuses a view with no `ServiceSpec`, no
+  reads. A URL kwarg the spec does not declare raises `ImproperlyConfigured`
+  under either `unknown_arguments` policy, since the route is the host's. A
+  success redirects to `get_success_url(result)`, `success_url` by default;
+  a refusal re-renders the bound form at `error_response`'s status, and a
+  denial or a missing row is Django's own `PermissionDenied` or `Http404`. `as_view()` refuses a view with no `ServiceSpec`, no
   `FormValidator` or nowhere to redirect. Sync only.
 - `add_argument_errors`: a refusal tree placed on a bound form with
   `form.add_error`, beside the form's own errors and never duplicating one. A
