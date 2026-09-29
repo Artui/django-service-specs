@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-29
+
 ### Added
 - `FormValidator`: a Django form class as a Validator. The form's fields become
   the operation's `Parameters`, with their JSON types, formats, choices and
@@ -124,5 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Artui/django-service-specs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-service-specs/compare/v0.0.0...v0.1.0
