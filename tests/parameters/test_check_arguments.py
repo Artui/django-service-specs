@@ -170,6 +170,21 @@ def test_a_decimal_float_must_be_finite() -> None:
     assert refusal(DECIMAL, {"price": float("nan")}) == {"price": [NOT_A_NUMBER]}
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_a_number_must_be_finite(value: float) -> None:
+    # No JSON value is one, and Python's decoder reads an overflowing literal
+    # such as 1e400 as an infinity.
+    assert refusal(one(Parameter("ratio", "number")), {"ratio": value}) == {"ratio": [NOT_A_NUMBER]}
+
+
+def test_an_untyped_element_must_be_finite_too() -> None:
+    # Whatever the declaration leaves open, it cannot be a value JSON has no
+    # spelling for.
+    assert refusal(one(Parameter("tags", "array")), {"tags": ["a", float("inf")]}) == {
+        "tags": {1: [NOT_A_NUMBER]}
+    }
+
+
 DATE_TIME = one(Parameter("at", "string", format="date-time"))
 DATE = one(Parameter("on", "string", format="date"))
 

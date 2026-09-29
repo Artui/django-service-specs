@@ -64,7 +64,9 @@ def request_arguments(
     dispatch stays the one place that refuses it, under the caller's policy.
 
     **Files are not arguments.** Parameters have no file type, so an upload in
-    a multipart body is not read, and ``request.FILES`` is the view's own.
+    a multipart body is never one. A POST's uploads are in ``request.FILES``,
+    which Django fills for POST alone: those in a PUT, PATCH or DELETE body
+    parsed here are dropped.
 
     **URL kwargs are merged last**, through ``coerce_flat`` as well since a
     path segment with no converter is a string. The route wins a clash, as it
@@ -197,7 +199,9 @@ def _refuse_constant(constant: str) -> NoReturn:
     """Refuse ``NaN`` and the infinities, which Python's decoder takes and JSON does not have.
 
     No JSON encoder writes one, and ``coerce_flat`` refuses the same values on
-    the flat route, so a Validator never sees one from either. DRF's parser
-    refuses them too, in its default strict mode.
+    the flat route. DRF's parser refuses them too, in its default strict mode.
+    An overflowing literal such as ``1e400`` is well-formed and decodes to an
+    infinity all the same; the shape check refuses that one, at its address,
+    so a Validator sees neither.
     """
     raise ValueError(f"{constant} is not JSON.")

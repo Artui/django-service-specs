@@ -172,7 +172,7 @@ and refused, which is not the same as malformed.
 This is the ladder
 [`error_response`][django_service_specs.http.error_response.error_response]
 ships, statuses included, for a transport that answers over HTTP. They are
-djangorestframework-services' statuses, so a client of both reads one answer;
+djangorestframework-services' statuses;
 [Serving over HTTP](http.md) has the whole of it.
 
 Configuration errors are neither family. A spec with no permission check, a

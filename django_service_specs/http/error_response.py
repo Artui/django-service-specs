@@ -38,8 +38,10 @@ sees one loop, not seven rows, so each row is held by its own case of
 def error_response(exc: DispatchError | ServiceError) -> JsonResponse:
     """``exc`` as JSON, at the status djangorestframework-services answers it with.
 
-    One ladder for both families, so a client of either package reads one
-    answer:
+    One ladder for both families, at djangorestframework-services' statuses.
+    One body differs from its answer: a service's string or list detail, which
+    DRF answers as a bare list and this as a field map under
+    ``non_field_errors``, so every 400 here has one shape:
 
     | Refusal | Status | Body |
     | --- | --- | --- |

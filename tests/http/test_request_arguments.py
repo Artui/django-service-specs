@@ -175,6 +175,8 @@ class TestFormBody:
         )
         assert request.POST == {}
         assert read(request) == {"count": 2, "ids": [1, 2]}
+        # Django fills ``request.FILES`` for POST alone, as the page says.
+        assert not request.FILES
 
     @pytest.mark.parametrize("method", ["post", "put"])
     def test_a_body_that_is_neither_form_nor_json_is_refused(self, method: str) -> None:
@@ -197,6 +199,15 @@ class TestFormBody:
         assert request.POST == {}
         with pytest.raises(UnsupportedMediaType):
             read(request)
+
+    def test_a_multipart_post_is_read_after_the_middleware_has_read_it(self) -> None:
+        # Django streams a multipart POST into ``request.POST`` without keeping
+        # the body, so once CsrfViewMiddleware has read it, ``request.POST`` is
+        # the only place its fields still are: parsing the body again raises.
+        attached = SimpleUploadedFile("notes.txt", b"A file.")
+        request = FACTORY.post("/", data={"count": "2", "notes": attached})
+        assert request.POST["count"] == "2"
+        assert read(request) == {"count": 2}
 
     def test_a_request_with_no_body_carries_no_arguments_whatever_its_label(self) -> None:
         # ``fetch(url, {method: "POST"})`` for an operation its route names.

@@ -109,8 +109,10 @@ no body carries no arguments whatever its `Content-Type` says, so a
 
 Django parses a form body into `request.POST` for POST alone, so a PUT, PATCH
 or DELETE form is parsed here the same way rather than arriving empty. **Files
-are not arguments**: a parameter has no file type, so an upload is left in
-`request.FILES` for the view.
+are not arguments**: a parameter has no file type. A POST's uploads are in
+`request.FILES` for the view, since Django parses them; it fills
+`request.FILES` for POST alone, and the uploads in a PUT, PATCH or DELETE body
+parsed here are dropped.
 
 **The URL kwargs are arguments too**, merged last so the route wins a clash, as
 it does in djangorestframework-services. A client-supplied value must not move
@@ -141,7 +143,9 @@ principal never acts, on HTTP or off it.
 
 [`error_response`][django_service_specs.http.error_response.error_response]
 answers both [families](arguments.md#two-families-of-error), with the statuses
-djangorestframework-services uses, so a client of both reads one answer:
+djangorestframework-services uses. One body differs from its answer: a
+service's string or list detail, which DRF answers as a bare list and this as
+a field map under `non_field_errors`, so every 400 here has one shape:
 
 | Refusal | Status | Body |
 | --- | --- | --- |

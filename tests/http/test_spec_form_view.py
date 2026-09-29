@@ -496,6 +496,13 @@ class TestServing:
         assert str(raised.value) == UNDECLARED.format(names="org, zone")
         assert spec.service.calls == []
 
+    def test_the_page_is_refused_for_a_route_capturing_an_undeclared_kwarg(self, ada: Any) -> None:
+        # On GET too, as SpecView refuses it on any method: served anyway, the
+        # page would fail only once someone had filled it in.
+        with pytest.raises(ImproperlyConfigured) as raised:
+            get(form_view(entry_spec()), ada, zone="eu", org="a")
+        assert str(raised.value) == UNDECLARED.format(names="org, zone")
+
     def test_a_method_it_does_not_serve_is_djangos_405(self, ada: Any) -> None:
         request = signed_in(FACTORY.put("/", data=b""), ada)
         assert form_view(entry_spec())(request).status_code == 405

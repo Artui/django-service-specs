@@ -142,6 +142,11 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         """The page, with an unbound form, for a principal the spec's class check admits."""
         spec = self.served_spec()
+        # Refused before the page is served, as ``SpecView`` refuses it on any
+        # method: a route capturing a kwarg the spec does not declare is wrong
+        # for every request, and a page served anyway fails only once someone
+        # has filled it in.
+        route_arguments(spec.parameters(), kwargs)
         try:
             authorize(spec, request_principal(request))
         except (NotPermitted, PrincipalUnavailable) as refused:

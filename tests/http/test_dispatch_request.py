@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from typing import Any
 
@@ -9,6 +10,7 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.http.dispatch_request import dispatch_request
 from django_service_specs.services.service_conflict import ServiceConflict
@@ -30,6 +32,11 @@ from tests.http.utils import (
 pytestmark = pytest.mark.django_db
 
 UNAVAILABLE = {"detail": "The acting principal is unavailable."}
+
+
+@dataclasses.dataclass
+class Measured:
+    ratio: float
 
 
 def _taken(*, title: str) -> None:
@@ -171,6 +178,16 @@ class TestRefusals:
             400,
             {"title": ["This field is required."], "colour": ["Unknown argument."]},
         )
+
+    def test_a_number_the_decoder_reads_as_infinity_is_400_at_its_address(self, ada: Any) -> None:
+        # 1e400 is well-formed JSON, and Python's decoder reads it as infinity:
+        # the constants are refused by name, and this is refused as a number.
+        spec = ServiceSpec(
+            service=lambda **pool: None, permissions=OPEN, validator=DataclassValidator(Measured)
+        )
+        request = FACTORY.post("/", data=b'{"ratio": 1e400}', content_type="application/json")
+        response = dispatch_request(spec, signed_in(request, ada))
+        assert (response.status_code, body(response)) == (400, {"ratio": ["Enter a number."]})
 
     def test_a_malformed_body_is_400(self, ada: Any) -> None:
         request = signed_in(FACTORY.post("/", data=b"[1", content_type="application/json"), ada)

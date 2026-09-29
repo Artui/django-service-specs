@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -229,6 +230,16 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
     # The first condition is held by test_an_array_with_no_items_accepts_any_element.
     if json_type is not None and not _is_json_type(json_type, value):
         return expected_type(json_type)
+    # No JSON value is NaN or an infinity, and neither HTTP reading hands one
+    # on by name: ``coerce_flat`` refuses ``"nan"``, a JSON body the constants.
+    # A decoder still makes one from an overflowing literal - Python's reads
+    # ``1e400`` as infinity - and a Python caller can pass one. Refused here,
+    # every transport refuses it at its own address, in the words Django's
+    # number fields use. One branch to coverage: the type condition is held by
+    # test_accepts_a_value_of_its_json_type[string-], the finiteness one by
+    # test_accepts_a_value_of_its_json_type[number-2.5].
+    if isinstance(value, float) and not math.isfinite(value):
+        return gettext("Enter a number.")
     if fmt is None:
         return None
     try:
