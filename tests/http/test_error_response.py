@@ -18,6 +18,7 @@ from django.utils.translation import gettext_lazy
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.http.error_response import error_response
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
@@ -52,6 +53,7 @@ def answered(exc: DispatchError | ServiceError) -> tuple[int, Any]:
         (ServiceConflict("Taken."), 409),
         (ServiceError("Not today."), 422),
         (Postponed("Later."), 422),
+        (UnsupportedMediaType("Not JSON."), 415),
         (Throttled("Slow down."), 400),
         (DispatchError("Refused."), 400),
     ],
@@ -135,5 +137,6 @@ def test_no_refusal_is_ever_a_401() -> None:
         ServiceValidationError("x"),
         ServiceNotFound(),
         ServiceConflict(),
+        UnsupportedMediaType(),
     ]
     assert 401 not in {error_response(exc).status_code for exc in refusals}

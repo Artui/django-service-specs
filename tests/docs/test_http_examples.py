@@ -32,6 +32,7 @@ from django_service_specs import (
     ServiceError,
     ServiceNotFound,
     ServiceValidationError,
+    UnsupportedMediaType,
     error_response,
 )
 from tests.dispatch_app.models import Note
@@ -187,6 +188,7 @@ def test_the_pages_status_table_is_the_one_shipped() -> None:
         ServiceNotFound(),
         ServiceConflict(),
         ServiceError(),
+        UnsupportedMediaType(),
         DispatchError(),
     ]
     shipped = {type(exc).__name__: error_response(exc).status_code for exc in examples}

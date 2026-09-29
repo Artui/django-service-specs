@@ -11,6 +11,7 @@ from django.http import HttpRequest, QueryDict
 from django.http.multipartparser import MultiPartParser
 from django.utils.translation import gettext
 
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -19,6 +20,9 @@ from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_typ
 
 _CSRF_FIELD = "csrfmiddlewaretoken"
 """The field ``{% csrf_token %}`` renders into a form: Django's, and never an argument."""
+
+_URLENCODED = "application/x-www-form-urlencoded"
+_MULTIPART = "multipart/form-data"
 
 
 def request_arguments(
@@ -38,15 +42,21 @@ def request_arguments(
       or ``multipart/form-data``): the fields, which are flat. Django parses
       one into ``request.POST`` for POST alone, so a PUT, PATCH or DELETE
       body is parsed here the same way rather than arriving empty. Any other
-      body carries no arguments.
+      body is refused as
+      [`UnsupportedMediaType`][django_service_specs.http.unsupported_media_type.UnsupportedMediaType]
+      rather than read as none, since an operation whose parameters are all
+      optional would then run with nothing; a request with no body carries no
+      arguments, whatever its ``Content-Type`` says.
 
     **A flat source** is read by the declaration. A parameter of type
     ``array`` takes every value its key was sent with, and anything else takes
-    the last, as ``QueryDict`` reads a repeated key. A blank value for a
-    parameter that is not a ``string`` is absent - a flat wire has no other
-    spelling of "left blank", and an empty ``?count=`` is not a refusal to
-    count - and so is each blank element of an array whose elements are not
-    strings, the whole array included once nothing is left. Django's
+    the last, as ``QueryDict`` reads a repeated key. **A blank value is
+    absent unless** ``""`` **is one the parameter can take**: a plain string
+    can, and a number, a boolean, a date, a decimal, or a string whose
+    choices leave the blank out cannot. A flat wire has no other spelling of
+    "left blank", and an empty ``?count=`` or ``?since=`` from a filter form is
+    not a refusal to count or a malformed date. Each blank element of an array
+    is read by the same rule, the whole array absent once nothing is left. Django's
     ``csrfmiddlewaretoken`` is dropped. What remains goes through
     [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat],
     which leaves an undeclared key as it is, so the closed argument set in
@@ -67,6 +77,7 @@ def request_arguments(
         InvalidArguments: a JSON body that does not parse or is not an object,
             under ``non_field_errors``; or ``coerce_flat``'s refusals, each at
             its parameter's name.
+        UnsupportedMediaType: a body that is neither JSON nor a form.
     """
     route = dict(url_kwargs or {})
     if request.method in ("GET", "HEAD"):
@@ -88,50 +99,77 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
         # (the first) and test_a_scalar_takes_the_last_of_repeated_values (the
         # second, without which every declared value would become a list).
         if param is not None and param.type == "array":
-            keep = _keeps_blank_elements(param)
+            keep = _takes_blank(param.items, param)
             values = [value for value in source.getlist(key) if keep or value != ""]
             if values:
                 raw[key] = values
             continue
         value = source[key]
         # One branch to coverage, so each condition is held by its own test:
-        # test_a_blank_string_is_kept (the type), test_a_scalar_takes_the_last_of_repeated_values
-        # (the blank: without it every integer is dropped), and
+        # test_a_blank_string_is_kept (whether it takes a blank),
+        # test_a_scalar_takes_the_last_of_repeated_values (the blank: without
+        # it every integer is dropped), and
         # test_an_undeclared_key_passes_through_for_the_closed_set_to_refuse
         # (the declaration: an undeclared blank has no type to ask about).
-        if value == "" and param is not None and param.type != "string":
+        if (
+            value == ""
+            and param is not None
+            and not _takes_blank(param.type, param, fmt=param.format)
+        ):
             continue
         raw[key] = value
     return raw
 
 
-def _keeps_blank_elements(param: Parameter) -> bool:
-    """Whether an array's elements are strings, so a blank one is a value rather than absent.
+def _takes_blank(json_type: object, param: Parameter, *, fmt: str | None = None) -> bool:
+    """Whether ``""`` is a value of ``json_type`` under ``param``, so a blank is kept rather than absent.
 
-    An undeclared element is one: ``coerce_flat`` leaves it as the string it
-    arrived as. The two halves are held by
-    test_blank_elements_of_a_string_array_are_kept and
-    test_blank_elements_of_an_undeclared_element_type_are_kept.
+    ``json_type`` is the parameter's own type, or an array's element type:
+    ``None`` for an undeclared element, which ``coerce_flat`` leaves as the
+    string it arrived as, and a ``Parameters`` for a row, which is no string.
+    A format names what a string decodes into, and no date or decimal is
+    blank. ``choices`` constrain a scalar and each element of an array alike,
+    so a blank they leave out is refused by the shape check rather than read
+    as a choice, and here it is absent instead.
+
+    One branch to coverage, so each condition is held by its own test:
+    test_blank_elements_of_an_undeclared_element_type_are_kept (``None``),
+    test_blank_elements_of_a_string_array_are_kept (``"string"``),
+    test_a_blank_date_is_absent (the format),
+    test_a_blank_the_choices_leave_out_is_absent (the choices, whole),
+    test_a_blank_string_is_kept (``choices is None``), and
+    test_a_blank_the_choices_name_is_kept (``"" in choices``).
     """
-    return param.items is None or param.items == "string"
+    return (
+        (json_type is None or json_type == "string")
+        and fmt is None
+        and (param.choices is None or "" in param.choices)
+    )
 
 
 def _form(request: HttpRequest) -> QueryDict:
     """The form fields a request's body carries, whatever its method."""
+    if request.content_type not in (_URLENCODED, _MULTIPART):
+        # Readable even once ``request.POST`` has been, as CsrfViewMiddleware
+        # reads it: Django leaves the stream unread for a body it does not parse.
+        if request.body:
+            raise UnsupportedMediaType(
+                gettext('Unsupported media type "%(media_type)s" in request.')
+                % {"media_type": request.content_type}
+            )
+        return QueryDict(encoding=request.encoding)
     if request.method == "POST":
         # Django's own parse, which CsrfViewMiddleware may already have done:
         # the stream can be read once, and ``request.POST`` is where it went.
         return request.POST
-    if request.content_type == "application/x-www-form-urlencoded":
+    if request.content_type == _URLENCODED:
         return QueryDict(request.body, encoding=request.encoding)
-    if request.content_type == "multipart/form-data":
-        # The parser Django runs for a POST, over the buffered body. Its files
-        # are discarded, since no parameter can declare one.
-        fields, _files = MultiPartParser(
-            request.META, BytesIO(request.body), request.upload_handlers, request.encoding
-        ).parse()
-        return fields
-    return QueryDict(encoding=request.encoding)
+    # The parser Django runs for a POST, over the buffered body. Its files
+    # are discarded, since no parameter can declare one.
+    fields, _files = MultiPartParser(
+        request.META, BytesIO(request.body), request.upload_handlers, request.encoding
+    ).parse()
+    return fields
 
 
 def _json_object(request: HttpRequest) -> dict[str, Any]:

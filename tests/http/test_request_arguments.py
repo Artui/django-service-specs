@@ -18,6 +18,7 @@ from django.test import RequestFactory
 from django.test.client import encode_multipart
 
 from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -37,6 +38,13 @@ FLAT = Parameters.of(
     Parameter("tags", "array"),
 )
 BOOK = Parameters.of(Parameter("title", "string", required=True))
+BLANKS = Parameters.of(
+    Parameter("since", "string", format="date"),
+    Parameter("price", "string", format="decimal"),
+    Parameter("status", "string", choices=("draft", "live")),
+    Parameter("shelf", "string", choices=("", "top")),
+    Parameter("labels", "array", items="string", choices=("a", "b")),
+)
 
 
 def read(request: HttpRequest, parameters: Parameters = FLAT, **kwargs: Any) -> dict[str, Any]:
@@ -113,6 +121,20 @@ class TestBlanks:
         # Holds the ``"string"`` half of the element check.
         assert read(FACTORY.get("/?words=a&words=")) == {"words": ["a", ""]}
 
+    def test_a_blank_date_is_absent(self) -> None:
+        # A filter form's empty date input. Kept, it reached the shape check as
+        # a malformed date, refusing a form that was only left blank.
+        assert read(FACTORY.get("/?since=&price="), BLANKS) == {}
+
+    def test_a_blank_the_choices_leave_out_is_absent(self) -> None:
+        # An "any status" option whose value is blank: the shape check would
+        # refuse it as no valid choice, and an array's choices constrain each
+        # of its elements the same way.
+        assert read(FACTORY.get("/?status=&labels=&labels=a"), BLANKS) == {"labels": ["a"]}
+
+    def test_a_blank_the_choices_name_is_kept(self) -> None:
+        assert read(FACTORY.get("/?shelf="), BLANKS) == {"shelf": ""}
+
     def test_blank_elements_of_an_undeclared_element_type_are_kept(self) -> None:
         # Holds the ``None`` half: coerce_flat reads an undeclared element as
         # the string it arrived as, so its blank is a string's blank.
@@ -153,11 +175,32 @@ class TestFormBody:
         assert request.POST == {}
         assert read(request) == {"count": 2, "ids": [1, 2]}
 
-    def test_a_body_that_is_neither_form_nor_json_carries_no_arguments(self) -> None:
-        # Read as a form, ``count=2`` in a text body would become an argument
-        # its client never framed as one.
-        request = FACTORY.put("/", data="count=2", content_type="text/plain")
-        assert read(request) == {}
+    @pytest.mark.parametrize("method", ["post", "put"])
+    def test_a_body_that_is_neither_form_nor_json_is_refused(self, method: str) -> None:
+        # Read as no arguments, an operation whose parameters are all optional
+        # ran with nothing and answered success; read as a form, ``count=2``
+        # became an argument its client never framed as one.
+        request = getattr(FACTORY, method)(
+            "/", data='{"count": 2}', content_type="application/merge-patch+json"
+        )
+        with pytest.raises(UnsupportedMediaType) as caught:
+            read(request)
+        assert caught.value.message == (
+            'Unsupported media type "application/merge-patch+json" in request.'
+        )
+
+    def test_the_refusal_survives_the_middleware_reading_post_first(self) -> None:
+        # CsrfViewMiddleware reads ``request.POST`` before any view runs, and a
+        # body it has consumed could no longer be seen to be there.
+        request = FACTORY.post("/", data="count=2", content_type="text/plain")
+        assert request.POST == {}
+        with pytest.raises(UnsupportedMediaType):
+            read(request)
+
+    def test_a_request_with_no_body_carries_no_arguments_whatever_its_label(self) -> None:
+        # ``fetch(url, {method: "POST"})`` for an operation its route names.
+        request = FACTORY.post("/", data="", content_type="text/plain")
+        assert read(request, url_kwargs={"pk": "4"}) == {"pk": 4}
 
     def test_a_post_does_not_read_its_query_string(self) -> None:
         request = FACTORY.post("/?count=9", data="title=x", content_type=FORM)

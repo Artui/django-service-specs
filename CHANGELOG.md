@@ -31,19 +31,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   query string; any other method a JSON object body as it is, or a form or
   multipart body, which is parsed for PUT, PATCH and DELETE too rather than
   arriving empty. A flat source takes every value for an array parameter and
-  the last otherwise, reads a blank value for a parameter that is not a string
-  as absent, drops `csrfmiddlewaretoken`, and goes through `coerce_flat`. URL
-  kwargs are coerced and merged last, so the route wins a clash. A malformed
-  JSON body, or one that is not an object, is `InvalidArguments` under
-  `non_field_errors`; files are not arguments.
+  the last otherwise, reads a blank value as absent unless `""` is one the
+  parameter can take (a plain string, or one whose choices name it), drops
+  `csrfmiddlewaretoken`, and goes through `coerce_flat`. URL kwargs are
+  coerced and merged last, so the route wins a clash. A malformed JSON body,
+  or one that is not an object, is `InvalidArguments` under
+  `non_field_errors`; a body in any other format is `UnsupportedMediaType`
+  rather than no arguments; files are not arguments.
 - `error_response`: either family of refusal as JSON, at the statuses
   djangorestframework-services answers with. `InvalidArguments` and
   `ServiceValidationError` are 400 and both bodies are field maps, a service's
   string or list detail under `non_field_errors`; `NotPermitted` and
   `PrincipalUnavailable` are 403, `ServiceNotFound` 404, `ServiceConflict`
-  409, any other `ServiceError` 422, each as `{"detail": message}`. Never 401.
+  409, any other `ServiceError` 422, `UnsupportedMediaType` 415, each as
+  `{"detail": message}`. Never 401.
+- `UnsupportedMediaType`, a `DispatchError`: a request body that is neither
+  JSON nor a form, refused rather than read as no arguments, since an
+  operation whose parameters are all optional would run with nothing and
+  answer success.
 
 ### Fixed
+- `ServiceValidationError` raised with a lazy translation replaced it with
+  its default `message`, since a lazy string is not a `str`. The lazy string
+  is now the message, and renders in the language active where it is read.
 - An operation declaring `list[X | None]` refused every null element before
   its Validator ran, although both adapters accept one: the declaration had
   no way to say the element was nullable, so the shape check read a gap as a

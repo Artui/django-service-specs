@@ -23,6 +23,7 @@ from django_service_specs.http.dispatch_request import dispatch_request
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.spec_view import SpecView
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.adelete_relations import adelete_relations
 from django_service_specs.mutations.apply_input import apply_input
@@ -132,6 +133,7 @@ __all__ = [
     "UnknownArguments",
     "Unrestricted",
     "UnsetType",
+    "UnsupportedMediaType",
     "ValidationContext",
     "Validator",
     "__version__",

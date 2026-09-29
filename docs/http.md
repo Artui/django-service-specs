@@ -81,13 +81,16 @@ reads them, by method and body:
 | GET, HEAD | the query string | yes, with `coerce_flat` |
 | any other method, `application/json` body | the body, which must be an object | no |
 | any other method, form or multipart body | the form fields | yes, with `coerce_flat` |
-| any other method, any other body | nothing | - |
+| any other method, no body | nothing | - |
+| any other method, any other body | refused, 415 | - |
 
 **A flat source is read by the declaration.** An `array` parameter takes every
 value its key was sent with (`?ids=1&ids=2`), and anything else takes the last.
-A blank value for a parameter that is not a `string` is absent, since a flat
-wire has no other spelling of "left blank": an empty `?count=` is not a refusal
-to count. Django's `csrfmiddlewaretoken` is never an argument. Then
+A blank value is absent unless `""` is one the parameter can take: a plain
+string can, and a number, a boolean, a date, a decimal, or a string whose
+`choices` leave the blank out cannot. A flat wire has no other spelling of
+"left blank", and an empty `?count=` or `?since=` from a filter form is not a
+refusal to count or a malformed date. Django's `csrfmiddlewaretoken` is never an argument. Then
 [`coerce_flat`](arguments.md#flat-transports) types the strings, and leaves an
 undeclared key for the closed argument set to refuse under the caller's policy.
 
@@ -95,6 +98,14 @@ undeclared key for the closed argument set to refuse under the caller's policy.
 caller that sends `"5"` for an integer has sent a string, and the shape check
 says so. A body that does not parse, or is not an object, is refused as
 `InvalidArguments` under `non_field_errors`. An empty body is no arguments.
+
+**A body in any other format is refused** as
+[`UnsupportedMediaType`][django_service_specs.http.unsupported_media_type.UnsupportedMediaType],
+answered 415, rather than read as no arguments: a PATCH sent as `text/plain`
+or `application/merge-patch+json` to an operation whose parameters are all
+optional would otherwise run with nothing and answer success. A request with
+no body carries no arguments whatever its `Content-Type` says, so a
+`fetch(url, {method: "POST"})` for an operation its route names is served.
 
 Django parses a form body into `request.POST` for POST alone, so a PUT, PATCH
 or DELETE form is parsed here the same way rather than arriving empty. **Files
@@ -134,6 +145,7 @@ djangorestframework-services uses, so a client of both reads one answer:
 | `ServiceNotFound` | 404 | `{"detail": message}` |
 | `ServiceConflict` | 409 | `{"detail": message}` |
 | `ServiceError` | 422 | `{"detail": message}` |
+| `UnsupportedMediaType` | 415 | `{"detail": message}` |
 | `DispatchError` | 400 | `{"detail": message}` |
 
 A row is read top to bottom and the first match answers, so a subclass is

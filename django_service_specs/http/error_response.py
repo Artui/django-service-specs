@@ -9,6 +9,7 @@ from django.http import JsonResponse
 
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.services.service_conflict import ServiceConflict
@@ -23,13 +24,14 @@ _STATUSES: tuple[tuple[type[Exception], int], ...] = (
     (ServiceNotFound, 404),
     (ServiceConflict, 409),
     (ServiceError, 422),
+    (UnsupportedMediaType, 415),
     (DispatchError, 400),
 )
 """Each message-carrying refusal's status, read top to bottom, first match wins.
 
 A subclass is listed above its base, or the base's row would answer for it:
 ``ServiceNotFound`` and ``ServiceConflict`` are ``ServiceError``s too. Coverage
-sees one loop, not six rows, so each row is held by its own case of
+sees one loop, not seven rows, so each row is held by its own case of
 ``test_a_message_refusal_is_its_status_and_a_detail``."""
 
 
@@ -47,6 +49,7 @@ def error_response(exc: DispatchError | ServiceError) -> JsonResponse:
     | `ServiceNotFound` | 404 | `{"detail": message}` |
     | `ServiceConflict` | 409 | `{"detail": message}` |
     | any other `ServiceError` | 422 | `{"detail": message}` |
+    | `UnsupportedMediaType` | 415 | `{"detail": message}` |
     | any other `DispatchError` | 400 | `{"detail": message}` |
 
     **Every 400 body is a field map.** ``InvalidArguments`` is its tree, whose

@@ -6,10 +6,12 @@ from django_service_specs.http.dispatch_request import dispatch_request
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.spec_view import SpecView
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 
 __all__ = [
     "AsyncSpecView",
     "SpecView",
+    "UnsupportedMediaType",
     "adispatch_request",
     "dispatch_request",
     "error_response",
