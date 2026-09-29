@@ -1,0 +1,1192 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A service contract for Django: declare an operation's parameters, permission check, validation and output once, and dispatch it from any transport.">
+      
+      
+      
+        <link rel="canonical" href="https://artui.github.io/django-service-specs/declaring/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../dispatching/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Declaring an operation - django-service-specs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#declaring-an-operation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="django-service-specs" class="md-header__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            django-service-specs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Declaring an operation
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="django-service-specs" class="md-nav__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    django-service-specs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Declaring an operation
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Declaring an operation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#every-callable-declares-what-it-receives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every callable declares what it receives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A read
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A write
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-validator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Validator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Validator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-dataclass-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The dataclass adapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-and-the-presenter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output and the Presenter
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dispatching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispatching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arguments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arguments and refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relation writes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#every-callable-declares-what-it-receives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Every callable declares what it receives
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-read" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A read
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A write
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-validator" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Validator
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The Validator">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-dataclass-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The dataclass adapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-and-the-presenter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Output and the Presenter
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/Artui/django-service-specs/edit/main/docs/declaring.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="declaring-an-operation">Declaring an operation<a class="headerlink" href="#declaring-an-operation" title="Permanent link">&para;</a></h1>
+<p>An operation is a <strong>spec</strong>: a frozen dataclass that says what the operation
+takes, who may run it, what it acts on and what it returns. There are two.</p>
+<ul>
+<li><a class="autorefs autorefs-internal" title="SelectorSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.specs.selector_spec.SelectorSpec"><code>SelectorSpec</code></a> is a
+  <strong>read</strong>: a list or a retrieve.</li>
+<li><a class="autorefs autorefs-internal" title="ServiceSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.specs.service_spec.ServiceSpec"><code>ServiceSpec</code></a> is a
+  <strong>write</strong>: a service, the row or rows it acts on, and what it returns.</li>
+</ul>
+<p>Specs are usually built at module level, at import time. Anything that could
+need the app registry - reading a Validator's declaration, resolving an
+annotation - happens on first use instead, so building a spec never does.
+A declaration no reader could act on is refused where it is written, with
+<code>ImproperlyConfigured</code> naming the field: a Validator <em>class</em> where an instance
+belongs, both an instance and a collection selector, a presenter declared on a
+service and on its output selector, a string where <code>select_related</code> wants a
+sequence.</p>
+<h2 id="every-callable-declares-what-it-receives">Every callable declares what it receives<a class="headerlink" href="#every-callable-declares-what-it-receives" title="Permanent link">&para;</a></h2>
+<p>The service, the selector, <code>extend_queryset</code> and a pool seed's resolver are all
+called the same way: with the keywords their signature declares, picked from a
+pool dispatch builds for the call, and nothing else. A callable that takes
+<code>**kwargs</code> receives the whole pool.</p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Holds</th>
+<th>In the pool of</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>user</code></td>
+<td>The principal</td>
+<td>Every callable</td>
+</tr>
+<tr>
+<td>each validated value, by name</td>
+<td>What the Validator returned</td>
+<td>The service</td>
+</tr>
+<tr>
+<td><code>data</code></td>
+<td>All of the validated values, as one mapping</td>
+<td>The service</td>
+</tr>
+<tr>
+<td><code>instance</code></td>
+<td>The row an instance selector resolved</td>
+<td>The service</td>
+</tr>
+<tr>
+<td><code>collection</code></td>
+<td>The rows a collection selector resolved</td>
+<td>The service</td>
+</tr>
+<tr>
+<td>each of a selector's <code>reads</code>, by name</td>
+<td>The checked argument</td>
+<td>That selector</td>
+</tr>
+<tr>
+<td><code>result</code></td>
+<td>The service's return</td>
+<td>The output selector</td>
+</tr>
+<tr>
+<td><code>queryset</code></td>
+<td>The shaped queryset so far</td>
+<td><code>extend_queryset</code></td>
+</tr>
+<tr>
+<td>a registered seed</td>
+<td>Its resolver's value</td>
+<td>Every callable</td>
+</tr>
+</tbody>
+</table>
+<p>The fixed names - <code>user</code>, <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code> and
+<code>queryset</code>, with <code>progress</code> held back for later - are
+<a class="autorefs autorefs-internal" title="RESERVED_POOL_SEEDS
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS">reserved</a>:
+a parameter declared under one is refused, and so is a validated value
+returned under one, so an argument can never outrank a value dispatch put in
+the pool itself. A caller naming an argument <code>user</code> is the case that matters.
+<a href="../dispatching/#pool-seeds">Pool seeds</a> add names of your own, reserved the
+same way.</p>
+<h2 id="a-read">A read<a class="headerlink" href="#a-read" title="Permanent link">&para;</a></h2>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Any</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django.db.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">QuerySet</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">UNSET</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">DataclassPresenter</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">DataclassValidator</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">FieldMarking</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">Parameter</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">Parameters</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">PermissionCheck</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>    <span class="n">UnsetType</span><span class="p">,</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="p">)</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Status</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="k">class</span><span class="w"> </span><span class="nc">IsSignedIn</span><span class="p">(</span><span class="n">PermissionCheck</span><span class="p">):</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>        <span class="k">return</span> <span class="n">principal</span><span class="o">.</span><span class="n">is_authenticated</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="nd">@dataclass</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoteRow</span><span class="p">:</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>    <span class="nb">id</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">FieldMarking</span><span class="o">.</span><span class="n">handle</span><span class="p">()]</span>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>    <span class="n">title</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FieldMarking</span><span class="o">.</span><span class="n">label</span><span class="p">()]</span>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a><span class="k">def</span><span class="w"> </span><span class="nf">notes_of</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">search</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span><span class="p">,</span> <span class="n">ordering</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"title"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuerySet</span><span class="p">[</span><span class="n">Note</span><span class="p">]:</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="k">return</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">title__icontains</span><span class="o">=</span><span class="n">search</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="n">ordering</span><span class="p">)</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a><span class="n">list_notes_spec</span> <span class="o">=</span> <span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">notes_of</span><span class="p">,</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a>        <span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">),</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>        <span class="n">Parameter</span><span class="p">(</span><span class="s2">"ordering"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"-title"</span><span class="p">],</span> <span class="n">default</span><span class="o">=</span><span class="s2">"title"</span><span class="p">),</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>    <span class="p">),</span>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>    <span class="n">select_related</span><span class="o">=</span><span class="p">[</span><span class="s2">"owner"</span><span class="p">],</span>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>kind</code> is <a class="autorefs autorefs-internal" title="SelectorKind" href="../reference/#django_service_specs.specs.selector_kind.SelectorKind"><code>SelectorKind.LIST</code></a>
+or <code>RETRIEVE</code>. A retrieve returns one row: a queryset is read with <code>.first()</code>,
+a <code>DoesNotExist</code> raised by a selector written with <code>.get()</code> means the same
+missing row, and a missing row is reported as not-found unless the spec sets
+<code>allow_none=True</code>, which makes it the value <code>None</code> - the shape of an optional
+singleton, or of an upsert's target.</p>
+<p><code>reads</code> is the selector's whole input. There is no Validator in front of a
+read, so these Parameters are what the closed argument set and the shape check
+hold the caller to: an argument the spec does not declare is refused before
+the selector runs.</p>
+<p><code>select_related</code>, <code>prefetch_related</code> and <code>annotations</code> are applied to the
+queryset the selector returns, in that order, and <code>extend_queryset</code> last, with
+the shaped queryset as <code>queryset</code>. Declaring any of them on a selector that
+returns something other than a queryset is refused at dispatch.</p>
+<p><code>permissions</code> is required on a spec that is dispatched or registered, and
+ignored on a selector nested inside a <code>ServiceSpec</code>: authorization belongs to
+the spec being dispatched.</p>
+<h2 id="a-write">A write<a class="headerlink" href="#a-write" title="Permanent link">&para;</a></h2>
+<p>A <code>ServiceSpec</code> names its service and, at most, one target selector:</p>
+<ul>
+<li><strong><code>instance_selector_spec</code></strong>, a <code>RETRIEVE</code>, for a service that acts on one
+  row. It arrives as <code>instance</code>, and a missing row is not-found: the service
+  never runs and the Validator is never asked. With <code>allow_none=True</code> on the
+  selector, a missing row arrives as <code>instance=None</code> instead, which is how an
+  upsert is written.</li>
+<li><strong><code>collection_selector_spec</code></strong>, a <code>LIST</code>, for a bulk operation. The rows
+  arrive as <code>collection</code>.</li>
+<li>Neither, for a create.</li>
+</ul>
+<p><code>output_selector_spec</code> re-reads what the service produced, with its return in
+the pool as <code>result</code>. It is how a write returns a row with fresh annotations or
+prefetches, or a list after a bulk change; the
+<a href="../relations/#a-worked-example">relation-write example</a> uses one.</p>
+<p><code>atomic=True</code>, the default, runs the service inside <code>transaction.atomic()</code>.
+<code>metadata</code> holds a project's own per-operation facts, stored as given, for its
+own checks or audit hooks to read.</p>
+<p><code>spec.parameters()</code> is everything the write takes: its target selector's
+<code>reads</code>, then its Validator's parameters. A name both declare is refused -
+two sources claiming one argument is a declaration bug, and a last-wins merge
+would hide which declaration a transport describes. The selector sees only its
+own <code>reads</code>, and the Validator only its own parameters.</p>
+<h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="Parameter
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.parameters.parameter.Parameter"><code>Parameter</code></a> is one thing
+an operation takes, and every transport describes itself from it rather than
+from whichever validation library the spec happens to use: a JSON Schema,
+argv options, the closed argument set and the shape check are all derived from
+the same declaration.</p>
+<ul>
+<li><strong><code>type</code></strong> is a JSON type: <code>string</code>, <code>integer</code>, <code>number</code>, <code>boolean</code>, <code>array</code>
+  or <code>object</code>. JSON's own, because that is what crosses every wire the kernel
+  serves: a JSON-RPC call, a queue row, and argv once it has been read.</li>
+<li><strong><code>format</code></strong> is <code>decimal</code>, <code>date-time</code> or <code>date</code>, on a <code>string</code>: a value JSON
+  cannot carry, which travels as a string for the Validator to decode.</li>
+<li><strong><code>items</code></strong> is an array's element: a JSON type name for a flat list, or the
+  <code>Parameters</code> of the object each row is. <strong><code>fields</code></strong> is the same for an
+  <code>object</code>. Nesting is what lets a write declare its rows, so a malformed row
+  is refused by the declaration rather than reaching a constructor.</li>
+<li><strong><code>choices</code></strong>, <strong><code>nullable</code></strong> and <strong><code>required</code></strong> mean what they say.
+  <code>choices</code> on an array constrains each element.</li>
+<li><strong><code>default</code></strong> is <a class="autorefs autorefs-internal" title="UNSET
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.types.unset.UNSET"><code>UNSET</code></a> when none
+  is declared, so a default of <code>None</code> stays a real default. It is reported, not
+  applied: whether an omitted argument arrives as its default is the validating
+  library's behaviour.</li>
+</ul>
+<p>There are no bounds (<code>maxLength</code>, <code>minimum</code>) on a Parameter; the Validator
+enforces those.</p>
+<p><a class="autorefs autorefs-internal" title="Parameters
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.parameters.parameters.Parameters"><code>Parameters</code></a> is an
+ordered set of them. <code>Parameters.of(a, b)</code> builds one, <code>+</code> joins two, and a
+name declared twice is refused either way.</p>
+<h2 id="the-validator">The Validator<a class="headerlink" href="#the-validator" title="Permanent link">&para;</a></h2>
+<p>A <a class="autorefs autorefs-internal" title="Validator" href="../reference/#django_service_specs.validation.validator.Validator"><code>Validator</code></a> turns
+JSON-like arguments into the values a service receives. The contract is two
+methods:</p>
+<ul>
+<li><code>parameters()</code> declares what it takes, as <code>Parameters</code>. It must never query,
+  because a transport describes a spec before any call.</li>
+<li><code>validate(arguments, context)</code> returns the validated values keyed by name, or
+  raises <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>.
+  It receives only the arguments its own <code>parameters()</code> declare, already
+  through the shape check, and a
+  <a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
+  carrying the principal and the resolved target. It may query - a uniqueness
+  check does - and the target is there so that an update's check can exclude
+  the row being updated.</li>
+</ul>
+<p>Three things a newcomer may look for are absent on purpose:</p>
+<ul>
+<li><strong>It is nominal.</strong> An adapter subclasses <code>Validator</code>, and subclassing is the
+  opt-in. A structural check on a method name would let stock classes through
+  by accident: an <code>is_valid</code> method matches a Django form, a <code>validate</code> method
+  matches a pydantic model class, and neither was written to this contract.</li>
+<li><strong>There is no <code>partial</code>, <code>instance</code> or <code>many</code>.</strong> Those are one HTTP
+  framework's update and list semantics. Off HTTP, what an update may omit is a
+  property of the declared parameters, the row it acts on is target
+  resolution, and a list is an array parameter.</li>
+<li><strong>It is sync-only.</strong> It may query, so the async entry point runs it in
+  Django's thread-sensitive executor, and it must not be <code>async def</code>.</li>
+</ul>
+<h3 id="the-dataclass-adapter">The dataclass adapter<a class="headerlink" href="#the-dataclass-adapter" title="Permanent link">&para;</a></h3>
+<p><a class="autorefs autorefs-internal" title="DataclassValidator" href="../reference/#django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator"><code>DataclassValidator</code></a>
+is the reference adapter: what any adapter owes the kernel, with nothing but
+the standard library and Django. It reads a dataclass's fields and annotations
+into <code>Parameters</code>, and builds the instance from the arguments, nested
+dataclasses included.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookIn</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">price</span><span class="p">:</span> <span class="n">Decimal</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">status</span><span class="p">:</span> <span class="n">Status</span> <span class="o">=</span> <span class="n">Status</span><span class="o">.</span><span class="n">DRAFT</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">published_on</span><span class="p">:</span> <span class="n">date</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># present for a row that exists, absent for a new one</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="nd">@dataclass</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorIn</span><span class="p">:</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="nd">@dataclass</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorPatch</span><span class="p">:</span>  <span class="c1"># every field may be left out, and then holds UNSET</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="c1"># A spec takes a Validator instance: the adapter, wrapping the declaration.</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="n">author_validator</span> <span class="o">=</span> <span class="n">DataclassValidator</span><span class="p">(</span><span class="n">AuthorIn</span><span class="p">)</span>
+</span></code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Annotation</th>
+<th>Declares</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code></td>
+<td>Their JSON types. <code>float</code> also takes an integer; nothing else crosses types, so <code>true</code> is not an <code>int</code>.</td>
+</tr>
+<tr>
+<td><code>Decimal</code>, <code>datetime</code>, <code>date</code></td>
+<td>A <code>string</code> with the format it decodes from. A decimal also takes a JSON number.</td>
+</tr>
+<tr>
+<td><code>X \| None</code></td>
+<td>Nullable.</td>
+</tr>
+<tr>
+<td><code>Literal[...]</code>, an <code>Enum</code> (Django's <code>TextChoices</code> and <code>IntegerChoices</code> included)</td>
+<td>Choices. An <code>Enum</code> decodes to the member.</td>
+</tr>
+<tr>
+<td><code>list[X]</code></td>
+<td>An array. <code>list[SomeDataclass]</code> is an array of rows, each declared as nested Parameters.</td>
+</tr>
+<tr>
+<td>a dataclass</td>
+<td>An object, with its fields as nested Parameters.</td>
+</tr>
+<tr>
+<td><code>X \| UnsetType</code></td>
+<td>The argument may be left out, and the field then holds <code>UNSET</code>.</td>
+</tr>
+</tbody>
+</table>
+<p>A field with a default or a <code>default_factory</code> is optional; one with neither is
+required. An annotation outside the table is refused, naming the field.</p>
+<p>What <code>DataclassValidator(AuthorIn)</code> declares, then: <code>name</code>, a required string,
+and <code>books</code>, an optional array whose rows take a required <code>title</code>, a required
+<code>price</code> (a <code>string</code> in the <code>decimal</code> format), a <code>status</code> with the choices
+<code>draft</code> and <code>published</code> and the default <code>draft</code>, a nullable <code>published_on</code> in
+the <code>date</code> format, and a nullable integer <code>pk</code>. Its <code>validate()</code> returns the
+books as <code>BookIn</code> instances, which is what the relation writes read a row from.</p>
+<p>Two rules on that example are easy to miss:</p>
+<ul>
+<li><strong>A row that updates must declare its key.</strong> A relation write matches an
+  incoming row to an existing one by primary key, so <code>BookIn</code> declares
+  <code>pk: int | None = None</code>: present for a book that exists, absent for a new
+  one. Without it no incoming row matches, and every update replaces every
+  row. Nothing fails when that happens, which is why it is said here.</li>
+<li><strong>An update's fields should be omittable.</strong> <code>AuthorIn.books</code> defaults to an
+  empty list, which is right for a create and wrong for an update: an author
+  updated without <code>books</code> would arrive with <code>books=[]</code> and lose them all.
+  <code>AuthorPatch</code> declares every field <code>X | UnsetType = UNSET</code>, so a field the
+  caller left out arrives as <code>UNSET</code>, and the mutation helpers leave it alone.</li>
+</ul>
+<p>An offset-less date-time is made aware in the current time zone when <code>USE_TZ</code>
+is on, as Django's forms do, so a date-time means the same instant whichever
+library validated it. Every failure is reported at once, as one
+<code>InvalidArguments</code> tree; <a href="../arguments/">Arguments and refusals</a> describes it.</p>
+<h2 id="output-and-the-presenter">Output and the Presenter<a class="headerlink" href="#output-and-the-presenter" title="Permanent link">&para;</a></h2>
+<p>A <a class="autorefs autorefs-internal" title="Presenter" href="../reference/#django_service_specs.output.presenter.Presenter"><code>Presenter</code></a> turns one value
+an operation produced into JSON-like data. It is the output-side counterpart of
+the Validator:</p>
+<ul>
+<li><code>output()</code> declares the result as an
+  <a class="autorefs autorefs-internal" title="Output
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.output.Output"><code>Output</code></a>, an ordered tuple of
+  <a class="autorefs autorefs-internal" title="OutputField
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.output_field.OutputField"><code>OutputField</code></a>. It
+  never queries. The declaration is what a reader that never renders needs: an
+  agent tool's output schema, a command's table header when there are no rows,
+  a confirmation page. An HTML transport hands the row to a template and never
+  renders it, and still reads the declaration.</li>
+<li><code>present(value)</code> renders <strong>one</strong> value. Dispatch's
+  <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a> hands a list's
+  items over one at a time, so a Presenter never has to guess whether it was
+  given a row or a collection. It may query, and it is sync-only.</li>
+</ul>
+<p>An <code>OutputField</code> carries what a reader needs beyond a name and a type: a
+<code>label</code>, <code>choices</code> as value-and-display pairs (a table shows the display, a
+schema states it), <code>always_present</code> for a key that some rows omit, and a
+<a class="autorefs autorefs-internal" title="FieldMarking
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.field_marking.FieldMarking"><code>FieldMarking</code></a> saying
+who the field is for. The
+<a class="autorefs autorefs-internal" title="FieldAudience" href="../reference/#django_service_specs.output.field_audience.FieldAudience"><code>FieldAudience</code></a> is
+<code>CONTENT</code> by default, <code>LABEL</code> for the field that names the record,
+<code>HANDLE</code> for an opaque identifier that is passed to other tools and never read
+out to a person, and <code>HIDDEN</code> for plumbing. The kernel carries the marking on
+the declaration; projecting a payload for an audience is a transport's job.</p>
+<p><a class="autorefs autorefs-internal" title="DataclassPresenter" href="../reference/#django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter"><code>DataclassPresenter</code></a>
+declares the output as a dataclass and reads each field off the value <strong>by
+attribute</strong>, so the value is usually a model row and is never converted into
+the dataclass first. A nested dataclass field is read the same way, and a list
+field may be a related manager, read through <code>.all()</code> so a prefetch is used.
+A <code>Decimal</code> is rendered as its string, a date or date-time in ISO 8601, an
+<code>Enum</code> as its value. A marking is declared in the field's annotation, as
+<code>NoteRow</code> does above: <code>Annotated[int, FieldMarking.handle()]</code>.</p>
+<p>A read's presenter is its own <code>presenter</code>. A write's is its own, or its output
+selector's when it declares none, and declaring both is refused. A presenter on
+an instance or collection selector is never read, because the service consumes
+those rows rather than returning them.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

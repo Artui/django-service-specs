@@ -1,0 +1,1207 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A service contract for Django: declare an operation's parameters, permission check, validation and output once, and dispatch it from any transport.">
+      
+      
+      
+        <link rel="canonical" href="https://artui.github.io/django-service-specs/relations/">
+      
+      
+        <link rel="prev" href="../arguments/">
+      
+      
+        <link rel="next" href="../registry/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Relation writes - django-service-specs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#relation-writes" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="django-service-specs" class="md-header__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            django-service-specs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Relation writes
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="django-service-specs" class="md-nav__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    django-service-specs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../declaring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Declaring an operation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dispatching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispatching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arguments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arguments and refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relation writes
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relation writes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-worked-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-relation-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five relation specs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The five relation specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#matching-scope-and-orphans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching, scope and orphans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#row-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row services
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What changed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-from-a-nested-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors from a nested write
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#the-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-worked-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A worked example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-five-relation-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The five relation specs
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The five relation specs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#matching-scope-and-orphans" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Matching, scope and orphans
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#row-services" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Row services
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What changed
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#deleting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Deleting
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#errors-from-a-nested-write" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Errors from a nested write
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/Artui/django-service-specs/edit/main/docs/relations.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="relation-writes">Relation writes<a class="headerlink" href="#relation-writes" title="Permanent link">&para;</a></h1>
+<p>A write that creates or updates a row often writes its related rows in the
+same call: an author and its books, a post and its tags. The mutation helpers
+do that inside the service's transaction, reconciling the rows that arrived
+against the rows that exist, and report what changed.</p>
+<p>The helpers are ordinary functions a service calls. Dispatch knows nothing
+about them: the spec's Validator checks the nested rows before the service
+runs, and the helpers own persistence only.</p>
+<h2 id="the-helpers">The helpers<a class="headerlink" href="#the-helpers" title="Permanent link">&para;</a></h2>
+<ul>
+<li><a class="autorefs autorefs-internal" title="create_from_input" href="../reference/#django_service_specs.mutations.create_from_input.create_from_input"><code>create_from_input(model, data, ...)</code></a>
+  builds a row from <code>data</code>, saves it, then writes its relations.</li>
+<li><a class="autorefs autorefs-internal" title="update_from_input" href="../reference/#django_service_specs.mutations.update_from_input.update_from_input"><code>update_from_input(instance, data, ...)</code></a>
+  writes only the fields whose value changed, with a minimal
+  <code>save(update_fields=...)</code> (<code>auto_now</code> fields are added to it), then
+  reconciles its relations. <code>update_fields=False</code> makes it a full save, and a
+  list names the columns exactly.</li>
+<li><a class="autorefs autorefs-internal" title="apply_input" href="../reference/#django_service_specs.mutations.apply_input.apply_input"><code>apply_input(instance, data)</code></a>
+  sets the changed fields without saving, for a service that wants to see what
+  the input would change before deciding to persist.</li>
+<li><a class="autorefs autorefs-internal" title="delete_relations" href="../reference/#django_service_specs.mutations.delete_relations.delete_relations"><code>delete_relations(instance, relations=...)</code></a>
+  disposes of the rows <code>instance</code> owns, before a delete service removes
+  <code>instance</code> itself. See <a href="#deleting">Deleting</a>.</li>
+<li><a class="autorefs autorefs-internal" title="acreate_from_input
+
+
+  
+      async
+  " href="../reference/#django_service_specs.mutations.acreate_from_input.acreate_from_input"><code>acreate_from_input</code></a>,
+  <a class="autorefs autorefs-internal" title="aupdate_from_input
+
+
+  
+      async
+  " href="../reference/#django_service_specs.mutations.aupdate_from_input.aupdate_from_input"><code>aupdate_from_input</code></a>
+  and <a class="autorefs autorefs-internal" title="adelete_relations
+
+
+  
+      async
+  " href="../reference/#django_service_specs.mutations.adelete_relations.adelete_relations"><code>adelete_relations</code></a>
+  are the async forms, for an <code>async def</code> service.</li>
+</ul>
+<p><code>data</code> is a dataclass, a mapping, or an object with a <code>__dict__</code> - usually the
+validated values dispatch passes the service as <code>data</code>. A field holding
+<a class="autorefs autorefs-internal" title="UNSET
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.types.unset.UNSET"><code>UNSET</code></a> is left alone, which is what
+makes a partial update's omitted fields omitted. <code>field_map</code> renames input keys
+onto model fields and <code>exclude_fields</code> drops keys. <code>m2m={name: rows}</code> assigns
+many-to-many rows <strong>that already exist</strong>; writing the target rows from the
+payload is a <code>ManyToManySpec</code>, and naming one relation in both is refused.</p>
+<p><code>relations={name: spec}</code> declares the related rows, one spec per relation,
+and is the one map for every kind of relation.</p>
+<h2 id="a-worked-example">A worked example<a class="headerlink" href="#a-worked-example" title="Permanent link">&para;</a></h2>
+<p>An author and their books. <code>Author</code> has a <code>name</code>; <code>Book</code> has a <code>title</code>, a
+decimal <code>price</code>, a <code>status</code> and a non-nullable foreign key <code>author</code>, whose
+reverse accessor is <code>Author.books</code>. The input dataclasses are the ones
+<a href="../declaring/#the-dataclass-adapter">Declaring an operation</a> builds.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">ChangeResult</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">ChildSpec</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">DataclassPresenter</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">DataclassValidator</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">Parameter</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">Parameters</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>    <span class="n">create_from_input</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>    <span class="n">update_from_input</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="p">)</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">AuthorIn</span><span class="p">,</span> <span class="n">AuthorPatch</span><span class="p">,</span> <span class="n">IsSignedIn</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span><span class="p">,</span> <span class="n">Book</span><span class="p">,</span> <span class="n">Status</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="c1"># One declaration of how the books are written, shared by the create and the update.</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">BOOKS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"books"</span><span class="p">:</span> <span class="n">ChildSpec</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Book</span><span class="p">,</span> <span class="n">fk</span><span class="o">=</span><span class="s2">"author"</span><span class="p">)}</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="nd">@dataclass</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookOut</span><span class="p">:</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a>    <span class="n">price</span><span class="p">:</span> <span class="n">Decimal</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a>    <span class="n">status</span><span class="p">:</span> <span class="n">Status</span>
+</span><span id="__span-0-31"><a id="__codelineno-0-31" name="__codelineno-0-31" href="#__codelineno-0-31"></a>
+</span><span id="__span-0-32"><a id="__codelineno-0-32" name="__codelineno-0-32" href="#__codelineno-0-32"></a>
+</span><span id="__span-0-33"><a id="__codelineno-0-33" name="__codelineno-0-33" href="#__codelineno-0-33"></a><span class="nd">@dataclass</span>
+</span><span id="__span-0-34"><a id="__codelineno-0-34" name="__codelineno-0-34" href="#__codelineno-0-34"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorOut</span><span class="p">:</span>
+</span><span id="__span-0-35"><a id="__codelineno-0-35" name="__codelineno-0-35" href="#__codelineno-0-35"></a>    <span class="nb">id</span><span class="p">:</span> <span class="nb">int</span>
+</span><span id="__span-0-36"><a id="__codelineno-0-36" name="__codelineno-0-36" href="#__codelineno-0-36"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-0-37"><a id="__codelineno-0-37" name="__codelineno-0-37" href="#__codelineno-0-37"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookOut</span><span class="p">]</span>
+</span><span id="__span-0-38"><a id="__codelineno-0-38" name="__codelineno-0-38" href="#__codelineno-0-38"></a>
+</span><span id="__span-0-39"><a id="__codelineno-0-39" name="__codelineno-0-39" href="#__codelineno-0-39"></a>
+</span><span id="__span-0-40"><a id="__codelineno-0-40" name="__codelineno-0-40" href="#__codelineno-0-40"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ChangeResult</span><span class="p">[</span><span class="n">Author</span><span class="p">]:</span>
+</span><span id="__span-0-41"><a id="__codelineno-0-41" name="__codelineno-0-41" href="#__codelineno-0-41"></a>    <span class="k">return</span> <span class="n">create_from_input</span><span class="p">(</span><span class="n">Author</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">)</span>
+</span><span id="__span-0-42"><a id="__codelineno-0-42" name="__codelineno-0-42" href="#__codelineno-0-42"></a>
+</span><span id="__span-0-43"><a id="__codelineno-0-43" name="__codelineno-0-43" href="#__codelineno-0-43"></a>
+</span><span id="__span-0-44"><a id="__codelineno-0-44" name="__codelineno-0-44" href="#__codelineno-0-44"></a><span class="k">def</span><span class="w"> </span><span class="nf">update_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Author</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ChangeResult</span><span class="p">[</span><span class="n">Author</span><span class="p">]:</span>
+</span><span id="__span-0-45"><a id="__codelineno-0-45" name="__codelineno-0-45" href="#__codelineno-0-45"></a>    <span class="k">return</span> <span class="n">update_from_input</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">)</span>
+</span><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46" href="#__codelineno-0-46"></a>
+</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47" href="#__codelineno-0-47"></a>
+</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48" href="#__codelineno-0-48"></a><span class="c1"># The services return what changed; the output selector re-reads the author,</span>
+</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49" href="#__codelineno-0-49"></a><span class="c1"># with its books prefetched, for the presenter.</span>
+</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50" href="#__codelineno-0-50"></a><span class="n">reread_author</span> <span class="o">=</span> <span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51" href="#__codelineno-0-51"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
+</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52" href="#__codelineno-0-52"></a>    <span class="n">selector</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">result</span><span class="o">.</span><span class="n">instance</span><span class="o">.</span><span class="n">pk</span><span class="p">),</span>
+</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53" href="#__codelineno-0-53"></a>    <span class="n">prefetch_related</span><span class="o">=</span><span class="p">[</span><span class="s2">"books"</span><span class="p">],</span>
+</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54" href="#__codelineno-0-54"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">AuthorOut</span><span class="p">),</span>
+</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55" href="#__codelineno-0-55"></a><span class="p">)</span>
+</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56" href="#__codelineno-0-56"></a>
+</span><span id="__span-0-57"><a id="__codelineno-0-57" name="__codelineno-0-57" href="#__codelineno-0-57"></a><span class="n">create_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58" href="#__codelineno-0-58"></a>    <span class="n">service</span><span class="o">=</span><span class="n">create_author</span><span class="p">,</span>
+</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59" href="#__codelineno-0-59"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60" href="#__codelineno-0-60"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">AuthorIn</span><span class="p">),</span>
+</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61" href="#__codelineno-0-61"></a>    <span class="n">output_selector_spec</span><span class="o">=</span><span class="n">reread_author</span><span class="p">,</span>
+</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62" href="#__codelineno-0-62"></a><span class="p">)</span>
+</span><span id="__span-0-63"><a id="__codelineno-0-63" name="__codelineno-0-63" href="#__codelineno-0-63"></a>
+</span><span id="__span-0-64"><a id="__codelineno-0-64" name="__codelineno-0-64" href="#__codelineno-0-64"></a><span class="n">update_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-0-65"><a id="__codelineno-0-65" name="__codelineno-0-65" href="#__codelineno-0-65"></a>    <span class="n">service</span><span class="o">=</span><span class="n">update_author</span><span class="p">,</span>
+</span><span id="__span-0-66"><a id="__codelineno-0-66" name="__codelineno-0-66" href="#__codelineno-0-66"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-0-67"><a id="__codelineno-0-67" name="__codelineno-0-67" href="#__codelineno-0-67"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">AuthorPatch</span><span class="p">),</span>
+</span><span id="__span-0-68"><a id="__codelineno-0-68" name="__codelineno-0-68" href="#__codelineno-0-68"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-0-69"><a id="__codelineno-0-69" name="__codelineno-0-69" href="#__codelineno-0-69"></a>        <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
+</span><span id="__span-0-70"><a id="__codelineno-0-70" name="__codelineno-0-70" href="#__codelineno-0-70"></a>        <span class="n">selector</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">),</span>
+</span><span id="__span-0-71"><a id="__codelineno-0-71" name="__codelineno-0-71" href="#__codelineno-0-71"></a>        <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+</span><span id="__span-0-72"><a id="__codelineno-0-72" name="__codelineno-0-72" href="#__codelineno-0-72"></a>    <span class="p">),</span>
+</span><span id="__span-0-73"><a id="__codelineno-0-73" name="__codelineno-0-73" href="#__codelineno-0-73"></a>    <span class="n">output_selector_spec</span><span class="o">=</span><span class="n">reread_author</span><span class="p">,</span>
+</span><span id="__span-0-74"><a id="__codelineno-0-74" name="__codelineno-0-74" href="#__codelineno-0-74"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>What each call does:</p>
+<ul>
+<li><strong>Create</strong> with <code>{"name": "Ursula", "books": [{"title": "The Dispossessed",
+  "price": "9.99"}, {"title": "Lathe", "price": 12.5}]}</code> writes the author,
+  then both books pointing at it. The service's <code>ChangeResult</code> reports
+  <code>ChildCollectionChange(relation="books", created=(1, 2))</code>, and the presented
+  result is the author with both books, the prices rendered as <code>"9.99"</code> and
+  <code>"12.50"</code>.</li>
+<li><strong>Update</strong> with <code>{"pk": 1, "books": [{"pk": 1, "title": "The Dispossessed",
+  "price": "10.99"}, {"title": "Always Coming Home", "price": "8"}]}</code> matches
+  the first row to book 1 by its <code>pk</code> and updates it, creates the row with no
+  <code>pk</code>, and removes book 2, which the input left out: <code>ChildSpec</code>'s default
+  mode is <code>"replace"</code>, and because <code>Book.author</code> is not nullable the orphan is
+  deleted. The report is <code>created=(3,), updated=(1,), deleted=(2,)</code>. The
+  author's <code>name</code> was not sent, so <code>AuthorPatch</code> delivered it as <code>UNSET</code> and
+  it was not written.</li>
+<li><strong>Update without <code>books</code></strong> leaves every book alone: the relation arrives as
+  <code>UNSET</code>, and a relation the input omits is untouched. An explicit
+  <code>"books": []</code> would have removed them all.</li>
+<li><strong>A row naming a book the author does not have</strong> -
+  <code>{"pk": 1, "books": [{"pk": 4, ...}]}</code> where book 4 is someone else's - is
+  refused with <code>ServiceValidationError</code>, at
+  <code>{"books": {0: {"non_field_errors": ["references Book [4], which this write did not match. ..."]}}}</code>.
+  Saving a new row under a primary key it did not match would overwrite the
+  row that holds it, so the write refuses rather than creating.</li>
+<li><strong>A malformed row</strong> - a <code>status</code> of <code>"lost"</code> in the second book - is refused
+  by the Validator before the service runs, as <code>InvalidArguments</code> at
+  <code>{"books": {1: {"status": ["Select a valid choice. lost is not one of the available choices."]}}}</code>.</li>
+</ul>
+<h2 id="the-five-relation-specs">The five relation specs<a class="headerlink" href="#the-five-relation-specs" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>Spec</th>
+<th>Writes</th>
+<th>Named by</th>
+<th>Written</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ChildSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.relations.child_spec.ChildSpec"><code>ChildSpec</code></a></td>
+<td>A reverse foreign-key collection: rows whose <code>fk</code> points at the parent</td>
+<td>The reverse accessor (<code>"books"</code> for <code>Author.books</code>)</td>
+<td>After the parent's <code>save()</code></td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ForwardRelationSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.relations.forward_relation_spec.ForwardRelationSpec"><code>ForwardRelationSpec</code></a></td>
+<td>A <code>ForeignKey</code> or <code>OneToOneField</code> declared on the parent</td>
+<td>The parent's field (<code>"author"</code> for <code>Post.author</code>)</td>
+<td>Before the parent's <code>save()</code></td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ReverseOneToOneSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.relations.reverse_one_to_one_spec.ReverseOneToOneSpec"><code>ReverseOneToOneSpec</code></a></td>
+<td>The one row whose <code>OneToOneField</code> points back at the parent</td>
+<td>The reverse accessor (<code>"profile"</code> for <code>Author.profile</code>)</td>
+<td>After the parent's <code>save()</code></td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="GenericRelationSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.relations.generic_relation_spec.GenericRelationSpec"><code>GenericRelationSpec</code></a></td>
+<td>A <code>GenericRelation</code>: rows linked by content type and id</td>
+<td>The <code>GenericRelation</code> on the parent</td>
+<td>After the reverse kinds</td>
+</tr>
+<tr>
+<td><a class="autorefs autorefs-internal" title="ManyToManySpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.relations.many_to_many_spec.ManyToManySpec"><code>ManyToManySpec</code></a></td>
+<td>Target rows from payloads, then the membership</td>
+<td>Either side's accessor (<code>"tags"</code> for <code>Post.tags</code>)</td>
+<td>Last</td>
+</tr>
+</tbody>
+</table>
+<p>Each spec takes its required fields positionally and every option by keyword:
+<code>ChildSpec(Book, "author", mode="merge")</code>.</p>
+<p>The order is a property of the kind, not of how the <code>relations=</code> mapping is
+spelled: a forward target has to exist before the parent is saved, and a
+membership needs both rows saved.
+<a class="autorefs autorefs-internal" title="RelationPhase" href="../reference/#django_service_specs.relations.relation_phase.RelationPhase"><code>RelationPhase</code></a>
+names the sequence. Within one phase, relations are written in the order they
+are declared.</p>
+<p>How each kind reads its value:</p>
+<ul>
+<li><strong>Omitted</strong> leaves the relation untouched, for every kind.</li>
+<li><strong>A forward relation set to <code>None</code></strong> clears the parent's column and leaves
+  the row it pointed at alone: a forward target is not the parent's, and may be
+  shared. A mapping writes the target row - creating one, or with a
+  <code>match_key</code>, updating the row it names.</li>
+<li><strong>A reverse one-to-one set to <code>None</code></strong> removes the related row by the
+  <code>orphan</code> rule below, because that row <em>is</em> the parent's. A mapping updates
+  the existing row, or creates and links one.</li>
+<li><strong>A collection</strong> (child, generic, many-to-many) is reconciled: incoming rows
+  are matched to existing ones by <code>match_key</code> (<code>"pk"</code> by default), matched rows
+  are updated, the rest are created, and in <code>"replace"</code> mode the existing rows
+  the input left out are removed. <code>"merge"</code> mode only upserts.</li>
+</ul>
+<h3 id="matching-scope-and-orphans">Matching, scope and orphans<a class="headerlink" href="#matching-scope-and-orphans" title="Permanent link">&para;</a></h3>
+<p>A child collection, a generic relation and a reverse one-to-one match inside
+the parent's own rows, so a key that matches nothing there cannot name anyone
+else's row. A forward relation and a many-to-many match against rows the
+parent does not own, so they take a <strong><code>scope</code></strong>: a queryset, or a callable
+resolved from <code>context</code> (<code>lambda user: Author.objects.filter(owner=user)</code>),
+of the rows this caller may write. Without a scope the spec is create-only,
+and a payload carrying a <code>match_key</code> raises <code>ImproperlyConfigured</code> rather than
+letting any caller write any row of that model by guessing a key. A key
+outside the scope is refused with <code>ServiceValidationError</code>, at the row.</p>
+<p>What removing a row <em>does</em> is the <strong><code>orphan</code></strong> setting of a child collection,
+a reverse one-to-one or a generic relation. <code>"auto"</code>, the default, reads the
+schema: a nullable link is set to <code>None</code> (<strong>unlinked</strong>, like
+<code>on_delete=SET_NULL</code>), a non-nullable one is <strong>deleted</strong> (like <code>CASCADE</code>).
+<code>"unlink"</code> and <code>"delete"</code> say it outright, for a spec that means one of them:
+under <code>"auto"</code>, a later migration adding <code>null=True</code> would turn a destructive
+<code>"replace"</code> into a non-destructive one with nothing in the spec changing. A
+many-to-many target is shared, so a dropped member only loses its membership,
+and is reported as <code>unlinked</code>.</p>
+<p>A many-to-many with a custom <code>through</code> model is not covered: the helpers let
+Django write the through row, which cannot carry the extra columns a custom
+through model exists for.</p>
+<h3 id="row-services">Row services<a class="headerlink" href="#row-services" title="Permanent link">&para;</a></h3>
+<p>A row whose write has behaviour of its own - side effects, derived columns, an
+external call - takes a <code>create_service</code>, an <code>update_service</code> and, where rows
+are removed, a <code>delete_service</code>. The spec keeps what it never delegates: which
+rows exist, which incoming row matches which existing one, and what happens to
+the ones left over. The service is called once per row the helper has already
+decided about, with <code>data</code>, the <code>parent</code> (except on a forward relation, whose
+target is written before the parent exists), the <code>instance</code> for an update, and
+any keys of the helper's <code>context=</code> mapping it declares. That mapping is how a
+row service or a <code>scope</code> callable sees the acting user: the operation's service
+declares <code>user</code> and passes <code>context={"user": user}</code> on to the helper.</p>
+<p>Row services run with <code>atomic=False</code>, inside the transaction the operation
+already holds. Declaring one beside the shaping options it replaces
+(<code>field_map</code>, <code>exclude_fields</code>, <code>m2m</code>, nested <code>relations</code>) is
+refused at construction, because they would configure nothing. A
+<code>delete_service</code> owns the disposal, so its rows are reported as <code>removed</code>
+rather than guessed into <code>deleted</code> or <code>unlinked</code>. In the async helpers, a row
+service must be <code>async def</code>.</p>
+<h2 id="what-changed">What changed<a class="headerlink" href="#what-changed" title="Permanent link">&para;</a></h2>
+<p>Every helper returns a
+<a class="autorefs autorefs-internal" title="ChangeResult
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.mutations.change_result.ChangeResult"><code>ChangeResult</code></a>:</p>
+<ul>
+<li><code>instance</code> and <code>created</code>.</li>
+<li><code>changes</code>: a <a class="autorefs autorefs-internal" title="FieldChange
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.mutations.field_change.FieldChange"><code>FieldChange</code></a>
+  with <code>old</code> and <code>new</code> for every field whose value differed, <code>old</code> being
+  <code>UNSET</code> on a create. <code>changed_fields</code> lists their names.</li>
+<li><code>children</code>: a
+  <a class="autorefs autorefs-internal" title="ChildCollectionChange
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.mutations.child_collection_change.ChildCollectionChange"><code>ChildCollectionChange</code></a>
+  per collection - a child, generic or many-to-many relation - holding the
+  primary keys <code>created</code>, <code>updated</code>, <code>deleted</code>, <code>unlinked</code> and <code>removed</code>.
+  <code>get_child_change(name)</code> finds one.</li>
+<li><code>relations</code>: a
+  <a class="autorefs autorefs-internal" title="RelatedObjectChange
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.mutations.related_object_change.RelatedObjectChange"><code>RelatedObjectChange</code></a>
+  per one-row relation - a forward relation or a reverse one-to-one - holding
+  one
+  <a class="autorefs autorefs-internal" title="RelationOutcome" href="../reference/#django_service_specs.mutations.relation_outcome.RelationOutcome"><code>RelationOutcome</code></a>
+  and the <code>pk</code> it is about. <code>get_relation_change(name)</code> finds one.</li>
+</ul>
+<p>A <code>ChangeResult</code> is falsy when nothing changed.</p>
+<h2 id="deleting">Deleting<a class="headerlink" href="#deleting" title="Permanent link">&para;</a></h2>
+<p>A delete service that has to take a row's related rows with it calls
+<code>delete_relations</code> with the same map the writes use, then deletes the row:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">Parameter</span><span class="p">,</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">Parameters</span><span class="p">,</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">delete_relations</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">BOOKS</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Author</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="c1"># The database would take the books with the author and say nothing about</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="c1"># them. Cascading first, through the map the writes use, names each one.</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">cascade</span> <span class="o">=</span> <span class="n">delete_relations</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">)</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">instance</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">books</span> <span class="o">=</span> <span class="n">cascade</span><span class="o">.</span><span class="n">get_child_change</span><span class="p">(</span><span class="s2">"books"</span><span class="p">)</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="k">return</span> <span class="n">books</span><span class="o">.</span><span class="n">deleted</span> <span class="k">if</span> <span class="n">books</span> <span class="k">else</span> <span class="p">()</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="n">delete_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">service</span><span class="o">=</span><span class="n">delete_author</span><span class="p">,</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>        <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        <span class="n">selector</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">),</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="p">),</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The database's own cascade would remove these books as well, and report
+nothing. The helper matters where the database will not cascade, or should
+not be the one to:</p>
+<ul>
+<li><strong>A <code>PROTECT</code> foreign key</strong>, which refuses the parent's delete while a child
+  row exists.</li>
+<li><strong>A soft delete</strong>, which removes no row, so Django never cascades through it.
+  The instance outlives its cascade, and its cached relations are brought in
+  line with the removal, so it renders without the rows it lost.</li>
+<li><strong>A row service</strong>: a spec's <code>delete_service</code> sees each row go, which a
+  database cascade never calls.</li>
+<li><strong>A report</strong>: the returned <code>ChangeResult</code> names every row disposed of, as the
+  example returns them.</li>
+</ul>
+<p>The rule is the one a write follows when it removes a row, applied to every
+row the instance owns. A child, generic or reverse one-to-one row is disposed
+of after its own declared relations, so a non-nullable grandchild goes first,
+and each is deleted, unlinked or handed to its <code>delete_service</code> by the spec's
+<code>orphan</code> setting. A many-to-many loses its membership and its target rows
+survive. A forward relation is reported <code>untouched</code>: the row it points at is
+not the instance's, and refusing it would make a map that is right for writing
+impossible to cascade.</p>
+<h2 id="errors-from-a-nested-write">Errors from a nested write<a class="headerlink" href="#errors-from-a-nested-write" title="Permanent link">&para;</a></h2>
+<p>A refusal inside a row is <strong>re-rooted under the row's address</strong>, in the tree
+<a href="../arguments/#the-refusal-tree">Arguments and refusals</a> describes, and keeps
+its class: a <code>ServiceValidationError</code> from a row stays one, an
+<code>InvalidArguments</code> stays one, because the class says who refused. A grandchild's
+refusal carries both addresses.</p>
+<p>Django's own failures to write a row's data - a value a field cannot coerce, a
+key the model has no field for - carry no detail and would otherwise escape as
+an unhandled error naming no row. They become <code>InvalidArguments</code> at the row.</p>
+<p>Code the caller wrote is treated differently. Any other error a row service, a
+<code>scope</code> callable or an <code>m2m</code> callable raises passes through <strong>untouched</strong>, at
+any depth: reading its <code>TypeError</code> as a refusal of the arguments would report
+the caller's own bug as the client's mistake. An <code>IntegrityError</code> is left alone
+too: a constraint is a conflict with rows that exist rather than a shape, and
+the backend's message can quote another row's values.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
