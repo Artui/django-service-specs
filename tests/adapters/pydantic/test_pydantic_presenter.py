@@ -4,7 +4,7 @@ import dataclasses
 import datetime as dt
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -23,6 +23,7 @@ from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.pydantic.utils import (
     Address,
     Answer,
+    Colour,
     Everything,
     Line,
     Marked,
@@ -338,3 +339,19 @@ class TestAgainstTheValidator:
             arguments, ValidationContext(principal=None)
         )
         assert PydanticPresenter(Everything).present(values) == PRESENTED
+
+
+class _Tagged(BaseModel):
+    modes: list[Literal["fast", "slow"]]
+    colours: list[Colour]
+    statuses: list[Status]
+
+
+def test_a_list_of_choices_declares_their_pairs_for_each_element() -> None:
+    # ``items`` holds only the element's JSON type, and an array's choices
+    # constrain each element, so a list of choices keeps them there: where the
+    # shape check and the JSON Schema read them.
+    output = PydanticPresenter(_Tagged).output()
+    assert output.get("modes").choices == (("fast", "fast"), ("slow", "slow"))
+    assert output.get("colours").choices == (("red", "red"), ("blue", "blue"))
+    assert output.get("statuses").choices == (("draft", "Draft"), ("published", "Published"))

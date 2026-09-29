@@ -127,7 +127,9 @@ def _parameter(fs: FieldShape) -> Parameter:
         format=shape.format,
         items=_items(shape.items),
         fields=None if shape.fields is None else _parameters(shape.fields),
-        choices=shape.choices,
+        # A list's choices are its element's: an array's choices constrain each
+        # element, and ``items`` can hold only the element's JSON type.
+        choices=shape.choices if shape.items is None else shape.items.choices,
         default=fs.default,
         nullable=shape.nullable,
         help=fs.help,

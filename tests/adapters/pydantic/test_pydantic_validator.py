@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -410,3 +410,21 @@ class TestRelationWrite:
         )
         (books,) = change.children
         assert (books.relation, books.created) == ("books", (book.pk,))
+
+
+class _Tagged(BaseModel):
+    modes: list[Literal["fast", "slow"]]
+    colours: list[Colour]
+    statuses: list[Status]
+
+
+def test_a_list_of_choices_declares_them_for_each_element() -> None:
+    # ``items`` holds only the element's JSON type, and an array's choices
+    # constrain each element, so a list of choices keeps them there: where the
+    # shape check and the JSON Schema read them.
+    params = PydanticValidator(_Tagged).parameters()
+    assert [(p.name, p.items, p.choices) for p in params] == [
+        ("modes", "string", ("fast", "slow")),
+        ("colours", "string", ("red", "blue")),
+        ("statuses", "string", ("draft", "published")),
+    ]
