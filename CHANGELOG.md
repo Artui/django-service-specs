@@ -42,6 +42,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   string or list detail under `non_field_errors`; `NotPermitted` and
   `PrincipalUnavailable` are 403, `ServiceNotFound` 404, `ServiceConflict`
   409, any other `ServiceError` 422, each as `{"detail": message}`. Never 401.
+- `SpecFormView`: a `ServiceSpec` whose Validator is a `FormValidator`, served
+  as the page its form is. GET runs the spec's class-level permission check
+  and renders `template_name` with an unbound `form`, `view` and `spec`. POST
+  reads the post through the form's own widgets, so a checkbox is a boolean
+  and a multi-select a list, and neither the CSRF token nor a submit button
+  is an argument; a blank field is absent, and a number, date or date-time in
+  one of the field's input formats is sent on in the form the shape check
+  reads. A success redirects to `get_success_url(result)`, `success_url` by
+  default; a refusal re-renders the bound form at `error_response`'s status,
+  and a denial or a missing row is Django's own `PermissionDenied` or
+  `Http404`. `as_view()` refuses a view with no `ServiceSpec`, no
+  `FormValidator` or nowhere to redirect. Sync only.
+- `add_argument_errors`: a refusal tree placed on a bound form with
+  `form.add_error`, beside the form's own errors and never duplicating one. A
+  field's key goes on the field; `non_field_errors`, Django's `"__all__"` and
+  any key the form has no field for go to its non-field errors, the last
+  prefixed with its dotted path.
 
 ### Fixed
 - An operation declaring `list[X | None]` refused every null element before
