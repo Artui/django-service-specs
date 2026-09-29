@@ -345,6 +345,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving over HTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../arguments/" class="md-nav__link">
         
   
@@ -961,13 +988,15 @@ contradict, and states everything the declaration knows.</p>
 <ul>
 <li><strong>Nullable is stated for every node</strong>, objects and arrays included, as a
   type list: <code>["string", "null"]</code>. Parameters carries <code>nullable</code> whichever
-  library declared the field, so the schema does not depend on it.</li>
+  library declared the field, so the schema does not depend on it. An
+  array's element states its own, from <code>items_nullable</code>, on <code>items</code>: the
+  array and its elements may each be null or not, independently.</li>
 <li><strong>An enum lists every accepted value.</strong> An enum claims to be the whole set,
   so leaving a value out is a falsehood rather than an omission. A nullable
   parameter with choices therefore lists <code>null</code> among them, because the shape
   check accepts a null before it reads the choices. An array's choices
-  constrain each element, so they sit on <code>items</code>, and never gain <code>null</code> there:
-  a null element is refused whether or not the array itself may be null.</li>
+  constrain each element, so they sit on <code>items</code>, and gain <code>null</code> there by
+  the element's nullability alone, never by the array's.</li>
 <li><strong><code>required</code> lists what the shape check refuses when absent</strong>: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it

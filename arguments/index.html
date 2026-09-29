@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://artui.github.io/django-service-specs/arguments/">
       
       
-        <link rel="prev" href="../dispatching/">
+        <link rel="prev" href="../http/">
       
       
         <link rel="next" href="../relations/">
@@ -326,6 +326,33 @@
     
   
     Dispatching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving over HTTP
   
 
     
@@ -754,6 +781,16 @@ parameter with a declared default is not refused when absent, because the
 Validator will supply the default. A JSON <code>true</code> is neither an <code>integer</code> nor a
 <code>number</code>, although Python makes <code>bool</code> an <code>int</code>: sent for a count, it is a
 caller's mistake, not the number one.</p>
+<p>NaN and the infinities are refused, and that is a type rule rather than a
+stricter check: JSON has no spelling for either, so they are outside the
+<code>number</code> type, and only a decoder reading an overflowing literal such as <code>1e400</code>,
+or a Python caller, can produce one. Two validators would take one all the same -
+pydantic's <code>float</code> and the dataclass adapter's - where Django's number fields
+refuse both. A <code>number</code>, a decimal or an element of an array with no <code>items</code> is
+refused with <code>"Enter a number."</code>; any other type refuses one as the wrong type.
+Like every rule here, it holds wherever the declaration reaches: inside a
+free-form object, or an object or array element that nothing declares, the
+contents are the Validator's.</p>
 <p>It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument
 passes without exercising the Validator.</p>
@@ -943,38 +980,59 @@ both, since refusing a row the caller cannot see confirms that it exists.</p>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">InvalidArguments</span><span class="p">,</span>
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">NotPermitted</span><span class="p">,</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">ServiceError</span><span class="p">,</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">ServiceValidationError</span><span class="p">,</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">dispatch</span><span class="p">,</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">present</span><span class="p">,</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">answer</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span><span class="p">,</span> <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">    </span><span class="sd">"""One HTTP-shaped answer per outcome. Another transport maps the same types its own way."""</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="k">try</span><span class="p">:</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">principal</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="n">arguments</span><span class="p">)</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="c1"># Dispatch refused, before the operation ran.</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="k">except</span> <span class="n">InvalidArguments</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>        <span class="k">return</span> <span class="mi">400</span><span class="p">,</span> <span class="n">refused</span><span class="o">.</span><span class="n">detail</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="k">except</span> <span class="n">NotPermitted</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="k">return</span> <span class="mi">403</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="c1"># The operation refused. The subclasses first: each is also a ServiceError.</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    <span class="k">except</span> <span class="n">ServiceValidationError</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>        <span class="k">return</span> <span class="mi">422</span><span class="p">,</span> <span class="n">refused</span><span class="o">.</span><span class="n">detail</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="k">except</span> <span class="n">ServiceConflict</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        <span class="k">return</span> <span class="mi">409</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
-</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="k">except</span> <span class="n">ServiceError</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
-</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>        <span class="k">return</span> <span class="mi">400</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
-</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"not_found"</span><span class="p">:</span>
-</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>        <span class="k">return</span> <span class="mi">404</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="s2">"Not found."</span><span class="p">}</span>
-</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>    <span class="k">return</span> <span class="mi">200</span><span class="p">,</span> <span class="n">present</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">ServiceError</span><span class="p">,</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">ServiceValidationError</span><span class="p">,</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">dispatch</span><span class="p">,</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">present</span><span class="p">,</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">)</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">answer</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span><span class="p">,</span> <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">    </span><span class="sd">"""One HTTP-shaped answer per outcome. Another transport maps the same types its own way."""</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>        <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">principal</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="n">arguments</span><span class="p">)</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="c1"># Dispatch refused, before the operation ran.</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="k">except</span> <span class="n">InvalidArguments</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="k">return</span> <span class="mi">400</span><span class="p">,</span> <span class="n">refused</span><span class="o">.</span><span class="n">detail</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="k">except</span> <span class="p">(</span><span class="n">NotPermitted</span><span class="p">,</span> <span class="n">PrincipalUnavailable</span><span class="p">)</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>        <span class="k">return</span> <span class="mi">403</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>    <span class="c1"># The operation refused. The subclasses first: each is also a ServiceError.</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a>    <span class="k">except</span> <span class="n">ServiceValidationError</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>        <span class="k">return</span> <span class="mi">400</span><span class="p">,</span> <span class="n">field_map</span><span class="p">(</span><span class="n">refused</span><span class="o">.</span><span class="n">detail</span><span class="p">)</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="k">except</span> <span class="n">ServiceNotFound</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a>        <span class="k">return</span> <span class="mi">404</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
+</span><span id="__span-3-31"><a id="__codelineno-3-31" name="__codelineno-3-31" href="#__codelineno-3-31"></a>    <span class="k">except</span> <span class="n">ServiceConflict</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-32"><a id="__codelineno-3-32" name="__codelineno-3-32" href="#__codelineno-3-32"></a>        <span class="k">return</span> <span class="mi">409</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
+</span><span id="__span-3-33"><a id="__codelineno-3-33" name="__codelineno-3-33" href="#__codelineno-3-33"></a>    <span class="k">except</span> <span class="n">ServiceError</span> <span class="k">as</span> <span class="n">refused</span><span class="p">:</span>
+</span><span id="__span-3-34"><a id="__codelineno-3-34" name="__codelineno-3-34" href="#__codelineno-3-34"></a>        <span class="k">return</span> <span class="mi">422</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="n">refused</span><span class="o">.</span><span class="n">message</span><span class="p">}</span>
+</span><span id="__span-3-35"><a id="__codelineno-3-35" name="__codelineno-3-35" href="#__codelineno-3-35"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"not_found"</span><span class="p">:</span>
+</span><span id="__span-3-36"><a id="__codelineno-3-36" name="__codelineno-3-36" href="#__codelineno-3-36"></a>        <span class="k">return</span> <span class="mi">404</span><span class="p">,</span> <span class="p">{</span><span class="s2">"detail"</span><span class="p">:</span> <span class="s2">"Not found."</span><span class="p">}</span>
+</span><span id="__span-3-37"><a id="__codelineno-3-37" name="__codelineno-3-37" href="#__codelineno-3-37"></a>    <span class="k">return</span> <span class="mi">200</span><span class="p">,</span> <span class="n">present</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+</span><span id="__span-3-38"><a id="__codelineno-3-38" name="__codelineno-3-38" href="#__codelineno-3-38"></a>
+</span><span id="__span-3-39"><a id="__codelineno-3-39" name="__codelineno-3-39" href="#__codelineno-3-39"></a>
+</span><span id="__span-3-40"><a id="__codelineno-3-40" name="__codelineno-3-40" href="#__codelineno-3-40"></a><span class="k">def</span><span class="w"> </span><span class="nf">field_map</span><span class="p">(</span><span class="n">detail</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-3-41"><a id="__codelineno-3-41" name="__codelineno-3-41" href="#__codelineno-3-41"></a><span class="w">    </span><span class="sd">"""Every 400 body is a field map: a message about the input as a whole has its own key."""</span>
+</span><span id="__span-3-42"><a id="__codelineno-3-42" name="__codelineno-3-42" href="#__codelineno-3-42"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">detail</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+</span><span id="__span-3-43"><a id="__codelineno-3-43" name="__codelineno-3-43" href="#__codelineno-3-43"></a>        <span class="k">return</span> <span class="n">detail</span>
+</span><span id="__span-3-44"><a id="__codelineno-3-44" name="__codelineno-3-44" href="#__codelineno-3-44"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">"non_field_errors"</span><span class="p">:</span> <span class="n">detail</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">detail</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="k">else</span> <span class="p">[</span><span class="n">detail</span><span class="p">]}</span>
 </span></code></pre></div>
 <p>The subclasses of <code>ServiceError</code> are matched before <code>ServiceError</code> itself, or
 the base class swallows them. A transport that has never heard of
 <code>ServiceConflict</code> still handles it as a <code>ServiceError</code>.</p>
+<p>Every 400 is a field map, whichever family refused: a service's string or
+list detail goes under <code>non_field_errors</code>, where a message about the input as
+a whole sits in an <code>InvalidArguments</code> tree too. A service's own refusal that
+names no field (<code>ServiceError</code> itself) is a 422: the request was understood
+and refused, which is not the same as malformed.</p>
+<p>This is the ladder
+<a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
+ships, statuses included, for a transport that answers over HTTP. They are
+djangorestframework-services' statuses;
+<a href="../http/">Serving over HTTP</a> has the whole of it.</p>
 <p>Configuration errors are neither family. A spec with no permission check, a
 parameter named after a pool seed, shaping declared on a selector that returns
 no queryset: each raises Django's <code>ImproperlyConfigured</code>, because it is the

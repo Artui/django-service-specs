@@ -21,6 +21,10 @@
          <lastmod>2026-09-29</lastmod>
     </url>
     <url>
+         <loc>https://artui.github.io/django-service-specs/http/</loc>
+         <lastmod>2026-09-29</lastmod>
+    </url>
+    <url>
          <loc>https://artui.github.io/django-service-specs/pydantic/</loc>
          <lastmod>2026-09-29</lastmod>
     </url>

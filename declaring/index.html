@@ -475,6 +475,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving over HTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../arguments/" class="md-nav__link">
         
   
@@ -1007,6 +1034,10 @@ the same declaration.</p>
   is refused by the declaration rather than reaching a constructor.</li>
 <li><strong><code>choices</code></strong>, <strong><code>nullable</code></strong> and <strong><code>required</code></strong> mean what they say.
   <code>choices</code> on an array constrains each element.</li>
+<li><strong><code>items_nullable</code></strong> is the element's own nullability, as <code>list[int | None]</code>
+  declares it: whether a <code>null</code> may stand where an element would. It is
+  independent of <code>nullable</code>, which is the array's, and it needs <code>items</code>,
+  since an undeclared element admits anything already.</li>
 <li><strong><code>default</code></strong> is <a class="autorefs autorefs-internal" title="UNSET
 
 
@@ -1109,7 +1140,7 @@ dataclasses included.</p>
 </tr>
 <tr>
 <td><code>X \| None</code></td>
-<td>Nullable.</td>
+<td>Nullable. Inside a list, <code>list[X \| None]</code>, the element is: <code>items_nullable</code>.</td>
 </tr>
 <tr>
 <td><code>Literal[...]</code>, an <code>Enum</code> (Django's <code>TextChoices</code> and <code>IntegerChoices</code> included)</td>

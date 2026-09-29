@@ -345,6 +345,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving over HTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../arguments/" class="md-nav__link">
         
   
@@ -1068,7 +1095,11 @@ are declared.</p>
 <li><strong>A collection</strong> (child, generic, many-to-many) is reconciled: incoming rows
   are matched to existing ones by <code>match_key</code> (<code>"pk"</code> by default), matched rows
   are updated, the rest are created, and in <code>"replace"</code> mode the existing rows
-  the input left out are removed. <code>"merge"</code> mode only upserts.</li>
+  the input left out are removed. <code>"merge"</code> mode only upserts. A <code>null</code> row
+  is refused, every one of them and before any row is written, with
+  <code>"This field cannot be null."</code> under the row's <code>non_field_errors</code>: a
+  declaration may let one through (<code>list[Row | None]</code>), and nothing in a
+  relation spec says what it stands for.</li>
 </ul>
 <h3 id="matching-scope-and-orphans">Matching, scope and orphans<a class="headerlink" href="#matching-scope-and-orphans" title="Permanent link">&para;</a></h3>
 <p>A child collection, a generic relation and a reverse one-to-one match inside
