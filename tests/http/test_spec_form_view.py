@@ -312,6 +312,18 @@ class TestReadingThroughTheWidgets:
         data = received(spec)
         assert (data["price"], data["ratio"]) == (Decimal("12.50"), 2.5)
 
+    def test_a_decimal_with_three_places_is_not_read_as_thousands(
+        self, ada: Any, settings: Any
+    ) -> None:
+        # The page reads 1,500 as one and a half and sends on "1.500". The
+        # validator's own localized field then read that as fifteen hundred.
+        settings.USE_THOUSAND_SEPARATOR = True
+        spec = entry_spec()
+        with translation.override("de"):
+            post(form_view(spec), ada, {"title": "Hi", "price": "1,500"})
+        assert spec.validator.calls[0]["price"] == "1.500"
+        assert received(spec)["price"] == Decimal("1.500")
+
     def test_an_integer_the_form_reads_is_not_refused(self, ada: Any) -> None:
         # Django's IntegerField reads "5.0" as 5; a flat reading refuses it.
         spec = entry_spec()

@@ -571,6 +571,44 @@ class TestValidate:
         assert validator.validate({"name": "Ada", "colour": "red"}, CONTEXT) == {"name": "Ada"}
 
 
+class TestTheWireFormIsNotLocalized:
+    """An argument is in its wire form, and a localized field must not read it as the locale's."""
+
+    @pytest.fixture
+    def german(self, settings: Any) -> Any:
+        # A locale whose thousands separator is a dot, with separators read.
+        settings.USE_THOUSAND_SEPARATOR = True
+        with translation.override("de"):
+            yield
+
+    def test_a_decimal_with_three_places_is_not_read_as_thousands(self, german: Any) -> None:
+        # Bound as the string, the field read "1.500" as fifteen hundred: a
+        # person typing 1,500 on a German form was sent on as 1500.
+        form_class = _form("Priced", price=forms.DecimalField(localize=True, decimal_places=3))
+        cleaned = FormValidator(form_class).validate({"price": "1.500"}, CONTEXT)
+        assert cleaned == {"price": Decimal("1.500")}
+
+    def test_a_field_that_is_not_a_number_is_bound_as_it_came(self, german: Any) -> None:
+        # A postcode spells a number and is not one: made a Decimal, it lost
+        # its leading zero.
+        form_class = _form("Addressed", postcode=forms.CharField(localize=True))
+        cleaned = FormValidator(form_class).validate({"postcode": "01234"}, CONTEXT)
+        assert cleaned == {"postcode": "01234"}
+
+    def test_a_json_number_for_a_decimal_is_bound_as_it_came(self) -> None:
+        # The shape check accepts a JSON number for a decimal. Made a Decimal,
+        # 0.1 carries its binary expansion and fails the field's two places.
+        form_class = _form("Priced", price=forms.DecimalField(decimal_places=2))
+        cleaned = FormValidator(form_class).validate({"price": 0.1}, CONTEXT)
+        assert cleaned == {"price": Decimal("0.1")}
+
+    def test_a_string_that_is_no_number_is_refused_by_the_field(self) -> None:
+        form_class = _form("Priced", price=forms.DecimalField())
+        with pytest.raises(InvalidArguments) as refused:
+            FormValidator(form_class).validate({"price": "cheap"}, CONTEXT)
+        assert refused.value.detail == {"price": ["Enter a number."]}
+
+
 @pytest.mark.django_db
 class TestModelForm:
     def test_an_update_excludes_the_target_from_the_uniqueness_check(self) -> None:

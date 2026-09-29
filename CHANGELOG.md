@@ -73,6 +73,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prefixed with its dotted path.
 
 ### Fixed
+- `FormValidator` read a decimal argument with three places through the
+  active locale when its field was localized, so under a locale whose
+  thousands separator is a dot, `"1.500"` validated as 1500. A number
+  field's string argument is now bound as the `Decimal` it spells, which
+  no locale reinterprets. `SpecFormView` reached it from an ordinary form:
+  `1,500` typed on a German page is sent on as `"1.500"`.
 - `ServiceValidationError` raised with a lazy translation replaced it with
   its default `message`, since a lazy string is not a `str`. The lazy string
   is now the message, and renders in the language active where it is read.
