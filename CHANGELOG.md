@@ -57,9 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecFormView`: a `ServiceSpec` whose Validator is a `FormValidator`, served
   as the page its form is. GET runs the spec's class-level permission check
   and renders `template_name` with an unbound `form`, `view` and `spec`. POST
-  runs the same check before it reads the post, since a refused post is
-  answered with the page and dispatch's shape check comes before its own
-  permission check, and hands dispatch the grant so the check runs once. It
+  runs the same check before it builds the form from the post, since a
+  refused post is answered with the page and dispatch's shape check comes
+  before its own permission check, and hands dispatch the grant so the check
+  runs once. It
   reads the post through the form's own widgets, so a checkbox is a boolean
   and a multi-select a list, and neither the CSRF token nor a submit button
   is an argument; a blank field is absent, and a number, date or date-time in
@@ -81,13 +82,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prefixed with its dotted path.
 
 ### Fixed
-- The shape check refuses NaN and the infinities wherever the declaration
-  reaches, with `"Enter a number."` at the value's address, as it already did
-  for a decimal. JSON has no spelling for either, so they are outside the
-  number type rather than a stricter check. Python's decoder reads an
-  overflowing literal such as `1e400` as an infinity, so a JSON body
-  carrying one reached the Validator, and so could a Python caller's. A
-  free-form object's contents stay its Validator's, as for every other rule.
+- The shape check refuses NaN and the infinities for a `number` and for an
+  element of an array with no `items`, with `"Enter a number."` at the
+  value's address, as it already did for a decimal; every other type already
+  refused one as the wrong type. JSON has no spelling for either, so they are
+  outside the number type rather than a stricter check. Python's decoder
+  reads an overflowing literal such as `1e400` as an infinity, so a JSON body
+  carrying one reached the Validator, and so could a Python caller's. Inside
+  a container nothing declares, the contents stay the Validator's, as for
+  every other rule.
 - `FormValidator` read a decimal argument with three places through the
   active locale when its field was localized, so under a locale whose
   thousands separator is a dot, `"1.500"` validated as 1500. A number

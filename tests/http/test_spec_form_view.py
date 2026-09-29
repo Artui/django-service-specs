@@ -125,6 +125,19 @@ class AssignForm(forms.Form):
     assignee = forms.ModelChoiceField(queryset=get_user_model().objects.all(), required=False)
 
 
+class Listed(forms.Form):
+    """Builds its choices in its constructor, as a form offering the rows of the moment does."""
+
+    title = forms.CharField()
+    owner = forms.ChoiceField(required=False)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["owner"].choices = [
+            (user.pk, user.username) for user in get_user_model().objects.all()
+        ]
+
+
 class Counted(PermissionCheck):
     """Admits every principal, counting each class-level check."""
 
@@ -464,6 +477,24 @@ class TestRefusals:
         with django_assert_num_queries(0), pytest.raises(PermissionDenied):
             post(form_view(spec), ada, {"title": "", "assignee": "99999"})
 
+    def test_a_refused_principals_unreadable_number_is_never_read(self, ada: Any) -> None:
+        # ``coerce_flat`` refuses a number it cannot read, and it runs before
+        # dispatch: sized so that it, not the shape check, would answer, a
+        # refused principal read the post first was shown the page at 400.
+        spec = entry_spec(permissions=[Refuse()])
+        with pytest.raises(PermissionDenied):
+            post(form_view(spec), ada, {"title": "Hi", "count": "abc"})
+
+    def test_a_refused_principals_form_is_never_built(
+        self, ada: Any, django_assert_num_queries: Any
+    ) -> None:
+        # A constructor that reads rows runs only for a principal the spec admits.
+        spec = ServiceSpec(
+            service=lambda **pool: None, permissions=[Refuse()], validator=FormValidator(Listed)
+        )
+        with django_assert_num_queries(0), pytest.raises(PermissionDenied):
+            post(form_view(spec), ada, {"title": "Hi"})
+
     def test_the_class_level_check_runs_once(self, ada: Any) -> None:
         # The view runs it before reading the post and hands dispatch the
         # grant, rather than dispatch running it a second time.
@@ -587,6 +618,14 @@ class TestServing:
         with pytest.raises(ImproperlyConfigured) as raised:
             get(form_view(entry_spec()), ada, zone="eu", org="a")
         assert str(raised.value) == UNDECLARED.format(names="org, zone")
+
+    def test_an_undeclared_kwarg_is_raised_whoever_posts(self, ada: Any) -> None:
+        # The host's mistake, so a principal the spec refuses meets it too,
+        # rather than a 403 that hides it until someone admitted posts.
+        spec = entry_spec(permissions=[Refuse()])
+        with pytest.raises(ImproperlyConfigured) as raised:
+            post(form_view(spec), ada, {"title": "Hi"}, zone="eu")
+        assert str(raised.value) == UNDECLARED.format(names="zone")
 
     def test_a_method_it_does_not_serve_is_djangos_405(self, ada: Any) -> None:
         request = signed_in(FACTORY.put("/", data=b""), ada)

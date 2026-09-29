@@ -220,12 +220,14 @@ principal the post would refuse: an anonymous visitor above gets Django's own
 unbound; showing an update's current row as its initial data is a page of its
 own, which this view does not build.
 
-**POST runs the same check first**, before it reads the post. A refused post
-is answered with the page again, and dispatch's shape check comes before its
-own permission check, so without it a principal the spec refuses would be
-shown the page - every row a choice field lists, and `extra_context` - by
-posting a malformed form. The `Grant` the check returns goes to dispatch, so
-it runs once; the object-level check is still dispatch's.
+**POST starts as GET does**: the route first, then the same check, and only
+then is the form built from the post. A refused post is answered with the
+page again, and dispatch's shape check comes before its own permission check,
+so without it a principal the spec refuses would be shown the page - every
+row a choice field lists, and `extra_context` - by posting a malformed form,
+and a form whose constructor reads rows would read them for that principal.
+The `Grant` the check returns goes to dispatch, so it runs once; the
+object-level check is still dispatch's.
 
 **POST** then binds the form to the post and reads the arguments **through
 the form's own widgets**, which is how Django reads a form:

@@ -20,13 +20,18 @@ stricter than the worker would refuse calls that would have run. A required
 parameter with a declared default is not refused when absent, because the
 Validator will supply the default. A JSON `true` is neither an `integer` nor a
 `number`, although Python makes `bool` an `int`: sent for a count, it is a
-caller's mistake, not the number one. NaN and the infinities are refused with
-`"Enter a number."`, and that is a type rule rather than a stricter check: JSON
-has no spelling for either, so they are outside the `number` type, and only a
-decoder reading an overflowing literal such as `1e400`, or a Python caller, can
-produce one. Pydantic's `float` is the one validator behind this that would take
-one. Like every rule here, it holds wherever the declaration reaches; inside a
-free-form object, the contents are the Validator's.
+caller's mistake, not the number one.
+
+NaN and the infinities are refused, and that is a type rule rather than a
+stricter check: JSON has no spelling for either, so they are outside the
+`number` type, and only a decoder reading an overflowing literal such as `1e400`,
+or a Python caller, can produce one. Two validators would take one all the same -
+pydantic's `float` and the dataclass adapter's - where Django's number fields
+refuse both. A `number`, a decimal or an element of an array with no `items` is
+refused with `"Enter a number."`; any other type refuses one as the wrong type.
+Like every rule here, it holds wherever the declaration reaches: inside a
+free-form object, or an object or array element that nothing declares, the
+contents are the Validator's.
 
 It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument

@@ -18,6 +18,7 @@ from django.views.generic.base import ContextMixin, TemplateResponseMixin
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.authorize import authorize
+from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
@@ -74,11 +75,13 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     always unbound: showing an update's current row as its initial data is a
     page of its own, which this view does not build.
 
-    **POST runs that check first too**, before the post is read. A refused
-    post is answered with the page again, and dispatch's shape check comes
-    before its own permission check, so without it a principal the spec
-    refuses would be shown the page - every row a choice field lists, and
-    ``extra_context`` - by posting a malformed form. The
+    **POST starts as GET does**: the route first, then that check, and only
+    then is the form built from the post. A refused post is answered with the
+    page again, and dispatch's shape check comes before its own permission
+    check, so without it a principal the spec refuses would be shown the
+    page - every row a choice field lists, and ``extra_context`` - by posting
+    a malformed form, and a form whose constructor reads rows would read them
+    for that principal. The
     [`Grant`][django_service_specs.authorization.grant.Grant] it returns goes
     to dispatch, so the class-level check runs once; the object-level check
     is still dispatch's, on the row it resolves.
@@ -157,31 +160,23 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         """The page, with an unbound form, for a principal the spec's class check admits."""
         spec = self.served_spec()
-        # Refused before the page is served, as ``SpecView`` refuses it on any
-        # method: a route capturing a kwarg the spec does not declare is wrong
-        # for every request, and a page served anyway fails only once someone
-        # has filled it in.
-        route_arguments(spec.parameters(), kwargs)
-        try:
-            authorize(spec, request_principal(request))
-        except (NotPermitted, PrincipalUnavailable) as refused:
-            raise PermissionDenied(refused.message) from refused
+        _admitted(spec, request, kwargs)
         return self.render_to_response(self.get_context_data(form=_form_class(spec)()))
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         """Dispatch the posted form: a redirect on success, the form re-rendered on a refusal."""
         spec = self.served_spec()
+        # Admitted as ``get`` admits, before the form is built from the post:
+        # re-rendering a refused post offers the page, and dispatch's shape
+        # check - and ``coerce_flat`` before it - runs before its permission
+        # check, so a principal the spec refuses was otherwise answered a
+        # malformed post with the page, every row a choice field lists
+        # included. A form's constructor may query, for choices it builds, so
+        # it waits too. The grant hands dispatch the check already made, so it
+        # runs once; it leaves the object-level check to dispatch.
+        principal, grant = _admitted(spec, request, kwargs)
         form = _form_class(spec)(data=request.POST, files=request.FILES)
         try:
-            # The principal and the class-level check before the post is read,
-            # as ``get`` runs them. Re-rendering a refused post offers the
-            # page, and dispatch's shape check runs before its own permission
-            # check: a principal the spec refuses was otherwise answered a
-            # malformed post with the page, every row a choice field lists
-            # included. The grant hands dispatch the check already made, so it
-            # runs once; it leaves the object-level check to dispatch.
-            principal = request_principal(request)
-            grant = authorize(spec, principal)
             arguments = _form_arguments(form, spec.parameters(), kwargs)
             result = dispatch(
                 spec,
@@ -192,6 +187,9 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
                 unknown_arguments=self.unknown_arguments,
             )
         except (NotPermitted, PrincipalUnavailable) as refused:
+            # The object-level check, on the row dispatch resolved, or either
+            # raised by the operation: answered as ``error_response`` answers
+            # it, whoever refused.
             raise PermissionDenied(refused.message) from refused
         except ServiceNotFound as refused:
             raise Http404(refused.message) from refused
@@ -283,6 +281,26 @@ def _check_configuration(cls: type[SpecFormView], initkwargs: Mapping[str, Any])
 def _form_class(spec: ServiceSpec) -> type[forms.BaseForm]:
     """The form the spec validates with, which ``as_view`` checked is there."""
     return cast("FormValidator", spec.validator).form_class
+
+
+def _admitted(
+    spec: ServiceSpec, request: HttpRequest, url_kwargs: Mapping[str, Any]
+) -> tuple[Any, Grant]:
+    """The principal and its grant, once the route and the class-level check pass.
+
+    The route first, as ``SpecView`` refuses it on any method: a route
+    capturing a kwarg the spec does not declare is wrong for every request and
+    every principal, and a page served anyway fails only once someone has
+    filled it in. Then the principal the spec's class-level check admits, so
+    neither the page nor anything the post reaches is offered to one it
+    refuses.
+    """
+    route_arguments(spec.parameters(), url_kwargs)
+    try:
+        principal = request_principal(request)
+        return principal, authorize(spec, principal)
+    except (NotPermitted, PrincipalUnavailable) as refused:
+        raise PermissionDenied(refused.message) from refused
 
 
 def _form_arguments(

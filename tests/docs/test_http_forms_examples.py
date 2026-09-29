@@ -101,6 +101,13 @@ class TestGet:
         with pytest.raises(PermissionDenied, match=r"^Sign in to add a book\.$"):
             serve(FACTORY.get("/books/new/"))
 
+    def test_anonymous_is_never_shown_the_page_for_a_malformed_post(self, author: Author) -> None:
+        # Refused before the post is read, as the page is: re-rendered, a
+        # malformed post would list every author the choice field offers.
+        data = {**posted(author, title=""), "author": "99999"}
+        with pytest.raises(PermissionDenied, match=r"^Sign in to add a book\.$"):
+            serve(FACTORY.post("/books/new/", data=data))
+
 
 class TestPost:
     def test_a_book_is_created_and_the_post_redirected(self, ada: Any, author: Author) -> None:
