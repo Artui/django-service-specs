@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 # --8<-- [start:schema]
-from django_service_specs import UnknownArguments
-from django_service_specs.schema import spec_input_schema, spec_output_schema
+from django_service_specs import UnknownArguments, spec_input_schema, spec_output_schema
 from docs.examples.declaring import list_notes_spec
 from docs.examples.relations import create_author_spec
 

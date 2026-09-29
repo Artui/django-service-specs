@@ -170,6 +170,8 @@ out is refused rather than read as "no restriction".
 - [Arguments and refusals](https://artui.github.io/django-service-specs/arguments/) - the shape check, the error tree and the two error families
 - [Relation writes](https://artui.github.io/django-service-specs/relations/) - nested writes through the five relation specs
 - [The registry](https://artui.github.io/django-service-specs/registry/) - one named set of operations for several transports
+- [The forms adapter](https://artui.github.io/django-service-specs/forms/) - a Django form class as the Validator, `ModelForm` included
+- [JSON Schema](https://artui.github.io/django-service-specs/schema/) - the input and output schema a transport describes an operation with
 - [API reference](https://artui.github.io/django-service-specs/reference/)
 
 ## License

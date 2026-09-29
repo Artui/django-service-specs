@@ -32,10 +32,21 @@ code; the subpackage paths are where each name is defined.
 ::: django_service_specs.output.field_marking.FieldMarking
 ::: django_service_specs.output.field_audience.FieldAudience
 
+## JSON Schema
+
+::: django_service_specs.schema.spec_input_schema.spec_input_schema
+::: django_service_specs.schema.spec_output_schema.spec_output_schema
+::: django_service_specs.schema.parameters_schema.parameters_schema
+::: django_service_specs.schema.output_schema.output_schema
+
 ## Dataclass adapters
 
 ::: django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator
 ::: django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter
+
+## Forms adapter
+
+::: django_service_specs.adapters.forms.form_validator.FormValidator
 
 ## Dispatch
 

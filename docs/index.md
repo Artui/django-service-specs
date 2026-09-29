@@ -94,4 +94,8 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   operation.
 - [The registry](registry.md): one named set of operations for several
   transports.
+- [The forms adapter](forms.md): a Django form class, `ModelForm` included,
+  as the Validator.
+- [JSON Schema](schema.md): the input and output schema a transport
+  describes an operation with.
 - [API reference](reference.md): every public name.

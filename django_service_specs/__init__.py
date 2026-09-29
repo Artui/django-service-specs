@@ -2,6 +2,7 @@
 
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
@@ -53,6 +54,10 @@ from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
+from django_service_specs.schema.output_schema import output_schema
+from django_service_specs.schema.parameters_schema import parameters_schema
+from django_service_specs.schema.spec_input_schema import spec_input_schema
+from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
@@ -83,6 +88,7 @@ __all__ = [
     "FieldAudience",
     "FieldChange",
     "FieldMarking",
+    "FormValidator",
     "ForwardRelationSpec",
     "GenericRelationSpec",
     "Grant",
@@ -138,10 +144,14 @@ __all__ = [
     "delete_relations",
     "dispatch",
     "is_async",
+    "output_schema",
+    "parameters_schema",
     "present",
     "resolve_callable_kwargs",
     "resolve_principal",
     "run_service",
     "shape_queryset",
+    "spec_input_schema",
+    "spec_output_schema",
     "update_from_input",
 ]

@@ -1,17 +1,18 @@
 # The forms adapter
 
-`FormValidator` makes a Django form class a
+[`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
+makes a Django form class a
 [`Validator`][django_service_specs.validation.validator.Validator]. The form
 you already have - its fields, their validators, `clean_<field>()`, `clean()`
 and, on a `ModelForm`, the model's own validation and uniqueness checks - is
 what validates the arguments, and the adapter reads its fields into the
 `Parameters` every transport describes itself from.
 
-It needs nothing beyond Django, and it is imported from its own subpackage
-rather than the package root:
+It needs nothing beyond Django, so like the dataclass adapters it is exported
+from the package root:
 
 ```python
-from django_service_specs.adapters.forms import FormValidator
+from django_service_specs import FormValidator
 ```
 
 There is no presenter: a form describes what goes in, not what comes out.

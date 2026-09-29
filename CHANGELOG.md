@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `FormValidator`: a Django form class as a Validator. The form's fields become
+  the operation's `Parameters`, with their JSON types, formats, choices and
+  help, and validation is the form's own - its field validators,
+  `clean_<field>()`, `clean()` and, on a `ModelForm`, the model's validation
+  and uniqueness checks. A `ModelForm` is built on a copy of the resolved row,
+  so an update's uniqueness check excludes that row without the form writing
+  its cleaned values onto the row the service receives. A field the form
+  cannot describe is refused where the Validator is built, by form, field and
+  class. The form's own `__all__` errors come back under `non_field_errors`,
+  like every other refusal.
+- JSON Schema from the declarations: `spec_input_schema()` and
+  `spec_output_schema()` describe an operation, and `parameters_schema()` and
+  `output_schema()` a bare declaration. The schema is read from `Parameters`
+  and `Output` alone, so it is one dialect whichever library declared the
+  spec. The input schema closes every object the `UnknownArguments` policy
+  closes and leaves a defaulted parameter out of `required`; the output schema
+  is an array for a list, and nullable wherever the operation may return
+  nothing. Each is flat, with no `$defs` or `$ref`.
+
+### Changed
+- `OutputField` refuses a `format` on anything but a string, as `Parameter`
+  already did. Every format names what a string decodes into, and the JSON
+  Schema states it beside the type, so a format on a number described a value
+  the output never holds.
+
 ### Fixed
 - The docs site no longer publishes the example sources and their bytecode
   beside its pages. `docs/` is also a Python package, so the suite can run

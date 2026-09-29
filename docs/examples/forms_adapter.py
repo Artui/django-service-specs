@@ -9,6 +9,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 
 from django_service_specs import (
+    FormValidator,
     Parameter,
     Parameters,
     PermissionCheck,
@@ -17,7 +18,6 @@ from django_service_specs import (
     ServiceSpec,
     update_from_input,
 )
-from django_service_specs.adapters.forms import FormValidator
 from tests.adapter_app.models import Author, Status
 
 
