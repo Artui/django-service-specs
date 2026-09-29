@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The docs site no longer publishes the example sources and their bytecode
+  beside its pages. `docs/` is also a Python package, so the suite can run
+  every example, and MkDocs copied its `.py` files and `__pycache__` into the
+  site. The pages are unchanged: they take the examples through snippets.
+
 ## [0.1.0] — 2026-09-29
 
 ### Added
