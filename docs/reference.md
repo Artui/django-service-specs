@@ -75,9 +75,11 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.http.adispatch_request.adispatch_request
 ::: django_service_specs.http.spec_view.SpecView
 ::: django_service_specs.http.async_spec_view.AsyncSpecView
+::: django_service_specs.http.spec_form_view.SpecFormView
 ::: django_service_specs.http.request_arguments.request_arguments
 ::: django_service_specs.http.error_response.error_response
 ::: django_service_specs.http.unsupported_media_type.UnsupportedMediaType
+::: django_service_specs.http.add_argument_errors.add_argument_errors
 
 ## Authorization
 

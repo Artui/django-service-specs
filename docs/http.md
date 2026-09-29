@@ -11,8 +11,8 @@ from django_service_specs import AsyncSpecView, SpecView, adispatch_request, dis
 ```
 
 It is the plumbing, not the pages: a view here answers JSON to a script, a
-`fetch()` or an htmx request. A form a person fills in and reads back is a page
-of its own.
+`fetch()` or an htmx request. The one page it serves is a spec's own form, from
+[`SpecFormView`](#forms), for a spec a Django form validates.
 
 ## A function view
 
@@ -178,3 +178,117 @@ token is the host's decision, and one line:
 docs/examples/http.py:csrf
 --8<--
 ```
+
+## Forms
+
+[`SpecFormView`][django_service_specs.http.spec_form_view.SpecFormView] serves
+a spec whose Validator is a [`FormValidator`](forms.md) as the page a person
+fills that form in on: the form that validates the arguments is the form the
+page renders.
+
+```python
+--8<--
+docs/examples/http_forms.py:spec
+--8<--
+```
+
+```python
+--8<--
+docs/examples/http_forms.py:urls
+--8<--
+```
+
+The template is any template that renders the form inside a POST form with
+its token. The one above is as small as that:
+
+```html
+--8<--
+tests/templates/spec_form.html
+--8<--
+```
+
+**GET** renders `template_name` with an unbound form under `form`, and `view`
+and `spec` beside it: the names Django's `FormView` uses, with
+`extra_context` merged in as Django's `ContextMixin` does. The spec's
+class-level permission check runs first, so the page is never offered to a
+principal the post would refuse: an anonymous visitor above gets Django's own
+`PermissionDenied`, which the host's 403 page answers. The form is always
+unbound; showing an update's current row as its initial data is a page of its
+own, which this view does not build.
+
+**POST** binds the form to the post and reads the arguments **through the
+form's own widgets**, which is how Django reads a form:
+
+- A checkbox is `True` or `False` and a multi-select a list, where a flat
+  reading would refuse a checkbox's `"on"`. Only the form's fields are read,
+  so the CSRF token and a named submit button never become arguments, and a
+  disabled field is not read at all, since the form ignores what is posted
+  for it.
+- **A field left blank is absent**, for every field, as it is to the form. An
+  optional date, number or choice left empty is simply not sent, and a
+  required field left empty is refused with `"This field is required."`,
+  once.
+- **A number, a date or a date-time in one of the field's input formats** -
+  `10/25/1974`, a localized `12,50`, `5.0` for an integer - is read by the
+  field's own `to_python` and sent on in the form the shape check reads: an
+  ISO date, an ISO date-time with its offset, a decimal string, a number. So
+  the shape check never refuses what the form accepts. A value the field
+  refuses is sent on as it came, and refused in the kernel's words, which are
+  the field's own.
+- The URL kwargs are merged last, so the route wins a clash, and typed with
+  [`coerce_flat`](arguments.md#flat-transports) in the same call as
+  everything else: one refusal carries every problem. Each is an argument,
+  so the spec declares each one. A kwarg the route captures and the spec does
+  not declare is the host's misconfiguration, wrong for every caller, so it
+  raises `ImproperlyConfigured` under either `unknown_arguments` policy - the
+  policy governs what a client sends - rather than blaming the client with a
+  refused post.
+
+Then [`dispatch`](dispatching.md). **A success redirects** to
+`get_success_url(result)`, which resolves `success_url` as Django's
+`redirect()` does, so a path, a `reverse_lazy` or a URL name all work. Override
+it to read the result, as `AddBookThenShowIt` does to reach the book it
+created. A refusal:
+
+| Refusal | The form view answers |
+| --- | --- |
+| `InvalidArguments`, `ServiceValidationError` | 400, the form re-rendered |
+| `ServiceConflict` | 409, the form re-rendered |
+| `ServiceError` | 422, the form re-rendered |
+| `DispatchError` | 400, the form re-rendered |
+| `NotPermitted`, `PrincipalUnavailable` | `PermissionDenied` |
+| `ServiceNotFound`, a not-found result | `Http404` |
+
+The first two rows place the refusal on the form, and a service's string or
+list detail is about the whole form. Every other re-rendered refusal is its
+message, among the form's non-field errors. The statuses are
+[`error_response`](#refusals)'s, so a client reading a refused post - htmx,
+or Turbo, which will not render a failed post answered 200 - reads it the
+same way it reads the JSON views.
+
+`as_view()` refuses, when the URLconf is imported, a view with no
+`ServiceSpec`, a spec whose Validator is not a `FormValidator`, and a view
+with neither a `success_url` nor its own `get_success_url`. The view is **sync
+only** in this release.
+
+### A refusal, placed on the form
+
+[`add_argument_errors`][django_service_specs.http.add_argument_errors.add_argument_errors]
+is how the view places a refusal, and a hand-written view with its own bound
+form can call it the same way. It uses Django's public `form.add_error`, beside
+the form's own errors:
+
+- **A key naming one of the form's fields** puts its messages on that field.
+- `non_field_errors`, and Django's own `"__all__"`, go to the form's non-field
+  errors.
+- **Any other key** - a URL kwarg such as `pk`, or a key a service chose -
+  goes to the non-field errors prefixed with its path: `"pk: Enter a whole
+  number."`. A nested tree is flattened with its path joined by dots,
+  `"books.1.title: This field is required."`, since a form is flat. Below a
+  field the path is an array's element index, which means nothing to a
+  person reading one control, so it is dropped there.
+- **Never a duplicate.** A message the form already carries at the same place
+  is not added again. The form validating the same post says what the kernel
+  says - a `FormValidator`'s refusal is the form's own errors, and the shape
+  check spells its messages as Django's fields do - so without this most
+  refusals would show twice.
