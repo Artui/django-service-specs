@@ -34,6 +34,13 @@ The package has no models and needs no entry in `INSTALLED_APPS`. A principal
 is a user of `django.contrib.auth`, and a generic-relation write needs
 `django.contrib.contenttypes`. Django 4.2 or later, on Python 3.10 or later.
 
+The pydantic adapter is the one part that needs more, and it comes with an
+extra:
+
+```bash
+pip install "django-service-specs[pydantic]"
+```
+
 ## Quickstart
 
 One write, declared once: what it takes (a dataclass behind a `Validator`),
@@ -170,6 +177,9 @@ out is refused rather than read as "no restriction".
 - [Arguments and refusals](https://artui.github.io/django-service-specs/arguments/) - the shape check, the error tree and the two error families
 - [Relation writes](https://artui.github.io/django-service-specs/relations/) - nested writes through the five relation specs
 - [The registry](https://artui.github.io/django-service-specs/registry/) - one named set of operations for several transports
+- [The forms adapter](https://artui.github.io/django-service-specs/forms/) - a Django form class as the Validator, `ModelForm` included
+- [The pydantic adapter](https://artui.github.io/django-service-specs/pydantic/) - a pydantic model as the Validator and the Presenter
+- [JSON Schema](https://artui.github.io/django-service-specs/schema/) - the input and output schema a transport describes an operation with
 - [API reference](https://artui.github.io/django-service-specs/reference/)
 
 ## License

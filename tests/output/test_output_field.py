@@ -31,6 +31,9 @@ def test_choices_are_value_and_display_pairs() -> None:
     [
         ({"type": "str"}, "is not a JSON type"),
         ({"type": "string", "format": "uuid"}, "format 'uuid' is not one of"),
+        # A schema states the format beside the type, so one on a number would
+        # publish a decimal no JSON number is.
+        ({"type": "number", "format": "decimal"}, "a format describes a string"),
         ({"type": "string", "fields": Output()}, "fields describes an object"),
         ({"type": "string", "items": "string"}, "items describes an array"),
         ({"type": "string", "choices": ["d", "p"]}, "choices are \\(value, display\\) pairs"),
@@ -45,3 +48,7 @@ def test_nesting_is_legal_where_the_type_allows_it() -> None:
     inner = Output((OutputField("name", "string"),))
     assert OutputField("author", "object", fields=inner).fields is inner
     assert OutputField("books", "array", items=inner).items is inner
+
+
+def test_a_format_on_a_string_is_kept() -> None:
+    assert OutputField("price", "string", format="decimal").format == "decimal"

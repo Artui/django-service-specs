@@ -4,7 +4,7 @@ import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -316,3 +316,20 @@ def test_what_the_validator_builds_the_presenter_renders_as_it_came_in() -> None
     # What was sent comes back unchanged; what was omitted comes back as the
     # dataclass's defaults, and the UNSET field stays absent.
     assert presented == {**arguments, "note": None, "level": 3, "extras": []}
+
+
+@dataclass
+class _Tagged:
+    modes: list[Literal["fast", "slow"]]
+    colours: list[Colour]
+    statuses: list[Status]
+
+
+def test_a_list_of_choices_declares_their_pairs_for_each_element() -> None:
+    # ``items`` holds only the element's JSON type, and an array's choices
+    # constrain each element, so a list of choices keeps them there: where the
+    # shape check and the JSON Schema read them.
+    output = DataclassPresenter(_Tagged).output()
+    assert output.get("modes").choices == (("fast", "fast"), ("slow", "slow"))
+    assert output.get("colours").choices == (("red", "red"), ("blue", "blue"))
+    assert output.get("statuses").choices == (("draft", "Draft"), ("published", "Published"))

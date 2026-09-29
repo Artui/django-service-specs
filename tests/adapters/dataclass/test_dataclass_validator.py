@@ -3,7 +3,7 @@ from __future__ import annotations
 import datetime as dt
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -467,3 +467,22 @@ def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     with pytest.raises(InvalidArguments) as shape:
         check_arguments(validator.parameters(), {**valid, **arguments})
     assert shape.value.detail == _refusal(_Typed, {**valid, **arguments})
+
+
+@dataclass
+class _Tagged:
+    modes: list[Literal["fast", "slow"]]
+    colours: list[Colour]
+    statuses: list[Status]
+
+
+def test_a_list_of_choices_declares_them_for_each_element() -> None:
+    # ``items`` holds only the element's JSON type, and an array's choices
+    # constrain each element, so a list of choices keeps them there: where the
+    # shape check and the JSON Schema read them.
+    params = DataclassValidator(_Tagged).parameters()
+    assert [(p.name, p.items, p.choices) for p in params] == [
+        ("modes", "string", ("fast", "slow")),
+        ("colours", "string", ("red", "blue")),
+        ("statuses", "string", ("draft", "published")),
+    ]

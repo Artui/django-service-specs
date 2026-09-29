@@ -92,4 +92,7 @@ nav:
   - Arguments and refusals: arguments.md
   - Relation writes: relations.md
   - The registry: registry.md
+  - The forms adapter: forms.md
+  - The pydantic adapter: pydantic.md
+  - JSON Schema: schema.md
   - API reference: reference.md

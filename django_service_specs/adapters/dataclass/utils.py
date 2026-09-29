@@ -3,14 +3,15 @@
 Shared by the validator and the presenter, which read one declaration from two
 sides: what an argument must be to decode into a field, and what a field's
 value becomes when it is rendered. Reading it once, here, is what keeps the two
-from disagreeing about a type.
+from disagreeing about a type. The scalar table and the unwrapping of
+``Annotated`` and ``| None`` are shared with the other adapters, in
+``adapters/utils.py``, for the same reason one level up.
 """
 
 from __future__ import annotations
 
 import dataclasses
 import datetime as dt
-import types
 import typing
 from dataclasses import dataclass
 from decimal import Decimal
@@ -20,23 +21,9 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Manager
 
+from django_service_specs.adapters.utils import SCALARS, scalar_type, strip
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.types.unset import UNSET, UnsetType
-
-_SCALARS: dict[type, tuple[str, str | None]] = {
-    str: ("string", None),
-    int: ("integer", None),
-    float: ("number", None),
-    bool: ("boolean", None),
-    # JSON has no decimal, date-time or date, so each travels as a string and
-    # the format names what the string decodes into.
-    Decimal: ("string", "decimal"),
-    dt.datetime: ("string", "date-time"),
-    dt.date: ("string", "date"),
-}
-"""The scalar annotations and their JSON type and format. Looked up by
-identity, so ``bool`` is not read as ``int`` and ``datetime`` is not read as
-``date``, although each subclasses the other."""
+from django_service_specs.types.unset import UNSET
 
 _SUPPORTED = (
     "str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
@@ -196,57 +183,6 @@ def encode_fields(fields: tuple[FieldShape, ...], value: Any) -> dict[str, Any]:
     return encoded
 
 
-def scalar_type(value: Any) -> str | None:
-    """The JSON type of a scalar value, or ``None`` for anything else.
-
-    ``bool`` first: it subclasses ``int``, and ``true`` is not an integer on
-    any wire this kernel has.
-    """
-    if isinstance(value, bool):
-        return "boolean"
-    if isinstance(value, int):
-        return "integer"
-    if isinstance(value, float):
-        return "number"
-    if isinstance(value, str):
-        return "string"
-    return None
-
-
-def _strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:
-    """(base, nullable, omittable, Annotated extras) for one field's annotation.
-
-    Loops rather than recursing because the wrappers nest either way round:
-    ``Annotated[str | None, m]`` and ``Annotated[str, m] | None`` both mean a
-    nullable string marked ``m``.
-    """
-    nullable = omittable = False
-    extras: list[Any] = []
-    while True:
-        origin = typing.get_origin(annotation)
-        if origin is typing.Annotated:
-            base, *metadata = typing.get_args(annotation)
-            extras.extend(metadata)
-            annotation = base
-        elif origin in (typing.Union, types.UnionType):
-            arms = []
-            for arm in typing.get_args(annotation):
-                if arm is type(None):
-                    nullable = True
-                elif arm is UnsetType:
-                    omittable = True
-                else:
-                    arms.append(arm)
-            # ``int | str`` has no single JSON type, and neither does a union
-            # of only ``None`` and ``UnsetType``. Both fall through to the
-            # refusal below as the annotation they are.
-            if len(arms) != 1:
-                return annotation, nullable, omittable, tuple(extras)
-            annotation = arms[0]
-        else:
-            return annotation, nullable, omittable, tuple(extras)
-
-
 def _read(
     annotation: Any, *, where: str, stack: tuple[type[Any], ...]
 ) -> tuple[Shape, bool, tuple[Any, ...]]:
@@ -256,7 +192,7 @@ def _read(
     is declared, naming the field, because a wrong type in a declaration is a
     schema that lies to every transport reading it.
     """
-    base, nullable, omittable, extras = _strip(annotation)
+    base, nullable, omittable, extras = strip(annotation)
     origin = typing.get_origin(base)
     args = typing.get_args(base)
     if origin is typing.Literal:
@@ -284,8 +220,8 @@ def _read(
         )
     elif isinstance(base, type) and dataclasses.is_dataclass(base):
         shape = Shape("object", python=base, nullable=nullable, fields=read_fields(base, stack))
-    elif isinstance(base, type) and base in _SCALARS:
-        json_type, fmt = _SCALARS[base]
+    elif isinstance(base, type) and base in SCALARS:
+        json_type, fmt = SCALARS[base]
         shape = Shape(json_type, python=base, format=fmt, nullable=nullable)
     else:
         raise _unmappable(base, where=where)
@@ -306,7 +242,13 @@ def _choice_type(values: tuple[Any, ...], annotation: Any, *, where: str) -> str
 
 
 def _unmappable(annotation: Any, *, where: str) -> ImproperlyConfigured:
-    name = annotation.__qualname__ if isinstance(annotation, type) else repr(annotation)
+    # A class by its name, and anything else - a parametrized generic included,
+    # which Python 3.10 also counts as a ``type`` - as it was written. The
+    # second condition decides only there, where the ``set[int]`` row of
+    # test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation
+    # holds it.
+    plain = isinstance(annotation, type) and typing.get_origin(annotation) is None
+    name = annotation.__qualname__ if plain else repr(annotation)
     return ImproperlyConfigured(
         f"{where}: {name} has no JSON type this adapter can declare. Use {_SUPPORTED}."
     )

@@ -82,7 +82,8 @@ def _output_field(fs: FieldShape) -> OutputField:
         shape.type,
         format=shape.format,
         nullable=shape.nullable,
-        choices=_choice_pairs(shape),
+        # A list's choices are its element's, as on the Parameter side.
+        choices=_choice_pairs(shape if shape.items is None else shape.items),
         always_present=not fs.omittable,
         marking=fs.marking,
         fields=None if shape.fields is None else _output(shape.fields),

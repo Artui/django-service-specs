@@ -55,8 +55,9 @@ class DataclassValidator(Validator):
       share. An ``Enum`` decodes to the member.
     - ``list[X]``: an array; ``list[SomeDataclass]`` is an array of rows, each
       declared as nested Parameters. For any other element, ``Parameter.items``
-      can hold only its JSON type, so a list of decimals or of choices is
-      declared as an array of strings, and the rest is decoded here.
+      can hold only its JSON type, so a list of decimals is declared as an
+      array of strings and decoded here. A list of choices declares them on
+      the array, where they constrain each element.
     - a dataclass: an object, with its own fields as nested Parameters.
     - ``X | UnsetType``: the argument may be left out, with or without a
       default, and the field then holds ``UNSET`` rather than a value a
@@ -149,7 +150,9 @@ def _parameter(fs: FieldShape) -> Parameter:
         format=shape.format,
         items=_items(shape.items),
         fields=None if shape.fields is None else _parameters(shape.fields),
-        choices=shape.choices,
+        # A list's choices are its element's: an array's choices constrain each
+        # element, and ``items`` can hold only the element's JSON type.
+        choices=shape.choices if shape.items is None else shape.items.choices,
         # Encoded, so a Decimal or an Enum default is reported as the argument
         # that would be sent for it. ``UNSET`` stays ``UNSET``: no default.
         default=UNSET if default is dataclasses.MISSING else encode(shape, default),

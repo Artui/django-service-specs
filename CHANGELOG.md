@@ -7,7 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-29
+
+### Added
+- `FormValidator`: a Django form class as a Validator. The form's fields become
+  the operation's `Parameters`, with their JSON types, formats, choices and
+  help, and validation is the form's own - its field validators,
+  `clean_<field>()`, `clean()` and, on a `ModelForm`, the model's validation
+  and uniqueness checks. A `ModelForm` is built on a copy of the resolved row,
+  so an update's uniqueness check excludes that row without the form writing
+  its cleaned values onto the row the service receives. A field the form
+  cannot describe is refused where the Validator is built, by form, field and
+  class. The form's own `__all__` errors come back under `non_field_errors`,
+  like every other refusal.
+- JSON Schema from the declarations: `spec_input_schema()` and
+  `spec_output_schema()` describe an operation, and `parameters_schema()` and
+  `output_schema()` a bare declaration. The schema is read from `Parameters`
+  and `Output` alone, so it is one dialect whichever library declared the
+  spec. The input schema closes every object the `UnknownArguments` policy
+  closes and leaves a defaulted parameter out of `required`; the output schema
+  is an array for a list, and nullable wherever the operation may return
+  nothing. Each is flat, with no `$defs` or `$ref`.
+- A pydantic adapter, with the `pydantic` extra: `PydanticValidator` and
+  `PydanticPresenter` read a model into `Parameters` and `Output` from the
+  same annotation table as the dataclass adapters, so a model and a dataclass
+  declaring one field declare one parameter. Aliases are read as pydantic
+  reads and writes them, and pydantic's refusals come back in the kernel's
+  error tree, addressed by parameter name. A model that contains itself is
+  described four levels deep and validated in full. The presenter reads rows,
+  related managers, objects and mappings through `model_dump`. Both are
+  exported from `django_service_specs.adapters.pydantic` alone: the package
+  root never imports pydantic. Needs pydantic 2.11 or later.
+
+### Changed
+- `OutputField` refuses a `format` on anything but a string, as `Parameter`
+  already did. Every format names what a string decodes into, and the JSON
+  Schema states it beside the type, so a format on a number described a value
+  the output never holds.
+
 ### Fixed
+- The dataclass adapters declare a list of choices - `list[Literal[...]]`, a
+  list of an `Enum` or of Django `Choices` - with its choices, which constrain
+  each element. They declared a plain array of strings, so the shape check
+  passed any string on to the Validator and a JSON Schema left the choices
+  out.
+- On Python 3.10, `DataclassValidator` names a refused parametrized generic
+  as it was written, `set[int]` rather than `set`.
 - The docs site no longer publishes the example sources and their bytecode
   beside its pages. `docs/` is also a Python package, so the suite can run
   every example, and MkDocs copied its `.py` files and `__pycache__` into the
@@ -81,5 +126,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Artui/django-service-specs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-service-specs/compare/v0.0.0...v0.1.0
