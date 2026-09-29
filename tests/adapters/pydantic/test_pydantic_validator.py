@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import datetime as dt
+import math
+from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any, Literal
 
 import pytest
+from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from pydantic import (
     BaseModel,
@@ -18,6 +21,7 @@ from pydantic import (
 )
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
@@ -488,3 +492,34 @@ def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
     with pytest.raises(InvalidArguments) as caught:
         check_arguments(params, {**arguments, "tags": [None]})
     assert caught.value.detail == {"tags": {0: ["Expected a string."]}}
+
+
+class _Ratio(BaseModel):
+    ratio: float
+
+
+@dataclass
+class _RatioRow:
+    ratio: float
+
+
+class _RatioForm(forms.Form):
+    ratio = forms.FloatField()
+
+
+@pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+def test_which_validators_take_the_non_finite_float_the_shape_check_refuses(
+    value: float,
+) -> None:
+    # The arguments page names them: JSON has no spelling for the value, so the
+    # shape check refuses it as outside the number type, where two of the
+    # validators behind it would have taken it from a Python caller and
+    # Django's number field refuses it in the same words.
+    for validator in (PydanticValidator(_Ratio), DataclassValidator(_RatioRow)):
+        assert not math.isfinite(validator.validate({"ratio": value}, CONTEXT)["ratio"])
+        with pytest.raises(InvalidArguments) as caught:
+            check_arguments(validator.parameters(), {"ratio": value})
+        assert caught.value.detail == {"ratio": ["Enter a number."]}
+    with pytest.raises(InvalidArguments) as caught:
+        FormValidator(_RatioForm).validate({"ratio": value}, CONTEXT)
+    assert caught.value.detail == {"ratio": ["Enter a number."]}

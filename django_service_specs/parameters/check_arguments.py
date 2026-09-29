@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -66,11 +67,18 @@ def check_arguments(
     - ``bool`` is neither an ``integer`` nor a ``number``, although Python
       makes it an ``int``: a JSON ``true`` sent for a count is a caller's
       mistake, not the number one.
+    - NaN and the infinities are refused wherever the declaration reaches.
+      JSON has no spelling for either, so they are outside the ``number``
+      type, and this is a type rule rather than a stricter check - although
+      pydantic's ``float`` and the dataclass adapter's both take one.
     - ``choices`` constrain the value, and an array's choices constrain each of
       its elements, since an array is never one of a list of scalars.
-    - An ``object`` with no ``fields``, and an array with no ``items``, are
-      free-form: their type is checked and their contents are not, because
-      nothing is declared inside them to check against.
+    - An ``object`` with no ``fields`` is free-form: its type is checked and
+      its contents are not, because nothing is declared inside it to check
+      against. An array with no ``items`` takes any element, and each is
+      still one of the array's values: its choices and the finiteness rule
+      reach it, while an element that is itself an object or an array is not
+      walked.
 
     **The closed argument set applies at every level**, inside each row and
     each nested object as well as at the top. Closed only at the top, an
@@ -229,6 +237,19 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
     # The first condition is held by test_an_array_with_no_items_accepts_any_element.
     if json_type is not None and not _is_json_type(json_type, value):
         return expected_type(json_type)
+    # No JSON value is NaN or an infinity, and neither HTTP reading hands one
+    # on by name: ``coerce_flat`` refuses ``"nan"``, a JSON body the constants.
+    # A decoder still makes one from an overflowing literal - Python's reads
+    # ``1e400`` as infinity - and a Python caller can pass one. Having no JSON
+    # spelling puts it outside the number type, so this is a type rule rather
+    # than a check stricter than the libraries: every transport refuses it at
+    # its own address, in the words Django's number fields use, wherever the
+    # declaration reaches. A container it leaves open is not walked, so one
+    # inside is its Validator's. One branch to coverage: the type
+    # condition is held by test_accepts_a_value_of_its_json_type[string-], the
+    # finiteness one by test_accepts_a_value_of_its_json_type[number-2.5].
+    if isinstance(value, float) and not math.isfinite(value):
+        return gettext("Enter a number.")
     if fmt is None:
         return None
     try:

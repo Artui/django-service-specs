@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-29
+
 ### Added
 - `items_nullable` on `Parameter` and `OutputField`: whether a `null` may
   stand where an array's element would, as `list[int | None]` declares it.
@@ -14,8 +16,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   needs a declared `items`. The dataclass and pydantic adapters set it from
   the element's annotation, the shape check keeps a null element where it is
   set, and both schemas state it on `items`, choices included.
+- `dispatch_request` and `adispatch_request`, in the new `http` subpackage: a
+  spec served from a hand-written Django view, answered as JSON with no API
+  framework in between. The principal is `request.user`, anonymous included,
+  and an authenticated account with `is_active` false is refused as
+  `PrincipalUnavailable`. A not-found result is 404; a success is the
+  presented value, bare, at the caller's `success_status`, else 204 for a
+  service with nothing to present and 200 otherwise. The async one reads the
+  request off the event loop, since `request.user` is a session query.
+- `SpecView` and `AsyncSpecView`: one spec as a class-based view. A selector
+  spec answers GET and HEAD and a service spec POST, unless `methods` names
+  others; any other method is Django's own 405 with a matching `Allow`. The
+  URL kwargs are arguments, so a route capturing one its spec does not declare
+  raises `ImproperlyConfigured` rather than answering the client 400, under
+  either `unknown_arguments` policy: the route is the host's. A view with no
+  spec is refused by `as_view()`.
+  Nothing is exempted from CSRF: that is the host's middleware.
+- `request_arguments`: a request read as arguments. GET and HEAD read the
+  query string; any other method a JSON object body as it is, or a form or
+  multipart body, which is parsed for PUT, PATCH and DELETE too rather than
+  arriving empty. A flat source takes every value for an array parameter and
+  the last otherwise, reads a blank value as absent unless `""` is one the
+  parameter can take (a plain string, or one whose choices name it), drops
+  `csrfmiddlewaretoken`, and goes through `coerce_flat`. URL kwargs are
+  coerced and merged last, so the route wins a clash. A malformed JSON body,
+  or one that is not an object, is `InvalidArguments` under
+  `non_field_errors`; a body in any other format is `UnsupportedMediaType`
+  rather than no arguments; files are not arguments.
+- `error_response`: either family of refusal as JSON, at the statuses
+  djangorestframework-services answers with. `InvalidArguments` and
+  `ServiceValidationError` are 400 and both bodies are field maps, a service's
+  string or list detail under `non_field_errors`; `NotPermitted` and
+  `PrincipalUnavailable` are 403, `ServiceNotFound` 404, `ServiceConflict`
+  409, any other `ServiceError` 422, `UnsupportedMediaType` 415, each as
+  `{"detail": message}`. Never 401.
+- `UnsupportedMediaType`, a `DispatchError`: a request body that is neither
+  JSON nor a form, refused rather than read as no arguments, since an
+  operation whose parameters are all optional would run with nothing and
+  answer success.
+- `SpecFormView`: a `ServiceSpec` whose Validator is a `FormValidator`, served
+  as the page its form is. GET runs the spec's class-level permission check
+  and renders `template_name` with an unbound `form`, `view` and `spec`. POST
+  runs the same check before it builds the form from the post, since a
+  refused post is answered with the page and dispatch's shape check comes
+  before its own permission check, and hands dispatch the grant so the check
+  runs once. It
+  reads the post through the form's own widgets, so a checkbox is a boolean
+  and a multi-select a list, and neither the CSRF token nor a submit button
+  is an argument; a blank field is absent, and a number, date or date-time in
+  one of the field's input formats is sent on in the form the shape check
+  reads. A URL kwarg the spec does not declare raises `ImproperlyConfigured`
+  under either `unknown_arguments` policy, since the route is the host's. A
+  success redirects to `get_success_url(result)`, `success_url` by default;
+  a refusal re-renders the bound form carrying that refusal and none of the
+  form's own errors, at `error_response`'s status, since the page's form is
+  bound to no row and its uniqueness check would call an update's unchanged
+  value taken. A denial or a missing row is Django's own `PermissionDenied`
+  or `Http404`.
+  `as_view()` refuses a view with no `ServiceSpec`, no `FormValidator` or
+  nowhere to redirect. Sync only.
+- `add_argument_errors`: a refusal tree placed on a bound form with
+  `form.add_error`, beside the form's own errors and never duplicating one. A
+  field's key goes on the field; `non_field_errors`, Django's `"__all__"` and
+  any key the form has no field for go to its non-field errors, the last
+  prefixed with its dotted path.
 
 ### Fixed
+- The shape check refuses NaN and the infinities for a `number` and for an
+  element of an array with no `items`, with `"Enter a number."` at the
+  value's address, as it already did for a decimal; every other type already
+  refused one as the wrong type. JSON has no spelling for either, so they are
+  outside the number type rather than a stricter check. Python's decoder
+  reads an overflowing literal such as `1e400` as an infinity, so a JSON body
+  carrying one reached the Validator, and so could a Python caller's. Inside
+  a container nothing declares, the contents stay the Validator's, as for
+  every other rule.
+- `FormValidator` read a decimal argument with three places through the
+  active locale when its field was localized, so under a locale whose
+  thousands separator is a dot, `"1.500"` validated as 1500. A number
+  field's string argument is now bound as the `Decimal` it spells, which
+  no locale reinterprets. `SpecFormView` reached it from an ordinary form:
+  `1,500` typed on a German page is sent on as `"1.500"`.
+- `ServiceValidationError` raised with a lazy translation replaced it with
+  its default `message`, since a lazy string is not a `str`. The lazy string
+  is now the message, and renders in the language active where it is read.
 - An operation declaring `list[X | None]` refused every null element before
   its Validator ran, although both adapters accept one: the declaration had
   no way to say the element was nullable, so the shape check read a gap as a
@@ -24,6 +108,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a row with no fields, created or matched on nothing. It is now refused
   with `"This field cannot be null."` under that row's `non_field_errors`,
   every null row at once and before any row is written.
+- The arguments page's HTTP-shaped ladder answered a `ServiceValidationError`
+  422 and a plain `ServiceError` 400, the reverse of the statuses
+  djangorestframework-services answers, and left `ServiceNotFound` and
+  `PrincipalUnavailable` to fall through. It now answers as `error_response`
+  does, and a test holds the two to each other.
 
 ## [0.2.0] — 2026-09-29
 
@@ -144,6 +233,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Artui/django-service-specs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-service-specs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-service-specs/compare/v0.0.0...v0.1.0

@@ -17,6 +17,15 @@ from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.present import present
+from django_service_specs.http.add_argument_errors import add_argument_errors
+from django_service_specs.http.adispatch_request import adispatch_request
+from django_service_specs.http.async_spec_view import AsyncSpecView
+from django_service_specs.http.dispatch_request import dispatch_request
+from django_service_specs.http.error_response import error_response
+from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.http.spec_form_view import SpecFormView
+from django_service_specs.http.spec_view import SpecView
+from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.adelete_relations import adelete_relations
 from django_service_specs.mutations.apply_input import apply_input
@@ -77,6 +86,7 @@ from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
 
 __all__ = [
+    "AsyncSpecView",
     "ChangeResult",
     "ChildCollectionChange",
     "ChildSpec",
@@ -119,17 +129,22 @@ __all__ = [
     "ServiceNotFound",
     "ServiceSpec",
     "ServiceValidationError",
+    "SpecFormView",
     "SpecRegistry",
+    "SpecView",
     "UNSET",
     "UnknownArguments",
     "Unrestricted",
     "UnsetType",
+    "UnsupportedMediaType",
     "ValidationContext",
     "Validator",
     "__version__",
     "acreate_from_input",
+    "add_argument_errors",
     "adelete_relations",
     "adispatch",
+    "adispatch_request",
     "apply_input",
     "apresent",
     "arun_service",
@@ -143,10 +158,13 @@ __all__ = [
     "create_from_input",
     "delete_relations",
     "dispatch",
+    "dispatch_request",
+    "error_response",
     "is_async",
     "output_schema",
     "parameters_schema",
     "present",
+    "request_arguments",
     "resolve_callable_kwargs",
     "resolve_principal",
     "run_service",

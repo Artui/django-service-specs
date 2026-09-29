@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 from collections.abc import Iterator, Mapping
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django import forms
@@ -154,6 +155,13 @@ class FormValidator(Validator):
     optional choice field reads ``""`` as no value, and a caller sends
     ``null`` for that instead.
 
+    **An argument is in its wire form, which no locale touches.** A number
+    field reads a string through the active locale when it is localized, and
+    under one whose thousands separator is a dot that reads ``"1.500"`` as
+    fifteen hundred. So a string argument for an ``IntegerField``,
+    ``FloatField`` or ``DecimalField`` is bound as the ``Decimal`` it spells,
+    which the field reads as the number it is, localized or not.
+
     **Declare the fields on the class.** A field a form adds or changes in its
     own ``__init__`` is not in ``base_fields``, so it is not described, and
     under ``UnknownArguments.REJECT`` the closed argument set refuses its key
@@ -226,7 +234,12 @@ class FormValidator(Validator):
         ``ModelMultipleChoiceField`` to a queryset, which is what the service
         receives.
         """
-        form = self._bind(dict(arguments), context.target)
+        fields = {parameter.name: field for parameter, field in self._declared}
+        data = {
+            name: _as_bound(fields[name], value) if name in fields else value
+            for name, value in arguments.items()
+        }
+        form = self._bind(data, context.target)
         if not form.is_valid():
             raise InvalidArguments(
                 {
@@ -244,6 +257,34 @@ class FormValidator(Validator):
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
         return form_class(data=data, instance=instance)
+
+
+def _as_bound(field: forms.Field, value: Any) -> Any:
+    """``value`` as the form's data: a number field's string bound as the ``Decimal`` it spells.
+
+    An argument arrives in its wire form, which no locale touches, and a
+    decimal's wire form is a string. A localized number field reads a string
+    through Django's ``sanitize_separators``, which takes a dot followed by
+    exactly three digits for a thousands separator where the active locale's
+    is one: bound as ``"1.500"``, one and a half, it cleans to 1500. It passes
+    anything but a string through, so a ``Decimal`` is read as the number it
+    is, localized or not, and it spells every value the shape check accepts
+    exactly.
+
+    One branch to coverage, so each condition is held by its own test:
+    test_a_field_that_is_not_a_number_is_bound_as_it_came (the field) and
+    test_a_json_number_for_a_decimal_is_bound_as_it_came (the string, since a
+    float made a ``Decimal`` carries its binary expansion into the field's
+    decimal-places check).
+    """
+    if not (isinstance(field, forms.IntegerField) and isinstance(value, str)):
+        return value
+    try:
+        return Decimal(value)
+    except InvalidOperation:
+        # Not a number at all, from a caller the shape check did not front:
+        # the field refuses it, in its own words.
+        return value
 
 
 def _check_model(form_class: type[forms.BaseForm]) -> None:

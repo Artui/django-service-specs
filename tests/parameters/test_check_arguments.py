@@ -170,6 +170,33 @@ def test_a_decimal_float_must_be_finite() -> None:
     assert refusal(DECIMAL, {"price": float("nan")}) == {"price": [NOT_A_NUMBER]}
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_a_number_must_be_finite(value: float) -> None:
+    # No JSON value is one, and Python's decoder reads an overflowing literal
+    # such as 1e400 as an infinity.
+    assert refusal(one(Parameter("ratio", "number")), {"ratio": value}) == {"ratio": [NOT_A_NUMBER]}
+
+
+def test_an_untyped_element_must_be_finite_too() -> None:
+    # Whatever the declaration leaves open, it cannot be a value JSON has no
+    # spelling for.
+    assert refusal(one(Parameter("tags", "array")), {"tags": ["a", float("inf")]}) == {
+        "tags": {1: [NOT_A_NUMBER]}
+    }
+
+
+def test_a_non_finite_value_inside_a_free_form_object_is_its_validators() -> None:
+    # Nothing is declared inside it, so the type rule has nothing to reach, as
+    # no other rule does; an object or array element of an untyped array, and
+    # an array element of an array of arrays, are the same.
+    blob, row = {"ratio": float("nan")}, [float("nan")]
+    assert check_arguments(one(Parameter("x", "object")), {"x": blob})["x"] is blob
+    assert check_arguments(one(Parameter("xs", "array")), {"xs": [blob]})["xs"][0] is blob
+    assert check_arguments(one(Parameter("xs", "array")), {"xs": [row]})["xs"][0] is row
+    nested = one(Parameter("xs", "array", items="array"))
+    assert check_arguments(nested, {"xs": [row]})["xs"][0] is row
+
+
 DATE_TIME = one(Parameter("at", "string", format="date-time"))
 DATE = one(Parameter("on", "string", format="date"))
 
