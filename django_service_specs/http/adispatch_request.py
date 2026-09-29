@@ -12,7 +12,12 @@ from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.http.error_response import error_response
-from django_service_specs.http.utils import not_found_response, read_request, success_response
+from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.http.utils import (
+    not_found_response,
+    request_principal,
+    success_response,
+)
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -47,7 +52,7 @@ async def adispatch_request(
     Building the response does not query and stays on the loop.
     """
     try:
-        principal, arguments = await sync_to_async(read_request, thread_sensitive=True)(
+        principal, arguments = await sync_to_async(_read_request, thread_sensitive=True)(
             spec, request, url_kwargs
         )
         result = await adispatch(
@@ -63,3 +68,20 @@ async def adispatch_request(
         return success_response(spec, await apresent(spec, result), success_status)
     except (DispatchError, ServiceError) as refused:
         return error_response(refused)
+
+
+def _read_request(
+    spec: ServiceSpec | SelectorSpec,
+    request: HttpRequest,
+    url_kwargs: Mapping[str, Any] | None,
+) -> tuple[Any, dict[str, Any]]:
+    """The principal, then the arguments, in the one executor hop they share.
+
+    The principal first, as ``adispatch`` resolves a ``principal_id`` before
+    its shape check, so a deactivated account is refused without learning
+    anything about its request. Both off the loop: the principal may be a
+    session query, and ``spec.parameters()`` may be one too, since a
+    Validator may read a model to declare what it takes.
+    """
+    principal = request_principal(request)
+    return principal, request_arguments(request, spec.parameters(), url_kwargs=url_kwargs)

@@ -12,6 +12,7 @@ import json
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.http import HttpRequest
 from django.test import RequestFactory
@@ -293,5 +294,20 @@ class TestUrlKwargs:
             "pk": 4,
         }
 
-    def test_an_undeclared_route_value_passes_through(self) -> None:
-        assert read(FACTORY.get("/"), url_kwargs={"slug": "x"}) == {"slug": "x"}
+    @pytest.mark.parametrize(
+        "request_",
+        [
+            FACTORY.get("/"),
+            post_json({"count": 2}),
+            FACTORY.post("/", data="count=2", content_type=FORM),
+        ],
+        ids=["query", "json", "form"],
+    )
+    def test_an_undeclared_route_value_is_the_hosts_misconfiguration(
+        self, request_: HttpRequest
+    ) -> None:
+        # Read as a client's undeclared argument, it was a 400 blaming the
+        # client for the host's route; held on every path, since each merges
+        # the route by its own branch.
+        with pytest.raises(ImproperlyConfigured, match="The route captures org, slug,"):
+            read(request_, url_kwargs={"slug": "x", "org": "acme", "pk": "4"})

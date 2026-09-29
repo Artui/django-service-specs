@@ -92,6 +92,13 @@ async def test_a_seed_reaches_the_service(ada: Any) -> None:
     assert spec.service.calls[0]["tenant"] == "tenant-of-ada"
 
 
+async def test_an_undeclared_url_kwarg_propagates_from_the_executor_hop(ada: Any) -> None:
+    # The route is read beside the principal, off the loop, and a refusal
+    # raised there must reach the host rather than be answered as a client's.
+    with pytest.raises(ImproperlyConfigured, match="The route captures org,"):
+        await send(AsyncSpecView.as_view(spec=notes_spec()), "GET", ada, org="acme")
+
+
 def test_a_view_with_no_spec_is_refused_at_as_view() -> None:
     with pytest.raises(ImproperlyConfigured, match="AsyncSpecView.as_view"):
         AsyncSpecView.as_view()

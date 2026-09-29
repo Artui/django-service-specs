@@ -11,7 +11,12 @@ from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.http.error_response import error_response
-from django_service_specs.http.utils import not_found_response, read_request, success_response
+from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.http.utils import (
+    not_found_response,
+    request_principal,
+    success_response,
+)
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -51,13 +56,19 @@ def dispatch_request(
     [`error_response`][django_service_specs.http.error_response.error_response].
     Anything else propagates, a configuration error included: it is wrong for
     every caller, so it belongs to the host's error handling rather than to one
-    client's response.
+    client's response. A URL kwarg ``spec`` does not declare is one, raised
+    as ``ImproperlyConfigured``: every URL kwarg is an argument, and the route
+    is the host's.
 
     **CSRF is the host's middleware**, as for any Django view: nothing here
     exempts a view, and ``csrf_exempt`` is one line for a host that wants it.
     """
     try:
-        principal, arguments = read_request(spec, request, url_kwargs)
+        # The principal first, as ``adispatch`` resolves a ``principal_id``
+        # before its shape check: a deactivated account is refused without
+        # learning anything about its request.
+        principal = request_principal(request)
+        arguments = request_arguments(request, spec.parameters(), url_kwargs=url_kwargs)
         result = dispatch(
             spec,
             principal=principal,

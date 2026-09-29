@@ -6,9 +6,12 @@ from typing import Any
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.http.utils import answered_methods, request_principal
+from django_service_specs.http.utils import answered_methods, request_principal, route_arguments
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
 from tests.http.utils import FACTORY, note_spec, signed_in, titled_spec
 
 
@@ -51,3 +54,24 @@ def test_a_deactivated_principal_is_refused() -> None:
 )
 def test_the_methods_a_spec_answers(spec: Any, methods: Any, expected: Any) -> None:
     assert answered_methods(spec, methods, label="SpecView") == expected
+
+
+ROUTED = Parameters.of(Parameter("pk", "integer"), Parameter("slug", "string"))
+
+
+def test_a_declared_route_is_returned_as_a_plain_uncoerced_copy() -> None:
+    captured = {"pk": "4", "slug": "x"}
+    route = route_arguments(ROUTED, captured)
+    assert route == captured and route is not captured and type(route) is dict
+
+
+def test_no_route_is_no_arguments() -> None:
+    assert route_arguments(ROUTED, None) == {}
+
+
+def test_every_undeclared_kwarg_is_named_in_order() -> None:
+    with pytest.raises(ImproperlyConfigured) as refused:
+        route_arguments(ROUTED, {"pk": "4", "team": "a", "org": "b"})
+    assert str(refused.value).startswith(
+        "The route captures org, team, which the spec does not declare."
+    )

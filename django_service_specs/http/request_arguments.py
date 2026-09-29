@@ -12,6 +12,7 @@ from django.http.multipartparser import MultiPartParser
 from django.utils.translation import gettext
 
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
+from django_service_specs.http.utils import route_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -78,8 +79,11 @@ def request_arguments(
             under ``non_field_errors``; or ``coerce_flat``'s refusals, each at
             its parameter's name.
         UnsupportedMediaType: a body that is neither JSON nor a form.
+        ImproperlyConfigured: a URL kwarg ``parameters`` does not declare,
+            which is the host's route rather than the client's request; see
+            ``route_arguments`` in this subpackage's ``utils``.
     """
-    route = dict(url_kwargs or {})
+    route = route_arguments(parameters, url_kwargs)
     if request.method in ("GET", "HEAD"):
         return coerce_flat(parameters, {**_flat(parameters, request.GET), **route})
     if request.content_type == "application/json":

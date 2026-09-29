@@ -26,7 +26,9 @@ class SpecView(SpecViewBase):
     own 405, whose ``Allow`` header lists exactly the methods served, and
     OPTIONS is Django's own answer. **The URL kwargs are arguments**, merged
     last so the route wins a clash, which means the spec declares each one:
-    an undeclared kwarg is refused like any other undeclared argument.
+    a route capturing a kwarg its spec does not declare raises
+    ``ImproperlyConfigured`` on the first request it serves, since that is the
+    host's configuration rather than anything a client sent.
 
     ``as_view()`` checks the spec and the methods when the view is built, so a
     view with no spec fails when the URLconf is imported rather than on its

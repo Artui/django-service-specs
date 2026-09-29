@@ -117,8 +117,14 @@ it does in djangorestframework-services. A client-supplied value must not move
 the route's scope: a POST to `/notes/4/rename/` whose body says `"pk": 9`
 renames note 4 or nothing. A path segment with no converter arrives as a
 string and goes through `coerce_flat` like a query value. Every URL kwarg is
-an argument, so the spec declares each one; an undeclared one is refused like
-any other undeclared argument.
+an argument, so the spec declares each one. A route capturing a kwarg its spec
+does not declare raises `ImproperlyConfigured` on the first request it
+serves, under either `unknown_arguments` policy: the mismatch is the host's,
+wrong for every request, and a 400 would tell the client it had sent
+something wrong. A host scoping by a kwarg its spec does not take (an `org`
+read by middleware, say) calls
+[`dispatch_request`][django_service_specs.http.dispatch_request.dispatch_request]
+from its own view and passes the `url_kwargs` the spec declares.
 
 ## The principal
 

@@ -25,7 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecView` and `AsyncSpecView`: one spec as a class-based view. A selector
   spec answers GET and HEAD and a service spec POST, unless `methods` names
   others; any other method is Django's own 405 with a matching `Allow`. The
-  URL kwargs are arguments, and a view with no spec is refused by `as_view()`.
+  URL kwargs are arguments, so a route capturing one its spec does not declare
+  raises `ImproperlyConfigured` rather than answering the client 400, under
+  either `unknown_arguments` policy: the route is the host's. A view with no
+  spec is refused by `as_view()`.
   Nothing is exempted from CSRF: that is the host's middleware.
 - `request_arguments`: a request read as arguments. GET and HEAD read the
   query string; any other method a JSON object body as it is, or a form or

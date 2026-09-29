@@ -77,9 +77,16 @@ class TestServing:
         response = send(SpecView.as_view(spec=note_spec()), "GET", ada, pk=str(note.pk))
         assert (response.status_code, body(response)) == (200, {"title": "One"})
 
-    def test_every_url_kwarg_is_an_argument_the_spec_must_declare(self, ada: Any) -> None:
-        response = send(SpecView.as_view(spec=notes_spec()), "GET", ada, org="acme")
-        assert (response.status_code, body(response)) == (400, {"org": ["Unknown argument."]})
+    @pytest.mark.parametrize("policy", list(UnknownArguments))
+    def test_every_url_kwarg_is_an_argument_the_spec_must_declare(
+        self, ada: Any, policy: UnknownArguments
+    ) -> None:
+        # The route is the host's, so the mismatch is wrong for every request
+        # and propagates to the host's error handling, whatever the policy on
+        # what a client sends.
+        view = SpecView.as_view(spec=notes_spec(), unknown_arguments=policy)
+        with pytest.raises(ImproperlyConfigured, match="The route captures org,"):
+            send(view, "GET", ada, org="acme")
 
     def test_the_views_settings_reach_dispatch(self, ada: Any) -> None:
         spec = titled_spec({"id": 1})

@@ -1,10 +1,14 @@
-"""What the HTTP entry points share: reading a request, answering a result, the view's half.
+"""What the HTTP entry points share: the principal, the route, the answer, the view's half.
 
 ``dispatch_request`` and ``adispatch_request`` differ only in how they reach
 the kernel, so everything either does to a request before dispatch and to a
-result after it is written once here. The async one runs ``read_request`` in
-an executor hop and builds its responses on the loop, which is why the two
+result after it is written once here. The async one reads the request in an
+executor hop and builds its responses on the loop, which is why the two
 halves are separate functions: the read may query, and the answer never does.
+
+Nothing here imports ``request_arguments``, which reads the route through
+``route_arguments``: a shared helper that did would make the two import each
+other.
 
 ``SpecView`` and ``AsyncSpecView`` likewise differ only in their handlers, so
 everything else about them is ``SpecViewBase``.
@@ -22,7 +26,7 @@ from django.utils.translation import gettext
 from django.views import View
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -67,22 +71,32 @@ def request_principal(request: HttpRequest) -> Any:
     return user
 
 
-def read_request(
-    spec: ServiceSpec | SelectorSpec,
-    request: HttpRequest,
-    url_kwargs: Mapping[str, Any] | None,
-) -> tuple[Any, dict[str, Any]]:
-    """The principal, then the arguments: everything a dispatch needs from the request.
+def route_arguments(parameters: Parameters, url_kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The kwargs a route captured, as arguments, each one a parameter the spec declares.
 
-    The principal first, as ``adispatch`` resolves a ``principal_id`` before
-    its shape check, so a deactivated account is refused without learning
-    anything about its request. One function, so the async entry point reads
-    both in one executor hop: the principal may be a session query, and
-    ``spec.parameters()`` may be one too, since a Validator may read a model
-    to declare what it takes.
+    Every URL kwarg is an argument, so a route capturing one its spec does not
+    declare is the host's configuration, wrong for every request the route
+    serves, rather than anything a client sent. It is refused as one - Django
+    answers it 500 and shows it under ``DEBUG`` - where a client's own
+    undeclared argument is a 400. The ``unknown_arguments`` policy does not
+    reach it: that policy is about what a client sends, and no client can send
+    a route kwarg or stop sending one.
+
+    Returned as a plain copy and uncoerced, so each caller merges it last,
+    where the route wins a clash, and coerces it beside what the client sent.
+
+    Raises:
+        ImproperlyConfigured: naming every undeclared kwarg.
     """
-    principal = request_principal(request)
-    return principal, request_arguments(request, spec.parameters(), url_kwargs=url_kwargs)
+    route = dict(url_kwargs or {})
+    undeclared = sorted(set(route) - parameters.names())
+    if undeclared:
+        raise ImproperlyConfigured(
+            f"The route captures {', '.join(undeclared)}, which the spec does not declare. "
+            "Every URL kwarg is an argument: declare each one as a parameter, or leave it "
+            "out of url_kwargs."
+        )
+    return route
 
 
 def not_found_response() -> JsonResponse:
