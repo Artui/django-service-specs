@@ -3,6 +3,11 @@
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.affordances.enforce_affordances import enforce_affordances
+from django_service_specs.affordances.operation_affordances import operation_affordances
+from django_service_specs.affordances.unmet_operation_affordance import (
+    unmet_operation_affordance,
+)
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
@@ -68,6 +73,8 @@ from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.services.action_unavailable import ActionUnavailable
+from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
@@ -78,6 +85,7 @@ from django_service_specs.services.service_validation_error import ServiceValida
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.unknown_arguments import UnknownArguments
@@ -86,6 +94,9 @@ from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
 
 __all__ = [
+    "ActionUnavailable",
+    "AdditionalInputRequired",
+    "Affordance",
     "AsyncSpecView",
     "ChangeResult",
     "ChildCollectionChange",
@@ -159,8 +170,10 @@ __all__ = [
     "delete_relations",
     "dispatch",
     "dispatch_request",
+    "enforce_affordances",
     "error_response",
     "is_async",
+    "operation_affordances",
     "output_schema",
     "parameters_schema",
     "present",
@@ -171,5 +184,6 @@ __all__ = [
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
+    "unmet_operation_affordance",
     "update_from_input",
 ]
