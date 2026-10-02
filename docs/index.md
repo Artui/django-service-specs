@@ -86,7 +86,7 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
 
 - [Declaring an operation](declaring.md): the two spec types, Parameters, the
   Validator contract and its dataclass adapter, Output and the Presenter.
-- [Dispatching](dispatching.md): the six steps, results, grants, the async
+- [Dispatching](dispatching.md): the seven steps, results, grants, the async
   entry point, and pool seeds.
 - [Serving over HTTP](http.md): a spec as a Django view, answered as JSON:
   the arguments a request carries, the principal, and the status of each refusal.

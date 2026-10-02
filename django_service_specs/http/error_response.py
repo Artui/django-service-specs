@@ -41,9 +41,12 @@ def error_response(exc: DispatchError | ServiceError) -> JsonResponse:
     """``exc`` as JSON, at the status djangorestframework-services answers it with.
 
     One ladder for both families, at djangorestframework-services' statuses.
-    One body differs from its answer: a service's string or list detail, which
+    Two bodies differ from its answer. A service's string or list detail, which
     DRF answers as a bare list and this as a field map under
-    ``non_field_errors``, so every 400 here has one shape:
+    ``non_field_errors``, so every 400 here has one shape. And an
+    ``AdditionalInputRequired`` schema, which DRF reads as an error detail and
+    so writes with every value a string (``"minimum": "1"``), and this writes as
+    the JSON Schema it is:
 
     | Refusal | Status | Body |
     | --- | --- | --- |
@@ -101,9 +104,24 @@ def error_response(exc: DispatchError | ServiceError) -> JsonResponse:
     # row of ``test_a_message_refusal_is_its_status_and_a_detail`` without the
     # first (a plain service error has no schema to read).
     if isinstance(exc, AdditionalInputRequired) and exc.schema is not None:
-        return JsonResponse({"detail": exc.message, "schema": dict(exc.schema)}, status=422)
+        return JsonResponse({"detail": exc.message, "schema": _plain(exc.schema)}, status=422)
     status = next(status for kind, status in _STATUSES if isinstance(exc, kind))
     return JsonResponse({"detail": exc.message}, status=status)
+
+
+def _plain(value: Any) -> Any:
+    """``value`` with every mapping in it a ``dict``, at any depth.
+
+    The encoder writes only a ``dict`` as an object, and a schema may arrive
+    as any mapping - a frozen one, say - at the top or nested in a property,
+    where it would otherwise be a 500. Both container kinds are held by
+    ``test_a_schema_of_any_mapping_is_written_at_any_depth``.
+    """
+    if isinstance(value, Mapping):
+        return {key: _plain(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(item) for item in value]
+    return value
 
 
 def _field_map(detail: Any) -> Mapping[Any, Any]:

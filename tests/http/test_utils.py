@@ -21,6 +21,9 @@ from django_service_specs.http.utils import (
 )
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
+from tests.dispatch_app.models import Note
 from tests.http.utils import ASYNC_FACTORY, FACTORY, body, note_spec, signed_in, titled_spec
 
 
@@ -95,6 +98,34 @@ def test_a_service_presenting_nothing_answers_an_empty_body_at_the_callers_statu
     # status stays the caller's rather than becoming 204.
     response = success_response(titled_spec(), None, status)
     assert (response.status_code, response.content) == (status, b"")
+    assert "Content-Type" not in response
+
+
+@pytest.mark.parametrize(
+    ("spec", "presented", "status"),
+    [(titled_spec(), None, None), (titled_spec(), None, 204), (note_spec(), "Hello", 204)],
+    ids=["default", "service-at-204", "read-at-204"],
+)
+def test_a_204_carries_no_body_and_no_content_type(spec: Any, presented: Any, status: Any) -> None:
+    response = success_response(spec, presented, status)
+    assert (response.status_code, response.content) == (204, b"")
+    assert "Content-Type" not in response
+
+
+def _nothing_left(*, result: Any) -> Any:
+    return Note.objects.none()
+
+
+@pytest.mark.django_db
+def test_an_empty_re_read_keeps_the_callers_status() -> None:
+    # djangorestframework-services answers 204 here whatever status was named;
+    # the kernel keeps the caller's, since an empty re-read is the value None.
+    spec = titled_spec(
+        "done",
+        output_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=_nothing_left),
+    )
+    response = dispatch_request(spec, _posted(FACTORY), success_status=201)
+    assert (response.status_code, response.content) == (201, b"")
     assert "Content-Type" not in response
 
 

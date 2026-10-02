@@ -123,7 +123,9 @@ def success_response(
     and ``test_a_service_with_a_body_is_200`` (the body).
 
     A 204 carries no body, whichever way it was chosen: it is the status that
-    says there is none, and a client may not read one.
+    says there is none, and a client may not read one. Like an empty body at
+    any other status, it carries no ``Content-Type``, which would describe
+    nothing, as DRF drops it.
 
     **A service with nothing to present, at a caller's status other than
     204, answers an empty body with no** ``Content-Type``, as
@@ -136,11 +138,12 @@ def success_response(
     nothing = isinstance(spec, ServiceSpec) and body is None
     if success_status is None:
         success_status = 204 if nothing else 200
-    if success_status == 204:
-        return HttpResponse(status=204)
-    if nothing:
+    if success_status == 204 or nothing:
+        # No body either way: a 204 says there is none, whatever was presented.
         # ``HttpResponse`` stamps ``text/html`` on whatever it is given, and an
-        # empty body is no HTML document.
+        # empty body is no HTML document. Each side is held by its own test:
+        # test_a_204_carries_no_body_and_no_content_type (a read's body at 204)
+        # and test_a_service_presenting_nothing_answers_an_empty_body_at_the_callers_status.
         response = HttpResponse(status=success_status)
         del response["Content-Type"]
         return response

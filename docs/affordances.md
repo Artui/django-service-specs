@@ -105,11 +105,22 @@ the moment it flips.
 
 ## Enforcing at the call
 
-[`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
-raises
+[`dispatch`][django_service_specs.dispatch.dispatch.dispatch] and
+[`adispatch`][django_service_specs.dispatch.adispatch.adispatch] answer a
+service spec's affordances themselves, after object-level authorization and
+the Validator and before the run's transaction opens. The first one not met
+refuses the call with
 [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable],
-carrying the first unmet affordance's `reason` as its message and its `code`. A transport that runs a service itself calls it after
-authorization and validation, and before the service:
+carrying its `reason` as the message and its `code`, and the service never
+runs. A callable condition sees every registered seed, an HTTP adapter's
+`request` among them. A selector spec's `affordances` refuse nothing: they are
+answers about each row.
+
+[`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
+is that step, exported for a transport that runs a service itself. It calls it
+after authorization and validation and before the service, with the pool
+seeds' `reserved` set, or a condition the direct path refuses is skipped on
+that one:
 
 ```python
 --8<--

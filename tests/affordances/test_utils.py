@@ -46,6 +46,14 @@ class TestAmbientPool:
         }
         assert ambient_pool(pool, reserved=RESERVED_POOL_SEEDS) == {"user": "ada", "progress": "p"}
 
+    def test_a_drf_adapters_serializer_is_never_ambient(self) -> None:
+        # djangorestframework-services hands these functions a pool holding the
+        # bound input serializer, with ``serializer`` in its reserved set. It is
+        # the call's input, so a condition never sees it there either.
+        pool = {"user": "ada", "request": "r", "serializer": "bound"}
+        reserved = RESERVED_POOL_SEEDS | {"request", "serializer"}
+        assert ambient_pool(pool, reserved=reserved) == {"user": "ada", "request": "r"}
+
     def test_a_registered_seed_is_ambient_only_when_reserved_says_so(self) -> None:
         pool = {"user": "ada", "tenant": "t"}
         assert ambient_pool(pool, reserved=RESERVED_POOL_SEEDS) == {"user": "ada"}

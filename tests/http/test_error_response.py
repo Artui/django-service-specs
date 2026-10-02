@@ -8,6 +8,7 @@ translations included.
 from __future__ import annotations
 
 import json
+from types import MappingProxyType
 from typing import Any, ClassVar
 
 import pytest
@@ -102,15 +103,38 @@ class TestAdditionalInputRequired:
     # second half (without it, a missing schema would be written as null);
     # the parametrized ``Postponed`` row above holds the first half, since a
     # plain service error has no ``schema`` to read.
+    def test_a_schema_of_any_mapping_is_written_at_any_depth(self) -> None:
+        # A frozen mapping at the top, in a property, in a list and in a tuple:
+        # each is an object on the wire, where the encoder alone would refuse it.
+        frozen = MappingProxyType
+        schema = frozen(
+            {
+                "choice": frozen({"oneOf": [frozen({"const": 1})], "examples": (frozen({}),)}),
+            }
+        )
+        exc = AdditionalInputRequired("Pick one.", schema=schema)
+        assert answered(exc) == (
+            422,
+            {
+                "detail": "Pick one.",
+                "schema": {"choice": {"oneOf": [{"const": 1}], "examples": [{}]}},
+            },
+        )
+
     def test_a_schema_joins_the_detail(self) -> None:
         exc = AdditionalInputRequired(
-            "120 rows match. Confirm to proceed.", schema={"confirmed": {"type": "boolean"}}
+            "120 rows match. Confirm to proceed.",
+            schema={"confirmed": {"type": "boolean"}, "count": {"type": "integer", "minimum": 1}},
         )
+        # ``minimum`` stays a number: DRF would write it as the string "1".
         assert answered(exc) == (
             422,
             {
                 "detail": "120 rows match. Confirm to proceed.",
-                "schema": {"confirmed": {"type": "boolean"}},
+                "schema": {
+                    "confirmed": {"type": "boolean"},
+                    "count": {"type": "integer", "minimum": 1},
+                },
             },
         )
 

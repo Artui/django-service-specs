@@ -121,12 +121,16 @@ class TestWhen:
         )
 
     def test_every_per_call_name_a_callable_reads_is_named_in_order(self) -> None:
-        def when(*, user: Any, result: Any, data: Any) -> bool:
+        # Four, declared out of order, so an unsorted set cannot pass by luck of
+        # the hash seed, as two names would half the time.
+        def when(*, user: Any, result: Any, serializer: Any, data: Any, queryset: Any) -> bool:
             return True
 
         with pytest.raises(ImproperlyConfigured) as refused:
             Affordance(code="c", reason="r", when=when)
-        assert str(refused.value).startswith("Affordance 'c': `when` reads 'data', 'result',")
+        assert str(refused.value).startswith(
+            "Affordance 'c': `when` reads 'data', 'queryset', 'result', 'serializer',"
+        )
 
     def test_instance_beside_another_per_call_name_answers_with_the_row_message(self) -> None:
         def when(*, data: Any, instance: Any) -> bool:

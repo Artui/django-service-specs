@@ -25,7 +25,15 @@ from typing import Any, Final
 # imports nothing else in the package. The rest of the reserved names - ``user``
 # and ``progress`` - are ambient, and ``tests/types/test_utils.py`` holds the
 # partition, so a name reserved later has to be placed on one side of it.
-PER_CALL_POOL_NAMES: Final = frozenset({"data", "instance", "collection", "result", "queryset"})
+#
+# ``serializer`` is djangorestframework-services' per-call name for the bound
+# input serializer, which this kernel never seeds. It stays here because that
+# package re-exports these functions in place of its own, and hands them a pool
+# with ``serializer`` in it and a reserved set naming it: without it, a condition
+# taking ``**kwargs`` would be handed the call's input there.
+PER_CALL_POOL_NAMES: Final = frozenset(
+    {"data", "instance", "collection", "result", "queryset", "serializer"}
+)
 
 
 def is_row_condition(when: Any) -> bool:

@@ -17,7 +17,9 @@ def test_the_per_call_names_and_the_ambient_seeds_partition_the_reserved_names()
     # ``types/`` cannot import ``pool/``, so the per-call names are written out
     # rather than derived. This is what holds the two lists together: a name
     # reserved later has to be placed on one side or the other, deliberately.
-    assert PER_CALL_POOL_NAMES <= RESERVED_POOL_SEEDS
+    # ``serializer`` is the one exception: the DRF adapter's per-call name,
+    # which this kernel never seeds and so never reserves.
+    assert PER_CALL_POOL_NAMES - {"serializer"} <= RESERVED_POOL_SEEDS
     ambient = RESERVED_POOL_SEEDS - PER_CALL_POOL_NAMES
     assert ambient == {"user", "progress"}
 

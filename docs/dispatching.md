@@ -13,7 +13,11 @@ result = dispatch(spec, principal=user, arguments={"pk": 3, "title": "Final"})
 
 ## The order
 
-The same six steps for a read and a write, and for the async entry point:
+A deactivated principal is refused first, as `PrincipalUnavailable`: an
+authenticated one whose `is_active` is false. One with no `is_active` reads as
+active, and anonymous goes on to the permission check, which decides whether
+anonymous may act. Then the same seven steps for a read and a write, and for
+the async entry point:
 
 1. **The shape check and the closed argument set**, over `spec.parameters()`:
    presence, JSON type, format, choices and nullability at every level of
@@ -29,10 +33,13 @@ The same six steps for a read and a write, and for the async entry point:
    never on a `None` that `allow_none` let through.
 5. **Validation**: a write's Validator, on only the arguments it declares, with
    the resolved target in its context.
-6. **The run**: the service, inside `transaction.atomic()` unless the spec says
+6. **Affordances**: a write's `affordances`, in declaration order. The first
+   one not met refuses the call with `ActionUnavailable`, carrying its `code`.
+7. **The run**: the service, inside `transaction.atomic()` unless the spec says
    `atomic=False`, then the output selector if one is declared.
 
-A read stops after step four: its selector is its run.
+A read stops after step four: its selector is its run. Its `affordances` are
+answers about each row, for a list to report, and refuse nothing.
 
 The order is the design, and each place reads as if it could move:
 
@@ -45,6 +52,12 @@ The order is the design, and each place reads as if it could move:
 - **Resolution comes before validation**, so the Validator's context carries
   the row. An update's uniqueness check has to exclude the row being updated,
   and it cannot if the row is resolved afterwards.
+- **A deactivated principal is refused before the shape check**, so it learns
+  nothing about its arguments, and it is refused at the same point whether it
+  was handed over, named by `principal_id` or read off `request.user`.
+- **Affordances come after object-level authorization and validation**, so a
+  principal who may not see the row is never told what state it is in. They
+  come before the run's transaction opens, so a refusal never opens one.
 
 ## The result
 
@@ -140,7 +153,9 @@ Carried to another operation or another user it covers nothing, and dispatch
 refuses it with `NotPermitted`. It covers the class-level check only, unless
 it says `target_checked=True`, which a transport can claim once it has resolved
 the row and run the object-level check itself; otherwise dispatch still runs
-`has_object_permission` on the row it resolves. And **a grant cannot be
+`has_object_permission` on the row it resolves. A grant stands in for neither
+check that is not about permission: a deactivated principal is refused with
+one, and a write's affordances are still answered. And **a grant cannot be
 serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.
@@ -162,7 +177,8 @@ or deactivated one with
 It never falls back to an anonymous user: an operation dispatched with no
 resolvable principal has no principal, not an anonymous one. The stock
 permission classes of the HTTP frameworks pass a deactivated user, which is why
-the refusal lives at lookup.
+the refusal does not wait for them: `resolve_principal` refuses one at lookup,
+and `dispatch` refuses one it is handed, by the same rule.
 
 ## Binding without dispatching
 
@@ -213,6 +229,9 @@ run's shape decides only what joins it:
   thread-sensitive call queued behind it. Anything after it - an output
   selector, a read's shaping and object-level check - takes a second hop.
 
+Every refusal before the run is made inside that hop, an affordance included:
+a condition on the row is a query.
+
 ```python
 --8<--
 docs/examples/async_dispatch.py:async
@@ -222,7 +241,8 @@ docs/examples/async_dispatch.py:async
 `adispatch` takes exactly one of `principal` and `principal_id`. An identifier
 is resolved with `resolve_principal` inside the hop, since resolving it is a
 query. A grant never covers a principal resolved there, because a grant is
-bound to the principal object it was made for.
+bound to the principal object it was made for. A deactivated row is refused
+there, with its identifier in the message.
 
 The sync `dispatch` accepts an `async def` run as well, and drives it to
 completion, inside the transaction when the spec is atomic.
@@ -265,3 +285,21 @@ builds it with [`base_pool`][django_service_specs.pool.base_pool.base_pool]
 and binds a callable with
 [`resolve_callable_kwargs`][django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs],
 the declare-to-receive rule every callable here is called through.
+
+### Progress
+
+`progress=` on `dispatch` and `adispatch` takes the transport's own
+`ProgressReporter`:
+a callable taking how far along, and optionally `total`, `message` and
+`meta`. It is seeded under the reserved name `progress`, as it is, into the
+pool of the call's run - the service, or a read's own selector - and of a
+callable affordance condition. A reporter must not raise, because nothing
+between it and the service catches it. Under `adispatch` a sync run calls it
+on the executor thread, and an `async def` run on an event loop.
+
+With no reporter the pool carries
+`null_progress`, so a
+service that declares `progress` runs unchanged on every transport and in
+tests. A target or output selector always gets `null_progress`: a lookup has
+nothing to report, and one reporting after the service finished would read to
+a watching client as the work restarting.

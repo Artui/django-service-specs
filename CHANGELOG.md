@@ -36,6 +36,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   affordances a list's rows are answered for. Each answer is named
   `affordance__<name>__<code>`, and a name colliding with an `annotations` key
   or with another entry's is refused at construction.
+- `dispatch` and `adispatch` answer a service spec's `affordances`
+  themselves: after object-level authorization and the Validator, and before
+  the run's transaction opens, so a principal who may not see the row is
+  never told what state it is in and a refusal never opens a transaction. The
+  first one not met refuses the call with `ActionUnavailable` and the service
+  never runs. A callable condition sees every registered seed. `adispatch`
+  answers them inside its one executor hop. A selector spec's `affordances`
+  refuse nothing.
+- `progress=` on `dispatch` and `adispatch`: the transport's
+  `ProgressReporter`, seeded under the reserved name `progress` into the pool
+  of the call's run (the service, or a selector spec's own selector) and of a
+  callable affordance condition, as it is. `base_pool` takes the same keyword.
+  With no reporter the pool carries `null_progress`, so a callable that
+  declares `progress` runs on every transport; a target or output selector
+  always gets `null_progress`. `ProgressReporter` and `null_progress` keep
+  djangorestframework-services' signatures.
 
 ### Changed
 - An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as
@@ -48,7 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A service with nothing to present, at a `success_status` other than 204,
   answers an empty body with no `Content-Type`, at the caller's status, from
   `SpecView`, `AsyncSpecView`, `dispatch_request` and `adispatch_request`.
-  They wrote `null`. A read whose value is `None` still answers `null`.
+  They wrote `null`. A read whose value is `None` still answers `null`. A 204
+  no longer carries `Content-Type: text/html` either.
+- Dispatch refuses a deactivated principal. `dispatch` and `adispatch` raise
+  `PrincipalUnavailable` for an authenticated principal whose `is_active` is
+  false, before the shape check and with or without a grant, by the rule the
+  HTTP entry points and `resolve_principal` already applied: a principal with
+  no `is_active` reads as active, and anonymous goes on to the permission
+  check. A caller that hands dispatch such a user object reached the
+  permission check in 0.3.0, and the stock permission classes pass one.
+- Every pool dispatch builds carries `progress`, so a callable taking
+  `**kwargs` receives it beside `user`.
 
 ### Fixed
 - A `Parameter` with a list or dict default was unhashable, although a frozen

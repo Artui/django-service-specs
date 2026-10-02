@@ -27,6 +27,7 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | Name | Holds | In the pool of |
 | --- | --- | --- |
 | `user` | The principal | Every callable |
+| `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and a callable affordance condition's |
 | each validated value, by name | What the Validator returned | The service |
 | `data` | All of the validated values, as one mapping | The service |
 | `instance` | The row an instance selector resolved | The service |
@@ -36,8 +37,8 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
 
-The fixed names - `user`, `data`, `instance`, `collection`, `result` and
-`queryset`, with `progress` held back for later - are
+The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
+`result` and `queryset` - are
 [reserved][django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS]:
 a parameter declared under one is refused, and so is a validated value
 returned under one, so an argument can never outrank a value dispatch put in

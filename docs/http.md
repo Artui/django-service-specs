@@ -139,15 +139,20 @@ user rather than being pre-empted.
 **A deactivated account is refused**, as `PrincipalUnavailable` (403), before
 anything else is read. Django's `ModelBackend` never logs one in, but
 `AllowAllUsersModelBackend` and a project's own backend may, and a deactivated
-principal never acts, on HTTP or off it.
+principal never acts, on HTTP or off it. `dispatch` refuses one by the same
+rule, so a hand-written view handing `request.user` to it is covered too; the
+entry points refuse first so that the request is never read.
 
 ## Refusals
 
 [`error_response`][django_service_specs.http.error_response.error_response]
 answers both [families](arguments.md#two-families-of-error), with the statuses
-djangorestframework-services uses. One body differs from its answer: a
+djangorestframework-services uses. Two bodies differ from its answer. A
 service's string or list detail, which DRF answers as a bare list and this as
-a field map under `non_field_errors`, so every 400 here has one shape:
+a field map under `non_field_errors`, so every 400 here has one shape. And an
+`AdditionalInputRequired` schema, which DRF reads as an error detail and so
+writes with every value a string (`"minimum": "1"`), and this writes as the
+JSON Schema it is:
 
 | Refusal | Status | Body |
 | --- | --- | --- |
