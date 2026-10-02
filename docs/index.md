@@ -92,6 +92,9 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   the arguments a request carries, the principal, and the status of each refusal.
 - [Arguments and refusals](arguments.md): the shape check, the error tree, flat
   transports, and the two error families.
+- [Affordances](affordances.md): when an operation is possible right now, the
+  refusal's stable code, offering only what a call could pass, and asking for
+  one more value.
 - [Relation writes](relations.md): writing a row and its related rows in one
   operation.
 - [The registry](registry.md): one named set of operations for several

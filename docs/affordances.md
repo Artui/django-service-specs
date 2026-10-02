@@ -15,7 +15,7 @@ docs/examples/affordances.py:declare
 
 [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]'s
 `affordances` takes a sequence of conditions, each an
-`Affordance`
+[`Affordance`][django_service_specs.types.affordance.Affordance]
 with three fields:
 
 - **`code`** names the rule, never the state that tripped it, and does not
@@ -75,7 +75,7 @@ asked:
 
 A transport that lists operations before anyone calls them - an MCP server
 building its tool list, an agent assembling its next toolset - asks
-`unmet_operation_affordance`
+[`unmet_operation_affordance`][django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance]
 for the first callable condition not met now, or `None`.
 
 ```python
@@ -88,7 +88,7 @@ Conditions on the row are skipped without a query, because at list time there
 is no row; they go on being answered at the call. A
 [`SelectorSpec`][django_service_specs.specs.selector_spec.SelectorSpec]
 answers `None`.
-`operation_affordances`
+[`operation_affordances`][django_service_specs.affordances.operation_affordances.operation_affordances]
 returns the conditions that would be asked, so a transport can skip building a
 pool when there are none.
 
@@ -105,9 +105,9 @@ the moment it flips.
 
 ## Enforcing at the call
 
-`enforce_affordances`
+[`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
 raises
-`ActionUnavailable`,
+[`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable],
 carrying the first unmet affordance's `reason` as its message and its `code`. A transport that runs a service itself calls it after
 authorization and validation, and before the service:
 
@@ -140,7 +140,7 @@ answers it at 409, with the code beside the detail a client already reads:
 
 A service that gets far enough to discover it needs something else - usually
 because of what it found - raises
-`AdditionalInputRequired`
+[`AdditionalInputRequired`][django_service_specs.services.additional_input_required.AdditionalInputRequired]
 with a message and a `schema`. It is not a validation error, because what was sent is not
 wrong, and it is a
 [`ServiceError`][django_service_specs.services.service_error.ServiceError], so

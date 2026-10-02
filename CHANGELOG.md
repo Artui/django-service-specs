@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Affordance(code, reason, when)` and `ServiceSpec.affordances`: when an
+  operation is possible right now, as a fact about the world rather than about
+  the caller. `when` is an ORM boolean expression, a condition on the row
+  answered in SQL with every one in a single query, or a callable over the
+  pool's seeds, which never sees the call's target, input or arguments. A
+  Python callable over the row, a non-boolean expression, a code declared twice
+  and a condition on the row beside a `collection_selector_spec` are refused at
+  construction.
+- `enforce_affordances`, `unmet_operation_affordance` and
+  `operation_affordances`, in the new `affordances` subpackage, with
+  djangorestframework-services' signatures. The first refuses a call with
+  `ActionUnavailable`, in declaration order, and a row that vanished since it
+  was resolved with `ServiceNotFound`. The other two tell a transport listing
+  operations which ones no call could pass right now, skipping conditions on
+  the row without a query.
+- `ActionUnavailable`, a `ServiceConflict` carrying the unmet affordance's
+  `code`. `error_response` answers it at 409 with `code` beside `detail`.
+- `AdditionalInputRequired(message, *, schema=None)`, a `ServiceError` a
+  service raises when it needs one more value, with `schema` keyed by the
+  argument it expects back. `error_response` answers it at 422, with `schema`
+  beside `detail` when there is one.
+- `ServiceSpec.idempotent`: whether repeating the call leaves the state making
+  it once did. Declaration-only, and `None`, the default, means undeclared, so
+  a declared `False` is told apart from silence.
+- `SelectorSpec.affordances`: a mapping from a name to the `ServiceSpec` whose
+  affordances a list's rows are answered for. Each answer is named
+  `affordance__<name>__<code>`, and a name colliding with an `annotations` key
+  or with another entry's is refused at construction.
+
+### Changed
+- An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as
+  5, as Django's and DRF's `IntegerField` do, for a parameter and for each
+  integer element of an array; `"5.5"` is still refused. The shape check
+  accepts an integral float such as `5.0` for an `integer`, as JSON Schema
+  does, and hands the Validator an `int` at every level the declaration
+  reaches. `bool`, NaN and the infinities are refused as before, and a
+  `number` keeps its float.
+- A service with nothing to present, at a `success_status` other than 204,
+  answers an empty body with no `Content-Type`, at the caller's status, from
+  `SpecView`, `AsyncSpecView`, `dispatch_request` and `adispatch_request`.
+  They wrote `null`. A read whose value is `None` still answers `null`.
+
+### Fixed
+- A `Parameter` with a list or dict default was unhashable, although a frozen
+  declaration reads as hashable. `default` now takes no part in the hash, so
+  `hash()` no longer raises `TypeError`; equality still compares it, and the
+  reported value is unchanged.
+
 ## [0.3.0] — 2026-09-29
 
 ### Added

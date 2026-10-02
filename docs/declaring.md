@@ -183,7 +183,7 @@ docs/examples/declaring.py:validator
 
 | Annotation | Declares |
 | --- | --- |
-| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. |
+| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. Through dispatch, the shape check hands an `int` field a whole float such as `2.0` as `2`. |
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. |

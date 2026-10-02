@@ -177,6 +177,7 @@ out is refused rather than read as "no restriction".
 - [Dispatching](https://artui.github.io/django-service-specs/dispatching/) - the order, results, grants, the async rule and pool seeds
 - [Serving over HTTP](https://artui.github.io/django-service-specs/http/) - a spec as a Django view answering JSON, and the status of each refusal
 - [Arguments and refusals](https://artui.github.io/django-service-specs/arguments/) - the shape check, the error tree and the two error families
+- [Affordances](https://artui.github.io/django-service-specs/affordances/) - when an operation is possible right now, its refusal's stable code, and asking for one more value
 - [Relation writes](https://artui.github.io/django-service-specs/relations/) - nested writes through the five relation specs
 - [The registry](https://artui.github.io/django-service-specs/registry/) - one named set of operations for several transports
 - [The forms adapter](https://artui.github.io/django-service-specs/forms/) - a Django form class as the Validator, `ModelForm` included

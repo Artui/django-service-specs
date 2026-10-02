@@ -71,6 +71,10 @@ Non-negotiable. They keep the package navigable.
    first `NotPermitted` to load pulled in `dispatch()`, which needs
    `authorize`, which needs `NotPermitted`. A function-local import would
    hide that cycle rather than remove it.
+   `Affordance` sits there for the same reason, with the helpers its
+   construction reads in `types/utils.py`: `ServiceSpec` imports it, and
+   `affordances/`, which answers the conditions at the call and before it,
+   imports `specs/`.
 
 ## Naming the concepts
 

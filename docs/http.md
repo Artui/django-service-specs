@@ -31,9 +31,11 @@ It reads the principal and the arguments, dispatches with the `grant`,
 - **A not-found result** is 404, `{"detail": "Not found."}`.
 - **A success** is the presented value, bare, with no envelope around it. The
   status is the caller's `success_status`, or else 204 for a service with
-  nothing to present and 200 for everything else. A 204 has no body. A read
-  whose value is `None` (an `allow_none` retrieve that found nothing) answers
-  `null` at 200, since `None` is its value.
+  nothing to present and 200 for everything else. A 204 has no body. A service
+  with nothing to present at any other status the caller names answers an
+  empty body with no `Content-Type`, as djangorestframework-services does, and
+  the status stays the caller's. A read whose value is `None` (an `allow_none`
+  retrieve that found nothing) answers `null`, since `None` is its value.
 - **A refusal of either family** is
   [`error_response`](#refusals)'s answer. Anything else propagates, a
   configuration error included: it is wrong for every caller, so it belongs to
@@ -153,7 +155,9 @@ a field map under `non_field_errors`, so every 400 here has one shape:
 | `ServiceValidationError` | 400 | its detail, as a field map |
 | `NotPermitted`, `PrincipalUnavailable` | 403 | `{"detail": message}` |
 | `ServiceNotFound` | 404 | `{"detail": message}` |
+| `ActionUnavailable` | 409 | `{"detail": message, "code": code}` |
 | `ServiceConflict` | 409 | `{"detail": message}` |
+| `AdditionalInputRequired`, with a schema | 422 | `{"detail": message, "schema": schema}` |
 | `ServiceError` | 422 | `{"detail": message}` |
 | `UnsupportedMediaType` | 415 | `{"detail": message}` |
 | `DispatchError` | 400 | `{"detail": message}` |

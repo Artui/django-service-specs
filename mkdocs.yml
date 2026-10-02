@@ -91,6 +91,7 @@ nav:
   - Dispatching: dispatching.md
   - Serving over HTTP: http.md
   - Arguments and refusals: arguments.md
+  - Affordances: affordances.md
   - Relation writes: relations.md
   - The registry: registry.md
   - The forms adapter: forms.md

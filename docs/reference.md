@@ -69,6 +69,12 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.apresent.apresent
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 
+## Affordances
+
+::: django_service_specs.affordances.enforce_affordances.enforce_affordances
+::: django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance
+::: django_service_specs.affordances.operation_affordances.operation_affordances
+
 ## HTTP
 
 ::: django_service_specs.http.dispatch_request.dispatch_request
@@ -101,6 +107,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.service_validation_error.ServiceValidationError
 ::: django_service_specs.services.service_conflict.ServiceConflict
 ::: django_service_specs.services.service_not_found.ServiceNotFound
+::: django_service_specs.services.action_unavailable.ActionUnavailable
+::: django_service_specs.services.additional_input_required.AdditionalInputRequired
 
 ## Pool
 
@@ -151,3 +159,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.dispatch_error.DispatchError
 ::: django_service_specs.types.unset.UNSET
 ::: django_service_specs.types.unset.UnsetType
+::: django_service_specs.types.affordance.Affordance
