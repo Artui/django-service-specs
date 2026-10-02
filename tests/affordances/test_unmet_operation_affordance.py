@@ -11,6 +11,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -99,4 +100,4 @@ class TestTheSeedsAConditionSees:
         spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
         pool = base_pool(user=ada, seeds=TENANT_SEEDS)
         assert unmet_operation_affordance(spec, pool) is None
-        assert seen == {"user": ada}
+        assert seen == {"user": ada, "progress": null_progress}

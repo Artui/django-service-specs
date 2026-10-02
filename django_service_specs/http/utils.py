@@ -26,6 +26,7 @@ from django.utils.translation import gettext
 from django.views import View
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -47,16 +48,14 @@ def request_principal(request: HttpRequest) -> Any:
     whether anonymous may act, and the spec declares that check; refusing it
     here would make every spec's policy stricter than the one it states.
 
-    A deactivated account is refused. ``ModelBackend`` never logs one in, but
-    ``AllowAllUsersModelBackend`` and a project's own backend may, and the
-    kernel's rule - the one ``resolve_principal`` enforces off HTTP - is that a
-    deactivated principal never acts. ``AnonymousUser.is_active`` is ``False``,
-    so the guard asks about authenticated users alone, and a custom user model
-    with no ``is_active`` reads as active, as ``ModelBackend`` reads it.
-
-    Each condition is held by its own test:
-    ``test_anonymous_reaches_the_permission_check`` (``is_authenticated``) and
-    ``test_the_request_user_is_the_principal`` (``not is_active``).
+    A deactivated account is refused, by the rule dispatch itself applies and
+    ``resolve_principal`` applies off HTTP: ``ModelBackend`` never logs one in,
+    but ``AllowAllUsersModelBackend`` and a project's own backend may. The rule
+    asks about authenticated users alone, since ``AnonymousUser.is_active`` is
+    ``False``, and a custom user model with no ``is_active`` reads as active.
+    Dispatch would refuse the same user; refusing here as well is what keeps
+    the request unread for one, as ``adispatch`` resolves a ``principal_id``
+    before looking at its arguments.
 
     Touching ``request.user`` evaluates the lazy object AuthenticationMiddleware
     leaves there, which is a session query, so the async entry point calls this
@@ -66,7 +65,7 @@ def request_principal(request: HttpRequest) -> Any:
         PrincipalUnavailable: an authenticated user whose ``is_active`` is false.
     """
     user = request.user
-    if user.is_authenticated and not getattr(user, "is_active", True):
+    if is_deactivated(user):
         raise PrincipalUnavailable()
     return user
 

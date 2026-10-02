@@ -30,9 +30,10 @@ from django_service_specs.validation.validator import Validator
 class ServiceSpec:
     """A write: what it takes, who may run it, what it acts on, what it returns.
 
-    Dispatch runs it in a fixed order: the shape check and the closed argument
-    set, class-level authorization, target resolution, object-level
-    authorization, validation with the target in the Validator's context, the
+    Dispatch runs it in a fixed order, once a deactivated principal has been
+    refused: the shape check and the closed argument set, class-level
+    authorization, target resolution, object-level authorization, validation
+    with the target in the Validator's context, the ``affordances``, the
     service, then the output selector.
 
     Attributes:

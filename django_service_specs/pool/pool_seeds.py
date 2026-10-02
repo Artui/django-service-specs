@@ -112,6 +112,7 @@ DEFAULT_POOL_SEEDS: PoolSeeds = PoolSeeds()
 """The empty registry every dispatch entry point falls back to.
 
 A project that registers nothing gets the pool dispatch builds on its own: the
-principal as ``user``, and each step's own values (``data``, ``instance``,
-``collection``, ``result``, ``queryset``) where that step has them.
+principal as ``user``, a reporter as ``progress``, and each step's own values
+(``data``, ``instance``, ``collection``, ``result``, ``queryset``) where that
+step has them.
 """

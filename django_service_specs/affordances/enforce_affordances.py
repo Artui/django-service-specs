@@ -29,12 +29,20 @@ def enforce_affordances(
 ) -> None:
     """Refuse the call if one of the spec's ``affordances`` is not met.
 
-    A transport that runs a service itself - a chain that owns the transaction
-    and hands each step its own pool, say - calls this exactly as it calls
+    [`dispatch`][django_service_specs.dispatch.dispatch.dispatch] and
+    [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] call this
+    themselves for a service spec, with the pool the service is about to
+    receive and the pool seeds' ``reserved`` set. A transport that runs a
+    service **without** them - a chain that owns the transaction and hands each
+    step its own pool, say - must call it too, exactly as it calls
     [`authorize`][django_service_specs.authorization.authorize.authorize], or a
-    condition is skipped on that path. ``pool`` is the keyword pool the service
-    is about to receive and ``instance`` its resolved target, ``None`` for an
-    operation with none. It raises
+    condition the direct path refuses is skipped on that one. Neither entry
+    point calls it for a selector spec, whose ``affordances`` are answers about
+    each row rather than a refusal of the read.
+
+    ``pool`` is the keyword pool the service is about to receive and
+    ``instance`` its resolved target, ``None`` for an operation with none. It
+    raises
     [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable]
     carrying the unmet affordance's ``reason`` and ``code``.
 
@@ -43,7 +51,8 @@ def enforce_affordances(
     resolution -> object-level authorization -> validation -> affordances ->
     service. After access because a refusal describes the row's state, and
     telling a caller who may not see the row what state it is in is a
-    disclosure.
+    disclosure. Dispatch calls it before an atomic service's transaction opens,
+    so a refusal never opens one.
 
     Declaration order decides which refusal a caller sees, and nothing past the
     first unmet condition runs. Every condition on the row is answered together

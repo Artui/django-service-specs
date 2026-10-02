@@ -18,9 +18,12 @@ from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 
+from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.pool.base_pool import base_pool
@@ -31,6 +34,7 @@ from django_service_specs.selectors.utils import call_selector, materialize_retr
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 
@@ -71,7 +75,17 @@ def open_call(
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
-    A parameter a registered seed occupies is refused first, before the
+    **A deactivated principal is refused before anything else**, as
+    ``PrincipalUnavailable``, by the rule ``resolve_principal`` and the HTTP
+    entry points read too: an authenticated principal whose ``is_active`` is
+    false, where one with no ``is_active`` reads as active and anonymous goes on
+    to the permission check. First, so the three ways a principal reaches
+    dispatch - handed over, named by ``principal_id``, or ``request.user`` -
+    are refused at the same point and learn nothing about their arguments. A
+    ``grant`` does not stand in for it: a grant says the permission check ran,
+    and whether there is anyone to check is a question before that.
+
+    A parameter a registered seed occupies is refused next, before the
     arguments are looked at, because it is the declaration that is wrong and it
     is wrong for every caller. The dispatcher's own names never reach this
     check: ``spec.parameters()`` refuses them as it assembles. A registered
@@ -82,6 +96,8 @@ def open_call(
     it refuses learns nothing about which rows exist. It runs after the shape
     check, which reveals only what the declaration already says.
     """
+    if is_deactivated(principal):
+        raise PrincipalUnavailable()
     parameters = spec.parameters()
     taken = sorted(parameters.names() & pool_seeds.reserved)
     if taken:
@@ -100,23 +116,39 @@ def selector_pool(
     *,
     principal: Any,
     pool_seeds: PoolSeeds,
+    progress: ProgressReporter | None = None,
 ) -> dict[str, Any]:
     """The pool a selector is called from: the base pool, plus the arguments its ``reads`` declare.
 
     Only its own reads. A service spec's checked arguments also carry its
     Validator's, which have not been validated yet and are not the selector's
-    to see.
+    to see. ``progress`` is passed only for a selector spec's own selector,
+    which is that spec's run; see ``call_pool``.
     """
     reads = selector_spec.reads.names()
     return call_pool(
         principal,
         pool_seeds,
         {name: value for name, value in checked.items() if name in reads},
+        progress=progress,
     )
 
 
-def call_pool(principal: Any, pool_seeds: PoolSeeds, entries: Mapping[str, Any]) -> dict[str, Any]:
+def call_pool(
+    principal: Any,
+    pool_seeds: PoolSeeds,
+    entries: Mapping[str, Any],
+    *,
+    progress: ProgressReporter | None = None,
+) -> dict[str, Any]:
     """The base pool, then this call's own entries on top of it.
+
+    ``progress`` is the caller's reporter, and is passed only for a pool a run
+    is called from: a service's, or a selector spec's own selector's. A target
+    or output selector's pool gets ``base_pool``'s no-op instead, deliberately,
+    as djangorestframework-services does: a lookup has no progress to report,
+    and one reporting after the service finished would read to a watching
+    client as the work having restarted.
 
     Added after ``base_pool`` returns rather than spread through its
     ``**extra``, for two reasons. Every seed resolves before the entries exist,
@@ -130,7 +162,7 @@ def call_pool(principal: Any, pool_seeds: PoolSeeds, entries: Mapping[str, Any])
     dispatch adds itself (``data``, ``instance``, ``collection``, ``result``)
     are names no project can register.
     """
-    pool = base_pool(user=principal, seeds=pool_seeds)
+    pool = base_pool(user=principal, progress=progress, seeds=pool_seeds)
     pool.update(entries)
     return pool
 
@@ -221,15 +253,17 @@ def prepare_service(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> Prepared | DispatchResult:
-    """Steps one to five for a service spec, and the keywords its run is called with.
+    """Steps one to six for a service spec, and the keywords its run is called with.
 
     Returns ``NOT_FOUND`` when the instance selector resolves nothing and
-    ``allow_none`` is off: the service never runs and the Validator is never
-    asked. The pool carries ``instance`` when the spec declares an instance
-    selector - the row, or ``None`` under ``allow_none``, so an upsert's
-    service can declare it without a default - and ``collection`` when it
-    declares a collection selector. A create carries neither.
+    ``allow_none`` is off: the service never runs, and neither the Validator
+    nor an affordance is asked. The pool carries ``instance`` when the spec
+    declares an instance selector - the row, or ``None`` under ``allow_none``,
+    so an upsert's service can declare it without a default - and
+    ``collection`` when it declares a collection selector. A create carries
+    neither.
     """
     checked, granted = open_call(
         spec,
@@ -243,6 +277,8 @@ def prepare_service(
     resolved: dict[str, Any] = {}
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
+    # The target lookups get no live reporter, and nor does the output selector
+    # in ``finish_service``: neither is the run (see ``call_pool``).
     if instance_spec is not None:
         pool = selector_pool(instance_spec, checked, principal=principal, pool_seeds=pool_seeds)
         target = lookup(instance_spec, pool, source=INSTANCE_SOURCE)
@@ -265,7 +301,19 @@ def prepare_service(
             f"The Validator returned the key(s) {seeded}, which dispatch seeds itself. A "
             "validated value must never outrank a seeded one; rename the value."
         )
-    pool = call_pool(principal, pool_seeds, {**data, "data": data, **resolved})
+    pool = call_pool(principal, pool_seeds, {**data, "data": data, **resolved}, progress=progress)
+    # Step six, in djangorestframework-services' place for it: after the
+    # object-level check and the Validator, so a principal who may not see the
+    # row is never told what state it is in, and before the run - outside the
+    # transaction ``run_service`` opens, so a refusal never opens one. Here
+    # rather than in each entry point, so ``adispatch`` answers it inside the
+    # same hop as the rest of the prelude: a condition on the row is a query.
+    # ``reserved`` is this call's seed set, or a callable condition declaring a
+    # registered seed (an HTTP adapter's ``request``) would not be handed it:
+    # test_a_condition_reads_a_registered_seed_through_dispatch fails without it.
+    # ``instance`` is the row, never a collection: a condition on the row beside
+    # a ``collection_selector_spec`` is refused when the spec is declared.
+    enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=pool_seeds.reserved)
     return Prepared(principal, target, data, resolve_callable_kwargs(spec.service, pool))
 
 

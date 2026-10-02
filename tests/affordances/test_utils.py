@@ -13,6 +13,7 @@ from django_service_specs.affordances.utils import (
     answer_operation_condition,
 )
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from tests.dispatch.utils import TENANT_SEEDS, make_user
 from tests.dispatch_app.models import Note
@@ -62,7 +63,7 @@ class TestAnswerOperationCondition:
 
         pool = call_pool(ada, title="Final", data={"title": "Final"}, instance="row")
         assert answer_operation_condition(when, pool, reserved=TENANT_SEEDS.reserved) is True
-        assert seen == {"user": ada, "tenant": "tenant-of-ada"}
+        assert seen == {"user": ada, "progress": null_progress, "tenant": "tenant-of-ada"}
 
     def test_a_condition_names_what_it_wants_from_the_seeds(self) -> None:
         ada = make_user("ada")

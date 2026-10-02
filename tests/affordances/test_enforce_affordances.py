@@ -15,6 +15,7 @@ from django.db.models import Q
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.specs.selector_kind import SelectorKind
@@ -167,7 +168,7 @@ class TestCallableConditions:
         enforce_affordances(
             spec, pool_for(ada, note), instance=note, reserved=TENANT_SEEDS.reserved
         )
-        assert seen == {"user": ada, "tenant": "tenant-of-ada"}
+        assert seen == {"user": ada, "progress": null_progress, "tenant": "tenant-of-ada"}
 
 
 @pytest.mark.django_db

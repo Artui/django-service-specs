@@ -1,26 +1,35 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import F, Value
+from django.db import connection
+from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
 
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validation_context import ValidationContext
 from tests.dispatch.utils import (
     OPEN,
     PK,
@@ -206,7 +215,7 @@ def test_a_selector_receives_the_pool_and_only_its_declared_reads(ada: Any) -> N
 
     dispatch(spec, principal=ada, arguments={"q": "x"})
 
-    assert selector.calls == [{"user": ada, "q": "x"}]
+    assert selector.calls == [{"user": ada, "progress": null_progress, "q": "x"}]
 
 
 def test_a_selector_spec_s_rows_are_shaped(ada: Any, bob: Any) -> None:
@@ -319,7 +328,9 @@ def test_a_create_runs_with_the_validated_values_and_no_target(ada: Any) -> None
 
     result = dispatch(spec, principal=ada, arguments={"title": "  Hello "})
 
-    assert service.calls == [{"user": ada, "data": {"title": "Hello"}, "title": "Hello"}]
+    assert service.calls == [
+        {"user": ada, "progress": null_progress, "data": {"title": "Hello"}, "title": "Hello"}
+    ]
     assert validator.calls[0][1].target is None
     assert result == DispatchResult(
         kind="instance",
@@ -348,7 +359,13 @@ def test_an_update_resolves_the_row_before_validating_and_hands_it_to_both(ada: 
     assert validator.calls[0][1].principal is ada
     assert validator.calls[0][1].target == note
     assert service.calls == [
-        {"user": ada, "data": {"title": "new"}, "title": "new", "instance": note}
+        {
+            "user": ada,
+            "progress": null_progress,
+            "data": {"title": "new"},
+            "title": "new",
+            "instance": note,
+        }
     ]
     assert result.instance == note
     assert result.data == {"title": "new"}
@@ -365,7 +382,7 @@ def test_a_target_selector_receives_only_its_own_reads(ada: Any) -> None:
 
     dispatch(spec, principal=ada, arguments={"pk": 7, "title": "t"})
 
-    assert selector.calls == [{"user": ada, "pk": 7}]
+    assert selector.calls == [{"user": ada, "progress": null_progress, "pk": 7}]
 
 
 def test_an_update_of_a_missing_row_is_not_found_and_nothing_else_runs(ada: Any) -> None:
@@ -396,7 +413,7 @@ def test_an_upsert_s_missing_row_reaches_the_service_as_none_unchecked(ada: Any)
 
     result = dispatch(spec, principal=ada, arguments={"pk": 404})
 
-    assert service.calls == [{"user": ada, "data": {}, "instance": None}]
+    assert service.calls == [{"user": ada, "progress": null_progress, "data": {}, "instance": None}]
     assert check.rows == []
     assert result.value == "upserted"
 
@@ -446,7 +463,7 @@ def test_a_collection_is_passed_as_collection_and_never_object_checked(ada: Any,
     result = dispatch(spec, principal=ada, arguments={})
 
     (pool,) = service.calls
-    assert set(pool) == {"user", "data", "collection"}
+    assert set(pool) == {"user", "progress", "data", "collection"}
     assert list(pool["collection"]) == list(Note.objects.all())
     assert result.instance is pool["collection"]
     assert result.kind == "instance"
@@ -469,7 +486,7 @@ def test_the_output_selector_re_reads_with_only_result_in_its_pool(ada: Any) -> 
 
     result = dispatch(spec, principal=ada, arguments={"title": "t"})
 
-    assert reread.calls == [{"user": ada, "result": note}]
+    assert reread.calls == [{"user": ada, "progress": null_progress, "result": note}]
     assert result.kind == "instance"
     assert result.value.label == "mine!"
     assert result.service_result is note
@@ -644,8 +661,8 @@ def test_a_seed_resolves_from_the_principal_and_never_sees_an_argument(ada: Any)
 
     dispatch(spec, principal=ada, arguments={"pk": 1, "title": "t"}, pool_seeds=seeds)
 
-    assert selector.calls[0]["seen"] == ["user"]
-    assert service.calls[0]["seen"] == ["user"]
+    assert selector.calls[0]["seen"] == ["progress", "user"]
+    assert service.calls[0]["seen"] == ["progress", "user"]
 
 
 def test_a_parameter_may_share_a_name_with_base_pool_s_own_keywords(ada: Any) -> None:
@@ -696,3 +713,369 @@ def test_a_service_s_target_is_presented_with_the_relations_it_wrote() -> None:
     )
     outcome = dispatch(spec, principal=owner, arguments={"pk": owner.pk, "title": "second"})
     assert sorted(note.title for note in outcome.value.notes.all()) == ["first", "second"]
+
+
+# --- The deactivated principal ----------------------------------------------------------
+
+
+def _deactivated(username: str) -> Any:
+    user = make_user(username)
+    user.is_active = False
+    user.save(update_fields=["is_active"])
+    return user
+
+
+class _AskedRefuse(Refuse):
+    """``Refuse``, recording every principal it was asked about."""
+
+    def __init__(self) -> None:
+        self.asked: list[Any] = []
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.asked.append(principal)
+        return False
+
+
+@pytest.mark.parametrize("kind", ["selector", "service"])
+def test_a_deactivated_principal_is_refused_before_the_class_level_check(kind: str) -> None:
+    # The class-level check would refuse too, in words of its own; it is never asked.
+    check = _AskedRefuse()
+    spec: SelectorSpec | ServiceSpec = (
+        SelectorSpec(kind=LIST, selector=notes_of, permissions=[check])
+        if kind == "selector"
+        else ServiceSpec(service=Record(), permissions=[check])
+    )
+
+    with pytest.raises(PrincipalUnavailable) as caught:
+        dispatch(spec, principal=_deactivated("ada"), arguments={})
+
+    assert caught.value.message == "The acting principal is unavailable."
+    assert check.asked == []
+
+
+def test_a_grant_does_not_admit_a_deactivated_principal() -> None:
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN)
+    who = _deactivated("ada")
+
+    with pytest.raises(PrincipalUnavailable):
+        dispatch(spec, principal=who, arguments={}, grant=Grant(spec, who, target_checked=True))
+
+    assert service.calls == []
+
+
+def test_a_deactivated_principal_is_refused_before_its_arguments_are_checked() -> None:
+    # ``pk`` is missing, which the shape check would refuse; the principal answers
+    # first, as ``adispatch`` refuses a deactivated ``principal_id`` and the HTTP
+    # entry points a deactivated ``request.user``.
+    with pytest.raises(PrincipalUnavailable):
+        dispatch(retrieve(), principal=_deactivated("ada"), arguments={})
+
+
+def test_anonymous_goes_on_to_the_permission_check() -> None:
+    # ``AnonymousUser.is_active`` is false, so only the ``is_authenticated`` half
+    # of the rule keeps this from being refused as deactivated.
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[Refuse()])
+
+    with pytest.raises(NotPermitted) as caught:
+        dispatch(spec, principal=AnonymousUser(), arguments={})
+
+    assert caught.value.message == "Only editors may run this."
+
+
+def test_a_principal_with_no_is_active_reads_as_active() -> None:
+    principal = SimpleNamespace(is_authenticated=True)
+    spec = ServiceSpec(service=lambda *, user: user, permissions=OPEN)
+
+    assert dispatch(spec, principal=principal, arguments={}).value is principal
+
+
+# --- Affordances ------------------------------------------------------------------------
+
+NOT_ARCHIVED = Affordance(
+    code="note_archived", reason="An archived note cannot be renamed.", when=Q(archived=False)
+)
+
+
+class _Condition:
+    """A callable affordance condition answering ``returns``; records each call's keywords."""
+
+    def __init__(self, returns: bool) -> None:
+        self.returns = returns
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, *, user: Any) -> bool:
+        self.calls.append({"user": user})
+        return self.returns
+
+
+def _renaming(service: Any, *affordances: Affordance, **kwargs: Any) -> ServiceSpec:
+    kwargs.setdefault("permissions", [OwnerOnly()])
+    kwargs.setdefault("validator", Titled())
+    return ServiceSpec(
+        service=service,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        affordances=list(affordances),
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize("granted", [False, True], ids=["checked", "granted"])
+def test_an_unmet_affordance_refuses_the_call_and_the_service_never_runs(
+    ada: Any, granted: bool
+) -> None:
+    note = Note.objects.create(owner=ada, title="old", archived=True)
+    service = Record()
+    spec = _renaming(service, NOT_ARCHIVED)
+    # A grant that claims both checks ran still leaves the row's state to ask.
+    grant = Grant(spec, ada, target_checked=True) if granted else None
+
+    with pytest.raises(ActionUnavailable) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}, grant=grant)
+
+    assert (caught.value.code, caught.value.message) == (
+        "note_archived",
+        "An archived note cannot be renamed.",
+    )
+    assert service.calls == []
+
+
+def test_a_met_affordance_lets_the_service_run(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="old")
+    spec = _renaming(Record(returns="ran"), NOT_ARCHIVED)
+
+    assert dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}).value == "ran"
+
+
+def test_the_object_level_check_answers_before_an_affordance(ada: Any, bob: Any) -> None:
+    # Both would refuse: the row is archived and is not ada's. A principal who may
+    # not see the row is never told what state it is in.
+    theirs = Note.objects.create(owner=bob, title="theirs", archived=True)
+    condition = _Condition(returns=False)
+    spec = _renaming(
+        Record(),
+        Affordance(code="closed", reason="Closed for the night.", when=condition),
+        NOT_ARCHIVED,
+    )
+
+    with pytest.raises(NotPermitted) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk, "title": "new"})
+
+    assert caught.value.message == "Only the owner may touch this note."
+    assert condition.calls == []
+
+
+class _RefusesBad(Titled):
+    """``Titled``, refusing the well-shaped title ``"bad"`` as only a Validator can."""
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        if arguments["title"] == "bad":
+            raise InvalidArguments({"title": ["Not that one."]})
+        return super().validate(arguments, context)
+
+
+def test_the_validator_answers_before_an_affordance(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="old", archived=True)
+    condition = _Condition(returns=False)
+    spec = _renaming(
+        Record(),
+        Affordance(code="closed", reason="Closed for the night.", when=condition),
+        validator=_RefusesBad(),
+    )
+
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "bad"})
+
+    assert caught.value.detail == {"title": ["Not that one."]}
+    assert condition.calls == []
+
+
+def test_a_missing_row_is_not_found_and_no_affordance_is_asked(ada: Any) -> None:
+    condition = _Condition(returns=False)
+    spec = _renaming(
+        Record(), Affordance(code="closed", reason="Closed for the night.", when=condition)
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"pk": 404, "title": "new"})
+
+    assert result.kind == "not_found"
+    assert condition.calls == []
+
+
+# A registered seed under the name an HTTP adapter registers its request by.
+_REQUEST = object()
+REQUEST_SEEDS = DEFAULT_POOL_SEEDS.extend(request=lambda: _REQUEST)
+
+
+def test_a_condition_reads_a_registered_seed_through_dispatch(ada: Any) -> None:
+    seen: list[Any] = []
+
+    def from_the_request(*, request: Any) -> bool:
+        seen.append(request)
+        return False
+
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        affordances=[Affordance(code="closed", reason="Closed.", when=from_the_request)],
+    )
+
+    with pytest.raises(ActionUnavailable):
+        dispatch(spec, principal=ada, arguments={}, pool_seeds=REQUEST_SEEDS)
+
+    assert seen == [_REQUEST]
+    assert service.calls == []
+
+
+def test_affordances_are_answered_before_the_transaction_opens(ada: Any) -> None:
+    # Where djangorestframework-services answers them: outside the atomic block
+    # ``run_service`` opens, so a refusal never opens a transaction. Depth is
+    # counted, because the test's own transaction is already open around both.
+    depths: dict[str, int] = {}
+
+    def condition(*, user: Any) -> bool:
+        depths["condition"] = len(connection.atomic_blocks)
+        return True
+
+    def service(*, user: Any) -> None:
+        depths["service"] = len(connection.atomic_blocks)
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        atomic=True,
+        affordances=[Affordance(code="open", reason="Closed.", when=condition)],
+    )
+
+    dispatch(spec, principal=ada, arguments={})
+
+    assert depths["condition"] + 1 == depths["service"]
+
+
+def test_a_selector_spec_s_affordances_are_answers_not_refusals(ada: Any) -> None:
+    # A selector spec's ``affordances`` name the operations each row answers for,
+    # and what a list reports is per row. Nothing about reading is refused.
+    archived = Note.objects.create(owner=ada, title="old", archived=True)
+    spec = SelectorSpec(
+        kind=RETRIEVE,
+        selector=note_by_pk,
+        reads=PK,
+        permissions=OPEN,
+        affordances={"rename": _renaming(Record(), NOT_ARCHIVED)},
+    )
+
+    assert dispatch(spec, principal=ada, arguments={"pk": archived.pk}).value == archived
+
+
+# --- Progress ---------------------------------------------------------------------------
+
+
+class _Reporter:
+    """A ``ProgressReporter`` that keeps every report it was given, in order."""
+
+    def __init__(self) -> None:
+        self.reports: list[tuple[float, float | None, str | None, Any]] = []
+
+    def __call__(
+        self,
+        progress: float,
+        *,
+        total: float | None = None,
+        message: str | None = None,
+        meta: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.reports.append((progress, total, message, meta))
+
+
+def _exporting(*, progress: Any) -> str:
+    progress(1, total=2, message="half", meta={"com.example/stage": "rows"})
+    progress(2, total=2)
+    return "exported"
+
+
+def test_a_service_that_declares_progress_reports_to_the_caller_s_reporter(ada: Any) -> None:
+    reporter = _Reporter()
+    spec = ServiceSpec(service=_exporting, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={}, progress=reporter).value == "exported"
+    assert reporter.reports == [
+        (1, 2, "half", {"com.example/stage": "rows"}),
+        (2, 2, None, None),
+    ]
+
+
+def test_a_service_that_declares_progress_runs_with_no_reporter_supplied(ada: Any) -> None:
+    spec = ServiceSpec(service=_exporting, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={}).value == "exported"
+
+
+def test_a_selector_spec_may_report_too(ada: Any) -> None:
+    reporter = _Reporter()
+
+    def counted(*, user: Any, progress: Any) -> Any:
+        progress(1, message="counted")
+        return Note.objects.filter(owner=user)
+
+    spec = SelectorSpec(kind=LIST, selector=counted, permissions=OPEN)
+
+    dispatch(spec, principal=ada, arguments={}, progress=reporter)
+
+    assert reporter.reports == [(1, None, "counted", None)]
+
+
+def test_a_lookup_never_reports_to_the_caller_s_reporter(ada: Any) -> None:
+    # A target or output selector has no progress of its own to report, and one
+    # reporting after the service finished would read as the work restarting.
+    note = Note.objects.create(owner=ada, title="old")
+    reporter = _Reporter()
+
+    def looked_up(*, pk: int, progress: Any) -> Any:
+        progress(99, message="target")
+        return Note.objects.filter(pk=pk)
+
+    def reread(*, result: Any, progress: Any) -> Any:
+        progress(99, message="output")
+        return Note.objects.filter(pk=result.pk)
+
+    def rename(*, instance: Note, progress: Any) -> Note:
+        progress(1, message="service")
+        return instance
+
+    spec = ServiceSpec(
+        service=rename,
+        permissions=OPEN,
+        instance_selector_spec=nested(RETRIEVE, selector=looked_up, reads=PK),
+        output_selector_spec=nested(RETRIEVE, selector=reread),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"pk": note.pk}, progress=reporter)
+
+    assert result.value == note
+    assert reporter.reports == [(1, None, "service", None)]
+
+
+def test_the_run_and_a_condition_are_handed_the_caller_s_reporter_as_it_is(ada: Any) -> None:
+    # Not wrapped: a transport's reporter must not raise, because nothing
+    # between it and the service would catch it.
+    reporter = _Reporter()
+    handed: dict[str, Any] = {}
+
+    def condition(*, progress: Any) -> bool:
+        handed["condition"] = progress
+        return True
+
+    def service(*, progress: Any) -> None:
+        handed["service"] = progress
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        affordances=[Affordance(code="open", reason="Closed.", when=condition)],
+    )
+
+    dispatch(spec, principal=ada, arguments={}, progress=reporter)
+
+    assert handed["condition"] is reporter
+    assert handed["service"] is reporter
