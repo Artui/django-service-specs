@@ -289,7 +289,7 @@ the declare-to-receive rule every callable here is called through.
 ### Progress
 
 `progress=` on `dispatch` and `adispatch` takes the transport's own
-`ProgressReporter`:
+[`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]:
 a callable taking how far along, and optionally `total`, `message` and
 `meta`. It is seeded under the reserved name `progress`, as it is, into the
 pool of the call's run - the service, or a read's own selector - and of a
@@ -297,8 +297,14 @@ callable affordance condition. A reporter must not raise, because nothing
 between it and the service catches it. Under `adispatch` a sync run calls it
 on the executor thread, and an `async def` run on an event loop.
 
+```python
+--8<--
+docs/examples/dispatching.py:progress
+--8<--
+```
+
 With no reporter the pool carries
-`null_progress`, so a
+[`null_progress`][django_service_specs.pool.null_progress.null_progress], so a
 service that declares `progress` runs unchanged on every transport and in
 tests. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to

@@ -266,6 +266,28 @@ class TestDispatching:
         with pytest.raises(ValueError, match="reserved pool seed"):
             dispatching.seeds.extend(user=lambda: None)
 
+    def test_a_service_reports_to_the_transports_reporter(self, ada: Any) -> None:
+        Note.objects.create(owner=ada, title="One")
+        Note.objects.create(owner=ada, title="Two")
+        calls: list[tuple[Any, ...]] = []
+
+        def report(
+            progress: float,
+            total: float | None = None,
+            message: str | None = None,
+            meta: Any = None,
+        ) -> None:
+            calls.append((progress, total, message))
+
+        assert dispatching.retitle_all_reporting(ada, "Done", report) == 2
+        assert calls == [(1, 2, "retitling notes"), (2, 2, "retitling notes")]
+        assert set(Note.objects.values_list("title", flat=True)) == {"Done"}
+
+    def test_with_no_reporter_the_service_runs_unchanged(self, ada: Any) -> None:
+        Note.objects.create(owner=ada, title="One")
+        result = dispatch(dispatching.retitle_all_spec, principal=ada, arguments={"title": "Done"})
+        assert result.value == 1
+
 
 @pytest.mark.django_db(transaction=True)
 class TestAsyncDispatch:

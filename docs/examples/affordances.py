@@ -74,6 +74,19 @@ def tools_for(user: Any) -> dict[str, str | None]:
 # --8<-- [end:offer]
 
 
+# --8<-- [start:dispatch]
+def rename(user: Any, pk: int, title: str) -> Note:
+    # dispatch answers the affordances itself, after the object-level check and
+    # the Validator: an archived note is refused before the service runs.
+    result = dispatch(
+        rename_spec, principal=user, arguments={"pk": pk, "title": title}, pool_seeds=seeds
+    )
+    return result.value
+
+
+# --8<-- [end:dispatch]
+
+
 # --8<-- [start:enforce]
 def rename_step(user: Any, note: Note, title: str) -> Note:
     """One step of a chain that resolved its row itself and runs the service in hand."""

@@ -52,6 +52,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declares `progress` runs on every transport; a target or output selector
   always gets `null_progress`. `ProgressReporter` and `null_progress` keep
   djangorestframework-services' signatures.
+- `paginate_output(rows, *, page=None, limit=None, max_page_size=None)`,
+  `DEFAULT_PAGE_SIZE` and `OutputPage`: a list result's value sliced into the
+  one page a transport serves, and `OutputPage.envelope(rendered)` wrapping the
+  presented rows as `{items, page, totalPages, hasNext}`. Out-of-range values
+  clamp at both ends and the envelope reports the page actually served; a
+  queryset is counted before it is sliced, so a page past the end is never an
+  unbounded `OFFSET`. The names a caller pages by and the ceiling are the
+  transport's, and `SpecView` does not page.
+- `spec_output_schema(spec, *, paginate=False, projection=None,
+  handle_description=None)`: `paginate=True` describes a list as the page
+  envelope and changes nothing that is not a list, which stays a bare array by
+  default; `projection=` describes the projected payload, applied to the item
+  and never to the array or the envelope.
+- `AudienceProjection`, `audience_projection_for_spec`, `project_payload`,
+  `annotate_output_schema` and `render_for_audience`: the `FieldMarking`s an
+  `Output` declares, applied to the presented value and to the output schema
+  for a caller that names an audience. A hidden field is dropped from both, a
+  choice is spoken by its display with its schema's stated `type` restated to
+  match, and a handle keeps its value and takes the transport's
+  `handle_description`. A mount's `overrides=` are layered over the
+  declaration, and two fields left marked as the label are refused, naming
+  both. `present`, and so every HTTP response, is unchanged.
 
 ### Changed
 - An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as

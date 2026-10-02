@@ -97,4 +97,5 @@ nav:
   - The forms adapter: forms.md
   - The pydantic adapter: pydantic.md
   - JSON Schema: schema.md
+  - Paging and projection: paging-and-projection.md
   - API reference: reference.md

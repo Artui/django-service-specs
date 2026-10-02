@@ -35,6 +35,10 @@ importing the package root never imports pydantic.
 ::: django_service_specs.output.output_field.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking
 ::: django_service_specs.output.field_audience.FieldAudience
+::: django_service_specs.output.audience_projection.AudienceProjection
+::: django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec
+::: django_service_specs.output.project_payload.project_payload
+::: django_service_specs.output.annotate_output_schema.annotate_output_schema
 
 ## JSON Schema
 
@@ -67,6 +71,9 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.dispatch_result.DispatchResult
 ::: django_service_specs.dispatch.present.present
 ::: django_service_specs.dispatch.apresent.apresent
+::: django_service_specs.dispatch.render_for_audience.render_for_audience
+::: django_service_specs.dispatch.paginate_output.paginate_output
+::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 
 ## Affordances
@@ -116,6 +123,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.pool_seeds.DEFAULT_POOL_SEEDS
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
+::: django_service_specs.pool.null_progress.null_progress
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations
@@ -160,3 +168,5 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.unset.UNSET
 ::: django_service_specs.types.unset.UnsetType
 ::: django_service_specs.types.affordance.Affordance
+::: django_service_specs.types.progress_reporter.ProgressReporter
+::: django_service_specs.types.output_page.OutputPage

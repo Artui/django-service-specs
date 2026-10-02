@@ -116,6 +116,12 @@ runs. A callable condition sees every registered seed, an HTTP adapter's
 `request` among them. A selector spec's `affordances` refuse nothing: they are
 answers about each row.
 
+```python
+--8<--
+docs/examples/affordances.py:dispatch
+--8<--
+```
+
 [`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
 is that step, exported for a transport that runs a service itself. It calls it
 after authorization and validation and before the service, with the pool

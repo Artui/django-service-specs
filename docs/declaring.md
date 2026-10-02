@@ -247,7 +247,11 @@ who the field is for. The
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read
 out to a person, and `HIDDEN` for plumbing. The kernel carries the marking on
-the declaration; projecting a payload for an audience is a transport's job.
+the declaration and applies it only for a caller that names an audience,
+through
+[`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience];
+`present`, and so every HTTP response, serves every field. See
+[paging and projection](paging-and-projection.md).
 
 [`DataclassPresenter`][django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter]
 declares the output as a dataclass and reads each field off the value **by

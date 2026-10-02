@@ -103,6 +103,34 @@ class TestEnforcing:
 
 
 @pytest.mark.django_db
+class TestDispatching:
+    def test_a_live_note_is_renamed(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Draft")
+        assert affordances.rename(ada, note.pk, "Final").title == "Final"
+
+    def test_an_archived_note_is_refused_before_the_service_runs(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Draft", archived=True)
+        with pytest.raises(ActionUnavailable) as refused:
+            affordances.rename(ada, note.pk, "Final")
+        assert refused.value.code == "note_archived"
+        note.refresh_from_db()
+        assert note.title == "Draft"
+
+    @pytest.mark.usefixtures("read_only")
+    def test_a_callable_condition_reads_the_registered_seed(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Draft")
+        with pytest.raises(ActionUnavailable) as refused:
+            affordances.rename(ada, note.pk, "Final")
+        assert refused.value.code == "notes_read_only"
+
+    def test_the_object_level_check_answers_before_the_affordance(self, ada: Any) -> None:
+        bob = get_user_model().objects.create_user(username="bob")
+        note = Note.objects.create(owner=ada, title="Draft", archived=True)
+        with pytest.raises(NotPermitted):
+            affordances.rename(bob, note.pk, "Mine now")
+
+
+@pytest.mark.django_db
 class TestOffering:
     def test_everything_is_offered_while_every_condition_holds(self, ada: Any) -> None:
         assert affordances.tools_for(ada) == {"list_notes": None, "rename_note": None}
