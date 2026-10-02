@@ -21,7 +21,9 @@ from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
+from django_service_specs.dispatch.render_for_audience import render_for_audience
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.adispatch_request import adispatch_request
 from django_service_specs.http.async_spec_view import AsyncSpecView
@@ -43,11 +45,15 @@ from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
+from django_service_specs.output.annotate_output_schema import annotate_output_schema
+from django_service_specs.output.audience_projection import AudienceProjection
+from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -87,6 +93,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
@@ -98,9 +105,11 @@ __all__ = [
     "AdditionalInputRequired",
     "Affordance",
     "AsyncSpecView",
+    "AudienceProjection",
     "ChangeResult",
     "ChildCollectionChange",
     "ChildSpec",
+    "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "DataclassPresenter",
     "DataclassValidator",
@@ -118,6 +127,7 @@ __all__ = [
     "NotPermitted",
     "Output",
     "OutputField",
+    "OutputPage",
     "Parameter",
     "Parameters",
     "PermissionCheck",
@@ -156,9 +166,11 @@ __all__ = [
     "adelete_relations",
     "adispatch",
     "adispatch_request",
+    "annotate_output_schema",
     "apply_input",
     "apresent",
     "arun_service",
+    "audience_projection_for_spec",
     "aupdate_from_input",
     "authorize",
     "authorize_target",
@@ -175,8 +187,11 @@ __all__ = [
     "is_async",
     "operation_affordances",
     "output_schema",
+    "paginate_output",
     "parameters_schema",
     "present",
+    "project_payload",
+    "render_for_audience",
     "request_arguments",
     "resolve_callable_kwargs",
     "resolve_principal",

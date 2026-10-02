@@ -44,10 +44,14 @@ def output_schema(output: Output) -> dict[str, Any]:
       by ``items_nullable`` rather than the array's own nullability. A choice
       set holding a value JSON cannot carry is left out whole.
 
-    ``marking`` is **not** emitted. Showing a field to an agent audience, or
-    leaving it out, is a projection over this schema, and projection is not
-    the kernel's yet; the kernel declares a marking and applies none, which is
-    why a ``HIDDEN`` field is described here like any other.
+    ``marking`` is **not** emitted, and a ``HIDDEN`` field is described here
+    like any other: this is the whole declaration, which is what a caller
+    naming no audience is presented. Showing a field to an agent audience, or
+    leaving it out, is a projection over this schema, which
+    [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema]
+    applies and
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    composes for a caller that passes one.
 
     As on input: no ``$defs`` or ``$ref``, no ``$schema`` key, and a new
     schema on every call.
