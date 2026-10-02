@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from asgiref.sync import sync_to_async
 
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.output.output import Output
@@ -16,7 +17,15 @@ from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
-from tests.dispatch.utils import OPEN, make_user, notes_of
+from tests.dispatch.utils import (
+    EDIT,
+    OPEN,
+    REFUSED_ARCHIVED,
+    RENAME,
+    NoteRows,
+    make_user,
+    notes_of,
+)
 from tests.dispatch_app.models import Note
 
 # By import path: the package's attribute of this name is the function.
@@ -76,3 +85,33 @@ async def test_not_found_is_refused_as_present_refuses_it() -> None:
         "A not-found result has nothing to present. Answer it as the transport's own "
         "not-found before presenting."
     )
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_the_answers_are_presented_in_the_same_one_hop(hops: list[str]) -> None:
+    owner = await sync_to_async(make_user)("ada")
+    live = await Note.objects.acreate(owner=owner, title="live")
+    archived = await Note.objects.acreate(owner=owner, title="archived", archived=True)
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=notes_of,
+        permissions=OPEN,
+        presenter=NoteRows(),
+        affordances={"rename": RENAME, "edit": EDIT},
+    )
+
+    rendered = await apresent(spec, await adispatch(spec, principal=owner, arguments={}))
+
+    assert rendered == [
+        {
+            "id": live.pk,
+            "title": "live",
+            "affordances": {"rename": {"available": True}, "edit": {"available": True}},
+        },
+        {
+            "id": archived.pk,
+            "title": "archived",
+            "affordances": {"rename": REFUSED_ARCHIVED, "edit": {"available": True}},
+        },
+    ]
+    assert hops == ["present"]

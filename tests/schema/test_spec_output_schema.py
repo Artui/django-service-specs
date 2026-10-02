@@ -16,7 +16,16 @@ from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from tests.dispatch.utils import OPEN, PK, make_user, note_by_pk, notes_of
+from tests.dispatch.utils import (
+    BOOKS_OPEN,
+    EDIT,
+    OPEN,
+    PK,
+    RENAME,
+    make_user,
+    note_by_pk,
+    notes_of,
+)
 from tests.dispatch_app.models import Note
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA, InvoicePresenter
 
@@ -282,3 +291,119 @@ class TestProjection:
         )
 
         assert schema == PROJECTED_SCHEMA
+
+
+ANSWERS: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "rename": {
+            "type": "object",
+            "properties": {
+                "available": {"type": "boolean"},
+                "code": {"type": "string", "enum": ["note_archived", "books_closed"]},
+                "reason": {"type": "string"},
+            },
+            "required": ["available"],
+        },
+        "edit": {
+            "type": "object",
+            "properties": {"available": {"type": "boolean"}},
+            "required": ["available"],
+        },
+    },
+    "required": ["rename", "edit"],
+}
+
+
+def answered(item: dict[str, Any]) -> dict[str, Any]:
+    """``item`` declaring the ``affordances`` object every presented row then carries."""
+    return {
+        **item,
+        "properties": {**item["properties"], "affordances": ANSWERS},
+        "required": [*item["required"], "affordances"],
+    }
+
+
+AFFORDANCES = {"rename": RENAME, "edit": EDIT}
+
+
+class TestAffordances:
+    """The ``affordances`` object a selector spec's declaration adds to each presented row."""
+
+    def test_a_list_s_items_declare_the_answers(self) -> None:
+        spec = listing(presenter=NoteTitle(), affordances=AFFORDANCES)
+
+        assert spec_output_schema(spec) == {"type": "array", "items": answered(ITEM)}
+
+    def test_a_page_s_items_declare_them_and_the_envelope_does_not(self) -> None:
+        spec = listing(presenter=NoteTitle(), affordances=AFFORDANCES)
+
+        assert spec_output_schema(spec, paginate=True) == {
+            **PAGED,
+            "properties": {
+                **PAGED["properties"],
+                "items": {"type": "array", "items": answered(ITEM)},
+            },
+        }
+
+    def test_a_retrieve_allowing_none_declares_them_on_the_item_that_admits_null(self) -> None:
+        spec = retrieve(presenter=NoteTitle(), allow_none=True, affordances=AFFORDANCES)
+
+        assert spec_output_schema(spec) == {**answered(ITEM), "type": ["object", "null"]}
+
+    def test_a_projected_item_declares_the_same_answers_reason_included(self) -> None:
+        # After the projection, which walks declared fields and has nothing to
+        # say about a key no Output declares; an agent reads the reason too.
+        spec = retrieve(presenter=InvoicePresenter(), affordances=AFFORDANCES)
+
+        schema = spec_output_schema(
+            spec,
+            projection=audience_projection_for_spec(spec),
+            handle_description=HANDLE_DESCRIPTION,
+        )
+
+        assert schema == answered(PROJECTED_SCHEMA)
+
+    def test_a_service_spec_declares_its_output_selector_s_answers_not_its_own(self) -> None:
+        spec = ServiceSpec(
+            service=write,
+            permissions=OPEN,
+            affordances=[BOOKS_OPEN],
+            output_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE,
+                selector=note_by_pk,
+                presenter=NoteTitle(),
+                affordances={"edit": EDIT},
+            ),
+        )
+        own_only = ServiceSpec(
+            service=write, permissions=OPEN, presenter=NoteTitle(), affordances=[BOOKS_OPEN]
+        )
+
+        schema = spec_output_schema(spec)
+
+        assert schema is not None
+        assert schema["properties"]["affordances"] == {
+            "type": "object",
+            "properties": {"edit": ANSWERS["properties"]["edit"]},
+            "required": ["edit"],
+        }
+        assert spec_output_schema(own_only) == ITEM
+
+    @pytest.mark.django_db
+    def test_every_presented_row_has_what_its_schema_requires_and_nothing_else(self) -> None:
+        ada = make_user("ada")
+        Note.objects.create(owner=ada, title="live")
+        Note.objects.create(owner=ada, title="archived", archived=True)
+        spec = listing(presenter=NoteTitle(), affordances=AFFORDANCES)
+        item = answered(ITEM)
+
+        rows = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+        for row in rows:
+            assert sorted(row) == sorted(item["required"])
+            for name, answer in row["affordances"].items():
+                declared = ANSWERS["properties"][name]
+                assert set(declared["required"]) <= set(answer) <= set(declared["properties"])
+                assert answer.get("code", "note_archived") in ["note_archived", "books_closed"]
+        assert rows[1]["affordances"]["rename"]["code"] == "note_archived"

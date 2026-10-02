@@ -210,3 +210,79 @@ A name colliding with a key of the selector's `annotations`, or two entries
 generating one name, is refused when the spec is built, because a generated
 answer silently replacing a project's own annotation is the worst way for this
 to fail.
+
+Dispatch answers them wherever the selector runs: a selector spec's own, or a
+service spec's output selector. On a queryset, every answer joins the spec's
+`annotations` in the one `.annotate()` call shaping makes, before
+`extend_queryset` and before a transport pages the rows, so the list still
+costs one query and a page's rows carry what the whole list would have. A
+condition on the row is the same correlated `EXISTS` the call is refused by,
+so the list and the call agree about every row; a callable condition is
+answered once per call, against the seeds alone, as it is at the call. Rows a
+selector returns directly are answered too: instances by one query per model
+class, mappings with their callable answers only, because a mapping has no row
+to find.
+
+[`present`][django_service_specs.dispatch.present.present] then adds an
+`affordances` object to every row it presents, and so does every response the
+HTTP views serve and every payload
+[`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+hands an agent, `reason` included:
+
+```python
+--8<--
+docs/examples/affordances.py:rows
+--8<--
+```
+
+```json
+[
+  {"id": 1, "title": "Draft", "affordances": {"rename": {"available": true}}},
+  {
+    "id": 2,
+    "title": "Old",
+    "affordances": {
+      "rename": {
+        "available": false,
+        "code": "note_archived",
+        "reason": "An archived note cannot be renamed. Restore it first."
+      }
+    }
+  }
+]
+```
+
+Each name answers with the first condition its row does not meet, in
+declaration order, as the call would refuse. A row deleted between the selector
+returning it and its answers being asked is `{"available": false}` with no
+`code` and no `reason`, because no condition's sentence is true of a row that
+no longer exists. A selector spec's `affordances` refuse nothing: the archived
+note is still listed, and says why it cannot be renamed.
+
+[`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+describes the object on each item, with or without a projection, and with each
+name's codes enumerated so a client can switch on them:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "rename": {
+      "type": "object",
+      "properties": {
+        "available": {"type": "boolean"},
+        "code": {"type": "string", "enum": ["notes_read_only", "note_archived"]},
+        "reason": {"type": "string"}
+      },
+      "required": ["available"]
+    }
+  },
+  "required": ["rename"]
+}
+```
+
+Presenting refuses what would lose or garble the answers: a spec declaring
+`affordances` with no presenter, a presented row that is not an object or
+already has an `affordances` key, and a row that did not come through the
+selector declaring them. Dispatch refuses a condition on the row beside mapping
+rows, and a row that is neither a model instance nor a mapping.

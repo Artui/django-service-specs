@@ -21,7 +21,15 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
-from tests.dispatch.utils import OPEN, make_user, notes_of
+from tests.dispatch.utils import (
+    EDIT,
+    OPEN,
+    REFUSED_ARCHIVED,
+    RENAME,
+    NoteRows,
+    make_user,
+    notes_of,
+)
 from tests.dispatch_app.models import Note
 from tests.output.utils import PROJECTED_ROW, ROW, InvoicePresenter
 
@@ -117,6 +125,62 @@ class TestFromDispatch:
             "totalPages": 3,
             "hasNext": True,
         }
+
+    def test_an_agent_reads_the_same_answers_present_does_reason_included(self) -> None:
+        # The answers pass the projection whole: ``available``, the ``code`` a
+        # client branches on, and the ``reason`` a model relays. The field
+        # markings still apply beside them.
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="Draft", archived=True)
+        spec = replace(spec_of(NoteRow()), affordances={"rename": RENAME, "edit": EDIT})
+        answers = {"rename": REFUSED_ARCHIVED, "edit": {"available": True}}
+
+        result = dispatch(spec, principal=ada, arguments={})
+
+        assert render_for_audience(spec, result) == [
+            {"id": note.pk, "title": "Draft", "affordances": answers}
+        ]
+        assert present(spec, result) == [
+            {"id": note.pk, "title": "Draft", "owner_id": ada.pk, "affordances": answers}
+        ]
+
+    def test_a_page_s_rows_carry_their_answers(self) -> None:
+        # Answered on the queryset before it is sliced, so the page's rows are
+        # read once and carry what the whole list would have.
+        ada = make_user("ada")
+        Note.objects.bulk_create(
+            [Note(owner=ada, title=f"n{index}", archived=index % 2 == 1) for index in range(5)]
+        )
+        spec = replace(spec_of(NoteRow()), affordances={"rename": RENAME})
+
+        result = dispatch(spec, principal=ada, arguments={})
+        page = paginate_output(result.value, page=2, limit=2)
+        rendered = render_for_audience(spec, replace(result, value=page.items))
+
+        assert [row["affordances"] for row in page.envelope(rendered)["items"]] == [
+            {"rename": {"available": True}},
+            {"rename": REFUSED_ARCHIVED},
+        ]
+
+    def test_a_page_of_instances_a_selector_returned_carries_their_answers(self) -> None:
+        ada = make_user("ada")
+        Note.objects.bulk_create(
+            [Note(owner=ada, title=f"n{index}", archived=index % 2 == 1) for index in range(5)]
+        )
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST,
+            selector=lambda *, user: list(notes_of(user=user)),
+            permissions=OPEN,
+            presenter=NoteRows(),
+            affordances={"rename": RENAME},
+        )
+
+        result = dispatch(spec, principal=ada, arguments={})
+        page = paginate_output(result.value, page=3, limit=2)
+
+        assert page.envelope(present(spec, replace(result, value=page.items)))["items"] == [
+            {"id": page.items[0].pk, "title": "n4", "affordances": {"rename": {"available": True}}}
+        ]
 
 
 @pytest.mark.django_db(transaction=True)

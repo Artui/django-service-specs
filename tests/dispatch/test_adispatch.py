@@ -29,8 +29,11 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import (
+    EDIT,
     OPEN,
     PK,
+    RENAME,
+    TENANT_SEEDS,
     OwnerOnly,
     Record,
     Refuse,
@@ -526,3 +529,44 @@ async def test_a_run_declaring_progress_runs_with_no_reporter_supplied(ada: Any)
     spec, _, _ = _REPORTING["_prepare"]
 
     assert (await adispatch(spec, principal=ada, arguments={})).value == "done"
+
+
+async def test_a_list_s_rows_are_answered_inside_its_one_hop(ada: Any, hops: list[str]) -> None:
+    # A condition on the row is an annotation and a callable one is answered
+    # against the call's pool, registered seeds included, both in the hop.
+    await _create(owner=ada, title="live")
+    await _create(owner=ada, title="archived", archived=True)
+    mine = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        affordances=[
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
+        ],
+    )
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=lambda *, user: list(notes_of(user=user)),
+        permissions=OPEN,
+        affordances={"rename": RENAME, "edit": EDIT, "mine": mine},
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert hops == ["_dispatch"]
+    assert [
+        (row.affordance__rename__note_archived, row.affordance__mine__c) for row in result.value
+    ] == [(True, True), (False, True)]
+
+
+async def test_an_async_selector_s_rows_are_answered_off_the_loop(ada: Any) -> None:
+    await _create(owner=ada, title="live")
+    await _create(owner=ada, title="archived", archived=True)
+
+    async def notes(*, user: Any) -> list[Note]:
+        return await sync_to_async(lambda: list(notes_of(user=user)))()
+
+    spec = SelectorSpec(kind=LIST, selector=notes, permissions=OPEN, affordances={"rename": RENAME})
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert [row.affordance__rename__note_archived for row in result.value] == [True, False]

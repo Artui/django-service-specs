@@ -5,10 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django.core.exceptions import ImproperlyConfigured
-
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
-from django_service_specs.selectors.utils import is_queryset
+from django_service_specs.selectors.utils import apply_shaping
 from django_service_specs.specs.selector_spec import SelectorSpec
 
 
@@ -42,29 +39,6 @@ def shape_queryset(
             Django queryset — loud failure beats a stray ``AttributeError``
             deep inside whichever transport renders the result.
     """
-    if (
-        spec.select_related is None
-        and spec.prefetch_related is None
-        and spec.annotations is None
-        and spec.extend_queryset is None
-    ):
-        return queryset
-    if not is_queryset(queryset):
-        raise ImproperlyConfigured(
-            "select_related / prefetch_related / annotations / extend_queryset "
-            f"are set on the spec but {source_label} returned "
-            f"{type(queryset).__name__}, which is not a Django QuerySet. Drop "
-            "the shaping fields or have the callable return a QuerySet."
-        )
-    if spec.select_related is not None:
-        queryset = queryset.select_related(*spec.select_related)
-    if spec.prefetch_related is not None:
-        queryset = queryset.prefetch_related(*spec.prefetch_related)
-    if spec.annotations is not None:
-        queryset = queryset.annotate(**spec.annotations)
-    if spec.extend_queryset is not None:
-        extend_pool = {**pool, "queryset": queryset}
-        queryset = spec.extend_queryset(
-            **resolve_callable_kwargs(spec.extend_queryset, extend_pool)
-        )
-    return queryset
+    return apply_shaping(
+        queryset, spec, pool, annotations=spec.annotations, source_label=source_label
+    )

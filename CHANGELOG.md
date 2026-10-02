@@ -35,7 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SelectorSpec.affordances`: a mapping from a name to the `ServiceSpec` whose
   affordances a list's rows are answered for. Each answer is named
   `affordance__<name>__<code>`, and a name colliding with an `annotations` key
-  or with another entry's is refused at construction.
+  or with another entry's is refused at construction. `dispatch` and
+  `adispatch` answer them wherever the selector runs, a service spec's output
+  selector included: on a queryset in the one `.annotate()` call shaping
+  makes, before `extend_queryset` and before `paginate_output` slices it, so
+  the list costs no extra query and a page's rows carry their answers; on
+  instances a selector returns directly by one query per model class, and on
+  mappings with the callable answers only. A callable condition is answered
+  once per call, against the seeds alone. `present`, `apresent`,
+  `render_for_audience` and the HTTP views then add an `affordances` object
+  to every presented row: per name `{"available": true}`, or the first unmet
+  condition's `code` and `reason`, or a bare `{"available": false}` for a row
+  deleted before it was asked. `spec_output_schema` declares that object on
+  the item, codes enumerated, with or without paging and a projection. A
+  spec declaring `affordances` with no presenter, a presented row that is not
+  an object or already has an `affordances` key, a row condition beside
+  mapping rows, and a row that is neither an instance nor a mapping are
+  refused as `ImproperlyConfigured`.
 - `dispatch` and `adispatch` answer a service spec's `affordances`
   themselves: after object-level authorization and the Validator, and before
   the run's transaction opens, so a principal who may not see the row is

@@ -16,7 +16,16 @@ from django_service_specs.http.dispatch_request import dispatch_request
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
-from tests.dispatch.utils import OPEN, TENANT_SEEDS, OwnerOnly, Refuse, Titled, make_user
+from tests.dispatch.utils import (
+    OPEN,
+    REFUSED_ARCHIVED,
+    RENAME,
+    TENANT_SEEDS,
+    OwnerOnly,
+    Refuse,
+    Titled,
+    make_user,
+)
 from tests.dispatch_app.models import Note
 from tests.http.utils import (
     FACTORY,
@@ -61,6 +70,19 @@ class TestSuccess:
         response = dispatch_request(notes_spec(), signed_in(FACTORY.get("/"), ada))
         assert response.status_code == 200
         assert body(response) == [{"title": "One"}, {"title": "Two"}]
+
+    def test_each_presented_row_carries_its_affordances(self, ada: Any) -> None:
+        Note.objects.create(owner=ada, title="One")
+        Note.objects.create(owner=ada, title="Two", archived=True)
+
+        response = dispatch_request(
+            notes_spec(affordances={"rename": RENAME}), signed_in(FACTORY.get("/"), ada)
+        )
+
+        assert body(response) == [
+            {"title": "One", "affordances": {"rename": {"available": True}}},
+            {"title": "Two", "affordances": {"rename": REFUSED_ARCHIVED}},
+        ]
 
     def test_a_retrieve_reads_its_pk_from_the_route(self, ada: Any) -> None:
         note = Note.objects.create(owner=ada, title="One")

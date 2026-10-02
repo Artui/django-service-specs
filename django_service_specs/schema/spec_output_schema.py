@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
+from django_service_specs.affordances.utils import (
+    AFFORDANCES_KEY,
+    affordance_schema,
+    rendered_affordances,
+)
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.schema.output_schema import output_schema
@@ -73,6 +78,19 @@ def spec_output_schema(
         item = (
             annotate_output_schema(item, projection, handle_description=handle_description) or item
         )
+    affordances = rendered_affordances(spec)
+    if affordances is not None:
+        # After the projection, which walks declared fields and has nothing to
+        # say about a key no ``Output`` declares, and before the array, the
+        # envelope or a ``"null"``, because the answers belong to each row.
+        item = {
+            **item,
+            "properties": {
+                **item.get("properties", {}),
+                AFFORDANCES_KEY: affordance_schema(affordances),
+            },
+            "required": [*item.get("required", []), AFFORDANCES_KEY],
+        }
     if isinstance(spec, SelectorSpec):
         kind, may_be_none = spec.kind, spec.allow_none
     elif spec.output_selector_spec is not None:

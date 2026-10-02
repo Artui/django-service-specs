@@ -42,6 +42,13 @@ def render_for_audience(
     what comes back. The envelope's keys belong to no ``Output``, so the
     projection must never walk them.
 
+    A selector spec's declared ``affordances`` pass through whole: the
+    ``affordances`` object ``present`` adds to each row is a key no ``Output``
+    declares, so the projection has nothing to say about it, and an agent
+    reads ``available``, the ``code`` a client branches on, and the ``reason``
+    - the sentence a model relays when it explains why an action is not
+    possible, written for exactly that reader.
+
     Render an agent's **answer** with this. A pipeline that feeds one spec's
     output into the next keeps presenting with ``present``, or the handles the
     next step reads by will have been projected away.
