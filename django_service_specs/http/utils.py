@@ -116,19 +116,35 @@ def success_response(
 
     The default is djangorestframework-services': 204 for a service with
     nothing to present, 200 otherwise. A read whose value is ``None`` - an
-    ``allow_none`` retrieve that found nothing - answers ``null`` at 200,
-    because ``None`` is its value rather than the absence of one. Each
-    condition of the 204 rule is held by its own test:
+    ``allow_none`` retrieve that found nothing - answers ``null``, at 200 or
+    at the caller's status, because ``None`` is its value rather than the
+    absence of one. Each condition of what counts as nothing to present is
+    held by its own test:
     ``test_a_selector_that_allows_none_answers_null_at_200`` (the spec's kind)
     and ``test_a_service_with_a_body_is_200`` (the body).
 
     A 204 carries no body, whichever way it was chosen: it is the status that
     says there is none, and a client may not read one.
+
+    **A service with nothing to present, at a caller's status other than
+    204, answers an empty body with no** ``Content-Type``, as
+    djangorestframework-services answers it: DRF renders ``None`` as no bytes
+    and then drops the header, which would describe nothing. The status stays
+    the caller's, even where an output selector's re-read found nothing: the
+    caller named it, and the kernel already says what an empty re-read is,
+    the value ``None``.
     """
+    nothing = isinstance(spec, ServiceSpec) and body is None
     if success_status is None:
-        success_status = 204 if isinstance(spec, ServiceSpec) and body is None else 200
+        success_status = 204 if nothing else 200
     if success_status == 204:
         return HttpResponse(status=204)
+    if nothing:
+        # ``HttpResponse`` stamps ``text/html`` on whatever it is given, and an
+        # empty body is no HTML document.
+        response = HttpResponse(status=success_status)
+        del response["Content-Type"]
+        return response
     # ``safe=False`` because a list is as much a body as an object is; the
     # default encoder renders lazy translations, decimals, dates and UUIDs.
     return JsonResponse(body, status=success_status, safe=False)

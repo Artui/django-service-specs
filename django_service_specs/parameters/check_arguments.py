@@ -67,6 +67,17 @@ def check_arguments(
     - ``bool`` is neither an ``integer`` nor a ``number``, although Python
       makes it an ``int``: a JSON ``true`` sent for a count is a caller's
       mistake, not the number one.
+    - **An integral float is an** ``integer``, and is handed on as an ``int``
+      wherever the declaration reaches. JSON Schema counts ``5.0`` as an
+      integer, so the ``{"type": "integer"}`` this kernel advertises admits
+      it, and a Validator never sees ``5.0`` for an integer: its own type
+      check and its bounds read the ``int``. ``5.5`` is still refused, and so
+      are NaN and the infinities, which no integer is. A ``number`` keeps the
+      float it was sent. **DRF reads it differently at an exponent**: its
+      ``IntegerField`` reads ``str(value)``, as Django's form field does, so
+      given ``1e16`` raw, both read ``"1e+16"`` and refuse it, where this
+      check follows JSON Schema and hands on ``10000000000000000``, which
+      either field then takes.
     - NaN and the infinities are refused wherever the declaration reaches.
       JSON has no spelling for either, so they are outside the ``number``
       type, and this is a type rule rather than a stricter check - although
@@ -89,7 +100,8 @@ def check_arguments(
     Returns a cleaned copy and never modifies ``arguments``. The containers it
     walks are new - the top-level mapping, each declared object, each array -
     while a value it does not look inside, such as a free-form object, is
-    passed through as the caller's.
+    passed through as the caller's. An integral float declared an integer is
+    the one value it replaces.
 
     Raises:
         InvalidArguments: carrying **every** problem found as one tree
@@ -208,6 +220,8 @@ def _check_one(
     ``json_type`` is ``None`` for the element of an array that declares no
     ``items``, which accepts anything.
     """
+    # Read before the type check, which then sees an int and is unchanged.
+    value = _integral(json_type, value)
     problem = _type_problem(json_type, fmt, value)
     if problem is not None:
         return None, [problem]
@@ -221,6 +235,25 @@ def _check_one(
             % {"value": value}
         ]
     return value, None
+
+
+def _integral(json_type: str | None, value: Any) -> Any:
+    """``value``, or the ``int`` an integral float declared an integer stands for.
+
+    JSON Schema counts ``5.0`` as an integer, and the Validator is handed the
+    int, so it never meets ``5.0`` for an integer. One branch to coverage, so
+    each condition is held by its own test:
+    ``test_a_float_nothing_declares_an_integer_stays_a_float`` (its ``number``:
+    without the type, a number's float becomes an int), and
+    ``test_refuses_a_value_of_another_json_type``, by its ``"3"`` (without the
+    float, a string is asked ``is_integer``, and where an int has one, ``True``
+    becomes 1) and its ``1.5`` (without integral, ``int`` truncates it to an
+    accepted 1). NaN and the infinities are not integral, so the type check
+    refuses them as it did.
+    """
+    if json_type == "integer" and isinstance(value, float) and value.is_integer():
+        return int(value)
+    return value
 
 
 def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | None:

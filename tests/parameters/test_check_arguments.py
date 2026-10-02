@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+import dataclasses
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
 import pytest
+from django import forms
+from django.core.exceptions import ValidationError
 from django.utils import translation
 
+from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validation_context import ValidationContext
 
 REQUIRED = "This field is required."
 NULL = "This field cannot be null."
@@ -130,6 +136,114 @@ def test_refuses_a_value_of_another_json_type(json_type: str, value: Any, messag
 )
 def test_accepts_a_value_of_its_json_type(json_type: str, value: Any) -> None:
     assert "x" in check_arguments(one(Parameter("x", json_type)), {"x": value})
+
+
+@pytest.mark.parametrize(("value", "number"), [(5.0, 5), (-3.0, -3), (-0.0, 0), (1e16, 10**16)])
+def test_an_integral_float_is_an_integer_and_is_handed_on_as_an_int(
+    value: float, number: int
+) -> None:
+    # JSON Schema counts 5.0 as an integer, so the {"type": "integer"} the
+    # kernel advertises admits it. 1e16 is one too, although a field reading
+    # ``str(value)`` sees "1e+16" and refuses it.
+    cleaned = check_arguments(one(Parameter("count", "integer")), {"count": value})
+    assert cleaned == {"count": number}
+    assert type(cleaned["count"]) is int
+
+
+def test_a_field_reading_str_refuses_at_an_exponent_what_the_check_hands_on() -> None:
+    # The divergence the check's docstring states, against the real field:
+    # Django's IntegerField reads ``str(value)`` as DRF's does, so 1e16 raw is
+    # "1e+16" and refused, while the int the check hands on is taken.
+    field = forms.IntegerField()
+    with pytest.raises(ValidationError):
+        field.clean(1e16)
+    cleaned = check_arguments(one(Parameter("count", "integer")), {"count": 1e16})
+    assert field.clean(cleaned["count"]) == 10**16
+
+
+def test_an_integral_float_is_an_int_wherever_the_declaration_reaches() -> None:
+    # Equality cannot tell 5.0 from 5, so the repr is what is compared.
+    params = Parameters.of(
+        Parameter("count", "integer"),
+        Parameter("ids", "array", items="integer", items_nullable=True),
+        Parameter("box", "object", fields=Parameters.of(Parameter("size", "integer"))),
+        Parameter("lines", "array", items=Parameters.of(Parameter("qty", "integer"))),
+        Parameter("rank", "integer", choices=(1, 2)),
+    )
+    arguments = {
+        "count": 5.0,
+        "ids": [1.0, None, 2],
+        "box": {"size": 3.0},
+        "lines": [{"qty": 4.0}],
+        "rank": 2.0,
+    }
+    expected = {
+        "count": 5,
+        "ids": [1, None, 2],
+        "box": {"size": 3},
+        "lines": [{"qty": 4}],
+        "rank": 2,
+    }
+    assert repr(check_arguments(params, arguments)) == repr(expected)
+    assert arguments["box"] == {"size": 3.0}
+    assert repr(arguments["box"]["size"]) == "3.0"
+
+
+def test_a_choice_refused_after_the_conversion_names_the_int() -> None:
+    params = one(Parameter("rank", "integer", choices=(1, 2)))
+    assert refusal(params, {"rank": 3.0}) == {
+        "rank": ["Select a valid choice. 3 is not one of the available choices."]
+    }
+
+
+@pytest.mark.parametrize(
+    ("parameter", "value"),
+    [
+        (Parameter("x", "number"), 5.0),
+        (Parameter("x", "array"), [5.0]),
+        (Parameter("x", "object"), {"size": 5.0}),
+    ],
+    ids=["number", "untyped-element", "free-form-object"],
+)
+def test_a_float_nothing_declares_an_integer_stays_a_float(
+    parameter: Parameter, value: Any
+) -> None:
+    # Holds ``json_type == "integer"`` in the conversion: a number keeps the
+    # float the caller sent, and what an undeclared element or a free-form
+    # object holds is the caller's, for its Validator.
+    assert repr(check_arguments(one(parameter), {"x": value})["x"]) == repr(value)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_a_non_finite_float_is_still_no_integer(value: float) -> None:
+    # Neither is integral, so neither is converted, and the type check
+    # answers as it did before an integral float was an integer.
+    assert refusal(one(Parameter("count", "integer")), {"count": value}) == {
+        "count": ["Expected an integer."]
+    }
+
+
+def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
+    # The dataclass adapter refuses a float for an ``int``, so it passing here
+    # is the int the check handed on; the form's bounds read that same int.
+    @dataclasses.dataclass
+    class Counted:
+        count: int
+
+    strict = DataclassValidator(Counted)
+    cleaned = check_arguments(strict.parameters(), {"count": 2.0})
+    assert repr(strict.validate(cleaned, ValidationContext(principal=None))) == "{'count': 2}"
+
+    class Bounded(forms.Form):
+        count = forms.IntegerField(min_value=1, max_value=10)
+
+    bounded = FormValidator(Bounded)
+    with pytest.raises(InvalidArguments) as caught:
+        bounded.validate(
+            check_arguments(bounded.parameters(), {"count": 11.0}),
+            ValidationContext(principal=None),
+        )
+    assert caught.value.detail == {"count": ["Ensure this value is less than or equal to 10."]}
 
 
 def test_a_tuple_comes_back_as_a_list() -> None:

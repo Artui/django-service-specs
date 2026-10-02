@@ -103,10 +103,12 @@ class TestSuccess:
         assert (response.status_code, body(response)) == (201, {"id": 7})
 
     def test_a_callers_success_status_holds_for_nothing_to_present(self, ada: Any) -> None:
+        # An empty body with nothing to describe it, rather than ``null``.
         response = dispatch_request(
             titled_spec(None), post(ada, {"title": "x"}), success_status=200
         )
-        assert (response.status_code, body(response)) == (200, None)
+        assert (response.status_code, response.content) == (200, b"")
+        assert "Content-Type" not in response
 
     def test_a_204_carries_no_body_whatever_was_presented(self, ada: Any) -> None:
         response = dispatch_request(

@@ -2,17 +2,26 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.http.utils import answered_methods, request_principal, route_arguments
+from django_service_specs.http.adispatch_request import adispatch_request
+from django_service_specs.http.dispatch_request import dispatch_request
+from django_service_specs.http.utils import (
+    answered_methods,
+    request_principal,
+    route_arguments,
+    success_response,
+)
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from tests.http.utils import FACTORY, note_spec, signed_in, titled_spec
+from tests.http.utils import ASYNC_FACTORY, FACTORY, body, note_spec, signed_in, titled_spec
 
 
 class Principal:
@@ -75,3 +84,39 @@ def test_every_undeclared_kwarg_is_named_in_order() -> None:
     assert str(refused.value).startswith(
         "The route captures org, team, which the spec does not declare."
     )
+
+
+@pytest.mark.parametrize("status", [200, 201, 202])
+def test_a_service_presenting_nothing_answers_an_empty_body_at_the_callers_status(
+    status: int,
+) -> None:
+    # As djangorestframework-services answers it: DRF renders ``None`` as no
+    # bytes and then drops the Content-Type, which would describe nothing. The
+    # status stays the caller's rather than becoming 204.
+    response = success_response(titled_spec(), None, status)
+    assert (response.status_code, response.content) == (status, b"")
+    assert "Content-Type" not in response
+
+
+def test_a_read_whose_value_is_none_answers_null_at_any_status() -> None:
+    # A read's ``None`` is its value, not the absence of one, so it is a body.
+    response = success_response(note_spec(allow_none=True), None, 201)
+    assert (response.status_code, body(response)) == (201, None)
+
+
+def _posted(factory: Any) -> Any:
+    request = factory.post("/", data=json.dumps({"title": "x"}), content_type="application/json")
+    return signed_in(request)
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_both_entry_points_answer_through_success_response() -> None:
+    # Each entry point builds its success answer here and nowhere else, so
+    # both answer a service presenting nothing with the same empty body.
+    synced = await sync_to_async(dispatch_request)(
+        titled_spec(None), _posted(FACTORY), success_status=201
+    )
+    awaited = await adispatch_request(titled_spec(None), _posted(ASYNC_FACTORY), success_status=201)
+    for response in (synced, awaited):
+        assert (response.status_code, response.content) == (201, b"")
+        assert "Content-Type" not in response
