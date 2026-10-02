@@ -21,6 +21,18 @@ queue with Django alone.
 will depend on this package and become its DRF adapter; this package will
 never depend on it.
 
+**No agent transport reads a spec without DRF yet.** The family's MCP server
+([`djangorestframework-mcp-server`](https://github.com/Artui/djangorestframework-mcp-server))
+and its Pydantic AI toolset
+([`djangorestframework-pydantic-ai`](https://github.com/Artui/djangorestframework-pydantic-ai))
+both require DRF and `djangorestframework-services` today. What a tool-building
+transport reads off a spec besides dispatch - affordances, paging, the agent
+projection of an output, progress - is here, and those transports are planned
+to read kernel specs through it, with DRF behind an extra, once
+`djangorestframework-services` is this package's DRF adapter. Until then a
+project without DRF can dispatch its specs from its own views, commands, tasks
+and agent tools, and no ready-made MCP server or agent toolset serves them.
+
 **Status:** early. The public API may still change between minor releases,
 and every change is recorded in the [changelog](CHANGELOG.md).
 

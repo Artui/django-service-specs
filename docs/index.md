@@ -28,6 +28,15 @@ agent, a command or a queue. Nothing in `django_service_specs` imports
 will depend on this package, never the reverse, with its own `ServiceSpec`
 becoming the DRF adapter over this kernel.
 
+**No agent transport reads a spec without DRF yet.** The family's MCP server and
+Pydantic AI toolset both require DRF and `djangorestframework-services` today.
+What they read off a spec besides dispatch is here - see
+[affordances](affordances.md) and [paging and projection](paging-and-projection.md) -
+and they are planned to read kernel specs through it, with DRF behind an extra,
+once `djangorestframework-services` is this package's DRF adapter. Until then a
+project without DRF dispatches its specs from its own views, commands, tasks
+and agent tools.
+
 ## Install
 
 ```bash
