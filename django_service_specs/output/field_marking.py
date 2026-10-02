@@ -17,7 +17,17 @@ class FieldMarking:
     transport's projection for an audience work over a dataclass, a pydantic
     model and a DRF serializer alike: each adapter reads its own library's
     declaration into ``Output``, marking included, and the projection reads
-    only ``Output``. The kernel carries the marking and applies none of it.
+    only ``Output``.
+
+    Applied only for a caller that names an audience:
+    [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec]
+    reads the markings into an
+    [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection],
+    which [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+    applies to the presented value and
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    to the schema. A caller that names none, which is every HTTP response, is
+    presented every field whatever its marking.
 
     The marking lives on the **field**, not in a list beside the output. That is
     what lets it travel into a nested output with no hoisting rule, and what
@@ -41,7 +51,7 @@ class FieldMarking:
 
     @classmethod
     def hidden(cls) -> FieldMarking:
-        """Plumbing: dropped from the projected payload."""
+        """Plumbing: dropped from the projected payload and the projected schema."""
         return cls(FieldAudience.HIDDEN)
 
     @classmethod
