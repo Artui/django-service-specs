@@ -117,7 +117,7 @@ def dispatch(
         pool = selector_pool(
             spec, checked, principal=principal, pool_seeds=pool_seeds, progress=progress
         )
-        value = lookup(spec, pool, source=SELECTOR_SOURCE)
+        value = lookup(spec, pool, source=SELECTOR_SOURCE, reserved=pool_seeds.reserved)
         return conclude_selector(spec, value, principal=principal, grant=granted)
     prepared = prepare_service(
         spec,

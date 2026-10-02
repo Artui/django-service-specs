@@ -17,8 +17,14 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.db.models import BooleanField, Value
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
+from django_service_specs.affordances.utils import (
+    affordance_expression,
+    rows_with_affordances,
+    split_affordances,
+)
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
@@ -29,8 +35,12 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
-from django_service_specs.selectors.shape_queryset import shape_queryset
-from django_service_specs.selectors.utils import call_selector, materialize_retrieve
+from django_service_specs.selectors.utils import (
+    apply_shaping,
+    call_selector,
+    is_queryset,
+    materialize_retrieve,
+)
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -183,15 +193,76 @@ def reraise_unless_retrieve(selector_spec: SelectorSpec, error: ObjectDoesNotExi
         raise error
 
 
-def settle(selector_spec: SelectorSpec, raw: Any, pool: Mapping[str, Any], *, source: str) -> Any:
-    """Shape what a selector returned, and collapse a RETRIEVE to its row or ``None``."""
-    shaped = shape_queryset(raw, selector_spec, pool, source_label=source)
+def settle(
+    selector_spec: SelectorSpec,
+    raw: Any,
+    pool: Mapping[str, Any],
+    *,
+    source: str,
+    reserved: frozenset[str],
+) -> Any:
+    """Shape what a selector returned, answer its affordances, and collapse a RETRIEVE.
+
+    A selector spec's ``affordances`` are answered wherever its selector runs,
+    as djangorestframework-services answers them: on a ``QuerySet`` they join
+    the spec's own ``annotations`` in the one ``.annotate()`` call the shaping
+    makes, before ``extend_queryset`` and before a transport pages the rows, so
+    a page's rows carry what the whole list would have. On any other result - a
+    list of rows, or a RETRIEVE selector's bare row - the rows are answered
+    after the shaping, by ``rows_with_affordances``. A callable condition is
+    answered once, against ``pool`` - the pool the selector was called from -
+    with ``reserved``, the call's seed set, so a registered seed reaches it.
+    The answers refuse nothing: they describe each row for whoever presents it.
+    """
+    annotations: Mapping[str, Any] | None = selector_spec.annotations
+    row_conditions: dict[str, Any] = {}
+    constants: dict[str, bool] = {}
+    queryset = is_queryset(raw)
+    if selector_spec.affordances is not None:
+        row_conditions, constants = split_affordances(
+            selector_spec.affordances, pool, reserved=reserved
+        )
+        if queryset:
+            generated: dict[str, Any] = {
+                **{
+                    alias: affordance_expression(raw.model, when)
+                    for alias, when in row_conditions.items()
+                },
+                **{
+                    alias: Value(answer, output_field=BooleanField())
+                    for alias, answer in constants.items()
+                },
+            }
+            # A mapping whose operations declare no conditions generates
+            # nothing, and adds no ``annotate`` call:
+            # test_a_spec_with_no_affordances_of_its_own_adds_no_annotation.
+            if generated:
+                annotations = {**(annotations or {}), **generated}
+    shaped = apply_shaping(raw, selector_spec, pool, annotations=annotations, source_label=source)
+    # One branch to coverage, so each condition is held by its own test:
+    # test_declaring_nothing_leaves_a_returned_list_as_it_was (the first) and
+    # test_every_answer_rides_in_the_one_list_query_and_the_one_annotate_call
+    # (the second: a queryset walked here would be answered by a second query).
+    if selector_spec.affordances is not None and not queryset:
+        shaped = rows_with_affordances(
+            shaped,
+            kind=selector_spec.kind,
+            row_conditions=row_conditions,
+            constants=constants,
+            source_label=source,
+        )
     if selector_spec.kind is SelectorKind.RETRIEVE:
         return materialize_retrieve(shaped)
     return shaped
 
 
-def lookup(selector_spec: SelectorSpec, pool: Mapping[str, Any], *, source: str) -> Any:
+def lookup(
+    selector_spec: SelectorSpec,
+    pool: Mapping[str, Any],
+    *,
+    source: str,
+    reserved: frozenset[str],
+) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
     An ``async def`` selector is bridged by ``call_selector``, driven from this
@@ -205,7 +276,7 @@ def lookup(selector_spec: SelectorSpec, pool: Mapping[str, Any], *, source: str)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(selector_spec, error)
         return None
-    return settle(selector_spec, raw, pool, source=source)
+    return settle(selector_spec, raw, pool, source=source, reserved=reserved)
 
 
 def conclude_selector(
@@ -281,7 +352,7 @@ def prepare_service(
     # in ``finish_service``: neither is the run (see ``call_pool``).
     if instance_spec is not None:
         pool = selector_pool(instance_spec, checked, principal=principal, pool_seeds=pool_seeds)
-        target = lookup(instance_spec, pool, source=INSTANCE_SOURCE)
+        target = lookup(instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved)
         if target is not None:
             authorize_target(spec, principal, target, grant=granted)
         elif not instance_spec.allow_none:
@@ -289,7 +360,9 @@ def prepare_service(
         resolved["instance"] = target
     elif collection_spec is not None:
         pool = selector_pool(collection_spec, checked, principal=principal, pool_seeds=pool_seeds)
-        target = lookup(collection_spec, pool, source=COLLECTION_SOURCE)
+        target = lookup(
+            collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
+        )
         resolved["collection"] = target
     data = validate_arguments(spec, checked, principal=principal, target=target)
     # A Validator returning ``user`` is a bug, and letting its value outrank the
@@ -345,7 +418,7 @@ def finish_service(
     kind: Literal["instance", "list"] = "instance"
     if output_spec is not None:
         pool = call_pool(prepared.principal, pool_seeds, {"result": result})
-        value = lookup(output_spec, pool, source=OUTPUT_SOURCE)
+        value = lookup(output_spec, pool, source=OUTPUT_SOURCE, reserved=pool_seeds.reserved)
         if output_spec.kind is SelectorKind.LIST:
             kind = "list"
     return DispatchResult(

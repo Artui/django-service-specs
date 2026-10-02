@@ -21,6 +21,7 @@ from django_service_specs import (
     bind_arguments,
     dispatch,
     enforce_affordances,
+    present,
     resolve_callable_kwargs,
     unmet_operation_affordance,
 )
@@ -138,3 +139,14 @@ def purge(user: Any, arguments: dict[str, Any]) -> int:
 # The list, declaring which operations' answers its rows are asked for.
 list_notes_with_answers_spec = replace(list_notes_spec, affordances={"rename": rename_spec})
 # --8<-- [end:selector]
+
+
+# --8<-- [start:rows]
+def list_notes(user: Any) -> list[dict[str, Any]]:
+    # dispatch answers every row's affordances as it runs the selector, in the
+    # one query the list costs; present adds them to each row it presents.
+    result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
+    return present(list_notes_with_answers_spec, result)
+
+
+# --8<-- [end:rows]

@@ -213,9 +213,14 @@ def _open_selector(
 
 
 def _settle_and_conclude(
-    spec: SelectorSpec, raw: Any, pool: dict[str, Any], who: Any, granted: Grant
+    spec: SelectorSpec,
+    raw: Any,
+    pool: dict[str, Any],
+    who: Any,
+    granted: Grant,
+    reserved: frozenset[str],
 ) -> DispatchResult:
-    value = settle(spec, raw, pool, source=SELECTOR_SOURCE)
+    value = settle(spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved)
     return conclude_selector(spec, value, principal=who, grant=granted)
 
 
@@ -249,5 +254,5 @@ async def _await_selector(
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
         return conclude_selector(spec, None, principal=who, grant=granted)
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
-        spec, raw, pool, who, granted
+        spec, raw, pool, who, granted, pool_seeds.reserved
     )

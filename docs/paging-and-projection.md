@@ -137,6 +137,13 @@ The order matters. Paging first means only the page's rows are read and
 presented. Projecting before wrapping means the projection never walks the
 envelope's keys.
 
+A selector spec declaring [`affordances`](affordances.md#answers-for-each-row-of-a-list)
+pages the same way. Dispatch answers them on the queryset before
+`paginate_output` slices it, so each page's rows carry the `affordances` object
+the whole list would have, and the projection passes that object through
+whole, `reason` included. `spec_output_schema` puts it on the item inside the
+envelope, with or without `paginate=True` and `projection=`.
+
 From async code, present with
 [`apresent`][django_service_specs.dispatch.apresent.apresent], which runs the
 queries in the executor, and project what it returns with

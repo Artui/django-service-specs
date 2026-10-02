@@ -25,6 +25,7 @@ from django_service_specs import (
     ServiceNotFound,
     error_response,
     operation_affordances,
+    spec_output_schema,
 )
 from docs.examples import affordances
 from tests.dispatch_app.models import Note
@@ -180,8 +181,8 @@ class TestAskingForOneMoreValue:
             affordances.purge(ada, {})
         assert body(asked.value) == (422, json_blocks()[1])
 
-    def test_the_page_shows_exactly_two_bodies(self) -> None:
-        assert len(json_blocks()) == 2
+    def test_the_page_shows_two_bodies_then_the_rows_and_their_schema(self) -> None:
+        assert len(json_blocks()) == 4
 
 
 def test_idempotent_is_declared() -> None:
@@ -194,3 +195,35 @@ def test_a_list_names_each_answer_after_the_entry_and_the_code() -> None:
     for name in ("affordance__rename__notes_read_only", "affordance__rename__note_archived"):
         with pytest.raises(ImproperlyConfigured, match=f"generates the annotation '{name}'"):
             replace(spec, annotations={name: None})
+
+
+@pytest.mark.django_db
+class TestAnswersForEachRow:
+    def test_the_page_shows_the_rows_present_serves(self, ada: Any) -> None:
+        draft = Note.objects.create(owner=ada, title="Draft")
+        old = Note.objects.create(owner=ada, title="Old", archived=True)
+        shown = json_blocks()[2]
+
+        payload = json.loads(json.dumps(affordances.list_notes(ada)))
+
+        assert payload == [{**shown[0], "id": draft.pk}, {**shown[1], "id": old.pk}]
+
+    def test_the_page_shows_the_schema_each_row_s_answers_follow(self) -> None:
+        schema = spec_output_schema(affordances.list_notes_with_answers_spec)
+
+        assert schema is not None
+        assert schema["items"]["properties"]["affordances"] == json_blocks()[3]
+        assert "affordances" in schema["items"]["required"]
+
+    def test_an_unmet_callable_answers_for_every_row(self, ada: Any, read_only: None) -> None:
+        Note.objects.create(owner=ada, title="Draft")
+        Note.objects.create(owner=ada, title="Old", archived=True)
+
+        rows = affordances.list_notes(ada)
+
+        assert {row["affordances"]["rename"]["code"] for row in rows} == {"notes_read_only"}
+
+    def test_the_list_refuses_nothing(self, ada: Any) -> None:
+        Note.objects.create(owner=ada, title="Old", archived=True)
+
+        assert [row["title"] for row in affordances.list_notes(ada)] == ["Old"]
