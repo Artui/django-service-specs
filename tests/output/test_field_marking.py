@@ -13,6 +13,7 @@ from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.dispatch_app.models import Note
 from tests.http.utils import FACTORY, body, signed_in
@@ -39,6 +40,49 @@ def test_constructors_name_the_audience() -> None:
     assert FieldMarking.handle("opaque") == FieldMarking(FieldAudience.HANDLE, "opaque")
     assert FieldMarking.hidden() == FieldMarking(FieldAudience.HIDDEN)
     assert FieldMarking.label() == FieldMarking(FieldAudience.LABEL)
+
+
+def test_a_marking_formats_nothing_by_default() -> None:
+    assert FieldMarking().formatter is None
+    assert FieldMarking.handle().formatter is None
+
+
+def test_the_formatter_is_the_third_field() -> None:
+    """In djangorestframework-services' order, so a positional declaration
+    means the same thing in both packages."""
+    money = ValueFormatter(str, produces="string")
+
+    marking = FieldMarking(FieldAudience.LABEL, "The amount.", money)
+
+    assert (marking.audience, marking.description, marking.formatter) == (
+        FieldAudience.LABEL,
+        "The amount.",
+        money,
+    )
+
+
+def test_formatted_is_content_through_its_formatter() -> None:
+    money = ValueFormatter(str, produces="string")
+
+    assert FieldMarking.formatted(money, "In euros.") == FieldMarking(
+        FieldAudience.CONTENT, "In euros.", money
+    )
+
+
+def test_timestamp_is_content_through_a_timestamp_formatter() -> None:
+    marking = FieldMarking.timestamp("%Y-%m-%d", "The due date.")
+
+    assert (marking.audience, marking.description) == (FieldAudience.CONTENT, "The due date.")
+    assert marking.formatter is not None
+    assert marking.formatter.json_schema() == {"examples": ["2026-01-31"], "type": "string"}
+    assert marking.formatter.apply("2026-01-31T10:00:00") == "2026-01-31"
+
+
+def test_timestamp_defaults_to_the_timestamp_formatters_format() -> None:
+    marking = FieldMarking.timestamp()
+
+    assert marking.formatter is not None
+    assert marking.formatter.schema == ValueFormatter.timestamp().schema
 
 
 def test_audience_is_a_json_friendly_string() -> None:

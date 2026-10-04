@@ -170,3 +170,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
 ::: django_service_specs.types.output_page.OutputPage
+::: django_service_specs.types.value_formatter.ValueFormatter

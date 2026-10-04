@@ -8,6 +8,7 @@ from typing import Any
 
 from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.types.value_formatter import ValueFormatter
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,11 @@ class AudienceProjection:
         The fast path: an unmarked output with no labelled choices anywhere
         costs a caller one boolean rather than a walk of the payload.
 
+        A value formatter needs no term of its own: it is carried *by* a
+        marking, so an output that declares one has a non-empty ``fields``
+        already. A term that can never be the deciding one goes stale without
+        failing.
+
         One ``or``-chain, so each term is held by its own case of
         ``test_each_term_alone_makes_it_non_empty``.
         """
@@ -65,3 +71,20 @@ class AudienceProjection:
         """The audience declared for ``name``, defaulting to ``CONTENT``."""
         marking = self.fields.get(name)
         return marking.audience if marking is not None else FieldAudience.CONTENT
+
+    def formatter(self, name: str) -> ValueFormatter | None:
+        """The formatter that applies to ``name``, or ``None``.
+
+        ``None`` for a ``HANDLE`` however the two were declared together: a
+        handle is another tool's input and a formatted machine identifier is a
+        broken one. The suppression lives here rather than in each walk, so the
+        payload and the schema cannot end up formatting different fields,
+        which is the one failure the projection exists to make impossible.
+        """
+        marking = self.fields.get(name)
+        # One branch to coverage, so each condition is held by its own test:
+        # test_an_unmarked_field_has_none (the first) and
+        # test_a_handle_has_none_however_it_was_declared (the second).
+        if marking is None or marking.audience is FieldAudience.HANDLE:
+            return None
+        return marking.formatter

@@ -7,14 +7,17 @@ import pytest
 
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
+from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.output.utils import PROJECTED_ROW, ROW, InvoicePresenter
 
 LABELS = {"PENDING_REVIEW": "Awaiting review"}
+SHOUTED = ValueFormatter(lambda value: str(value).upper(), produces="string")
 
 
 def invoice_projection() -> AudienceProjection:
@@ -100,3 +103,54 @@ def test_a_payload_that_is_not_an_object_passes_through(payload: Any) -> None:
     projection = AudienceProjection(fields={"a": FieldMarking.hidden()})
 
     assert project_payload(payload, projection) == payload
+
+
+class TestFormatters:
+    def test_a_formatted_field_is_rendered_through_its_formatter(self) -> None:
+        projection = AudienceProjection(fields={"name": FieldMarking.formatted(SHOUTED)})
+
+        assert project_payload({"name": "ada", "other": "ada"}, projection) == {
+            "name": "ADA",
+            "other": "ada",
+        }
+
+    def test_a_null_is_not_formatted(self) -> None:
+        projection = AudienceProjection(fields={"name": FieldMarking.formatted(SHOUTED)})
+
+        assert project_payload({"name": None}, projection) == {"name": None}
+
+    def test_a_formatter_wins_over_the_choice_displays(self) -> None:
+        """Declared beats derived: the transform written by hand is the one
+        asked for, so the display is never substituted first."""
+        projection = AudienceProjection(
+            fields={"status": FieldMarking.formatted(SHOUTED)}, choice_labels={"status": LABELS}
+        )
+
+        assert project_payload({"status": "pending_review"}, projection) == {
+            "status": "PENDING_REVIEW"
+        }
+
+    def test_a_formatter_wins_over_a_nested_projection(self) -> None:
+        projection = AudienceProjection(
+            fields={"line": FieldMarking.formatted(SHOUTED)},
+            nested={"line": AudienceProjection(fields={"cost": FieldMarking.hidden()})},
+        )
+
+        assert project_payload({"line": {"cost": 1}}, projection) == {"line": "{'COST': 1}"}
+
+    def test_a_handle_is_never_formatted(self) -> None:
+        """Declaring both is honoured as the handle, and its choices keep their
+        constants as well."""
+        projection = AudienceProjection(
+            fields={"kind": FieldMarking(FieldAudience.HANDLE, formatter=SHOUTED)},
+            choice_labels={"kind": LABELS},
+        )
+
+        assert project_payload({"kind": "pending_review"}, projection) == {"kind": "pending_review"}
+
+    def test_a_hidden_field_is_dropped_whatever_formats_it(self) -> None:
+        projection = AudienceProjection(
+            fields={"etag": FieldMarking(FieldAudience.HIDDEN, formatter=SHOUTED)}
+        )
+
+        assert project_payload({"etag": "w/1"}, projection) == {}

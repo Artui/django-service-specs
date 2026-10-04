@@ -7,6 +7,9 @@ import pytest
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.types.value_formatter import ValueFormatter
+
+MONEY = ValueFormatter(str, produces="string")
 
 
 def test_a_default_projection_is_empty() -> None:
@@ -42,6 +45,31 @@ def test_audience_defaults_to_content() -> None:
 
     assert projection.audience("id") is FieldAudience.HANDLE
     assert projection.audience("title") is FieldAudience.CONTENT
+
+
+class TestFormatter:
+    def test_an_unmarked_field_has_none(self) -> None:
+        """The first condition of the suppression: no marking, no formatter."""
+        projection = AudienceProjection(fields={"amount": FieldMarking.formatted(MONEY)})
+
+        assert projection.formatter("other") is None
+
+    def test_a_marked_field_has_its_markings(self) -> None:
+        projection = AudienceProjection(
+            fields={"amount": FieldMarking.formatted(MONEY), "id": FieldMarking.handle()}
+        )
+
+        assert projection.formatter("amount") is MONEY
+        assert projection.formatter("id") is None
+
+    def test_a_handle_has_none_however_it_was_declared(self) -> None:
+        """The second condition of the suppression: a handle is another
+        tool's input, and a formatted identifier is a broken one."""
+        projection = AudienceProjection(
+            fields={"id": FieldMarking(FieldAudience.HANDLE, formatter=MONEY)}
+        )
+
+        assert projection.formatter("id") is None
 
 
 def test_a_projection_is_frozen() -> None:
