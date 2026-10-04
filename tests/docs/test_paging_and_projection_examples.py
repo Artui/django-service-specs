@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -42,11 +43,17 @@ def ada() -> Any:
 def books() -> list[Book]:
     le_guin = Author.objects.create(name="Ursula K. Le Guin")
     return [
-        Book.objects.create(author=le_guin, title=title, price=Decimal("9.99"), status=status)
-        for title, status in [
-            ("The Dispossessed", Status.PUBLISHED),
-            ("The Lathe of Heaven", Status.DRAFT),
-            ("A Wizard of Earthsea", Status.PUBLISHED),
+        Book.objects.create(
+            author=le_guin,
+            title=title,
+            price=Decimal("9.99"),
+            status=status,
+            published_on=published_on,
+        )
+        for title, status, published_on in [
+            ("The Dispossessed", Status.PUBLISHED, date(1974, 5, 1)),
+            ("The Lathe of Heaven", Status.DRAFT, None),
+            ("A Wizard of Earthsea", Status.PUBLISHED, date(1968, 11, 1)),
         ]
     ]
 
@@ -101,12 +108,36 @@ class TestServingAPage:
     def test_every_served_row_meets_the_advertised_item(self, ada: Any, books: list[Book]) -> None:
         item = SCHEMA["properties"]["items"]["items"]
         displays = {entry["const"] for entry in item["properties"]["status"]["oneOf"]}
+        json_type = {str: "string", type(None): "null"}
 
         served = paging_and_projection.list_books_tool(ada)
 
         for row in served["items"]:
             assert set(row) == set(item["properties"]) == set(item["required"])
             assert row["status"] in displays
+            assert json_type[type(row["price"])] == item["properties"]["price"]["type"]
+            assert (
+                json_type[type(row["published_on"])] in item["properties"]["published_on"]["type"]
+            )
+        # The draft has no publication date, and its null was served as one.
+        assert [row["published_on"] for row in served["items"]] == [
+            "01 May 1974",
+            None,
+            "01 November 1968",
+        ]
+
+    def test_each_formatted_example_is_the_shape_its_rows_are_served_in(
+        self, ada: Any, books: list[Book]
+    ) -> None:
+        """The page says each example shows what the field looks like, and the
+        timestamp's is rendered from the format its rows are served in."""
+        properties = SCHEMA["properties"]["items"]["items"]["properties"]
+
+        served = paging_and_projection.list_books_tool(ada)["items"][0]
+
+        assert properties["price"]["examples"] == [served["price"]]
+        for value in (*properties["published_on"]["examples"], served["published_on"]):
+            datetime.strptime(value, "%d %B %Y")
 
 
 @pytest.mark.django_db

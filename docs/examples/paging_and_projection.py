@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import date
+from decimal import Decimal
 from typing import Annotated, Any
 
 from django.db.models import QuerySet
@@ -12,6 +14,7 @@ from django_service_specs import (
     FieldMarking,
     SelectorKind,
     SelectorSpec,
+    ValueFormatter,
     audience_projection_for_spec,
     dispatch,
     paginate_output,
@@ -22,13 +25,21 @@ from django_service_specs import (
 from docs.examples.declaring import IsSignedIn
 from tests.adapter_app.models import Book, Status
 
-
 # --8<-- [start:declare]
+euros = ValueFormatter(
+    lambda amount: f"EUR {amount}",
+    produces="string",
+    schema={"examples": ["EUR 9.99"]},
+)
+
+
 @dataclass
 class BookRow:
     id: Annotated[int, FieldMarking.handle()]
     title: Annotated[str, FieldMarking.label()]
     status: Status
+    price: Annotated[Decimal, FieldMarking.formatted(euros)]
+    published_on: Annotated[date | None, FieldMarking.timestamp("%d %B %Y")]
     author_id: Annotated[int, FieldMarking.hidden()]
 
 
@@ -98,7 +109,7 @@ def books_with_authors_tool(user: Any) -> Any:
 
 # --8<-- [start:unprojected]
 def books_over_http(user: Any) -> Any:
-    # A caller naming no audience is presented every field, as before.
+    # A caller naming no audience is presented every field, unprojected.
     return present(list_books_spec, dispatch(list_books_spec, principal=user, arguments={}))
 
 

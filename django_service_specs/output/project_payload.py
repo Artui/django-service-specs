@@ -10,9 +10,9 @@ from django_service_specs.output.field_audience import FieldAudience
 
 
 def project_payload(payload: Any, projection: AudienceProjection) -> Any:
-    """Drop plumbing and speak choice displays, at any depth.
+    """Drop plumbing, speak choice displays and format values, at any depth.
 
-    Two changes, both driven by the declaration that shapes the schema in
+    Three changes, each driven by the declaration that shapes the schema in
     [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema],
     so the two cannot disagree:
 
@@ -24,6 +24,13 @@ def project_payload(payload: Any, projection: AudienceProjection) -> Any:
       read ``PENDING_REVIEW``. **Not** on a ``HANDLE``, which another tool
       takes as input. An array of choices is substituted member by member
       rather than looked up whole.
+    - a field whose marking carries a
+      [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
+      is rendered through it: a date-time read as a local date-time rather
+      than raw ISO-8601, an amount with its currency. It wins over the choice
+      display, being the transform an author wrote by hand, and over a nested
+      output's projection. Also **not** on a ``HANDLE``, for the same reason,
+      and a null is never formatted.
 
     A payload that is neither an object nor a list of them is returned as it
     is, and so is every key the projection has nothing to say about, including
@@ -48,8 +55,17 @@ def _project(payload: Any, projection: AudienceProjection) -> Any:
         audience = projection.audience(key)
         if audience is FieldAudience.HIDDEN:
             continue
+        # Declared beats derived, deliberately and not as a by-product of which
+        # branch this chain happens to reach first. A field with choices its
+        # author has also given a formatter is a real collision, and the
+        # transform written by hand is the one that was asked for.
+        # ``annotate_output_schema`` orders its mirror of this chain the same
+        # way; the two agree only while they are read together.
+        formatter = projection.formatter(key)
         child = projection.nested.get(key)
-        if child is not None:
+        if formatter is not None:
+            projected[key] = formatter.apply(value)
+        elif child is not None:
             projected[key] = _project(value, child)
         # One branch to coverage, so each condition is held by its own test:
         # test_a_handle_keeps_its_constant (the first) and

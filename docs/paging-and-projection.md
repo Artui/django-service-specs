@@ -11,8 +11,9 @@ Both are functions a transport calls between dispatch and the wire. Neither is
 applied by [`dispatch`][django_service_specs.dispatch.dispatch.dispatch],
 [`present`][django_service_specs.dispatch.present.present] or
 [`SpecView`][django_service_specs.http.spec_view.SpecView], so a caller that
-names no audience - every HTTP response - is served exactly what it was
-before, every field included and a list as a bare array.
+names no audience - every HTTP response - is not projected: no marking
+applies to it, so it is served every field, each value as presented, and a
+list as a bare array.
 
 ```python
 --8<--
@@ -23,8 +24,9 @@ docs/examples/paging_and_projection.py:declare
 The output says who each field is for, with the
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking]s
 described under [declaring an operation](declaring.md): `id` is a handle,
-`title` names the record, `author_id` is plumbing, and `status` is content
-whose choices have displays.
+`title` names the record, `author_id` is plumbing, `status` is content
+whose choices have displays, and `price` and `published_on` are content
+rendered through a formatter.
 
 ## Built once, where the transport registers
 
@@ -64,9 +66,11 @@ above:
           "status": {
             "type": "string",
             "oneOf": [{"const": "Draft"}, {"const": "Published"}]
-          }
+          },
+          "price": {"type": "string", "examples": ["EUR 9.99"]},
+          "published_on": {"type": ["string", "null"], "examples": ["31 January 2026"]}
         },
-        "required": ["id", "title", "status"]
+        "required": ["id", "title", "status", "price", "published_on"]
       }
     },
     "page": {"type": "integer"},
@@ -84,7 +88,12 @@ Each change to the item is the mirror of one the payload undergoes:
   carries. The `title` that annotated each stored value is dropped, since the
   value now equals it, and a stated `"type"` is restated as the type of the
   displays, so an integer choice spoken as `"Low"` is never described as an
-  integer.
+  integer. Two values sharing one display list it once, so a row served it
+  matches one entry of the `oneOf` rather than two.
+- `price` and `published_on` are described as what their formatters produce,
+  and nothing they said about the value before survives: the `"format"` of a
+  decimal and a date is gone, since `"EUR 9.99"` is neither. `"null"` stays
+  in `published_on`'s type, because a null is never formatted.
 - `id` keeps its values on both sides - a handle is passed to other tools,
   which take the stored value - and carries `handle_description`, the
   transport's sentence for a handle whose marking declares no description of
@@ -93,6 +102,36 @@ Each change to the item is the mirror of one the payload undergoes:
 
 The projection applies to the item, never to the array or the envelope around
 it, whose keys belong to no `Output`.
+
+## Formatting a value
+
+A [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
+is a transform and the JSON type it produces, declared together, and a
+[`FieldMarking`][django_service_specs.output.field_marking.FieldMarking]
+carries it. `euros` above is the generic form: `render` turns the presented
+value - the decimal's string - into the string a reader is told, `produces`
+is the type the schema states, and `schema` adds what the produced value
+looks like. A fragment naming `type` is refused, so a formatter cannot
+advertise one type and declare another.
+
+[`FieldMarking.timestamp`][django_service_specs.output.field_marking.FieldMarking.timestamp]
+is a formatter already written: a date-time as a local string, `strftime`'s
+`fmt` defaulting to day-first and 24-hour, with the example in the schema
+rendered from that same format. A date-time is converted to Django's active
+time zone, which is the only zone it can be rendered in: the projection is
+built once, before any request, so a zone chosen per call would describe one
+payload and serve another. A date, like `published_on`, is read as midnight,
+which is why its format names no time.
+
+Both sides of the projection read one formatter, so the payload and the
+schema change together, and a formatter decides over the rest of the field's
+declaration:
+
+- it wins over a choice's display, being the transform an author wrote by
+  hand;
+- it is never applied to a `HANDLE`, which another tool takes as input, so a
+  marking that declares both is honoured as the handle;
+- a null passes through it unformatted.
 
 ## Serving a page
 
@@ -126,7 +165,15 @@ then wraps them. With three books, page 2 at a limit of 2 is:
 
 ```json
 {
-  "items": [{"id": 3, "title": "A Wizard of Earthsea", "status": "Published"}],
+  "items": [
+    {
+      "id": 3,
+      "title": "A Wizard of Earthsea",
+      "status": "Published",
+      "price": "EUR 9.99",
+      "published_on": "01 November 1968"
+    }
+  ],
   "page": 2,
   "totalPages": 2,
   "hasNext": false
@@ -164,7 +211,14 @@ mount only. Here a tool whose callers go on to look up the author keeps
 `author_id`, as a handle:
 
 ```json
-{"id": 1, "title": "The Dispossessed", "status": "Published", "author_id": 1}
+{
+  "id": 1,
+  "title": "The Dispossessed",
+  "status": "Published",
+  "price": "EUR 9.99",
+  "published_on": "01 May 1974",
+  "author_id": 1
+}
 ```
 
 An override that leaves two fields marked as the label is refused in the
@@ -179,10 +233,18 @@ docs/examples/paging_and_projection.py:unprojected
 ```
 
 `present` applies no marking, so the same spec over HTTP still serves every
-field, and each choice as its stored value:
+field, each choice as its stored value and each formatted field as it was
+presented:
 
 ```json
-{"id": 1, "title": "The Dispossessed", "status": "published", "author_id": 1}
+{
+  "id": 1,
+  "title": "The Dispossessed",
+  "status": "published",
+  "price": "9.99",
+  "published_on": "1974-05-01",
+  "author_id": 1
+}
 ```
 
 Render an agent's **answer** with the projection. A pipeline that feeds one

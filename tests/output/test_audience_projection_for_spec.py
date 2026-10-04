@@ -15,6 +15,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.output.utils import PRIORITIES, InvoicePresenter
 
@@ -95,6 +96,9 @@ def test_a_child_with_nothing_to_project_is_left_out() -> None:
     )
 
     assert projection.is_empty()
+    # ``is_empty`` recurses, so an empty child kept under ``nested`` would
+    # still leave the projection empty: this is what holds the guard.
+    assert projection.nested == {}
 
 
 def test_a_service_reads_the_presenter_it_is_presented_with() -> None:
@@ -197,3 +201,11 @@ class TestOverrides:
         assert audience_projection_for_spec(spec, overrides={}) == audience_projection_for_spec(
             spec
         )
+
+
+def test_a_formatter_travels_with_its_marking() -> None:
+    money = ValueFormatter(str, produces="string")
+
+    projection = of(OutputField("amount", "string", marking=FieldMarking.formatted(money)))
+
+    assert projection.formatter("amount") is money
