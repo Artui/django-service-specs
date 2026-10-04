@@ -56,7 +56,7 @@ def spec_output_schema(
     pages, so a transport may pass it for every spec it serves paged.
 
     ``projection`` describes what
-    [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+    [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
     hands back rather than what ``present`` does, through
     [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema]:
     hidden fields left out, labelled choices restated in their displays, and a

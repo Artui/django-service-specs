@@ -215,7 +215,7 @@ class TestPaging:
 
 
 class TestProjection:
-    """The schema of what ``render_for_audience`` hands back, for a caller naming an audience."""
+    """The schema of what ``present_for_audience`` hands back, for a caller naming an audience."""
 
     def test_a_caller_naming_no_audience_is_described_in_full(self) -> None:
         schema = spec_output_schema(retrieve(presenter=InvoicePresenter()))

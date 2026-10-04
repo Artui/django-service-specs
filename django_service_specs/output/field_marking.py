@@ -23,7 +23,7 @@ class FieldMarking:
     [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec]
     reads the markings into an
     [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection],
-    which [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+    which [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
     applies to the presented value and
     [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
     to the schema. A caller that names none, which is every HTTP response, is

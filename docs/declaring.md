@@ -249,7 +249,7 @@ who the field is for. The
 out to a person, and `HIDDEN` for plumbing. The kernel carries the marking on
 the declaration and applies it only for a caller that names an audience,
 through
-[`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience];
+[`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience];
 `present`, and so every HTTP response, serves every field. See
 [paging and projection](paging-and-projection.md).
 

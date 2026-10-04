@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instances a selector returns directly by one query per model class, and on
   mappings with the callable answers only. A callable condition is answered
   once per call, against the seeds alone. `present`, `apresent`,
-  `render_for_audience` and the HTTP views then add an `affordances` object
+  `present_for_audience` and the HTTP views then add an `affordances` object
   to every presented row: per name `{"available": true}`, or the first unmet
   condition's `code` and `reason`, or a bare `{"available": false}` for a row
   deleted before it was asked. `spec_output_schema` declares that object on
@@ -78,21 +78,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   queryset is counted before it is sliced, so a page past the end is never an
   unbounded `OFFSET`. A `Manager` is paged as its `.all()`. The names a
   caller pages by and the ceiling are the transport's, and `SpecView` does
-  not page.
+  not page. All three keep djangorestframework-services' signatures.
 - `spec_output_schema(spec, *, paginate=False, projection=None,
   handle_description=None)`: `paginate=True` describes a list as the page
   envelope and changes nothing that is not a list, which stays a bare array by
   default; `projection=` describes the projected payload, applied to the item
   and never to the array or the envelope.
 - `AudienceProjection`, `audience_projection_for_spec`, `project_payload`,
-  `annotate_output_schema` and `render_for_audience`: the `FieldMarking`s an
+  `annotate_output_schema` and `present_for_audience`: the `FieldMarking`s an
   `Output` declares, applied to the presented value and to the output schema
   for a caller that names an audience. A hidden field is dropped from both, a
   choice is spoken by its display with its schema's stated `type` restated to
   match, and a handle keeps its value and takes the transport's
   `handle_description`. A mount's `overrides=` are layered over the
   declaration, and two fields left marked as the label are refused, naming
-  both. `present`, and so every HTTP response, is unchanged.
+  both. `present`, and so every HTTP response, applies no marking.
+  `present_for_audience` is `present` plus the projection, as
+  djangorestframework-services' `render_for_audience` is its serializer
+  render plus the projection, and it is named apart because that one takes
+  the view and request its serializer reads.
 
 ### Changed
 - An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as

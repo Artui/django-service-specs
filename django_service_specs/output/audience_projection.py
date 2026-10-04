@@ -20,7 +20,7 @@ class AudienceProjection:
     [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec].
     Nothing here depends on the value being presented, so a transport builds
     it **once**, where it registers the spec, and passes it to every
-    [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+    [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
     and [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
     rather than reading the declaration again per call.
 

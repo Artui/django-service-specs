@@ -7,7 +7,7 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
-from django_service_specs.dispatch.render_for_audience import render_for_audience
+from django_service_specs.dispatch.present_for_audience import present_for_audience
 
 __all__ = [
     "DEFAULT_PAGE_SIZE",
@@ -18,5 +18,5 @@ __all__ = [
     "dispatch",
     "paginate_output",
     "present",
-    "render_for_audience",
+    "present_for_audience",
 ]

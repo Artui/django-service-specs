@@ -226,7 +226,7 @@ to find.
 [`present`][django_service_specs.dispatch.present.present] then adds an
 `affordances` object to every row it presents, and so does every response the
 HTTP views serve and every payload
-[`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+[`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
 hands an agent, `reason` included:
 
 ```python

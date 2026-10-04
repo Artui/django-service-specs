@@ -16,7 +16,7 @@ from django_service_specs import (
     dispatch,
     paginate_output,
     present,
-    render_for_audience,
+    present_for_audience,
     spec_output_schema,
 )
 from docs.examples.declaring import IsSignedIn
@@ -70,7 +70,7 @@ def list_books_tool(
     # reach dispatch, whose argument set is closed.
     result = dispatch(list_books_spec, principal=user, arguments=arguments)
     shaped = paginate_output(result.value, page=page, limit=limit, max_page_size=MAX_PAGE_SIZE)
-    rows = render_for_audience(
+    rows = present_for_audience(
         list_books_spec, replace(result, value=shaped.items), projection=projection
     )
     return shaped.envelope(rows)
@@ -90,7 +90,7 @@ with_authors = audience_projection_for_spec(
 
 def books_with_authors_tool(user: Any) -> Any:
     result = dispatch(list_books_spec, principal=user, arguments={})
-    return render_for_audience(list_books_spec, result, projection=with_authors)
+    return present_for_audience(list_books_spec, result, projection=with_authors)
 
 
 # --8<-- [end:override]

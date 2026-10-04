@@ -11,7 +11,7 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import paginate_output
 from django_service_specs.dispatch.present import present
-from django_service_specs.dispatch.render_for_audience import render_for_audience
+from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_marking import FieldMarking
@@ -57,13 +57,13 @@ def spec_of(presenter: Presenter | None, kind: SelectorKind = SelectorKind.LIST)
 def test_derives_the_projection_from_the_spec_when_given_none() -> None:
     spec = spec_of(InvoicePresenter(), SelectorKind.RETRIEVE)
 
-    assert render_for_audience(spec, DispatchResult("instance", ROW)) == PROJECTED_ROW
+    assert present_for_audience(spec, DispatchResult("instance", ROW)) == PROJECTED_ROW
 
 
 def test_projects_each_row_of_a_list() -> None:
     spec = spec_of(InvoicePresenter())
 
-    rendered = render_for_audience(spec, DispatchResult("list", [ROW, ROW]))
+    rendered = present_for_audience(spec, DispatchResult("list", [ROW, ROW]))
 
     assert rendered == [PROJECTED_ROW, PROJECTED_ROW]
 
@@ -74,7 +74,7 @@ def test_uses_a_projection_built_once_and_passed_in() -> None:
     spec = spec_of(InvoicePresenter(), SelectorKind.RETRIEVE)
     projection = audience_projection_for_spec(spec, overrides={"etag": FieldMarking()})
 
-    rendered = render_for_audience(spec, DispatchResult("instance", ROW), projection=projection)
+    rendered = present_for_audience(spec, DispatchResult("instance", ROW), projection=projection)
 
     assert rendered == {**PROJECTED_ROW, "etag": "W/1"}
 
@@ -83,18 +83,18 @@ def test_an_empty_projection_is_presenting_and_nothing_else() -> None:
     spec = spec_of(InvoicePresenter(), SelectorKind.RETRIEVE)
     result = DispatchResult("instance", ROW)
 
-    rendered = render_for_audience(spec, result, projection=AudienceProjection())
+    rendered = present_for_audience(spec, result, projection=AudienceProjection())
 
     assert rendered == present(spec, result) == ROW
 
 
 def test_a_spec_with_no_presenter_passes_the_value_through() -> None:
-    assert render_for_audience(spec_of(None), DispatchResult("list", [{"a": 1}])) == [{"a": 1}]
+    assert present_for_audience(spec_of(None), DispatchResult("list", [{"a": 1}])) == [{"a": 1}]
 
 
 def test_nothing_found_is_still_nothing_to_present() -> None:
     with pytest.raises(ValueError, match="nothing to present"):
-        render_for_audience(spec_of(InvoicePresenter()), DispatchResult("not_found"))
+        present_for_audience(spec_of(InvoicePresenter()), DispatchResult("not_found"))
 
 
 @pytest.mark.django_db
@@ -106,7 +106,7 @@ class TestFromDispatch:
 
         result = dispatch(spec, principal=ada, arguments={})
 
-        assert render_for_audience(spec, result) == [{"id": note.pk, "title": "Draft"}]
+        assert present_for_audience(spec, result) == [{"id": note.pk, "title": "Draft"}]
         # The same result, presented for a caller naming no audience, is whole.
         assert present(spec, result) == [{"id": note.pk, "title": "Draft", "owner_id": ada.pk}]
 
@@ -117,7 +117,7 @@ class TestFromDispatch:
 
         result = dispatch(spec, principal=ada, arguments={})
         page = paginate_output(result.value, page=2, limit=2)
-        rendered = render_for_audience(spec, replace(result, value=page.items))
+        rendered = present_for_audience(spec, replace(result, value=page.items))
 
         assert page.envelope(rendered) == {
             "items": [{"id": n.pk, "title": n.title} for n in Note.objects.all()[2:4]],
@@ -137,7 +137,7 @@ class TestFromDispatch:
 
         result = dispatch(spec, principal=ada, arguments={})
 
-        assert render_for_audience(spec, result) == [
+        assert present_for_audience(spec, result) == [
             {"id": note.pk, "title": "Draft", "affordances": answers}
         ]
         assert present(spec, result) == [
@@ -155,7 +155,7 @@ class TestFromDispatch:
 
         result = dispatch(spec, principal=ada, arguments={})
         page = paginate_output(result.value, page=2, limit=2)
-        rendered = render_for_audience(spec, replace(result, value=page.items))
+        rendered = present_for_audience(spec, replace(result, value=page.items))
 
         assert [row["affordances"] for row in page.envelope(rendered)["items"]] == [
             {"rename": {"available": True}},

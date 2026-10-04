@@ -71,7 +71,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.dispatch_result.DispatchResult
 ::: django_service_specs.dispatch.present.present
 ::: django_service_specs.dispatch.apresent.apresent
-::: django_service_specs.dispatch.render_for_audience.render_for_audience
+::: django_service_specs.dispatch.present_for_audience.present_for_audience
 ::: django_service_specs.dispatch.paginate_output.paginate_output
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments

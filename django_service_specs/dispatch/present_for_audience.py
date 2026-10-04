@@ -1,4 +1,4 @@
-"""``render_for_audience`` - present a dispatch result for an agent audience."""
+"""``present_for_audience`` - present a dispatch result for an agent audience."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 
 
-def render_for_audience(
+def present_for_audience(
     spec: ServiceSpec | SelectorSpec,
     result: DispatchResult,
     *,
@@ -28,6 +28,11 @@ def render_for_audience(
     first: the projection applies to the presented value and never to the
     value it was presented from.
 
+    djangorestframework-services' ``render_for_audience`` is the same
+    composition over its serializer render, and takes the ``view``,
+    ``request`` and ``many`` that render reads. This is named apart so that
+    neither package's name means two signatures.
+
     ``projection`` is the output's resolved markings. Omit it and one is read
     off the spec; a transport that registers its tools up front builds it
     once with
@@ -37,7 +42,7 @@ def render_for_audience(
     which is what every HTTP response is.
 
     To serve one page, page the result's value first and present the page's
-    rows: ``render_for_audience(spec, replace(result, value=page.items))``,
+    rows: ``present_for_audience(spec, replace(result, value=page.items))``,
     then [`envelope`][django_service_specs.types.output_page.OutputPage.envelope]
     what comes back. The envelope's keys belong to no ``Output``, so the
     projection must never walk them.

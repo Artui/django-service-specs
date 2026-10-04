@@ -119,7 +119,7 @@ not arguments of the spec, whose argument set is closed, so the tool takes
 them off the call before dispatch sees the rest; and two mounts of one spec
 may well allow different page sizes.
 
-[`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+[`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
 is `present` followed by the projection, and the page's rows are what it
 presents. [`envelope`][django_service_specs.types.output_page.OutputPage.envelope]
 then wraps them. With three books, page 2 at a limit of 2 is:

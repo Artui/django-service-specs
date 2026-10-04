@@ -31,7 +31,7 @@ def audience_projection_for_spec(
     service spec's own presenter's, or its output selector's when it declares
     none. A transport that registers its tools up front calls this once per
     spec and hands the result to
-    [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+    [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
     and [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema],
     so the payload it sends and the schema it advertises are projected by one
     declaration.

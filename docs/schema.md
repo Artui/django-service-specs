@@ -249,6 +249,6 @@ service can return `None` is not something its declaration says.
   `present` and every HTTP response return. With one,
   [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what
-  [`render_for_audience`][django_service_specs.dispatch.render_for_audience.render_for_audience]
+  [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
   returns; see [paging and projection](paging-and-projection.md).
 - **No `$schema` key.** A transport whose wire wants one adds it.
