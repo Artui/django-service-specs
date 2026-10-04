@@ -74,8 +74,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   presented rows as `{items, page, totalPages, hasNext}`. Out-of-range values
   clamp at both ends and the envelope reports the page actually served; a
   queryset is counted before it is sliced, so a page past the end is never an
-  unbounded `OFFSET`. The names a caller pages by and the ceiling are the
-  transport's, and `SpecView` does not page.
+  unbounded `OFFSET`. A `Manager` is paged as its `.all()`. The names a
+  caller pages by and the ceiling are the transport's, and `SpecView` does
+  not page.
 - `spec_output_schema(spec, *, paginate=False, projection=None,
   handle_description=None)`: `paginate=True` describes a list as the page
   envelope and changes nothing that is not a list, which stays a bare array by
@@ -119,6 +120,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declaration reads as hashable. `default` now takes no part in the hash, so
   `hash()` no longer raises `TypeError`; equality still compares it, and the
   reported value is unchanged.
+- A list selector returning a `Manager`, such as `Note.objects`, could not be
+  presented: `present` raised `TypeError`, on every transport, unless the spec
+  declared shaping. Dispatch now takes the Manager's `.all()`, as a selector
+  returning every row means.
 
 ## [0.3.0] — 2026-09-29
 

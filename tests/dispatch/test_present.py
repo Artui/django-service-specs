@@ -404,3 +404,37 @@ class TestARowThatVanished:
         payload = served(vanishing(BOOKS_CLOSED, NOT_ARCHIVED), ada)
 
         assert [row["affordances"] for row in payload] == [{"rename": REFUSED_CLOSED}] * 2
+
+
+@pytest.mark.django_db
+def test_a_list_selector_returning_a_manager_presents_every_row() -> None:
+    # ``Note.objects`` is a selector's shortest spelling of "every row", and a
+    # Manager is neither iterable nor sliceable: dispatch takes ``.all()`` of it.
+    ada = make_user("ada")
+    Note.objects.create(owner=ada, title="One")
+    Note.objects.create(owner=ada, title="Two")
+    spec = SelectorSpec(
+        kind=LIST, selector=lambda: Note.objects, permissions=OPEN, presenter=Titles()
+    )
+
+    rendered = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+    assert sorted(row["title"] for row in rendered) == ["One", "Two"]
+
+
+@pytest.mark.django_db
+def test_a_list_selector_returning_a_manager_answers_its_rows_affordances() -> None:
+    ada = make_user("ada")
+    Note.objects.create(owner=ada, title="One", archived=True)
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=lambda: Note.objects,
+        permissions=OPEN,
+        presenter=Titles(),
+        affordances={"rename": RENAME},
+    )
+
+    (row,) = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+    assert row["title"] == "One"
+    assert row["affordances"]["rename"]["available"] is False

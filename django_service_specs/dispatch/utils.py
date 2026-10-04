@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from django.db.models import BooleanField, Value
+from django.db.models import BooleanField, Manager, Value
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -214,6 +214,12 @@ def settle(
     with ``reserved``, the call's seed set, so a registered seed reaches it.
     The answers refuse nothing: they describe each row for whoever presents it.
     """
+    if isinstance(raw, Manager):
+        # ``Note.objects`` is a selector's shortest spelling of every row, and a
+        # Manager is neither iterable nor sliceable, so a list declaring no
+        # shaping - which leaves the result as it came - could not be presented
+        # or paged: test_a_list_selector_returning_a_manager_presents_every_row.
+        raw = raw.all()
     annotations: Mapping[str, Any] | None = selector_spec.annotations
     row_conditions: dict[str, Any] = {}
     constants: dict[str, bool] = {}

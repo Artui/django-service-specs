@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Final
 
+from django.db.models import Manager
+
 from django_service_specs.selectors.utils import is_queryset
 from django_service_specs.types.output_page import OutputPage
 
@@ -50,12 +52,17 @@ def paginate_output(
     A queryset is counted with ``COUNT`` and sliced lazily, so the page's
     ``items`` is still a queryset: present them, as
     [`present`][django_service_specs.dispatch.present.present] does a list,
-    and the page is read once.
+    and the page is read once. A ``Manager`` is paged as its ``.all()``, since
+    it counts and cannot be sliced.
 
     Raises:
         TypeError: ``rows`` is neither a queryset nor a sized, sliceable
             sequence, so there is nothing to count and nothing to slice.
     """
+    if isinstance(rows, Manager):
+        # Counted, and then refused at the slice, without this:
+        # test_a_manager_is_paged_as_its_queryset.
+        rows = rows.all()
     served_limit: int = max(1, DEFAULT_PAGE_SIZE if limit is None else limit)
     if max_page_size is not None:
         served_limit = min(served_limit, max_page_size)

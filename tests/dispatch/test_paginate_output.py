@@ -143,3 +143,15 @@ class _Indexable:
 def test_something_that_cannot_be_both_counted_and_sliced_says_so(rows: Any) -> None:
     with pytest.raises(TypeError, match="QuerySet or a sized, sliceable sequence"):
         paginate_output(rows)
+
+
+@pytest.mark.django_db
+def test_a_manager_is_paged_as_its_queryset() -> None:
+    # A Manager counts and cannot be sliced, so it is paged as ``.all()``.
+    ada = make_user("ada")
+    for title in ("a", "b", "c"):
+        Note.objects.create(owner=ada, title=title)
+
+    page = paginate_output(Note.objects, limit=2)
+
+    assert (len(list(page.items)), page.total, page.has_next) == (2, 3, True)
