@@ -89,14 +89,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Output` declares, applied to the presented value and to the output schema
   for a caller that names an audience. A hidden field is dropped from both, a
   choice is spoken by its display with its schema's stated `type` restated to
-  match, and a handle keeps its value and takes the transport's
-  `handle_description`. A mount's `overrides=` are layered over the
+  match, a display two choices share is listed once, and a handle keeps its
+  value and takes the transport's `handle_description`. djangorestframework-services
+  states neither the restated `type` nor the single listing, so its projected
+  schema refuses rows its own payload serves. A mount's `overrides=` are layered over the
   declaration, and two fields left marked as the label are refused, naming
   both. `present`, and so every HTTP response, applies no marking.
   `present_for_audience` is `present` plus the projection, as
   djangorestframework-services' `render_for_audience` is its serializer
   render plus the projection, and it is named apart because that one takes
   the view and request its serializer reads.
+- `ValueFormatter(render, produces, schema=None)`, `FieldMarking.formatter`
+  with the `FieldMarking.formatted()` and `FieldMarking.timestamp()`
+  constructors, and `AudienceProjection.formatter(name)`, with
+  djangorestframework-services' signatures. A formatter renders one field's
+  value for an agent audience and declares the JSON type it produces:
+  `project_payload` serves the rendered value, and `annotate_output_schema`
+  restates the property as that type, keeping its `title` and `description`.
+  It wins over a choice's display and never applies to a `HANDLE`. A null
+  passes through unformatted, so a property whose type admits `"null"` keeps
+  admitting it, which djangorestframework-services does not do.
+  `ValueFormatter.timestamp()` renders a date-time in Django's active time
+  zone.
 
 ### Changed
 - An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as

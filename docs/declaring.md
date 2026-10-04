@@ -246,8 +246,13 @@ who the field is for. The
 [`FieldAudience`][django_service_specs.output.field_audience.FieldAudience] is
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read
-out to a person, and `HIDDEN` for plumbing. The kernel carries the marking on
-the declaration and applies it only for a caller that names an audience,
+out to a person, and `HIDDEN` for plumbing. A marking may also carry a
+[`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter],
+which renders the field's value for that audience, a date-time in the
+active time zone say, and states the JSON type it produces (see
+[formatting a value](paging-and-projection.md#formatting-a-value)). The kernel
+carries the marking on the declaration and applies it only for a caller that
+names an audience,
 through
 [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience];
 `present`, and so every HTTP response, serves every field. See
