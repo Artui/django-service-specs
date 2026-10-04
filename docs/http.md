@@ -33,8 +33,11 @@ It reads the principal and the arguments, dispatches with the `grant`,
   status is the caller's `success_status`, or else 204 for a service with
   nothing to present and 200 for everything else. A 204 has no body. A service
   with nothing to present at any other status the caller names answers an
-  empty body with no `Content-Type`, as djangorestframework-services does, and
-  the status stays the caller's. A read whose value is `None` (an `allow_none`
+  empty body with no `Content-Type`, at that status. djangorestframework-services
+  answers the same, except that where an output selector ran and found nothing
+  it answers 204 whatever the caller named. Here the status stays the caller's:
+  the caller named it, and an empty re-read already has a meaning, the value
+  `None`. A read whose value is `None` (an `allow_none`
   retrieve that found nothing) answers `null`, since `None` is its value.
 - **A refusal of either family** is
   [`error_response`](#refusals)'s answer. Anything else propagates, a

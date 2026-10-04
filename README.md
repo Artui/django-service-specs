@@ -137,8 +137,9 @@ app, and the test suite runs it.
 
 ## The order dispatch runs in
 
-`dispatch()` and `adispatch()` take the same steps, in the same order, for a
-write and a read:
+`dispatch()` and `adispatch()` refuse a deactivated principal first, as
+`PrincipalUnavailable`, before anything about the call is checked. Then they
+take the same steps, in the same order, for a write and a read:
 
 1. **Shape check and closed argument set.** Every argument against the declared
    parameters, at every level of nesting, with no query.
@@ -150,10 +151,14 @@ write and a read:
 4. **Object-level authorization.** `has_object_permission` on a retrieved row.
 5. **Validation.** The Validator, with the resolved row in its context, so an
    update's uniqueness check can exclude the row being updated.
-6. **The run.** The service, inside `transaction.atomic()` unless the spec
+6. **Affordances.** A write's declared `affordances`, in order. The first one
+   the row or the moment does not meet refuses the call with
+   `ActionUnavailable`, before the run's transaction opens.
+7. **The run.** The service, inside `transaction.atomic()` unless the spec
    says `atomic=False`, then the output selector if one is declared.
 
-A read stops after step four: its selector is its run.
+A read stops after step four: its selector is its run. Its `affordances` are
+answers about each row, for a list to report, and refuse nothing.
 
 `present()` renders the result afterwards, and only when the transport asks,
 so one that hands the row to a template never pays for rendering it.
@@ -165,13 +170,15 @@ so one that hands the row to a template never pays for rendering it.
 | An argument of the wrong type, missing, or not declared | `InvalidArguments`, with every problem in `.detail` | Dispatch |
 | Arguments the Validator rejects | `InvalidArguments` | Dispatch |
 | A permission check says no, or a `Grant` does not cover the call | `NotPermitted` | Dispatch |
-| An identifier that names no active user | `PrincipalUnavailable` | Dispatch |
+| A deactivated principal, or an identifier that names no active user | `PrincipalUnavailable` | Dispatch |
 | A business rule, raised by the service | `ServiceError`, `ServiceValidationError`, `ServiceConflict`, `ServiceNotFound` | The operation |
+| A declared affordance the row or the moment does not meet | `ActionUnavailable`, a `ServiceConflict` carrying a stable `code` | Dispatch, before the run |
 | A required row that does not exist | Nothing: `DispatchResult(kind="not_found")` | - |
 | An operation that declares no permission check | `ImproperlyConfigured`, at registration and at dispatch | Configuration |
 
-The first four share the base `DispatchError`; the service's own share
-`ServiceError`. **Neither subclasses the other.** A consumer reads a service
+The first four share the base `DispatchError`; the next two share
+`ServiceError`, an unavailable action included, because the caller adapts to
+it as it does to a business rule. **Neither base subclasses the other.** A consumer reads a service
 refusal as something the caller adapts to - an agent routes around it and
 keeps going - so a denial declared as one becomes something a model retries.
 And an MCP server tells arguments of the wrong shape from a business rule on
@@ -195,6 +202,7 @@ out is refused rather than read as "no restriction".
 - [The forms adapter](https://artui.github.io/django-service-specs/forms/) - a Django form class as the Validator, `ModelForm` included
 - [The pydantic adapter](https://artui.github.io/django-service-specs/pydantic/) - a pydantic model as the Validator and the Presenter
 - [JSON Schema](https://artui.github.io/django-service-specs/schema/) - the input and output schema a transport describes an operation with
+- [Paging and projection](https://artui.github.io/django-service-specs/paging-and-projection/) - a list served a page at a time, and each row shaped for an agent reading it
 - [API reference](https://artui.github.io/django-service-specs/reference/)
 
 ## License

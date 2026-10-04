@@ -114,4 +114,6 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   the Presenter, with the `pydantic` extra.
 - [JSON Schema](schema.md): the input and output schema a transport
   describes an operation with.
+- [Paging and projection](paging-and-projection.md): a list served a page at
+  a time, and each row shaped for an agent reading it.
 - [API reference](reference.md): every public name.

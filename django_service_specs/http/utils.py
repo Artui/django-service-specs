@@ -131,9 +131,11 @@ def success_response(
     204, answers an empty body with no** ``Content-Type``, as
     djangorestframework-services answers it: DRF renders ``None`` as no bytes
     and then drops the header, which would describe nothing. The status stays
-    the caller's, even where an output selector's re-read found nothing: the
-    caller named it, and the kernel already says what an empty re-read is,
-    the value ``None``.
+    the caller's, even where an output selector's re-read found nothing,
+    which djangorestframework-services answers 204 whatever the caller named.
+    That is a departure on purpose: the caller named the status, and the
+    kernel already says what an empty re-read is, the value ``None``. Held by
+    ``test_an_empty_re_read_keeps_the_callers_status``.
     """
     nothing = isinstance(spec, ServiceSpec) and body is None
     if success_status is None:

@@ -112,8 +112,8 @@ the Validator and before the run's transaction opens. The first one not met
 refuses the call with
 [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable],
 carrying its `reason` as the message and its `code`, and the service never
-runs. A callable condition sees every registered seed, an HTTP adapter's
-`request` among them. A selector spec's `affordances` refuse nothing: they are
+runs. A callable condition sees every registered seed, and whatever a
+transport seeds per call, such as `progress`. A selector spec's `affordances` refuse nothing: they are
 answers about each row.
 
 ```python
