@@ -192,6 +192,15 @@ class TestChoices:
             "oneOf": [{"const": "Awaiting review"}, {"type": "null"}]
         }
 
+    def test_a_one_of_member_with_no_constant_keeps_its_place(self) -> None:
+        subschema = {"oneOf": [{"type": "null"}, {"const": "PENDING_REVIEW", "title": "x"}]}
+        schema = {"type": "object", "properties": {"s": subschema}}
+        projection = AudienceProjection(choice_labels={"s": LABELS})
+
+        assert annotate(schema, projection)["properties"]["s"] == {
+            "oneOf": [{"type": "null"}, {"const": "Awaiting review"}]
+        }
+
     def test_a_schema_with_no_choice_keyword_is_left_alone(self) -> None:
         subschema = {"type": "string"}
         schema = {"type": "object", "properties": {"s": subschema}}
@@ -312,6 +321,17 @@ class TestSharedDisplays:
 
         assert annotate(schema, projection)["properties"]["s"] == {"enum": [True, 1, "Ex"]}
 
+    def test_a_boolean_and_the_number_it_equals_stay_two_constants(self) -> None:
+        """The ``oneOf`` spelling of the test above, the one a duplicate would
+        break: a row served ``1`` matches the entry naming ``1``."""
+        subschema = {"oneOf": [{"const": True}, {"const": 1}, {"const": "x", "title": "Ex"}]}
+        schema = {"type": "object", "properties": {"s": subschema}}
+        projection = AudienceProjection(choice_labels={"s": {"x": "Ex"}})
+
+        assert annotate(schema, projection)["properties"]["s"] == {
+            "oneOf": [{"const": True}, {"const": 1}, {"const": "Ex"}]
+        }
+
 
 class TestFormatters:
     """A formatter replaces what the property said about its value."""
@@ -379,6 +399,33 @@ class TestFormatters:
             "type": "number"
         }
 
+    def test_the_formatters_own_values_are_not_spoken(self) -> None:
+        """What the formatter declares is what it produces, so the displays of
+        the stored values are never applied to it."""
+        produced = ValueFormatter(str, produces="string", schema={"enum": ["a", "b"]})
+        marking = FieldMarking.formatted(produced)
+
+        assert self.formatted(
+            {"type": "string", "enum": ["a", "b"]}, marking, choice_labels={"due": {"a": "Alpha"}}
+        ) == {"type": "string", "enum": ["a", "b"]}
+
+    def test_a_hidden_field_is_dropped_whatever_formats_it(self) -> None:
+        """The schema's mirror of the payload test of that name: hidden is
+        answered before the formatter is asked, so the property and its
+        ``required`` entry both go."""
+        schema = {
+            "type": "object",
+            "properties": {"id": {"type": "integer"}, "due": {"type": "string"}},
+            "required": ["id", "due"],
+        }
+        hidden = FieldMarking(FieldAudience.HIDDEN, formatter=TIMESTAMP)
+
+        assert annotate(schema, AudienceProjection(fields={"due": hidden})) == {
+            "type": "object",
+            "properties": {"id": {"type": "integer"}},
+            "required": ["id"],
+        }
+
     def test_a_formatter_replaces_a_nested_object(self) -> None:
         subschema = {"type": "object", "properties": {"cost": {"type": "string"}}}
         child = AudienceProjection(fields={"cost": FieldMarking.hidden()})
@@ -397,6 +444,9 @@ class TestFormatters:
         subschema = {"type": ["string", "null"], "format": "date-time"}
 
         assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_field_stated_only_as_null_still_admits_it(self) -> None:
+        assert self.formatted({"type": "null"}) == {**LOCAL_TIME, "type": ["string", "null"]}
 
     def test_a_type_admitting_no_null_admits_none_after_formatting(self) -> None:
         """The condition of the null kept: only a stated ``"null"`` is."""

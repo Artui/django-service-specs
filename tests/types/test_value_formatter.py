@@ -32,6 +32,13 @@ class TestDeclaration:
         with pytest.raises(ImproperlyConfigured, match=rf"produces={produces!r}\) is not a JSON"):
             ValueFormatter(str, produces=produces)
 
+    def test_the_produced_type_is_checked_first(self) -> None:
+        """djangorestframework-services' order: a formatter wrong on both counts
+        is told about ``produces``, and never about the fragment."""
+        with pytest.raises(ImproperlyConfigured, match="is not a JSON type") as raised:
+            ValueFormatter(str, produces="object", schema={"type": "integer"})  # type: ignore[arg-type]
+        assert "may not set" not in str(raised.value)
+
     def test_the_fragment_may_not_name_the_type(self) -> None:
         """``produces`` declares it, so a formatter cannot contradict its own
         advertisement, and the refusal names the spelling that would."""
@@ -79,6 +86,13 @@ class TestTimestamp:
     @pytest.mark.parametrize("value", ["soon", 3, ["2026-01-31"]], ids=["text", "number", "list"])
     def test_anything_that_is_not_a_date_time_passes_through(self, value: Any) -> None:
         assert ValueFormatter.timestamp().apply(value) == value
+
+    def test_a_date_time_string_naming_no_real_moment_raises(self) -> None:
+        """The limit of passing through, kept from djangorestframework-services:
+        Django's parser accepts the shape and then refuses the day. The
+        message is Python's, and its wording differs between versions."""
+        with pytest.raises(ValueError):
+            ValueFormatter.timestamp().apply("2026-02-30T10:00:00")
 
     def test_the_example_is_rendered_from_the_format_in_use(self) -> None:
         """A day past the twelfth and an hour past noon, so the example tells

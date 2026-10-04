@@ -184,10 +184,13 @@ class ValueFormatter:
         A bare date string is read as midnight, so a date can be formatted
         too: give it a ``fmt`` without a time, or the rendering invents one. A
         naive date-time, as a project with ``USE_TZ = False`` has, is already
-        local and is formatted as it is. Anything else passes through
-        unchanged, for the same reason an unrecognised choice value does: a
-        stale or oddly-typed row should still be reported rather than fail the
-        call. Declaring this on a field that never carries a date is a
+        local and is formatted as it is. A value that is not a date-time, and a
+        string that does not read as one, passes through unchanged, for the
+        same reason an unrecognised choice value does: a stale or oddly-typed
+        row should still be reported rather than fail the call. A string shaped
+        like a date-time that names no real moment, the thirtieth of February
+        say, raises Django's ``ValueError``, as djangorestframework-services'
+        does. Declaring this on a field that never carries a date is a
         misdeclaration nothing here can detect.
         """
 

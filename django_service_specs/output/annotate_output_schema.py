@@ -145,8 +145,13 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
 
     A stated type that admits ``"null"`` still admits it, after the type the
     formatter produces: ``apply`` passes a null through unformatted, so a
-    nullable field still serves one. djangorestframework-services drops it,
-    because the serializer walk it annotates states no nullable type to keep.
+    nullable field still serves one. djangorestframework-services drops it.
+    Only a stated type list is read: a null stated as an ``anyOf`` member, or
+    as ``None`` in an ``enum``, is the spelling a schema written elsewhere may
+    use, and under a formatter it is lost, as it is there. This package's own
+    output schema states nullability as a type list. Each spelling read is
+    held by ``test_a_nullable_field_stays_nullable`` and
+    ``test_a_field_stated_only_as_null_still_admits_it``.
     """
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
