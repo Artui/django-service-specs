@@ -36,7 +36,11 @@ def base_pool(
 
     ``progress`` is the caller's reporter, and defaults to ``null_progress``
     rather than to ``None``, so a declared reporter is always callable - see
-    ``ProgressReporter``. A seed's resolver sees it like any other entry.
+    ``ProgressReporter``. Only ``None`` is replaced: a reporter that happens to
+    be falsy, such as a list-backed recorder that is empty until its first
+    report, is seeded as it is, where djangorestframework-services' ``or``
+    would swap it for ``null_progress`` and drop every report. A seed's
+    resolver sees it like any other entry.
 
     **An adapter that dispatches callables through this package must build its
     pool from this function**, with its own entries spread in —

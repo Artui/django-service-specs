@@ -27,7 +27,7 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | Name | Holds | In the pool of |
 | --- | --- | --- |
 | `user` | The principal | Every callable |
-| `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and a callable affordance condition's |
+| `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and its spec's callable affordance conditions' |
 | each validated value, by name | What the Validator returned | The service |
 | `data` | All of the validated values, as one mapping | The service |
 | `instance` | The row an instance selector resolved | The service |

@@ -292,8 +292,8 @@ the declare-to-receive rule every callable here is called through.
 [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]:
 a callable taking how far along, and optionally `total`, `message` and
 `meta`. It is seeded under the reserved name `progress`, as it is, into the
-pool of the call's run - the service, or a read's own selector - and of a
-callable affordance condition. A reporter must not raise, because nothing
+pool of the call's run - the service, or a read's own selector - and of that
+spec's callable affordance conditions. A reporter must not raise, because nothing
 between it and the service catches it. Under `adispatch` a sync run calls it
 on the executor thread, and an `async def` run on an event loop.
 

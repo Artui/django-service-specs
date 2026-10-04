@@ -1079,3 +1079,27 @@ def test_the_run_and_a_condition_are_handed_the_caller_s_reporter_as_it_is(ada: 
 
     assert handed["condition"] is reporter
     assert handed["service"] is reporter
+
+
+def test_an_output_selector_s_rows_are_answered_with_the_registered_seeds(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="Draft")
+    mine = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
+        ],
+    )
+    spec = ServiceSpec(
+        service=lambda: note.pk,
+        permissions=OPEN,
+        output_selector_spec=SelectorSpec(
+            kind=RETRIEVE,
+            selector=lambda *, result: Note.objects.filter(pk=result),
+            affordances={"x": mine},
+        ),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert result.value.affordance__x__c is True

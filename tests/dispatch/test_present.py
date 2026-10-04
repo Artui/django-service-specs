@@ -15,6 +15,7 @@ from django_service_specs.dispatch.present import present
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -438,3 +439,41 @@ def test_a_list_selector_returning_a_manager_answers_its_rows_affordances() -> N
 
     assert row["title"] == "One"
     assert row["affordances"]["rename"]["available"] is False
+
+
+@pytest.mark.django_db
+def test_a_target_lookup_s_answers_are_never_presented() -> None:
+    # Answered, as djangorestframework-services' dispatch answers them, and read
+    # by nothing: a service spec presents only its output selector's answers.
+    ada = make_user("ada")
+    note = Note.objects.create(owner=ada, title="Draft")
+    spec = ServiceSpec(
+        service=lambda *, instance: instance,
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(
+            kind=RETRIEVE, selector=note_by_pk, reads=PK, affordances={"rename": RENAME}
+        ),
+        presenter=Titles(),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"pk": note.pk})
+
+    assert result.value.affordance__rename__note_archived is True
+    assert present(spec, result) == {"title": "Draft"}
+
+
+@pytest.mark.django_db
+def test_rows_shaped_outside_dispatch_carry_no_answers_and_are_refused() -> None:
+    ada = make_user("ada")
+    Note.objects.create(owner=ada, title="Draft")
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=notes_of,
+        permissions=OPEN,
+        presenter=Titles(),
+        affordances={"rename": RENAME},
+    )
+    rows = shape_queryset(Note.objects.all(), spec, {"user": ada}, source_label="a transport")
+
+    with pytest.raises(ImproperlyConfigured, match="no 'affordance__rename__note_archived' answer"):
+        present(spec, DispatchResult("list", rows))

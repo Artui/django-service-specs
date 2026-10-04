@@ -37,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `affordance__<name>__<code>`, and a name colliding with an `annotations` key
   or with another entry's is refused at construction. `dispatch` and
   `adispatch` answer them wherever the selector runs, a service spec's output
-  selector included: on a queryset in the one `.annotate()` call shaping
+  selector included, and a target lookup's too, though nothing presents
+  those: on a queryset in the one `.annotate()` call shaping
   makes, before `extend_queryset` and before `paginate_output` slices it, so
   the list costs no extra query and a page's rows carry their answers; on
   instances a selector returns directly by one query per model class, and on
@@ -62,11 +63,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse nothing.
 - `progress=` on `dispatch` and `adispatch`: the transport's
   `ProgressReporter`, seeded under the reserved name `progress` into the pool
-  of the call's run (the service, or a selector spec's own selector) and of a
-  callable affordance condition, as it is. `base_pool` takes the same keyword.
-  With no reporter the pool carries `null_progress`, so a callable that
-  declares `progress` runs on every transport; a target or output selector
-  always gets `null_progress`. `ProgressReporter` and `null_progress` keep
+  of the call's run (the service, or a selector spec's own selector) and of
+  that spec's callable affordance conditions, as it is; a falsy reporter is
+  kept. `base_pool` takes the same keyword. With no reporter the pool carries
+  `null_progress`, so a callable that declares `progress` runs on every
+  transport; a target or output selector, and its affordance conditions,
+  always get `null_progress`. `ProgressReporter` and `null_progress` keep
   djangorestframework-services' signatures.
 - `paginate_output(rows, *, page=None, limit=None, max_page_size=None)`,
   `DEFAULT_PAGE_SIZE` and `OutputPage`: a list result's value sliced into the

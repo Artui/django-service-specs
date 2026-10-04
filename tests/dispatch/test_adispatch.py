@@ -570,3 +570,25 @@ async def test_an_async_selector_s_rows_are_answered_off_the_loop(ada: Any) -> N
     result = await adispatch(spec, principal=ada, arguments={})
 
     assert [row.affordance__rename__note_archived for row in result.value] == [True, False]
+
+
+async def test_an_async_selector_s_rows_are_answered_with_the_registered_seeds(ada: Any) -> None:
+    # The async selector path answers its rows in a hop of its own, so it is
+    # handed the call's seed set separately from the sync path.
+    await _create(owner=ada, title="live")
+
+    async def notes(*, user: Any) -> list[Note]:
+        return await sync_to_async(lambda: list(notes_of(user=user)))()
+
+    mine = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
+        ],
+    )
+    spec = SelectorSpec(kind=LIST, selector=notes, permissions=OPEN, affordances={"x": mine})
+
+    result = await adispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert [row.affordance__x__c for row in result.value] == [True]

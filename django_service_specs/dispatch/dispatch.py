@@ -81,10 +81,11 @@ def dispatch(
 
     ``progress`` is the transport's own progress reporter, seeded under the
     reserved name ``progress`` into the pool of whatever is this call's run -
-    the service, or a selector spec's own selector - and into a callable
-    affordance condition's. With none, the pool carries ``null_progress``, so a
-    callable that declares the parameter runs on every transport. A target or
-    output selector always gets ``null_progress``: a lookup has nothing to
+    the service, or a selector spec's own selector - and into that spec's
+    callable affordance conditions'. With none, the pool carries
+    ``null_progress``, so a callable that declares the parameter runs on every
+    transport. A target or output selector, and its affordance conditions,
+    always get ``null_progress``: a lookup has nothing to
     report, and one reporting after the service finished would read as the
     work restarting.
 

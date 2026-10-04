@@ -92,6 +92,19 @@ def test_a_supplied_reporter_is_seeded_as_it_is() -> None:
     assert base_pool(user="u", progress=reporter)["progress"] is reporter
 
 
+class _Recorder(list[float]):
+    """A reporter that is falsy until its first report."""
+
+    def __call__(self, progress: float, **_: Any) -> None:
+        self.append(progress)
+
+
+def test_a_falsy_reporter_is_seeded_as_it_is() -> None:
+    recorder = _Recorder()
+
+    assert base_pool(user="u", progress=recorder)["progress"] is recorder
+
+
 def test_a_resolver_sees_the_caller_s_reporter() -> None:
     def reporter(progress: float, **_: Any) -> None: ...
 

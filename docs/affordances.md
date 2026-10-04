@@ -286,3 +286,15 @@ Presenting refuses what would lose or garble the answers: a spec declaring
 already has an `affordances` key, and a row that did not come through the
 selector declaring them. Dispatch refuses a condition on the row beside mapping
 rows, and a row that is neither a model instance nor a mapping.
+
+A target lookup - a service spec's `instance_selector_spec` or
+`collection_selector_spec` - that declares `affordances` has its rows answered
+too, as djangorestframework-services' dispatch answers them, and nothing
+presents them: a service spec presents only its output selector's answers. The
+declaration costs a subquery, or a query of its own when the lookup returns a
+bare row, and buys nothing. Declare the answers on the read that lists the
+rows, or on the output selector.
+
+[`shape_queryset`][django_service_specs.selectors.shape_queryset.shape_queryset]
+answers none: a transport that shapes a selector's rows itself, rather than
+through dispatch, hands `present` rows with no answers on them, and is refused.

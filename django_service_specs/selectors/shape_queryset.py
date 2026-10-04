@@ -25,6 +25,11 @@ def shape_queryset(
     as every other pool-resolved callable, and its return is the shaped
     queryset from here on.
 
+    It answers no ``affordances``. Dispatch answers a selector spec's in the
+    same ``.annotate()`` call, with the call's registered seeds, which this is
+    not handed; a transport that shapes rows here and then presents them
+    through a spec declaring ``affordances`` is refused at ``present``.
+
     Args:
         source_label: Named in the misconfiguration error to point at the
             offending spec (``"SelectorSpec.selector"`` vs
