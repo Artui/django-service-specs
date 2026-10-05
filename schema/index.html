@@ -16,7 +16,7 @@
         <link rel="prev" href="../pydantic/">
       
       
-        <link rel="next" href="../reference/">
+        <link rel="next" href="../paging-and-projection/">
       
       
         
@@ -399,6 +399,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../relations/" class="md-nav__link">
         
   
@@ -675,6 +702,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../reference/" class="md-nav__link">
         
   
@@ -870,9 +924,12 @@ happened to install.</p>
 <li><a class="autorefs autorefs-internal" title="spec_input_schema" href="../reference/#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema(spec, *, unknown_arguments=REJECT)</code></a>
   describes everything <code>spec.parameters()</code> declares: the arguments dispatch
   checks.</li>
-<li><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(spec)</code></a>
+<li><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)</code></a>
   describes what <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a>
-  returns for the spec, or <code>None</code> when the spec declares no output.</li>
+  returns for the spec, or <code>None</code> when the spec declares no output. With
+  <code>paginate=True</code> a list is described as the page envelope, and with a
+  <code>projection</code> as an agent audience is served it; see
+  <a href="../paging-and-projection/">paging and projection</a>.</li>
 <li><a class="autorefs autorefs-internal" title="parameters_schema" href="../reference/#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema(parameters, *, unknown_arguments=REJECT)</code></a>
   and <a class="autorefs autorefs-internal" title="output_schema" href="../reference/#django_service_specs.schema.output_schema.output_schema"><code>output_schema(output)</code></a>
   are the same over a bare declaration, for a transport describing something
@@ -911,8 +968,8 @@ choices and a default, and refuses any other argument:</p>
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>It returns a list, so its output is an array of rows. The rows' fields carry
-markings - <code>id</code> is a handle, <code>title</code> the label - which the schema does not
-state; see <a href="#what-is-deliberately-not-emitted">what is not emitted</a>.</p>
+markings - <code>id</code> is a handle, <code>title</code> the label - which this schema does not
+apply; see <a href="#what-is-deliberately-not-emitted">what is not emitted</a>.</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"array"</span><span class="p">,</span>
 </span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
@@ -1097,11 +1154,16 @@ service can return <code>None</code> is not something its declaration says.</p>
 <li><strong>No <code>additionalProperties</code> on output.</strong> Output is not a set a caller can get
   wrong, and a transport may add keys of its own to what it sends.</li>
 <li><strong>No <code>default</code> or <code>description</code> on output.</strong> A default says what happens when
-  a caller omits an argument, which means nothing for a value that came back.</li>
-<li><strong>No marking.</strong> A field marked as a handle, a label or hidden is described
-  like any other. Showing a field to an agent audience, or leaving it out, is a
-  projection over the schema and the payload, and the kernel declares markings
-  without applying any.</li>
+  a caller omits an argument, which means nothing for a value that came back. A
+  projected schema is the exception for <code>description</code>: a marking's description,
+  or the transport's <code>handle_description</code> on a handle, is stated there.</li>
+<li><strong>No marking, unless a projection is passed.</strong> Without one, a field marked as
+  a handle, a label or hidden is described like any other, which is what
+  <code>present</code> and every HTTP response return. With one,
+  <a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+  describes what
+  <a class="autorefs autorefs-internal" title="present_for_audience" href="../reference/#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+  returns; see <a href="../paging-and-projection/">paging and projection</a>.</li>
 <li><strong>No <code>$schema</code> key.</strong> A transport whose wire wants one adds it.</li>
 </ul>
 

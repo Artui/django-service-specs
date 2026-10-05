@@ -1,0 +1,1261 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A service contract for Django: declare an operation's parameters, permission check, validation and output once, and dispatch it from any transport.">
+      
+      
+      
+        <link rel="canonical" href="https://artui.github.io/django-service-specs/affordances/">
+      
+      
+        <link rel="prev" href="../arguments/">
+      
+      
+        <link rel="next" href="../relations/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Affordances - django-service-specs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#affordances" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="django-service-specs" class="md-header__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            django-service-specs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Affordances
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 7a5 5 0 0 1 5 5 5 5 0 0 1-5 5 5 5 0 0 1-5-5 5 5 0 0 1 5-5m0 2a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3m0-7 2.39 3.42C13.65 5.15 12.84 5 12 5s-1.65.15-2.39.42zM3.34 7l4.16-.35A7.2 7.2 0 0 0 5.94 8.5c-.44.74-.69 1.5-.83 2.29zm.02 10 1.76-3.77a7.131 7.131 0 0 0 2.38 4.14zM20.65 7l-1.77 3.79a7.02 7.02 0 0 0-2.38-4.15zm-.01 10-4.14.36c.59-.51 1.12-1.14 1.54-1.86.42-.73.69-1.5.83-2.29zM12 22l-2.41-3.44c.74.27 1.55.44 2.41.44.82 0 1.63-.17 2.37-.44z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m17.75 4.09-2.53 1.94.91 3.06-2.63-1.81-2.63 1.81.91-3.06-2.53-1.94L12.44 4l1.06-3 1.06 3zm3.5 6.91-1.64 1.25.59 1.98-1.7-1.17-1.7 1.17.59-1.98L15.75 11l2.06-.05L18.5 9l.69 1.95zm-2.28 4.95c.83-.08 1.72 1.1 1.19 1.85-.32.45-.66.87-1.08 1.27C15.17 23 8.84 23 4.94 19.07c-3.91-3.9-3.91-10.24 0-14.14.4-.4.82-.76 1.27-1.08.75-.53 1.93.36 1.85 1.19-.27 2.86.69 5.83 2.89 8.02a9.96 9.96 0 0 0 8.02 2.89m-1.64 2.02a12.08 12.08 0 0 1-7.8-3.47c-2.17-2.19-3.33-5-3.49-7.82-2.81 3.14-2.7 7.96.31 10.98 3.02 3.01 7.84 3.12 10.98.31"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="django-service-specs" class="md-nav__button md-logo" aria-label="django-service-specs" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    django-service-specs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Artui/django-service-specs" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    Artui/django-service-specs
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../declaring/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Declaring an operation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../dispatching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dispatching
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../http/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serving over HTTP
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../arguments/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Arguments and refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-kinds-of-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two kinds of condition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refused-where-it-is-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused where it is written
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#offering-an-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offering an operation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enforcing-at-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcing at the call
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asking-for-one-more-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking for one more value
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declaring-idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring idempotency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#answers-for-each-row-of-a-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answers for each row of a list
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../relations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Relation writes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../registry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The forms adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pydantic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The pydantic adapter
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#two-kinds-of-condition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two kinds of condition
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#refused-where-it-is-written" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Refused where it is written
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#offering-an-operation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Offering an operation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#enforcing-at-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Enforcing at the call
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#asking-for-one-more-value" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Asking for one more value
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#declaring-idempotency" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Declaring idempotency
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#answers-for-each-row-of-a-list" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answers for each row of a list
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/Artui/django-service-specs/edit/main/docs/affordances.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="affordances">Affordances<a class="headerlink" href="#affordances" title="Permanent link">&para;</a></h1>
+<p>Some operations are impossible right now as a fact about the world rather than
+about the caller: an archived note cannot be renamed, refunds are closed while
+the books are. An <strong>affordance</strong> says so on the operation, once, so every
+transport reads the same rule. A call is refused with a stable code beside the
+sentence, and a transport listing operations before anyone calls them can leave
+out one that no call could pass.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># An ambient fact a condition may read, registered like any other pool seed.</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">seeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">read_only</span><span class="o">=</span><span class="k">lambda</span><span class="p">:</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">settings</span><span class="p">,</span> <span class="s2">"NOTES_READ_ONLY"</span><span class="p">,</span> <span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">rename_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">service</span><span class="o">=</span><span class="n">rename_note</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsOwner</span><span class="p">()],</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">instance_selector_spec</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteOut</span><span class="p">),</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">affordances</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>        <span class="n">Affordance</span><span class="p">(</span>  <span class="c1"># a condition on nothing in particular: a callable over the seeds</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="n">code</span><span class="o">=</span><span class="s2">"notes_read_only"</span><span class="p">,</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>            <span class="n">reason</span><span class="o">=</span><span class="s2">"Notes are read-only during maintenance."</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>            <span class="n">when</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">read_only</span><span class="p">:</span> <span class="ow">not</span> <span class="n">read_only</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>        <span class="p">),</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="n">Affordance</span><span class="p">(</span>  <span class="c1"># a condition on the row: an ORM expression, answered in SQL</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>            <span class="n">code</span><span class="o">=</span><span class="s2">"note_archived"</span><span class="p">,</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>            <span class="n">reason</span><span class="o">=</span><span class="s2">"An archived note cannot be renamed. Restore it first."</span><span class="p">,</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>            <span class="n">when</span><span class="o">=</span><span class="n">Q</span><span class="p">(</span><span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a>        <span class="p">),</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="p">],</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    <span class="n">idempotent</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># renaming twice to one title leaves what renaming once did</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><a class="autorefs autorefs-internal" title="ServiceSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.specs.service_spec.ServiceSpec"><code>ServiceSpec</code></a>'s
+<code>affordances</code> takes a sequence of conditions, each an
+<a class="autorefs autorefs-internal" title="Affordance
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.affordance.Affordance"><code>Affordance</code></a>
+with three fields:</p>
+<ul>
+<li><strong><code>code</code></strong> names the rule, never the state that tripped it, and does not
+  change when the sentence is reworded. It is what a transport or a client
+  branches on.</li>
+<li><strong><code>reason</code></strong> is the sentence people and models both read, and the message
+  of the refusal. Say what is not possible and, where it helps, what would
+  make it possible.</li>
+<li><strong><code>when</code></strong> is true when the operation <strong>is</strong> available.</li>
+</ul>
+<p>Not a fact about the caller: that is <code>permissions</code>, which is always checked
+first, so a principal who may not see a row is never told what state it is in.</p>
+<h2 id="two-kinds-of-condition">Two kinds of condition<a class="headerlink" href="#two-kinds-of-condition" title="Permanent link">&para;</a></h2>
+<p><code>when</code>'s type decides which kind it is. It is derived, never declared, so it
+cannot drift from what it describes:</p>
+<ul>
+<li><strong>An ORM boolean expression</strong> - a <code>Q</code>, an <code>Exists</code>, a lookup - is a
+  condition on the row. It reads exactly as <code>Note.objects.filter(when)</code> does,
+  relations included, and is answered in SQL: every condition on the row in
+  one query, however many are declared. A <code>NULL</code> is not true.</li>
+<li><strong>A callable</strong> is a condition on nothing in particular. It is called with
+  the pool seeds it names - <code>user</code>, <code>progress</code> and any registered
+  <a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.pool.pool_seeds.PoolSeeds">pool seed</a>, like
+  <code>read_only</code> above - and never with the call's target, its validated values
+  or a client's argument: the caller does not get to decide whether the
+  operation is available. Its result is read for truth, so a callable that
+  returns nothing means unavailable.</li>
+</ul>
+<p><strong>A Python callable over the row is refused.</strong> A rule that has to run once per
+row turns every list reporting availability into a query per row, and
+prefetching does not fix it. A rule the ORM cannot express is not an
+affordance: it stays in the service, which raises a
+<a class="autorefs autorefs-internal" title="ServiceConflict" href="../reference/#django_service_specs.services.service_conflict.ServiceConflict"><code>ServiceConflict</code></a>
+and advertises nothing.</p>
+<h2 id="refused-where-it-is-written">Refused where it is written<a class="headerlink" href="#refused-where-it-is-written" title="Permanent link">&para;</a></h2>
+<p>Every mistake below raises <code>ImproperlyConfigured</code> when the spec is built, so it
+fails at import rather than on the first call through a transport that never
+asked:</p>
+<ul>
+<li>a <code>code</code> or <code>reason</code> that is not a non-empty string;</li>
+<li>an ORM expression that is not boolean, such as <code>F("title")</code>;</li>
+<li>a callable naming <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code> or <code>queryset</code>,
+  the names dispatch seeds per call;</li>
+<li>a <code>when</code> that is neither an expression nor a callable;</li>
+<li><code>affordances</code> that is not a sequence - a single <code>Affordance</code>, a set whose
+  order would decide which refusal a caller sees, a generator the first call
+  would exhaust;</li>
+<li>an entry that is not an <code>Affordance</code>, or a code declared twice;</li>
+<li>a condition on the row on an operation with a <code>collection_selector_spec</code>,
+  which has no single row to answer it against.</li>
+</ul>
+<h2 id="offering-an-operation">Offering an operation<a class="headerlink" href="#offering-an-operation" title="Permanent link">&para;</a></h2>
+<p>A transport that lists operations before anyone calls them - an MCP server
+building its tool list, an agent assembling its next toolset - asks
+<a class="autorefs autorefs-internal" title="unmet_operation_affordance" href="../reference/#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance"><code>unmet_operation_affordance</code></a>
+for the first callable condition not met now, or <code>None</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">OPERATIONS</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"list_notes"</span><span class="p">:</span> <span class="n">list_notes_spec</span><span class="p">,</span> <span class="s2">"rename_note"</span><span class="p">:</span> <span class="n">rename_spec</span><span class="p">}</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">tools_for</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">    </span><span class="sd">"""Each operation a transport could offer, with the code of what withholds it."""</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">pool</span> <span class="o">=</span> <span class="n">base_pool</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>  <span class="c1"># the seeds a call would be handed</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">tools</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">spec</span> <span class="ow">in</span> <span class="n">OPERATIONS</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>        <span class="n">unmet</span> <span class="o">=</span> <span class="n">unmet_operation_affordance</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">pool</span><span class="p">,</span> <span class="n">reserved</span><span class="o">=</span><span class="n">seeds</span><span class="o">.</span><span class="n">reserved</span><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>        <span class="n">tools</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">unmet</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">unmet</span><span class="o">.</span><span class="n">code</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="k">return</span> <span class="n">tools</span>
+</span></code></pre></div>
+<p>Conditions on the row are skipped without a query, because at list time there
+is no row; they go on being answered at the call. A
+<a class="autorefs autorefs-internal" title="SelectorSpec
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.specs.selector_spec.SelectorSpec"><code>SelectorSpec</code></a>
+answers <code>None</code>.
+<a class="autorefs autorefs-internal" title="operation_affordances" href="../reference/#django_service_specs.affordances.operation_affordances.operation_affordances"><code>operation_affordances</code></a>
+returns the conditions that would be asked, so a transport can skip building a
+pool when there are none.</p>
+<p><strong>Build the pool the way the call's would be</strong>:
+<a class="autorefs autorefs-internal" title="base_pool" href="../reference/#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a> with the same
+<code>seeds=</code>, and <code>reserved=seeds.reserved</code> beside it, or a condition reading a
+registered seed is asked without it. A condition that raises propagates: one
+that cannot be answered is not a no.</p>
+<p><strong>The answer is advisory.</strong> An operation listed a moment before a condition
+flips is refused when it is called, with the code this would answer if asked
+again then. A condition driven by a clock has no event, so nothing announces
+the moment it flips.</p>
+<h2 id="enforcing-at-the-call">Enforcing at the call<a class="headerlink" href="#enforcing-at-the-call" title="Permanent link">&para;</a></h2>
+<p><a class="autorefs autorefs-internal" title="dispatch" href="../reference/#django_service_specs.dispatch.dispatch.dispatch"><code>dispatch</code></a> and
+<a class="autorefs autorefs-internal" title="adispatch
+
+
+  
+      async
+  " href="../reference/#django_service_specs.dispatch.adispatch.adispatch"><code>adispatch</code></a> answer a
+service spec's affordances themselves, after object-level authorization and
+the Validator and before the run's transaction opens. The first one not met
+refuses the call with
+<a class="autorefs autorefs-internal" title="ActionUnavailable" href="../reference/#django_service_specs.services.action_unavailable.ActionUnavailable"><code>ActionUnavailable</code></a>,
+carrying its <code>reason</code> as the message and its <code>code</code>, and the service never
+runs. A callable condition sees every registered seed, and whatever a
+transport seeds per call, such as <code>progress</code>. A selector spec's <code>affordances</code> refuse nothing: they are
+answers about each row.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># dispatch answers the affordances itself, after the object-level check and</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="c1"># the Validator: an archived note is refused before the service runs.</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>        <span class="n">rename_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">pk</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">pool_seeds</span><span class="o">=</span><span class="n">seeds</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="p">)</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">value</span>
+</span></code></pre></div>
+<p><a class="autorefs autorefs-internal" title="enforce_affordances" href="../reference/#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>
+is that step, exported for a transport that runs a service itself. It calls it
+after authorization and validation and before the service, with the pool
+seeds' <code>reserved</code> set, or a condition the direct path refuses is skipped on
+that one:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_step</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="sd">"""One step of a chain that resolved its row itself and runs the service in hand."""</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">grant</span> <span class="o">=</span> <span class="n">authorize</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="n">user</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">authorize_target</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="n">user</span><span class="p">,</span> <span class="n">note</span><span class="p">,</span> <span class="n">grant</span><span class="o">=</span><span class="n">grant</span><span class="p">)</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">data</span> <span class="o">=</span> <span class="n">bind_arguments</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">note</span><span class="o">.</span><span class="n">pk</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">note</span><span class="p">)</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">pool</span> <span class="o">=</span> <span class="n">base_pool</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">pool</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="o">**</span><span class="n">data</span><span class="p">,</span> <span class="s2">"data"</span><span class="p">:</span> <span class="n">data</span><span class="p">,</span> <span class="s2">"instance"</span><span class="p">:</span> <span class="n">note</span><span class="p">})</span>  <span class="c1"># the pool the service receives</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">enforce_affordances</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="n">pool</span><span class="p">,</span> <span class="n">instance</span><span class="o">=</span><span class="n">note</span><span class="p">,</span> <span class="n">reserved</span><span class="o">=</span><span class="n">seeds</span><span class="o">.</span><span class="n">reserved</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>    <span class="k">return</span> <span class="n">rename_spec</span><span class="o">.</span><span class="n">service</span><span class="p">(</span><span class="o">**</span><span class="n">resolve_callable_kwargs</span><span class="p">(</span><span class="n">rename_spec</span><span class="o">.</span><span class="n">service</span><span class="p">,</span> <span class="n">pool</span><span class="p">))</span>
+</span></code></pre></div>
+<p>Declaration order decides which refusal a caller sees, and nothing after the
+first unmet condition runs. A condition on the row is read from the table, not
+from the instance in hand. Two other answers come from the row: one that
+vanished since it was resolved is
+<a class="autorefs autorefs-internal" title="ServiceNotFound" href="../reference/#django_service_specs.services.service_not_found.ServiceNotFound"><code>ServiceNotFound</code></a>,
+and a condition on the row reached with no model instance to answer it for is
+<code>ImproperlyConfigured</code>.</p>
+<p><code>ActionUnavailable</code> is a <code>ServiceConflict</code>, so a transport that has never heard
+of it still answers a conflict. One that wants the code matches it before its
+generic conflict and service-error handlers.</p>
+<p><a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
+answers it at 409, with the code beside the detail a client already reads:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"An archived note cannot be renamed. Restore it first."</span><span class="p">,</span><span class="w"> </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">}</span>
+</span></code></pre></div>
+<h2 id="asking-for-one-more-value">Asking for one more value<a class="headerlink" href="#asking-for-one-more-value" title="Permanent link">&para;</a></h2>
+<p>A service that gets far enough to discover it needs something else - usually
+because of what it found - raises
+<a class="autorefs autorefs-internal" title="AdditionalInputRequired" href="../reference/#django_service_specs.services.additional_input_required.AdditionalInputRequired"><code>AdditionalInputRequired</code></a>
+with a message and a <code>schema</code>. It is not a validation error, because what was sent is not
+wrong, and it is a
+<a class="autorefs autorefs-internal" title="ServiceError" href="../reference/#django_service_specs.services.service_error.ServiceError"><code>ServiceError</code></a>, so
+a transport that has never heard of it still reports why the operation did not
+complete.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">Purge</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">confirmed</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>  <span class="c1"># declared, so the second call may send it</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="k">def</span><span class="w"> </span><span class="nf">purge_archived</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">confirmed</span><span class="p">:</span> <span class="nb">bool</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">doomed</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    <span class="n">count</span> <span class="o">=</span> <span class="n">doomed</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="k">if</span> <span class="n">count</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">confirmed</span><span class="p">:</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="k">raise</span> <span class="n">AdditionalInputRequired</span><span class="p">(</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">count</span><span class="si">}</span><span class="s2"> archived notes will be deleted. Confirm to proceed."</span><span class="p">,</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>            <span class="n">schema</span><span class="o">=</span><span class="p">{</span><span class="s2">"confirmed"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"type"</span><span class="p">:</span> <span class="s2">"boolean"</span><span class="p">}},</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="p">)</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="n">doomed</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="k">return</span> <span class="n">count</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a><span class="n">purge_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="n">service</span><span class="o">=</span><span class="n">purge_archived</span><span class="p">,</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Purge</span><span class="p">),</span>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="p">)</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>
+</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a><span class="k">def</span><span class="w"> </span><span class="nf">purge</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    <span class="k">return</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">purge_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="n">arguments</span><span class="p">)</span><span class="o">.</span><span class="n">value</span>
+</span></code></pre></div>
+<p><code>schema</code> describes what is missing, keyed by the argument the service expects
+it back under. The answer comes back as an ordinary argument on the next call,
+so the operation declares it like any other, and there is no session to
+resume. <code>error_response</code> answers 422, with the schema beside the detail when
+there is one:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2 archived notes will be deleted. Confirm to proceed."</span><span class="p">,</span><span class="w"> </span><span class="nt">"schema"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"confirmed"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"boolean"</span><span class="p">}}}</span>
+</span></code></pre></div>
+<h2 id="declaring-idempotency">Declaring idempotency<a class="headerlink" href="#declaring-idempotency" title="Permanent link">&para;</a></h2>
+<p><code>ServiceSpec(idempotent=True)</code> states that repeating the call with the same
+arguments leaves the state making it once did. Nothing in this package reads
+it, because idempotency is a property of the service the author writes, not
+something a dispatcher can arrange; it is stated once so that a retry policy, a
+queue's redelivery handling and an agent tool annotation all read the same
+answer. <code>None</code>, the default, means undeclared, so a transport can tell "nothing
+was said" from a declared <code>False</code>. <code>atomic</code> answers a different question: a
+single call is all-or-nothing, not that a second one is a no-op.</p>
+<h2 id="answers-for-each-row-of-a-list">Answers for each row of a list<a class="headerlink" href="#answers-for-each-row-of-a-list" title="Permanent link">&para;</a></h2>
+<p>A <code>SelectorSpec</code> declares which operations' affordances each of its rows is
+answered for, keyed by a name the caller chooses:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># The list, declaring which operations' answers its rows are asked for.</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">list_notes_with_answers_spec</span> <span class="o">=</span> <span class="n">replace</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">,</span> <span class="n">affordances</span><span class="o">=</span><span class="p">{</span><span class="s2">"rename"</span><span class="p">:</span> <span class="n">rename_spec</span><span class="p">})</span>
+</span></code></pre></div>
+<p>The values are the <code>ServiceSpec</code>s themselves rather than registry names, so a
+read takes no registry dependency and the declaration is the one the operation
+enforces. Each answer is named <code>affordance__&lt;name&gt;__&lt;code&gt;</code> - here
+<code>affordance__rename__notes_read_only</code> and <code>affordance__rename__note_archived</code>.
+A name colliding with a key of the selector's <code>annotations</code>, or two entries
+generating one name, is refused when the spec is built, because a generated
+answer silently replacing a project's own annotation is the worst way for this
+to fail.</p>
+<p>Dispatch answers them wherever the selector runs: a selector spec's own, or a
+service spec's output selector. On a queryset, every answer joins the spec's
+<code>annotations</code> in the one <code>.annotate()</code> call shaping makes, before
+<code>extend_queryset</code> and before a transport pages the rows, so the list still
+costs one query and a page's rows carry what the whole list would have. A
+condition on the row is the same correlated <code>EXISTS</code> the call is refused by,
+so the list and the call agree about every row; a callable condition is
+answered once per call, against the seeds alone, as it is at the call. Rows a
+selector returns directly are answered too: instances by one query per model
+class, mappings with their callable answers only, because a mapping has no row
+to find.</p>
+<p><a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a> then adds an
+<code>affordances</code> object to every row it presents, and so does every response the
+HTTP views serve and every payload
+<a class="autorefs autorefs-internal" title="present_for_audience" href="../reference/#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+hands an agent, <code>reason</code> included:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">list_notes</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="c1"># dispatch answers every row's affordances as it runs the selector, in the</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="c1"># one query the list costs; present adds them to each row it presents.</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">list_notes_with_answers_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{},</span> <span class="n">pool_seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="k">return</span> <span class="n">present</span><span class="p">(</span><span class="n">list_notes_with_answers_spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="p">[</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">  </span><span class="p">{</span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Draft"</span><span class="p">,</span><span class="w"> </span><span class="nt">"affordances"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"rename"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}},</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="w">    </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Old"</span><span class="p">,</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">    </span><span class="nt">"affordances"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">      </span><span class="nt">"rename"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">        </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">,</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">        </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="s2">"An archived note cannot be renamed. Restore it first."</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a><span class="w">  </span><span class="p">}</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a><span class="p">]</span>
+</span></code></pre></div>
+<p>Each name answers with the first condition its row does not meet, in
+declaration order, as the call would refuse. A row deleted between the selector
+returning it and its answers being asked is <code>{"available": false}</code> with no
+<code>code</code> and no <code>reason</code>, because no condition's sentence is true of a row that
+no longer exists. A selector spec's <code>affordances</code> refuse nothing: the archived
+note is still listed, and says why it cannot be renamed.</p>
+<p><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+describes the object on each item, with or without a projection, and with each
+name's codes enumerated so a client can switch on them:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="p">{</span>
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="w">    </span><span class="nt">"rename"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">      </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">        </span><span class="nt">"available"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"boolean"</span><span class="p">},</span>
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">        </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="nt">"enum"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"notes_read_only"</span><span class="p">,</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">]},</span>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">        </span><span class="nt">"reason"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">}</span>
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">      </span><span class="p">},</span>
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a><span class="w">      </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"available"</span><span class="p">]</span>
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"rename"</span><span class="p">]</span>
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>Presenting refuses what would lose or garble the answers: a spec declaring
+<code>affordances</code> with no presenter, a presented row that is not an object or
+already has an <code>affordances</code> key, and a row that did not come through the
+selector declaring them. Dispatch refuses a condition on the row beside mapping
+rows, and a row that is neither a model instance nor a mapping.</p>
+<p>A target lookup - a service spec's <code>instance_selector_spec</code> or
+<code>collection_selector_spec</code> - that declares <code>affordances</code> has its rows answered
+too, as djangorestframework-services' dispatch answers them, and nothing
+presents them: a service spec presents only its output selector's answers. The
+declaration costs a subquery, or a query of its own when the lookup returns a
+bare row, and buys nothing. Declare the answers on the read that lists the
+rows, or on the output selector.</p>
+<p><a class="autorefs autorefs-internal" title="shape_queryset" href="../reference/#django_service_specs.selectors.shape_queryset.shape_queryset"><code>shape_queryset</code></a>
+answers none: a transport that shapes a selector's rows itself, rather than
+through dispatch, hands <code>present</code> rows with no answers on them, and is refused.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.instant", "navigation.tracking", "navigation.sections", "navigation.top", "search.highlight", "search.suggest", "content.code.copy", "content.code.annotate", "content.action.edit", "toc.follow"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

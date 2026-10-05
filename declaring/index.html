@@ -529,6 +529,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../relations/" class="md-nav__link">
         
   
@@ -645,6 +672,33 @@
     
   
     JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
   
 
     
@@ -865,6 +919,11 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 <td>Every callable</td>
 </tr>
 <tr>
+<td><code>progress</code></td>
+<td>The transport's progress reporter, or <code>null_progress</code></td>
+<td>Every callable; the caller's reporter only in the run's pool and its spec's callable affordance conditions'</td>
+</tr>
+<tr>
 <td>each validated value, by name</td>
 <td>What the Validator returned</td>
 <td>The service</td>
@@ -906,8 +965,8 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 </tr>
 </tbody>
 </table>
-<p>The fixed names - <code>user</code>, <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code> and
-<code>queryset</code>, with <code>progress</code> held back for later - are
+<p>The fixed names - <code>user</code>, <code>progress</code>, <code>data</code>, <code>instance</code>, <code>collection</code>,
+<code>result</code> and <code>queryset</code> - are
 <a class="autorefs autorefs-internal" title="RESERVED_POOL_SEEDS
 
 
@@ -1132,7 +1191,7 @@ dataclasses included.</p>
 <tbody>
 <tr>
 <td><code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code></td>
-<td>Their JSON types. <code>float</code> also takes an integer; nothing else crosses types, so <code>true</code> is not an <code>int</code>.</td>
+<td>Their JSON types. <code>float</code> also takes an integer; nothing else crosses types, so <code>true</code> is not an <code>int</code>. Through dispatch, the shape check hands an <code>int</code> field a whole float such as <code>2.0</code> as <code>2</code>.</td>
 </tr>
 <tr>
 <td><code>Decimal</code>, <code>datetime</code>, <code>date</code></td>
@@ -1225,8 +1284,22 @@ who the field is for. The
 <a class="autorefs autorefs-internal" title="FieldAudience" href="../reference/#django_service_specs.output.field_audience.FieldAudience"><code>FieldAudience</code></a> is
 <code>CONTENT</code> by default, <code>LABEL</code> for the field that names the record,
 <code>HANDLE</code> for an opaque identifier that is passed to other tools and never read
-out to a person, and <code>HIDDEN</code> for plumbing. The kernel carries the marking on
-the declaration; projecting a payload for an audience is a transport's job.</p>
+out to a person, and <code>HIDDEN</code> for plumbing. A marking may also carry a
+<a class="autorefs autorefs-internal" title="ValueFormatter
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.value_formatter.ValueFormatter"><code>ValueFormatter</code></a>,
+which renders the field's value for that audience, a date-time in the
+active time zone say, and states the JSON type it produces (see
+<a href="../paging-and-projection/#formatting-a-value">formatting a value</a>). The kernel
+carries the marking on the declaration and applies it only for a caller that
+names an audience,
+through
+<a class="autorefs autorefs-internal" title="present_for_audience" href="../reference/#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>;
+<code>present</code>, and so every HTTP response, serves every field. See
+<a href="../paging-and-projection/">paging and projection</a>.</p>
 <p><a class="autorefs autorefs-internal" title="DataclassPresenter" href="../reference/#django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter"><code>DataclassPresenter</code></a>
 declares the output as a dataclass and reads each field off the value <strong>by
 attribute</strong>, so the value is usually a model row and is never converted into

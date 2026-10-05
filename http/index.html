@@ -540,6 +540,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../relations/" class="md-nav__link">
         
   
@@ -656,6 +683,33 @@
     
   
     JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
   
 
     
@@ -869,9 +923,14 @@ is the whole of what a hand-written view calls:</p>
 <li><strong>A not-found result</strong> is 404, <code>{"detail": "Not found."}</code>.</li>
 <li><strong>A success</strong> is the presented value, bare, with no envelope around it. The
   status is the caller's <code>success_status</code>, or else 204 for a service with
-  nothing to present and 200 for everything else. A 204 has no body. A read
-  whose value is <code>None</code> (an <code>allow_none</code> retrieve that found nothing) answers
-  <code>null</code> at 200, since <code>None</code> is its value.</li>
+  nothing to present and 200 for everything else. A 204 has no body. A service
+  with nothing to present at any other status the caller names answers an
+  empty body with no <code>Content-Type</code>, at that status. djangorestframework-services
+  answers the same, except that where an output selector ran and found nothing
+  it answers 204 whatever the caller named. Here the status stays the caller's:
+  the caller named it, and an empty re-read already has a meaning, the value
+  <code>None</code>. A read whose value is <code>None</code> (an <code>allow_none</code>
+  retrieve that found nothing) answers <code>null</code>, since <code>None</code> is its value.</li>
 <li><strong>A refusal of either family</strong> is
   <a href="#refusals"><code>error_response</code></a>'s answer. Anything else propagates, a
   configuration error included: it is wrong for every caller, so it belongs to
@@ -1000,13 +1059,18 @@ user rather than being pre-empted.</p>
 <p><strong>A deactivated account is refused</strong>, as <code>PrincipalUnavailable</code> (403), before
 anything else is read. Django's <code>ModelBackend</code> never logs one in, but
 <code>AllowAllUsersModelBackend</code> and a project's own backend may, and a deactivated
-principal never acts, on HTTP or off it.</p>
+principal never acts, on HTTP or off it. <code>dispatch</code> refuses one by the same
+rule, so a hand-written view handing <code>request.user</code> to it is covered too; the
+entry points refuse first so that the request is never read.</p>
 <h2 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
 answers both <a href="../arguments/#two-families-of-error">families</a>, with the statuses
-djangorestframework-services uses. One body differs from its answer: a
+djangorestframework-services uses. Two bodies differ from its answer. A
 service's string or list detail, which DRF answers as a bare list and this as
-a field map under <code>non_field_errors</code>, so every 400 here has one shape:</p>
+a field map under <code>non_field_errors</code>, so every 400 here has one shape. And an
+<code>AdditionalInputRequired</code> schema, which DRF reads as an error detail and so
+writes with every value a string (<code>"minimum": "1"</code>), and this writes as the
+JSON Schema it is:</p>
 <table>
 <thead>
 <tr>
@@ -1037,9 +1101,19 @@ a field map under <code>non_field_errors</code>, so every 400 here has one shape
 <td><code>{"detail": message}</code></td>
 </tr>
 <tr>
+<td><code>ActionUnavailable</code></td>
+<td>409</td>
+<td><code>{"detail": message, "code": code}</code></td>
+</tr>
+<tr>
 <td><code>ServiceConflict</code></td>
 <td>409</td>
 <td><code>{"detail": message}</code></td>
+</tr>
+<tr>
+<td><code>AdditionalInputRequired</code>, with a schema</td>
+<td>422</td>
+<td><code>{"detail": message, "schema": schema}</code></td>
 </tr>
 <tr>
 <td><code>ServiceError</code></td>

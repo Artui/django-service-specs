@@ -480,6 +480,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Pool seeds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -532,6 +549,33 @@
     
   
     Arguments and refusals
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
   
 
     
@@ -667,6 +711,33 @@
     
   
     JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
   
 
     
@@ -835,6 +906,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Pool seeds">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -877,7 +965,11 @@ dispatch, and answer the result in their own terms.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="mi">3</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="s2">"Final"</span><span class="p">})</span>
 </span></code></pre></div>
 <h2 id="the-order">The order<a class="headerlink" href="#the-order" title="Permanent link">&para;</a></h2>
-<p>The same six steps for a read and a write, and for the async entry point:</p>
+<p>A deactivated principal is refused first, as <code>PrincipalUnavailable</code>: an
+authenticated one whose <code>is_active</code> is false. One with no <code>is_active</code> reads as
+active, and anonymous goes on to the permission check, which decides whether
+anonymous may act. Then the same seven steps for a read and a write, and for
+the async entry point:</p>
 <ol>
 <li><strong>The shape check and the closed argument set</strong>, over <code>spec.parameters()</code>:
    presence, JSON type, format, choices and nullability at every level of
@@ -893,10 +985,13 @@ dispatch, and answer the result in their own terms.</p>
    never on a <code>None</code> that <code>allow_none</code> let through.</li>
 <li><strong>Validation</strong>: a write's Validator, on only the arguments it declares, with
    the resolved target in its context.</li>
+<li><strong>Affordances</strong>: a write's <code>affordances</code>, in declaration order. The first
+   one not met refuses the call with <code>ActionUnavailable</code>, carrying its <code>code</code>.</li>
 <li><strong>The run</strong>: the service, inside <code>transaction.atomic()</code> unless the spec says
    <code>atomic=False</code>, then the output selector if one is declared.</li>
 </ol>
-<p>A read stops after step four: its selector is its run.</p>
+<p>A read stops after step four: its selector is its run. Its <code>affordances</code> are
+answers about each row, for a list to report, and refuse nothing.</p>
 <p>The order is the design, and each place reads as if it could move:</p>
 <ul>
 <li><strong>The shape check comes first</strong> because it costs nothing and reveals nothing
@@ -908,6 +1003,12 @@ dispatch, and answer the result in their own terms.</p>
 <li><strong>Resolution comes before validation</strong>, so the Validator's context carries
   the row. An update's uniqueness check has to exclude the row being updated,
   and it cannot if the row is resolved afterwards.</li>
+<li><strong>A deactivated principal is refused before the shape check</strong>, so it learns
+  nothing about its arguments, and it is refused at the same point whether it
+  was handed over, named by <code>principal_id</code> or read off <code>request.user</code>.</li>
+<li><strong>Affordances come after object-level authorization and validation</strong>, so a
+  principal who may not see the row is never told what state it is in. They
+  come before the run's transaction opens, so a refusal never opens one.</li>
 </ul>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>A <code>DispatchResult</code> has a <code>kind</code> and a <code>value</code>:</p>
@@ -1028,7 +1129,9 @@ Carried to another operation or another user it covers nothing, and dispatch
 refuses it with <code>NotPermitted</code>. It covers the class-level check only, unless
 it says <code>target_checked=True</code>, which a transport can claim once it has resolved
 the row and run the object-level check itself; otherwise dispatch still runs
-<code>has_object_permission</code> on the row it resolves. And <strong>a grant cannot be
+<code>has_object_permission</code> on the row it resolves. A grant stands in for neither
+check that is not about permission: a deactivated principal is refused with
+one, and a write's affordances are still answered. And <strong>a grant cannot be
 serialized</strong>: pickling one raises <code>TypeError</code>, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.</p>
@@ -1047,7 +1150,8 @@ or deactivated one with
 It never falls back to an anonymous user: an operation dispatched with no
 resolvable principal has no principal, not an anonymous one. The stock
 permission classes of the HTTP frameworks pass a deactivated user, which is why
-the refusal lives at lookup.</p>
+the refusal does not wait for them: <code>resolve_principal</code> refuses one at lookup,
+and <code>dispatch</code> refuses one it is handed, by the same rule.</p>
 <h2 id="binding-without-dispatching">Binding without dispatching<a class="headerlink" href="#binding-without-dispatching" title="Permanent link">&para;</a></h2>
 <p>Some transports bind input themselves: an MCP server answering a malformed call
 before it opens a transaction, a queue validating a task in the worker.
@@ -1099,6 +1203,8 @@ run's shape decides only what joins it:</p>
   thread-sensitive call queued behind it. Anything after it - an output
   selector, a read's shaping and object-level check - takes a second hop.</li>
 </ul>
+<p>Every refusal before the run is made inside that hop, an affordance included:
+a condition on the row is a query.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServiceSpec</span><span class="p">,</span> <span class="n">adispatch</span><span class="p">,</span> <span class="n">apresent</span>
@@ -1135,7 +1241,8 @@ run's shape decides only what joins it:</p>
 <p><code>adispatch</code> takes exactly one of <code>principal</code> and <code>principal_id</code>. An identifier
 is resolved with <code>resolve_principal</code> inside the hop, since resolving it is a
 query. A grant never covers a principal resolved there, because a grant is
-bound to the principal object it was made for.</p>
+bound to the principal object it was made for. A deactivated row is refused
+there, with its identifier in the message.</p>
 <p>The sync <code>dispatch</code> accepts an <code>async def</code> run as well, and drives it to
 completion, inside the transaction when the spec is atomic.
 <a class="autorefs autorefs-internal" title="run_service" href="../reference/#django_service_specs.services.run_service.run_service"><code>run_service</code></a> and
@@ -1193,6 +1300,42 @@ builds it with <a class="autorefs autorefs-internal" title="base_pool" href="../
 and binds a callable with
 <a class="autorefs autorefs-internal" title="resolve_callable_kwargs" href="../reference/#django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs"><code>resolve_callable_kwargs</code></a>,
 the declare-to-receive rule every callable here is called through.</p>
+<h3 id="progress">Progress<a class="headerlink" href="#progress" title="Permanent link">&para;</a></h3>
+<p><code>progress=</code> on <code>dispatch</code> and <code>adispatch</code> takes the transport's own
+<a class="autorefs autorefs-internal" title="ProgressReporter" href="../reference/#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a>:
+a callable taking how far along, and optionally <code>total</code>, <code>message</code> and
+<code>meta</code>. It is seeded under the reserved name <code>progress</code>, as it is, into the
+pool of the call's run - the service, or a read's own selector - and of that
+spec's callable affordance conditions. A reporter must not raise, because nothing
+between it and the service catches it. Under <code>adispatch</code> a sync run calls it
+on the executor thread, and an <code>async def</code> run on an event loop.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">notes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">))</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">for</span> <span class="n">done</span><span class="p">,</span> <span class="n">note</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">notes</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">progress</span><span class="p">(</span><span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span> <span class="n">message</span><span class="o">=</span><span class="s2">"retitling notes"</span><span class="p">)</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">retitle_all_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">service</span><span class="o">=</span><span class="n">retitle_all</span><span class="p">,</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="p">)</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>
+</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all_reporting</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">report</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="c1"># The transport's own reporter; with none, the service gets null_progress.</span>
+</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">retitle_all_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">progress</span><span class="o">=</span><span class="n">report</span><span class="p">)</span>
+</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">value</span>
+</span></code></pre></div>
+<p>With no reporter the pool carries
+<a class="autorefs autorefs-internal" title="null_progress" href="../reference/#django_service_specs.pool.null_progress.null_progress"><code>null_progress</code></a>, so a
+service that declares <code>progress</code> runs unchanged on every transport and in
+tests. A target or output selector always gets <code>null_progress</code>: a lookup has
+nothing to report, and one reporting after the service finished would read to
+a watching client as the work restarting.</p>
 
 
 

@@ -16,7 +16,7 @@
         <link rel="prev" href="../http/">
       
       
-        <link rel="next" href="../relations/">
+        <link rel="next" href="../affordances/">
       
       
         
@@ -501,6 +501,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../relations/" class="md-nav__link">
         
   
@@ -617,6 +644,33 @@
     
   
     JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
   
 
     
@@ -780,7 +834,14 @@ stricter than the worker would refuse calls that would have run. A required
 parameter with a declared default is not refused when absent, because the
 Validator will supply the default. A JSON <code>true</code> is neither an <code>integer</code> nor a
 <code>number</code>, although Python makes <code>bool</code> an <code>int</code>: sent for a count, it is a
-caller's mistake, not the number one.</p>
+caller's mistake, not the number one.
+An integral float is an <code>integer</code>: JSON Schema counts <code>5.0</code> as one, so the
+<code>{"type": "integer"}</code> the kernel advertises admits it, and the check hands
+the Validator <code>5</code> wherever the declaration reaches, so the Validator's own
+type check and bounds read the int. <code>5.5</code> is still refused, and a <code>number</code>
+keeps its float. DRF's <code>IntegerField</code>, like Django's form field, reads
+<code>str(value)</code>, so given <code>1e16</code> it reads <code>"1e+16"</code> and refuses it; the check
+follows JSON Schema and hands on <code>10000000000000000</code>.</p>
 <p>NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
 <code>number</code> type, and only a decoder reading an overflowing literal such as <code>1e400</code>,
@@ -911,7 +972,10 @@ directed by the declaration.</p>
 </span><span id="__span-2-14"><a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">TYPED</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"limit"</span><span class="p">:</span> <span class="mi">10</span><span class="p">,</span> <span class="s2">"published"</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">"ids"</span><span class="p">:</span> <span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="s2">"price_below"</span><span class="p">:</span> <span class="s2">"9.99"</span><span class="p">}</span>
 </span></code></pre></div>
 <ul>
-<li>An <code>integer</code> or a <code>number</code> is parsed.</li>
+<li>An <code>integer</code> or a <code>number</code> is parsed. An integer is read as Django's
+  <code>IntegerField</code> reads one: <code>"5.0"</code> and <code>"5."</code> are 5, and <code>"5.5"</code> is refused
+  with <code>"Enter a whole number."</code>. Each integer element of an array, a
+  repeated query-string key's included, is read the same way.</li>
 <li>A <code>boolean</code> is parsed from exactly four spellings - <code>true</code>, <code>false</code>, <code>1</code>, <code>0</code>,
   in any case - and anything else is refused with
   <code>"Enter true, false, 1 or 0."</code>. Libraries disagree about every other

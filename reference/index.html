@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://artui.github.io/django-service-specs/reference/">
       
       
-        <link rel="prev" href="../schema/">
+        <link rel="prev" href="../paging-and-projection/">
       
       
       
@@ -397,6 +397,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../affordances/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Affordances
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../relations/" class="md-nav__link">
         
   
@@ -513,6 +540,33 @@
     
   
     JSON Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../paging-and-projection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Paging and projection
   
 
     
@@ -1059,6 +1113,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#django_service_specs.output.field_marking.FieldMarking.handle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1085,6 +1150,28 @@
     <span class="md-ellipsis">
       
         label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.formatted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        timestamp
       
     </span>
   </a>
@@ -1154,6 +1241,133 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AudienceProjection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AudienceProjection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.choice_labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        choice_labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.is_empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_empty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.audience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        audience
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        audience_projection_for_spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.project_payload.project_payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        project_payload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.annotate_output_schema.annotate_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        annotate_output_schema
+      
+    </span>
+  </a>
   
 </li>
       
@@ -1507,10 +1721,87 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.present_for_audience.present_for_audience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        present_for_audience
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.paginate_output.paginate_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        paginate_output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEFAULT_PAGE_SIZE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.dispatch.bind_arguments.bind_arguments" class="md-nav__link">
     <span class="md-ellipsis">
       
         bind_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affordances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.enforce_affordances.enforce_affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        enforce_affordances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unmet_operation_affordance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.operation_affordances.operation_affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        operation_affordances
       
     </span>
   </a>
@@ -1966,6 +2257,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.services.action_unavailable.ActionUnavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActionUnavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.services.additional_input_required.AdditionalInputRequired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdditionalInputRequired
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2064,6 +2377,17 @@
     <span class="md-ellipsis">
       
         base_pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.pool.null_progress.null_progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null_progress
       
     </span>
   </a>
@@ -2735,6 +3059,161 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.affordance.Affordance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affordance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.progress_reporter.ProgressReporter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProgressReporter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OutputPage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OutputPage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.total_pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        total_pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.has_next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_next
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValueFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ValueFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.render" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.produces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        produces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.json_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        json_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        timestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3240,6 +3719,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#django_service_specs.output.field_marking.FieldMarking.handle" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3266,6 +3756,28 @@
     <span class="md-ellipsis">
       
         label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.formatted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatted
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.field_marking.FieldMarking.timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        timestamp
       
     </span>
   </a>
@@ -3335,6 +3847,133 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AudienceProjection
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AudienceProjection">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        fields
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.label" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        label
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.choice_labels" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        choice_labels
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.nested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        nested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.is_empty" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_empty
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.audience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        audience
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection.AudienceProjection.formatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        formatter
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        audience_projection_for_spec
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.project_payload.project_payload" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        project_payload
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.annotate_output_schema.annotate_output_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        annotate_output_schema
+      
+    </span>
+  </a>
   
 </li>
       
@@ -3688,10 +4327,87 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.present_for_audience.present_for_audience" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        present_for_audience
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.paginate_output.paginate_output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        paginate_output
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DEFAULT_PAGE_SIZE
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.dispatch.bind_arguments.bind_arguments" class="md-nav__link">
     <span class="md-ellipsis">
       
         bind_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affordances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.enforce_affordances.enforce_affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        enforce_affordances
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unmet_operation_affordance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.affordances.operation_affordances.operation_affordances" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        operation_affordances
       
     </span>
   </a>
@@ -4147,6 +4863,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.services.action_unavailable.ActionUnavailable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ActionUnavailable
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.services.additional_input_required.AdditionalInputRequired" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AdditionalInputRequired
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4245,6 +4983,17 @@
     <span class="md-ellipsis">
       
         base_pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.pool.null_progress.null_progress" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        null_progress
       
     </span>
   </a>
@@ -4919,6 +5668,161 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.affordance.Affordance" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Affordance
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.progress_reporter.ProgressReporter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ProgressReporter
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        OutputPage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="OutputPage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.total_pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        total_pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.has_next" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        has_next
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.output_page.OutputPage.envelope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        envelope
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ValueFormatter
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ValueFormatter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.render" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        render
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.produces" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        produces
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.apply" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.json_schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        json_schema
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.value_formatter.ValueFormatter.timestamp" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        timestamp
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -4974,9 +5878,10 @@ importing the package root never imports pydantic.</p>
 
 
         <p>A write: what it takes, who may run it, what it acts on, what it returns.</p>
-<p>Dispatch runs it in a fixed order: the shape check and the closed argument
-set, class-level authorization, target resolution, object-level
-authorization, validation with the target in the Validator's context, the
+<p>Dispatch runs it in a fixed order, once a deactivated principal has been
+refused: the shape check and the closed argument set, class-level
+authorization, target resolution, object-level authorization, validation
+with the target in the Validator's context, the <code>affordances</code>, the
 service, then the output selector.</p>
 
 
@@ -5098,6 +6003,34 @@ selector's presenter is used; declaring both is refused.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.affordances">affordances</span></code></td>
+            <td>
+                  <code><span title="collections.abc.Sequence">Sequence</span>[<a class="autorefs autorefs-internal" title="Affordance
+
+
+  
+      dataclass
+   (django_service_specs.types.affordance.Affordance)" href="#django_service_specs.types.affordance.Affordance">Affordance</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>What must be true for this operation to be possible right
+now, as a sequence of <code>Affordance</code> declarations, kept as a tuple
+in declaration order. <code>enforce_affordances</code> answers them at the
+call: the first one not met refuses it with an
+<code>ActionUnavailable</code> carrying its <code>code</code>, and the service does
+not run. Every condition on the row is answered by <strong>one</strong> query,
+however many are declared. A condition on the row needs a single
+resolved row, so it is refused beside a
+<code>collection_selector_spec</code>. It is a check at the moment of the
+call, not a lock: the service still re-validates whatever it relies
+on. <code>None</code> declares nothing and costs nothing - no query, no call.
+Codes must be unique within a spec, because the code is how a
+reader tells the conditions apart.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.atomic">atomic</span></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
@@ -5105,6 +6038,28 @@ selector's presenter is used; declaring both is refused.</p>
             <td>
               <div class="doc-md-description">
                 <p>Run the service inside <code>transaction.atomic()</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.idempotent">idempotent</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Whether repeating the call with the same arguments leaves
+the same state as making it once. Declaration-only: nothing in this
+package reads it, because idempotency is a property of the service
+the author writes, not something a dispatcher can arrange. It is
+here so the fact is stated once, on the spec, and every transport
+reads the same answer - a retry policy, a queue's redelivery
+handling, an agent tool annotation. <code>None</code> means <strong>undeclared</strong>
+and is the default: a transport that turns the signal into a
+published annotation must be able to tell "nothing was said" from a
+declared <code>False</code>, or every spec ever written starts claiming it is
+not idempotent. <code>atomic</code> is a different question: it says a single
+call is all-or-nothing, not that a second call is a no-op.</p>
               </div>
             </td>
           </tr>
@@ -5386,6 +6341,36 @@ returns the queryset to use.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.selector_spec.SelectorSpec.affordances">affordances</span></code></td>
+            <td>
+                  <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <a class="autorefs autorefs-internal" title="ServiceSpec
+
+
+  
+      dataclass
+   (django_service_specs.specs.service_spec.ServiceSpec)" href="#django_service_specs.specs.service_spec.ServiceSpec">ServiceSpec</a>] | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>What can be done to each row right now. A mapping from a
+name the caller chooses to the
+<a class="autorefs autorefs-internal" title="ServiceSpec
+
+
+  
+      dataclass
+  " href="#django_service_specs.specs.service_spec.ServiceSpec"><code>ServiceSpec</code></a>
+whose <code>affordances</code> are being asked about - the spec objects, not
+registry names, so the read path takes no registry dependency and
+the declaration stays the one the operation enforces. Each answer is
+named <code>affordance__&lt;name&gt;__&lt;code&gt;</code>; a collision with a key of
+<code>annotations</code>, or between two entries, is refused at
+construction, because a generated answer silently replacing a
+project's own annotation is the worst way for this to fail.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.selector_spec.SelectorSpec.metadata">metadata</span></code></td>
             <td>
                   <code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="typing.Any">Any</span>] | None</code>
@@ -5568,7 +6553,9 @@ admits a <code>null</code> element already.</p>
 declared, so a default of <code>None</code> stays a real default. It is reported, not
 applied: whether an omitted argument arrives as the default, as <code>None</code> or
 not at all is the validating library's behaviour, and each adapter reports
-what its library does.</p>
+what its library does. It takes no part in the hash, so a declaration with
+a list or dict default is as hashable as any other, while equality still
+tells two defaults apart.</p>
 <p>There are no bounds (<code>maxLength</code>, <code>minimum</code>) yet. The Validator enforces
 those; adding them here is additive.</p>
 
@@ -5786,6 +6773,17 @@ have run.</p>
 <li><code>bool</code> is neither an <code>integer</code> nor a <code>number</code>, although Python
   makes it an <code>int</code>: a JSON <code>true</code> sent for a count is a caller's
   mistake, not the number one.</li>
+<li><strong>An integral float is an</strong> <code>integer</code>, and is handed on as an <code>int</code>
+  wherever the declaration reaches. JSON Schema counts <code>5.0</code> as an
+  integer, so the <code>{"type": "integer"}</code> this kernel advertises admits
+  it, and a Validator never sees <code>5.0</code> for an integer: its own type
+  check and its bounds read the <code>int</code>. <code>5.5</code> is still refused, and so
+  are NaN and the infinities, which no integer is. A <code>number</code> keeps the
+  float it was sent. <strong>DRF reads it differently at an exponent</strong>: its
+  <code>IntegerField</code> reads <code>str(value)</code>, as Django's form field does, so
+  given <code>1e16</code> raw, both read <code>"1e+16"</code> and refuse it, where this
+  check follows JSON Schema and hands on <code>10000000000000000</code>, which
+  either field then takes.</li>
 <li>NaN and the infinities are refused wherever the declaration reaches.
   JSON has no spelling for either, so they are outside the <code>number</code>
   type, and this is a type rule rather than a stricter check - although
@@ -5807,7 +6805,8 @@ unknown key in a row would reach the row's constructor and come back as a
 <p>Returns a cleaned copy and never modifies <code>arguments</code>. The containers it
 walks are new - the top-level mapping, each declared object, each array -
 while a value it does not look inside, such as a free-form object, is
-passed through as the caller's.</p>
+passed through as the caller's. An integral float declared an integer is
+the one value it replaces.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -5863,6 +6862,9 @@ left as the string it arrived as. <strong>A decimal, a date-time and a date stay
 strings</strong>, for the Validator to decode, exactly as they would arrive off a
 JSON wire.</p>
 <ul>
+<li>An integer is read as Django's <code>IntegerField</code> reads one: <code>"5.0"</code> and
+  <code>"5."</code> are 5, and <code>"5.5"</code> is refused. An array's integer elements
+  are read the same way, a repeated query-string key's included.</li>
 <li>An array's elements are each coerced by its <code>items</code> type, and a single
   value becomes a one-element list, since a flat transport sends a
   one-element list as a bare value. <code>None</code> is not wrapped: an option
@@ -6567,7 +7569,21 @@ rather than to whichever library rendered it. That is what lets a
 transport's projection for an audience work over a dataclass, a pydantic
 model and a DRF serializer alike: each adapter reads its own library's
 declaration into <code>Output</code>, marking included, and the projection reads
-only <code>Output</code>. The kernel carries the marking and applies none of it.</p>
+only <code>Output</code>.</p>
+<p>Applied only for a caller that names an audience:
+<a class="autorefs autorefs-internal" title="audience_projection_for_spec" href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec"><code>audience_projection_for_spec</code></a>
+reads the markings into an
+<a class="autorefs autorefs-internal" title="AudienceProjection
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.audience_projection.AudienceProjection"><code>AudienceProjection</code></a>,
+which <a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+applies to the presented value and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+to the schema. A caller that names none, which is every HTTP response, is
+presented every field whatever its marking.</p>
 <p>The marking lives on the <strong>field</strong>, not in a list beside the output. That is
 what lets it travel into a nested output with no hoisting rule, and what
 stops a rename from silently desyncing it from a name the parent maintains.</p>
@@ -6619,6 +7635,57 @@ human reader sees.</p>
 
 </div>
 
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.output.field_marking.FieldMarking.formatter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">formatter</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.output.field_marking.FieldMarking.formatter" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">formatter</span><span class="p">:</span> <span class="n">ValueFormatter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How this field's value is rendered for an agent audience, if not verbatim.</p>
+<p>A <a class="autorefs autorefs-internal" title="ValueFormatter
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.value_formatter.ValueFormatter"><code>ValueFormatter</code></a>
+transforms the value and declares the JSON type it produces, so the
+payload and the schema move together. Unset, the default, changes
+nothing.</p>
+<p><strong>An explicit formatter wins over the substitution of a choice's
+display</strong>, which is a real collision: a status field can have choices and
+still be something an author wants spelled their own way. Only one
+transform can apply, and the one written by hand is the one that was asked
+for; a derived default losing to an explicit declaration is the ordinary
+direction.</p>
+<p><strong><code>HANDLE</code> suppresses it</strong>, exactly as it suppresses choice
+substitution: a handle is another tool's input, and a formatted machine
+identifier is a broken one. Declaring both is honoured as <code>HANDLE</code> and
+the formatter never runs. A field a second tool takes as input therefore
+wants <a class="autorefs autorefs-internal" title="handle
+
+
+  
+      classmethod
+  " href="#django_service_specs.output.field_marking.FieldMarking.handle"><code>handle</code></a>,
+or that tool receives a display string its own input schema rejects.</p>
+
+    </div>
+
+</div>
+
 
 
 
@@ -6663,7 +7730,7 @@ human reader sees.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Plumbing: dropped from the projected payload.</p>
+        <p>Plumbing: dropped from the projected payload and the projected schema.</p>
 
 
     </div>
@@ -6688,6 +7755,75 @@ human reader sees.</p>
     <div class="doc doc-contents ">
 
         <p>The field that names this record for a human.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.field_marking.FieldMarking.formatted" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">formatted</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#django_service_specs.output.field_marking.FieldMarking.formatted" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">formatted</span><span class="p">(</span><span class="n">formatter</span><span class="p">:</span> <span class="n">ValueFormatter</span><span class="p">,</span> <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldMarking</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Ordinary content, rendered through <code>formatter</code>.</p>
+<p>The generic constructor: any transform that declares what it produces.
+<a class="autorefs autorefs-internal" title="timestamp
+
+
+  
+      classmethod
+  " href="#django_service_specs.output.field_marking.FieldMarking.timestamp"><code>timestamp</code></a>
+is one of these with the formatter filled in, and a field that is both
+formatted and something else - a formatted label, say - is written as
+<code>FieldMarking(FieldAudience.LABEL, formatter=...)</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.field_marking.FieldMarking.timestamp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">timestamp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#django_service_specs.output.field_marking.FieldMarking.timestamp" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">timestamp</span><span class="p">(</span><span class="n">fmt</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldMarking</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A date-time read as a formatted local string rather than raw ISO-8601.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">due_at</span><span class="p">:</span> <span class="n">Annotated</span><span class="p">[</span><span class="n">datetime</span><span class="p">,</span> <span class="n">FieldMarking</span><span class="o">.</span><span class="n">timestamp</span><span class="p">()]</span>
+</span></code></pre></div>
+<p>The zone is Django's active one and cannot be passed here; <code>fmt</code> is a
+<code>strftime</code> string and defaults to a day-first, 24-hour rendering.
+<a class="autorefs autorefs-internal" title="timestamp
+
+
+  
+      classmethod
+  " href="#django_service_specs.types.value_formatter.ValueFormatter.timestamp"><code>ValueFormatter.timestamp</code></a>
+holds the transform and the reasoning behind both of those.</p>
 
 
     </div>
@@ -6738,7 +7874,9 @@ on the field's <a class="autorefs autorefs-internal" title="OutputField
 
   
       dataclass
-  " href="#django_service_specs.output.output_field.OutputField"><code>OutputField</code></a>.</p>
+  " href="#django_service_specs.output.output_field.OutputField"><code>OutputField</code></a>,
+and applied only for a caller that names an audience; one that names none
+keeps presenting every field.</p>
 <p>Inheriting from <code>str</code> keeps the value JSON-serializable and print-friendly
 while still behaving as a proper enum for <code>is</code> / <code>==</code>.</p>
 
@@ -6804,7 +7942,8 @@ while still behaving as a proper enum for <code>is</code> / <code>==</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The field that names this record for a human. At most one per output.</p>
+        <p>The field that names this record for a human. At most one per output, and
+two are refused when the output is read into a projection.</p>
 
     </div>
 
@@ -6855,9 +7994,7 @@ never re-spelled by a choice's display - a handle is somebody else's input.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Plumbing. Left out of what an agent audience is shown.</p>
-<p>The kernel declares the marking and applies none: leaving the field out is
-the job of the transport that renders for that audience.</p>
+        <p>Plumbing. Dropped from the projected payload and from the projected schema.</p>
 
     </div>
 
@@ -6869,6 +8006,458 @@ the job of the transport that renders for that audience.</p>
 
 
   </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.output.audience_projection.AudienceProjection" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">AudienceProjection</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>How one operation's output is shaped for an agent audience.</p>
+<p>Read off the <a class="autorefs autorefs-internal" title="FieldMarking
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.field_marking.FieldMarking"><code>FieldMarking</code></a>s
+and the choices an <a class="autorefs autorefs-internal" title="Output
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.output.Output"><code>Output</code></a>
+declares, by
+<a class="autorefs autorefs-internal" title="audience_projection_for_spec" href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec"><code>audience_projection_for_spec</code></a>.
+Nothing here depends on the value being presented, so a transport builds
+it <strong>once</strong>, where it registers the spec, and passes it to every
+<a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+and <a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+rather than reading the declaration again per call.</p>
+<p>One projection drives both
+<a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a>
+and <a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>,
+which is what keeps the advertised schema describing the payload sent.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.fields" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">fields</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.fields" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">fields</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FieldMarking</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Every explicitly marked field, by name. Unmarked fields are absent.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.label" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">label</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.label" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">label</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The field naming this record for a human, if one is marked.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.choice_labels" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">choice_labels</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.choice_labels" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">choice_labels</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Per field with choices, the <code>{value: display}</code> pairs whose display
+differs from the value. Absent for a field whose displays only repeat its
+values.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.nested" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">nested</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.nested" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">nested</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">AudienceProjection</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">)</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Child projections, by field name, for a nested object and for the
+objects of an array.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.is_empty" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">is_empty</span>
+
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.is_empty" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">is_empty</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>True when applying this projection would change nothing.</p>
+<p>The fast path: an unmarked output with no labelled choices anywhere
+costs a caller one boolean rather than a walk of the payload.</p>
+<p>A value formatter needs no term of its own: it is carried <em>by</em> a
+marking, so an output that declares one has a non-empty <code>fields</code>
+already. A term that can never be the deciding one goes stale without
+failing.</p>
+<p>One <code>or</code>-chain, so each term is held by its own case of
+<code>test_each_term_alone_makes_it_non_empty</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.audience" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">audience</span>
+
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.audience" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">audience</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldAudience</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The audience declared for <code>name</code>, defaulting to <code>CONTENT</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.audience_projection.AudienceProjection.formatter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">formatter</span>
+
+
+<a href="#django_service_specs.output.audience_projection.AudienceProjection.formatter" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">formatter</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ValueFormatter</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The formatter that applies to <code>name</code>, or <code>None</code>.</p>
+<p><code>None</code> for a <code>HANDLE</code> however the two were declared together: a
+handle is another tool's input and a formatted machine identifier is a
+broken one. The suppression lives here rather than in each walk, so the
+payload and the schema cannot end up formatting different fields,
+which is the one failure the projection exists to make impossible.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">audience_projection_for_spec</span>
+
+
+<a href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">audience_projection_for_spec</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">overrides</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">FieldMarking</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AudienceProjection</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Resolve the markings on the <a class="autorefs autorefs-internal" title="Output
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.output.Output"><code>Output</code></a> <code>spec</code> presents.</p>
+<p>The output is <code>spec.output()</code>: a selector spec's presenter's, or a
+service spec's own presenter's, or its output selector's when it declares
+none. A transport that registers its tools up front calls this once per
+spec and hands the result to
+<a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+and <a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>,
+so the payload it sends and the schema it advertises are projected by one
+declaration.</p>
+<p>Each <a class="autorefs autorefs-internal" title="OutputField
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.output_field.OutputField"><code>OutputField</code></a>
+contributes its <code>marking</code>, its <code>choices</code> whose display differs from the
+value, and, for an object's <code>fields</code> or an array's <code>items</code> declared as
+an <code>Output</code>, a child projection when the child has anything to project.
+A spec with no output yields an empty projection rather than an error:
+there is nothing to mark up.</p>
+<p><code>overrides</code> layers a mount's own markings over the declaration's, for the
+one case the declaration cannot express: a mount that needs what its
+sibling hides. The declaration stays authoritative, and an override is the
+exception rather than a second place to declare an audience. Only the
+top-level markings and the label move; the choices and the children come
+from the declaration. <code>name</code> identifies the mount in the refusal below.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Two fields of one output
+are both marked <code>LABEL</code>, whether the declaration says so or an
+override does. A record has one name, and picking one silently
+would name it by whichever came first.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.output.project_payload.project_payload" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">project_payload</span>
+
+
+<a href="#django_service_specs.output.project_payload.project_payload" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">project_payload</span><span class="p">(</span><span class="n">payload</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">projection</span><span class="p">:</span> <span class="n">AudienceProjection</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Drop plumbing, speak choice displays and format values, at any depth.</p>
+<p>Three changes, each driven by the declaration that shapes the schema in
+<a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>,
+so the two cannot disagree:</p>
+<ul>
+<li>fields marked <code>HIDDEN</code> are <strong>removed</strong>. Removed rather than moved under
+  some reserved key: a payload a model reads is read in full either way, so
+  moving a field costs its keys again and hides nothing. What an agent must
+  never use should not be there.</li>
+<li>a field's choice value is replaced by its display, so a person is not
+  read <code>PENDING_REVIEW</code>. <strong>Not</strong> on a <code>HANDLE</code>, which another tool
+  takes as input. An array of choices is substituted member by member
+  rather than looked up whole.</li>
+<li>a field whose marking carries a
+  <a class="autorefs autorefs-internal" title="ValueFormatter
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.value_formatter.ValueFormatter"><code>ValueFormatter</code></a>
+  is rendered through it: a date-time read as a local date-time rather
+  than raw ISO-8601, an amount with its currency. It wins over the choice
+  display, being the transform an author wrote by hand, and over a nested
+  output's projection. Also <strong>not</strong> on a <code>HANDLE</code>, for the same reason,
+  and a null is never formatted.</li>
+</ul>
+<p>A payload that is neither an object nor a list of them is returned as it
+is, and so is every key the projection has nothing to say about, including
+one a transport added beside the declared fields.</p>
+<p>Apply this where a payload becomes an agent's <strong>answer</strong>, not where it
+feeds the next step of a chain, which still needs the handles. Returns a
+new payload and never modifies <code>payload</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.output.annotate_output_schema.annotate_output_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">annotate_output_schema</span>
+
+
+<a href="#django_service_specs.output.annotate_output_schema.annotate_output_schema" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">annotate_output_schema</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">schema</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">projection</span><span class="p">:</span> <span class="n">AudienceProjection</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">handle_description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Apply to a schema the projection <a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a> applies to the payload.</p>
+<p>Four changes, each the mirror of one the payload undergoes:</p>
+<ul>
+<li>hidden properties are removed, and dropped from <code>required</code>, which is
+  left out when nothing in it remains;</li>
+<li>a marking's <code>description</code> becomes the property's <code>"description"</code>, so
+  a handle says what it is for in the schema a model reads without that
+  wording reaching any other reader;</li>
+<li>a field with labelled choices is restated in its <strong>displays</strong>, because
+  that is what the projected payload carries: an <code>enum</code>'s values are
+  replaced, and a <code>oneOf</code>'s <code>const</code>s are, each losing the <code>title</code>
+  that annotated the value it now equals. A <code>"type"</code> stated beside them
+  is restated as the types of the values now listed, <code>"null"</code> last, so a
+  display string is never described as the integer it replaced, and a
+  display two values share is listed once, so a row served it matches one
+  <code>oneOf</code> entry rather than two. Not on a <code>HANDLE</code>, which keeps its
+  values on both sides: a field another tool takes as input should be
+  marked one.</li>
+<li>a formatted field is restated as the type its
+  <a class="autorefs autorefs-internal" title="ValueFormatter
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.value_formatter.ValueFormatter"><code>ValueFormatter</code></a>
+  says it produces, plus whatever that declaration adds about the shape of
+  the produced value, in place of everything the property said about the
+  value before, choices included. Its <code>title</code> and <code>description</code> are
+  kept, and so is a <code>"null"</code> in its type, since a null is never
+  formatted. The type is written from <code>produces</code> rather than taken from
+  the fragment, so a renderer cannot contradict its own advertisement. Not
+  on a <code>HANDLE</code> either.</li>
+</ul>
+<p>Generating both sides from one declaration is the point: a schema that
+advertises a field the payload no longer carries is worse than either
+behaviour on its own.</p>
+<p><code>handle_description</code> is the wording for a <code>HANDLE</code> whose marking
+declares none, and defaults to <strong>nothing</strong>. Telling a reader what to do
+with an identifier is advice for one kind of reader, and the kernel does
+not know which kind is reading. The transport that knows its audience
+supplies the sentence.</p>
+<p>Takes the <strong>item</strong> schema; an array's <code>items</code> are annotated and the
+array kept. A caller wrapping items in an envelope of its own annotates the
+item and wraps it afterwards, as
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+does. <code>None</code>, or a projection with nothing in it, returns <code>schema</code>
+itself; anything else returns a new schema and never modifies <code>schema</code>.</p>
+
 
     </div>
 
@@ -6913,7 +8502,13 @@ model-backed declaration is asked only once the app registry is ready.</p>
 
 
 <a href="#django_service_specs.schema.spec_output_schema.spec_output_schema" class="headerlink" title="Permanent link">&para;</a></h2>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">spec_output_schema</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">spec_output_schema</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">paginate</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">projection</span><span class="p">:</span> <span class="n">AudienceProjection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">handle_description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -6939,6 +8534,24 @@ shaped by what dispatch returns for this kind of spec:</p>
   returned, described by its presenter as the item. Whether a service may
   return <code>None</code> is not in its declaration, so it is not stated.</li>
 </ul>
+<p><code>paginate</code> describes a list served one page at a time, as
+<a class="autorefs autorefs-internal" title="paginate_output" href="#django_service_specs.dispatch.paginate_output.paginate_output"><code>paginate_output</code></a>
+and <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>OutputPage.envelope</code></a>
+shape it: <code>{"items": [...], "page": n, "totalPages": n, "hasNext": b}</code>,
+every key required. It changes only a list's schema, since one row has no
+pages, so a transport may pass it for every spec it serves paged.</p>
+<p><code>projection</code> describes what
+<a class="autorefs autorefs-internal" title="present_for_audience" href="#django_service_specs.dispatch.present_for_audience.present_for_audience"><code>present_for_audience</code></a>
+hands back rather than what <code>present</code> does, through
+<a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>:
+hidden fields left out, labelled choices restated in their displays, and a
+marking's wording as a field's <code>"description"</code>. It lands on the
+<strong>item</strong>, wherever the item sits, because the array and the paging
+envelope are this function's own shapes and belong to no <code>Output</code>. Omit
+it, as every caller naming no audience does, and the schema is the full
+declaration. <code>handle_description</code> is the wording for a handle whose
+marking declares none, and defaults to none: what a reader should do with
+an identifier depends on the reader, and the transport is what knows.</p>
 
 
     </div>
@@ -7073,10 +8686,14 @@ differences a description of what came back needs:</p>
   by <code>items_nullable</code> rather than the array's own nullability. A choice
   set holding a value JSON cannot carry is left out whole.</li>
 </ul>
-<p><code>marking</code> is <strong>not</strong> emitted. Showing a field to an agent audience, or
-leaving it out, is a projection over this schema, and projection is not
-the kernel's yet; the kernel declares a marking and applies none, which is
-why a <code>HIDDEN</code> field is described here like any other.</p>
+<p><code>marking</code> is <strong>not</strong> emitted, and a <code>HIDDEN</code> field is described here
+like any other: this is the whole declaration, which is what a caller
+naming no audience is presented. Showing a field to an agent audience, or
+leaving it out, is a projection over this schema, which
+<a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>
+applies and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+composes for a caller that passes one.</p>
 <p>As on input: no <code>$defs</code> or <code>$ref</code>, no <code>$schema</code> key, and a new
 schema on every call.</p>
 
@@ -7829,13 +9446,20 @@ every attribute is missing.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
 
         <p>Run <code>spec</code> for <code>principal</code> with <code>arguments</code>, in a fixed order.</p>
-<p>The same six steps for both kinds of spec, and for <code>adispatch</code>:</p>
+<p>First, a deactivated principal is refused as <code>PrincipalUnavailable</code>: an
+authenticated one whose <code>is_active</code> is false, with or without a
+<code>grant</code>. One with no <code>is_active</code> reads as active, and anonymous goes on
+to the permission check, which decides whether anonymous may act. It is
+the rule <code>resolve_principal</code> and the HTTP entry points apply, so a
+principal is refused alike whichever way it reached dispatch.</p>
+<p>Then the same seven steps for both kinds of spec, and for <code>adispatch</code>:</p>
 <ol>
 <li><a class="autorefs autorefs-internal" title="check_arguments" href="#django_service_specs.parameters.check_arguments.check_arguments"><code>check_arguments</code></a>
    over <code>spec.parameters()</code> under <code>unknown_arguments</code>: the closed
@@ -7854,14 +9478,31 @@ every attribute is missing.</p>
    <code>allow_none</code> let through.</li>
 <li>A service spec's Validator, on only the arguments it declares, with the
    resolved target in its context.</li>
+<li>A service spec's <code>affordances</code>, through
+   <a class="autorefs autorefs-internal" title="enforce_affordances" href="#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>:
+   the first one not met refuses the call as <code>ActionUnavailable</code> carrying
+   its <code>code</code>. After the object-level check, so a principal who may not
+   see the row is never told what state it is in, and before the run's
+   transaction opens, so a refusal never opens one.</li>
 <li>The run: the service, called with the principal, <code>data</code> (the
    validated values), <code>instance</code> or <code>collection</code>, each validated value by
-   name and every registered seed, through
+   name, <code>progress</code> and every registered seed, through
    <a class="autorefs autorefs-internal" title="run_service" href="#django_service_specs.services.run_service.run_service"><code>run_service</code></a> so
    <code>spec.atomic</code> holds and an <code>async def</code> service is bridged. Then the
    output selector, if declared, with the service's return as <code>result</code>.</li>
 </ol>
-<p>A selector spec stops after step four: its selector is its run.</p>
+<p>A selector spec stops after step four: its selector is its run. Its
+<code>affordances</code> are answers about each row, for a list to report, and
+nothing about reading is refused by them.</p>
+<p><code>progress</code> is the transport's own progress reporter, seeded under the
+reserved name <code>progress</code> into the pool of whatever is this call's run -
+the service, or a selector spec's own selector - and into that spec's
+callable affordance conditions'. With none, the pool carries
+<code>null_progress</code>, so a callable that declares the parameter runs on every
+transport. A target or output selector, and its affordance conditions,
+always get <code>null_progress</code>: a lookup has nothing to
+report, and one reporting after the service finished would read as the
+work restarting.</p>
 <p><code>kind</code> is <code>"list"</code> for a LIST selector spec or a service whose output
 selector is a LIST, and <code>"instance"</code> otherwise. Nothing is presented here;
 <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does that, so a
@@ -7877,6 +9518,16 @@ transport that hands the object to a template never pays for rendering it.</p>
         </tr>
       </thead>
       <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PrincipalUnavailable (django_service_specs.authorization.principal_unavailable.PrincipalUnavailable)" href="#django_service_specs.authorization.principal_unavailable.PrincipalUnavailable">PrincipalUnavailable</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>a deactivated principal, before step one.</p>
+              </div>
+            </td>
+          </tr>
           <tr class="doc-section-item">
             <td>
                   <code><a class="autorefs autorefs-internal" title="InvalidArguments (django_service_specs.parameters.invalid_arguments.InvalidArguments)" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments">InvalidArguments</a></code>
@@ -7899,13 +9550,35 @@ transport that hands the object to a template never pays for rendering it.</p>
           </tr>
           <tr class="doc-section-item">
             <td>
+                  <code><a class="autorefs autorefs-internal" title="ActionUnavailable (django_service_specs.services.action_unavailable.ActionUnavailable)" href="#django_service_specs.services.action_unavailable.ActionUnavailable">ActionUnavailable</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>step six, an affordance not met.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ServiceNotFound (django_service_specs.services.service_not_found.ServiceNotFound)" href="#django_service_specs.services.service_not_found.ServiceNotFound">ServiceNotFound</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>step six, a condition on the row reached after the row
+was deleted.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
                   <code><span title="ImproperlyConfigured">ImproperlyConfigured</span></code>
             </td>
             <td>
               <div class="doc-md-description">
                 <p>a spec that declares no permissions, a parameter
-or a validated value named after a seed, or shaping declared on a
-selector that returned something other than a queryset.</p>
+or a validated value named after a seed, shaping declared on a
+selector that returned something other than a queryset, or a
+condition on the row with no row to answer it for.</p>
               </div>
             </td>
           </tr>
@@ -7938,7 +9611,8 @@ selector that returned something other than a queryset.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -7954,6 +9628,8 @@ both entry points, and a concept written <code>async def</code> could not be cal
 from <code>dispatch</code>.</p>
 <p>So the phases run in <strong>one</strong> <code>sync_to_async(thread_sensitive=True)</code> hop,
 and the run's shape decides only what else joins it:</p>
+<p>Every refusal before the run is made inside that hop, an affordance
+included: a condition on the row is a query.</p>
 <ul>
 <li>A sync run joins the hop, so a sync spec costs exactly one.</li>
 <li>An atomic <code>async def</code> service joins it too, through the bridge in
@@ -7973,7 +9649,14 @@ resolved with
 inside the hop, because resolving it is itself a query; taking only the
 row would push that query into a hop of the caller's. A <code>grant</code> never
 covers a principal resolved here, since a grant is bound to the principal
-object it was minted for.</p>
+object it was minted for. A deactivated row is refused there, with its
+identifier in the message; a deactivated <code>principal</code> is refused by
+<code>dispatch</code>'s own check, which reads the same rule, so the two cannot
+disagree about who may act.</p>
+<p><code>progress</code> reaches the run as it does under <code>dispatch</code>, including an
+<code>async def</code> one awaited on the loop, so a reporter must be safe to call
+from either: the executor thread for a sync run, and an event loop for an
+<code>async def</code> one, atomic or not.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -8001,7 +9684,8 @@ object it was minted for.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>principal_id</code> names no principal who may act.</p>
+                <p><code>principal_id</code> names no principal who may act,
+or <code>principal</code> is deactivated.</p>
               </div>
             </td>
           </tr>
@@ -8012,6 +9696,16 @@ object it was minted for.</p>
             <td>
               <div class="doc-md-description">
                 <p>as <code>dispatch</code>.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code>(<a class="autorefs autorefs-internal" title="ActionUnavailable (django_service_specs.services.action_unavailable.ActionUnavailable)" href="#django_service_specs.services.action_unavailable.ActionUnavailable">ActionUnavailable</a>, <a class="autorefs autorefs-internal" title="ServiceNotFound (django_service_specs.services.service_not_found.ServiceNotFound)" href="#django_service_specs.services.service_not_found.ServiceNotFound">ServiceNotFound</a>)</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>as <code>dispatch</code>, from its affordances.</p>
               </div>
             </td>
           </tr>
@@ -8177,6 +9871,18 @@ declares none.</p>
   row, and asking a presenter to render one produces either a crash or an
   object of blank fields indistinguishable from a real row.</li>
 </ul>
+<p><strong>Affordances.</strong> When the selector spec presented through declares
+<code>affordances</code> - a selector spec's own, or a service spec's output
+selector's, never a service spec's own, which are what its call is checked
+against - each presented object gains an <code>affordances</code> key: per declared
+name, <code>{"available": true}</code>, or <code>{"available": false, "code": ...,
+"reason": ...}</code> naming the first condition the row does not meet, or a
+bare <code>{"available": false}</code> for a row deleted before its answers were
+asked, which fails no condition and so has no sentence to report. <code>None</code>
+is not a row and carries none. The answers are read off the rows as the
+selector's dispatch left them - annotations on a queryset's rows, or the
+answers it attached to rows a selector returned directly - so presenting
+them costs no query. A spec declaring none presents exactly as before.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -8197,6 +9903,19 @@ declares none.</p>
                 <p><code>kind="not_found"</code>. Presenting nothing as a success is the
 bug this refuses; the transport answers a not-found in its own
 terms (a 404, an exit code, a tool error) and never presents it.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The spec declares <code>affordances</code> and no presenter
+to present them through; a presented row is not an object, or
+already has an <code>affordances</code> key; or a row carries no answer,
+because it did not come through the selector that declares them.</p>
               </div>
             </td>
           </tr>
@@ -8255,6 +9974,202 @@ plain data, safe to use on the loop.</p>
       </tbody>
     </table>
 
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.dispatch.present_for_audience.present_for_audience" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">present_for_audience</span>
+
+
+<a href="#django_service_specs.dispatch.present_for_audience.present_for_audience" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">present_for_audience</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">result</span><span class="p">:</span> <span class="n">DispatchResult</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">projection</span><span class="p">:</span> <span class="n">AudienceProjection</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p><a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> plus the agent projection.</p>
+<p>The one call an agent transport makes instead of <code>present</code>, so an MCP
+server, an in-process toolset and anything added later shape payloads
+identically rather than each growing its own post-processor. <code>spec</code> and
+<code>result</code> mean exactly what they mean to <code>present</code>, which this calls
+first: the projection applies to the presented value and never to the
+value it was presented from.</p>
+<p>djangorestframework-services' <code>render_for_audience</code> is the same
+composition over its serializer render, and takes the <code>view</code>,
+<code>request</code> and <code>many</code> that render reads. This is named apart so that
+neither package's name means two signatures.</p>
+<p><code>projection</code> is the output's resolved markings. Omit it and one is read
+off the spec; a transport that registers its tools up front builds it
+once with
+<a class="autorefs autorefs-internal" title="audience_projection_for_spec" href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec"><code>audience_projection_for_spec</code></a>,
+a mount's overrides included, and passes it in. <code>None</code> is therefore not
+a way out of projecting: a caller naming no audience calls <code>present</code>,
+which is what every HTTP response is.</p>
+<p>To serve one page, page the result's value first and present the page's
+rows: <code>present_for_audience(spec, replace(result, value=page.items))</code>,
+then <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>envelope</code></a>
+what comes back. The envelope's keys belong to no <code>Output</code>, so the
+projection must never walk them.</p>
+<p>A selector spec's declared <code>affordances</code> pass through whole: the
+<code>affordances</code> object <code>present</code> adds to each row is a key no <code>Output</code>
+declares, so the projection has nothing to say about it, and an agent
+reads <code>available</code>, the <code>code</code> a client branches on, and the <code>reason</code>
+- the sentence a model relays when it explains why an action is not
+possible, written for exactly that reader.</p>
+<p>Render an agent's <strong>answer</strong> with this. A pipeline that feeds one spec's
+output into the next keeps presenting with <code>present</code>, or the handles the
+next step reads by will have been projected away.</p>
+<p>From async code, project what
+<a class="autorefs autorefs-internal" title="apresent
+
+
+  
+      async
+  " href="#django_service_specs.dispatch.apresent.apresent"><code>apresent</code></a> returns:
+<code>project_payload(await apresent(spec, result), projection)</code>. Presenting
+may query and runs in the executor; projecting reads only the presented
+data and the declaration, so it is safe on the event loop.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>kind="not_found"</code>, as <code>present</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.dispatch.paginate_output.paginate_output" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">paginate_output</span>
+
+
+<a href="#django_service_specs.dispatch.paginate_output.paginate_output" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">paginate_output</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">rows</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">max_page_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OutputPage</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Slice <code>rows</code> into the page a transport serves.</p>
+<p>A function a transport calls on a list result's <code>value</code> before presenting
+it, not a paging scheme: the names a caller pages by, and the ceiling a
+mount allows, are the transport's. A transport takes them off the call
+before the spec's closed argument set sees them, and bounds legitimately
+differ between two mounts of one spec. HTTP views do not page.</p>
+<p><code>page</code> and <code>limit</code> default to 1 and
+<a class="autorefs autorefs-internal" title="DEFAULT_PAGE_SIZE
+
+
+  
+      module-attribute
+  " href="#django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE"><code>DEFAULT_PAGE_SIZE</code></a>.
+Out-of-range values clamp at <strong>both</strong> ends - <code>limit</code> down to
+<code>max_page_size</code> and up to 1, <code>page</code> up to 1 and down to the last page
+that exists - and the clamps are not silent the way truncating an unpaged
+result would be: <code>totalPages</code> and <code>hasNext</code> are computed from the
+clamped <code>limit</code>, and the returned <code>page</code> is the one actually served. A
+caller that asked for 500 rows and got 100, or for page 10 of 3, is told
+what it received.</p>
+<p>Both values are taken already parsed. Turning an untyped argument into an
+integer is where transports legitimately differ - a public endpoint clamps
+a malformed value and answers, an in-process toolset can hand a model its
+mistake back and ask again - and that is a policy about bad input, not
+about what a page is.</p>
+<p>The upper clamp on <code>page</code> is why <code>total</code> is counted <strong>before</strong> the
+slice: <code>(page - 1) * limit</code> on an unclamped page is an arbitrarily large
+SQL <code>OFFSET</code>, which a backend either scans towards or refuses outright
+with a <code>DatabaseError</code> this does not catch.</p>
+<p>A queryset is counted with <code>COUNT</code> and sliced lazily, so the page's
+<code>items</code> is still a queryset: present them, as
+<a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does a list,
+and the page is read once. A <code>Manager</code> is paged as its <code>.all()</code>, since
+it counts and cannot be sliced.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>rows</code> is neither a queryset nor a sized, sliceable
+sequence, so there is nothing to count and nothing to slice.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">DEFAULT_PAGE_SIZE</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">DEFAULT_PAGE_SIZE</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">100</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Rows per page when the caller asks for a page and names no size.</p>
 
     </div>
 
@@ -8346,6 +10261,221 @@ arguments.</p>
 
     </div>
 
+</div><h2 id="affordances">Affordances<a class="headerlink" href="#affordances" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.affordances.enforce_affordances.enforce_affordances" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">enforce_affordances</span>
+
+
+<a href="#django_service_specs.affordances.enforce_affordances.enforce_affordances" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">enforce_affordances</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">pool</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Refuse the call if one of the spec's <code>affordances</code> is not met.</p>
+<p><a class="autorefs autorefs-internal" title="dispatch" href="#django_service_specs.dispatch.dispatch.dispatch"><code>dispatch</code></a> and
+<a class="autorefs autorefs-internal" title="adispatch
+
+
+  
+      async
+  " href="#django_service_specs.dispatch.adispatch.adispatch"><code>adispatch</code></a> call this
+themselves for a service spec, with the pool the service is about to
+receive and the pool seeds' <code>reserved</code> set. A transport that runs a
+service <strong>without</strong> them - a chain that owns the transaction and hands each
+step its own pool, say - must call it too, exactly as it calls
+<a class="autorefs autorefs-internal" title="authorize" href="#django_service_specs.authorization.authorize.authorize"><code>authorize</code></a>, or a
+condition the direct path refuses is skipped on that one. Neither entry
+point calls it for a selector spec, whose <code>affordances</code> are answers about
+each row rather than a refusal of the read.</p>
+<p><code>pool</code> is the keyword pool the service is about to receive and
+<code>instance</code> its resolved target, <code>None</code> for an operation with none. It
+raises
+<a class="autorefs autorefs-internal" title="ActionUnavailable" href="#django_service_specs.services.action_unavailable.ActionUnavailable"><code>ActionUnavailable</code></a>
+carrying the unmet affordance's <code>reason</code> and <code>code</code>.</p>
+<p>Callers must invoke this <strong>after</strong> object-level authorization and
+validation, and <strong>before</strong> the service: class-level authorization -&gt; target
+resolution -&gt; object-level authorization -&gt; validation -&gt; affordances -&gt;
+service. After access because a refusal describes the row's state, and
+telling a caller who may not see the row what state it is in is a
+disclosure. Dispatch calls it before an atomic service's transaction opens,
+so a refusal never opens one.</p>
+<p>Declaration order decides which refusal a caller sees, and nothing past the
+first unmet condition runs. Every condition on the row is answered together
+by one query the first time one is reached. A callable condition sees the
+seeds of <code>pool</code> - never the call's target, input or client arguments - so
+a <code>**kwargs</code> catch-all is held to the same rule the declaration enforces on
+a named parameter. <code>reserved</code> is this call's seed set, registered seeds
+included: <code>seeds.reserved</code> for the
+<a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="#django_service_specs.pool.pool_seeds.PoolSeeds"><code>PoolSeeds</code></a> the pool was
+built with. A callable's result is read for truth, so one that returns
+nothing refuses rather than allows.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ActionUnavailable (django_service_specs.services.action_unavailable.ActionUnavailable)" href="#django_service_specs.services.action_unavailable.ActionUnavailable">ActionUnavailable</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>An affordance is not met.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="ServiceNotFound (django_service_specs.services.service_not_found.ServiceNotFound)" href="#django_service_specs.services.service_not_found.ServiceNotFound">ServiceNotFound</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A condition on the row was reached and the row is gone:
+resolved a moment ago, and there is now nothing to do it to.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>A condition on the row was reached and
+<code>instance</code> is not a model instance.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">unmet_operation_affordance</span>
+
+
+<a href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">unmet_operation_affordance</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">pool</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Affordance</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The first of the spec's operation-scope affordances not met now, or <code>None</code>.</p>
+<p>For a transport deciding whether to offer an operation at all, before anyone
+attempts it: an MCP server building its tool list, an agent assembling the
+toolset for its next step. An operation whose answer is an
+<a class="autorefs autorefs-internal" title="Affordance
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.affordance.Affordance"><code>Affordance</code></a> cannot be
+called right now whatever it is called with, so offering it only invites a
+refusal.</p>
+<p>Only the callable conditions are asked - the ones answered without a row. A
+condition on the row is skipped without being evaluated, because at list
+time there is no row: it runs no query and needs no instance, and it goes on
+being answered per object where it always is, at the call. The callables are
+asked in declaration order and the first unmet one is returned, which is the
+one a call would be refused with when no row condition before it answers
+first. A callable's result is read for truth, so one that returns nothing is
+unmet here as it is refused at the call. An exception it raises propagates:
+this answers the question, and a condition that cannot be answered is not a
+<code>no</code>.</p>
+<p><strong>Build <code>pool</code> the way the call's would be.</strong> A condition sees the seeds of
+it, never a client argument, through the same definition the call is
+refused by, so the two see the same names only if they are handed the same
+seeds:
+<a class="autorefs autorefs-internal" title="base_pool" href="#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a> with the same
+<code>seeds=</code>, and <code>reserved=seeds.reserved</code> here, or a condition reading a
+registered seed is asked without it.</p>
+<p><strong>The answer is advisory.</strong> Enforcement at the call
+(<a class="autorefs autorefs-internal" title="enforce_affordances" href="#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>)
+remains the authority, so a list built a moment before a condition flips is
+answered, when the stale entry is called, by an
+<a class="autorefs autorefs-internal" title="ActionUnavailable" href="#django_service_specs.services.action_unavailable.ActionUnavailable"><code>ActionUnavailable</code></a>
+carrying the <code>code</code> this would return if asked again then (or a row
+condition's, where one declared earlier refuses first). A condition driven by
+a clock has no event: it is answered when asked, and nothing announces the
+moment it flips. A transport that can push list changes to its client needs
+something else to tell it when to ask again.</p>
+<p>A <code>SelectorSpec</code> is accepted and answers <code>None</code>: its <code>affordances</code> maps
+names to <em>other</em> operations, to be answered for its rows, and is never a
+condition on the selector itself - so a transport passes whatever spec it
+holds rather than branching on its type and risking reading that mapping as
+the selector's own.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.affordances.operation_affordances.operation_affordances" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">operation_affordances</span>
+
+
+<a href="#django_service_specs.affordances.operation_affordances.operation_affordances" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">operation_affordances</span><span class="p">(</span><span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Affordance</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The operation-scope affordances <code>spec</code> declares, in declaration order.</p>
+<p>The callable ones: the conditions answered without a row. A condition on the
+row is left out, and so is anything on a <code>SelectorSpec</code>, which answers
+<code>()</code>: its <code>affordances</code> maps names to <em>other</em> operations, to be answered
+for its rows, and reading that mapping as the selector's own conditions
+would answer a question about some other operation. A spec declaring none
+answers <code>()</code> too.</p>
+<p>A transport uses this to decide cheaply whether there is anything to ask at
+list time before it builds a pool: most operations declare nothing, and an
+empty answer means
+<a class="autorefs autorefs-internal" title="unmet_operation_affordance" href="#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance"><code>unmet_operation_affordance</code></a>
+would return <code>None</code> without running anything. That function selects its
+conditions here, so a transport's shortcut and the answer it skips cannot
+disagree about which conditions there are.</p>
+
+
+    </div>
+
 </div><h2 id="http">HTTP<a class="headerlink" href="#http" title="Permanent link">&para;</a></h2>
 
 
@@ -8377,7 +10507,8 @@ arguments.</p>
    spec's permission check is what decides whether anonymous may act. An
    authenticated user whose <code>is_active</code> is false is refused as
    <code>PrincipalUnavailable</code>: a backend other than <code>ModelBackend</code> can log
-   one in, and a deactivated principal never acts.</li>
+   one in, and a deactivated principal never acts. Dispatch refuses one by
+   the same rule; refusing here as well keeps the request unread for it.</li>
 <li><strong>The arguments</strong> are
    <a class="autorefs autorefs-internal" title="request_arguments" href="#django_service_specs.http.request_arguments.request_arguments"><code>request_arguments</code></a>
    for <code>spec.parameters()</code>, with <code>url_kwargs</code> merged last.</li>
@@ -9184,9 +11315,12 @@ which is the host's route rather than the client's request; see
 
         <p><code>exc</code> as JSON, at the status djangorestframework-services answers it with.</p>
 <p>One ladder for both families, at djangorestframework-services' statuses.
-One body differs from its answer: a service's string or list detail, which
+Two bodies differ from its answer. A service's string or list detail, which
 DRF answers as a bare list and this as a field map under
-<code>non_field_errors</code>, so every 400 here has one shape:</p>
+<code>non_field_errors</code>, so every 400 here has one shape. And an
+<code>AdditionalInputRequired</code> schema, which DRF reads as an error detail and
+so writes with every value a string (<code>"minimum": "1"</code>), and this writes as
+the JSON Schema it is:</p>
 <table>
 <thead>
 <tr>
@@ -9217,9 +11351,19 @@ DRF answers as a bare list and this as a field map under
 <td><code>{"detail": message}</code></td>
 </tr>
 <tr>
-<td><code>ServiceConflict</code></td>
+<td><code>ActionUnavailable</code></td>
+<td>409</td>
+<td><code>{"detail": message, "code": code}</code></td>
+</tr>
+<tr>
+<td>any other <code>ServiceConflict</code></td>
 <td>409</td>
 <td><code>{"detail": message}</code></td>
+</tr>
+<tr>
+<td><code>AdditionalInputRequired</code> with a <code>schema</code></td>
+<td>422</td>
+<td><code>{"detail": message, "schema": schema}</code></td>
 </tr>
 <tr>
 <td>any other <code>ServiceError</code></td>
@@ -9249,6 +11393,17 @@ encoder renders every lazy string it meets, messages included.</p>
 and a 401 tells a client to start an authentication flow it has no way to
 finish. An anonymous caller a permission check refuses is a 403, like any
 other refused principal.</p>
+<p><strong>Two members add a key beside <code>detail</code>, and keep their base's status.</strong>
+<code>ActionUnavailable</code> is a conflict, and its arm exists only to put the
+affordance's <code>code</code> in the body beside the <code>detail</code> a client already
+reads: the stable code is the whole point of the member, and a client left
+with only the sentence has nothing to branch on. <code>AdditionalInputRequired</code>
+is "I need one more value", which is the operation being unprocessable as
+asked, so it stays a 422 like any other service error; the <code>schema</code> naming
+what is missing joins the body, because without it a client is told that
+something is needed and not what. Only when there is a schema: the error is
+valid without one, and growing the body unconditionally would change every
+plain message into an object for no gain.</p>
 <p>A <code>DispatchError</code> no row names - raised by nobody in this package, or a
 subclass a later release adds - is still a refusal of the call rather than
 the operation's own verdict, so it answers 400 rather than 422.</p>
@@ -9747,9 +11902,10 @@ terminal and never a fallback:</p>
 <li>a malformed primary key (<code>ValueError</code>, <code>TypeError</code>, or Django's own
   <code>ValidationError</code> - a non-UUID string against a UUID primary key raises
   that one instead of <code>ValueError</code>);</li>
-<li><code>is_active</code> is <code>False</code>. Read with <code>getattr</code> rather than assumed,
-  because a custom user model is not required to declare the field at all,
-  and one that omits it is active by default.</li>
+<li>the row is deactivated, by the rule dispatch applies to a principal it
+  is handed (<code>is_active</code> false, and a model with no such field reads as
+  active). So <code>adispatch(principal_id=...)</code> refuses here, with the
+  identifier in the message, and dispatch's own check never disagrees.</li>
 </ul>
 <p>Never <code>AnonymousUser</code>: an operation dispatched with no resolvable
 principal has no principal, not an anonymous one.</p>
@@ -9828,7 +11984,12 @@ refusal to route around keeps trying, where a denial should end the attempt.</p>
 
 
 
-        <p>The identifier names no user who may act: missing, malformed, or deactivated.</p>
+        <p>The principal cannot act: an identifier naming nobody, or a deactivated account.</p>
+<p>Raised by <code>resolve_principal</code> for an identifier that is missing,
+malformed or names a deactivated row, and by dispatch and the HTTP entry
+points for a deactivated principal they were handed. Either way it comes
+before any permission check, which is about what a principal may do, not
+whether there is one.</p>
 <p>Terminal. Never a fallback to <code>AnonymousUser</code>, which would run the
 operation as somebody the caller did not name, and never a retry: a deleted
 row does not come back, and a deactivated account is deactivated on purpose.</p>
@@ -10175,6 +12336,154 @@ check swallows it.</p>
 
     </div>
 
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.services.action_unavailable.ActionUnavailable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ActionUnavailable</span>
+
+
+<a href="#django_service_specs.services.action_unavailable.ActionUnavailable" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ServiceConflict (django_service_specs.services.service_conflict.ServiceConflict)" href="#django_service_specs.services.service_conflict.ServiceConflict">ServiceConflict</a></code></p>
+
+
+
+        <p>The operation is not possible right now, for a reason with a stable name.</p>
+<p>Raised when one of a spec's
+<a class="autorefs autorefs-internal" title="Affordance
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.affordance.Affordance"><code>Affordance</code></a> conditions
+is not met, carrying that affordance's <code>code</code> and its <code>reason</code> as the
+message. Over HTTP it is a <code>409</code> whose body is
+<code>{"detail": &lt;reason&gt;, "code": &lt;code&gt;}</code>.</p>
+<p>A <a class="autorefs autorefs-internal" title="ServiceConflict" href="#django_service_specs.services.service_conflict.ServiceConflict"><code>ServiceConflict</code></a>
+subclass rather than a <code>code=</code> argument on its parent, for three reasons. The
+<code>409</code> answer needs no new status, because a subclass is matched by its
+parent's arm. A transport that wants the code matches this class ahead of its
+generic conflict handler, and one that has never heard of it still reports a
+conflict. And a <code>ServiceConflict</code> a service raises by hand genuinely has no
+code and never will, so a nullable <code>code</code> on the parent would be a field
+that lies at every other call site.</p>
+<p><code>code</code> names the rule and is what a transport or client branches on; the
+message is the affordance's <code>reason</code>, the sentence a person or a model is
+shown when the call is refused. A transport serving an agent should pass on
+both: the model can say the sentence, and the code is what stays stable when
+the sentence is reworded.</p>
+<p>Like every member, it must be matched <strong>before</strong> a generic <code>ServiceConflict</code>
+or <code>ServiceError</code> handler, or the subclass check swallows it.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.services.additional_input_required.AdditionalInputRequired" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">AdditionalInputRequired</span>
+
+
+<a href="#django_service_specs.services.additional_input_required.AdditionalInputRequired" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="ServiceError (django_service_specs.services.service_error.ServiceError)" href="#django_service_specs.services.service_error.ServiceError">ServiceError</a></code></p>
+
+
+
+        <p>A service cannot proceed without a value it was not given.</p>
+<p>Not "what you sent is wrong" - that is
+<a class="autorefs autorefs-internal" title="ServiceValidationError" href="#django_service_specs.services.service_validation_error.ServiceValidationError"><code>ServiceValidationError</code></a>
+- but "I got far enough to discover I need something else", usually
+<em>conditional on what the service found</em>, so it cannot be expressed as a
+required parameter:</p>
+<div class="language-text highlight"><pre><span></span><code>def delete_rows(*, data, confirmed: bool = False):
+    doomed = rows_matching(data)
+    if len(doomed) &gt; 100 and not confirmed:
+        raise AdditionalInputRequired(
+            f"{len(doomed)} rows match. Confirm to proceed.",
+            schema={"confirmed": {"type": "boolean"}},
+        )
+    ...
+</code></pre></div>
+<p><code>schema</code> describes what is missing, keyed by the argument name the service
+expects it back under: a transport that can ask renders it, one that cannot
+still has a message worth showing. <strong>The answer comes back as an ordinary
+argument</strong> on every transport - an HTTP client re-submits with <code>confirmed</code>
+in the body, an MCP client is asked and its answer is merged into the tool
+arguments before dispatch - so raising is the whole of the service's
+involvement; there is no callback to hold and no session to resume. The
+operation declares that argument like any other, so the closed argument set
+admits it on the second call.</p>
+<p>A <a class="autorefs autorefs-internal" title="ServiceError" href="#django_service_specs.services.service_error.ServiceError"><code>ServiceError</code></a>
+subclass deliberately, so a transport that has never heard of it still
+reports that the operation could not be completed and why. One that wants to
+do better must catch it <em>before</em> its generic <code>ServiceError</code> handler.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
 </div><h2 id="pool">Pool<a class="headerlink" href="#pool" title="Permanent link">&para;</a></h2>
 
 
@@ -10425,8 +12734,9 @@ carrier so nothing in <code>pool/</code> depends on it in a cycle.</p>
 
         <p>The empty registry every dispatch entry point falls back to.</p>
 <p>A project that registers nothing gets the pool dispatch builds on its own: the
-principal as <code>user</code>, and each step's own values (<code>data</code>, <code>instance</code>,
-<code>collection</code>, <code>result</code>, <code>queryset</code>) where that step has them.</p>
+principal as <code>user</code>, a reporter as <code>progress</code>, and each step's own values
+(<code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code>, <code>queryset</code>) where that
+step has them.</p>
 
     </div>
 
@@ -10453,14 +12763,19 @@ principal as <code>user</code>, and each step's own values (<code>data</code>, <
     <div class="doc doc-contents first">
 
         <p>The names dispatch seeds into a callable's keyword pool, which no argument may use.</p>
-<p><code>user</code> is the principal, <code>data</code> the validated values, <code>instance</code> and
-<code>collection</code> the resolved target, <code>result</code> the service's return (in an
-output selector's pool) and <code>queryset</code> what <code>extend_queryset</code> shapes. They
-are the names <code>djangorestframework-services</code> seeds for the same values, so a
-callable written for it runs under this kernel unchanged.</p>
-<p><code>progress</code> has no value yet and is reserved anyway, so that seeding it later
-is additive: reserving a name after a spec has declared a parameter by it would
-break that spec.</p>
+<p><code>user</code> is the principal, <code>progress</code> the caller's progress reporter,
+<code>data</code> the validated values, <code>instance</code> and <code>collection</code> the resolved
+target, <code>result</code> the service's return (in an output selector's pool) and
+<code>queryset</code> what <code>extend_queryset</code> shapes. They are the names
+<code>djangorestframework-services</code> seeds for the same values, so a callable
+written for it runs under this kernel unchanged.</p>
+<p><code>progress</code> is in every pool, and live only where there is work to report on:
+a service's run, and a selector spec's own selector. In a target or output
+selector's pool it is <code>null_progress</code>, because a lookup has nothing to
+report, and one reporting after the service finished would read to a watching
+client as the work restarting. It was reserved before it carried a value, so
+that seeding it was additive rather than a break for a spec that had declared
+a parameter by it.</p>
 <p>A parameter declaring one of these names is refused, because a spread argument
 must never be able to outrank the value dispatch seeded - a caller naming
 itself <code>user</code> is the case that matters. <code>request</code> and <code>view</code> are not here:
@@ -10480,8 +12795,12 @@ reserves them the same way.</p>
 
 <a href="#django_service_specs.pool.base_pool.base_pool" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">base_pool</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span> <span class="o">**</span><span class="n">extra</span><span class="p">:</span> <span class="n">Any</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">**</span><span class="n">extra</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -10495,12 +12814,19 @@ enforce on its callers: this is a builder, not a gate. A transport adapter
 that assembles a pool as a dict literal of its own carries exactly the keys
 it wrote there, because <code>resolve_callable_kwargs</code> forwards only keys the
 pool actually has. A callable declaring a seed the literal omitted then
-raises <code>TypeError</code> at call time rather than running.</p>
+raises <code>TypeError</code> at call time rather than running - <code>progress</code> most
+often, since it is the seed with a default and so the one nobody remembers.</p>
 <p>There is no <code>request</code> entry here: this is the kernel, and off HTTP there
 is no request to seed. An HTTP adapter that wants one registers it as its
 own seed through <code>PoolSeeds</code>, the same way any other ambient value is
-added. <code>progress</code> is reserved (see <code>RESERVED_POOL_SEEDS</code>) but has no
-value yet, so it is not seeded either.</p>
+added.</p>
+<p><code>progress</code> is the caller's reporter, and defaults to <code>null_progress</code>
+rather than to <code>None</code>, so a declared reporter is always callable - see
+<code>ProgressReporter</code>. Only <code>None</code> is replaced: a reporter that happens to
+be falsy, such as a list-backed recorder that is empty until its first
+report, is seeded as it is, where djangorestframework-services' <code>or</code>
+would swap it for <code>null_progress</code> and drop every report. A seed's
+resolver sees it like any other entry.</p>
 <p><strong>An adapter that dispatches callables through this package must build its
 pool from this function</strong>, with its own entries spread in —
 <code>base_pool(user=…, **own_entries)</code> — rather than restating the seeds.
@@ -10521,6 +12847,44 @@ convenience: a registered name is also reserved, so dispatch refuses a spec
 that declares an argument by that name rather than letting the two meet in
 one pool. An <code>**extra</code> entry has no such protection. Spread an entry that
 is genuinely per-call; register one that is ambient.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.pool.null_progress.null_progress" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">null_progress</span>
+
+
+<a href="#django_service_specs.pool.null_progress.null_progress" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">null_progress</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">progress</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">total</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">meta</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The
+<a class="autorefs autorefs-internal" title="ProgressReporter" href="#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a>
+a transport with nowhere to send progress uses.</p>
+<p>Seeded by <a class="autorefs autorefs-internal" title="base_pool" href="#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a>
+whenever the caller supplied no reporter, which is every dispatch from a
+transport with no progress channel of its own, every HTTP request, and every
+test.</p>
+<p><strong>The default is what makes the seed usable.</strong> Without it, a service
+declaring <code>progress</code> would work over one transport and raise a
+<code>TypeError</code> over the others, so nobody could declare it in code meant to
+be shared - which is the entire premise of writing a service once.
+Discarding the report is the honest behaviour for a caller that cannot
+forward it; refusing the call is not.</p>
 
 
     </div>
@@ -13831,6 +16195,10 @@ declaratively-shaped queryset. <code>extend_queryset</code> is resolved from
 <code>{**pool, "queryset": queryset}</code> through the same declare-to-receive rule
 as every other pool-resolved callable, and its return is the shaped
 queryset from here on.</p>
+<p>It answers no <code>affordances</code>. Dispatch answers a selector spec's in the
+same <code>.annotate()</code> call, with the call's registered seeds, which this is
+not handed; a transport that shapes rows here and then presents them
+through a spec declaring <code>affordances</code> is refused at <code>present</code>.</p>
 
 
 <p><span class="doc-section-title">Parameters:</span></p>
@@ -13910,7 +16278,7 @@ offending spec (<code>"SelectorSpec.selector"</code> vs
       <tbody>
           <tr class="doc-section-item">
             <td>
-                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+                  <code><span title="ImproperlyConfigured">ImproperlyConfigured</span></code>
             </td>
             <td>
               <div class="doc-md-description">
@@ -14050,6 +16418,721 @@ you compare against and <code>UnsetType</code> is only useful as a type annotati
 
 
 
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.affordance.Affordance" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Affordance</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.types.affordance.Affordance" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>What can be done to this object right now, declared once on the operation.</p>
+<p>A condition on a
+<a class="autorefs autorefs-internal" title="ServiceSpec
+
+
+  
+      dataclass
+  " href="#django_service_specs.specs.service_spec.ServiceSpec"><code>ServiceSpec</code></a> saying
+whether the operation is possible <strong>as a fact about the world</strong>: an order
+that shipped cannot be cancelled, a draft with no title cannot be published,
+refunds are closed while the books are. Not a fact about the caller - that is
+<code>permissions</code>, which refuses with
+<a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
+and is always checked first. An affordance refuses with
+<a class="autorefs autorefs-internal" title="ActionUnavailable" href="#django_service_specs.services.action_unavailable.ActionUnavailable"><code>ActionUnavailable</code></a>,
+a conflict.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">service</span><span class="o">=</span><span class="n">cancel_order</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">affordances</span><span class="o">=</span><span class="p">[</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="n">Affordance</span><span class="p">(</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>            <span class="n">code</span><span class="o">=</span><span class="s2">"order_shipped"</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>            <span class="n">reason</span><span class="o">=</span><span class="s2">"A shipped order cannot be cancelled."</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>            <span class="n">when</span><span class="o">=~</span><span class="n">Q</span><span class="p">(</span><span class="n">status</span><span class="o">=</span><span class="s2">"shipped"</span><span class="p">),</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="p">),</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="p">],</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>when</code> is true when the action <strong>is</strong> available, and its type decides what
+kind of condition it is - derived, never declared, so it cannot drift from
+what it describes:</p>
+<ul>
+<li><strong>An ORM boolean expression</strong> - a <code>Q</code>, an <code>Exists</code>, a lookup - is a
+  condition on the row. It reads exactly as <code>Model.objects.filter(when)</code>
+  does, relations included, and is evaluated in SQL: one query for a single
+  object, however many conditions it declares. A row is available only when
+  the condition is true; a <code>NULL</code> is not true.</li>
+<li><strong>A callable</strong> is a condition on nothing in particular - "refunds are
+  closed during month-end". It is resolved through the keyword pool like any
+  other spec callable and returns a <code>bool</code>, and it sees the pool's seeds
+  only: <code>user</code>, <code>progress</code> and any registered pool seed, an HTTP
+  adapter's <code>request</code> among them. Never the call's target or input, and
+  never a client argument - the caller does not get to decide whether the
+  operation is available.</li>
+</ul>
+<p><strong>A Python callable over the row is refused, and that refusal is the design.</strong>
+A predicate the ORM cannot read has to run once per row, which turns every
+list that reports availability into one query per row, and prefetching does
+not fix it: a prefetched relation answers some reads from its cache and
+silently re-queries for others. A rule that cannot be computed for fifty rows
+in one query is not an affordance - it stays in the service, where it is
+enforced and never advertised.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.types.affordance.Affordance.code">code</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Stable and machine-readable: it names the rule, never the state
+that tripped it, and it does not change when the sentence is
+reworded. What a transport or a client branches on.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.types.affordance.Affordance.reason">reason</span></code></td>
+            <td>
+                  <code><span title="str">str</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The sentence people and models both read - in a rendered
+answer, and as the message of the <code>ActionUnavailable</code> a refused
+call raises. Write it for them: say what is not possible and, where
+it helps, what would make it possible, and keep internal state out
+of it, since every reader of the operation reads it.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.types.affordance.Affordance.when">when</span></code></td>
+            <td>
+                  <code><span title="typing.Any">Any</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The condition, as above.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>code</code> or <code>reason</code> is not a non-empty string;
+<code>when</code> is an ORM expression that is not boolean; <code>when</code> is a
+callable naming <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code>
+or <code>queryset</code>; or <code>when</code> is neither an expression nor a
+callable.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.progress_reporter.ProgressReporter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ProgressReporter</span>
+
+
+<a href="#django_service_specs.types.progress_reporter.ProgressReporter" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="typing.Protocol">Protocol</span></code></p>
+
+
+
+        <p>How a long-running service reports how far it has got.</p>
+<p>A dispatched callable receives one under the reserved pool seed
+<code>progress</code>, exactly as it receives <code>user</code> - declare the parameter and it
+arrives:</p>
+<div class="language-text highlight"><pre><span></span><code>def export_invoices(*, data, progress: ProgressReporter):
+    rows = list(build_rows(data))
+    for index, row in enumerate(rows):
+        write(row)
+        progress(index + 1, total=len(rows), message="writing rows")
+</code></pre></div>
+<p><strong>Reporting is always safe and never required.</strong> A transport with somewhere
+to send progress passes its reporter to <code>dispatch(progress=...)</code>; one with
+nowhere to send it passes nothing, and the pool carries
+<a class="autorefs autorefs-internal" title="null_progress" href="#django_service_specs.pool.null_progress.null_progress"><code>null_progress</code></a>
+instead. So a service that declares the parameter runs unchanged on every
+transport and in tests. The call takes four arguments:</p>
+<ul>
+<li><code>progress</code> - how far along, in whatever unit the service chose. It
+  <strong>must increase</strong> across calls within one dispatch; a transport that
+  forwards it is entitled to treat a decrease as a bug.</li>
+<li><code>total</code> - the denominator, when it is known. Omit it rather than
+  guessing: a receiver renders an indeterminate bar for a missing total
+  and a wrong percentage for a wrong one.</li>
+<li><code>message</code> - a short human-readable status. For a person watching, not
+  for a machine to parse.</li>
+<li><code>meta</code> - structured detail <em>about this update</em> (which stage, which
+  file, how many rows have failed), so that structure need not be
+  stringified into <code>message</code> and parsed back out at the far end.</li>
+</ul>
+<p><strong><code>meta</code> is the part a receiver may not understand</strong>, and each decides
+for itself: a websocket consumer forwards it into the frame the UI renders;
+a receiver with nowhere to put it drops it. Never encode something the
+operation's <em>correctness</em> depends on - it is telemetry, not a channel. And
+namespace the keys if the far end might be MCP: a progress notification
+carries the structure under the protocol's <code>_meta</code>, whose key-naming
+rules reserve unprefixed names and anything under a
+<code>modelcontextprotocol</code> / <code>mcp</code> prefix, so <code>{"com.example/stage": ...}</code>
+is safe and <code>{"stage": ...}</code> is not portable.</p>
+<p>Implementations must not raise. A reporter is called from inside domain
+code that has no reason to defend against it, and dispatch hands the
+caller's reporter over as it is, so a transport failing mid-report would
+take the service run down with it.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.output_page.OutputPage" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">OutputPage</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.types.output_page.OutputPage" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>One page of rows, plus what a caller needs to know to ask for the next.</p>
+<p>What <a class="autorefs autorefs-internal" title="paginate_output" href="#django_service_specs.dispatch.paginate_output.paginate_output"><code>paginate_output</code></a>
+returns, and the payload
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(paginate=True)</code></a>
+describes. The schema and the shaper are one mechanism in two places, so
+they are kept beside each other: a transport that wraps its pages and one
+that returns a bare list, against a schema claiming the envelope for both,
+is the drift this exists to prevent.</p>
+<p><code>items</code> is the slice itself, unpresented: presenting needs the spec and
+belongs to the caller. Hand the presented result back to
+<a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>envelope</code></a>
+to get the wire shape.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.types.output_page.OutputPage.total_pages" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">total_pages</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#django_service_specs.types.output_page.OutputPage.total_pages" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">total_pages</span><span class="p">:</span> <span class="nb">int</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>How many pages exist at this <code>limit</code>. At least one, even for no rows.</p>
+<p>An empty result is one empty page rather than zero pages: <code>page</code> is
+1-based and the page served for an empty result is 1, so reporting 0
+would describe a page the caller was just handed as not existing.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.types.output_page.OutputPage.has_next" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">has_next</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#django_service_specs.types.output_page.OutputPage.has_next" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">has_next</span><span class="p">:</span> <span class="nb">bool</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Whether asking for <code>page + 1</code> would return anything.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.output_page.OutputPage.envelope" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">envelope</span>
+
+
+<a href="#django_service_specs.types.output_page.OutputPage.envelope" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">envelope</span><span class="p">(</span><span class="n">rendered</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Wrap already-presented rows in the published paging envelope.</p>
+<p><code>rendered</code> rather than <code>items</code> because an audience projection lands
+on the rows and never on the envelope: <code>page</code>, <code>totalPages</code> and
+<code>hasNext</code> are this shape's own keys and belong to no <code>Output</code>, so a
+projection walking them would look for markings that cannot exist.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.value_formatter.ValueFormatter" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ValueFormatter</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>One field's value, transformed for an agent audience, plus what that yields.</p>
+<p>Attached to a
+<a class="autorefs autorefs-internal" title="FieldMarking
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.field_marking.FieldMarking"><code>FieldMarking</code></a>
+and applied by the same walk that drops hidden fields and speaks choice
+displays, on both sides at once:
+<a class="autorefs autorefs-internal" title="project_payload" href="#django_service_specs.output.project_payload.project_payload"><code>project_payload</code></a>
+gives the payload <code>render</code>'s result, and
+<a class="autorefs autorefs-internal" title="annotate_output_schema" href="#django_service_specs.output.annotate_output_schema.annotate_output_schema"><code>annotate_output_schema</code></a>
+gives the schema <code>produces</code> and <code>schema</code>, from this one declaration.</p>
+<p><strong>This is generic on purpose.</strong> A formatted local timestamp is the case
+that asked for it, and building that alone would have left two hard-coded,
+type-specific value transforms where there was one. Money with its
+currency, a duration, a percentage and a quantity with its unit are all
+visible from this same spot; adding them one at a time is how a small
+marking type becomes a switch statement.
+<a class="autorefs autorefs-internal" title="timestamp
+
+
+  
+      classmethod
+  " href="#django_service_specs.types.value_formatter.ValueFormatter.timestamp"><code>timestamp</code></a>
+is a named constructor over the mechanism rather than a branch inside it.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">money</span> <span class="o">=</span> <span class="n">ValueFormatter</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="k">lambda</span> <span class="n">amount</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"EUR </span><span class="si">{</span><span class="n">amount</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">produces</span><span class="o">=</span><span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">schema</span><span class="o">=</span><span class="p">{</span><span class="s2">"examples"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"EUR 1240.00"</span><span class="p">]},</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>The declaration carries what it produces, and the kernel writes that
+into the schema.</strong> Choice substitution cannot lie, because both sides are
+derived from the same choices; a caller-supplied <code>render</code> can, so the
+type is declared next to it rather than inferred or left to a fragment.
+<code>schema</code> merges <em>over</em> the written type for <code>description</code>,
+<code>examples</code> or <code>format</code>, and is refused if it names <code>type</code>: a
+formatter that could contradict its own advertisement would put the
+divergence between schema and payload that the projection exists to
+prevent back inside a single declaration.</p>
+<p>Naming the type without describing the string it produces was the other
+rejected shape: what a formatted field looks like is most of what makes it
+discoverable, so both halves are here.</p>
+<p>Nothing checks <code>render</code>'s <em>result</em> when it runs. <code>produces</code> is a
+promise the author makes once, not a per-value assertion: the guarantee is
+that a renderer cannot advertise one thing and declare another, not that a
+misdeclared renderer is caught mid-call.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>produces</code> is not one
+of JSON's scalar types, or <code>schema</code> names <code>type</code>.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.render" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">render</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.render" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">render</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The transform, applied to the presented value.</p>
+<p>Called with what the presenter returned, not with a model attribute: the
+projection runs after presenting, so a date-time a
+<a class="autorefs autorefs-internal" title="DataclassPresenter" href="#django_service_specs.adapters.dataclass.dataclass_presenter.DataclassPresenter"><code>DataclassPresenter</code></a>
+presented arrives as its ISO-8601 string, and a decimal as its string.
+Never called with <code>None</code>; see
+<a class="autorefs autorefs-internal" title="apply" href="#django_service_specs.types.value_formatter.ValueFormatter.apply"><code>apply</code></a>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.produces" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">produces</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.produces" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">produces</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s1">'string'</span><span class="p">,</span> <span class="s1">'number'</span><span class="p">,</span> <span class="s1">'integer'</span><span class="p">,</span> <span class="s1">'boolean'</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The JSON type <code>render</code> returns. Written into the schema by the kernel.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">schema</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.schema" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">schema</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Extra JSON Schema keywords, merged over the written type.</p>
+<p>For saying what the produced value <em>looks like</em>: <code>description</code>,
+<code>examples</code>, <code>format</code>. May not contain <code>type</code>.</p>
+
+    </div>
+
+</div>
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.apply" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">apply</span>
+
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.apply" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">apply</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p><code>render(value)</code>, except that <code>None</code> passes straight through.</p>
+<p>A null is the absence of the value the formatter formats, and every
+transform would otherwise have to repeat the same guard: a nullable
+field is ordinary, and <code>strftime</code> on <code>None</code> raises. The schema
+keeps the null on its side as well, so a nullable field stays nullable
+once formatted.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.json_schema" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">json_schema</span>
+
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.json_schema" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">json_schema</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The declared type, with <code>schema</code> merged over it.</p>
+<p><code>type</code> is written <em>last</em> on purpose. <code>__post_init__</code> already
+refuses a fragment that names it, so this can never be the thing that
+decides, and that is the point: the guarantee is structural as well as
+validated, rather than resting on a check somebody may one day relax.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.value_formatter.ValueFormatter.timestamp" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">timestamp</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-classmethod"><code>classmethod</code></small>
+  </span>
+
+<a href="#django_service_specs.types.value_formatter.ValueFormatter.timestamp" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">timestamp</span><span class="p">(</span><span class="n">fmt</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ValueFormatter</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A date-time as a formatted local string, with an example of the shape.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">OutputField</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="s2">"due_at"</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="nb">format</span><span class="o">=</span><span class="s2">"date-time"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">marking</span><span class="o">=</span><span class="n">FieldMarking</span><span class="p">(</span><span class="n">formatter</span><span class="o">=</span><span class="n">ValueFormatter</span><span class="o">.</span><span class="n">timestamp</span><span class="p">()),</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><strong>The zone is Django's active one, and there is no way to pass
+another.</strong> It is what a per-tenant middleware calling
+<code>timezone.activate()</code> is already for, and a worker serving an agent
+activates the zone itself.</p>
+<p><strong>A callable zone is not merely unsupported, it is impossible.</strong> A
+projection is built once, where a transport registers the spec, by
+<a class="autorefs autorefs-internal" title="audience_projection_for_spec" href="#django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec"><code>audience_projection_for_spec</code></a>,
+and the schema it advertises is described then, before any request
+exists to describe. A per-request callable would therefore resolve
+differently on the two sides, which is the divergence between schema
+and payload that the projection exists to prevent. The schema says a
+formatted string and never names a zone, and that is what keeps it
+honest.</p>
+<p><code>fmt</code> is a <code>strftime</code> format string and defaults to a day-first,
+24-hour rendering. The example in the schema is rendered from it, so
+it cannot drift from what the field actually carries.</p>
+<p>A bare date string is read as midnight, so a date can be formatted
+too: give it a <code>fmt</code> without a time, or the rendering invents one. A
+naive date-time, as a project with <code>USE_TZ = False</code> has, is already
+local and is formatted as it is. A value that is not a date-time, and a
+string that does not read as one, passes through unchanged, for the
+same reason an unrecognised choice value does: a stale or oddly-typed
+row should still be reported rather than fail the call. A string shaped
+like a date-time that names no real moment, the thirtieth of February
+say, raises Django's <code>ValueError</code>, as djangorestframework-services'
+does. Declaring this on a field that never carries a date is a
+misdeclaration nothing here can detect.</p>
+
+
+    </div>
+
+</div>
 
 
 
