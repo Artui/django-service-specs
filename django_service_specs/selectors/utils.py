@@ -7,14 +7,17 @@ once it lands.
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from asgiref.sync import async_to_sync
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import QuerySet
 from django.db.models.manager import BaseManager
 
+from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.services.is_async import is_async
+from django_service_specs.specs.selector_spec import SelectorSpec
 
 
 def is_queryset(obj: Any) -> bool:
@@ -53,3 +56,48 @@ def call_selector(fn: Callable[..., Any], kwargs: dict[str, Any]) -> Any:
     if is_async(fn):
         return async_to_sync(fn)(**kwargs)
     return fn(**kwargs)
+
+
+def apply_shaping(
+    queryset: Any,
+    spec: SelectorSpec,
+    pool: Mapping[str, Any],
+    *,
+    annotations: Mapping[str, Any] | None,
+    source_label: str,
+) -> Any:
+    """``shape_queryset``, with the annotations it applies named by the caller.
+
+    ``shape_queryset`` passes the spec's own. Dispatch passes them with every
+    affordance answer the spec declares beside them, built against the model
+    the selector returned, so each answer rides in the one ``.annotate()`` call
+    and ``extend_queryset`` sees the answers as it sees a declared annotation.
+    The public function cannot build them itself: a callable condition is
+    answered against the call's registered seeds, which it is not handed.
+    """
+    if (
+        spec.select_related is None
+        and spec.prefetch_related is None
+        and annotations is None
+        and spec.extend_queryset is None
+    ):
+        return queryset
+    if not is_queryset(queryset):
+        raise ImproperlyConfigured(
+            "select_related / prefetch_related / annotations / extend_queryset "
+            f"are set on the spec but {source_label} returned "
+            f"{type(queryset).__name__}, which is not a Django QuerySet. Drop "
+            "the shaping fields or have the callable return a QuerySet."
+        )
+    if spec.select_related is not None:
+        queryset = queryset.select_related(*spec.select_related)
+    if spec.prefetch_related is not None:
+        queryset = queryset.prefetch_related(*spec.prefetch_related)
+    if annotations is not None:
+        queryset = queryset.annotate(**annotations)
+    if spec.extend_queryset is not None:
+        extend_pool = {**pool, "queryset": queryset}
+        queryset = spec.extend_queryset(
+            **resolve_callable_kwargs(spec.extend_queryset, extend_pool)
+        )
+    return queryset

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -23,6 +24,14 @@ The libraries disagree about every other one - a Django ``BooleanField`` reads
 - so a refusal is the one answer they all share, and the only one that cannot
 set a flag the caller meant to clear."""
 
+_INTEGRAL_DECIMAL = re.compile(r"\.0*\s*$")
+"""A decimal point with nothing after it but zeros and space, stripped before ``int``.
+
+It is Django's own expression: ``forms.IntegerField`` strips exactly this, and
+DRF's ``IntegerField`` does too, so ``"5.0"`` and ``"5."`` are 5 to both while
+``"5.5"`` is still refused. A flat transport stricter than the fields behind it
+would refuse a value the worker reads as a whole number."""
+
 
 def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any]:
     """Flat strings to the JSON-like primitives a typed caller would have sent.
@@ -37,6 +46,9 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
     strings**, for the Validator to decode, exactly as they would arrive off a
     JSON wire.
 
+    - An integer is read as Django's ``IntegerField`` reads one: ``"5.0"`` and
+      ``"5."`` are 5, and ``"5.5"`` is refused. An array's integer elements
+      are read the same way, a repeated query-string key's included.
     - An array's elements are each coerced by its ``items`` type, and a single
       value becomes a one-element list, since a flat transport sends a
       one-element list as a bare value. ``None`` is not wrapped: an option
@@ -98,7 +110,7 @@ def _coerce_one(json_type: str, value: Any) -> tuple[Any, str | None]:
         return value, None
     if json_type == "integer":
         try:
-            return int(value), None
+            return int(_INTEGRAL_DECIMAL.sub("", value)), None
         except ValueError:
             return None, gettext("Enter a whole number.")
     if json_type == "number":

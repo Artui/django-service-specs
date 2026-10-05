@@ -35,6 +35,10 @@ importing the package root never imports pydantic.
 ::: django_service_specs.output.output_field.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking
 ::: django_service_specs.output.field_audience.FieldAudience
+::: django_service_specs.output.audience_projection.AudienceProjection
+::: django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec
+::: django_service_specs.output.project_payload.project_payload
+::: django_service_specs.output.annotate_output_schema.annotate_output_schema
 
 ## JSON Schema
 
@@ -67,7 +71,16 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.dispatch_result.DispatchResult
 ::: django_service_specs.dispatch.present.present
 ::: django_service_specs.dispatch.apresent.apresent
+::: django_service_specs.dispatch.present_for_audience.present_for_audience
+::: django_service_specs.dispatch.paginate_output.paginate_output
+::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
+
+## Affordances
+
+::: django_service_specs.affordances.enforce_affordances.enforce_affordances
+::: django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance
+::: django_service_specs.affordances.operation_affordances.operation_affordances
 
 ## HTTP
 
@@ -101,6 +114,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.service_validation_error.ServiceValidationError
 ::: django_service_specs.services.service_conflict.ServiceConflict
 ::: django_service_specs.services.service_not_found.ServiceNotFound
+::: django_service_specs.services.action_unavailable.ActionUnavailable
+::: django_service_specs.services.additional_input_required.AdditionalInputRequired
 
 ## Pool
 
@@ -108,6 +123,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.pool_seeds.DEFAULT_POOL_SEEDS
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
+::: django_service_specs.pool.null_progress.null_progress
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations
@@ -151,3 +167,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.dispatch_error.DispatchError
 ::: django_service_specs.types.unset.UNSET
 ::: django_service_specs.types.unset.UnsetType
+::: django_service_specs.types.affordance.Affordance
+::: django_service_specs.types.progress_reporter.ProgressReporter
+::: django_service_specs.types.output_page.OutputPage
+::: django_service_specs.types.value_formatter.ValueFormatter

@@ -21,9 +21,12 @@ happened to install.
 - [`spec_input_schema(spec, *, unknown_arguments=REJECT)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
   describes everything `spec.parameters()` declares: the arguments dispatch
   checks.
-- [`spec_output_schema(spec)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+- [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
-  returns for the spec, or `None` when the spec declares no output.
+  returns for the spec, or `None` when the spec declares no output. With
+  `paginate=True` a list is described as the page envelope, and with a
+  `projection` as an agent audience is served it; see
+  [paging and projection](paging-and-projection.md).
 - [`parameters_schema(parameters, *, unknown_arguments=REJECT)`][django_service_specs.schema.parameters_schema.parameters_schema]
   and [`output_schema(output)`][django_service_specs.schema.output_schema.output_schema]
   are the same over a bare declaration, for a transport describing something
@@ -58,8 +61,8 @@ choices and a default, and refuses any other argument:
 ```
 
 It returns a list, so its output is an array of rows. The rows' fields carry
-markings - `id` is a handle, `title` the label - which the schema does not
-state; see [what is not emitted](#what-is-deliberately-not-emitted).
+markings - `id` is a handle, `title` the label - which this schema does not
+apply; see [what is not emitted](#what-is-deliberately-not-emitted).
 
 ```json
 {
@@ -238,9 +241,14 @@ service can return `None` is not something its declaration says.
 - **No `additionalProperties` on output.** Output is not a set a caller can get
   wrong, and a transport may add keys of its own to what it sends.
 - **No `default` or `description` on output.** A default says what happens when
-  a caller omits an argument, which means nothing for a value that came back.
-- **No marking.** A field marked as a handle, a label or hidden is described
-  like any other. Showing a field to an agent audience, or leaving it out, is a
-  projection over the schema and the payload, and the kernel declares markings
-  without applying any.
+  a caller omits an argument, which means nothing for a value that came back. A
+  projected schema is the exception for `description`: a marking's description,
+  or the transport's `handle_description` on a handle, is stated there.
+- **No marking, unless a projection is passed.** Without one, a field marked as
+  a handle, a label or hidden is described like any other, which is what
+  `present` and every HTTP response return. With one,
+  [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+  describes what
+  [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
+  returns; see [paging and projection](paging-and-projection.md).
 - **No `$schema` key.** A transport whose wire wants one adds it.

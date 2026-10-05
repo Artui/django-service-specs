@@ -21,6 +21,13 @@ parameter with a declared default is not refused when absent, because the
 Validator will supply the default. A JSON `true` is neither an `integer` nor a
 `number`, although Python makes `bool` an `int`: sent for a count, it is a
 caller's mistake, not the number one.
+An integral float is an `integer`: JSON Schema counts `5.0` as one, so the
+`{"type": "integer"}` the kernel advertises admits it, and the check hands
+the Validator `5` wherever the declaration reaches, so the Validator's own
+type check and bounds read the int. `5.5` is still refused, and a `number`
+keeps its float. DRF's `IntegerField`, like Django's form field, reads
+`str(value)`, so given `1e16` it reads `"1e+16"` and refuses it; the check
+follows JSON Schema and hands on `10000000000000000`.
 
 NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
@@ -112,7 +119,10 @@ docs/examples/arguments.py:flat
 --8<--
 ```
 
-- An `integer` or a `number` is parsed.
+- An `integer` or a `number` is parsed. An integer is read as Django's
+  `IntegerField` reads one: `"5.0"` and `"5."` are 5, and `"5.5"` is refused
+  with `"Enter a whole number."`. Each integer element of an array, a
+  repeated query-string key's included, is read the same way.
 - A `boolean` is parsed from exactly four spellings - `true`, `false`, `1`, `0`,
   in any case - and anything else is refused with
   `"Enter true, false, 1 or 0."`. Libraries disagree about every other

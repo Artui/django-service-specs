@@ -21,6 +21,8 @@ from django_service_specs.specs.utils import (
     check_presenter,
     check_reserved,
 )
+from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.utils import is_row_condition
 from django_service_specs.validation.validator import Validator
 
 
@@ -28,9 +30,10 @@ from django_service_specs.validation.validator import Validator
 class ServiceSpec:
     """A write: what it takes, who may run it, what it acts on, what it returns.
 
-    Dispatch runs it in a fixed order: the shape check and the closed argument
-    set, class-level authorization, target resolution, object-level
-    authorization, validation with the target in the Validator's context, the
+    Dispatch runs it in a fixed order, once a deactivated principal has been
+    refused: the shape check and the closed argument set, class-level
+    authorization, target resolution, object-level authorization, validation
+    with the target in the Validator's context, the ``affordances``, the
     service, then the output selector.
 
     Attributes:
@@ -56,7 +59,32 @@ class ServiceSpec:
             with fresh annotations, or a list after a bulk write.
         presenter: Renders the dispatch value. When ``None``, the output
             selector's presenter is used; declaring both is refused.
+        affordances: What must be true for this operation to be possible right
+            now, as a sequence of ``Affordance`` declarations, kept as a tuple
+            in declaration order. ``enforce_affordances`` answers them at the
+            call: the first one not met refuses it with an
+            ``ActionUnavailable`` carrying its ``code``, and the service does
+            not run. Every condition on the row is answered by **one** query,
+            however many are declared. A condition on the row needs a single
+            resolved row, so it is refused beside a
+            ``collection_selector_spec``. It is a check at the moment of the
+            call, not a lock: the service still re-validates whatever it relies
+            on. ``None`` declares nothing and costs nothing - no query, no call.
+            Codes must be unique within a spec, because the code is how a
+            reader tells the conditions apart.
         atomic: Run the service inside ``transaction.atomic()``.
+        idempotent: Whether repeating the call with the same arguments leaves
+            the same state as making it once. Declaration-only: nothing in this
+            package reads it, because idempotency is a property of the service
+            the author writes, not something a dispatcher can arrange. It is
+            here so the fact is stated once, on the spec, and every transport
+            reads the same answer - a retry policy, a queue's redelivery
+            handling, an agent tool annotation. ``None`` means **undeclared**
+            and is the default: a transport that turns the signal into a
+            published annotation must be able to tell "nothing was said" from a
+            declared ``False``, or every spec ever written starts claiming it is
+            not idempotent. ``atomic`` is a different question: it says a single
+            call is all-or-nothing, not that a second call is a no-op.
         metadata: A project's own per-operation facts, stored as given.
     """
 
@@ -67,7 +95,21 @@ class ServiceSpec:
     collection_selector_spec: SelectorSpec | None = None
     output_selector_spec: SelectorSpec | None = None
     presenter: Presenter | None = None
+    # Not ``availability``: that names the answer rather than the declaration,
+    # and in Django reads as scheduling. Not ``conditions``: django-fsm's word
+    # for the same idea on a transition, which would promise a state machine
+    # this is not. ``affordances`` is the established name for the
+    # state-dependent set of things a resource currently offers, and it names
+    # the object's side of the question - which is also the key a list reports
+    # it under.
+    affordances: Sequence[Affordance] | None = None
     atomic: bool = True
+    # A bare adjective, to sit with ``atomic``. Not ``idempotent_hint``: that is
+    # one transport's spelling, and the fact is about the operation, not about
+    # the annotation somebody derives from it. Not ``safe``: RFC 9110 reserves
+    # that for "no side effects at all", which a write never is. ``bool | None``
+    # rather than ``bool``, because silence must not read as a claim.
+    idempotent: bool | None = None
     metadata: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -105,6 +147,7 @@ class ServiceSpec:
                 f"{label} declares a presenter and so does its output selector. One "
                 "value is presented once; keep the one that describes what is returned."
             )
+        object.__setattr__(self, "affordances", _check_affordances(self))
         check_metadata(self.metadata, label=label)
 
     def target_selector_spec(self) -> SelectorSpec | None:
@@ -146,3 +189,51 @@ def _check_selector(spec: SelectorSpec | None, kind: SelectorKind, role: str) ->
         raise ImproperlyConfigured(
             f"ServiceSpec.{role}_selector_spec is a {spec.kind.name}; it must be a {kind.name}."
         )
+
+
+def _check_affordances(spec: ServiceSpec) -> tuple[Affordance, ...] | None:
+    """Refuse an ``affordances`` declaration that could never be honoured, and normalize it.
+
+    At construction, like every other check here: a spec reaches transports
+    that dispatch it without ever asking, and each of these would otherwise
+    surface on the first call through exactly those.
+    """
+    affordances: Any = spec.affordances
+    if affordances is None:
+        return None
+    # ``Sequence`` alone refuses a single ``Affordance`` too - a dataclass is not
+    # one - as well as a set, whose order would decide which refusal a caller
+    # sees, and a generator, which the first call would exhaust.
+    if not isinstance(affordances, Sequence):
+        raise ImproperlyConfigured(
+            "ServiceSpec.affordances takes a sequence of Affordance declarations; got "
+            f"{type(affordances).__name__}. Wrap a single one in a list: affordances=[...]."
+        )
+    declared = tuple(affordances)
+    codes: set[str] = set()
+    for index, affordance in enumerate(declared):
+        if not isinstance(affordance, Affordance):
+            raise ImproperlyConfigured(
+                f"ServiceSpec.affordances[{index}] must be an Affordance; got "
+                f"{type(affordance).__name__}."
+            )
+        if affordance.code in codes:
+            raise ImproperlyConfigured(
+                f"ServiceSpec.affordances declares the code {affordance.code!r} twice. A "
+                "code is how a client tells one refusal from another, so each must be "
+                "unique within a spec."
+            )
+        codes.add(affordance.code)
+        # Two conjuncts, each held by its own test in tests/specs/test_service_spec.py:
+        # ``test_a_callable_condition_on_a_collection_operation_is_fine`` fails
+        # without the first, ``test_a_row_condition_on_a_one_row_operation_is_fine``
+        # without the second.
+        if is_row_condition(affordance.when) and spec.collection_selector_spec is not None:
+            raise ImproperlyConfigured(
+                f"ServiceSpec.affordances[{index}] ({affordance.code!r}) is a condition on "
+                "the row, and this spec operates on a collection (a "
+                "collection_selector_spec) with no single row to evaluate it against. "
+                "Declare it on the per-row operation, or express a rule about the "
+                "collection in the service."
+            )
+    return declared

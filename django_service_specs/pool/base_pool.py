@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from typing import Any
 
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.types.progress_reporter import ProgressReporter
 
 
 def base_pool(
     *,
     user: Any,
+    progress: ProgressReporter | None = None,
     seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     **extra: Any,
 ) -> dict[str, Any]:
@@ -23,13 +26,21 @@ def base_pool(
     that assembles a pool as a dict literal of its own carries exactly the keys
     it wrote there, because ``resolve_callable_kwargs`` forwards only keys the
     pool actually has. A callable declaring a seed the literal omitted then
-    raises ``TypeError`` at call time rather than running.
+    raises ``TypeError`` at call time rather than running - ``progress`` most
+    often, since it is the seed with a default and so the one nobody remembers.
 
     There is no ``request`` entry here: this is the kernel, and off HTTP there
     is no request to seed. An HTTP adapter that wants one registers it as its
     own seed through ``PoolSeeds``, the same way any other ambient value is
-    added. ``progress`` is reserved (see ``RESERVED_POOL_SEEDS``) but has no
-    value yet, so it is not seeded either.
+    added.
+
+    ``progress`` is the caller's reporter, and defaults to ``null_progress``
+    rather than to ``None``, so a declared reporter is always callable - see
+    ``ProgressReporter``. Only ``None`` is replaced: a reporter that happens to
+    be falsy, such as a list-backed recorder that is empty until its first
+    report, is seeded as it is, where djangorestframework-services' ``or``
+    would swap it for ``null_progress`` and drop every report. A seed's
+    resolver sees it like any other entry.
 
     **An adapter that dispatches callables through this package must build its
     pool from this function**, with its own entries spread in —
@@ -50,6 +61,7 @@ def base_pool(
     """
     pool: dict[str, Any] = {
         "user": user,
+        "progress": null_progress if progress is None else progress,
         **extra,
     }
     # Every resolver binds against the pool *before* any seed is written, so the

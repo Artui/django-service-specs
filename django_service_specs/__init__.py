@@ -3,6 +3,11 @@
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.affordances.enforce_affordances import enforce_affordances
+from django_service_specs.affordances.operation_affordances import operation_affordances
+from django_service_specs.affordances.unmet_operation_affordance import (
+    unmet_operation_affordance,
+)
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
@@ -16,7 +21,9 @@ from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
+from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.adispatch_request import adispatch_request
 from django_service_specs.http.async_spec_view import AsyncSpecView
@@ -38,17 +45,22 @@ from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
+from django_service_specs.output.annotate_output_schema import annotate_output_schema
+from django_service_specs.output.audience_projection import AudienceProjection
+from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
@@ -68,6 +80,8 @@ from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.services.action_unavailable import ActionUnavailable
+from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
@@ -78,18 +92,27 @@ from django_service_specs.services.service_validation_error import ServiceValida
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.output_page import OutputPage
+from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET, UnsetType
+from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
 
 __all__ = [
+    "ActionUnavailable",
+    "AdditionalInputRequired",
+    "Affordance",
     "AsyncSpecView",
+    "AudienceProjection",
     "ChangeResult",
     "ChildCollectionChange",
     "ChildSpec",
+    "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "DataclassPresenter",
     "DataclassValidator",
@@ -107,12 +130,14 @@ __all__ = [
     "NotPermitted",
     "Output",
     "OutputField",
+    "OutputPage",
     "Parameter",
     "Parameters",
     "PermissionCheck",
     "PoolSeeds",
     "Presenter",
     "PrincipalUnavailable",
+    "ProgressReporter",
     "RESERVED_POOL_SEEDS",
     "RegisteredSpec",
     "RelatedObjectChange",
@@ -139,15 +164,18 @@ __all__ = [
     "UnsupportedMediaType",
     "ValidationContext",
     "Validator",
+    "ValueFormatter",
     "__version__",
     "acreate_from_input",
     "add_argument_errors",
     "adelete_relations",
     "adispatch",
     "adispatch_request",
+    "annotate_output_schema",
     "apply_input",
     "apresent",
     "arun_service",
+    "audience_projection_for_spec",
     "aupdate_from_input",
     "authorize",
     "authorize_target",
@@ -159,11 +187,17 @@ __all__ = [
     "delete_relations",
     "dispatch",
     "dispatch_request",
+    "enforce_affordances",
     "error_response",
     "is_async",
+    "null_progress",
+    "operation_affordances",
     "output_schema",
+    "paginate_output",
     "parameters_schema",
     "present",
+    "present_for_audience",
+    "project_payload",
     "request_arguments",
     "resolve_callable_kwargs",
     "resolve_principal",
@@ -171,5 +205,6 @@ __all__ = [
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
+    "unmet_operation_affordance",
     "update_from_input",
 ]

@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
+from django_service_specs.affordances.utils import (
+    AFFORDANCES_KEY,
+    affordance_schema,
+    rendered_affordances,
+)
+from django_service_specs.output.annotate_output_schema import annotate_output_schema
+from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.utils import allow_null
 from django_service_specs.specs.selector_kind import SelectorKind
@@ -11,7 +18,13 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 
 
-def spec_output_schema(spec: ServiceSpec | SelectorSpec) -> dict[str, Any] | None:
+def spec_output_schema(
+    spec: ServiceSpec | SelectorSpec,
+    *,
+    paginate: bool = False,
+    projection: AudienceProjection | None = None,
+    handle_description: str | None = None,
+) -> dict[str, Any] | None:
     """The JSON Schema of what [`present`][django_service_specs.dispatch.present.present] returns for ``spec``.
 
     ``None`` when ``spec.output()`` is ``None``: a spec with no presenter
@@ -34,11 +47,50 @@ def spec_output_schema(spec: ServiceSpec | SelectorSpec) -> dict[str, Any] | Non
     - **A service spec with no output selector** presents what the service
       returned, described by its presenter as the item. Whether a service may
       return ``None`` is not in its declaration, so it is not stated.
+
+    ``paginate`` describes a list served one page at a time, as
+    [`paginate_output`][django_service_specs.dispatch.paginate_output.paginate_output]
+    and [`OutputPage.envelope`][django_service_specs.types.output_page.OutputPage.envelope]
+    shape it: ``{"items": [...], "page": n, "totalPages": n, "hasNext": b}``,
+    every key required. It changes only a list's schema, since one row has no
+    pages, so a transport may pass it for every spec it serves paged.
+
+    ``projection`` describes what
+    [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
+    hands back rather than what ``present`` does, through
+    [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema]:
+    hidden fields left out, labelled choices restated in their displays, and a
+    marking's wording as a field's ``"description"``. It lands on the
+    **item**, wherever the item sits, because the array and the paging
+    envelope are this function's own shapes and belong to no ``Output``. Omit
+    it, as every caller naming no audience does, and the schema is the full
+    declaration. ``handle_description`` is the wording for a handle whose
+    marking declares none, and defaults to none: what a reader should do with
+    an identifier depends on the reader, and the transport is what knows.
     """
     output = spec.output()
     if output is None:
         return None
-    item = output_schema(output)
+    item: dict[str, Any] = output_schema(output)
+    if projection is not None:
+        # On the item before anything wraps it: the projection walks declared
+        # fields, and the array and the envelope declare none.
+        item = (
+            annotate_output_schema(item, projection, handle_description=handle_description) or item
+        )
+    affordances = rendered_affordances(spec)
+    if affordances is not None:
+        # After the projection, which walks declared fields and has nothing to
+        # say about a key no ``Output`` declares, and before the array, the
+        # envelope or a ``"null"``, because the answers belong to each row.
+        item = {
+            **item,
+            "properties": {
+                **item.get("properties", {}),
+                AFFORDANCES_KEY: affordance_schema(affordances),
+            },
+            "required": [*item.get("required", []), AFFORDANCES_KEY],
+        }
     if isinstance(spec, SelectorSpec):
         kind, may_be_none = spec.kind, spec.allow_none
     elif spec.output_selector_spec is not None:
@@ -46,5 +98,24 @@ def spec_output_schema(spec: ServiceSpec | SelectorSpec) -> dict[str, Any] | Non
     else:
         return item
     if kind is SelectorKind.LIST:
-        return {"type": "array", "items": item}
+        array: dict[str, Any] = {"type": "array", "items": item}
+        return _paged(array) if paginate else array
     return allow_null(item) if may_be_none else item
+
+
+def _paged(array: dict[str, Any]) -> dict[str, Any]:
+    """The paging envelope around ``array``, as ``OutputPage.envelope`` writes it.
+
+    No ``additionalProperties``, as on every output object: a transport may add
+    keys of its own to what it sends.
+    """
+    return {
+        "type": "object",
+        "properties": {
+            "items": array,
+            "page": {"type": "integer"},
+            "totalPages": {"type": "integer"},
+            "hasNext": {"type": "boolean"},
+        },
+        "required": ["items", "page", "totalPages", "hasNext"],
+    }

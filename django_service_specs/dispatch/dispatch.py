@@ -20,6 +20,7 @@ from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.run_service import run_service
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
@@ -31,10 +32,18 @@ def dispatch(
     grant: Grant | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    progress: ProgressReporter | None = None,
 ) -> DispatchResult:
     """Run ``spec`` for ``principal`` with ``arguments``, in a fixed order.
 
-    The same six steps for both kinds of spec, and for ``adispatch``:
+    First, a deactivated principal is refused as ``PrincipalUnavailable``: an
+    authenticated one whose ``is_active`` is false, with or without a
+    ``grant``. One with no ``is_active`` reads as active, and anonymous goes on
+    to the permission check, which decides whether anonymous may act. It is
+    the rule ``resolve_principal`` and the HTTP entry points apply, so a
+    principal is refused alike whichever way it reached dispatch.
+
+    Then the same seven steps for both kinds of spec, and for ``adispatch``:
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()`` under ``unknown_arguments``: the closed
@@ -53,14 +62,32 @@ def dispatch(
        ``allow_none`` let through.
     5. A service spec's Validator, on only the arguments it declares, with the
        resolved target in its context.
-    6. The run: the service, called with the principal, ``data`` (the
+    6. A service spec's ``affordances``, through
+       [`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]:
+       the first one not met refuses the call as ``ActionUnavailable`` carrying
+       its ``code``. After the object-level check, so a principal who may not
+       see the row is never told what state it is in, and before the run's
+       transaction opens, so a refusal never opens one.
+    7. The run: the service, called with the principal, ``data`` (the
        validated values), ``instance`` or ``collection``, each validated value by
-       name and every registered seed, through
+       name, ``progress`` and every registered seed, through
        [`run_service`][django_service_specs.services.run_service.run_service] so
        ``spec.atomic`` holds and an ``async def`` service is bridged. Then the
        output selector, if declared, with the service's return as ``result``.
 
-    A selector spec stops after step four: its selector is its run.
+    A selector spec stops after step four: its selector is its run. Its
+    ``affordances`` are answers about each row, for a list to report, and
+    nothing about reading is refused by them.
+
+    ``progress`` is the transport's own progress reporter, seeded under the
+    reserved name ``progress`` into the pool of whatever is this call's run -
+    the service, or a selector spec's own selector - and into that spec's
+    callable affordance conditions'. With none, the pool carries
+    ``null_progress``, so a callable that declares the parameter runs on every
+    transport. A target or output selector, and its affordance conditions,
+    always get ``null_progress``: a lookup has nothing to
+    report, and one reporting after the service finished would read as the
+    work restarting.
 
     ``kind`` is ``"list"`` for a LIST selector spec or a service whose output
     selector is a LIST, and ``"instance"`` otherwise. Nothing is presented here;
@@ -68,11 +95,16 @@ def dispatch(
     transport that hands the object to a template never pays for rendering it.
 
     Raises:
+        PrincipalUnavailable: a deactivated principal, before step one.
         InvalidArguments: step one, or the Validator.
         NotPermitted: step two or step four.
+        ActionUnavailable: step six, an affordance not met.
+        ServiceNotFound: step six, a condition on the row reached after the row
+            was deleted.
         ImproperlyConfigured: a spec that declares no permissions, a parameter
-            or a validated value named after a seed, or shaping declared on a
-            selector that returned something other than a queryset.
+            or a validated value named after a seed, shaping declared on a
+            selector that returned something other than a queryset, or a
+            condition on the row with no row to answer it for.
     """
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
@@ -83,8 +115,10 @@ def dispatch(
             pool_seeds=pool_seeds,
             unknown_arguments=unknown_arguments,
         )
-        pool = selector_pool(spec, checked, principal=principal, pool_seeds=pool_seeds)
-        value = lookup(spec, pool, source=SELECTOR_SOURCE)
+        pool = selector_pool(
+            spec, checked, principal=principal, pool_seeds=pool_seeds, progress=progress
+        )
+        value = lookup(spec, pool, source=SELECTOR_SOURCE, reserved=pool_seeds.reserved)
         return conclude_selector(spec, value, principal=principal, grant=granted)
     prepared = prepare_service(
         spec,
@@ -93,6 +127,7 @@ def dispatch(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        progress=progress,
     )
     if isinstance(prepared, DispatchResult):
         return prepared

@@ -9,24 +9,31 @@ evidence that nothing did.
 
 from __future__ import annotations
 
+import asyncio
 import importlib
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.db.models import Q
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import (
+    EDIT,
     OPEN,
     PK,
+    RENAME,
+    TENANT_SEEDS,
     OwnerOnly,
     Record,
     Refuse,
@@ -247,7 +254,7 @@ async def test_its_output_selector_takes_a_second_hop(ada: Any, hops: list[str])
 
     assert result.value.title == "made"
     assert result.value == result.service_result
-    assert set(reread.calls[0]) == {"user", "result"}
+    assert set(reread.calls[0]) == {"user", "progress", "result"}
     assert len(hops) == 2
 
 
@@ -353,3 +360,235 @@ async def test_an_async_list_is_shaped_in_the_second_hop(ada: Any, bob: Any) -> 
 
     assert result.kind == "list"
     assert [row.title for row in await sync_to_async(list)(result.value)] == ["mine"]
+
+
+# --- Refused inside the hop, on every path -----------------------------------------------
+
+
+async def _async_service(*, user: Any) -> None:
+    raise AssertionError("ran")
+
+
+async def _async_selector(*, user: Any) -> Any:
+    raise AssertionError("ran")
+
+
+def _sync_service(*, user: Any) -> None:
+    raise AssertionError("ran")
+
+
+# One spec per path ``adispatch`` takes, named by the function its first hop runs.
+_PATHS: dict[str, Callable[..., Any]] = {
+    "_dispatch": lambda **kw: ServiceSpec(service=_sync_service, **kw),
+    "_prepare": lambda **kw: ServiceSpec(service=_async_service, atomic=False, **kw),
+    "_open_selector": lambda **kw: SelectorSpec(kind=LIST, selector=_async_selector, **kw),
+}
+
+
+async def _deactivated(username: str) -> Any:
+    user = await sync_to_async(make_user)(username)
+    user.is_active = False
+    await user.asave(update_fields=["is_active"])
+    return user
+
+
+@pytest.mark.parametrize("path", sorted(_PATHS))
+async def test_a_deactivated_principal_is_refused_before_the_class_level_check(
+    path: str, hops: list[str]
+) -> None:
+    spec = _PATHS[path](permissions=[Refuse()])
+
+    with pytest.raises(PrincipalUnavailable) as caught:
+        await adispatch(spec, principal=await _deactivated("ada"), arguments={})
+
+    assert caught.value.message == "The acting principal is unavailable."
+    assert hops == [path]
+
+
+async def test_a_deactivated_principal_id_is_refused_by_resolve_principal(ada: Any) -> None:
+    # The one rule, answered by its first reader: the identifier's message, not
+    # dispatch's, so the two copies cannot disagree about who is refused.
+    ada.is_active = False
+    await ada.asave(update_fields=["is_active"])
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[Refuse()])
+
+    with pytest.raises(PrincipalUnavailable) as caught:
+        await adispatch(spec, principal_id=ada.pk, arguments={})
+
+    assert caught.value.message == f"The principal {ada.pk!r} is deactivated."
+
+
+@pytest.mark.parametrize("path", ["_dispatch", "_prepare"])
+async def test_an_unmet_affordance_is_refused_inside_the_one_hop(
+    path: str, ada: Any, hops: list[str]
+) -> None:
+    closed = Affordance(code="closed", reason="Closed for the night.", when=lambda: False)
+    spec = _PATHS[path](permissions=OPEN, affordances=[closed])
+
+    with pytest.raises(ActionUnavailable) as caught:
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.code == "closed"
+    assert hops == [path]
+
+
+async def test_a_row_condition_is_answered_inside_the_one_hop(ada: Any, hops: list[str]) -> None:
+    # A query: on the event loop it would raise ``SynchronousOnlyOperation``.
+    note = await _create(owner=ada, title="old", archived=True)
+    spec = ServiceSpec(
+        service=_async_service,
+        atomic=False,
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+        affordances=[Affordance(code="note_archived", reason="Archived.", when=Q(archived=False))],
+    )
+
+    with pytest.raises(ActionUnavailable):
+        await adispatch(spec, principal=ada, arguments={"pk": note.pk})
+
+    assert hops == ["_prepare"]
+
+
+# --- Progress, on every path -------------------------------------------------------------
+
+
+def _on_the_loop() -> bool:
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return False
+    return True
+
+
+class _Reporter:
+    """A ``ProgressReporter`` keeping each report, and whether it was made on the event loop."""
+
+    def __init__(self) -> None:
+        self.reports: list[tuple[float, str | None, bool]] = []
+
+    def __call__(
+        self,
+        progress: float,
+        *,
+        total: float | None = None,
+        message: str | None = None,
+        meta: Mapping[str, Any] | None = None,
+    ) -> None:
+        self.reports.append((progress, message, _on_the_loop()))
+
+
+def _sync_reporting(*, progress: Any) -> str:
+    progress(1, message="sync")
+    return "done"
+
+
+async def _async_reporting(*, progress: Any) -> Any:
+    progress(1, message="async")
+    return "done"
+
+
+async def _async_reporting_selector(*, user: Any, progress: Any) -> Any:
+    progress(1, message="selector")
+    return Note.objects.filter(owner=user)
+
+
+# Each path's spec, the message its run reports, and whether that run is
+# awaited on an event loop rather than called on the executor thread. An atomic
+# ``async def`` service joins the one hop and is still a coroutine there.
+_REPORTING: dict[str, tuple[Any, str, bool]] = {
+    "_dispatch": (ServiceSpec(service=_sync_reporting, permissions=OPEN), "sync", False),
+    "_dispatch-atomic-async": (
+        ServiceSpec(service=_async_reporting, atomic=True, permissions=OPEN),
+        "async",
+        True,
+    ),
+    "_prepare": (
+        ServiceSpec(service=_async_reporting, atomic=False, permissions=OPEN),
+        "async",
+        True,
+    ),
+    "_open_selector": (
+        SelectorSpec(kind=LIST, selector=_async_reporting_selector, permissions=OPEN),
+        "selector",
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_REPORTING))
+async def test_the_caller_s_reporter_reaches_the_run_on_every_path(path: str, ada: Any) -> None:
+    spec, message, on_the_loop = _REPORTING[path]
+    reporter = _Reporter()
+
+    await adispatch(spec, principal=ada, arguments={}, progress=reporter)
+
+    assert reporter.reports == [(1, message, on_the_loop)]
+
+
+async def test_a_run_declaring_progress_runs_with_no_reporter_supplied(ada: Any) -> None:
+    spec, _, _ = _REPORTING["_prepare"]
+
+    assert (await adispatch(spec, principal=ada, arguments={})).value == "done"
+
+
+async def test_a_list_s_rows_are_answered_inside_its_one_hop(ada: Any, hops: list[str]) -> None:
+    # A condition on the row is an annotation and a callable one is answered
+    # against the call's pool, registered seeds included, both in the hop.
+    await _create(owner=ada, title="live")
+    await _create(owner=ada, title="archived", archived=True)
+    mine = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        affordances=[
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
+        ],
+    )
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=lambda *, user: list(notes_of(user=user)),
+        permissions=OPEN,
+        affordances={"rename": RENAME, "edit": EDIT, "mine": mine},
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert hops == ["_dispatch"]
+    assert [
+        (row.affordance__rename__note_archived, row.affordance__mine__c) for row in result.value
+    ] == [(True, True), (False, True)]
+
+
+async def test_an_async_selector_s_rows_are_answered_off_the_loop(ada: Any) -> None:
+    await _create(owner=ada, title="live")
+    await _create(owner=ada, title="archived", archived=True)
+
+    async def notes(*, user: Any) -> list[Note]:
+        return await sync_to_async(lambda: list(notes_of(user=user)))()
+
+    spec = SelectorSpec(kind=LIST, selector=notes, permissions=OPEN, affordances={"rename": RENAME})
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert [row.affordance__rename__note_archived for row in result.value] == [True, False]
+
+
+async def test_an_async_selector_s_rows_are_answered_with_the_registered_seeds(ada: Any) -> None:
+    # The async selector path answers its rows in a hop of its own, so it is
+    # handed the call's seed set separately from the sync path.
+    await _create(owner=ada, title="live")
+
+    async def notes(*, user: Any) -> list[Note]:
+        return await sync_to_async(lambda: list(notes_of(user=user)))()
+
+    mine = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
+        ],
+    )
+    spec = SelectorSpec(kind=LIST, selector=notes, permissions=OPEN, affordances={"x": mine})
+
+    result = await adispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert [row.affordance__x__c for row in result.value] == [True]

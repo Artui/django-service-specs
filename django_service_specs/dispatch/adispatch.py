@@ -29,6 +29,7 @@ from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
@@ -41,6 +42,7 @@ async def adispatch(
     grant: Grant | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    progress: ProgressReporter | None = None,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
@@ -55,6 +57,9 @@ async def adispatch(
 
     So the phases run in **one** ``sync_to_async(thread_sensitive=True)`` hop,
     and the run's shape decides only what else joins it:
+
+    Every refusal before the run is made inside that hop, an affordance
+    included: a condition on the row is a query.
 
     - A sync run joins the hop, so a sync spec costs exactly one.
     - An atomic ``async def`` service joins it too, through the bridge in
@@ -74,12 +79,22 @@ async def adispatch(
     inside the hop, because resolving it is itself a query; taking only the
     row would push that query into a hop of the caller's. A ``grant`` never
     covers a principal resolved here, since a grant is bound to the principal
-    object it was minted for.
+    object it was minted for. A deactivated row is refused there, with its
+    identifier in the message; a deactivated ``principal`` is refused by
+    ``dispatch``'s own check, which reads the same rule, so the two cannot
+    disagree about who may act.
+
+    ``progress`` reaches the run as it does under ``dispatch``, including an
+    ``async def`` one awaited on the loop, so a reporter must be safe to call
+    from either: the executor thread for a sync run, and an event loop for an
+    ``async def`` one, atomic or not.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``.
-        PrincipalUnavailable: ``principal_id`` names no principal who may act.
+        PrincipalUnavailable: ``principal_id`` names no principal who may act,
+            or ``principal`` is deactivated.
         InvalidArguments, NotPermitted, ImproperlyConfigured: as ``dispatch``.
+        ActionUnavailable, ServiceNotFound: as ``dispatch``, from its affordances.
     """
     # One branch to coverage, so each side is held by its own test besides
     # test_exactly_one_of_principal_and_principal_id_is_required: the first by
@@ -87,7 +102,7 @@ async def adispatch(
     # by test_principal_id_is_resolved_inside_the_one_hop (``principal_id`` alone).
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
-    rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments)
+    rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
             return await _await_selector(spec, *rest)
@@ -111,6 +126,7 @@ def _dispatch(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
     return dispatch(
@@ -120,6 +136,7 @@ def _dispatch(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        progress=progress,
     )
 
 
@@ -131,6 +148,7 @@ def _prepare(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> Prepared | DispatchResult:
     return prepare_service(
         spec,
@@ -139,6 +157,7 @@ def _prepare(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        progress=progress,
     )
 
 
@@ -150,10 +169,11 @@ async def _await_service(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
     prepared = await sync_to_async(_prepare, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments
+        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
     )
     if isinstance(prepared, DispatchResult):
         return prepared
@@ -177,6 +197,7 @@ def _open_selector(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> tuple[Any, Grant, dict[str, Any]]:
     who = _principal(principal, principal_id)
     checked, granted = open_call(
@@ -187,13 +208,19 @@ def _open_selector(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
     )
-    return who, granted, selector_pool(spec, checked, principal=who, pool_seeds=pool_seeds)
+    pool = selector_pool(spec, checked, principal=who, pool_seeds=pool_seeds, progress=progress)
+    return who, granted, pool
 
 
 def _settle_and_conclude(
-    spec: SelectorSpec, raw: Any, pool: dict[str, Any], who: Any, granted: Grant
+    spec: SelectorSpec,
+    raw: Any,
+    pool: dict[str, Any],
+    who: Any,
+    granted: Grant,
+    reserved: frozenset[str],
 ) -> DispatchResult:
-    value = settle(spec, raw, pool, source=SELECTOR_SOURCE)
+    value = settle(spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved)
     return conclude_selector(spec, value, principal=who, grant=granted)
 
 
@@ -205,6 +232,7 @@ async def _await_selector(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    progress: ProgressReporter | None,
 ) -> DispatchResult:
     """An ``async def`` selector spec: steps one and two, the await, then shaping and step four.
 
@@ -215,7 +243,7 @@ async def _await_selector(
     executor, with the object-level check.
     """
     who, granted, pool = await sync_to_async(_open_selector, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments
+        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
     )
     fn = spec.selector
     try:
@@ -226,5 +254,5 @@ async def _await_selector(
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
         return conclude_selector(spec, None, principal=who, grant=granted)
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
-        spec, raw, pool, who, granted
+        spec, raw, pool, who, granted, pool_seeds.reserved
     )

@@ -8,6 +8,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.authorization.utils import is_deactivated
 
 
 def resolve_principal(identifier: Any) -> Any:
@@ -26,9 +27,10 @@ def resolve_principal(identifier: Any) -> Any:
     - a malformed primary key (``ValueError``, ``TypeError``, or Django's own
       ``ValidationError`` - a non-UUID string against a UUID primary key raises
       that one instead of ``ValueError``);
-    - ``is_active`` is ``False``. Read with ``getattr`` rather than assumed,
-      because a custom user model is not required to declare the field at all,
-      and one that omits it is active by default.
+    - the row is deactivated, by the rule dispatch applies to a principal it
+      is handed (``is_active`` false, and a model with no such field reads as
+      active). So ``adispatch(principal_id=...)`` refuses here, with the
+      identifier in the message, and dispatch's own check never disagrees.
 
     Never ``AnonymousUser``: an operation dispatched with no resolvable
     principal has no principal, not an anonymous one.
@@ -38,6 +40,6 @@ def resolve_principal(identifier: Any) -> Any:
         user = user_model._default_manager.get(pk=identifier)
     except (user_model.DoesNotExist, ValueError, TypeError, ValidationError):
         raise PrincipalUnavailable(f"No principal with identifier {identifier!r}.") from None
-    if not getattr(user, "is_active", True):
+    if is_deactivated(user):
         raise PrincipalUnavailable(f"The principal {identifier!r} is deactivated.")
     return user

@@ -14,6 +14,7 @@ from django_service_specs.dispatch.utils import (
     reraise_unless_retrieve,
     validate_arguments,
 )
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -72,4 +73,10 @@ def test_seeds_resolve_before_the_call_s_own_entries_exist() -> None:
 
     pool: dict[str, Any] = call_pool(PRINCIPAL, seeds, {"pk": 1, "data": {}})
 
-    assert pool == {"user": PRINCIPAL, "seen": ["user"], "pk": 1, "data": {}}
+    assert pool == {
+        "user": PRINCIPAL,
+        "progress": null_progress,
+        "seen": ["progress", "user"],
+        "pk": 1,
+        "data": {},
+    }

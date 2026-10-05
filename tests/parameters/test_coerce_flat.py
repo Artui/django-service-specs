@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from django import forms
 
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
@@ -58,9 +59,30 @@ def test_every_other_boolean_spelling_is_refused(spelling: str) -> None:
     assert refusal(FLAT, {"active": spelling}) == {"active": ["Enter true, false, 1 or 0."]}
 
 
-@pytest.mark.parametrize("value", ["3.5", "three", ""])
+@pytest.mark.parametrize("value", ["3.5", "5.05", "three", "", ".0", "5.0.0", "1e3"])
 def test_an_integer_must_be_a_whole_number(value: str) -> None:
+    # ``.0`` and ``5.0.0`` lose their trailing zeros and still do not parse,
+    # as in Django's IntegerField; ``1e3`` is no decimal spelling at all.
     assert refusal(FLAT, {"count": value}) == {"count": ["Enter a whole number."]}
+
+
+@pytest.mark.parametrize(
+    ("value", "number"), [("5.0", 5), ("5.", 5), ("-3.000", -3), (" 7.0 ", 7), ("0.0", 0)]
+)
+def test_an_integral_decimal_spelling_is_an_integer(value: str, number: int) -> None:
+    # Django's IntegerField strips ``.0*`` and trailing space before ``int``,
+    # and so does DRF's, so both read each of these as a whole number. The
+    # field itself is asked, so the two readings cannot drift apart unseen.
+    coerced = coerce_flat(FLAT, {"count": value})
+    assert coerced == {"count": number} == {"count": forms.IntegerField().clean(value)}
+    assert type(coerced["count"]) is int
+
+
+def test_an_arrays_integer_elements_read_an_integral_decimal_alike() -> None:
+    # A repeated query-string key arrives as a list of strings, and each element
+    # is read as the parameter of its ``items`` type would be.
+    assert coerce_flat(FLAT, {"ids": ["5.0", "6.", "7"]}) == {"ids": [5, 6, 7]}
+    assert refusal(FLAT, {"ids": ["5.0", "5.5"]}) == {"ids": {1: ["Enter a whole number."]}}
 
 
 @pytest.mark.parametrize("value", ["two", "nan", "inf", "-Infinity"])

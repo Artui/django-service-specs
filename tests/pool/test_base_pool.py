@@ -7,19 +7,20 @@ from typing import Any
 import pytest
 
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 
 
-def test_seeds_are_the_documented_one() -> None:
+def test_seeds_are_the_documented_ones() -> None:
     user = object()
-    assert base_pool(user=user) == {"user": user}
+    assert base_pool(user=user) == {"user": user, "progress": null_progress}
 
 
 def test_extra_entries_join_the_seeds() -> None:
     """An adapter can build its whole pool here instead of restating the seeds."""
     own_entries: dict[str, Any] = {"tenant": "acme", "trace_id": 7}
     pool = base_pool(user="u", **own_entries)
-    assert pool == {"user": "u", "tenant": "acme", "trace_id": 7}
+    assert pool == {"user": "u", "progress": null_progress, "tenant": "acme", "trace_id": 7}
 
 
 def test_an_entry_named_user_collides_loudly() -> None:
@@ -59,7 +60,7 @@ def test_a_resolver_declaring_var_keyword_receives_the_whole_pool() -> None:
         return "x"
 
     base_pool(user="u", seeds=DEFAULT_POOL_SEEDS.extend(seed=everything))
-    assert set(captured) == {"user"}
+    assert set(captured) == {"user", "progress"}
 
 
 def test_a_seed_cannot_read_another_seed() -> None:
@@ -83,3 +84,29 @@ def test_a_seed_colliding_with_a_spread_entry_is_refused() -> None:
     seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "registered")
     with pytest.raises(TypeError, match="tenant"):
         base_pool(user="u", seeds=seeds, tenant="spread")
+
+
+def test_a_supplied_reporter_is_seeded_as_it_is() -> None:
+    def reporter(progress: float, **_: Any) -> None: ...
+
+    assert base_pool(user="u", progress=reporter)["progress"] is reporter
+
+
+class _Recorder(list[float]):
+    """A reporter that is falsy until its first report."""
+
+    def __call__(self, progress: float, **_: Any) -> None:
+        self.append(progress)
+
+
+def test_a_falsy_reporter_is_seeded_as_it_is() -> None:
+    recorder = _Recorder()
+
+    assert base_pool(user="u", progress=recorder)["progress"] is recorder
+
+
+def test_a_resolver_sees_the_caller_s_reporter() -> None:
+    def reporter(progress: float, **_: Any) -> None: ...
+
+    seeds = DEFAULT_POOL_SEEDS.extend(sink=lambda *, progress: progress)
+    assert base_pool(user="u", progress=reporter, seeds=seeds)["sink"] is reporter

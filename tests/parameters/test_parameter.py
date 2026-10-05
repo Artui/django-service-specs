@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import copy
+from typing import Any
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
@@ -27,6 +30,34 @@ def test_defaults() -> None:
 
 def test_choices_are_normalized_to_a_tuple() -> None:
     assert Parameter("status", "string", choices=["a", "b"]).choices == ("a", "b")
+
+
+@pytest.mark.parametrize("default", [[1, 2], {"sizes": [1]}, [], UNSET, None])
+def test_a_parameter_is_hashable_whatever_its_default(default: Any) -> None:
+    # A list default reaches a Parameter from the pydantic adapter, which
+    # reports a field's default as given, and a transport caching a tool's
+    # schema by its Parameters hashes every one, nested ones included.
+    def declared() -> Parameter:
+        return Parameter("sizes", "array", items="integer", default=copy.deepcopy(default))
+
+    parameter, twin = declared(), declared()
+    assert hash(parameter) == hash(twin)
+    assert {parameter: "cached"}[twin] == "cached"
+    assert hash(Parameter("box", "object", fields=Parameters.of(parameter))) == hash(
+        Parameter("box", "object", fields=Parameters.of(twin))
+    )
+    # Reported as declared: not frozen into a tuple on the way in.
+    assert parameter.default == default
+    assert type(parameter.default) is type(default)
+
+
+def test_a_default_still_tells_two_parameters_apart() -> None:
+    # Out of the hash, not out of equality: two declarations differing only by
+    # default share a hash and stay two keys.
+    one, other = Parameter("n", "integer", default=[1]), Parameter("n", "integer", default=[2])
+    assert hash(one) == hash(other)
+    assert one != other
+    assert len({one, other}) == 2
 
 
 @pytest.mark.parametrize(

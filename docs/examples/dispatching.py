@@ -1,4 +1,4 @@
-"""Dispatching: results, not-found, grants, binding outside dispatch, and pool seeds."""
+"""Dispatching: results, not-found, grants, binding outside dispatch, pool seeds, progress."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from django_service_specs import (
     Grant,
     Parameter,
     Parameters,
+    ProgressReporter,
     SelectorKind,
     SelectorSpec,
     ServiceSpec,
@@ -95,3 +96,29 @@ def create_signed_note(user: Any, title: str) -> DispatchResult:
 
 
 # --8<-- [end:seeds]
+
+
+# --8<-- [start:progress]
+def retitle_all(*, user: Any, title: str, progress: ProgressReporter) -> int:
+    notes = list(Note.objects.filter(owner=user).order_by("pk"))
+    for done, note in enumerate(notes, start=1):
+        note.title = title
+        note.save(update_fields=["title"])
+        progress(done, total=len(notes), message="retitling notes")
+    return len(notes)
+
+
+retitle_all_spec = ServiceSpec(
+    service=retitle_all,
+    permissions=[IsSignedIn()],
+    validator=DataclassValidator(Rename),
+)
+
+
+def retitle_all_reporting(user: Any, title: str, report: ProgressReporter) -> int:
+    # The transport's own reporter; with none, the service gets null_progress.
+    result = dispatch(retitle_all_spec, principal=user, arguments={"title": title}, progress=report)
+    return result.value
+
+
+# --8<-- [end:progress]

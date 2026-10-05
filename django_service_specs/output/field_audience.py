@@ -17,7 +17,9 @@ class FieldAudience(str, Enum):
 
     So the axis this names is **audience**, not protocol. Declared per field
     through [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking],
-    on the field's [`OutputField`][django_service_specs.output.output_field.OutputField].
+    on the field's [`OutputField`][django_service_specs.output.output_field.OutputField],
+    and applied only for a caller that names an audience; one that names none
+    keeps presenting every field.
 
     Inheriting from ``str`` keeps the value JSON-serializable and print-friendly
     while still behaving as a proper enum for ``is`` / ``==``.
@@ -27,14 +29,12 @@ class FieldAudience(str, Enum):
     """The default: ordinary data, shown to every consumer."""
 
     LABEL = "label"
-    """The field that names this record for a human. At most one per output."""
+    """The field that names this record for a human. At most one per output, and
+    two are refused when the output is read into a projection."""
 
     HANDLE = "handle"
     """An opaque identifier. Passed to other tools, never read out to a user, and
     never re-spelled by a choice's display - a handle is somebody else's input."""
 
     HIDDEN = "hidden"
-    """Plumbing. Left out of what an agent audience is shown.
-
-    The kernel declares the marking and applies none: leaving the field out is
-    the job of the transport that renders for that audience."""
+    """Plumbing. Dropped from the projected payload and from the projected schema."""

@@ -28,6 +28,15 @@ agent, a command or a queue. Nothing in `django_service_specs` imports
 will depend on this package, never the reverse, with its own `ServiceSpec`
 becoming the DRF adapter over this kernel.
 
+**No agent transport reads a spec without DRF yet.** The family's MCP server and
+Pydantic AI toolset both require DRF and `djangorestframework-services` today.
+What they read off a spec besides dispatch is here - see
+[affordances](affordances.md) and [paging and projection](paging-and-projection.md) -
+and they are planned to read kernel specs through it, with DRF behind an extra,
+once `djangorestframework-services` is this package's DRF adapter. Until then a
+project without DRF dispatches its specs from its own views, commands, tasks
+and agent tools.
+
 ## Install
 
 ```bash
@@ -86,12 +95,15 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
 
 - [Declaring an operation](declaring.md): the two spec types, Parameters, the
   Validator contract and its dataclass adapter, Output and the Presenter.
-- [Dispatching](dispatching.md): the six steps, results, grants, the async
+- [Dispatching](dispatching.md): the seven steps, results, grants, the async
   entry point, and pool seeds.
 - [Serving over HTTP](http.md): a spec as a Django view, answered as JSON:
   the arguments a request carries, the principal, and the status of each refusal.
 - [Arguments and refusals](arguments.md): the shape check, the error tree, flat
   transports, and the two error families.
+- [Affordances](affordances.md): when an operation is possible right now, the
+  refusal's stable code, offering only what a call could pass, and asking for
+  one more value.
 - [Relation writes](relations.md): writing a row and its related rows in one
   operation.
 - [The registry](registry.md): one named set of operations for several
@@ -102,4 +114,6 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   the Presenter, with the `pydantic` extra.
 - [JSON Schema](schema.md): the input and output schema a transport
   describes an operation with.
+- [Paging and projection](paging-and-projection.md): a list served a page at
+  a time, and each row shaped for an agent reading it.
 - [API reference](reference.md): every public name.

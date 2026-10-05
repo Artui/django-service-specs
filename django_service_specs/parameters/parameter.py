@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import KW_ONLY, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -53,7 +53,9 @@ class Parameter:
     declared, so a default of ``None`` stays a real default. It is reported, not
     applied: whether an omitted argument arrives as the default, as ``None`` or
     not at all is the validating library's behaviour, and each adapter reports
-    what its library does.
+    what its library does. It takes no part in the hash, so a declaration with
+    a list or dict default is as hashable as any other, while equality still
+    tells two defaults apart.
 
     There are no bounds (``maxLength``, ``minimum``) yet. The Validator enforces
     those; adding them here is additive.
@@ -68,7 +70,14 @@ class Parameter:
     items_nullable: bool = False
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
-    default: Any = UNSET
+    # Out of the hash and still in equality, so a list or dict default - which
+    # the pydantic adapter reports as given - leaves the declaration hashable.
+    # Equal Parameters still hash equal, which is all a hash promises; two that
+    # differ only by default share one and stay unequal. This is the case the
+    # ``dataclasses`` documentation names for ``hash=``: a field equality needs
+    # while the others carry the hash. Freezing the value instead would change
+    # the type the adapter reported and leave a dict default unhashable.
+    default: Any = field(default=UNSET, hash=False)
     nullable: bool = False
     help: str | None = None
 

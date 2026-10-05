@@ -7,6 +7,146 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-04
+
+### Added
+- `Affordance(code, reason, when)` and `ServiceSpec.affordances`: when an
+  operation is possible right now, as a fact about the world rather than about
+  the caller. `when` is an ORM boolean expression, a condition on the row
+  answered in SQL with every one in a single query, or a callable over the
+  pool's seeds, which never sees the call's target, input or arguments. A
+  Python callable over the row, a non-boolean expression, a code declared twice
+  and a condition on the row beside a `collection_selector_spec` are refused at
+  construction.
+- `enforce_affordances`, `unmet_operation_affordance` and
+  `operation_affordances`, in the new `affordances` subpackage, with
+  djangorestframework-services' signatures. The first refuses a call with
+  `ActionUnavailable`, in declaration order, and a row that vanished since it
+  was resolved with `ServiceNotFound`. The other two tell a transport listing
+  operations which ones no call could pass right now, skipping conditions on
+  the row without a query.
+- `ActionUnavailable`, a `ServiceConflict` carrying the unmet affordance's
+  `code`. `error_response` answers it at 409 with `code` beside `detail`.
+- `AdditionalInputRequired(message, *, schema=None)`, a `ServiceError` a
+  service raises when it needs one more value, with `schema` keyed by the
+  argument it expects back. `error_response` answers it at 422, with `schema`
+  beside `detail` when there is one.
+- `ServiceSpec.idempotent`: whether repeating the call leaves the state making
+  it once did. Declaration-only, and `None`, the default, means undeclared, so
+  a declared `False` is told apart from silence.
+- `SelectorSpec.affordances`: a mapping from a name to the `ServiceSpec` whose
+  affordances a list's rows are answered for. Each answer is named
+  `affordance__<name>__<code>`, and a name colliding with an `annotations` key
+  or with another entry's is refused at construction. `dispatch` and
+  `adispatch` answer them wherever the selector runs, a service spec's output
+  selector included, and a target lookup's too, though nothing presents
+  those: on a queryset in the one `.annotate()` call shaping
+  makes, before `extend_queryset` and before `paginate_output` slices it, so
+  the list costs no extra query and a page's rows carry their answers; on
+  instances a selector returns directly by one query per model class, and on
+  mappings with the callable answers only. A callable condition is answered
+  once per call, against the seeds alone. `present`, `apresent`,
+  `present_for_audience` and the HTTP views then add an `affordances` object
+  to every presented row: per name `{"available": true}`, or the first unmet
+  condition's `code` and `reason`, or a bare `{"available": false}` for a row
+  deleted before it was asked. `spec_output_schema` declares that object on
+  the item, codes enumerated, with or without paging and a projection. A
+  spec declaring `affordances` with no presenter, a presented row that is not
+  an object or already has an `affordances` key, a row condition beside
+  mapping rows, and a row that is neither an instance nor a mapping are
+  refused as `ImproperlyConfigured`.
+- `dispatch` and `adispatch` answer a service spec's `affordances`
+  themselves: after object-level authorization and the Validator, and before
+  the run's transaction opens, so a principal who may not see the row is
+  never told what state it is in and a refusal never opens a transaction. The
+  first one not met refuses the call with `ActionUnavailable` and the service
+  never runs. A callable condition sees every registered seed. `adispatch`
+  answers them inside its one executor hop. A selector spec's `affordances`
+  refuse nothing.
+- `progress=` on `dispatch` and `adispatch`: the transport's
+  `ProgressReporter`, seeded under the reserved name `progress` into the pool
+  of the call's run (the service, or a selector spec's own selector) and of
+  that spec's callable affordance conditions, as it is; a falsy reporter is
+  kept. `base_pool` takes the same keyword. With no reporter the pool carries
+  `null_progress`, so a callable that declares `progress` runs on every
+  transport; a target or output selector, and its affordance conditions,
+  always get `null_progress`. `ProgressReporter` and `null_progress` keep
+  djangorestframework-services' signatures.
+- `paginate_output(rows, *, page=None, limit=None, max_page_size=None)`,
+  `DEFAULT_PAGE_SIZE` and `OutputPage`: a list result's value sliced into the
+  one page a transport serves, and `OutputPage.envelope(rendered)` wrapping the
+  presented rows as `{items, page, totalPages, hasNext}`. Out-of-range values
+  clamp at both ends and the envelope reports the page actually served; a
+  queryset is counted before it is sliced, so a page past the end is never an
+  unbounded `OFFSET`. A `Manager` is paged as its `.all()`. The names a
+  caller pages by and the ceiling are the transport's, and `SpecView` does
+  not page. All three keep djangorestframework-services' signatures.
+- `spec_output_schema(spec, *, paginate=False, projection=None,
+  handle_description=None)`: `paginate=True` describes a list as the page
+  envelope and changes nothing that is not a list, which stays a bare array by
+  default; `projection=` describes the projected payload, applied to the item
+  and never to the array or the envelope.
+- `AudienceProjection`, `audience_projection_for_spec`, `project_payload`,
+  `annotate_output_schema` and `present_for_audience`: the `FieldMarking`s an
+  `Output` declares, applied to the presented value and to the output schema
+  for a caller that names an audience. A hidden field is dropped from both, a
+  choice is spoken by its display with its schema's stated `type` restated to
+  match, a display two choices share is listed once, and a handle keeps its
+  value and takes the transport's `handle_description`. djangorestframework-services
+  states neither the restated `type` nor the single listing, so its projected
+  schema refuses rows its own payload serves. A mount's `overrides=` are layered over the
+  declaration, and two fields left marked as the label are refused, naming
+  both. `present`, and so every HTTP response, applies no marking.
+  `present_for_audience` is `present` plus the projection, as
+  djangorestframework-services' `render_for_audience` is its serializer
+  render plus the projection, and it is named apart because that one takes
+  the view and request its serializer reads.
+- `ValueFormatter(render, produces, schema=None)`, `FieldMarking.formatter`
+  with the `FieldMarking.formatted()` and `FieldMarking.timestamp()`
+  constructors, and `AudienceProjection.formatter(name)`, with
+  djangorestframework-services' signatures. A formatter renders one field's
+  value for an agent audience and declares the JSON type it produces:
+  `project_payload` serves the rendered value, and `annotate_output_schema`
+  restates the property as that type, keeping its `title` and `description`.
+  It wins over a choice's display and never applies to a `HANDLE`. A null
+  passes through unformatted, so a property whose type admits `"null"` keeps
+  admitting it, which djangorestframework-services does not do.
+  `ValueFormatter.timestamp()` renders a date-time in Django's active time
+  zone.
+
+### Changed
+- An integral decimal is an integer. `coerce_flat` reads `"5.0"` and `"5."` as
+  5, as Django's and DRF's `IntegerField` do, for a parameter and for each
+  integer element of an array; `"5.5"` is still refused. The shape check
+  accepts an integral float such as `5.0` for an `integer`, as JSON Schema
+  does, and hands the Validator an `int` at every level the declaration
+  reaches. `bool`, NaN and the infinities are refused as before, and a
+  `number` keeps its float.
+- A service with nothing to present, at a `success_status` other than 204,
+  answers an empty body with no `Content-Type`, at the caller's status, from
+  `SpecView`, `AsyncSpecView`, `dispatch_request` and `adispatch_request`.
+  They wrote `null`. A read whose value is `None` still answers `null`. A 204
+  no longer carries `Content-Type: text/html` either.
+- Dispatch refuses a deactivated principal. `dispatch` and `adispatch` raise
+  `PrincipalUnavailable` for an authenticated principal whose `is_active` is
+  false, before the shape check and with or without a grant, by the rule the
+  HTTP entry points and `resolve_principal` already applied: a principal with
+  no `is_active` reads as active, and anonymous goes on to the permission
+  check. A caller that hands dispatch such a user object reached the
+  permission check in 0.3.0, and the stock permission classes pass one.
+- Every pool dispatch builds carries `progress`, so a callable taking
+  `**kwargs` receives it beside `user`.
+
+### Fixed
+- A `Parameter` with a list or dict default was unhashable, although a frozen
+  declaration reads as hashable. `default` now takes no part in the hash, so
+  `hash()` no longer raises `TypeError`; equality still compares it, and the
+  reported value is unchanged.
+- A list selector returning a `Manager`, such as `Note.objects`, could not be
+  presented: `present` raised `TypeError`, on every transport, unless the spec
+  declared shaping. Dispatch now takes the Manager's `.all()`, as a selector
+  returning every row means.
+
 ## [0.3.0] — 2026-09-29
 
 ### Added
@@ -233,7 +373,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-service-specs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-service-specs/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Artui/django-service-specs/compare/v0.0.0...v0.1.0

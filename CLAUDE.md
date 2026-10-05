@@ -71,6 +71,10 @@ Non-negotiable. They keep the package navigable.
    first `NotPermitted` to load pulled in `dispatch()`, which needs
    `authorize`, which needs `NotPermitted`. A function-local import would
    hide that cycle rather than remove it.
+   `Affordance` sits there for the same reason, with the helpers its
+   construction reads in `types/utils.py`: `ServiceSpec` imports it, and
+   `affordances/`, which answers the conditions at the call and before it,
+   imports `specs/`.
 
 ## Naming the concepts
 
@@ -107,9 +111,11 @@ Each of these reads as an oversight and is not.
   already authorized says so with a `Grant`, bound to one operation and one
   principal and not serializable, so it cannot cross a queue. Enforcement by
   omission is how an off-HTTP runner skips authorization with nothing warning.
-- **A deactivated principal is refused at lookup.** `resolve_principal` is the
-  only thing that refuses `is_active=False`; the stock permission classes of
-  the frameworks this adapts both pass one. Never fall back to an anonymous
+- **A deactivated principal is refused by dispatch.** One rule,
+  `authorization/utils.py`'s `is_deactivated`, read by `dispatch` (first, grant
+  or no grant), by `resolve_principal` and by the HTTP entry points. The stock
+  permission classes of the frameworks this adapts both pass one, so the
+  refusal cannot wait for a permission check. Never fall back to an anonymous
   user.
 - **An operation with no declared permission check is refused at
   registration.** Off HTTP there is no view to inherit a policy from, so an
@@ -124,7 +130,9 @@ Each of these reads as an oversight and is not.
 - **Target resolution runs before validation.** The validator's context
   carries the resolved row, because an update's uniqueness check has to
   exclude the row being updated. Class-level authorization runs before either,
-  so a refused principal learns nothing about which rows exist.
+  so a refused principal learns nothing about which rows exist. Affordances
+  run after both and before the run's transaction: a refusal describes the
+  row's state, so a principal who may not see the row is refused first.
 
 ## Adding a feature
 
