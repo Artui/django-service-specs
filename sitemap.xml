@@ -2,54 +2,54 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://artui.github.io/django-service-specs/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/affordances/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/arguments/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/declaring/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/dispatching/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/forms/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/http/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/paging-and-projection/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/pydantic/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/reference/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/registry/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/relations/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
     <url>
          <loc>https://artui.github.io/django-service-specs/schema/</loc>
-         <lastmod>2026-10-05</lastmod>
+         <lastmod>2026-10-06</lastmod>
     </url>
 </urlset>
