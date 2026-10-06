@@ -59,6 +59,17 @@ class ServiceSpec:
             with fresh annotations, or a list after a bulk write.
         presenter: Renders the dispatch value. When ``None``, the output
             selector's presenter is used; declaring both is refused.
+        allow_none: Declares that a service with no output selector may
+            present nothing: its return may be ``None``, and
+            [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+            then admits ``"null"``. Declaration-only, as on a selector spec's
+            schema: dispatch presents a ``None`` the service returned whatever
+            this says, because whether a service may return one is not
+            otherwise in its declaration. Left ``False``, the item stays the
+            strict object its presenter declares. Beside an output selector it
+            changes nothing: a ``RETRIEVE`` re-read admits ``"null"`` already,
+            and a ``LIST`` one presents its rows rather than the service's
+            return.
         affordances: What must be true for this operation to be possible right
             now, as a sequence of ``Affordance`` declarations, kept as a tuple
             in declaration order. ``enforce_affordances`` answers them at the
@@ -95,6 +106,9 @@ class ServiceSpec:
     collection_selector_spec: SelectorSpec | None = None
     output_selector_spec: SelectorSpec | None = None
     presenter: Presenter | None = None
+    # The name a ``SelectorSpec`` already uses for a value that may be ``None``,
+    # so one word means one thing on both specs.
+    allow_none: bool = False
     # Not ``availability``: that names the answer rather than the declaration,
     # and in Django reads as scheduling. Not ``conditions``: django-fsm's word
     # for the same idea on a transition, which would promise a state machine

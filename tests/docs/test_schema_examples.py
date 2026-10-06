@@ -13,7 +13,12 @@ import re
 from pathlib import Path
 from typing import Any
 
+import pytest
+
+from django_service_specs import dispatch, present
 from docs.examples import schema
+from tests.dispatch.utils import make_user
+from tests.dispatch_app.models import Note
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -110,6 +115,22 @@ class TestSchemaPage:
 
     def test_the_author_write_may_return_null_and_titles_each_status(self) -> None:
         assert schema.author_output == AUTHOR_OUTPUT
+
+    def test_a_service_allowing_none_admits_null_beside_its_row(self) -> None:
+        assert schema.archive_output == {**NOTES_OUTPUT["items"], "type": ["object", "null"]}
+        assert schema.archive_oldest_spec.allow_none is True
+
+    @pytest.mark.django_db
+    def test_the_archive_presents_its_row_and_then_nothing(self) -> None:
+        """What the declared null is for: the second call has nothing left."""
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="Draft")
+        spec = schema.archive_oldest_spec
+
+        first = present(spec, dispatch(spec, principal=ada, arguments={}))
+        second = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+        assert (first, second) == ({"id": note.pk, "title": "Draft"}, None)
 
     def test_the_pages_json_blocks_are_what_the_example_returns(self) -> None:
         page = (ROOT / "docs" / "schema.md").read_text()

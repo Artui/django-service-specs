@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import QuerySet
+from django.db.models.manager import BaseManager
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
@@ -249,6 +251,21 @@ def test_a_model_row_is_presented_through_its_relations() -> None:
     assert DataclassPresenter(_AuthorOut).present(Author.objects.get()) == {
         "name": "Ann",
         "books": [{"title": "One"}, {"title": "Two"}],
+    }
+
+
+@pytest.mark.django_db
+def test_a_manager_built_on_base_manager_is_read_through_all_too() -> None:
+    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``;
+    a model whose default manager is one has related managers built on it too."""
+    author = Author.objects.create(name="Ann")
+    Book.objects.create(author=author, title="One", price=Decimal("9.99"))
+    books: Any = BaseManager.from_queryset(QuerySet)()
+    books.model = Book
+
+    assert DataclassPresenter(_AuthorOut).present(SimpleNamespace(name="Ann", books=books)) == {
+        "name": "Ann",
+        "books": [{"title": "One"}],
     }
 
 

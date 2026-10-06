@@ -23,11 +23,16 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.validation.validation_context import ValidationContext
+from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
     OPEN,
@@ -592,3 +597,65 @@ async def test_an_async_selector_s_rows_are_answered_with_the_registered_seeds(a
     result = await adispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
     assert [row.affordance__x__c for row in result.value] == [True]
+
+
+# --- A parameter nothing filled, on every path --------------------------------------------
+
+
+async def _by_tenant(*, tenant: str) -> list[str]:
+    return [tenant]
+
+
+def _sync_by_tenant(*, tenant: str) -> list[str]:
+    return [tenant]
+
+
+async def _async_service_of(*, tenant: str) -> str:
+    return tenant
+
+
+def _sync_service_of(*, tenant: str) -> str:
+    return tenant
+
+
+TENANT_READ = Parameters.of(Parameter("tenant", "string"))
+
+
+class _OptionalTenant(Validator):
+    """Declares ``tenant`` optional and hands back exactly what it was sent."""
+
+    def parameters(self) -> Parameters:
+        return TENANT_READ
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+# One spec per path ``adispatch`` takes to the call, each leaving ``tenant``
+# optional so that only the parameter, never the shape check, can refuse it.
+_UNFILLED: dict[str, Callable[[], Any]] = {
+    "sync selector": lambda: SelectorSpec(
+        kind=LIST, selector=_sync_by_tenant, reads=TENANT_READ, permissions=OPEN
+    ),
+    "async selector": lambda: SelectorSpec(
+        kind=LIST, selector=_by_tenant, reads=TENANT_READ, permissions=OPEN
+    ),
+    "sync service": lambda: ServiceSpec(
+        service=_sync_service_of, permissions=OPEN, validator=_OptionalTenant()
+    ),
+    "async service": lambda: ServiceSpec(
+        service=_async_service_of, atomic=False, permissions=OPEN, validator=_OptionalTenant()
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_UNFILLED))
+async def test_an_unfilled_parameter_is_refused_as_a_missing_argument(ada: Any, path: str) -> None:
+    spec = _UNFILLED[path]()
+
+    sent = await adispatch(spec, principal=ada, arguments={"tenant": "acme"})
+    with pytest.raises(InvalidArguments) as caught:
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert sent.value in (["acme"], "acme")
+    assert caught.value.detail == {"tenant": ["This field is required."]}

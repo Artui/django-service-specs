@@ -90,9 +90,38 @@ class TestServiceSpecs:
         assert spec_output_schema(spec) is None
 
     def test_a_service_presenting_its_own_return_is_the_item(self) -> None:
+        """Undeclared, a ``None`` is not stated: the item stays strict."""
         spec = ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle())
 
+        assert spec.allow_none is False
         assert spec_output_schema(spec) == ITEM
+
+    def test_a_service_allowing_none_admits_null(self) -> None:
+        spec = ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle(), allow_none=True)
+
+        assert spec_output_schema(spec) == NULLABLE_ITEM
+
+    def test_allow_none_changes_nothing_beside_a_retrieve_reread(self) -> None:
+        """The re-read already admits null, declared or not."""
+        reread = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing, presenter=NoteTitle())
+
+        for allow_none in (False, True):
+            spec = ServiceSpec(
+                service=write,
+                permissions=OPEN,
+                output_selector_spec=reread,
+                allow_none=allow_none,
+            )
+            assert spec_output_schema(spec) == NULLABLE_ITEM
+
+    def test_allow_none_changes_nothing_beside_a_list_reread(self) -> None:
+        """The re-read's rows are what is presented, never the service's ``None``."""
+        reread = listing(selector=nothing, presenter=NoteTitle())
+        spec = ServiceSpec(
+            service=write, permissions=OPEN, output_selector_spec=reread, allow_none=True
+        )
+
+        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
 
     def test_a_service_whose_output_selector_is_a_list_presents_an_array(self) -> None:
         reread = listing(selector=nothing, presenter=NoteTitle())
@@ -148,6 +177,20 @@ class TestWhatDispatchPresents:
 
         assert present(spec, result) is None
         assert spec_output_schema(spec) == NULLABLE_ITEM
+
+    @pytest.mark.parametrize("allow_none", [False, True])
+    def test_a_service_that_returns_nothing_presents_null(self, allow_none: bool) -> None:
+        """Presented as ``None`` either way; only a declared ``allow_none`` says so,
+        because whether a service may return nothing is not otherwise in its
+        declaration."""
+        spec = ServiceSpec(
+            service=write, permissions=OPEN, presenter=NoteTitle(), allow_none=allow_none
+        )
+
+        result = dispatch(spec, principal=make_user("ada"), arguments={})
+
+        assert present(spec, result) is None
+        assert spec_output_schema(spec) == (NULLABLE_ITEM if allow_none else ITEM)
 
     def test_a_list_presents_a_list_of_items(self) -> None:
         ada = make_user("ada")

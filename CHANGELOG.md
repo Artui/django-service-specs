@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `allow_none` on `ServiceSpec`, the name `SelectorSpec` already uses:
+  `True` declares that a service with no output selector may present nothing,
+  and `spec_output_schema` then admits `"null"` beside the item. Dispatch
+  presented a `None` the service returned all along, while the schema
+  described a strict object, so a transport advertised a shape its own answer
+  could fail. Left `False`, the default, the item stays strict, as before.
+  Beside an output selector it changes nothing: a `RETRIEVE` re-read already
+  admits `"null"`, and a `LIST` one presents its rows.
+
+### Fixed
+- A selector or service parameter with no default that nothing filled - a
+  read declared optional that the caller left out, a value the Validator did
+  not return - reached the callable as a `TypeError`, on `dispatch` and
+  `adispatch` alike. It is now refused before the call as `InvalidArguments`
+  keyed by the parameter, with the shape check's `"This field is required."`.
+  It is decided at dispatch, because a registered seed may fill the
+  parameter. A reserved name missing from a pool is the declaration's error
+  rather than the caller's and still raises, as does anything the output
+  selector declares, since its pool carries no argument and the service has
+  already run.
+- A manager built with `BaseManager.from_queryset`, which is not a `Manager`,
+  was counted as a queryset and then handled as something else:
+  `paginate_output` refused it at the slice after counting it, a list
+  selector returning one could not be presented, and the dataclass and
+  pydantic presenters could not read a relation through one. Every
+  `BaseManager` is now read through its `.all()`.
+- `annotate_output_schema` narrowed the `"type"` beside a `oneOf` to the
+  displays' types even where an entry with no `const` admitted more, so a
+  value that entry matched failed the projected schema. The type is now left
+  as written there. `"null"` is restated where the stated type admitted it,
+  read off the type rather than the values, so a null admitted by a
+  `{"type": "null"}` entry is kept and a `None` the type refused is not newly
+  admitted.
+- `annotate_output_schema` kept `uniqueItems` on an array of choices whose
+  values collapse onto fewer displays. Two values selected together are
+  served as one display twice, so the payload failed its own schema; the
+  array no longer claims its items are unique there.
+
 ## [0.4.1] — 2026-10-06
 
 ### Fixed

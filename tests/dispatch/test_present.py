@@ -7,6 +7,8 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
+from django.db.models import QuerySet
+from django.db.models.manager import BaseManager
 from django.test.utils import CaptureQueriesContext
 
 from django_service_specs.dispatch.dispatch import dispatch
@@ -417,6 +419,23 @@ def test_a_list_selector_returning_a_manager_presents_every_row() -> None:
     spec = SelectorSpec(
         kind=LIST, selector=lambda: Note.objects, permissions=OPEN, presenter=Titles()
     )
+
+    rendered = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+    assert sorted(row["title"] for row in rendered) == ["One", "Two"]
+
+
+@pytest.mark.django_db
+def test_a_list_selector_returning_a_manager_built_on_base_manager_presents_every_row() -> None:
+    # ``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
+    # and ``is_queryset`` counts it like one, so dispatch takes its ``.all()``
+    # as well. Tested as ``Manager``, it reached the presenter unread.
+    ada = make_user("ada")
+    Note.objects.create(owner=ada, title="One")
+    Note.objects.create(owner=ada, title="Two")
+    manager: Any = BaseManager.from_queryset(QuerySet)()
+    manager.model = Note
+    spec = SelectorSpec(kind=LIST, selector=lambda: manager, permissions=OPEN, presenter=Titles())
 
     rendered = present(spec, dispatch(spec, principal=ada, arguments={}))
 

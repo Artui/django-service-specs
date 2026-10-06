@@ -12,12 +12,15 @@ transport takes when it binds input for itself.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+import inspect
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Final, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from django.db.models import BooleanField, Manager, Value
+from django.db.models import BooleanField, Value
+from django.db.models.manager import BaseManager
+from django.utils.translation import gettext
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -32,6 +35,7 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
@@ -57,6 +61,9 @@ SELECTOR_SOURCE = "SelectorSpec.selector"
 INSTANCE_SOURCE = "ServiceSpec.instance_selector_spec.selector"
 COLLECTION_SOURCE = "ServiceSpec.collection_selector_spec.selector"
 OUTPUT_SOURCE = "ServiceSpec.output_selector_spec.selector"
+
+_NAMED: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+"""The parameter kinds a pool fills by name, and so the only ones it can leave unfilled."""
 
 
 @dataclass(frozen=True)
@@ -214,11 +221,15 @@ def settle(
     with ``reserved``, the call's seed set, so a registered seed reaches it.
     The answers refuse nothing: they describe each row for whoever presents it.
     """
-    if isinstance(raw, Manager):
+    if isinstance(raw, BaseManager):
         # ``Note.objects`` is a selector's shortest spelling of every row, and a
         # Manager is neither iterable nor sliceable, so a list declaring no
         # shaping - which leaves the result as it came - could not be presented
         # or paged: test_a_list_selector_returning_a_manager_presents_every_row.
+        # ``BaseManager`` rather than ``Manager``, because ``is_queryset``
+        # counts every ``BaseManager`` and one built with
+        # ``BaseManager.from_queryset`` is not a ``Manager``:
+        # test_a_list_selector_returning_a_manager_built_on_base_manager_presents_every_row.
         raw = raw.all()
     annotations: Mapping[str, Any] | None = selector_spec.annotations
     row_conditions: dict[str, Any] = {}
@@ -262,12 +273,56 @@ def settle(
     return shaped
 
 
+def call_keywords(
+    fn: Callable[..., Any], pool: Mapping[str, Any], *, reserved: frozenset[str]
+) -> dict[str, Any]:
+    """The keywords ``fn`` is called with, refusing a parameter nothing filled.
+
+    ``resolve_callable_kwargs`` forwards only what the pool has, so a
+    parameter with no default that the call left out - an optional read the
+    caller did not send, a value the Validator did not return - reached the
+    callable as a ``TypeError``. It is refused before the call instead, as
+    ``InvalidArguments`` keyed by the parameter, in the shape check's own
+    wording for an argument left out.
+
+    Here rather than when the spec is declared, because a registered seed may
+    fill the parameter and the seeds are known only at dispatch.
+
+    A parameter is missing only if it is filled by name, has no default, is
+    not in the pool, and is not reserved. ``**kwargs`` takes the whole pool and
+    is never missing; a reserved name missing from this pool, such as
+    ``instance`` in a selector's, is the author's error rather than the
+    caller's, and is left to raise as one. Each condition is held by its own
+    test: test_a_callable_taking_the_whole_pool_is_never_missing_anything (the
+    kind), test_a_defaulted_parameter_is_never_missing (the default),
+    test_an_optional_read_a_selector_requires_is_refused_when_not_sent (the
+    pool: without it a sent read is refused too) and
+    test_a_missing_reserved_seed_is_the_author_s_error_and_not_refused (the
+    reservation).
+    """
+    missing = [
+        name
+        for name, param in inspect.signature(fn).parameters.items()
+        if param.kind in _NAMED
+        and param.default is inspect.Parameter.empty
+        and name not in pool
+        and name not in reserved
+    ]
+    if missing:
+        # Translated where it is raised, spelled as Django spells it, as the
+        # shape check does: ``check_arguments`` refuses an absent required
+        # argument with the same message.
+        raise InvalidArguments({name: [gettext("This field is required.")] for name in missing})
+    return resolve_callable_kwargs(fn, dict(pool))
+
+
 def lookup(
     selector_spec: SelectorSpec,
     pool: Mapping[str, Any],
     *,
     source: str,
     reserved: frozenset[str],
+    after_the_run: bool = False,
 ) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
@@ -275,10 +330,22 @@ def lookup(
     thread rather than awaited. That covers a selector spec's own selector when
     sync ``dispatch`` runs it, and a nested one on either entry point: a nested
     selector is never the run, so ``adispatch`` never awaits it on the loop.
+
+    ``after_the_run`` is the output selector's, whose parameters are bound as
+    they are rather than through ``call_keywords``. Its pool carries no
+    argument, so nothing a caller left out can be missing from it, and the
+    service has already run: a refusal that reads as "before the run" would
+    tell the caller the operation did not happen.
+    test_an_output_selector_is_never_refused_after_the_run fails without it.
     """
     fn = selector_spec.selector
+    kwargs = (
+        resolve_callable_kwargs(fn, dict(pool))
+        if after_the_run
+        else call_keywords(fn, pool, reserved=reserved)
+    )
     try:
-        raw = call_selector(fn, resolve_callable_kwargs(fn, dict(pool)))
+        raw = call_selector(fn, kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(selector_spec, error)
         return None
@@ -381,6 +448,10 @@ def prepare_service(
             "validated value must never outrank a seeded one; rename the value."
         )
     pool = call_pool(principal, pool_seeds, {**data, "data": data, **resolved}, progress=progress)
+    # Before the affordances, as the Validator is: a refusal of the call itself
+    # answers before one describing the row's state.
+    # test_a_missing_argument_answers_before_an_affordance fails without it.
+    kwargs = call_keywords(spec.service, pool, reserved=pool_seeds.reserved)
     # Step six, in djangorestframework-services' place for it: after the
     # object-level check and the Validator, so a principal who may not see the
     # row is never told what state it is in, and before the run - outside the
@@ -393,7 +464,7 @@ def prepare_service(
     # ``instance`` is the row, never a collection: a condition on the row beside
     # a ``collection_selector_spec`` is refused when the spec is declared.
     enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=pool_seeds.reserved)
-    return Prepared(principal, target, data, resolve_callable_kwargs(spec.service, pool))
+    return Prepared(principal, target, data, kwargs)
 
 
 def finish_service(
@@ -424,7 +495,13 @@ def finish_service(
     kind: Literal["instance", "list"] = "instance"
     if output_spec is not None:
         pool = call_pool(prepared.principal, pool_seeds, {"result": result})
-        value = lookup(output_spec, pool, source=OUTPUT_SOURCE, reserved=pool_seeds.reserved)
+        value = lookup(
+            output_spec,
+            pool,
+            source=OUTPUT_SOURCE,
+            reserved=pool_seeds.reserved,
+            after_the_run=True,
+        )
         if output_spec.kind is SelectorKind.LIST:
             kind = "list"
     return DispatchResult(

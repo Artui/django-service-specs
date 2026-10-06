@@ -19,7 +19,7 @@ from enum import Enum
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Manager
+from django.db.models.manager import BaseManager
 
 from django_service_specs.adapters.utils import SCALARS, scalar_type, strip
 from django_service_specs.output.field_marking import FieldMarking
@@ -159,7 +159,10 @@ def encode(shape: Shape, value: Any) -> Any:
     if shape.fields is not None:
         return encode_fields(shape.fields, value)
     if shape.items is not None:
-        rows = value.all() if isinstance(value, Manager) else value
+        # ``BaseManager``, so a related manager built on a model's
+        # ``BaseManager.from_queryset`` default manager, which is no ``Manager``,
+        # is read too: test_a_manager_built_on_base_manager_is_read_through_all_too.
+        rows = value.all() if isinstance(value, BaseManager) else value
         return [encode(shape.items, row) for row in rows]
     if isinstance(value, Enum):
         return value.value

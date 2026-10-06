@@ -15,6 +15,7 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
     Prepared,
+    call_keywords,
     conclude_selector,
     finish_service,
     open_call,
@@ -24,7 +25,6 @@ from django_service_specs.dispatch.utils import (
     settle,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -246,8 +246,11 @@ async def _await_selector(
         spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
     )
     fn = spec.selector
+    # Bound before the await and outside the ``try``: a parameter nothing filled
+    # is refused as a missing argument, as on every other path.
+    kwargs = call_keywords(fn, pool, reserved=pool_seeds.reserved)
     try:
-        raw = await fn(**resolve_callable_kwargs(fn, pool))
+        raw = await fn(**kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the

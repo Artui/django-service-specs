@@ -46,6 +46,21 @@ the pool itself. A caller naming an argument `user` is the case that matters.
 [Pool seeds](dispatching.md#pool-seeds) add names of your own, reserved the
 same way.
 
+A parameter with no default that the call's pool lacks - a read declared
+optional that the caller left out, a value the Validator did not return - is
+refused before the callable runs, on `dispatch` and `adispatch` alike, as
+[`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
+keyed by the parameter with the shape check's own `"This field is
+required."`, rather than reaching the callable as a `TypeError`. It is decided
+at dispatch rather than when the spec is declared, because a registered seed
+may fill the parameter, and the seeds are known only then. Three things are
+never missing: a parameter with a default, `**kwargs`, and a reserved name.
+A reserved name absent from a pool - `instance` in a selector's, say - is an
+error in the declaration that no caller could fix, so it is left to raise as
+one, and so is anything the output selector declares: its pool carries no
+argument, and the service has already run. Where an argument may be left out,
+give the parameter a default.
+
 ## A read
 
 ```python
@@ -91,7 +106,10 @@ A `ServiceSpec` names its service and, at most, one target selector:
 `output_selector_spec` re-reads what the service produced, with its return in
 the pool as `result`. It is how a write returns a row with fresh annotations or
 prefetches, or a list after a bulk change; the
-[relation-write example](relations.md#a-worked-example) uses one.
+[relation-write example](relations.md#a-worked-example) uses one. Without one,
+the service's own return is what is presented, and `allow_none=True` on the
+spec declares that it may be `None`, so its
+[output schema](schema.md#what-a-spec-returns) admits `"null"`.
 
 `atomic=True`, the default, runs the service inside `transaction.atomic()`.
 `metadata` holds a project's own per-operation facts, stored as given, for its
