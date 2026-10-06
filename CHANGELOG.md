@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-10-06
+
 ### Added
 - `allow_none` on `ServiceSpec`, the name `SelectorSpec` already uses:
   `True` declares that a service with no output selector may present nothing,
@@ -434,7 +436,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-service-specs/compare/v0.2.0...v0.3.0
