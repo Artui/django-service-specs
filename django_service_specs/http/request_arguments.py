@@ -187,8 +187,8 @@ def _json_object(request: HttpRequest) -> dict[str, Any]:
     except (ValueError, RecursionError):
         # JSONDecodeError and UnicodeDecodeError are both ValueErrors, and so
         # is _refuse_constant's, and the bare one an integer longer than the
-        # 4300 digits Python converts from a string raises; each means the
-        # body is not JSON. RecursionError is no ValueError: it is a body
+        # 4300 digits Python converts from a string by default raises; each
+        # means the body is not JSON. RecursionError is no ValueError: it is a body
         # nested deeper than the decoder reaches, and nothing above this
         # catches it, so uncaught it is the host's 500 for a client's body.
         # One branch to coverage, so each type is held by its own test:
