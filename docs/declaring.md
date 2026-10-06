@@ -53,18 +53,22 @@ have filled it, is refused before the callable runs, on `dispatch` and
 keyed by the parameter with the shape check's own `"This field is
 required."`, rather than reaching the callable as a `TypeError`. That is a
 read declared optional that the caller left out, whether the selector or its
-`extend_queryset` takes it, or a Validator parameter the Validator did not
-return, which the service takes.
+`extend_queryset` takes it, or a Validator parameter the caller left out,
+which the service takes.
 
 Any other parameter the pool lacks is the declaration's error, and raises as
 the callable's own `TypeError`. The argument set is closed, so a name that is
 none of the selector's `reads` - or, for the service, none of its Validator's
 parameters, which is every name when it has no Validator - can never be sent:
-`REJECT` refuses it as unknown and `IGNORE` drops it. Refusing it as a
-missing argument would ask for a value no caller can send, and a client that
-reads `InvalidArguments` as its own mistake would send the call again. It is
-decided at dispatch rather than when the spec is declared, because a
-registered seed may fill such a parameter, and the seeds are known only then.
+`REJECT` refuses it as unknown and `IGNORE` drops it. A Validator parameter
+the caller did send, and the Validator did not hand back under that name -
+a form that pops it in `clean()`, a pydantic field returned under its own
+name rather than its alias - has been sent already. Refusing either as a
+missing argument would ask for a value the caller cannot send or already
+did, and a client that reads `InvalidArguments` as its own mistake would
+send the call again. It is decided at dispatch rather than when the spec is
+declared, because a registered seed may fill such a parameter, and the seeds
+are known only then.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.

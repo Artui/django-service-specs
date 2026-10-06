@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - A parameter with no default that a caller could have filled and nothing
   did - a read declared optional that the caller left out, whether the
-  selector or its `extend_queryset` takes it, or a value the Validator did
-  not return, which the service takes - reached the callable as a
+  selector or its `extend_queryset` takes it, or a Validator parameter the
+  caller left out, which the service takes - reached the callable as a
   `TypeError`, on `dispatch` and `adispatch` alike. It is now refused before
   the call as `InvalidArguments` keyed by the parameter, with the shape
   check's `"This field is required."`. Only those: a parameter no caller can
@@ -30,7 +30,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selector parameter that is none of its `reads`, a service parameter its
   Validator does not declare - every one, without a Validator - and anything
   the output selector declares, since its pool carries no argument and the
-  service has already run. It is decided at dispatch, because a registered
+  service has already run. So does a Validator parameter the caller sent and
+  the Validator did not return under that name, as a form popping it in
+  `clean()` or a pydantic alias does, because the caller has sent it
+  already. It is decided at dispatch, because a registered
   seed may fill such a parameter.
 - A manager built with `BaseManager.from_queryset`, which is not a `Manager`,
   was counted as a queryset and then handled as something else:
@@ -45,7 +48,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a null is still served: a null admitted by a `{"type": "null"}` entry is
   now kept, a `None` listed beside a type that refused it is no longer newly
   admitted, and a `None` the choices give a display, as Django's
-  `(None, "Unknown")` does, is served as `"Unknown"` and names no null.
+  `(None, "Unknown")` does, is served as `"Unknown"` and names no null, as
+  before.
 - `annotate_output_schema` kept `uniqueItems` on an array of choices whose
   values collapse onto fewer displays. Two values selected together are
   served as one display twice, so the payload failed its own schema; the

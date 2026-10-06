@@ -5,13 +5,17 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
+from pydantic import BaseModel, Field
 
+from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -1249,6 +1253,82 @@ def test_a_service_parameter_no_validator_declares_is_the_author_s_error(
     with pytest.raises(TypeError, match="body"):
         dispatch(spec, principal=ada, arguments={})
     assert calls == []
+
+
+class _ConfirmedForm(forms.Form):
+    """Checks ``confirm`` in ``clean()`` and pops it, as a confirmation field is
+    popped: it is the form's to read, and never reaches the service."""
+
+    confirm = forms.BooleanField()
+
+    def clean(self) -> dict[str, Any]:
+        self.cleaned_data.pop("confirm")
+        return self.cleaned_data
+
+
+class _Due(BaseModel):
+    due_date: str = Field(alias="dueDate")
+
+
+class _DropsTitle(Validator):
+    """Declares ``title`` and hands back nothing of what it was sent."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string"))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return {}
+
+
+def _confirm(*, confirm: bool) -> bool:
+    return confirm
+
+
+def _schedule(*, dueDate: str) -> str:
+    return dueDate
+
+
+def _rename(*, title: str) -> str:
+    return title
+
+
+@pytest.mark.parametrize(
+    ("validator", "service", "arguments", "name"),
+    [
+        (FormValidator(_ConfirmedForm), _confirm, {"confirm": True}, "confirm"),
+        (PydanticValidator(_Due), _schedule, {"dueDate": "2026-10-06"}, "dueDate"),
+        (_DropsTitle(), _rename, {"title": "new"}, "title"),
+    ],
+    ids=["a form popping it in clean", "a pydantic alias", "a validator dropping it"],
+)
+def test_a_validator_parameter_the_caller_sent_is_the_author_s_error(
+    ada: Any, validator: Validator, service: Any, arguments: dict[str, Any], name: str
+) -> None:
+    """The caller sent every argument, and the Validator did not hand ``name``
+    back under that name: a form read it and popped it, pydantic returned it
+    under the field's own name, or the Validator dropped it. Refused as missing,
+    the call would tell the caller a field they just sent is required, and a
+    client reading ``InvalidArguments`` as its own mistake would send it again,
+    forever. It is the declaration's error, and raises as the callable's own."""
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+
+    with pytest.raises(TypeError, match=name):
+        dispatch(spec, principal=ada, arguments=arguments)
+
+
+def test_a_service_parameter_named_after_a_target_read_is_the_author_s_error(ada: Any) -> None:
+    """``pk`` is the instance selector's read, consumed there and never in the
+    service's pool, and the caller sent it: only a Validator's parameters are
+    the service's to ask a caller for, never the spec's whole argument set."""
+    note = Note.objects.create(owner=ada, title="mine")
+    spec = ServiceSpec(
+        service=lambda *, instance, pk: pk,
+        permissions=OPEN,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+    )
+
+    with pytest.raises(TypeError, match="pk"):
+        dispatch(spec, principal=ada, arguments={"pk": note.pk})
 
 
 def test_a_defaulted_parameter_is_never_missing(ada: Any) -> None:

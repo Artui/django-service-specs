@@ -414,10 +414,23 @@ def prepare_service(
     # Before the affordances, as the Validator is: a refusal of the call itself
     # answers before one describing the row's state.
     # test_a_missing_argument_answers_before_an_affordance fails without it.
-    # Only the Validator's parameters reach the service from a caller, so they
-    # are all a caller could have filled; with no Validator, nothing is.
+    # Only the Validator's parameters reach the service from a caller, and of
+    # those only the ones the caller left out are still theirs to fill; with no
+    # Validator, nothing is. A target selector's read was the selector's to
+    # consume, never the service's to ask for:
+    # test_a_service_parameter_named_after_a_target_read_is_the_author_s_error
+    # fails if the spec's whole argument set counts. One the caller sent and the
+    # Validator did not hand back under that name - a form popping it in
+    # ``clean()``, a pydantic alias returned under the field's name - would be
+    # asked for again, forever, by a client reading ``InvalidArguments`` as its
+    # own mistake; ``checked`` is exactly what was sent, since the shape check
+    # applies no default:
+    # test_a_validator_parameter_the_caller_sent_is_the_author_s_error fails
+    # without the subtraction.
     validator = spec.validator
-    fillable = validator.parameters().names() if validator is not None else frozenset()
+    fillable = (
+        validator.parameters().names() - checked.keys() if validator is not None else frozenset()
+    )
     kwargs = call_keywords(spec.service, pool, fillable=fillable)
     # Step six, in djangorestframework-services' place for it: after the
     # object-level check and the Validator, so a principal who may not see the

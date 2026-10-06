@@ -72,20 +72,25 @@ def call_keywords(
 
     ``resolve_callable_kwargs`` forwards only what the pool has, so a
     parameter with no default that the call left out - an optional read the
-    caller did not send, a value the Validator did not return - reached the
-    callable as a ``TypeError``. It is refused before the call instead, as
+    caller did not send, a Validator parameter the caller left out - reached
+    the callable as a ``TypeError``. It is refused before the call instead, as
     ``InvalidArguments`` keyed by the parameter, in the shape check's own
     wording for an argument left out.
 
     **Only where a caller could have filled it.** ``fillable`` is the names
     this call site lets a caller send: a selector's ``reads``, for the
     selector and its ``extend_queryset`` alike, or the service's Validator's
-    parameters, which are none without a Validator. The argument set is
-    closed, so any other name can never arrive - REJECT refuses it as
-    unknown, IGNORE drops it - and refusing it as missing would ask for a
-    value nobody can send, which a client reading ``InvalidArguments`` as its
-    own mistake retries. It is the declaration's error, and is left to raise
-    as the callable's own ``TypeError``. Decided at the call rather than when
+    parameters the caller left out, which are none without a Validator.
+    ``shape_queryset`` passes none, because a transport shaping rows itself
+    bound no arguments
+    (test_a_read_the_pool_lacks_is_the_callable_s_own_error). The argument
+    set is closed, so any other name can never arrive - REJECT refuses it as
+    unknown, IGNORE drops it - and one the caller sent and the Validator did
+    not hand back under that name has already arrived. Refusing either as
+    missing would ask for a value the caller cannot send or already did,
+    which a client reading ``InvalidArguments`` as its own mistake retries.
+    It is the declaration's error, and is left to raise as the callable's
+    own ``TypeError``. Decided at the call rather than when
     the spec is declared, because a registered seed may fill such a
     parameter, and the seeds are known only at dispatch.
 
