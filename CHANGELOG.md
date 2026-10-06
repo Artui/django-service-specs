@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- A JSON request body nested deeper than Python's decoder reaches ended the
+  request in a 500 rather than a refusal. `json.loads` raises `RecursionError`
+  for one, which is no `ValueError`, and nothing between the decode and the
+  response caught it, so every spec request through `request_arguments` -
+  `dispatch_request`, `adispatch_request`, `SpecView` and `AsyncSpecView` -
+  could be made one by its body. It is now refused as `InvalidArguments` under
+  `non_field_errors`, as every other body that is not JSON is. The depth this
+  takes moves with the interpreter: about 1,000 levels through Python 3.11,
+  10,000 on 3.12 and 3.13, and from 3.14 whatever the thread's stack allows.
+
 ## [0.4.0] — 2026-10-04
 
 ### Added
