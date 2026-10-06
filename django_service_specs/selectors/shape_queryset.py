@@ -47,6 +47,8 @@ def shape_queryset(
     # Nothing is the caller's to fill here: a transport shaping rows itself
     # has bound no arguments, so a parameter the pool lacks raises as the
     # callable's own error, as it always has.
+    # TestExtendQueryset.test_a_read_the_pool_lacks_is_the_callable_s_own_error
+    # fails if this names the spec's reads instead.
     return apply_shaping(
         queryset,
         spec,
