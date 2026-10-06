@@ -964,8 +964,15 @@ above:</p>
   carries. The <code>title</code> that annotated each stored value is dropped, since the
   value now equals it, and a stated <code>"type"</code> is restated as the type of the
   displays, so an integer choice spoken as <code>"Low"</code> is never described as an
-  integer. Two values sharing one display list it once, so a row served it
-  matches one entry of the <code>oneOf</code> rather than two.</li>
+  integer. <code>"null"</code> is named last where the stated type admitted it and a
+  null is still served: a <code>None</code> the choices give a display, as Django's
+  <code>(None, "Unknown")</code> does, is served as <code>"Unknown"</code>, so no null is named for
+  it. Beside a <code>oneOf</code> entry that admits more than its constants the type is
+  left as written, because narrowing it would refuse what that entry admits.
+  Two values sharing one display list it once, so a row served it matches one
+  entry of the <code>oneOf</code> rather than two, and an array of such choices stops
+  claiming <code>uniqueItems</code>: two values selected together are served as that
+  display twice.</li>
 <li><code>price</code> and <code>published_on</code> are described as what their formatters produce,
   and nothing they said about the value before survives: the <code>"format"</code> of a
   decimal and a date is gone, since <code>"EUR 9.99"</code> is neither. <code>"null"</code> stays

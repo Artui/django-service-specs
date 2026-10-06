@@ -940,21 +940,28 @@ its own keys - a <code>$schema</code>, an annotation of its own - without reachi
 declaration or another transport's copy.</p>
 <h2 id="an-example">An example<a class="headerlink" href="#an-example" title="Permanent link">&para;</a></h2>
 <p>The notes list and the author write from the earlier pages, described:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnknownArguments</span><span class="p">,</span> <span class="n">spec_input_schema</span><span class="p">,</span> <span class="n">spec_output_schema</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">list_notes_spec</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_author_spec</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># What a transport advertises for the notes list: its arguments, and its rows.</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">notes_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">notes_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># The author write, as a transport that refuses an undeclared argument...</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># ...and as one that drops it, which must not claim to refuse it.</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">lenient_author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">unknown_arguments</span><span class="o">=</span><span class="n">UnknownArguments</span><span class="o">.</span><span class="n">IGNORE</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">author_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">DataclassPresenter</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">UnknownArguments</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">spec_input_schema</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">spec_output_schema</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span><span class="p">,</span> <span class="n">NoteRow</span><span class="p">,</span> <span class="n">list_notes_spec</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_author_spec</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># What a transport advertises for the notes list: its arguments, and its rows.</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">notes_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">notes_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># The author write, as a transport that refuses an undeclared argument...</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># ...and as one that drops it, which must not claim to refuse it.</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">lenient_author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">unknown_arguments</span><span class="o">=</span><span class="n">UnknownArguments</span><span class="o">.</span><span class="n">IGNORE</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p">)</span>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">author_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The notes list takes a search term with help text and an ordering with two
 choices and a default, and refuses any other argument:</p>
@@ -1136,6 +1143,10 @@ on its presenter:</p>
 <td>A service spec with no output selector</td>
 <td>the item</td>
 </tr>
+<tr>
+<td>A service spec with no output selector, with <code>allow_none=True</code></td>
+<td>the item, with <code>"null"</code> in its type</td>
+</tr>
 </tbody>
 </table>
 <p>A <code>RETRIEVE</code> selector spec without <code>allow_none</code> answers a missing row as
@@ -1143,9 +1154,36 @@ not-found, which a transport reports in its own terms and never presents, so
 its item is not nullable. A service spec's <code>RETRIEVE</code> output selector is
 nullable whatever its <code>allow_none</code> says: once the service has run, a re-read
 that finds nothing is <code>None</code> rather than not-found, because not-found would
-tell the caller a committed write did not happen. And a service spec that
-presents what the service returned is described as the item: whether a
-service can return <code>None</code> is not something its declaration says.</p>
+tell the caller a committed write did not happen.</p>
+<p>A service spec that presents what the service returned is described as the
+item, and dispatch presents a <code>None</code> it returned as <code>None</code>. Whether a service
+may return one is not otherwise in its declaration, so the spec says it with
+<code>allow_none=True</code>, the name a selector spec already uses, and the item gains
+<code>"null"</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_oldest</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">if</span> <span class="n">note</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">return</span> <span class="n">note</span>  <span class="c1"># None once there is nothing left to archive</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">archive_oldest_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_oldest</span><span class="p">,</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="c1"># It presents what it returned, which may be nothing: said here, so the</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="c1"># schema a transport advertises admits the null it will serve.</span>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="p">)</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">archive_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">archive_oldest_spec</span><span class="p">)</span>
+</span></code></pre></div>
+<p>Left undeclared, a <code>None</code> is not stated, and the item stays the strict object
+its presenter declares: a schema that admitted <code>null</code> for every write would
+describe every service as one that may return nothing. On a service spec with
+an output selector, <code>allow_none</code> changes nothing: a <code>RETRIEVE</code> re-read admits
+<code>"null"</code> already, and a <code>LIST</code> one presents its rows rather than the
+service's return.</p>
 <h2 id="what-is-deliberately-not-emitted">What is deliberately not emitted<a class="headerlink" href="#what-is-deliberately-not-emitted" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>No <code>title</code> on input.</strong> A Parameter has no label. On output, a field's

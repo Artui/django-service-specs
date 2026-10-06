@@ -6003,6 +6003,27 @@ selector's presenter is used; declaring both is refused.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.allow_none">allow_none</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Declares that a service with no output selector may
+present nothing: its return may be <code>None</code>, and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+then admits <code>"null"</code>. Declaration-only, as on a selector spec's
+schema: dispatch presents a <code>None</code> the service returned whatever
+this says, because whether a service may return one is not
+otherwise in its declaration. Left <code>False</code>, the item stays the
+strict object its presenter declares. Beside an output selector it
+changes nothing: a <code>RETRIEVE</code> re-read admits <code>"null"</code> already,
+and a <code>LIST</code> one presents its rows rather than the service's
+return.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.affordances">affordances</span></code></td>
             <td>
                   <code><span title="collections.abc.Sequence">Sequence</span>[<a class="autorefs autorefs-internal" title="Affordance
@@ -8422,12 +8443,16 @@ new payload and never modifies <code>payload</code>.</p>
   that is what the projected payload carries: an <code>enum</code>'s values are
   replaced, and a <code>oneOf</code>'s <code>const</code>s are, each losing the <code>title</code>
   that annotated the value it now equals. A <code>"type"</code> stated beside them
-  is restated as the types of the values now listed, <code>"null"</code> last, so a
-  display string is never described as the integer it replaced, and a
-  display two values share is listed once, so a row served it matches one
-  <code>oneOf</code> entry rather than two. Not on a <code>HANDLE</code>, which keeps its
-  values on both sides: a field another tool takes as input should be
-  marked one.</li>
+  is restated as the types of the values now listed, so a display string
+  is never described as the integer it replaced, with <code>"null"</code> named
+  last where the stated type admitted it and a null is still served -
+  not where the choices give <code>None</code> a display, which is served in its
+  place - and left as written beside a <code>oneOf</code> entry that admits more
+  than its constants. A display two
+  values share is listed once, so a row served it matches one <code>oneOf</code>
+  entry rather than two, and an array of such choices no longer claims
+  <code>uniqueItems</code>. Not on a <code>HANDLE</code>, which keeps its values on both
+  sides: a field another tool takes as input should be marked one.</li>
 <li>a formatted field is restated as the type its
   <a class="autorefs autorefs-internal" title="ValueFormatter
 
@@ -8531,8 +8556,10 @@ shaped by what dispatch returns for this kind of spec:</p>
   that finds nothing is <code>None</code> rather than not-found, because reporting
   not-found would tell the caller a committed write did not happen.</li>
 <li><strong>A service spec with no output selector</strong> presents what the service
-  returned, described by its presenter as the item. Whether a service may
-  return <code>None</code> is not in its declaration, so it is not stated.</li>
+  returned, described by its presenter as the item, which gains
+  <code>"null"</code> when the spec declares <code>allow_none</code>. Undeclared, a <code>None</code>
+  is not stated and the item stays strict: whether a service may return
+  one is not otherwise in its declaration.</li>
 </ul>
 <p><code>paginate</code> describes a list served one page at a time, as
 <a class="autorefs autorefs-internal" title="paginate_output" href="#django_service_specs.dispatch.paginate_output.paginate_output"><code>paginate_output</code></a>
@@ -9534,7 +9561,14 @@ transport that hands the object to a template never pays for rendering it.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>step one, or the Validator.</p>
+                <p>step one, or the Validator, or a parameter of a
+selector, its <code>extend_queryset</code> or the service that has no
+default, that a caller could have filled and that nothing in the
+call's pool did - a read declared optional and not sent, a
+Validator parameter the caller left out - keyed by that
+parameter. One no caller can fill, or one the caller sent and the
+Validator did not hand back under that name, raises the
+callable's own <code>TypeError</code>.</p>
               </div>
             </td>
           </tr>
@@ -10119,7 +10153,8 @@ with a <code>DatabaseError</code> this does not catch.</p>
 <p>A queryset is counted with <code>COUNT</code> and sliced lazily, so the page's
 <code>items</code> is still a queryset: present them, as
 <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does a list,
-and the page is read once. A <code>Manager</code> is paged as its <code>.all()</code>, since
+and the page is read once. A manager - any <code>BaseManager</code>, so one built
+with <code>BaseManager.from_queryset</code> too - is paged as its <code>.all()</code>, since
 it counts and cannot be sliced.</p>
 
 

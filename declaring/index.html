@@ -978,6 +978,33 @@ returned under one, so an argument can never outrank a value dispatch put in
 the pool itself. A caller naming an argument <code>user</code> is the case that matters.
 <a href="../dispatching/#pool-seeds">Pool seeds</a> add names of your own, reserved the
 same way.</p>
+<p>A parameter with no default that the call's pool lacks, where a caller could
+have filled it, is refused before the callable runs, on <code>dispatch</code> and
+<code>adispatch</code> alike, as
+<a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>
+keyed by the parameter with the shape check's own <code>"This field is
+required."</code>, rather than reaching the callable as a <code>TypeError</code>. That is a
+read declared optional that the caller left out, whether the selector or its
+<code>extend_queryset</code> takes it, or a Validator parameter the caller left out,
+which the service takes.</p>
+<p>Any other parameter the pool lacks is the declaration's error, and raises as
+the callable's own <code>TypeError</code>. The argument set is closed, so a name that is
+none of the selector's <code>reads</code> - or, for the service, none of its Validator's
+parameters, which is every name when it has no Validator - can never be sent:
+<code>REJECT</code> refuses it as unknown and <code>IGNORE</code> drops it. A Validator parameter
+the caller did send, and the Validator did not hand back under that name -
+a form that pops it in <code>clean()</code>, a pydantic field returned under its own
+name rather than its alias - has been sent already. Refusing either as a
+missing argument would ask for a value the caller cannot send or already
+did, and a client that reads <code>InvalidArguments</code> as its own mistake would
+send the call again. It is decided at dispatch rather than when the spec is
+declared, because a registered seed may fill such a parameter, and the seeds
+are known only then.</p>
+<p>Four kinds of parameter are never missing: one with a default, <code>**kwargs</code>,
+<code>*args</code>, and a positional-only one, which dispatch never passes by name.
+Nothing the output selector declares is refused either: its pool carries no
+argument, and the service has already run. Where an argument may be left out,
+give the parameter a default.</p>
 <h2 id="a-read">A read<a class="headerlink" href="#a-read" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span><span class="p">,</span> <span class="n">field</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span>
@@ -1061,7 +1088,10 @@ the spec being dispatched.</p>
 <p><code>output_selector_spec</code> re-reads what the service produced, with its return in
 the pool as <code>result</code>. It is how a write returns a row with fresh annotations or
 prefetches, or a list after a bulk change; the
-<a href="../relations/#a-worked-example">relation-write example</a> uses one.</p>
+<a href="../relations/#a-worked-example">relation-write example</a> uses one. Without one,
+the service's own return is what is presented, and <code>allow_none=True</code> on the
+spec declares that it may be <code>None</code>, so its
+<a href="../schema/#what-a-spec-returns">output schema</a> admits <code>"null"</code>.</p>
 <p><code>atomic=True</code>, the default, runs the service inside <code>transaction.atomic()</code>.
 <code>metadata</code> holds a project's own per-operation facts, stored as given, for its
 own checks or audit hooks to read.</p>
