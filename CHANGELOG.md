@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-06
+
 ### Fixed
 - A JSON request body nested deeper than Python's decoder reaches ended the
   request in a 500 rather than a refusal. `json.loads` raises `RecursionError`
@@ -384,7 +386,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-service-specs/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/Artui/django-service-specs/compare/v0.1.0...v0.2.0
