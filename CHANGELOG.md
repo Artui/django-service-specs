@@ -18,16 +18,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admits `"null"`, and a `LIST` one presents its rows.
 
 ### Fixed
-- A selector or service parameter with no default that nothing filled - a
-  read declared optional that the caller left out, a value the Validator did
-  not return - reached the callable as a `TypeError`, on `dispatch` and
-  `adispatch` alike. It is now refused before the call as `InvalidArguments`
-  keyed by the parameter, with the shape check's `"This field is required."`.
-  It is decided at dispatch, because a registered seed may fill the
-  parameter. A reserved name missing from a pool is the declaration's error
-  rather than the caller's and still raises, as does anything the output
-  selector declares, since its pool carries no argument and the service has
-  already run.
+- A parameter with no default that a caller could have filled and nothing
+  did - a read declared optional that the caller left out, whether the
+  selector or its `extend_queryset` takes it, or a value the Validator did
+  not return, which the service takes - reached the callable as a
+  `TypeError`, on `dispatch` and `adispatch` alike. It is now refused before
+  the call as `InvalidArguments` keyed by the parameter, with the shape
+  check's `"This field is required."`. Only those: a parameter no caller can
+  fill still raises the callable's own `TypeError`, because the argument set
+  is closed and refusing it would ask for a value nobody can send. That is a
+  selector parameter that is none of its `reads`, a service parameter its
+  Validator does not declare - every one, without a Validator - and anything
+  the output selector declares, since its pool carries no argument and the
+  service has already run. It is decided at dispatch, because a registered
+  seed may fill such a parameter.
 - A manager built with `BaseManager.from_queryset`, which is not a `Manager`,
   was counted as a queryset and then handled as something else:
   `paginate_output` refused it at the slice after counting it, a list
@@ -37,10 +41,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `annotate_output_schema` narrowed the `"type"` beside a `oneOf` to the
   displays' types even where an entry with no `const` admitted more, so a
   value that entry matched failed the projected schema. The type is now left
-  as written there. `"null"` is restated where the stated type admitted it,
-  read off the type rather than the values, so a null admitted by a
-  `{"type": "null"}` entry is kept and a `None` the type refused is not newly
-  admitted.
+  as written there. `"null"` is named where the stated type admitted it and
+  a null is still served: a null admitted by a `{"type": "null"}` entry is
+  now kept, a `None` listed beside a type that refused it is no longer newly
+  admitted, and a `None` the choices give a display, as Django's
+  `(None, "Unknown")` does, is served as `"Unknown"` and names no null.
 - `annotate_output_schema` kept `uniqueItems` on an array of choices whose
   values collapse onto fewer displays. Two values selected together are
   served as one display twice, so the payload failed its own schema; the

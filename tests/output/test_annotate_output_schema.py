@@ -242,14 +242,29 @@ class TestRestatedType:
         assert self.spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
 
     def test_null_is_kept_where_the_stated_type_admitted_it(self) -> None:
-        """Read off the type, not the values: here the null is admitted by an
-        entry with no constant, and the restated type must not refuse it."""
+        """Here the null is admitted by an entry with no constant rather than
+        listed as one, and it is still served, so the restated type must not
+        refuse it."""
         subschema = {
             "type": ["integer", "null"],
             "oneOf": [{"const": 1, "title": "Low"}, {"type": "null"}],
         }
 
         assert self.spoken(subschema)["type"] == ["string", "null"]
+
+    def test_a_null_spoken_as_a_label_is_not_named(self) -> None:
+        """Django's ``(None, "Unknown")``: the stated type admitted a null, and
+        the payload serves ``"Unknown"`` in its place, so the restated type
+        names no null it never serves."""
+        subschema = {
+            "type": ["integer", "null"],
+            "oneOf": [{"const": 1, "title": "Low"}, {"const": None, "title": "Unknown"}],
+        }
+
+        assert self.spoken(subschema, {**LABELS, None: "Unknown"}) == {
+            "type": "string",
+            "oneOf": [{"const": "Low"}, {"const": "Unknown"}],
+        }
 
     def test_a_type_stated_as_null_alone_still_admits_it(self) -> None:
         """A scalar ``"null"`` is a stated type admitting null, as a list
@@ -308,7 +323,10 @@ class TestRestatedType:
         """An entry with no ``const`` admits values the displays say nothing
         about, so narrowing the type to the displays' would refuse them: ``7``
         matches ``minimum`` and is an integer, and narrowed to ``"string"``
-        the type would no longer admit it."""
+        the type would no longer admit it. Left as written, the type refuses
+        the display ``"Low"`` a row holding ``1`` is served, so that row still
+        fails this schema; only a schema written by hand reaches this shape,
+        and narrowing would refuse ``7`` and the null as well."""
         subschema = {
             "type": ["integer", "null"],
             "oneOf": [{"const": 1, "title": "Low"}, {"minimum": 5}],
@@ -322,6 +340,33 @@ class TestRestatedType:
     def test_an_untyped_choice_states_no_type(self) -> None:
         """Nothing was claimed, so there is nothing to contradict."""
         assert self.spoken({"enum": [1]}) == {"enum": ["Low"]}
+
+
+class TestServedNull:
+    """``"null"`` is named exactly where the projected payload can still serve one.
+
+    A nullable field's ``None`` is served as its display where the choices give
+    it one, and as a null where they do not.
+    """
+
+    @staticmethod
+    def projected(choices: tuple[tuple[Any, str], ...]) -> tuple[Any, Any]:
+        output = Output((OutputField("p", "integer", choices=choices, nullable=True),))
+        projection = of(*output)
+        schema = annotate(output_schema(output), projection)["properties"]["p"]
+        return schema, project_payload({"p": None}, projection)["p"]
+
+    def test_a_null_with_a_display_is_served_as_it_and_never_named(self) -> None:
+        schema, served = self.projected(((None, "Unknown"), (1, "Low")))
+
+        assert served == "Unknown"
+        assert schema == {"type": "string", "oneOf": [{"const": "Unknown"}, {"const": "Low"}]}
+
+    def test_a_null_with_no_display_is_served_and_still_named(self) -> None:
+        schema, served = self.projected(((1, "Low"),))
+
+        assert served is None
+        assert schema == {"type": ["string", "null"], "oneOf": [{"const": "Low"}, {"const": None}]}
 
 
 class TestSharedDisplays:

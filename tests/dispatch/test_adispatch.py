@@ -659,3 +659,48 @@ async def test_an_unfilled_parameter_is_refused_as_a_missing_argument(ada: Any, 
 
     assert sent.value in (["acme"], "acme")
     assert caught.value.detail == {"tenant": ["This field is required."]}
+
+
+# The same four paths, each declaring nothing a caller could fill ``tenant``
+# through: no read, no Validator.
+_UNFILLABLE: dict[str, Callable[[], Any]] = {
+    "sync selector": lambda: SelectorSpec(kind=LIST, selector=_sync_by_tenant, permissions=OPEN),
+    "async selector": lambda: SelectorSpec(kind=LIST, selector=_by_tenant, permissions=OPEN),
+    "sync service": lambda: ServiceSpec(service=_sync_service_of, permissions=OPEN),
+    "async service": lambda: ServiceSpec(service=_async_service_of, atomic=False, permissions=OPEN),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_UNFILLABLE))
+async def test_a_parameter_no_caller_can_fill_is_the_author_s_error(ada: Any, path: str) -> None:
+    """Nothing declares ``tenant`` as an argument, so the closed argument set
+    keeps every caller from sending it: refusing it as missing would ask for a
+    value nobody can send, so it raises as the declaration's error."""
+    spec = _UNFILLABLE[path]()
+
+    with pytest.raises(TypeError, match="tenant"):
+        await adispatch(spec, principal=ada, arguments={})
+
+
+async def _all_notes() -> Any:
+    return Note.objects.all()
+
+
+def _titled(*, queryset: Any, title: str) -> Any:
+    return queryset.filter(title=title)
+
+
+async def test_an_async_selector_s_extend_queryset_refuses_a_read_left_out(ada: Any) -> None:
+    """Shaped in the hop after the await, from the same pool and the same reads."""
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=_all_notes,
+        extend_queryset=_titled,
+        reads=Parameters.of(Parameter("title", "string")),
+        permissions=OPEN,
+    )
+
+    with pytest.raises(InvalidArguments) as caught:
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"title": ["This field is required."]}

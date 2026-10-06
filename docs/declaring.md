@@ -46,18 +46,29 @@ the pool itself. A caller naming an argument `user` is the case that matters.
 [Pool seeds](dispatching.md#pool-seeds) add names of your own, reserved the
 same way.
 
-A parameter with no default that the call's pool lacks - a read declared
-optional that the caller left out, a value the Validator did not return - is
-refused before the callable runs, on `dispatch` and `adispatch` alike, as
+A parameter with no default that the call's pool lacks, where a caller could
+have filled it, is refused before the callable runs, on `dispatch` and
+`adispatch` alike, as
 [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
 keyed by the parameter with the shape check's own `"This field is
-required."`, rather than reaching the callable as a `TypeError`. It is decided
-at dispatch rather than when the spec is declared, because a registered seed
-may fill the parameter, and the seeds are known only then. Three things are
-never missing: a parameter with a default, `**kwargs`, and a reserved name.
-A reserved name absent from a pool - `instance` in a selector's, say - is an
-error in the declaration that no caller could fix, so it is left to raise as
-one, and so is anything the output selector declares: its pool carries no
+required."`, rather than reaching the callable as a `TypeError`. That is a
+read declared optional that the caller left out, whether the selector or its
+`extend_queryset` takes it, or a Validator parameter the Validator did not
+return, which the service takes.
+
+Any other parameter the pool lacks is the declaration's error, and raises as
+the callable's own `TypeError`. The argument set is closed, so a name that is
+none of the selector's `reads` - or, for the service, none of its Validator's
+parameters, which is every name when it has no Validator - can never be sent:
+`REJECT` refuses it as unknown and `IGNORE` drops it. Refusing it as a
+missing argument would ask for a value no caller can send, and a client that
+reads `InvalidArguments` as its own mistake would send the call again. It is
+decided at dispatch rather than when the spec is declared, because a
+registered seed may fill such a parameter, and the seeds are known only then.
+
+Four kinds of parameter are never missing: one with a default, `**kwargs`,
+`*args`, and a positional-only one, which dispatch never passes by name.
+Nothing the output selector declares is refused either: its pool carries no
 argument, and the service has already run. Where an argument may be left out,
 give the parameter a default.
 

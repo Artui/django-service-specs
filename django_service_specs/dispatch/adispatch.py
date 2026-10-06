@@ -15,7 +15,6 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
     Prepared,
-    call_keywords,
     conclude_selector,
     finish_service,
     open_call,
@@ -25,6 +24,7 @@ from django_service_specs.dispatch.utils import (
     settle,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.selectors.utils import call_keywords
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -220,7 +220,9 @@ def _settle_and_conclude(
     granted: Grant,
     reserved: frozenset[str],
 ) -> DispatchResult:
-    value = settle(spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved)
+    value = settle(
+        spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
+    )
     return conclude_selector(spec, value, principal=who, grant=granted)
 
 
@@ -246,9 +248,9 @@ async def _await_selector(
         spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
     )
     fn = spec.selector
-    # Bound before the await and outside the ``try``: a parameter nothing filled
-    # is refused as a missing argument, as on every other path.
-    kwargs = call_keywords(fn, pool, reserved=pool_seeds.reserved)
+    # Bound before the await and outside the ``try``: a read the caller left
+    # out is refused as a missing argument, as on every other path.
+    kwargs = call_keywords(fn, pool, fillable=spec.reads.names())
     try:
         raw = await fn(**kwargs)
     except ObjectDoesNotExist as error:

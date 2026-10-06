@@ -44,6 +44,14 @@ def shape_queryset(
             Django queryset — loud failure beats a stray ``AttributeError``
             deep inside whichever transport renders the result.
     """
+    # Nothing is the caller's to fill here: a transport shaping rows itself
+    # has bound no arguments, so a parameter the pool lacks raises as the
+    # callable's own error, as it always has.
     return apply_shaping(
-        queryset, spec, pool, annotations=spec.annotations, source_label=source_label
+        queryset,
+        spec,
+        pool,
+        annotations=spec.annotations,
+        source_label=source_label,
+        fillable=frozenset(),
     )

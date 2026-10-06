@@ -12,15 +12,13 @@ transport takes when it binds input for itself.
 
 from __future__ import annotations
 
-import inspect
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Final, Literal
+from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
 from django.db.models.manager import BaseManager
-from django.utils.translation import gettext
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -35,12 +33,11 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
-from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.selectors.utils import (
     apply_shaping,
+    call_keywords,
     call_selector,
     is_queryset,
     materialize_retrieve,
@@ -61,9 +58,6 @@ SELECTOR_SOURCE = "SelectorSpec.selector"
 INSTANCE_SOURCE = "ServiceSpec.instance_selector_spec.selector"
 COLLECTION_SOURCE = "ServiceSpec.collection_selector_spec.selector"
 OUTPUT_SOURCE = "ServiceSpec.output_selector_spec.selector"
-
-_NAMED: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
-"""The parameter kinds a pool fills by name, and so the only ones it can leave unfilled."""
 
 
 @dataclass(frozen=True)
@@ -207,6 +201,7 @@ def settle(
     *,
     source: str,
     reserved: frozenset[str],
+    fillable: frozenset[str],
 ) -> Any:
     """Shape what a selector returned, answer its affordances, and collapse a RETRIEVE.
 
@@ -220,6 +215,9 @@ def settle(
     answered once, against ``pool`` - the pool the selector was called from -
     with ``reserved``, the call's seed set, so a registered seed reaches it.
     The answers refuse nothing: they describe each row for whoever presents it.
+
+    ``fillable`` is what the selector was bound with, and ``extend_queryset``
+    is bound with the same: see ``call_keywords``.
     """
     if isinstance(raw, BaseManager):
         # ``Note.objects`` is a selector's shortest spelling of every row, and a
@@ -255,7 +253,14 @@ def settle(
             # test_a_spec_with_no_affordances_of_its_own_adds_no_annotation.
             if generated:
                 annotations = {**(annotations or {}), **generated}
-    shaped = apply_shaping(raw, selector_spec, pool, annotations=annotations, source_label=source)
+    shaped = apply_shaping(
+        raw,
+        selector_spec,
+        pool,
+        annotations=annotations,
+        source_label=source,
+        fillable=fillable,
+    )
     # One branch to coverage, so each condition is held by its own test:
     # test_declaring_nothing_leaves_a_returned_list_as_it_was (the first) and
     # test_every_answer_rides_in_the_one_list_query_and_the_one_annotate_call
@@ -273,49 +278,6 @@ def settle(
     return shaped
 
 
-def call_keywords(
-    fn: Callable[..., Any], pool: Mapping[str, Any], *, reserved: frozenset[str]
-) -> dict[str, Any]:
-    """The keywords ``fn`` is called with, refusing a parameter nothing filled.
-
-    ``resolve_callable_kwargs`` forwards only what the pool has, so a
-    parameter with no default that the call left out - an optional read the
-    caller did not send, a value the Validator did not return - reached the
-    callable as a ``TypeError``. It is refused before the call instead, as
-    ``InvalidArguments`` keyed by the parameter, in the shape check's own
-    wording for an argument left out.
-
-    Here rather than when the spec is declared, because a registered seed may
-    fill the parameter and the seeds are known only at dispatch.
-
-    A parameter is missing only if it is filled by name, has no default, is
-    not in the pool, and is not reserved. ``**kwargs`` takes the whole pool and
-    is never missing; a reserved name missing from this pool, such as
-    ``instance`` in a selector's, is the author's error rather than the
-    caller's, and is left to raise as one. Each condition is held by its own
-    test: test_a_callable_taking_the_whole_pool_is_never_missing_anything (the
-    kind), test_a_defaulted_parameter_is_never_missing (the default),
-    test_an_optional_read_a_selector_requires_is_refused_when_not_sent (the
-    pool: without it a sent read is refused too) and
-    test_a_missing_reserved_seed_is_the_author_s_error_and_not_refused (the
-    reservation).
-    """
-    missing = [
-        name
-        for name, param in inspect.signature(fn).parameters.items()
-        if param.kind in _NAMED
-        and param.default is inspect.Parameter.empty
-        and name not in pool
-        and name not in reserved
-    ]
-    if missing:
-        # Translated where it is raised, spelled as Django spells it, as the
-        # shape check does: ``check_arguments`` refuses an absent required
-        # argument with the same message.
-        raise InvalidArguments({name: [gettext("This field is required.")] for name in missing})
-    return resolve_callable_kwargs(fn, dict(pool))
-
-
 def lookup(
     selector_spec: SelectorSpec,
     pool: Mapping[str, Any],
@@ -331,25 +293,26 @@ def lookup(
     sync ``dispatch`` runs it, and a nested one on either entry point: a nested
     selector is never the run, so ``adispatch`` never awaits it on the loop.
 
-    ``after_the_run`` is the output selector's, whose parameters are bound as
-    they are rather than through ``call_keywords``. Its pool carries no
-    argument, so nothing a caller left out can be missing from it, and the
-    service has already run: a refusal that reads as "before the run" would
-    tell the caller the operation did not happen.
-    test_an_output_selector_is_never_refused_after_the_run fails without it.
+    The selector, and its ``extend_queryset``, refuse a read the caller left
+    out (see ``call_keywords``); ``after_the_run`` is the output selector's,
+    for which nothing is the caller's to fill. Its pool carries no argument,
+    so not even a read it declares could be in it, and the service has
+    already run: a refusal that reads as "before the run" would tell the
+    caller the operation did not happen. A parameter its pool lacks raises as
+    the callable's own error.
+    test_an_output_selector_is_never_refused_after_the_run (the selector) and
+    test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run
+    (its ``extend_queryset``) fail without it.
     """
     fn = selector_spec.selector
-    kwargs = (
-        resolve_callable_kwargs(fn, dict(pool))
-        if after_the_run
-        else call_keywords(fn, pool, reserved=reserved)
-    )
+    fillable: frozenset[str] = frozenset() if after_the_run else selector_spec.reads.names()
+    kwargs = call_keywords(fn, pool, fillable=fillable)
     try:
         raw = call_selector(fn, kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(selector_spec, error)
         return None
-    return settle(selector_spec, raw, pool, source=source, reserved=reserved)
+    return settle(selector_spec, raw, pool, source=source, reserved=reserved, fillable=fillable)
 
 
 def conclude_selector(
@@ -451,7 +414,11 @@ def prepare_service(
     # Before the affordances, as the Validator is: a refusal of the call itself
     # answers before one describing the row's state.
     # test_a_missing_argument_answers_before_an_affordance fails without it.
-    kwargs = call_keywords(spec.service, pool, reserved=pool_seeds.reserved)
+    # Only the Validator's parameters reach the service from a caller, so they
+    # are all a caller could have filled; with no Validator, nothing is.
+    validator = spec.validator
+    fillable = validator.parameters().names() if validator is not None else frozenset()
+    kwargs = call_keywords(spec.service, pool, fillable=fillable)
     # Step six, in djangorestframework-services' place for it: after the
     # object-level check and the Validator, so a principal who may not see the
     # row is never told what state it is in, and before the run - outside the
