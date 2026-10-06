@@ -45,8 +45,10 @@ def spec_output_schema(
       that finds nothing is ``None`` rather than not-found, because reporting
       not-found would tell the caller a committed write did not happen.
     - **A service spec with no output selector** presents what the service
-      returned, described by its presenter as the item. Whether a service may
-      return ``None`` is not in its declaration, so it is not stated.
+      returned, described by its presenter as the item, which gains
+      ``"null"`` when the spec declares ``allow_none``. Undeclared, a ``None``
+      is not stated and the item stays strict: whether a service may return
+      one is not otherwise in its declaration.
 
     ``paginate`` describes a list served one page at a time, as
     [`paginate_output`][django_service_specs.dispatch.paginate_output.paginate_output]
@@ -96,7 +98,10 @@ def spec_output_schema(
     elif spec.output_selector_spec is not None:
         kind, may_be_none = spec.output_selector_spec.kind, True
     else:
-        return item
+        # One value, the service's return, which may be ``None`` only where the
+        # spec says so: test_a_service_allowing_none_admits_null and
+        # test_a_service_presenting_its_own_return_is_the_item.
+        return allow_null(item) if spec.allow_none else item
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}
         return _paged(array) if paginate else array

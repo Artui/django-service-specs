@@ -11,6 +11,8 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from django.db.models import QuerySet
+from django.db.models.manager import BaseManager
 
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from tests.dispatch.utils import make_user
@@ -155,3 +157,20 @@ def test_a_manager_is_paged_as_its_queryset() -> None:
     page = paginate_output(Note.objects, limit=2)
 
     assert (len(list(page.items)), page.total, page.has_next) == (2, 3, True)
+
+
+@pytest.mark.django_db
+def test_a_manager_built_on_base_manager_is_paged_too() -> None:
+    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
+    and ``is_queryset`` counts it like one, so it is paged as its ``.all()`` as
+    well. Testing ``Manager`` counted it and then refused it at the slice."""
+    ada = make_user("ada")
+    for title in ("a", "b", "c"):
+        Note.objects.create(owner=ada, title=title)
+    manager: Any = BaseManager.from_queryset(QuerySet)()
+    manager.model = Note
+
+    page = paginate_output(manager, limit=2)
+
+    assert (page.total, page.page, page.has_next) == (3, 1, True)
+    assert len(page.items) == 2

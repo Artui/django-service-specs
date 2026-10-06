@@ -237,9 +237,48 @@ class TestRestatedType:
         }
 
     def test_null_is_stated_last_wherever_it_was_listed(self) -> None:
-        subschema = {"type": ["integer", "null"], "enum": [None, 1]}
+        subschema = {"type": ["null", "integer"], "enum": [None, 1]}
 
         assert self.spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
+
+    def test_null_is_kept_where_the_stated_type_admitted_it(self) -> None:
+        """Here the null is admitted by an entry with no constant rather than
+        listed as one, and it is still served, so the restated type must not
+        refuse it."""
+        subschema = {
+            "type": ["integer", "null"],
+            "oneOf": [{"const": 1, "title": "Low"}, {"type": "null"}],
+        }
+
+        assert self.spoken(subschema)["type"] == ["string", "null"]
+
+    def test_a_null_spoken_as_a_label_is_not_named(self) -> None:
+        """Django's ``(None, "Unknown")``: the stated type admitted a null, and
+        the payload serves ``"Unknown"`` in its place, so the restated type
+        names no null it never serves."""
+        subschema = {
+            "type": ["integer", "null"],
+            "oneOf": [{"const": 1, "title": "Low"}, {"const": None, "title": "Unknown"}],
+        }
+
+        assert self.spoken(subschema, {**LABELS, None: "Unknown"}) == {
+            "type": "string",
+            "oneOf": [{"const": "Low"}, {"const": "Unknown"}],
+        }
+
+    def test_a_type_stated_as_null_alone_still_admits_it(self) -> None:
+        """A scalar ``"null"`` is a stated type admitting null, as a list
+        naming it is."""
+        subschema = {"type": "null", "enum": [None, 1]}
+
+        assert self.spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
+
+    def test_a_type_that_refused_null_still_refuses_it(self) -> None:
+        """The restated type admits what the stated one did, in display terms,
+        and nothing more: a ``None`` the type refused was never served."""
+        subschema = {"type": "integer", "enum": [1, None]}
+
+        assert self.spoken(subschema) == {"type": "string", "enum": ["Low", None]}
 
     def test_a_value_left_unspoken_keeps_its_type_beside_the_string(self) -> None:
         subschema = {"type": "integer", "enum": [1, 2]}
@@ -261,14 +300,73 @@ class TestRestatedType:
 
         assert self.spoken(subschema) == subschema
 
-    def test_a_one_of_with_no_constant_keeps_its_type(self) -> None:
-        subschema = {"type": "string", "oneOf": [{"pattern": "^a"}]}
+    def test_only_a_null_left_to_type_leaves_the_type_as_stated(self) -> None:
+        """Nothing but ``None`` is listed and the stated type refused it, so
+        there is no type to restate it as."""
+        subschema = {"type": "integer", "enum": [None]}
 
         assert self.spoken(subschema) == subschema
+
+    def test_a_one_of_with_no_constant_keeps_its_type(self) -> None:
+        subschema = {"type": ["string", "null"], "oneOf": [{"pattern": "^a"}]}
+
+        assert self.spoken(subschema) == subschema
+
+    def test_a_choice_listing_nothing_keeps_its_type(self) -> None:
+        """Nothing listed to restate the type from. Nullable, so that restating
+        it from nothing would leave ``"null"`` alone in place of the type."""
+        subschema = {"type": ["string", "null"], "enum": []}
+
+        assert self.spoken(subschema) == subschema
+
+    def test_an_entry_admitting_more_than_its_constants_keeps_the_type(self) -> None:
+        """An entry with no ``const`` admits values the displays say nothing
+        about, so narrowing the type to the displays' would refuse them: ``7``
+        matches ``minimum`` and is an integer, and narrowed to ``"string"``
+        the type would no longer admit it. Left as written, the type refuses
+        the display ``"Low"`` a row holding ``1`` is served, so that row still
+        fails this schema; only a schema written by hand reaches this shape,
+        and narrowing would refuse ``7`` and the null as well."""
+        subschema = {
+            "type": ["integer", "null"],
+            "oneOf": [{"const": 1, "title": "Low"}, {"minimum": 5}],
+        }
+
+        assert self.spoken(subschema) == {
+            "type": ["integer", "null"],
+            "oneOf": [{"const": "Low"}, {"minimum": 5}],
+        }
 
     def test_an_untyped_choice_states_no_type(self) -> None:
         """Nothing was claimed, so there is nothing to contradict."""
         assert self.spoken({"enum": [1]}) == {"enum": ["Low"]}
+
+
+class TestServedNull:
+    """``"null"`` is named exactly where the projected payload can still serve one.
+
+    A nullable field's ``None`` is served as its display where the choices give
+    it one, and as a null where they do not.
+    """
+
+    @staticmethod
+    def projected(choices: tuple[tuple[Any, str], ...]) -> tuple[Any, Any]:
+        output = Output((OutputField("p", "integer", choices=choices, nullable=True),))
+        projection = of(*output)
+        schema = annotate(output_schema(output), projection)["properties"]["p"]
+        return schema, project_payload({"p": None}, projection)["p"]
+
+    def test_a_null_with_a_display_is_served_as_it_and_never_named(self) -> None:
+        schema, served = self.projected(((None, "Unknown"), (1, "Low")))
+
+        assert served == "Unknown"
+        assert schema == {"type": "string", "oneOf": [{"const": "Unknown"}, {"const": "Low"}]}
+
+    def test_a_null_with_no_display_is_served_and_still_named(self) -> None:
+        schema, served = self.projected(((1, "Low"),))
+
+        assert served is None
+        assert schema == {"type": ["string", "null"], "oneOf": [{"const": "Low"}, {"const": None}]}
 
 
 class TestSharedDisplays:
@@ -280,6 +378,12 @@ class TestSharedDisplays:
     """
 
     CHOICES = (("legacy", "Draft"), ("draft", "Draft"), ("live", "Published"))
+    STAGE_LABELS: dict[Any, str] = dict(CHOICES)
+    ARRAY_OF_STAGES: dict[str, Any] = {
+        "type": "array",
+        "items": {"enum": ["legacy", "draft"]},
+        "uniqueItems": True,
+    }
 
     def test_every_projected_row_matches_exactly_one_entry(self) -> None:
         output = Output((OutputField("status", "string", choices=self.CHOICES),))
@@ -312,6 +416,57 @@ class TestSharedDisplays:
         )
 
         assert annotate(schema, projection)["properties"]["s"] == {"enum": ["Published", "Draft"]}
+
+    def test_an_array_of_shared_displays_stops_claiming_unique_items(self) -> None:
+        """``uniqueItems`` held for the stored values and not for their
+        displays: two values selected together are served as one display
+        twice, and the payload keeps both because both are selected."""
+        schema = {"type": "object", "properties": {"s": self.ARRAY_OF_STAGES}}
+        projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
+
+        assert annotate(schema, projection)["properties"]["s"] == {
+            "type": "array",
+            "items": {"enum": ["Draft"]},
+        }
+
+    def test_an_array_of_distinct_displays_keeps_unique_items(self) -> None:
+        """The condition of the drop: no two values collapsed, so the displays
+        served for distinct values are distinct too."""
+        subschema = {"type": "array", "items": {"enum": ["legacy", "live"]}, "uniqueItems": True}
+        schema = {"type": "object", "properties": {"s": subschema}}
+        projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
+
+        assert annotate(schema, projection)["properties"]["s"] == {
+            "type": "array",
+            "items": {"enum": ["Draft", "Published"]},
+            "uniqueItems": True,
+        }
+
+    def test_an_array_of_a_nullable_union_counts_across_its_members(self) -> None:
+        """An element stated as ``anyOf`` lists its values in a member, and the
+        collapse is counted there too."""
+        subschema = {
+            "type": "array",
+            "items": {"anyOf": [{"enum": ["legacy", "draft"]}, {"type": "null"}]},
+            "uniqueItems": True,
+        }
+        schema = {"type": "object", "properties": {"s": subschema}}
+        projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
+
+        assert "uniqueItems" not in annotate(schema, projection)["properties"]["s"]
+
+    def test_two_selected_values_sharing_a_display_meet_their_schema(self) -> None:
+        """End to end: ``["legacy", "draft"]`` is served as ``["Draft",
+        "Draft"]``, and the schema it is advertised under admits that."""
+        schema = {"type": "object", "properties": {"s": self.ARRAY_OF_STAGES}}
+        projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
+        served = project_payload({"s": ["legacy", "draft"]}, projection)["s"]
+        stages = annotate(schema, projection)["properties"]["s"]
+
+        assert served == ["Draft", "Draft"]
+        assert all(item in stages["items"]["enum"] for item in served)
+        # ``uniqueItems`` as JSON Schema reads it: a repeat fails the array.
+        assert not stages.get("uniqueItems") or len(set(served)) == len(served)
 
     def test_a_boolean_is_not_the_number_python_says_it_equals(self) -> None:
         """The second condition of a repeat: ``True == 1`` in Python and not in

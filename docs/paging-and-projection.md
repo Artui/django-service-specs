@@ -88,8 +88,15 @@ Each change to the item is the mirror of one the payload undergoes:
   carries. The `title` that annotated each stored value is dropped, since the
   value now equals it, and a stated `"type"` is restated as the type of the
   displays, so an integer choice spoken as `"Low"` is never described as an
-  integer. Two values sharing one display list it once, so a row served it
-  matches one entry of the `oneOf` rather than two.
+  integer. `"null"` is named last where the stated type admitted it and a
+  null is still served: a `None` the choices give a display, as Django's
+  `(None, "Unknown")` does, is served as `"Unknown"`, so no null is named for
+  it. Beside a `oneOf` entry that admits more than its constants the type is
+  left as written, because narrowing it would refuse what that entry admits.
+  Two values sharing one display list it once, so a row served it matches one
+  entry of the `oneOf` rather than two, and an array of such choices stops
+  claiming `uniqueItems`: two values selected together are served as that
+  display twice.
 - `price` and `published_on` are described as what their formatters produce,
   and nothing they said about the value before survives: the `"format"` of a
   decimal and a date is gone, since `"EUR 9.99"` is neither. `"null"` stays

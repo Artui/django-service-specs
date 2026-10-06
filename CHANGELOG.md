@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-10-06
+
+### Added
+- `allow_none` on `ServiceSpec`, the name `SelectorSpec` already uses:
+  `True` declares that a service with no output selector may present nothing,
+  and `spec_output_schema` then admits `"null"` beside the item. Dispatch
+  presented a `None` the service returned all along, while the schema
+  described a strict object, so a transport advertised a shape its own answer
+  could fail. Left `False`, the default, the item stays strict, as before.
+  Beside an output selector it changes nothing: a `RETRIEVE` re-read already
+  admits `"null"`, and a `LIST` one presents its rows.
+
+### Fixed
+- A parameter with no default that a caller could have filled and nothing
+  did - a read declared optional that the caller left out, whether the
+  selector or its `extend_queryset` takes it, or a Validator parameter the
+  caller left out, which the service takes - reached the callable as a
+  `TypeError`, on `dispatch` and `adispatch` alike. It is now refused before
+  the call as `InvalidArguments` keyed by the parameter, with the shape
+  check's `"This field is required."`. Only those: a parameter no caller can
+  fill still raises the callable's own `TypeError`, because the argument set
+  is closed and refusing it would ask for a value nobody can send. That is a
+  selector parameter that is none of its `reads`, a service parameter its
+  Validator does not declare - every one, without a Validator - and anything
+  the output selector declares, since its pool carries no argument and the
+  service has already run. So does a Validator parameter the caller sent and
+  the Validator did not return under that name, as a form popping it in
+  `clean()` or a pydantic alias does, because the caller has sent it
+  already. It is decided at dispatch, because a registered
+  seed may fill such a parameter.
+- A manager built with `BaseManager.from_queryset`, which is not a `Manager`,
+  was counted as a queryset and then handled as something else:
+  `paginate_output` refused it at the slice after counting it, a list
+  selector returning one could not be presented, and the dataclass and
+  pydantic presenters could not read a relation through one. Every
+  `BaseManager` is now read through its `.all()`.
+- `annotate_output_schema` narrowed the `"type"` beside a `oneOf` to the
+  displays' types even where an entry with no `const` admitted more, so a
+  value that entry matched failed the projected schema. The type is now left
+  as written there. `"null"` is named where the stated type admitted it and
+  a null is still served: a null admitted by a `{"type": "null"}` entry is
+  now kept, a `None` listed beside a type that refused it is no longer newly
+  admitted, and a `None` the choices give a display, as Django's
+  `(None, "Unknown")` does, is served as `"Unknown"` and names no null, as
+  before.
+- `annotate_output_schema` kept `uniqueItems` on an array of choices whose
+  values collapse onto fewer displays. Two values selected together are
+  served as one display twice, so the payload failed its own schema; the
+  array no longer claims its items are unique there.
+
 ## [0.4.1] — 2026-10-06
 
 ### Fixed
@@ -386,7 +436,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/Artui/django-service-specs/compare/v0.2.0...v0.3.0

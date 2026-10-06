@@ -96,7 +96,14 @@ def dispatch(
 
     Raises:
         PrincipalUnavailable: a deactivated principal, before step one.
-        InvalidArguments: step one, or the Validator.
+        InvalidArguments: step one, or the Validator, or a parameter of a
+            selector, its ``extend_queryset`` or the service that has no
+            default, that a caller could have filled and that nothing in the
+            call's pool did - a read declared optional and not sent, a
+            Validator parameter the caller left out - keyed by that
+            parameter. One no caller can fill, or one the caller sent and the
+            Validator did not hand back under that name, raises the
+            callable's own ``TypeError``.
         NotPermitted: step two or step four.
         ActionUnavailable: step six, an affordance not met.
         ServiceNotFound: step six, a condition on the row reached after the row

@@ -5,13 +5,17 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
+from pydantic import BaseModel, Field
 
+from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -30,6 +34,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
+from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     OPEN,
     PK,
@@ -1103,3 +1108,369 @@ def test_an_output_selector_s_rows_are_answered_with_the_registered_seeds(ada: A
     result = dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
     assert result.value.affordance__x__c is True
+
+
+# --- A parameter nothing filled -------------------------------------------------------------
+
+TENANT_READ = Parameters.of(Parameter("tenant", "string"))
+"""An optional read: the caller may leave ``tenant`` out, and nothing refuses it before the call."""
+
+REQUIRED = ["This field is required."]
+"""The shape check's own wording for a missing argument, keyed by the field it names."""
+
+
+def _by_tenant(*, tenant: str) -> list[str]:
+    return [tenant]
+
+
+class _OptionalTitle(Validator):
+    """Declares ``title`` optional and hands back exactly what it was sent."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string"))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+TITLE_READ = Parameters.of(Parameter("title", "string"))
+
+
+def _titled(*, queryset: Any, title: str) -> Any:
+    return queryset.filter(title=title)
+
+
+def _taking_title(taker: str) -> SelectorSpec:
+    """A list of notes reading an optional ``title``, taken by ``taker``."""
+    if taker == "selector":
+        return SelectorSpec(
+            kind=LIST,
+            selector=lambda *, title: Note.objects.filter(title=title),
+            reads=TITLE_READ,
+            permissions=OPEN,
+        )
+    return SelectorSpec(
+        kind=LIST,
+        selector=lambda: Note.objects.all(),
+        extend_queryset=_titled,
+        reads=TITLE_READ,
+        permissions=OPEN,
+    )
+
+
+def test_an_optional_read_a_selector_requires_is_refused_when_not_sent(ada: Any) -> None:
+    spec = SelectorSpec(kind=LIST, selector=_by_tenant, reads=TENANT_READ, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={"tenant": "acme"}).value == ["acme"]
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"tenant": REQUIRED}
+
+
+def test_a_target_selector_s_unfilled_parameter_is_refused_before_it_runs(ada: Any) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        collection_selector_spec=nested(LIST, selector=_by_tenant, reads=TENANT_READ),
+    )
+
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"tenant": REQUIRED}
+    assert service.calls == []
+
+
+def test_a_service_parameter_its_validator_left_unfilled_is_refused(ada: Any) -> None:
+    calls: list[str] = []
+
+    def rename(*, title: str) -> str:
+        calls.append(title)
+        return title
+
+    spec = ServiceSpec(service=rename, permissions=OPEN, validator=_OptionalTitle())
+
+    assert dispatch(spec, principal=ada, arguments={"title": "new"}).value == "new"
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"title": REQUIRED}
+    assert calls == ["new"]
+
+
+def test_a_registered_seed_fills_a_parameter_no_argument_did(ada: Any) -> None:
+    """``tenant`` is not a read, so only the declaration can fill it: a
+    registered seed does, and without one the call raises as the author's
+    error, since no argument a caller sends could fill it."""
+    spec = SelectorSpec(kind=LIST, selector=_by_tenant, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS).value == [
+        "tenant-of-ada"
+    ]
+    with pytest.raises(TypeError, match="tenant"):
+        dispatch(spec, principal=ada, arguments={})
+
+
+def test_a_selector_parameter_no_read_declares_is_the_author_s_error(ada: Any) -> None:
+    """The argument set is closed: ``tenant`` is not a read, so REJECT refuses
+    it as unknown and IGNORE drops it, and no caller can ever fill it. Refused
+    as a missing argument, the call would ask for a value nobody can send, and
+    a client reading ``InvalidArguments`` as its own mistake would retry it."""
+    spec = SelectorSpec(kind=LIST, selector=_by_tenant, permissions=OPEN)
+
+    with pytest.raises(InvalidArguments) as unknown:
+        dispatch(spec, principal=ada, arguments={"tenant": "acme"})
+    with pytest.raises(TypeError, match="tenant"):
+        dispatch(spec, principal=ada, arguments={})
+    with pytest.raises(TypeError, match="tenant"):
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"tenant": "acme"},
+            unknown_arguments=UnknownArguments.IGNORE,
+        )
+
+    assert "tenant" in str(unknown.value.detail)
+    assert "This field is required." not in str(unknown.value.detail)
+
+
+@pytest.mark.parametrize("validator", [None, _OptionalTitle()], ids=["none", "not declaring it"])
+def test_a_service_parameter_no_validator_declares_is_the_author_s_error(
+    ada: Any, validator: Validator | None
+) -> None:
+    """Only a Validator's parameters reach the service, so a service parameter
+    it does not declare - or any, with no Validator - is one no caller can fill."""
+    calls: list[str] = []
+
+    def publish(*, title: str = "", body: str) -> str:
+        calls.append(body)
+        return body
+
+    spec = ServiceSpec(service=publish, permissions=OPEN, validator=validator)
+
+    with pytest.raises(TypeError, match="body"):
+        dispatch(spec, principal=ada, arguments={})
+    assert calls == []
+
+
+class _ConfirmedForm(forms.Form):
+    """Checks ``confirm`` in ``clean()`` and pops it, as a confirmation field is
+    popped: it is the form's to read, and never reaches the service."""
+
+    confirm = forms.BooleanField()
+
+    def clean(self) -> dict[str, Any]:
+        self.cleaned_data.pop("confirm")
+        return self.cleaned_data
+
+
+class _Due(BaseModel):
+    due_date: str = Field(alias="dueDate")
+
+
+class _DropsTitle(Validator):
+    """Declares ``title`` and hands back nothing of what it was sent."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string"))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return {}
+
+
+def _confirm(*, confirm: bool) -> bool:
+    return confirm
+
+
+def _schedule(*, dueDate: str) -> str:
+    return dueDate
+
+
+def _rename(*, title: str) -> str:
+    return title
+
+
+@pytest.mark.parametrize(
+    ("validator", "service", "arguments", "name"),
+    [
+        (FormValidator(_ConfirmedForm), _confirm, {"confirm": True}, "confirm"),
+        (PydanticValidator(_Due), _schedule, {"dueDate": "2026-10-06"}, "dueDate"),
+        (_DropsTitle(), _rename, {"title": "new"}, "title"),
+    ],
+    ids=["a form popping it in clean", "a pydantic alias", "a validator dropping it"],
+)
+def test_a_validator_parameter_the_caller_sent_is_the_author_s_error(
+    ada: Any, validator: Validator, service: Any, arguments: dict[str, Any], name: str
+) -> None:
+    """The caller sent every argument, and the Validator did not hand ``name``
+    back under that name: a form read it and popped it, pydantic returned it
+    under the field's own name, or the Validator dropped it. Refused as missing,
+    the call would tell the caller a field they just sent is required, and a
+    client reading ``InvalidArguments`` as its own mistake would send it again,
+    forever. It is the declaration's error, and raises as the callable's own."""
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+
+    with pytest.raises(TypeError, match=name):
+        dispatch(spec, principal=ada, arguments=arguments)
+
+
+def test_a_service_parameter_named_after_a_target_read_is_the_author_s_error(ada: Any) -> None:
+    """``pk`` is the instance selector's read, consumed there and never in the
+    service's pool, and the caller sent it: only a Validator's parameters are
+    the service's to ask a caller for, never the spec's whole argument set."""
+    note = Note.objects.create(owner=ada, title="mine")
+    spec = ServiceSpec(
+        service=lambda *, instance, pk: pk,
+        permissions=OPEN,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+    )
+
+    with pytest.raises(TypeError, match="pk"):
+        dispatch(spec, principal=ada, arguments={"pk": note.pk})
+
+
+def test_a_defaulted_parameter_is_never_missing(ada: Any) -> None:
+    def by_tenant(*, tenant: str = "everyone") -> list[str]:
+        return [tenant]
+
+    spec = SelectorSpec(kind=LIST, selector=by_tenant, reads=TENANT_READ, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={}).value == ["everyone"]
+
+
+def test_a_callable_taking_the_whole_pool_is_never_missing_anything(ada: Any) -> None:
+    """``**tenant`` is named after a read the caller left out, so only its kind
+    keeps it from being refused: it takes whatever arrives, and needs nothing."""
+    spec = SelectorSpec(
+        kind=LIST, selector=lambda **tenant: sorted(tenant), reads=TENANT_READ, permissions=OPEN
+    )
+
+    assert dispatch(spec, principal=ada, arguments={}).value == ["progress", "user"]
+
+
+def test_a_positional_only_parameter_is_not_reported(ada: Any) -> None:
+    """Dispatch passes keywords only, so no caller value could ever fill it,
+    even one sent under a read's name, and refusing it would ask for one."""
+
+    def by_tenant(tenant: str, /) -> list[str]:
+        return [tenant]
+
+    spec = SelectorSpec(kind=LIST, selector=by_tenant, reads=TENANT_READ, permissions=OPEN)
+
+    with pytest.raises(TypeError, match="tenant"):
+        dispatch(spec, principal=ada, arguments={})
+
+
+def test_a_var_positional_parameter_is_never_missing(ada: Any) -> None:
+    """``*tenant`` is named after a read the caller left out, and is filled by
+    nothing whatever is sent: it needs no value, so there is nothing to refuse."""
+
+    def by_tenant(*tenant: str) -> list[str]:
+        return list(tenant)
+
+    spec = SelectorSpec(kind=LIST, selector=by_tenant, reads=TENANT_READ, permissions=OPEN)
+
+    assert dispatch(spec, principal=ada, arguments={}).value == []
+
+
+def test_a_missing_reserved_seed_is_the_author_s_error_and_not_refused(ada: Any) -> None:
+    """``instance`` is never in a selector spec's pool, and no caller could
+    send it: refusing it as a missing argument would blame the caller for a
+    declaration only its author can fix."""
+    spec = SelectorSpec(kind=LIST, selector=lambda *, instance: [instance], permissions=OPEN)
+
+    with pytest.raises(TypeError, match="instance"):
+        dispatch(spec, principal=ada, arguments={})
+
+
+def test_an_output_selector_is_never_refused_after_the_run(ada: Any) -> None:
+    """Its pool carries no argument, so nothing a caller left out can be
+    missing from it, and the service has already run: a refusal that reads as
+    "before the run" would tell the caller the operation did not happen."""
+    service = Record(returns=1)
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        # A read declared, so that only its being after the run keeps it unrefused.
+        output_selector_spec=nested(LIST, selector=_by_tenant, reads=TENANT_READ),
+    )
+
+    with pytest.raises(TypeError, match="tenant"):
+        dispatch(spec, principal=ada, arguments={})
+    assert len(service.calls) == 1
+
+
+def test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run(ada: Any) -> None:
+    service = Record(returns=1)
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        output_selector_spec=nested(
+            LIST,
+            selector=lambda: Note.objects.all(),
+            reads=TITLE_READ,
+            extend_queryset=_titled,
+        ),
+    )
+
+    with pytest.raises(TypeError, match="title"):
+        dispatch(spec, principal=ada, arguments={})
+    assert len(service.calls) == 1
+
+
+@pytest.mark.parametrize("taker", ["selector", "extend_queryset"])
+def test_a_read_left_out_is_refused_alike_by_whichever_callable_takes_it(
+    ada: Any, taker: str
+) -> None:
+    """``extend_queryset`` is bound from the same pool as the selector, so a
+    declared read the caller left out is the same refusal whichever one takes it."""
+    Note.objects.create(owner=ada, title="kept")
+    spec = _taking_title(taker)
+
+    assert [
+        note.title for note in dispatch(spec, principal=ada, arguments={"title": "kept"}).value
+    ] == ["kept"]
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"title": REQUIRED}
+
+
+def test_an_extend_queryset_parameter_no_read_declares_is_the_author_s_error(ada: Any) -> None:
+    spec = SelectorSpec(
+        kind=LIST, selector=lambda: Note.objects.all(), extend_queryset=_titled, permissions=OPEN
+    )
+
+    with pytest.raises(TypeError, match="title"):
+        dispatch(spec, principal=ada, arguments={})
+
+
+def test_a_target_selector_s_extend_queryset_refuses_a_read_left_out(ada: Any) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        collection_selector_spec=nested(
+            LIST, selector=lambda: Note.objects.all(), extend_queryset=_titled, reads=TITLE_READ
+        ),
+    )
+
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.detail == {"title": REQUIRED}
+    assert service.calls == []
+
+
+def test_a_missing_argument_answers_before_an_affordance(ada: Any) -> None:
+    """As the Validator does: a refusal of the call itself comes before one
+    describing the row's state."""
+    note = Note.objects.create(owner=ada, title="old", archived=True)
+    spec = _renaming(lambda *, instance, title: title, NOT_ARCHIVED, validator=_OptionalTitle())
+
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": note.pk})
+
+    assert caught.value.detail == {"title": REQUIRED}

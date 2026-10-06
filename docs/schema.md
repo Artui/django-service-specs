@@ -223,15 +223,33 @@ on its presenter:
 | A service spec whose output selector is a `LIST` | `{"type": "array", "items": <item>}` |
 | A service spec whose output selector is a `RETRIEVE` | the item, with `"null"` in its type |
 | A service spec with no output selector | the item |
+| A service spec with no output selector, with `allow_none=True` | the item, with `"null"` in its type |
 
 A `RETRIEVE` selector spec without `allow_none` answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
 its item is not nullable. A service spec's `RETRIEVE` output selector is
 nullable whatever its `allow_none` says: once the service has run, a re-read
 that finds nothing is `None` rather than not-found, because not-found would
-tell the caller a committed write did not happen. And a service spec that
-presents what the service returned is described as the item: whether a
-service can return `None` is not something its declaration says.
+tell the caller a committed write did not happen.
+
+A service spec that presents what the service returned is described as the
+item, and dispatch presents a `None` it returned as `None`. Whether a service
+may return one is not otherwise in its declaration, so the spec says it with
+`allow_none=True`, the name a selector spec already uses, and the item gains
+`"null"`:
+
+```python
+--8<--
+docs/examples/schema.py:allow_none
+--8<--
+```
+
+Left undeclared, a `None` is not stated, and the item stays the strict object
+its presenter declares: a schema that admitted `null` for every write would
+describe every service as one that may return nothing. On a service spec with
+an output selector, `allow_none` changes nothing: a `RETRIEVE` re-read admits
+`"null"` already, and a `LIST` one presents its rows rather than the
+service's return.
 
 ## What is deliberately not emitted
 

@@ -41,12 +41,16 @@ def annotate_output_schema(
       that is what the projected payload carries: an ``enum``'s values are
       replaced, and a ``oneOf``'s ``const``s are, each losing the ``title``
       that annotated the value it now equals. A ``"type"`` stated beside them
-      is restated as the types of the values now listed, ``"null"`` last, so a
-      display string is never described as the integer it replaced, and a
-      display two values share is listed once, so a row served it matches one
-      ``oneOf`` entry rather than two. Not on a ``HANDLE``, which keeps its
-      values on both sides: a field another tool takes as input should be
-      marked one.
+      is restated as the types of the values now listed, so a display string
+      is never described as the integer it replaced, with ``"null"`` named
+      last where the stated type admitted it and a null is still served -
+      not where the choices give ``None`` a display, which is served in its
+      place - and left as written beside a ``oneOf`` entry that admits more
+      than its constants. A display two
+      values share is listed once, so a row served it matches one ``oneOf``
+      entry rather than two, and an array of such choices no longer claims
+      ``uniqueItems``. Not on a ``HANDLE``, which keeps its values on both
+      sides: a field another tool takes as input should be marked one.
     - a formatted field is restated as the type its
       [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
       says it produces, plus whatever that declaration adds about the shape of
@@ -166,20 +170,35 @@ def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[st
 
     Both spellings an output schema uses are handled: a bare ``enum`` where the
     displays added nothing to some values, and ``oneOf`` of ``const`` and
-    ``title`` where they did. An array of choices arrives as an array wrapping
-    its element's schema, so the rewrite descends one level. A union arrives
-    as ``anyOf`` from a schema written elsewhere, and each member is rewritten,
-    the null one passing through untouched.
+    ``title`` where they did. A union arrives as ``anyOf`` from a schema
+    written elsewhere, and each member is rewritten, the null one passing
+    through untouched.
 
     Django allows two values one display, and a display is listed once, where
     first seen: ``oneOf`` admits a value valid under exactly one entry, so a
     display listed twice would refuse every row served it. A ``oneOf`` entry
-    with no ``const`` is kept wherever it stands. This, like ``_retyped``
-    below, departs from djangorestframework-services, whose walk does neither.
+    with no ``const`` is kept wherever it stands. The type stated beside the
+    values is restated by ``_retyped``.
+
+    An array of choices arrives as an array wrapping its element's schema, so
+    the rewrite descends one level. Its ``uniqueItems`` held for the stored
+    values and not for their displays: where the element's values collapse
+    onto fewer displays, two values selected together are served as one
+    display twice, and the payload keeps both because both are selected, so
+    the array stops claiming its items are unique. A schema written elsewhere
+    states it, such as a serializer's multiple choice.
     """
     items = schema.get("items")
     if isinstance(items, dict):
-        return {**schema, "items": _spoken_schema(items, labels)}
+        spoken_items = _spoken_schema(items, labels)
+        spoken = {**schema, "items": spoken_items}
+        if _listed_count(spoken_items) < _listed_count(items):
+            # Held by test_an_array_of_shared_displays_stops_claiming_unique_items
+            # (the drop) and test_an_array_of_distinct_displays_keeps_unique_items
+            # (the condition), end to end by
+            # test_two_selected_values_sharing_a_display_meet_their_schema.
+            spoken.pop("uniqueItems", None)
+        return spoken
     if "anyOf" in schema:
         return {**schema, "anyOf": [_spoken_schema(member, labels) for member in schema["anyOf"]]}
     if "enum" in schema:
@@ -200,8 +219,36 @@ def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[st
             if not _is_listed(display, consts):
                 consts.append(display)
                 one_of.append({"const": display})
-        return _retyped({**schema, "oneOf": one_of}, consts)
+        spoken = {**schema, "oneOf": one_of}
+        # An entry with no ``const`` admits values the displays say nothing
+        # about, so a type narrowed to the displays' would refuse them; one
+        # whose type is ``"null"`` admits only a null, which is passed on as a
+        # value it serves.
+        # One branch to coverage, so each condition is held by its own test:
+        # test_an_integer_spoken_whole_is_a_string (the first: without it every
+        # entry keeps the type) and
+        # test_null_is_kept_where_the_stated_type_admitted_it (the second). The
+        # guard itself is held by
+        # test_an_entry_admitting_more_than_its_constants_keeps_the_type.
+        if any("const" not in entry and entry.get("type") != "null" for entry in one_of):
+            return spoken
+        # A null that entry admits is served as itself, never as a display, so
+        # it is one of the values the type is restated from, as a listed
+        # ``None`` with no label is:
+        # test_null_is_kept_where_the_stated_type_admitted_it.
+        admits_null = any(entry.get("type") == "null" for entry in one_of)
+        return _retyped(spoken, [*consts, None] if admits_null else consts)
     return schema
+
+
+def _listed_count(schema: dict[str, Any]) -> int:
+    """How many values a choice schema lists, across a union's members.
+
+    Read across ``anyOf`` because a nullable element written elsewhere states
+    its values in a member: test_an_array_of_a_nullable_union_counts_across_its_members.
+    """
+    members: list[Any] = schema.get("anyOf", [schema])
+    return sum(len(member.get("enum", ())) + len(member.get("oneOf", ())) for member in members)
 
 
 def _is_listed(value: Any, listed: list[Any]) -> bool:
@@ -223,20 +270,32 @@ def _is_listed(value: Any, listed: list[Any]) -> bool:
 def _retyped(schema: dict[str, Any], values: list[Any]) -> dict[str, Any]:
     """``schema`` with any stated ``"type"`` restated as the types of ``values``.
 
-    A departure from djangorestframework-services, which leaves the type as
-    the serializer walk stated it.
-
     An output schema states a choice's type beside its values, and a display
     is a string whatever the value it replaced was, so an integer choice
     spoken as ``"Low"`` would otherwise be described as an integer and the
-    projected payload would fail the projected schema. A schema that states
-    no type claims nothing to contradict, one listing no value has nothing to
-    restate it from, and a value JSON has no scalar name for leaves the type as
-    written rather than guessed at.
+    projected payload would fail the projected schema.
+
+    ``"null"`` is named, last, where the stated type admitted it - as a list
+    naming it or as ``"null"`` alone - **and** a null is among ``values``: the
+    restated type admits what the stated one did, in display terms, and
+    nothing more. Both, because each answers a different half. The type says
+    whether a null was ever admitted, so a ``None`` listed beside a type that
+    refused it is not newly admitted. The values say whether one is still
+    served: Django's ``(None, "Unknown")`` serves ``"Unknown"`` in its place,
+    and naming ``"null"`` there would describe a value the payload never
+    carries. A ``oneOf`` entry whose type is ``"null"`` is passed in as a
+    ``None``, because the null it admits is served as itself. A ``oneOf``
+    entry admitting anything else is never passed here, because narrowing the
+    type would refuse what that entry admits.
+
+    A schema that states no type claims nothing to contradict, one listing no
+    value has nothing to restate it from, and a value JSON has no scalar name
+    for - or nothing but a null the type refused - leaves the type as written
+    rather than guessed at.
     """
     # One branch to coverage, so each condition is held by its own test:
     # test_an_untyped_choice_states_no_type (the first) and
-    # test_a_one_of_with_no_constant_keeps_its_type (the second).
+    # test_a_choice_listing_nothing_keeps_its_type (the second).
     if "type" not in schema or not values:
         return schema
     names: list[str] = []
@@ -250,8 +309,18 @@ def _retyped(schema: dict[str, Any], values: list[Any]) -> dict[str, Any]:
             return schema
         if name not in names:
             names.append(name)
-    if None in values:
+    stated = schema["type"]
+    # One branch to coverage, so each condition is held by its own test:
+    # test_a_null_spoken_as_a_label_is_not_named (the first: the type admitted
+    # a null and none is served) and test_a_type_that_refused_null_still_refuses_it
+    # (the second: a null is listed and the type refused it). Both spellings of
+    # a stated null: test_a_nullable_integer_keeps_its_null (a list naming it)
+    # and test_a_type_stated_as_null_alone_still_admits_it (``"null"`` alone).
+    if None in values and "null" in (stated if isinstance(stated, list) else [stated]):
         names.append("null")
+    # test_only_a_null_left_to_type_leaves_the_type_as_stated.
+    if not names:
+        return schema
     return {**schema, "type": names[0] if len(names) == 1 else names}
 
 

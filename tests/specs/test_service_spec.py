@@ -29,6 +29,7 @@ def test_defaults() -> None:
     assert spec.output() is None
     assert spec.affordances is None
     assert spec.idempotent is None
+    assert spec.allow_none is False
 
 
 @pytest.mark.parametrize("idempotent", [True, False])

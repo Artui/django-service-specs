@@ -10,9 +10,14 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, QuerySet
 
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from tests.dispatch.utils import make_user
+from tests.dispatch_app.models import Note
 
 
 def _bare_selector() -> Any:
@@ -113,6 +118,21 @@ class TestExtendQueryset:
             Permission.objects.all(), spec, {"unused": "ignored"}, source_label="x"
         )
         assert result.count() == 0
+
+    def test_a_read_the_pool_lacks_is_the_callable_s_own_error(self) -> None:
+        """A transport shaping rows itself bound no arguments, so no caller
+        could have sent ``title``, read or not: asking for it as a missing
+        argument would ask for a value nobody can send."""
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST,
+            selector=_bare_selector,
+            extend_queryset=lambda *, queryset, title: queryset.filter(title=title),
+            reads=Parameters.of(Parameter("title", "string")),
+        )
+        ada = make_user("ada")
+
+        with pytest.raises(TypeError, match="title"):
+            shape_queryset(Note.objects.all(), spec, base_pool(user=ada), source_label="x")
 
     def test_runs_after_declarative_shaping(self) -> None:
         """``extend_queryset`` sees the already select_related-shaped queryset."""

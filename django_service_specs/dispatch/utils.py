@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
-from django.db.models import BooleanField, Manager, Value
+from django.db.models import BooleanField, Value
+from django.db.models.manager import BaseManager
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -34,9 +35,9 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.selectors.utils import (
     apply_shaping,
+    call_keywords,
     call_selector,
     is_queryset,
     materialize_retrieve,
@@ -200,6 +201,7 @@ def settle(
     *,
     source: str,
     reserved: frozenset[str],
+    fillable: frozenset[str],
 ) -> Any:
     """Shape what a selector returned, answer its affordances, and collapse a RETRIEVE.
 
@@ -213,12 +215,19 @@ def settle(
     answered once, against ``pool`` - the pool the selector was called from -
     with ``reserved``, the call's seed set, so a registered seed reaches it.
     The answers refuse nothing: they describe each row for whoever presents it.
+
+    ``fillable`` is what the selector was bound with, and ``extend_queryset``
+    is bound with the same: see ``call_keywords``.
     """
-    if isinstance(raw, Manager):
+    if isinstance(raw, BaseManager):
         # ``Note.objects`` is a selector's shortest spelling of every row, and a
         # Manager is neither iterable nor sliceable, so a list declaring no
         # shaping - which leaves the result as it came - could not be presented
         # or paged: test_a_list_selector_returning_a_manager_presents_every_row.
+        # ``BaseManager`` rather than ``Manager``, because ``is_queryset``
+        # counts every ``BaseManager`` and one built with
+        # ``BaseManager.from_queryset`` is not a ``Manager``:
+        # test_a_list_selector_returning_a_manager_built_on_base_manager_presents_every_row.
         raw = raw.all()
     annotations: Mapping[str, Any] | None = selector_spec.annotations
     row_conditions: dict[str, Any] = {}
@@ -244,7 +253,14 @@ def settle(
             # test_a_spec_with_no_affordances_of_its_own_adds_no_annotation.
             if generated:
                 annotations = {**(annotations or {}), **generated}
-    shaped = apply_shaping(raw, selector_spec, pool, annotations=annotations, source_label=source)
+    shaped = apply_shaping(
+        raw,
+        selector_spec,
+        pool,
+        annotations=annotations,
+        source_label=source,
+        fillable=fillable,
+    )
     # One branch to coverage, so each condition is held by its own test:
     # test_declaring_nothing_leaves_a_returned_list_as_it_was (the first) and
     # test_every_answer_rides_in_the_one_list_query_and_the_one_annotate_call
@@ -268,6 +284,7 @@ def lookup(
     *,
     source: str,
     reserved: frozenset[str],
+    after_the_run: bool = False,
 ) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
@@ -275,14 +292,27 @@ def lookup(
     thread rather than awaited. That covers a selector spec's own selector when
     sync ``dispatch`` runs it, and a nested one on either entry point: a nested
     selector is never the run, so ``adispatch`` never awaits it on the loop.
+
+    The selector, and its ``extend_queryset``, refuse a read the caller left
+    out (see ``call_keywords``); ``after_the_run`` is the output selector's,
+    for which nothing is the caller's to fill. Its pool carries no argument,
+    so not even a read it declares could be in it, and the service has
+    already run: a refusal that reads as "before the run" would tell the
+    caller the operation did not happen. A parameter its pool lacks raises as
+    the callable's own error.
+    test_an_output_selector_is_never_refused_after_the_run (the selector) and
+    test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run
+    (its ``extend_queryset``) fail without it.
     """
     fn = selector_spec.selector
+    fillable: frozenset[str] = frozenset() if after_the_run else selector_spec.reads.names()
+    kwargs = call_keywords(fn, pool, fillable=fillable)
     try:
-        raw = call_selector(fn, resolve_callable_kwargs(fn, dict(pool)))
+        raw = call_selector(fn, kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(selector_spec, error)
         return None
-    return settle(selector_spec, raw, pool, source=source, reserved=reserved)
+    return settle(selector_spec, raw, pool, source=source, reserved=reserved, fillable=fillable)
 
 
 def conclude_selector(
@@ -381,6 +411,27 @@ def prepare_service(
             "validated value must never outrank a seeded one; rename the value."
         )
     pool = call_pool(principal, pool_seeds, {**data, "data": data, **resolved}, progress=progress)
+    # Before the affordances, as the Validator is: a refusal of the call itself
+    # answers before one describing the row's state.
+    # test_a_missing_argument_answers_before_an_affordance fails without it.
+    # Only the Validator's parameters reach the service from a caller, and of
+    # those only the ones the caller left out are still theirs to fill; with no
+    # Validator, nothing is. A target selector's read was the selector's to
+    # consume, never the service's to ask for:
+    # test_a_service_parameter_named_after_a_target_read_is_the_author_s_error
+    # fails if the spec's whole argument set counts. One the caller sent and the
+    # Validator did not hand back under that name - a form popping it in
+    # ``clean()``, a pydantic alias returned under the field's name - would be
+    # asked for again, forever, by a client reading ``InvalidArguments`` as its
+    # own mistake; ``checked`` is exactly what was sent, since the shape check
+    # applies no default:
+    # test_a_validator_parameter_the_caller_sent_is_the_author_s_error fails
+    # without the subtraction.
+    validator = spec.validator
+    fillable = (
+        validator.parameters().names() - checked.keys() if validator is not None else frozenset()
+    )
+    kwargs = call_keywords(spec.service, pool, fillable=fillable)
     # Step six, in djangorestframework-services' place for it: after the
     # object-level check and the Validator, so a principal who may not see the
     # row is never told what state it is in, and before the run - outside the
@@ -393,7 +444,7 @@ def prepare_service(
     # ``instance`` is the row, never a collection: a condition on the row beside
     # a ``collection_selector_spec`` is refused when the spec is declared.
     enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=pool_seeds.reserved)
-    return Prepared(principal, target, data, resolve_callable_kwargs(spec.service, pool))
+    return Prepared(principal, target, data, kwargs)
 
 
 def finish_service(
@@ -424,7 +475,13 @@ def finish_service(
     kind: Literal["instance", "list"] = "instance"
     if output_spec is not None:
         pool = call_pool(prepared.principal, pool_seeds, {"result": result})
-        value = lookup(output_spec, pool, source=OUTPUT_SOURCE, reserved=pool_seeds.reserved)
+        value = lookup(
+            output_spec,
+            pool,
+            source=OUTPUT_SOURCE,
+            reserved=pool_seeds.reserved,
+            after_the_run=True,
+        )
         if output_spec.kind is SelectorKind.LIST:
             kind = "list"
     return DispatchResult(

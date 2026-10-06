@@ -46,6 +46,36 @@ the pool itself. A caller naming an argument `user` is the case that matters.
 [Pool seeds](dispatching.md#pool-seeds) add names of your own, reserved the
 same way.
 
+A parameter with no default that the call's pool lacks, where a caller could
+have filled it, is refused before the callable runs, on `dispatch` and
+`adispatch` alike, as
+[`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
+keyed by the parameter with the shape check's own `"This field is
+required."`, rather than reaching the callable as a `TypeError`. That is a
+read declared optional that the caller left out, whether the selector or its
+`extend_queryset` takes it, or a Validator parameter the caller left out,
+which the service takes.
+
+Any other parameter the pool lacks is the declaration's error, and raises as
+the callable's own `TypeError`. The argument set is closed, so a name that is
+none of the selector's `reads` - or, for the service, none of its Validator's
+parameters, which is every name when it has no Validator - can never be sent:
+`REJECT` refuses it as unknown and `IGNORE` drops it. A Validator parameter
+the caller did send, and the Validator did not hand back under that name -
+a form that pops it in `clean()`, a pydantic field returned under its own
+name rather than its alias - has been sent already. Refusing either as a
+missing argument would ask for a value the caller cannot send or already
+did, and a client that reads `InvalidArguments` as its own mistake would
+send the call again. It is decided at dispatch rather than when the spec is
+declared, because a registered seed may fill such a parameter, and the seeds
+are known only then.
+
+Four kinds of parameter are never missing: one with a default, `**kwargs`,
+`*args`, and a positional-only one, which dispatch never passes by name.
+Nothing the output selector declares is refused either: its pool carries no
+argument, and the service has already run. Where an argument may be left out,
+give the parameter a default.
+
 ## A read
 
 ```python
@@ -91,7 +121,10 @@ A `ServiceSpec` names its service and, at most, one target selector:
 `output_selector_spec` re-reads what the service produced, with its return in
 the pool as `result`. It is how a write returns a row with fresh annotations or
 prefetches, or a list after a bulk change; the
-[relation-write example](relations.md#a-worked-example) uses one.
+[relation-write example](relations.md#a-worked-example) uses one. Without one,
+the service's own return is what is presented, and `allow_none=True` on the
+spec declares that it may be `None`, so its
+[output schema](schema.md#what-a-spec-returns) admits `"null"`.
 
 `atomic=True`, the default, runs the service inside `transaction.atomic()`.
 `metadata` holds a project's own per-operation facts, stored as given, for its
