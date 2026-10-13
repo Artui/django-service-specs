@@ -14,7 +14,7 @@ from django_service_specs.dispatch.utils import (
     lookup,
     open_call,
     prepare_service,
-    refuse_a_selector_spec_s_target,
+    refuse_target,
     selector_pool,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -99,6 +99,32 @@ def dispatch(
     row. Its ``affordances`` are answers about each row, for a list to
     report, and nothing about reading is refused by them.
 
+    **A** ``many`` **service spec takes a list of rows** under its
+    ``many_argument``, beside its ``reads`` and nothing else, and runs the
+    service once for all of them, inside one transaction under ``atomic``. Its
+    steps differ in three places:
+
+    - Step one checks the top level - the list, and the ``reads`` - and each
+      row, but raises only the top level's refusal there. A row's refusal is
+      raised in step five, beside the Validator's refusals of the other rows,
+      so a principal refused in step two learns nothing about the rows it sent.
+    - Steps three and four resolve nothing: the scope check is asked of
+      ``None``, as for a create, never of the caller's rows.
+    - Step five runs the Validator once per row, each with the
+      ``input_data`` provider's values merged over it; the provider is called
+      once for the call. Every row is checked and validated before the service
+      runs, and every failing row is refused in one ``InvalidArguments``,
+      addressed by the row's ``int`` index under ``many_argument``: a field as
+      ``{"items": {2: {"title": [...]}}}``, a message about the row itself
+      under ``non_field_errors`` inside the row, and the list's own refusal
+      as ``{"items": [...]}``. The service receives the rows' ``data`` as a
+      list under ``data``, and their values as a list under
+      ``many_argument``; neither is spread by field. The ``affordances`` -
+      conditions on no row, since one on the row is refused when the spec is
+      declared - and the ``preconditions`` are answered once.
+
+    ``kind`` is ``"list"`` for it, unless an output selector says otherwise.
+
     ``progress`` is the transport's own progress reporter, seeded under the
     reserved name ``progress`` into the pool of whatever is this call's run -
     the service, or a selector spec's own selector - and into that spec's
@@ -123,8 +149,9 @@ def dispatch(
     target's ``reads`` are still checked as declared, and keeping them and
     ``target`` in agreement is the caller's. A selector spec refuses it.
 
-    ``kind`` is ``"list"`` for a LIST selector spec or a service whose output
-    selector is a LIST, and ``"instance"`` otherwise. Nothing is presented here;
+    ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
+    selector is a LIST, or a ``many`` service with no output selector, and
+    ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
     transport that hands the object to a template never pays for rendering it.
 
@@ -139,18 +166,20 @@ def dispatch(
             Validator did not hand back under that name, raises the
             callable's own ``TypeError``.
         NotPermitted: step two or step four.
-        TypeError: ``target`` on a selector spec, or anything but ``None`` on
-            a service spec that declares no target selector.
+        TypeError: ``target`` on a selector spec or a ``many`` spec, or
+            anything but ``None`` on a service spec that declares no target
+            selector.
         ActionUnavailable: step six, an affordance not met.
         ServiceNotFound: step six, a condition on the row reached after the row
             was deleted.
         ImproperlyConfigured: a spec that declares no permissions, a parameter,
             a validated, bound or provided value named after a seed, a bound
-            value named after a validated one, shaping declared on a
+            value named after a validated one, any value bound for a row of a
+            ``many`` call, shaping declared on a
             selector that returned something other than a queryset, or a
             condition on the row with no row to answer it for.
     """
-    refuse_a_selector_spec_s_target(spec, target)
+    refuse_target(spec, target)
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
             spec,

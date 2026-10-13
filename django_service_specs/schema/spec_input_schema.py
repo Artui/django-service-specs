@@ -18,7 +18,9 @@ def spec_input_schema(
     """[`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema] over ``spec.parameters()``.
 
     The whole argument set dispatch checks: a selector spec's ``reads``, or a
-    service spec's target selector's ``reads`` followed by its Validator's
+    service spec's target selector's ``reads``, its own, then its Validator's
+    parameters. A ``many`` service spec's is its ``reads`` and the one list
+    its ``many_argument`` names, each row an object of the Validator's
     parameters. Pass the ``unknown_arguments`` the transport dispatches with,
     because the schema closes the argument set exactly when dispatch does.
 
