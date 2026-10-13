@@ -137,6 +137,9 @@ def shape_check(
     binds for itself honours ``partial`` exactly where dispatch does. Only a
     service spec declares ``partial``; a selector spec's call is never one.
     """
+    # One arc to coverage: every selector spec dispatched holds the first
+    # conjunct (a ``SelectorSpec`` has no ``partial``), and
+    # test_the_same_call_on_a_spec_that_is_not_partial_is_refused the second.
     partial = isinstance(spec, ServiceSpec) and spec.partial
     return check_arguments(
         parameters, arguments, unknown_arguments=unknown_arguments, partial=partial
@@ -506,7 +509,8 @@ def prepare_service(
 
     No entry outranks a seed: a parameter named after one is refused by
     ``open_call``, and a validated value, a bound value or a provider key
-    named after one here, as is a bound value named after a validated one. A
+    named after one here, as is a bound value named after a validated value
+    or a parameter. A
     read and a Validator parameter of one name are refused when
     ``parameters()`` is assembled, so a read outranks only a value the
     Validator returns without declaring it, as djangorestframework-services'
@@ -566,14 +570,19 @@ def prepare_service(
             "validated value must never outrank a seeded one; rename the value."
         )
     # A value bound for the call is not one a caller's argument names, so it
-    # may not stand in for a seed or a validated value: either way the service
-    # would read something other than what its name says.
-    # test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused holds each.
-    bound = sorted(validated.pool.keys() & (reserved | values.keys()))
+    # may not stand in for a seed, a validated value or a parameter - a read
+    # the caller sent, or a field a partial call left out: either way the
+    # service would read something other than what its name says. Each set is
+    # held by its own case: test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused
+    # (``a-seed``, ``a-validated-value``) and
+    # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``).
+    named = reserved | values.keys() | spec.parameters().names()
+    bound = sorted(validated.pool.keys() & named)
     if bound:
         raise ImproperlyConfigured(
-            f"The Validator bound the key(s) {bound}, which dispatch seeds or the Validator "
-            "returned as a value. A value bound for the call needs a name of its own."
+            f"The Validator bound the key(s) {bound}, which dispatch seeds, the Validator "
+            "returned as a value, or the spec declares as a parameter. A value bound for "
+            "the call needs a name of its own."
         )
     author = provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved)
     pool = {
@@ -602,7 +611,10 @@ def prepare_service(
     # test_a_validator_parameter_the_caller_sent_is_the_author_s_error fails
     # without the subtraction. Under ``partial`` no Validator parameter is the
     # caller's to fill, since a partial call may leave out any of them:
-    # test_a_partial_call_never_refuses_a_service_parameter_the_caller_left_out.
+    # test_a_partial_call_never_refuses_a_service_parameter_the_caller_left_out
+    # holds that conjunct, and every service spec with no Validator dispatched
+    # the other, such as
+    # test_a_service_parameter_no_validator_declares_is_the_author_s_error.
     validator = spec.validator
     asked = (
         validator.parameters().names()

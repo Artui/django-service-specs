@@ -1930,3 +1930,53 @@ def test_a_read_outranks_a_validated_value_of_its_name(ada: Any) -> None:
     )
     dispatch(spec, principal=ada, arguments={"project_pk": 7, "title": "T"})
     assert service.calls[0]["project_pk"] == 7
+
+
+@pytest.mark.parametrize(
+    ("bound", "partial", "arguments"),
+    [
+        pytest.param({"project_pk": 1}, False, {"project_pk": 7, "title": "T"}, id="a-read"),
+        pytest.param(
+            {"body": "bound"}, True, {"project_pk": 7, "title": "T"}, id="a-field-left-out"
+        ),
+    ],
+)
+def test_a_bound_value_naming_a_parameter_is_refused(
+    ada: Any, bound: Mapping[str, Any], partial: bool, arguments: Mapping[str, Any]
+) -> None:
+    # A bound value is not one the caller sent, so it may not stand in for an
+    # argument the caller sends or, under ``partial``, chose to leave out.
+    class _BindsBody(_Binds):
+        def parameters(self) -> Parameters:
+            return super().parameters() + Parameters.of(Parameter("body", "string"))
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        reads=PROJECT,
+        validator=_BindsBody(bound),
+        partial=partial,
+    )
+    with pytest.raises(ImproperlyConfigured, match="bound the key"):
+        dispatch(spec, principal=ada, arguments=arguments)
+
+
+def test_an_async_run_refused_before_it_starts_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    # The provider of an ``async def`` run is resolved before the run, so it
+    # must be resolved after everything that can refuse the call.
+    sink = _Sink()
+
+    async def reporting(*, progress: Any) -> None:
+        progress(1.0)
+
+    spec = ServiceSpec(
+        service=reporting,
+        permissions=OPEN,
+        progress_reporter=sink,
+        preconditions=[_Precondition(Boom())],
+    )
+    with pytest.raises(Boom):
+        dispatch(spec, principal=ada, arguments={})
+    assert sink.resolved == []
