@@ -86,7 +86,13 @@ def check_preconditions(
 def check_permissions(
     permissions: Sequence[PermissionCheck] | None, *, label: str
 ) -> tuple[PermissionCheck, ...] | None:
-    """Normalize to a tuple, refusing anything that is not a check *instance*.
+    """Normalize to a tuple, refusing anything that is not a check *instance*, and an empty one.
+
+    **An empty sequence is refused**, as ``None`` is refused at dispatch and
+    at registration: every check passing is vacuously true of no checks, so
+    ``permissions=[]`` would let anyone run the operation, and an empty list
+    is as often computed by accident as decided. ``Unrestricted()`` is the
+    decision, by name (test_an_empty_permissions_sequence_is_refused).
 
     A class is the likely mistake - an HTTP framework declares permission
     classes - and a class passes ``callable()``, so it is refused by name here
@@ -106,6 +112,11 @@ def check_permissions(
     if isinstance(permissions, str | bytes) or not isinstance(permissions, Sequence):
         raise ImproperlyConfigured(f"{label}.permissions must be a sequence of PermissionCheck.")
     checks = tuple(permissions)
+    if not checks:
+        raise ImproperlyConfigured(
+            f"{label}.permissions is empty, which would let anyone run it. Declare "
+            "permissions=[Unrestricted()] to mean that."
+        )
     for index, check in enumerate(checks):
         if isinstance(check, type):
             raise ImproperlyConfigured(

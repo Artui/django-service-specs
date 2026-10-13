@@ -58,7 +58,8 @@ class ServiceSpec:
             ``async def``; the kernel bridges it into ``atomic`` either way.
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open
-            operation says ``[Unrestricted()]``.
+            operation says ``[Unrestricted()]``. An empty sequence is refused
+            when the spec is built, since no checks would pass everyone.
         reads: The arguments the service, its providers and its preconditions
             read with no Validator in front of them - the ``project_pk`` a
             create's ``kwargs`` provider scopes by - as a selector spec's
