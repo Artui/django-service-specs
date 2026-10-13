@@ -257,11 +257,23 @@ def _form(request: HttpRequest) -> tuple[QueryDict, MultiValueDict]:
         return request.POST, request.FILES
     if request.content_type == _URLENCODED:
         return QueryDict(request.body, encoding=request.encoding), MultiValueDict()
-    # The parser Django runs for a POST, over the buffered body, which hands
-    # back the uploads beside the fields.
-    return MultiPartParser(
-        request.META, BytesIO(request.body), request.upload_handlers, request.encoding
-    ).parse()
+    # The parser Django runs for a POST, which hands back the uploads beside
+    # the fields, fed from the request's own stream while nothing has read it.
+    # Read whole first, a body past DATA_UPLOAD_MAX_MEMORY_SIZE was refused
+    # with RequestDataTooBig, where the parser streams a file part to the
+    # upload handlers and bounds only the fields, so a PATCH refused the
+    # upload a POST took. Once the stream has been read, ``request.body`` is
+    # the buffer if something kept one, and raises RawPostDataException if
+    # not: parsing the spent stream would read no arguments at all and say
+    # nothing, where Django's own POST parse does the same.
+    # test_an_upload_past_the_body_size_limit_is_read_whatever_the_method
+    # holds the stream, and test_a_multipart_stream_read_without_a_buffer_is_refused
+    # the read one; a buffered body would parse from either, since Django
+    # rewinds the stream onto the buffer it keeps. ``_read_started`` is the flag Django's own POST parse
+    # reads to make the same choice; the stubs do not declare it.
+    started: bool = request._read_started  # ty: ignore[unresolved-attribute]
+    stream = BytesIO(request.body) if started else request
+    return MultiPartParser(request.META, stream, request.upload_handlers, request.encoding).parse()
 
 
 def _json_object(request: HttpRequest) -> dict[str, Any]:

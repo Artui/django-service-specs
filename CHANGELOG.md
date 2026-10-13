@@ -184,6 +184,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `apply_input` read every field of a dataclass row, the rows of a relation a
   `DataclassValidator` hands over as instances included. Only its `__init__`
   fields are written now, at every depth.
+- A multipart PUT, PATCH or DELETE body past `DATA_UPLOAD_MAX_MEMORY_SIZE`
+  (2.5 MB by default) was refused with `RequestDataTooBig`, because its body
+  was read whole into memory before it was parsed, where a POST of the same
+  upload was taken. It is parsed from the request's stream now, as Django
+  parses a POST, so a file part streams to the upload handlers and the limit
+  bounds the fields alone.
 
 ## [0.4.2] — 2026-10-06
 

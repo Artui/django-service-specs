@@ -16,6 +16,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
+from django.http.request import RawPostDataException
 from django.test import RequestFactory
 from django.test.client import encode_multipart
 
@@ -413,6 +414,49 @@ class TestUploads:
         # file is simply absent rather than a crash on a parser that is not run.
         request = FACTORY.put("/", data="count=2", content_type=FORM)
         assert read(request, files()) == {"count": 2}
+
+    @pytest.mark.parametrize("method", ["POST", "PUT", "PATCH", "DELETE"])
+    def test_an_upload_past_the_body_size_limit_is_read_whatever_the_method(
+        self, method: str
+    ) -> None:
+        # DATA_UPLOAD_MAX_MEMORY_SIZE (2.5 MB by default) bounds a body read
+        # whole into memory, and Django never applies it to a file part, which
+        # its parser streams to the upload handlers. Reading a PATCH's body
+        # whole to parse it refused the upload a POST took with
+        # RequestDataTooBig.
+        scan = b"x" * (3 * 1024 * 1024)
+        request = FACTORY.generic(
+            method,
+            "/",
+            data=encode_multipart(BOUNDARY, {"count": "2", "notes": SimpleUploadedFile("a", scan)}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        assert contents(read(request, files())) == {"count": 2, "notes": scan}
+
+    def test_a_multipart_body_already_read_is_parsed_from_what_was_read(self) -> None:
+        # Something before the view read ``request.body``, so the stream is
+        # spent and the buffer is where the body still is, as Django's own
+        # parse of a POST takes it.
+        attached = SimpleUploadedFile("notes.txt", b"A file.")
+        request = FACTORY.patch(
+            "/",
+            data=encode_multipart(BOUNDARY, {"count": "2", "notes": attached}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        assert request.body
+        assert contents(read(request, files())) == {"count": 2, "notes": b"A file."}
+
+    def test_a_multipart_stream_read_without_a_buffer_is_refused(self) -> None:
+        # Something read the stream and kept nothing, so the body is gone:
+        # parsed anyway, it would be a call with no arguments.
+        request = FACTORY.patch(
+            "/",
+            data=encode_multipart(BOUNDARY, {"count": "2"}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        request.read()
+        with pytest.raises(RawPostDataException):
+            read(request)
 
     def test_a_file_input_left_empty_is_absent(self) -> None:
         # A browser posts an empty file input as a part with no filename, and

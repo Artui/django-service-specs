@@ -130,7 +130,10 @@ the upload itself, Django's `UploadedFile`, for a parameter of type `file`,
 every upload under the name for an array, and the last of repeated ones for
 anything else. It replaces a field of the same name, since a browser sends a
 file input only as a file. A POST's uploads are Django's own `request.FILES`;
-those in a PUT, PATCH or DELETE body are parsed here with its fields. An
+those in a PUT, PATCH or DELETE body are parsed here with its fields, by
+Django's own parser from the request's stream, so a file part is streamed to
+the upload handlers and `DATA_UPLOAD_MAX_MEMORY_SIZE` bounds the fields alone,
+as it does for a POST. An
 upload under a name the spec does not declare reaches the closed argument set
 like any undeclared field, and is refused under `REJECT`; a file input left
 empty is no upload, so it is absent. Only a multipart body carries one.
