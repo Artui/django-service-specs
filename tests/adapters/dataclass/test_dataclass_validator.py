@@ -17,6 +17,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET, UnsetType
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Status
 from tests.adapters.dataclass.utils import (
@@ -604,3 +605,18 @@ def test_a_partial_call_is_refused_as_the_spec_s_error(method: str) -> None:
         ),
     ):
         getattr(validator, method)({"price": "1.00"}, ValidationContext(None, partial=True))
+
+
+def test_a_subclass_may_extend_validated_through_validate() -> None:
+    # The base class's default reads this way round, so a subclass that adds a
+    # bound value on top of ``validate()`` must not loop back into itself.
+    class Binding(DataclassValidator):
+        def validated(self, arguments: Any, context: ValidationContext) -> Validated:
+            values = self.validate(arguments, context)
+            return Validated(values=values, data=values, pool={"bound": "yes"})
+
+    validated = Binding(_Price).validated({"price": "1.00"}, CONTEXT)
+    assert (validated.values, dict(validated.pool)) == (
+        {"price": Decimal("1.00")},
+        {"bound": "yes"},
+    )

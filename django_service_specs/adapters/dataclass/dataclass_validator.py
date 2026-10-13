@@ -122,7 +122,7 @@ class DataclassValidator(Validator):
         Nested values stay dataclass instances, which is what the mutation
         helpers read a row from. A partial call is refused: see ``validated()``.
         """
-        return self.validated(arguments, context).values
+        return self._validated(arguments, context).values
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
         """The built instance as the call's ``data``, and its ``__init__`` fields as the values.
@@ -140,6 +140,12 @@ class DataclassValidator(Validator):
         ``X | UnsetType``, which every call honours; a spec whose calls are
         partial uses a Validator that can return only what was sent.
         """
+        return self._validated(arguments, context)
+
+    def _validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
+        # Neither public method calls the other, so a subclass may extend
+        # either through the other, as one binding a value in ``pool`` on top
+        # of ``validate()`` does, without the two calling each other forever.
         if context.partial:
             raise ImproperlyConfigured(
                 f"DataclassValidator({self.cls.__qualname__}) cannot validate a partial call: "
