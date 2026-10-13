@@ -66,11 +66,12 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     ``joined_after`` - are refused, as any two Parameters of one name are,
     because django-filter would hand one value to both.
 
-    An object with no ``base_filters`` declares nothing, and is read without
-    django-filter. A
+    An object whose ``base_filters`` is missing, empty or ``None`` declares
+    nothing, and is read without django-filter. A
     [`SelectorSpec`][django_service_specs.specs.selector_spec.SelectorSpec]
-    refuses one as its ``filter_set``, since nothing it declares would be
-    handed to it. Reading any filter needs the ``[filter]`` extra.
+    refuses one as its ``filter_set`` unless it is a django-filter
+    ``FilterSet`` class, since none of the caller's data would be handed to
+    it. Reading any filter needs the ``[filter]`` extra.
     """
     base_filters: dict[str, Any] = dict(getattr(filter_set, "base_filters", None) or {})
     if not base_filters:

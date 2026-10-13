@@ -76,6 +76,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse raises Django's `BadRequest`; each of these rendered the page before.
   A create, a collection target and a missing row `allow_none` lets through
   still show an empty form.
+- **Breaking:** a `SelectorSpec.filter_set` that declares no filters is
+  refused at construction unless it is a django-filter `FilterSet` class. Only
+  one with no `base_filters` attribute at all was refused, so a duck-typed
+  stand-in whose `base_filters` was empty or `None` was accepted, declared no
+  arguments, and was handed none of the caller's data. A real `FilterSet`
+  declaring no filters is still accepted and narrows nothing. The check reads
+  django-filter only if it is already loaded, so a duck is refused in the same
+  words with or without the `filter` extra. A step narrowing the queryset by
+  no argument belongs in `extend_queryset`.
 
 ### Fixed
 - **A re-upload under the held file's name is written.** `update_from_input`,
