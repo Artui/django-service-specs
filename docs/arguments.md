@@ -186,10 +186,73 @@ Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The
 messages are spelled as Django's own form fields spell them wherever one has
 the message, so Django's catalogue translates them and a project adds nothing.
+The shape check's, `coerce_flat`'s and `request_arguments`' also carry a code,
+which the next section reads.
 
 [`DataclassValidator`][django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator]
 answers in the same tree, and so does a relation write that refuses a row, so
 a transport reads one shape whichever of them refused.
+
+## The codes a refusal carries
+
+A message is for a person, and is translated. A program reading the tree needs
+something that is not, so every refusal of the shape check, `coerce_flat` and
+`request_arguments` is a
+[`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]: a
+`str` carrying a `code`. The code is the one a DRF field gives the same mistake,
+so an adapter building DRF's `ErrorDetail` from the tree maps each one across
+unchanged, and a client of both reads one `get_codes()`.
+
+```python
+--8<--
+docs/examples/arguments.py:codes
+--8<--
+```
+
+| Refusal | Code | Raised by |
+| --- | --- | --- |
+| A required argument is absent | `required` | the shape check |
+| A null where none is allowed | `null` | the shape check |
+| A key nobody declared, under `REJECT` | `unknown` | the shape check |
+| A value of the wrong type, a malformed date or date-time, a decimal or number that is not finite, a row that is not an object | `invalid` | the shape check |
+| A value that is not an array where one is declared | `not_a_list` | the shape check |
+| A number past its `maximum`, or short of its `minimum` | `max_value`, `min_value` | the shape check |
+| A value outside its `choices` | `invalid_choice` | the shape check |
+| An array longer than it takes, or shorter | `max_length`, `min_length` | the shape check, `coerce_flat` |
+| A flat string that spells no integer, number or boolean, or one sent for a parameter with nested parameters | `invalid` | `coerce_flat` |
+| A request body that is not JSON | `parse_error` | `request_arguments` |
+| A request body that is not a JSON object | `invalid` | `request_arguments` |
+
+Two have no DRF field to follow. DRF ignores a key a serializer does not
+declare, so it has no code for refusing one, and `unknown` names the
+[policy](#the-closed-argument-set) that refused it. And a body DRF cannot parse
+is its `ParseError`, which is not a validation error there and is here, so
+`parse_error` is that exception's own code. A free-form `object` is `invalid`,
+as a nested serializer's refusal is, where DRF's `DictField` would say
+`not_a_dict`. An empty `many` list refused by `many_min_length=1` is
+`min_length`, as its message says, where a `ListSerializer` with
+`allow_empty=False` says `empty`.
+
+**A `CodedMessage` is its message to everything else.** It equals and hashes as
+its `str`, and `json.dumps` writes the plain message, so the codes never reach a
+body a transport writes and a test comparing a tree with plain strings is
+unchanged by them. A copy and a pickle keep the code.
+
+**A Validator's messages reach the tree as it raised them**, on one call and
+row by row on a `many` call. Dispatch does not rewrap them: a library's own
+coded message, DRF's `ErrorDetail` among them, keeps its code, and a plain
+`str` stays one, with no code. A message any other step of the kernel raises
+may be a plain `str` too, so read a code with `getattr(message, "code", ...)`
+and choose the default, as the example's
+`"invalid"` is DRF's own for a message raised with none.
+
+**One check answers a field.** The shape check runs before the Validator, so a
+call it refuses is never validated, and only its codes come back: a title that
+is blank and sent beside an unknown key reads `unknown` alone, not `blank`
+too. A [`many`](declaring.md#many-rows-in-one-call) call reads the same way
+row by row: a row the shape check refuses is never handed to the Validator,
+while every row it lets through is, so the two checks' refusals of different
+rows come back in one tree.
 
 ## Flat transports
 

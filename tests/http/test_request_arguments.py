@@ -31,12 +31,14 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.http.utils import DEEP_JSON
+from tests.parameters.utils import coded
 
 # The module, which ``http``'s own ``request_arguments`` re-export shadows as an attribute.
 request_arguments_module = importlib.import_module("django_service_specs.http.request_arguments")
@@ -591,6 +593,17 @@ class TestJsonBody:
         request = FACTORY.generic("POST", "/", CONTENT_TYPE="application/json")
         assert request.content_type == "application/json"
         assert read(request) == {}
+
+    def test_a_body_that_is_no_json_is_refused_as_drf_s_parser_refuses_it(self) -> None:
+        # DRF answers it with a ParseError, whose code is ``parse_error``; here it
+        # is one refusal of the arguments, carrying the same code.
+        request = FACTORY.post("/", data=b"{", content_type="application/json")
+        assert coded(refusal(request)) == {NON_FIELD_ERRORS: [(NOT_JSON, "parse_error")]}
+
+    def test_a_body_that_is_no_object_is_refused_as_a_serializer_refuses_it(self) -> None:
+        assert coded(refusal(post_json([1]))) == {
+            NON_FIELD_ERRORS: [("Expected an object.", "invalid")]
+        }
 
     @pytest.mark.parametrize(
         "body",

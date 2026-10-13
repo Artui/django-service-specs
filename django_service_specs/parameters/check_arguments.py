@@ -12,6 +12,7 @@ from django.core.files.base import File
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext
 
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -29,6 +30,9 @@ from django_service_specs.validation.unknown_arguments import UnknownArguments
 # so at import could not be imported before settings are configured. Where a
 # stock Django field already has the message, it is spelled exactly as Django
 # spells it, so Django's own catalog translates it and a project adds nothing.
+# Each is a ``CodedMessage`` carrying the code a DRF field gives the same
+# mistake, and test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake
+# holds each code by the case named for it.
 
 _PYTHON_TYPES: dict[str, type | tuple[type, ...]] = {
     "string": str,
@@ -202,7 +206,7 @@ def _check_object(
             # test_a_required_parameter_with_a_default_is_not_refused_when_absent
             # and test_a_partial_call_may_leave_out_a_required_parameter_at_every_depth.
             if param.required and param.default is UNSET and not walk.partial:
-                errors[param.name] = [gettext("This field is required.")]
+                errors[param.name] = [CodedMessage(gettext("This field is required."), "required")]
             continue
         value, detail = _check_value(param, arguments[param.name], walk)
         if detail is None:
@@ -215,14 +219,18 @@ def _check_object(
         declared = parameters.names()
         for key in arguments:
             if key not in declared:
-                errors[key] = [gettext("Unknown argument.")]
+                # DRF has no code for it, since a serializer ignores a key it
+                # does not declare; ``"unknown"`` names the policy that refused it.
+                errors[key] = [CodedMessage(gettext("Unknown argument."), "unknown")]
     return cleaned, errors
 
 
 def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
     """``(cleaned, None)``, or ``(None, detail)`` for a value that is refused."""
     if value is None:
-        return None, (None if param.nullable else [gettext("This field cannot be null.")])
+        if param.nullable:
+            return None, None
+        return None, [CodedMessage(gettext("This field cannot be null."), "null")]
     if param.type != "array":
         return _check_one(
             # ``any`` is the type an undeclared array element has, ``None``:
@@ -310,14 +318,13 @@ def _check_one(
         if errors:
             return None, errors
     if choices is not None and value not in choices:
-        return None, [
-            gettext("Select a valid choice. %(value)s is not one of the available choices.")
-            % {"value": value}
-        ]
+        # Coded after the interpolation, since ``%`` on any ``str`` returns a plain one.
+        message = gettext("Select a valid choice. %(value)s is not one of the available choices.")
+        return None, [CodedMessage(message % {"value": value}, "invalid_choice")]
     return value, None
 
 
-def _bound_problem(value: Any, minimum: float | None, maximum: float | None) -> str | None:
+def _bound_problem(value: Any, minimum: float | None, maximum: float | None) -> CodedMessage | None:
     """The bound a well-typed number is past, or ``None``.
 
     Read only once the type check has passed, so ``value`` is an ``int``, a
@@ -340,13 +347,11 @@ def _bound_problem(value: Any, minimum: float | None, maximum: float | None) -> 
     # passes a number inside the one bound declared, so the absent one is
     # compared too: without the test, against ``None``, which raises.
     if maximum is not None and number > maximum:
-        return gettext("Ensure this value is less than or equal to %(limit_value)s.") % {
-            "limit_value": maximum
-        }
+        message = gettext("Ensure this value is less than or equal to %(limit_value)s.")
+        return CodedMessage(message % {"limit_value": maximum}, "max_value")
     if minimum is not None and number < minimum:
-        return gettext("Ensure this value is greater than or equal to %(limit_value)s.") % {
-            "limit_value": minimum
-        }
+        message = gettext("Ensure this value is greater than or equal to %(limit_value)s.")
+        return CodedMessage(message % {"limit_value": minimum}, "min_value")
     return None
 
 
@@ -386,7 +391,7 @@ def _integral(json_type: str | None, value: Any) -> Any:
     return value
 
 
-def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | None:
+def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> CodedMessage | None:
     if fmt == "decimal":
         # A boolean is neither, although Python makes it an int: see _is_json_type.
         if not (_is_json_type("string", value) or _is_json_type("number", value)):
@@ -396,7 +401,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
         except InvalidOperation:
             finite = False
         # NaN and the infinities parse, and every decimal validator refuses them.
-        return None if finite else gettext("Enter a number.")
+        return None if finite else CodedMessage(gettext("Enter a number."), "invalid")
     # The first condition is held by test_an_array_with_no_items_accepts_any_element.
     if json_type is not None and not _is_json_type(json_type, value):
         return expected_type(json_type)
@@ -412,7 +417,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
     # condition is held by test_accepts_a_value_of_its_json_type[string-], the
     # finiteness one by test_accepts_a_value_of_its_json_type[number-2.5].
     if isinstance(value, float) and not math.isfinite(value):
-        return gettext("Enter a number.")
+        return CodedMessage(gettext("Enter a number."), "invalid")
     if fmt is None:
         return None
     try:
@@ -424,10 +429,11 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> str | N
         parsed = None
     if parsed is not None:
         return None
-    return (
+    return CodedMessage(
         gettext("Enter a valid date/time.")
         if fmt == "date-time"
-        else gettext("Enter a valid date.")
+        else gettext("Enter a valid date."),
+        "invalid",
     )
 
 
