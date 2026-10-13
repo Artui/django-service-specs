@@ -33,3 +33,21 @@ class Book(models.Model):
     class Meta:
         app_label = "adapter_app"
         ordering = ("pk",)
+
+
+class Edition(models.Model):
+    """A printing of a book, one per number, held by a ``UniqueConstraint``.
+
+    The constraint rather than ``unique_together``, because a ModelForm checks
+    the two by different calls, and an update that sends one of the pair must
+    be refused by either.
+    """
+
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="editions")
+    number = models.PositiveIntegerField()
+
+    class Meta:
+        app_label = "adapter_app"
+        constraints = [
+            models.UniqueConstraint(fields=["book", "number"], name="one_edition_per_number")
+        ]

@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 from django import forms
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -24,7 +26,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
-from tests.adapter_app.models import Author, Book
+from tests.adapter_app.models import Author, Book, Edition
 from tests.relations_app.models import Post, Timestamped
 
 User = get_user_model()
@@ -776,6 +778,45 @@ class _Profile(forms.Form):
         return cleaned
 
 
+class _PermissionForm(forms.ModelForm):
+    class Meta:
+        model = Permission
+        fields = ["name", "content_type", "codename"]
+
+
+class _PermissionName(forms.ModelForm):
+    class Meta:
+        model = Permission
+        fields = ["name", "codename"]
+
+
+class _EditionForm(forms.ModelForm):
+    class Meta:
+        model = Edition
+        fields = ["book", "number"]
+
+
+def _a_pair_and_its_collision(pair: str) -> tuple[Any, Any, dict[str, Any]]:
+    """A row holding a value, another row beside it, and the whole call that collides.
+
+    ``(taken, target, whole)``: the value of the pair's second field the first
+    row holds, the row an update targets, which shares the first field, and
+    the whole call that would give the target the first row's pair.
+    """
+    if pair == "permission":
+        kind = ContentType.objects.get_for_model(Book)
+        Permission.objects.create(name="Taken", content_type=kind, codename="taken")
+        target = Permission.objects.create(name="Mine", content_type=kind, codename="mine")
+        whole = {"name": "Mine", "content_type": str(kind.pk), "codename": "taken"}
+        return "taken", target, whole
+    book = Book.objects.create(
+        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+    )
+    Edition.objects.create(book=book, number=1)
+    target = Edition.objects.create(book=book, number=2)
+    return 1, target, {"book": str(book.pk), "number": 1}
+
+
 def _partial(target: Any = None) -> ValidationContext:
     """A partial call's context, built per test so the module imports on any version."""
     return ValidationContext(None, target, partial=True)
@@ -853,6 +894,57 @@ class TestPartial:
         with pytest.raises(InvalidArguments) as caught:
             validator.validate({"username": "bob"}, context)
         assert caught.value.detail == {"username": ["A user with that username already exists."]}
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        ("form_class", "pair"),
+        [
+            # ``unique_together``, which a ModelForm checks with validate_unique.
+            pytest.param(_PermissionForm, "permission", id="unique-together"),
+            # A ``UniqueConstraint``, which it checks with validate_constraints.
+            pytest.param(_EditionForm, "edition", id="unique-constraint"),
+        ],
+    )
+    def test_a_partial_update_colliding_with_a_unique_pair_is_refused_as_a_whole_one_is(
+        self, form_class: type[forms.ModelForm], pair: str
+    ) -> None:
+        # The update sends one field of the pair. Bound with only that field,
+        # the form excluded the other from its uniqueness check, and so skipped
+        # the pair: the collision surfaced as an IntegrityError on save.
+        taken, target, whole = _a_pair_and_its_collision(pair)
+        sent = {"codename": taken} if pair == "permission" else {"number": taken}
+        refused = _refusal(form_class, whole, target)
+        assert list(refused) == ["non_field_errors"]
+        with pytest.raises(InvalidArguments) as caught:
+            FormValidator(form_class).validate(sent, ValidationContext(None, target, partial=True))
+        assert caught.value.detail == refused
+
+    @pytest.mark.django_db
+    def test_a_whole_model_form_call_checks_uniqueness_once(
+        self, django_assert_num_queries: Any
+    ) -> None:
+        ada = User.objects.create_user(username="ada")
+        with django_assert_num_queries(1):
+            FormValidator(Username).validate({"username": "carol"}, ValidationContext(ada, ada))
+
+    @pytest.mark.django_db
+    def test_a_partial_update_checks_no_pair_the_form_does_not_declare(self) -> None:
+        # The whole call of a form without ``content_type`` excludes the pair,
+        # as Django excludes any model field a form does not have, and a
+        # partial one is no stricter.
+        taken, target, _ = _a_pair_and_its_collision("permission")
+        context = ValidationContext(None, target, partial=True)
+        assert FormValidator(_PermissionName).validate({"codename": taken}, context) == {
+            "codename": taken
+        }
+
+    @pytest.mark.django_db
+    def test_a_partial_update_that_collides_with_nothing_passes(self) -> None:
+        _, target, _ = _a_pair_and_its_collision("permission")
+        context = ValidationContext(None, target, partial=True)
+        assert FormValidator(_PermissionForm).validate({"codename": "free"}, context) == {
+            "codename": "free"
+        }
 
     def test_the_whole_and_validated_paths_agree(self) -> None:
         validated = FormValidator(_Profile).validated({"age": 3}, _partial())

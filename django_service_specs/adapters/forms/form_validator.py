@@ -10,7 +10,7 @@ from typing import Any
 
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
 from django.utils.datastructures import MultiValueDict
 
@@ -189,8 +189,15 @@ class FormValidator(Validator):
     update would write over the row. A value that is sent is checked exactly
     as on a whole call, so a required field may be left out but not sent
     empty. On a ``ModelForm`` the fields left out keep the target's values,
-    and its model and uniqueness checks skip them, as Django skips any model
-    field a form does not have. ``clean()`` sees only what was sent, so it
+    and each one's own model check skips them, as Django skips any model
+    field a form does not have. **Its uniqueness checks and constraints do
+    not**: they run over the row as it would be saved, what was sent on top
+    of the target's values, leaving out only the model fields the form never
+    declares, as a whole call does. So an update that sends one field of a
+    ``unique_together`` pair or a ``UniqueConstraint`` and collides is refused
+    as the whole call would be, under ``non_field_errors``, rather than
+    failing with an ``IntegrityError`` when the row is saved. ``clean()``
+    sees only what was sent, so it
     reads ``cleaned_data`` with ``get``, as Django advises for a field that
     failed. ``parameters()`` is the same for both calls: ``required`` says
     what a whole call needs.
@@ -232,6 +239,10 @@ class FormValidator(Validator):
         # ``base_fields`` is set by the metaclass of Form and ModelForm, or by
         # hand on a form built from BaseForm; the stubs declare it on neither.
         fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]
+        # Every field a whole call binds, disabled ones included: on a partial
+        # ModelForm call, the model fields outside it are the ones a whole
+        # call's uniqueness checks leave out.
+        self._names: frozenset[str] = frozenset(fields)
         self._declared: tuple[tuple[Parameter, forms.Field], ...] = tuple(
             (_parameter(form_class, name, field), field)
             for name, field in fields.items()
@@ -259,7 +270,8 @@ class FormValidator(Validator):
         A ``ModelChoiceField`` cleans to the row and a
         ``ModelMultipleChoiceField`` to a queryset, which is what the service
         receives. On a partial call, only the fields the caller sent are
-        bound, and so only those are returned.
+        bound, and so only those are returned; a ``ModelForm``'s uniqueness
+        checks still read the whole row, as the class docstring says.
         """
         fields = {parameter.name: field for parameter, field in self._declared}
         data: dict[str, Any] = {}
@@ -281,12 +293,14 @@ class FormValidator(Validator):
             for name in form.fields.keys() - arguments.keys():
                 del form.fields[name]
         if not form.is_valid():
-            raise InvalidArguments(
-                {
-                    NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: list(messages)
-                    for key, messages in form.errors.items()
-                }
-            )
+            raise InvalidArguments(_detail(form.errors))
+        # One branch to coverage, so each condition is held by its own test:
+        # test_a_whole_model_form_call_checks_uniqueness_once (the partial
+        # call: a whole one has already checked every pair, and would query
+        # for each again) and test_a_partial_call_returns_only_the_fields_the_caller_sent
+        # (the ModelForm: a plain form has no row to check).
+        if context.partial and isinstance(form, forms.BaseModelForm):
+            _check_unique_as_whole(form.instance, self._names)
         return dict(form.cleaned_data)
 
     def _bind(
@@ -299,6 +313,40 @@ class FormValidator(Validator):
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
         return form_class(data=data, files=files, instance=instance)
+
+
+def _detail(errors: Mapping[str, Any]) -> dict[str, list[Any]]:
+    """Django's errors as a refusal's detail, the form-wide ones under ``non_field_errors``."""
+    return {
+        NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: list(messages)
+        for key, messages in errors.items()
+    }
+
+
+def _check_unique_as_whole(instance: models.Model, names: frozenset[str]) -> None:
+    """Refuse a partial update whose row, as it would be saved, breaks a uniqueness rule.
+
+    A partial call takes the fields it was not sent off the form, and Django
+    leaves a model field the form does not have out of every uniqueness
+    check, so a pair - ``unique_together`` or a ``UniqueConstraint`` - of
+    which one field was sent was not checked at all, and the collision
+    surfaced as an ``IntegrityError`` when the row was saved. The form has
+    already written what was sent onto ``instance``, a copy of the target
+    holding its values for the rest, so the checks run here as a whole call
+    runs them: leaving out only the model fields the form never declares, and
+    refused in the words a whole call would use. A rule on fields that were
+    all sent is checked again, and passes again.
+    """
+    exclude = {field.name for field in instance._meta.fields if field.name not in names}
+    errors: dict[str, list[Any]] = {}
+    for check in (instance.validate_unique, instance.validate_constraints):
+        try:
+            check(exclude=exclude)
+        except ValidationError as error:
+            for key, messages in error.message_dict.items():
+                errors.setdefault(key, []).extend(messages)
+    if errors:
+        raise InvalidArguments(_detail(errors))
 
 
 def _as_bound(field: forms.Field, value: Any) -> Any:

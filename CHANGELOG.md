@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared unless a `kwargs` provider fills them, and a present value is checked as on a whole call. The Validator
   is told through `ValidationContext.partial`. `FormValidator` binds only the
   fields the caller sent and returns no key for any other, so an absent
-  `BooleanField` does not come back `False` nor an absent `CharField` `''`;
+  `BooleanField` does not come back `False` nor an absent `CharField` `''`,
+  while a `ModelForm`'s uniqueness checks and constraints still read the
+  whole row, so one field of a unique pair sent alone is refused as a whole
+  call refuses it rather than raising `IntegrityError` on save;
   `PydanticValidator` and `DataclassValidator` refuse a partial call with
   `ImproperlyConfigured`, because each validates every field. A service
   parameter a partial call left out is not refused as missing.
