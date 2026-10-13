@@ -63,19 +63,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a client learns the bound it meets, and under a setting of `None` an
   array with no `max_length` states none.
 - **Breaking:** `SpecFormView`'s GET shows the row an update's post would
-  act on. Where the spec declares a target selector, the page finds it as
-  dispatch would, through `resolve_target` on the route's kwargs, and the
-  unbound form shows the row's values for its own fields: a `ModelForm` of the
-  row's model is built on a copy of the row, as `FormValidator` binds it, and
-  any other form takes those values as its `initial`. So a held file is shown
-  with the clear checkbox an optional file's `ClearableFileInput` offers,
-  where it appeared only when the form class declared an initial file. The
-  page is refused where the post would be: a row the object-level check
-  refuses raises `PermissionDenied`, a missing row or a selector's
-  `ServiceNotFound` raises `Http404`, and a route value the target's reads
-  refuse raises Django's `BadRequest`; each of these rendered the page before.
-  A create, a collection target and a missing row `allow_none` lets through
-  still show an empty form.
+  act on. Every GET finds its target as dispatch would, through
+  `resolve_target` on the route's kwargs - the row or set a target selector
+  resolves, or `None` for a create - and the unbound form shows a row's values
+  for its own fields: a `ModelForm` of the row's model is built on a copy of
+  the row, as `FormValidator` binds it, and any other form takes those values
+  for its enabled fields as its `initial`. So a held file is shown with the
+  clear checkbox an optional file's `ClearableFileInput` offers, where it
+  appeared only when the form class declared an initial file. The page is
+  refused where the post would be: an object-level or scope check refusing
+  the target, a create's `None` included, raises `PermissionDenied`, a missing
+  row or a selector's `ServiceNotFound` raises `Http404`, and a route value
+  the spec's parameters refuse raises Django's `BadRequest`; each of these
+  rendered the page before. A create, a collection target and a missing row
+  `allow_none` lets through still show an empty form.
 - **Breaking:** a `SelectorSpec.filter_set` that declares no filters is
   refused at construction unless it is a django-filter `FilterSet` class. Only
   one with no `base_filters` attribute at all was refused, so a duck-typed

@@ -83,17 +83,20 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     [`authorize`][django_service_specs.authorization.authorize.authorize], so
     a page is never offered to a principal the post would refuse.
 
-    **An update's page shows the row it updates.** Where the spec declares a
-    target selector, GET finds the target as dispatch would, through
+    **An update's page shows the row it updates.** Every GET then finds its
+    target as dispatch would, through
     [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
-    on the route's kwargs: the object-level check refuses a row the post
-    would be refused, as ``PermissionDenied``, a missing row is ``Http404``,
-    and a route value the target's reads refuse is Django's ``BadRequest``.
-    The form shows a row's values for its own fields: a ``ModelForm`` of the
-    row's model is built on a copy of it, as the Validator binds one, and any
-    other form takes the row's values for the fields it names as its
-    ``initial``. So a file the row holds is shown, with the clear checkbox
-    an optional file's ``ClearableFileInput`` offers beside it. A create, a
+    on the route's kwargs, coerced as a post's are: the row or set a target
+    selector resolves, or ``None`` for a create. A check refusing it - the
+    object-level check on a row, the scope check on a set or on ``None`` -
+    raises ``PermissionDenied``, as the post would be refused; a missing row
+    or a selector's ``ServiceNotFound`` raises ``Http404``; and a route value
+    the spec's parameters refuse raises Django's ``BadRequest``. The form
+    shows a row's values for its own fields: a ``ModelForm`` of the row's
+    model is built on a copy of it, as the Validator binds one, and any other
+    form takes the row's values for the enabled fields it names as its
+    ``initial``. So a file the row holds is shown, with the clear checkbox an
+    optional file's ``ClearableFileInput`` offers beside it. A create, a
     collection target and a missing row ``allow_none`` lets through show an
     empty form.
 
@@ -368,8 +371,11 @@ def _page_form(spec: ServiceSpec, target: Any) -> forms.BaseForm:
     A ``ModelForm`` of the row's model is built on a copy of it, as
     ``FormValidator`` binds one, so its own ``__init__`` sees the row it
     edits; any other form takes the row's values for the fields it names, its
-    own fields alone, as its ``initial``. One branch to coverage, so each
-    condition is held by its own test:
+    own fields alone, as its ``initial``. A disabled field is left out: the
+    Validator declares none, and the form cleans one from its own
+    ``initial``, so the row's value is never what the post sends
+    (test_a_disabled_field_shows_its_own_initial). One branch to coverage, so
+    each condition is held by its own test:
     test_a_plain_form_shows_the_row_s_values_for_its_own_fields (a
     ``ModelForm``: a plain form takes no ``instance``) and
     test_a_model_form_of_another_model_is_built_as_a_create (the row's model,
@@ -381,7 +387,8 @@ def _page_form(spec: ServiceSpec, target: Any) -> forms.BaseForm:
     if issubclass(form_class, forms.BaseModelForm) and isinstance(target, form_class._meta.model):
         return form_class(instance=copy.copy(target))
     # ``base_fields`` is set by the metaclass, which the stubs do not declare.
-    names = list(form_class.base_fields)  # ty: ignore[unresolved-attribute]
+    fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]
+    names = [name for name, field in fields.items() if not field.disabled]
     return form_class(initial=model_to_dict(target, fields=names))
 
 

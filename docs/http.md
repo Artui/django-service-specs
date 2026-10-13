@@ -267,21 +267,24 @@ class-level permission check runs first, so the page is never offered to a
 principal the post would refuse: an anonymous visitor above gets Django's own
 `PermissionDenied`, which the host's 403 page answers.
 
-**An update's page shows the row it updates.** Where the spec declares a
-target selector, GET finds the target as dispatch would, through
+**An update's page shows the row it updates.** Every GET then finds its
+target as dispatch would, through
 [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
-on the route's kwargs, coerced as a post's are:
+on the route's kwargs, coerced as a post's are: the row or set a target
+selector resolves, or `None` for a create.
 
-- The object-level check refuses a row the post would be refused, as
-  `PermissionDenied`; a missing row, or a selector's `ServiceNotFound`, is
-  `Http404`; and a route value the target's reads refuse is Django's
-  `BadRequest`, which the host's 400 page answers.
+- A check refusing it - the object-level check on a row, the scope check on a
+  set or on `None` - raises `PermissionDenied`, as the post would be refused;
+  a missing row, or a selector's `ServiceNotFound`, is `Http404`; and a route
+  value the spec's parameters refuse is Django's `BadRequest`, which the
+  host's 400 page answers.
 - The form stays unbound, and shows the row's values for its own fields. A
   `ModelForm` of the row's model is built on a copy of the row, as the
   [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
   binds it, so its own `__init__` sees the row it edits. Any other form takes
   the row's values for the fields it names as its `initial`, and a field no
-  model field matches keeps its own.
+  model field matches keeps its own, as does a disabled one, which the post
+  cleans from that initial rather than reading.
 - So a file the row holds is shown, linked, with the
   [clear checkbox](forms.md#clearing-a-file) an optional file's
   `ClearableFileInput` offers beside it.

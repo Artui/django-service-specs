@@ -142,6 +142,24 @@ class NoteTitleForm(forms.Form):
     remark = forms.CharField(required=False, initial="none")
 
 
+class NoCreating(PermissionCheck):
+    """Admits every principal at class level, then refuses a call acting on no row."""
+
+    message = "Nothing may be created here."
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return True
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        return scope is not None
+
+
+class DisabledTitleForm(forms.Form):
+    """A plain form whose ``title`` is shown and never read."""
+
+    title = forms.CharField(disabled=True, initial="Fixed")
+
+
 class Throttled(DispatchError):
     """A dispatch refusal no row of the ladder names, as a later release might add."""
 
@@ -371,6 +389,14 @@ class TestAnUpdatePage:
         # A field no note has keeps its own initial.
         assert form["remark"].value() == "none"
 
+    def test_a_disabled_field_shows_its_own_initial(self, ada: Any) -> None:
+        # The post cleans it from that initial and never reads it, so the
+        # row's value is not what the page offers.
+        note = Note.objects.create(owner=ada, title="Ada's")
+        spec = row_spec(validator=Watched(DisabledTitleForm))
+        form = get(form_view(spec), ada, pk=note.pk).context_data["form"]
+        assert form["title"].value() == "Fixed"
+
     def test_a_model_form_of_another_model_is_built_as_a_create(self, ada: Any) -> None:
         # The Validator binds a ModelForm to the target only where the target
         # is a row of its model, so the page does too.
@@ -407,6 +433,15 @@ class TestAnUpdatePage:
         spec = row_spec(permissions=[OwnerOnly()])
         with pytest.raises(PermissionDenied, match=r"^Only the owner may touch this note\.$"):
             get(form_view(spec), ada, pk=note.pk)
+
+    def test_a_create_the_scope_check_refuses_is_never_offered(self, ada: Any) -> None:
+        # A create resolves ``None``, which dispatch's scope check is asked
+        # about, so the page is refused where its post would be.
+        spec = entry_spec(permissions=[NoCreating()])
+        with pytest.raises(PermissionDenied, match=r"^Nothing may be created here\.$"):
+            get(form_view(spec), ada)
+        with pytest.raises(PermissionDenied, match=r"^Nothing may be created here\.$"):
+            post(form_view(spec), ada, {"title": "Hi"})
 
     def test_a_missing_row_is_http404(self, ada: Any) -> None:
         with pytest.raises(Http404):

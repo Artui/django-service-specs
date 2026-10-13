@@ -332,11 +332,11 @@ class TestFilterSet:
             listing(filter_set=Duck)
 
     def test_a_filterset_declaring_no_filters_is_accepted(self) -> None:
-        # Holds the guard to the attribute's absence rather than its
-        # emptiness: a real FilterSet with no filters narrows nothing and
-        # declares nothing, which is a spec worth nothing but not a broken
-        # one. A guard reading ``getattr(..., "base_filters", None) or ...``
-        # refuses this.
+        # Holds the guard's FilterSet condition: a real FilterSet with no
+        # filters narrows nothing and declares nothing, which is a spec
+        # worth nothing but not a broken one, where any other object
+        # declaring no filters is refused. A guard reading the emptiness of
+        # ``base_filters`` alone refuses this.
         class Empty(django_filters.FilterSet):
             pass
 
