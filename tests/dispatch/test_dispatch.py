@@ -54,6 +54,7 @@ from tests.dispatch.utils import (
     Refuse,
     Scoped,
     Titled,
+    Titles,
     make_user,
     note_by_pk,
     notes_of,
@@ -487,7 +488,7 @@ def test_a_collection_is_passed_as_collection_and_never_object_checked(ada: Any,
     assert check.rows == []
 
 
-def test_the_output_selector_re_reads_with_only_result_in_its_pool(ada: Any) -> None:
+def test_the_output_selector_re_reads_with_only_the_service_s_return_in_its_pool(ada: Any) -> None:
     note = Note.objects.create(owner=ada, title="mine")
     reread = Record(returns=Note.objects.filter(pk=note.pk))
     spec = ServiceSpec(
@@ -503,7 +504,9 @@ def test_the_output_selector_re_reads_with_only_result_in_its_pool(ada: Any) -> 
 
     result = dispatch(spec, principal=ada, arguments={"title": "t"})
 
-    assert reread.calls == [{"user": ada, "progress": null_progress, "result": note}]
+    assert reread.calls == [
+        {"user": ada, "progress": null_progress, "instance": note, "result": note}
+    ]
     assert result.kind == "instance"
     assert result.value.label == "mine!"
     assert result.service_result is note
@@ -539,6 +542,47 @@ def test_an_output_selector_that_finds_nothing_is_none_not_not_found(ada: Any, h
     result = dispatch(spec, principal=ada, arguments={})
 
     assert result == DispatchResult(kind="instance", value=None, service_result="done", data={})
+
+
+def test_an_output_selector_reads_the_service_s_return_as_instance_not_the_target(
+    ada: Any,
+) -> None:
+    # The service acts on one note and returns another, so a re-read handed
+    # the resolved target under ``instance`` would answer the wrong row.
+    target = Note.objects.create(owner=ada, title="target")
+    written = Note.objects.create(owner=ada, title="written")
+
+    def reread(*, instance: Any) -> Any:
+        return Note.objects.filter(pk=instance.pk)
+
+    spec = ServiceSpec(
+        service=Record(returns=written),
+        permissions=OPEN,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        output_selector_spec=nested(RETRIEVE, selector=reread),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"pk": target.pk})
+
+    assert (result.kind, result.value, result.instance) == ("instance", written, target)
+
+
+@pytest.mark.parametrize("returns", [None, ["a", "b"], "done"], ids=["none", "list", "str"])
+def test_an_output_selector_s_instance_and_result_are_one_value(ada: Any, returns: Any) -> None:
+    # One pool entry under two names, whatever the service returned: a re-read
+    # declares whichever its author wrote, as under djangorestframework-services.
+    reread = Record(returns=Note.objects.none())
+    spec = ServiceSpec(
+        service=Record(returns=returns),
+        permissions=OPEN,
+        output_selector_spec=nested(RETRIEVE, selector=reread),
+    )
+
+    dispatch(spec, principal=ada, arguments={})
+
+    (pool,) = reread.calls
+    assert pool["instance"] is returns
+    assert pool["result"] is returns
 
 
 @pytest.mark.parametrize(("atomic", "survives"), [(True, False), (False, True)])
@@ -2662,6 +2706,119 @@ def test_a_retrieve_selector_spec_s_none_under_allow_none_is_asked_nothing(ada: 
     result = dispatch(spec, principal=ada, arguments={"pk": 404})
     assert (result.kind, result.value) == ("instance", None)
     assert (check.rows, check.scopes) == ([], [])
+
+
+# --- allow_none on a LIST: a selector's None is the empty list.
+
+
+def _nothing(**pool: Any) -> None:
+    return None
+
+
+def test_a_list_selector_s_none_under_allow_none_is_the_empty_list(ada: Any) -> None:
+    check = Scoped()
+    seen: list[Any] = []
+
+    def precondition(*, collection: Any) -> None:
+        seen.append(collection)
+
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=_nothing,
+        permissions=[check],
+        allow_none=True,
+        presenter=Titles(),
+        preconditions=[precondition],
+    )
+
+    result = dispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="list", value=[])
+    # Asked of the empty set, as an empty queryset is, and never of ``None``.
+    assert check.scopes == [[]]
+    assert seen == [[]]
+    assert present(spec, result) == []
+
+
+def test_a_list_selector_s_none_under_allow_none_is_refused_as_an_empty_set(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=_nothing, permissions=[check], allow_none=True)
+
+    with pytest.raises(NotPermitted, match=r"^Not within your scope\.$"):
+        dispatch(spec, principal=ada, arguments={})
+
+    assert check.scopes == [[]]
+
+
+def test_a_list_selector_s_none_under_allow_none_skips_the_shaping(ada: Any) -> None:
+    # Nothing to shape: the shaping check's "returned None" refusal does not
+    # answer for a None the spec says it may return.
+    spec = SelectorSpec(
+        kind=LIST, selector=_nothing, permissions=OPEN, allow_none=True, select_related=["owner"]
+    )
+
+    result = dispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="list", value=[])
+
+
+def test_a_list_selector_s_rows_under_allow_none_are_its_rows(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="kept")
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN, allow_none=True)
+
+    result = dispatch(spec, principal=ada, arguments={})
+
+    assert list(result.value) == [note]
+
+
+def test_a_retrieve_selector_s_own_none_under_allow_none_stays_none(ada: Any) -> None:
+    # A RETRIEVE's ``None`` is a missing row, never an empty list.
+    spec = retrieve(selector=_nothing, allow_none=True)
+
+    result = dispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert result == DispatchResult(kind="instance", value=None)
+
+
+def test_a_list_selector_s_none_without_allow_none_is_left_as_it_was(ada: Any) -> None:
+    # Unchanged: the scope check is asked of ``None``, the result carries it,
+    # and presenting it as a list fails as the author's error.
+    check = Scoped()
+    spec = SelectorSpec(kind=LIST, selector=_nothing, permissions=[check])
+
+    result = dispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="list", value=None)
+    assert check.scopes == [None]
+    with pytest.raises(TypeError, match="'NoneType' object is not iterable"):
+        present(spec, result)
+
+
+def test_a_collection_selector_s_none_under_allow_none_is_an_empty_collection(ada: Any) -> None:
+    check = Scoped()
+    service = Record(returns="done")
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        collection_selector_spec=nested(LIST, selector=_nothing, allow_none=True),
+    )
+
+    dispatch(spec, principal=ada, arguments={})
+
+    assert check.scopes == [[]]
+    assert service.calls[0]["collection"] == []
+
+
+def test_a_list_output_selector_s_none_under_allow_none_is_the_empty_list(ada: Any) -> None:
+    spec = ServiceSpec(
+        service=Record(returns="done"),
+        permissions=OPEN,
+        output_selector_spec=nested(LIST, selector=_nothing, allow_none=True),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={})
+
+    assert (result.kind, result.value) == ("list", [])
 
 
 # --- target=: a target the caller resolved, used as the resolved one.

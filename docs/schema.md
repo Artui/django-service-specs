@@ -269,6 +269,7 @@ on its presenter:
 | --- | --- |
 | No presenter, on the spec or its output selector | `None` |
 | A `LIST` selector spec | `{"type": "array", "items": <item>}` |
+| A `LIST` selector spec with `allow_none=True` | `{"type": "array", "items": <item>}`: its selector's `None` is presented as `[]` |
 | A `RETRIEVE` selector spec | the item |
 | A `RETRIEVE` selector spec with `allow_none=True` | the item, with `"null"` in its type |
 | A service spec whose output selector is a `LIST` | `{"type": "array", "items": <item>}` |

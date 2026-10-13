@@ -36,7 +36,7 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | each of a selector's `reads`, by name | The checked argument | That selector, its `kwargs` provider |
 | each of a service spec's `reads`, by name | The checked argument | The service, its providers |
 | each key a `kwargs` provider returns | The author's value, outranking the caller's | The selector or service it is declared on |
-| `result` | The service's return | The output selector |
+| `result` | The service's return | The output selector, which is handed it as `instance` too |
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
 
@@ -93,7 +93,12 @@ or `RETRIEVE`. A retrieve returns one row: a queryset is read with `.first()`,
 a `DoesNotExist` raised by a selector written with `.get()` means the same
 missing row, and a missing row is reported as not-found unless the spec sets
 `allow_none=True`, which makes it the value `None` - the shape of an optional
-singleton, or of an upsert's target.
+singleton, or of an upsert's target. On a list, `allow_none=True` says the
+selector may return `None` for "no rows": the result is the empty list, its
+scope check and `preconditions` are asked of that empty set as they are of an
+empty queryset, and the shaping is skipped, since there is nothing to shape.
+Without it, a list selector's `None` is passed on as it came, and presenting it
+fails as the author's error.
 
 `reads` is the selector's whole input. There is no Validator in front of a
 read, so these Parameters are what the closed argument set and the shape check

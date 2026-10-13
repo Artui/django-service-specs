@@ -176,6 +176,20 @@ def test_an_empty_collection_is_returned_as_a_set(ada: Any) -> None:
     assert list(dispatch(spec, principal=ada, arguments={}).instance) == []
 
 
+def test_a_collection_selector_s_none_under_allow_none_resolves_the_empty_list(ada: Any) -> None:
+    check = Scoped()
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[check],
+        collection_selector_spec=SelectorSpec(
+            kind=SelectorKind.LIST, selector=lambda: None, allow_none=True
+        ),
+    )
+    target, grant = _found(resolve_target(spec, principal=ada, arguments={}))
+    assert target == []
+    assert check.scopes == [[]]
+
+
 def test_a_create_resolves_nothing(ada: Any) -> None:
     spec = _create()
     target, grant = _found(resolve_target(spec, principal=ada, arguments={}))

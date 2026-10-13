@@ -261,7 +261,7 @@ async def test_its_output_selector_takes_a_second_hop(ada: Any, hops: list[str])
 
     assert result.value.title == "made"
     assert result.value == result.service_result
-    assert set(reread.calls[0]) == {"user", "progress", "result"}
+    assert set(reread.calls[0]) == {"user", "progress", "instance", "result"}
     assert len(hops) == 2
 
 
@@ -339,6 +339,54 @@ async def test_an_async_retrieve_raising_does_not_exist_is_decided_without_a_sec
     assert result == expected
     assert check.rows == []
     assert len(hops) == 1
+
+
+async def test_an_async_list_s_none_under_allow_none_is_the_empty_list(ada: Any) -> None:
+    async def nothing(*, user: Any) -> None:
+        return None
+
+    check = Scoped()
+    spec = SelectorSpec(kind=LIST, selector=nothing, permissions=[check], allow_none=True)
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="list", value=[])
+    assert check.scopes == [[]]
+
+
+async def test_an_async_list_s_none_under_allow_none_is_refused_as_an_empty_set(ada: Any) -> None:
+    async def nothing(*, user: Any) -> None:
+        return None
+
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=nothing, permissions=[check], allow_none=True)
+
+    with pytest.raises(NotPermitted) as caught:
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.message == "Not within your scope."
+    assert check.scopes == [[]]
+
+
+async def test_an_async_service_s_output_selector_reads_its_return_as_instance(ada: Any) -> None:
+    written = await sync_to_async(Note.objects.create)(owner=ada, title="written")
+
+    async def write(*, user: Any) -> Note:
+        return written
+
+    def reread(*, instance: Any) -> Any:
+        return Note.objects.filter(pk=instance.pk)
+
+    spec = ServiceSpec(
+        service=write,
+        permissions=OPEN,
+        atomic=False,
+        output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=reread),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert (result.kind, result.value) == ("instance", written)
 
 
 async def test_an_async_list_raising_does_not_exist_passes_through(ada: Any) -> None:

@@ -86,7 +86,7 @@ A `DispatchResult` has a `kind` and a `value`:
 
 | `kind` | When | `value` |
 | --- | --- | --- |
-| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one |
+| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
 | `"instance"` | Everything else that ran | The row, the service's return, or what the output selector re-read |
 | `"not_found"` | A required row does not exist | `None` |
 
@@ -118,6 +118,13 @@ One case is not reported as not-found: **a retrieve output selector that finds
 nothing**. The service has already run and, under `atomic`, committed, so
 reporting not-found would tell the caller the write did not happen. The value
 is `None` under `kind="instance"` instead.
+
+The output selector is called from the base pool plus the service's return,
+under two names: `result`, and `instance`, as djangorestframework-services
+binds it. They are one value, whatever the service returned, `None` included,
+so a re-read declares whichever its author wrote. `instance` there is what the
+service returned, not the target it acted on, which the result carries as
+`result.instance`.
 
 ## Presenting
 

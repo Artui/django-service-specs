@@ -58,9 +58,16 @@ class SelectorSpec:
             the shape check both apply to them.
         presenter: Renders the rows. Not read on an instance or collection
             selector, whose rows the service consumes rather than returns.
-        allow_none: ``RETRIEVE`` only. A missing row is the value ``None``
+        allow_none: On a ``RETRIEVE``, a missing row is the value ``None``
             rather than not-found - the shape of an optional singleton, or of an
-            upsert's target.
+            upsert's target. On a ``LIST``, a selector returning ``None`` has
+            returned the empty list: the shaping is skipped, since there is
+            nothing to shape, and the result is ``[]`` wherever the selector
+            runs, so a selector spec's own scope check and ``preconditions``
+            see the empty set, as they see an empty queryset, and its output
+            schema stays an array. Without it, a ``LIST`` selector's ``None``
+            is passed on as it came, and presenting it fails as the author's
+            error.
         select_related, prefetch_related, annotations: Applied to the queryset
             the selector returns, in that order. Declaring any of them when the
             selector returns something else is refused at dispatch.
@@ -198,10 +205,6 @@ class SelectorSpec:
         # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
         check_reserved(self.reads, label=f"{label}.reads")
         check_presenter(self.presenter, label=label)
-        if self.allow_none and kind is not SelectorKind.RETRIEVE:
-            raise ImproperlyConfigured(
-                f"{label}.allow_none describes a missing row, which only a RETRIEVE has."
-            )
         for name in ("select_related", "prefetch_related"):
             value = getattr(self, name)
             if value is not None:
