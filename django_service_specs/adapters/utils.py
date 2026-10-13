@@ -13,8 +13,10 @@ validation library, so the dataclass adapter uses it without importing
 pydantic.
 
 The forms adapter reads field instances rather than annotations and shares
-only ``scalar_type``: a typed choice field's values take their JSON type from
-it, exactly as a ``Literal``'s do.
+``scalar_type``, since a typed choice field's values take their JSON type from
+it exactly as a ``Literal``'s do, and ``element_format``, since a
+``ModelMultipleChoiceField`` keyed on a decimal column is a list of decimals as
+``list[Decimal]`` is.
 
 ``choice_labels`` reads Django's own vocabulary rather than an annotation's,
 and both annotation adapters label an enum's choices through it, so a
@@ -48,6 +50,24 @@ SCALARS: dict[type, tuple[str, str | None]] = {
 """The scalar annotations and their JSON type and format. Looked up by
 identity, so ``bool`` is not read as ``int`` and ``datetime`` is not read as
 ``date``, although each subclasses the other."""
+
+
+def element_format(fmt: str | None) -> str | None:
+    """The format an array declares for its element, given the element's own.
+
+    An array's format describes each element, and ``Parameter`` takes only
+    ``decimal`` there: the one format a flat reader may split on commas and
+    the shape check reads each element as. So a list of decimals is declared
+    as the scalar is, a string in the ``decimal`` format that takes a JSON
+    number too, while a list of dates or date-times stays an array of strings
+    for its Validator to decode. Held by
+    test_a_list_of_decimals_declares_each_element_a_decimal in the dataclass
+    and pydantic adapters and by
+    test_a_list_of_keys_declares_each_element_a_decimal_as_one_key_does in the
+    forms adapter: returning the element's format whole, a list of dates is
+    refused when declared.
+    """
+    return fmt if fmt == "decimal" else None
 
 
 def scalar_type(value: Any) -> str | None:
@@ -90,6 +110,12 @@ def strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:
     Loops rather than recursing because the wrappers nest either way round:
     ``Annotated[str | None, m]`` and ``Annotated[str, m] | None`` both mean a
     nullable string marked ``m``.
+
+    The extras run from the innermost ``Annotated`` out, each in the order it
+    was written: the order a library building the type applies them in, which
+    is what decides between two lengths on one list. Held by
+    test_every_spelling_of_a_list_s_length_is_declared, whose ``deep`` row
+    reads the outer length with them collected the other way round.
     """
     nullable = omittable = False
     extras: list[Any] = []
@@ -97,7 +123,8 @@ def strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:
         origin = typing.get_origin(annotation)
         if origin is typing.Annotated:
             base, *metadata = typing.get_args(annotation)
-            extras.extend(metadata)
+            # Found outside in, so each layer goes ahead of the ones already found.
+            extras[:0] = metadata
             annotation = base
         elif origin in (typing.Union, types.UnionType):
             arms = []

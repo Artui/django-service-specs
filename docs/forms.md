@@ -65,9 +65,9 @@ extends.
 | `TimeField`, `DurationField` | A `string`. |
 | `ChoiceField` | A `string` with the choices as strings, since a plain choice field cleans with `str` and compares against each choice's `str`. The empty choice is dropped and option groups are flattened. |
 | `TypedChoiceField` | Choices, of the JSON type every value shares. Values of mixed types, or of a type JSON does not have, are refused. |
-| `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. |
+| `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. No choice field declares a length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds every list one takes. |
 | `ModelChoiceField` | The JSON type of the model field rows are matched on - `to_field_name`, or the primary key - and no choices: they are rows, and listing them would query. It validates to the row. |
-| `ModelMultipleChoiceField` | An `array` of the same. It validates to a queryset. |
+| `ModelMultipleChoiceField` | An `array` of the same, so one matching rows on a `DecimalField` declares the `decimal` format for each element and `?rows=12.50,9.99` is two of them. Django matches each against the column's own spelling, `"12.50"` and not `12.5`. It validates to a queryset. |
 | `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. An optional one also declares its [clear checkbox](#clearing-a-file). |
 | any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
 
