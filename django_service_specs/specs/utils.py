@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
@@ -13,27 +14,33 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.is_async import is_async
 
+# The methods dispatch reads a permission check's answer from.
+_CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
+
 
 def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
     """Refuse a value that is not callable, and under ``sync`` one that is ``async def``.
 
     ``sync`` is for every seat dispatch calls from sync code and never awaits:
-    the providers and the preconditions. Called there, an ``async def``
-    callable returns a coroutine nobody awaits, so a precondition that would
-    have refused the call raises nothing and the call goes ahead, and a
-    provider hands dispatch a coroutine for its mapping or, as a
-    ``progress_reporter``, for the sink ``pool/utils.py`` calls each report
-    with. Refused when the spec is built, naming the seat and the callable,
-    rather than found at the first call or never. The run itself - the
-    service, or a selector spec's own selector - may be ``async def``, since
-    dispatch bridges it and ``adispatch`` awaits it, so it is checked without
-    ``sync``.
+    the providers, the preconditions, a selector spec's ``extend_queryset`` and
+    ``filter_set``, and each method of a permission check. Called there, an
+    ``async def`` callable returns a coroutine nobody awaits, so a precondition
+    that would have refused the call raises nothing and the call goes ahead, a
+    permission check's answer is truthy and allows it, and a provider or a
+    shaping callable hands dispatch a coroutine where its mapping, its sink or
+    its queryset should be. An async generator function is refused with them:
+    what it returns is never awaitable, never runs, and is truthy too. Refused
+    when the spec is built, naming the seat and the callable, rather than
+    found at the first call or never. The run itself - the service, or a
+    selector spec's own selector - may be ``async def``, since dispatch
+    bridges it and ``adispatch`` awaits it, so it is checked without ``sync``.
     """
     if not callable(value):
         raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
-    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``, and
-    # test_a_sync_provider_and_precondition_are_accepted the second.
-    if sync and is_async(value):
+    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``,
+    # test_a_sync_provider_and_precondition_are_accepted the second, and
+    # test_an_async_generator_precondition_is_refused the third.
+    if sync and (is_async(value) or inspect.isasyncgenfunction(value)):
         raise ImproperlyConfigured(
             f"{label} is {_name(value)}, an async callable. It is called from sync code "
             "and never awaited, on both entry points; declare it with def, since adispatch "
@@ -83,13 +90,22 @@ def check_permissions(
     A class is the likely mistake - an HTTP framework declares permission
     classes - and a class passes ``callable()``, so it is refused by name here
     rather than failing at dispatch with an unbound-method error.
+
+    Each of the three methods is read for truth from sync code, so an
+    ``async def`` one - whose answer is a truthy coroutine - is refused here,
+    on the bound method, as any other sync-only seat is. One case per method
+    in ``tests/specs/test_utils.py``'s ``TestAnAsyncPermissionCheckIsRefused``,
+    since coverage cannot see a name dropped from ``_CHECK_METHODS``. What
+    construction cannot see, a plain ``def`` handing back a coroutine, is
+    refused where the answer is read, by ``authorization/utils.py``'s
+    ``sync_answer``.
     """
     if permissions is None:
         return None
     if isinstance(permissions, str | bytes) or not isinstance(permissions, Sequence):
         raise ImproperlyConfigured(f"{label}.permissions must be a sequence of PermissionCheck.")
     checks = tuple(permissions)
-    for check in checks:
+    for index, check in enumerate(checks):
         if isinstance(check, type):
             raise ImproperlyConfigured(
                 f"{label}.permissions holds the class {check.__name__}; pass an instance, "
@@ -99,6 +115,10 @@ def check_permissions(
             raise ImproperlyConfigured(
                 f"{label}.permissions holds {type(check).__name__}, which is not a "
                 "PermissionCheck. Subclass PermissionCheck, or adapt it."
+            )
+        for method in _CHECK_METHODS:
+            check_callable(
+                getattr(check, method), label=f"{label}.permissions[{index}].{method}", sync=True
             )
     return checks
 

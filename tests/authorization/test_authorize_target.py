@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import inspect
+
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
@@ -8,7 +11,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
-from tests.authorization.utils import Allow, Refuse, RefuseWithMessage
+from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses
 
 
 def _spec(permissions: list | None) -> SelectorSpec:
@@ -78,3 +81,13 @@ def test_unrestricted_allows_at_the_object_level_too() -> None:
     spec, principal, target = _spec([Unrestricted()]), object(), object()
     grant = Grant(spec, principal)
     authorize_target(spec, principal, target, grant=grant)
+
+
+def test_a_check_answering_with_a_coroutine_is_refused_rather_than_read_as_a_pass() -> None:
+    # Sync-only like the class-level check: an unawaited answer is truthy.
+    answer = refuses()
+    spec, principal = _spec([AnswersWith(answer)]), object()
+    with pytest.raises(ImproperlyConfigured, match="answered with an awaitable") as caught:
+        authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+    assert "AnswersWith.has_object_permission" in str(caught.value)
+    assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED

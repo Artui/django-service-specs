@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.grant import Grant
@@ -10,6 +12,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from tests.authorization.utils import AnswersWith, refuses
 
 
 class _ScopeCheck(PermissionCheck):
@@ -73,3 +76,13 @@ def test_a_grant_that_checked_the_target_skips_the_checks() -> None:
 def test_no_permissions_declared_has_nothing_to_check() -> None:
     spec, principal = _spec(None), object()
     authorize_scope(spec, principal, [], grant=Grant(spec, principal))
+
+
+def test_a_check_answering_with_a_coroutine_is_refused_rather_than_read_as_a_pass() -> None:
+    # Sync-only like the class-level check: an unawaited answer is truthy.
+    answer = refuses()
+    spec, principal = _spec([AnswersWith(answer)]), object()
+    with pytest.raises(ImproperlyConfigured, match="answered with an awaitable") as caught:
+        authorize_scope(spec, principal, None, grant=Grant(spec, principal))
+    assert "AnswersWith.has_scope_permission" in str(caught.value)
+    assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED

@@ -36,7 +36,11 @@ class PermissionCheck(abc.ABC):
     says when this check refuses; ``None`` keeps the generic wording.
 
     **Sync-only**, like every concept: a check may query, so the async path runs
-    it in the executor.
+    it in the executor. An ``async def`` method would answer with a coroutine,
+    which is truthy and would allow every call, so a spec refuses a check
+    declaring one when it is built, with ``ImproperlyConfigured`` naming the
+    method; and an answer that is still to be awaited - from a plain ``def``
+    wrapping an ``async def`` - is refused where it is read, failing closed.
     """
 
     message: str | None = None
