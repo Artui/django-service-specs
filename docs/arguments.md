@@ -40,11 +40,14 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
-**Only an ASCII string spells a number**, and this is the one place the check
-is stricter than Django's forms. Python's `int` and `float`, and so Django's
-number fields, read Arabic-Indic and fullwidth digits and strip any Unicode
-space; no JSON number is spelled so, and pydantic refuses them. `"\u0665"`, the
-JSON spelling of an Arabic-Indic five, is refused as the type it is not, by the check and by `coerce_flat` alike.
+**Only an ASCII string spells an `integer` or a `number`**, and this is the one
+place the check is stricter than Django's forms. Python's `int` and `float`,
+and so Django's number fields, read Arabic-Indic and fullwidth digits and
+strip any Unicode space; no JSON number is spelled so, and pydantic refuses
+them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
+type it is not, by the check and by `coerce_flat` alike. A `decimal` string is
+not read this way: it is checked as Python's `Decimal` reads it, which takes
+those digits too.
 
 A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its

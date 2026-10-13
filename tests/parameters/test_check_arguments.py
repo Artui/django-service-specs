@@ -330,6 +330,13 @@ def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: st
     ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
 
 
+def test_a_decimal_string_outside_ascii_is_read_as_decimal_reads_it() -> None:
+    # Not a number's reading: a decimal is checked as Python's ``Decimal``
+    # parses it, which takes an Arabic-Indic five, and is handed on unchanged.
+    params = one(Parameter("price", "string", format="decimal"))
+    assert check_arguments(params, {"price": "\u0665"}) == {"price": "\u0665"}
+
+
 def test_true_is_still_no_number_and_no_integer() -> None:
     params = Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number"))
     assert refusal(params, {"count": True, "ratio": True}) == {

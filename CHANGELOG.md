@@ -135,8 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   too; it now reads it as Django's forms and pydantic's lax mode do, and as
   Django's `IntegerField` where the two differ, so an integer's `"5."` is 5.
   A string spelling no number is still refused, and so is `true`.
-- **Breaking:** only an ASCII string spells a number, in a query string, an
-  argv call and a JSON string alike. Arabic-Indic and fullwidth digits, and a
+- **Breaking:** only an ASCII string spells an `integer` or a `number`, in a
+  query string, an argv call and a JSON string alike. Arabic-Indic and fullwidth digits, and a
   number padded with a Unicode space, were read as the number by a flat
   transport, as Python's `int` and Django's fields read them; they are now
   refused as the type they are not, as pydantic and JSON refuse them.

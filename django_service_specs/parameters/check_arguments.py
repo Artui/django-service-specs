@@ -82,7 +82,8 @@ def check_arguments(
       makes, which this shares. Where the two differ it is Django's: an
       integer's ``"5."`` and ``"5 .0"`` are 5, which pydantic's ``int``
       refuses, so this is looser than pydantic there. **The exception** is a
-      string outside ASCII: Django's fields read Arabic-Indic or fullwidth
+      string outside ASCII for an ``integer`` or a ``number``, not a
+      ``decimal``: Django's fields read Arabic-Indic or fullwidth
       digits and Unicode spaces as Python's ``int`` does, and this refuses
       them, as pydantic and JSON do. A string that spells no such number is
       refused as the type it is not. The number goes on rather than the

@@ -76,11 +76,13 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     pydantic reads them too, and ``"5 .0"`` is none. NaN and the infinities
     parse and are no number, since no JSON caller can send one.
 
-    **Only an ASCII string spells a number.** Python's ``int`` and ``float``,
+    **Only an ASCII string spells one.** Python's ``int`` and ``float``,
     and so Django's fields, read Arabic-Indic and fullwidth digits and strip
     any Unicode space, which no JSON number is spelled with and pydantic
     refuses; reading them would hand on a number the caller never wrote in
-    digits. Stricter than Django's forms there, and only there.
+    digits. Stricter than Django's forms there, and only there. A decimal
+    string is not read here: the shape check reads it as ``Decimal`` does,
+    which takes those digits.
 
     The caller decides what a ``None`` means: a flat transport refuses it, and
     the shape check refuses the string as the type it is not.
