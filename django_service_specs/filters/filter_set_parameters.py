@@ -29,8 +29,13 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     values, flattened out of any group, as ``integer`` when every value is an
     ``int`` and otherwise as the strings Django's ``ChoiceField`` compares; a
     choice set built by a callable, and a related row's key, offer only
-    ``string``. Every other filter is its scalar: ``boolean``, ``number``, a
-    ``date`` or ``date-time`` string, and ``string`` for the rest.
+    ``string``. Every other filter is its scalar: ``boolean``, a ``date`` or
+    ``date-time`` string, and ``string`` for the rest. **A number filter, and
+    each bound of a numeric range, is a** ``decimal`` **string**, because its
+    form field is a ``DecimalField`` and reads one exactly, where a float read
+    on the way loses a key past ``2**53``; a JSON number is still taken. A CSV
+    filter's numbers stay ``number``, which over HTTP is what splits
+    ``?pks=1,2``, and keep that float reading.
 
     **Every one is optional**, because a filter narrows a read and never
     stands between a caller and it. ``help`` is the author's ``help_text`` when
@@ -85,7 +90,7 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     # ``kinds`` (a multiple choice) in
     # test_each_note_filter_reads_as_the_argument_django_filter_reads.
     if isinstance(filter_obj, (module.BaseCSVFilter, module.MultipleChoiceFilter)):
-        items, choices = offered or (_scalar(module, filter_obj)[0], None)
+        items, choices = offered or (_element(module, filter_obj), None)
         yield Parameter(name, "array", items=items, choices=choices, help=help_)
     elif offered is not None:
         yield Parameter(name, offered[0], choices=offered[1], help=help_)
@@ -121,10 +126,31 @@ def _scalar(module: Any, filter_obj: Any) -> tuple[str, str | None]:
     if isinstance(filter_obj, module.DateFilter):
         return "string", "date"
     if isinstance(filter_obj, module.NumberFilter):
-        return "number", None
+        # Its form field is a ``DecimalField``, which reads a string exactly.
+        # Declared a ``number``, a string argument was read as a float on the
+        # way, and a key past ``2**53`` matched its neighbour's row; a decimal
+        # stays the string it was sent, and still takes a JSON number.
+        return "string", "decimal"
     # A time, a UUID, a duration, text and anything unrecognised: each form
     # field behind them parses a string.
     return "string", None
+
+
+def _element(module: Any, filter_obj: Any) -> str:
+    """The JSON type of each value a CSV filter reads.
+
+    ``items`` holds a JSON type and no format, so a CSV filter's numbers are
+    the ``number`` a decimal cannot be there: declared ``string``, ``?pks=1,2``
+    would no longer split over HTTP, which splits only an element no comma can
+    be part of. So a number in a CSV filter is still read as a float on the
+    way, unlike a scalar number filter's, and a key past ``2**53`` in one may match
+    its neighbour's row. Held both ways by
+    test_each_note_filter_reads_as_the_argument_django_filter_reads (``pks``)
+    and test_a_csv_filter_of_text_reads_strings.
+    """
+    if isinstance(filter_obj, module.NumberFilter):
+        return "number"
+    return _scalar(module, filter_obj)[0]
 
 
 def _bound_type(module: Any, filter_obj: Any) -> tuple[str, str | None]:
@@ -132,7 +158,9 @@ def _bound_type(module: Any, filter_obj: Any) -> tuple[str, str | None]:
 
     The date and time ranges subclass ``RangeFilter``, so they are told apart
     first; a numeric range (``RangeFilter`` itself, or the PostgreSQL
-    ``NumericRangeFilter``) is a number, and any other suffixed filter a string.
+    ``NumericRangeFilter``) is a decimal, for the reason a number filter is -
+    each bound's form field is a ``DecimalField`` - and any other suffixed
+    filter a string.
     """
     if isinstance(filter_obj, module.DateTimeFromToRangeFilter):
         return "string", "date-time"
@@ -141,7 +169,7 @@ def _bound_type(module: Any, filter_obj: Any) -> tuple[str, str | None]:
     if isinstance(filter_obj, module.TimeRangeFilter):
         return "string", None
     if isinstance(filter_obj, (module.RangeFilter, module.NumericRangeFilter)):
-        return "number", None
+        return "string", "decimal"
     return "string", None
 
 

@@ -109,7 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SelectorSpec.filter_set`, a django-filter `FilterSet` applied after
   `extend_queryset`, whose filters are read as Parameters and join the
   selector's `reads` after the author's own; and `filter_set_parameters`, that
-  reading. A real FilterSet needs the new `filter` extra.
+  reading. A number filter, and each bound of a numeric range, is read as a
+  `decimal` string, which its `DecimalField` reads exactly, so a key past
+  `2**53` matches its own row. A real FilterSet needs the new `filter` extra.
 - `run_selector`, `arun_selector`, `materialize_retrieve`,
   `amaterialize_retrieve` and `is_queryset`, the selector steps dispatch runs,
   exported for a transport that runs a selector itself.

@@ -113,7 +113,12 @@ that answers `.qs`. Its filters are reads: each is read as a Parameter by
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument
 set and the shape check cover every filter, and a filter named like a read
-declared differently is refused. Every filter is optional.
+declared differently is refused. Every filter is optional. A number filter,
+and each bound of a numeric range, is a `decimal` string, which its
+`DecimalField` reads exactly: read as a float on the way, a key past `2**53`
+would match its neighbour's row. A JSON number is still taken. A CSV
+filter's numbers stay `number`, so `?pks=1,2` splits, and keep the float
+reading.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its
