@@ -25,6 +25,8 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 
 import django_service_specs
 from django_service_specs import (
@@ -52,12 +54,14 @@ from django_service_specs import (
     dispatch,
     error_response,
     present,
+    server_owned_keys,
     update_from_input,
 )
 from docs.examples import (
     arguments,
     async_dispatch,
     declaring,
+    declaring_writes,
     deleting,
     dispatching,
     quickstart,
@@ -186,6 +190,67 @@ class TestDeclaring:
         assert [p.required for p in validator.parameters()] == [False, False]
         assert validator.validate({}, ValidationContext(None)) == {"name": UNSET, "books": UNSET}
 
+    def test_a_dataclass_validator_refuses_a_partial_call(self) -> None:
+        validator = DataclassValidator(declaring.AuthorPatch)
+        with pytest.raises(ImproperlyConfigured, match="cannot validate a partial call"):
+            validator.validated({}, ValidationContext(None, partial=True))
+
+
+@pytest.mark.django_db
+class TestDeclaringWrites:
+    def test_a_many_call_takes_the_list_and_its_reads_alone(self) -> None:
+        params = declaring_writes.add_notes_spec.parameters()
+        assert [p.name for p in params] == ["archived", "items"]
+
+    def test_every_failing_row_is_refused_at_its_index(self, ada: Any) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                declaring_writes.add_notes_spec,
+                principal=ada,
+                arguments={"items": [{"title": "Fine"}, {"title": 3}, {}]},
+            )
+        assert refused.value.detail == {
+            "items": {
+                1: {"title": ["Expected a string."]},
+                2: {"title": ["This field is required."]},
+            }
+        }
+        assert not Note.objects.exists()  # no row ran: every row is checked first
+
+    def test_the_service_runs_once_over_every_row_with_the_read_beside_them(self, ada: Any) -> None:
+        result = dispatch(
+            declaring_writes.add_notes_spec,
+            principal=ada,
+            arguments={"items": [{"title": "Apples"}, {"title": "Pears"}], "archived": True},
+        )
+        assert result.kind == "list"
+        assert result.data == [declaring_writes.NoteIn("Apples"), declaring_writes.NoteIn("Pears")]
+        assert sorted(Note.objects.filter(archived=True).values_list("title", flat=True)) == [
+            "Apples",
+            "Pears",
+        ]
+
+    def test_another_argument_beside_the_list_is_refused(self, ada: Any) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                declaring_writes.add_notes_spec,
+                principal=ada,
+                arguments={"items": [{"title": "Apples"}], "title": "Pears"},
+            )
+        assert refused.value.detail == {"title": ["Unknown argument."]}
+
+    def test_the_owner_is_the_providers_and_is_not_asked_of_the_caller(
+        self, ada: Any, bob: Any
+    ) -> None:
+        spec = declaring_writes.create_note_spec
+        assert "owner_id" in server_owned_keys(spec)
+        result = dispatch(spec, principal=ada, arguments={"title": "Mine"})
+        assert result.value.owner_id == ada.pk
+        assert isinstance(result.data, declaring_writes.NoteCreate)
+        # A caller naming another owner is overruled by the provider.
+        sent = dispatch(spec, principal=ada, arguments={"title": "Also mine", "owner_id": bob.pk})
+        assert sent.value.owner_id == ada.pk
+
 
 @pytest.mark.django_db
 class TestDispatching:
@@ -231,6 +296,23 @@ class TestDispatching:
             )
         with pytest.raises(TypeError, match="cannot be serialized"):
             pickle.dumps(grant)
+
+    def test_a_resolved_target_is_shown_then_acted_on_without_a_second_lookup(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="Draft")
+        assert dispatching.rename_page(ada, note.pk) == note
+        with CaptureQueriesContext(connection) as queries:
+            renamed = dispatching.rename_page(ada, note.pk, "Final")
+        assert renamed == {"id": note.pk, "title": "Final"}
+        looked_up = [q["sql"] for q in queries if q["sql"].startswith("SELECT")]
+        assert len(looked_up) == 1  # resolve_target's lookup, and no second one from dispatch
+
+    def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Draft")
+        with pytest.raises(NotPermitted):
+            dispatching.rename_page(bob, note.pk)
+        assert dispatching.rename_page(ada, note.pk + 1) is None
 
     def test_binding_outside_dispatch_returns_only_the_validators_values(self, ada: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")
@@ -469,6 +551,8 @@ class TestRelations:
 
     def test_a_create_writes_the_author_and_its_books(self, ada: Any) -> None:
         result = self._create(ada)
+        # The service's ``data`` is the instance the dataclass Validator built.
+        assert isinstance(result.data, declaring.AuthorIn)
         author = result.value
         first, second = author.books.all()
         assert result.service_result.get_child_change("books") == ChildCollectionChange(

@@ -5,7 +5,6 @@ from __future__ import annotations
 # --8<-- [start:write]
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from django_service_specs import (
     ChangeResult,
@@ -42,11 +41,11 @@ class AuthorOut:
     books: list[BookOut]
 
 
-def create_author(*, data: dict[str, Any]) -> ChangeResult[Author]:
+def create_author(*, data: AuthorIn) -> ChangeResult[Author]:
     return create_from_input(Author, data, relations=BOOKS)
 
 
-def update_author(*, instance: Author, data: dict[str, Any]) -> ChangeResult[Author]:
+def update_author(*, instance: Author, data: AuthorPatch) -> ChangeResult[Author]:
     return update_from_input(instance, data, relations=BOOKS)
 
 

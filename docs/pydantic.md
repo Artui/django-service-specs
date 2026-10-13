@@ -54,7 +54,7 @@ same parameter:
 | `str`, `int`, `float`, `bool` | Their JSON types. |
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
-| `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. |
+| `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum` and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. |
 | a model | An object, with its fields as nested Parameters. |
 | `dict[str, X]` | An object with no declared fields. Its values are the model's to validate. |
@@ -138,6 +138,13 @@ reads for the model's own rules: bounds, patterns, validators.
 The context reaches pydantic's validators as `info.context`, a dict with
 `"principal"` and `"target"`, so a `field_validator` can check a value against
 the caller or the row being updated.
+
+**A partial call is refused** with `ImproperlyConfigured`, as the dataclass
+adapter refuses one. pydantic validates a model whole, and a
+`model_validator` is written against every field being there, so validating
+only the fields sent would skip the model's own rules. A spec whose calls are
+[`partial`](declaring.md#partial-updates) uses a `FormValidator`, or a
+Validator of its own that returns only what was sent.
 
 ## Output
 

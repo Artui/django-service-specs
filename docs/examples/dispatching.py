@@ -19,6 +19,7 @@ from django_service_specs import (
     bind_arguments,
     dispatch,
     present,
+    resolve_target,
 )
 from docs.examples.declaring import IsSignedIn, NoteRow, list_notes_spec
 from docs.examples.quickstart import Rename, rename_note_spec
@@ -74,6 +75,29 @@ def bind_rename(user: Any, note: Note, arguments: dict[str, Any]) -> dict[str, A
 
 
 # --8<-- [end:bind]
+
+
+# --8<-- [start:resolve_target]
+def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
+    found = resolve_target(rename_note_spec, principal=user, arguments={"pk": pk})
+    if isinstance(found, DispatchResult):
+        return None  # not found: the answer dispatch would give
+    note, grant = found  # NotPermitted was raised already for anyone else
+    if title is None:
+        return note  # the GET: the row the form will act on
+    # The POST acts on the row already found and checked: no second lookup,
+    # and the grant says has_object_permission was asked.
+    result = dispatch(
+        rename_note_spec,
+        principal=user,
+        arguments={"pk": pk, "title": title},
+        target=note,
+        grant=grant,
+    )
+    return present(rename_note_spec, result)
+
+
+# --8<-- [end:resolve_target]
 
 
 # --8<-- [start:seeds]

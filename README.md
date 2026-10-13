@@ -46,11 +46,12 @@ The package has no models and needs no entry in `INSTALLED_APPS`. A principal
 is a user of `django.contrib.auth`, and a generic-relation write needs
 `django.contrib.contenttypes`. Django 4.2 or later, on Python 3.10 or later.
 
-The pydantic adapter is the one part that needs more, and it comes with an
-extra:
+Two parts need more, and each comes with an extra: the pydantic adapter, and
+a selector's django-filter `FilterSet`:
 
 ```bash
 pip install "django-service-specs[pydantic]"
+pip install "django-service-specs[filter]"
 ```
 
 ## Quickstart
@@ -148,12 +149,15 @@ take the same steps, in the same order, for a write and a read:
    which rows exist.
 3. **Target resolution.** The selector finds the row or rows. A missing row is
    returned as `DispatchResult(kind="not_found")`, never raised.
-4. **Object-level authorization.** `has_object_permission` on a retrieved row.
+4. **Object-level authorization.** `has_object_permission` on a retrieved row,
+   and `has_scope_permission` where no single row is: a collection, a list,
+   or the `None` of a create.
 5. **Validation.** The Validator, with the resolved row in its context, so an
    update's uniqueness check can exclude the row being updated.
-6. **Affordances.** A write's declared `affordances`, in order. The first one
-   the row or the moment does not meet refuses the call with
-   `ActionUnavailable`, before the run's transaction opens.
+6. **Affordances, then preconditions.** A write's declared `affordances`, in
+   order: the first one the row or the moment does not meet refuses the call
+   with `ActionUnavailable`. Then its `preconditions`, the first to raise
+   aborting the call. Both before the run's transaction opens.
 7. **The run.** The service, inside `transaction.atomic()` unless the spec
    says `atomic=False`, then the output selector if one is declared.
 
@@ -175,6 +179,7 @@ so one that hands the row to a template never pays for rendering it.
 | A declared affordance the row or the moment does not meet | `ActionUnavailable`, a `ServiceConflict` carrying a stable `code` | Dispatch, before the run |
 | A required row that does not exist | Nothing: `DispatchResult(kind="not_found")` | - |
 | An operation that declares no permission check | `ImproperlyConfigured`, at registration and at dispatch | Configuration |
+| An `async def` permission check, condition, provider or precondition, which nothing awaits | `ImproperlyConfigured`, when it is declared | Configuration |
 
 The first four share the base `DispatchError`; the next two share
 `ServiceError`, an unavailable action included, because the caller adapts to
@@ -193,7 +198,7 @@ out is refused rather than read as "no restriction".
 [artui.github.io/django-service-specs](https://artui.github.io/django-service-specs/):
 
 - [Declaring an operation](https://artui.github.io/django-service-specs/declaring/) - specs, Parameters, Validators, Output and Presenters
-- [Dispatching](https://artui.github.io/django-service-specs/dispatching/) - the order, results, grants, the async rule and pool seeds
+- [Dispatching](https://artui.github.io/django-service-specs/dispatching/) - the order, results, grants, a target resolved ahead of the call, the async rule and pool seeds
 - [Serving over HTTP](https://artui.github.io/django-service-specs/http/) - a spec as a Django view answering JSON, and the status of each refusal
 - [Arguments and refusals](https://artui.github.io/django-service-specs/arguments/) - the shape check, the error tree and the two error families
 - [Affordances](https://artui.github.io/django-service-specs/affordances/) - when an operation is possible right now, its refusal's stable code, and asking for one more value

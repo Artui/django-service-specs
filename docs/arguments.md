@@ -29,6 +29,20 @@ keeps its float. DRF's `IntegerField`, like Django's form field, reads
 `str(value)`, so given `1e16` it reads `"1e+16"` and refuses it; the check
 follows JSON Schema and hands on `10000000000000000`.
 
+**A string spelling a number is that number** where an `integer` or a
+`number` is declared, wherever the declaration reaches, and the number is
+handed on: `"3"`, `"3.0"` and `" 3 "` are 3, and a number's `"1e3"` is
+1000.0. Django's forms, DRF and pydantic's lax mode all read these strings
+so, and their common reading is the one [`coerce_flat`](#flat-transports)
+makes, which the check shares. A string that spells no such number is refused
+as the type it is not, and `true` is still neither. The number goes on rather
+than the string because a Validator stricter than those three, the dataclass
+adapter's, refuses `"3"` for an `int`.
+
+A **`file`** is a Django `File`, an upload included, and nothing else is one:
+no JSON value can be, so a JSON caller's string for one is refused at its
+name.
+
 NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
 `number` type, and only a decoder reading an overflowing literal such as `1e400`,
@@ -39,6 +53,14 @@ refused with `"Enter a number."`; any other type refuses one as the wrong type.
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.
+
+Under `partial=True` no absent parameter is refused, at any depth: a partial
+update sends only what changes. A value that is present is checked as it would
+be otherwise, and an unknown key is still refused. Dispatch relaxes only a
+[`partial`](declaring.md#partial-updates) write's Validator parameters, so a
+transport checking a call as dispatch will calls
+[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
+rather than `check_arguments(partial=True)`.
 
 It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument
@@ -95,6 +117,13 @@ docs/examples/arguments.py:tree
   so it has no field to hang the message on. `non_field_errors` is Django's and
   DRF's spelling of the same idea, so a transport that renders either's errors
   reads these without a translation table.
+
+A [`many`](declaring.md#many-rows-in-one-call) write's rows are addressed the
+same way, under its `many_argument`: `{"items": {2: {"title": [...]}}}`, a
+message about a row itself under `non_field_errors` inside it, and the list's
+own refusal - absent, null, not a list - as `{"items": [...]}`. The shape
+check's refusals of some rows and the Validator's of others come back in the
+one tree.
 
 Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The
