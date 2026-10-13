@@ -11,19 +11,42 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.services.is_async import is_async
 
 
-def check_callable(value: Any, *, label: str) -> None:
+def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
+    """Refuse a value that is not callable, and under ``sync`` one that is ``async def``.
+
+    ``sync`` is for every seat dispatch calls from sync code and never awaits:
+    the providers and the preconditions. Called there, an ``async def``
+    callable returns a coroutine nobody awaits, so a precondition that would
+    have refused the call raises nothing and the call goes ahead, and a
+    provider hands dispatch a coroutine for its mapping or, as a
+    ``progress_reporter``, for the sink ``pool/utils.py`` calls each report
+    with. Refused when the spec is built, naming the seat and the callable,
+    rather than found at the first call or never. The run itself - the
+    service, or a selector spec's own selector - may be ``async def``, since
+    dispatch bridges it and ``adispatch`` awaits it, so it is checked without
+    ``sync``.
+    """
     if not callable(value):
         raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
+    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``, and
+    # test_a_sync_provider_and_precondition_are_accepted the second.
+    if sync and is_async(value):
+        raise ImproperlyConfigured(
+            f"{label} is {_name(value)}, an async callable. It is called from sync code "
+            "and never awaited, on both entry points; declare it with def, since adispatch "
+            "already runs it off the event loop."
+        )
 
 
 def check_providers(spec: Any, names: tuple[str, ...], *, label: str) -> None:
-    """Refuse a provider field holding anything but a callable; ``None`` declares none."""
+    """Refuse a provider field holding anything but a sync callable; ``None`` declares none."""
     for name in names:
         value = getattr(spec, name)
         if value is not None:
-            check_callable(value, label=f"{label}.{name}")
+            check_callable(value, label=f"{label}.{name}", sync=True)
 
 
 def check_preconditions(
@@ -48,7 +71,7 @@ def check_preconditions(
         )
     declared = tuple(preconditions)
     for index, precondition in enumerate(declared):
-        check_callable(precondition, label=f"{label}.preconditions[{index}]")
+        check_callable(precondition, label=f"{label}.preconditions[{index}]", sync=True)
     return declared
 
 
@@ -103,6 +126,11 @@ def check_reserved(parameters: Parameters, *, label: str) -> Parameters:
             "An argument must never outrank a seeded value; rename the parameter."
         )
     return parameters
+
+
+def _name(value: Any) -> str:
+    """A callable's own name, or its type's for an instance or a ``functools.partial``."""
+    return getattr(value, "__qualname__", None) or type(value).__name__
 
 
 def _describe(value: Any) -> str:

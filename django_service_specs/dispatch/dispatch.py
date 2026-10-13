@@ -14,6 +14,7 @@ from django_service_specs.dispatch.utils import (
     lookup,
     open_call,
     prepare_service,
+    refuse_a_selector_spec_s_target,
     selector_pool,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -21,6 +22,7 @@ from django_service_specs.services.run_service import run_service
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
@@ -33,6 +35,7 @@ def dispatch(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
+    target: Any = UNSET,
 ) -> DispatchResult:
     """Run ``spec`` for ``principal`` with ``arguments``, in a fixed order.
 
@@ -47,8 +50,11 @@ def dispatch(
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()`` under ``unknown_arguments``: the closed
-       argument set and the shape check, which under a service spec's
-       ``partial`` refuses no absent argument. A parameter a registered seed in
+       argument set and the shape check. It refuses no absent Validator field
+       under a service spec's ``partial``, at any depth, while a ``reads``
+       argument and the target's read stay required; nor one the spec's
+       ``input_data`` provider is annotated to fill, which the Validator still
+       refuses if the provider declines it. A parameter a registered seed in
        ``pool_seeds`` occupies is refused before that, as a configuration error.
     2. [`authorize`][django_service_specs.authorization.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything
@@ -60,8 +66,12 @@ def dispatch(
        missing row is ``DispatchResult(kind="not_found")``, returned rather than
        raised, unless the selector says ``allow_none``.
     4. [`authorize_target`][django_service_specs.authorization.authorize_target.authorize_target]
-       on a retrieved row - never on a list, and never on a ``None`` that
-       ``allow_none`` let through.
+       on a retrieved row, and
+       [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
+       where no row is: on a list, a collection target's set, empty or not,
+       a create's ``None``, and the ``None`` a service spec's ``allow_none``
+       lets through. A selector spec's own ``None`` under ``allow_none`` is
+       asked of neither.
     5. A service spec's Validator, on only the arguments it declares, with
        its ``input_data`` provider's values merged over the caller's, and the
        resolved target and ``partial`` in its context. Its
@@ -102,6 +112,17 @@ def dispatch(
     ``async def`` run once nothing can refuse the call; either way a refused
     call never calls it.
 
+    ``target`` is a service spec's target resolved by the caller - the row
+    an HTTP view's ``get_object()`` found, or what ``resolve_target``
+    returned - and stands in for step three: no lookup runs, and the call's
+    ``instance`` or ``collection`` is ``target``. Step four still runs on it,
+    unless ``grant`` says ``target_checked``, so with that grant
+    ``has_object_permission`` is asked once across both. ``None`` is a missing
+    row, not-found unless the instance selector says ``allow_none``; a create
+    takes ``None`` and refuses anything else. **Dispatch trusts it**: the
+    target's ``reads`` are still checked as declared, and keeping them and
+    ``target`` in agreement is the caller's. A selector spec refuses it.
+
     ``kind`` is ``"list"`` for a LIST selector spec or a service whose output
     selector is a LIST, and ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
@@ -118,6 +139,8 @@ def dispatch(
             Validator did not hand back under that name, raises the
             callable's own ``TypeError``.
         NotPermitted: step two or step four.
+        TypeError: ``target`` on a selector spec, or anything but ``None`` on
+            a service spec that declares no target selector.
         ActionUnavailable: step six, an affordance not met.
         ServiceNotFound: step six, a condition on the row reached after the row
             was deleted.
@@ -127,6 +150,7 @@ def dispatch(
             selector that returned something other than a queryset, or a
             condition on the row with no row to answer it for.
     """
+    refuse_a_selector_spec_s_target(spec, target)
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
             spec,
@@ -149,6 +173,7 @@ def dispatch(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        target=target,
     )
     if isinstance(prepared, DispatchResult):
         return prepared

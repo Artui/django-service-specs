@@ -42,6 +42,7 @@ from tests.dispatch.utils import (
     OwnerOnly,
     Record,
     Refuse,
+    Scoped,
     Titled,
     make_user,
     note_by_pk,
@@ -805,3 +806,80 @@ async def test_an_async_selector_spec_raising_does_not_exist_runs_no_preconditio
     )
     result = await adispatch(spec, principal=ada, arguments={})
     assert (result.value, seen) == (None, [])
+
+
+# --- the scope check and target=, inside the one hop ------------------------------------
+
+
+async def test_an_async_list_selector_s_rows_are_scope_checked_in_the_second_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    mine = await _create(owner=ada, title="mine")
+
+    async def selector() -> Any:
+        return Note.objects.filter(owner=ada)
+
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=selector, permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(spec, principal=ada, arguments={})
+
+    # Listing the set is a query, so the check ran on the executor thread.
+    assert check.scopes == [[mine]]
+    assert len(hops) == 2
+
+
+async def test_a_create_is_scope_checked_inside_the_one_hop(ada: Any, hops: list[str]) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = ServiceSpec(service=Record(), permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert check.scopes == [None]
+    assert len(hops) == 1
+
+
+@pytest.mark.parametrize("atomic", [True, False])
+async def test_a_pre_resolved_target_stands_in_for_the_lookup(
+    ada: Any, hops: list[str], atomic: bool
+) -> None:
+    note = await _create(owner=ada, title="mine")
+    looked_up: list[int] = []
+
+    def selector(*, pk: int) -> Any:
+        looked_up.append(pk)
+        return Note.objects.filter(pk=pk)
+
+    async def service(*, instance: Note) -> Note:
+        return instance
+
+    check = OwnerOnly()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        atomic=atomic,
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=selector, reads=PK),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": note.pk}, target=note)
+
+    assert result.instance == note
+    assert looked_up == []
+    assert check.rows == [note]
+    assert len(hops) == 1
+
+
+async def test_an_async_selector_spec_refuses_a_target_before_any_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    async def selector() -> list[Any]:
+        return []
+
+    spec = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN)
+
+    with pytest.raises(TypeError, match="target= is a ServiceSpec's"):
+        await adispatch(spec, principal=ada, arguments={}, target=[])
+
+    assert hops == []

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from typing_extensions import TypedDict
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.dispatch.bind_arguments import bind_arguments
@@ -201,3 +202,50 @@ def test_the_same_call_on_a_spec_that_is_not_partial_is_refused() -> None:
     with pytest.raises(InvalidArguments) as caught:
         bind_arguments(spec, {"title": "T"}, principal=None)
     assert caught.value.detail == {"body": ["This field is required."]}
+
+
+def test_a_partial_spec_still_requires_its_target_s_pk() -> None:
+    # ``partial`` relaxes the Validator's fields alone: a partial update still
+    # says which row it updates.
+    spec = ServiceSpec(
+        service=service, validator=Recording(), instance_selector_spec=retrieve(), partial=True
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "Kept"}, principal=PRINCIPAL)
+    assert caught.value.detail == {"pk": ["This field is required."]}
+
+
+class _ServerTitle(TypedDict):
+    title: str
+
+
+def _server_title() -> _ServerTitle:
+    return {"title": "server's"}
+
+
+class _Merged(Validator):
+    """Declares a required title, and refuses its absence in words no shape check uses."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string", required=True))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.calls.append(dict(arguments))
+        if "title" not in arguments:
+            raise InvalidArguments({"title": ["The merged input has no title."]})
+        return dict(arguments)
+
+
+def test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider() -> None:
+    # The shape check relaxes the field as dispatch's does, and this function
+    # calls no provider, so the Validator is handed the caller's arguments
+    # alone and is the one that refuses.
+    validator = _Merged()
+    spec = ServiceSpec(service=service, validator=validator, input_data=_server_title)
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {}, principal=PRINCIPAL)
+    assert caught.value.detail == {"title": ["The merged input has no title."]}
+    assert validator.calls == [{}]
