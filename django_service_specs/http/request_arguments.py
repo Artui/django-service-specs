@@ -23,6 +23,12 @@ from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_typ
 _CSRF_FIELD = "csrfmiddlewaretoken"
 """The field ``{% csrf_token %}`` renders into a form: Django's, and never an argument."""
 
+_COMMA_SEPARABLE = ("number", "integer", "boolean")
+"""The element types a comma can never be part of, so ``?ids=1,2`` is two elements, not one.
+
+A string can hold a comma, and so can anything the reader leaves as a string
+(a decimal, a date), so those arrays take a value whole."""
+
 _URLENCODED = "application/x-www-form-urlencoded"
 _MULTIPART = "multipart/form-data"
 
@@ -52,7 +58,14 @@ def request_arguments(
 
     **A flat source** is read by the declaration. A parameter of type
     ``array`` takes every value its key was sent with, and anything else takes
-    the last, as ``QueryDict`` reads a repeated key. **A blank value is
+    the last, as ``QueryDict`` reads a repeated key. **An array of numbers,
+    integers or booleans also reads a value holding commas as its elements**,
+    ``?ids=1,2`` as ``[1, 2]`` with the space around a part trimmed, because
+    a comma cannot be part of such a value and it is the spelling a
+    django-filter CSV filter advertises; repeated keys and commas may mix. An
+    empty part (``?ids=1,,2``) is not dropped as a blank element is: it is
+    refused at its index as any malformed element is. A string array is never
+    split, since a comma is part of a string. **A blank value is
     absent unless** ``""`` **is one the parameter can take**: a plain string
     can, and a number, a boolean, a date, a decimal, or a string whose
     choices leave the blank out cannot. A flat wire has no other spelling of
@@ -117,7 +130,26 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
         # second, without which every declared value would become a list).
         if param is not None and param.type == "array":
             keep = _takes_blank(param.items, param)
-            values = [value for value in source.getlist(key) if keep or value != ""]
+            # One branch to coverage; the element type decides whether a value
+            # is split: test_a_number_array_reads_a_comma_separated_value_as_its_elements
+            # (and the integer and boolean ones) hold the types that split, and
+            # test_a_string_array_is_not_split and
+            # test_an_array_with_no_declared_element_is_not_split the ones that
+            # must not. A blank is dropped first, so an empty part left by a
+            # stray comma is the reader's malformed element rather than a blank.
+            split = param.items in _COMMA_SEPARABLE
+            values: list[str] = []
+            for value in source.getlist(key):
+                # One branch to coverage, so each condition is held by its own
+                # test: test_blank_elements_of_a_non_string_array_are_dropped
+                # (the blank: without it every element is dropped) and
+                # test_blank_elements_of_a_string_array_are_kept (``not keep``).
+                if value == "" and not keep:
+                    continue
+                if split:
+                    values.extend(part.strip() for part in value.split(","))
+                else:
+                    values.append(value)
             if values:
                 raw[key] = values
             continue
