@@ -64,9 +64,13 @@ class ServiceSpec:
             and the shape check cover them; never handed to the Validator. A
             name the target selector also reads is refused at construction,
             and one the Validator declares when ``parameters()`` is assembled.
-        partial: Whether a call may leave out a required argument, as an HTTP
-            ``PATCH`` does: the shape check and the Validator are both told.
-            On a ``many`` spec that holds for every row.
+        partial: Whether a call may leave out any of the Validator's
+            parameters, as an HTTP ``PATCH`` does: the shape check does not
+            refuse an absent one, at any depth, and the Validator is told
+            through ``ValidationContext.partial``. The spec's ``reads`` and its
+            target selector's stay required as declared, so a partial update
+            still names its row. On a ``many`` spec it holds inside every row,
+            and the list itself stays required.
         many: Whether the call carries a list of rows, each validated by the
             ``validator``, under the one argument ``many_argument`` names, for
             one run of the service over all of them. The service receives the

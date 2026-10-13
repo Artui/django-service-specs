@@ -20,7 +20,8 @@ happened to install.
 
 - [`spec_input_schema(spec, *, unknown_arguments=REJECT)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
   describes everything `spec.parameters()` declares: the arguments dispatch
-  checks.
+  checks. A `many` service spec's is its `reads` and the one required list
+  `many_argument` names, each row an object of the Validator's parameters.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
@@ -164,6 +165,16 @@ contradict, and states everything the declaration knows.
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on `items`, and gain `null` there by
   the element's nullability alone, never by the array's.
+- **Labelled choices are a `oneOf`** of `{"const": value, "title": label}` in
+  place of the `enum`, where some label says more than its value, as the
+  book's `status` above shows; labels that only repeat their values keep the
+  `enum`. A choice with no label is a bare `{"const": value}`, and so is the
+  `null` a nullable parameter gains. A title is rendered when the schema is
+  built, so a lazy label is in the language active then, and it constrains
+  nothing.
+- **A file is `{}`.** No JSON value is one, so any type stated for it would be
+  false, and JSON Schema has no keyword for a multipart part. Whether it is
+  required, and its `description`, are still stated.
 - **`required` lists what the shape check refuses when absent**: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it
@@ -231,6 +242,7 @@ on its presenter:
 | A service spec whose output selector is a `RETRIEVE` | the item, with `"null"` in its type |
 | A service spec with no output selector | the item |
 | A service spec with no output selector, with `allow_none=True` | the item, with `"null"` in its type |
+| A `many` service spec with no output selector | `{"type": "array", "items": <item>}`, with `"null"` in its type under `allow_none=True` |
 
 A `RETRIEVE` selector spec without `allow_none` answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
@@ -260,9 +272,10 @@ service's return.
 
 ## What is deliberately not emitted
 
-- **No `title` on input.** A Parameter has no label. On output, a field's
-  `label` becomes its `title`, and adapters set a label only where the author
-  wrote one, so a title is never the field's name restated.
+- **No `title` on an input property.** A Parameter has no label of its own;
+  on input a `title` is only ever a choice's. On output, a field's `label`
+  becomes its `title`, and adapters set a label only where the author wrote
+  one, so a title is never the field's name restated.
 - **No `additionalProperties` on output.** Output is not a set a caller can get
   wrong, and a transport may add keys of its own to what it sends.
 - **No `default` or `description` on output.** A default says what happens when

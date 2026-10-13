@@ -68,15 +68,17 @@ extends.
 | `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. |
 | `ModelChoiceField` | The JSON type of the model field rows are matched on - `to_field_name`, or the primary key - and no choices: they are rows, and listing them would query. It validates to the row. |
 | `ModelMultipleChoiceField` | An `array` of the same. It validates to a queryset. |
+| `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. |
 | any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
 
-A choice set given as a callable is computed per form and may query, so it is
-not read: the field is declared as a `string` with no choices, which every
+Every choice field's choices carry their labels as `choice_labels`, the label
+Django displays keyed by the value as the caller sends it, so a schema states
+each as a `title`. A choice set given as a callable is computed per form and
+may query, so it is not read: the field is declared as a `string` with no choices, which every
 choice field accepts, and the form checks the choice when it validates.
 
 Refused, with `ImproperlyConfigured`:
 
-- `FileField` and `ImageField`: an upload does not cross a JSON transport.
 - `JSONField`: it takes any JSON value, and a parameter declares one type.
 - `MultiValueField`, such as `SplitDateTimeField`: it is cleaned from several
   widget values at once, which only an HTML form sends. Declare a field per
@@ -125,6 +127,19 @@ returns with the rest.
 The form is built from the arguments alone - `data=`, and `instance=` for a
 `ModelForm` - so a form whose `__init__` requires anything more, such as the
 signed-in user, cannot be used as it is.
+
+## Partial updates
+
+On a [`partial`](declaring.md#partial-updates) spec's call, every field the
+arguments do not name is taken off the bound form before it validates, so it
+is neither required nor cleaned, and `validate()` returns no key for it: an
+absent `BooleanField` does not come back `False`, nor an absent `CharField`
+`''`, which an update would write over the row. A value that is sent is
+checked exactly as on a whole call, so a required field may be left out but
+not sent empty. On a `ModelForm` the fields left out keep the target's
+values, and its model and uniqueness checks skip them. `clean()` sees only
+what was sent, so it reads `cleaned_data` with `get`. The parameters are the
+same for both calls: `required` says what a whole call needs.
 
 ## A ModelForm behind an update
 

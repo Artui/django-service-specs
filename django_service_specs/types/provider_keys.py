@@ -27,8 +27,14 @@ class ProviderKeys(NamedTuple):
         declinable: The keys whose value admits ``UnsetType``
             (``tenant: str | UnsetType``). The provider may return ``UNSET`` for
             one, which dispatch removes from the pool, so the caller's value is
-            the one the callable receives. Such a key is the caller's to send,
-            but not required of it, since the provider may fill it after all.
+            the one the callable receives. Such a key stays the caller's: a
+            transport keeps asking for it, and dispatch holds it to its
+            declaration, so a required one is required of the caller even
+            though the provider may fill it. What dispatch relaxes is narrower
+            still: a ``filled`` key of the spec's ``input_data`` provider that
+            names one of the Validator's parameters, at the top level or, on a
+            ``many`` spec, inside each row. A filled key naming a read stays
+            required.
     """
 
     filled: frozenset[str]
