@@ -15,7 +15,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
-from tests.filters.utils import NoteFilters, TitleFilter
+from tests.filters.utils import NoteFilters, TitleFilter, UserFilters
 from tests.specs.utils import PK, Named, Nobody
 
 
@@ -68,12 +68,40 @@ def test_output_is_the_presenters() -> None:
         ({"prefetch_related": "tags"}, "prefetch_related is a string"),
         ({"extend_queryset": 3}, "extend_queryset must be callable"),
         ({"metadata": ["x"]}, "metadata must be a mapping; got list"),
+        ({"kwargs": {"tenant": 1}}, "SelectorSpec.kwargs must be callable; got dict"),
+        ({"progress_reporter": 3}, "SelectorSpec.progress_reporter must be callable; got int"),
+        (
+            {"preconditions": print},
+            r"SelectorSpec.preconditions takes a sequence of callables; got "
+            r"builtin_function_or_method\. Wrap a single one in a list: preconditions=\[\.\.\.\]\.",
+        ),
+        ({"preconditions": {print}}, "SelectorSpec.preconditions takes a sequence"),
+        ({"preconditions": "print"}, "SelectorSpec.preconditions takes a sequence"),
+        (
+            {"preconditions": [print, 3]},
+            r"SelectorSpec.preconditions\[1\] must be callable; got int\.",
+        ),
     ],
 )
 def test_refuses_at_construction(kwargs: dict, message: str) -> None:
     base = {"kind": SelectorKind.LIST, "selector": list}
     with pytest.raises(ImproperlyConfigured, match=message):
         SelectorSpec(**{**base, **kwargs})
+
+
+def test_the_providers_and_preconditions_are_kept_in_declaration_order() -> None:
+    def scope() -> dict:
+        return {}
+
+    def sink() -> None:
+        return None
+
+    spec = listing(kwargs=scope, progress_reporter=sink, preconditions=[print, len])
+    assert spec.kwargs is scope
+    assert spec.progress_reporter is sink
+    assert spec.preconditions == (print, len)
+    bare = listing()
+    assert (bare.kwargs, bare.progress_reporter, bare.preconditions) == (None, None, None)
 
 
 def test_extend_queryset_and_metadata_are_kept_as_given() -> None:
@@ -170,6 +198,28 @@ class TestFilterSet:
         copy = dataclasses.replace(spec, allow_none=False)
         assert copy == spec
         assert copy.reads == Parameters.of(Parameter("title", "string"))
+
+    def test_a_copy_with_another_filter_set_reads_only_its_filters(self) -> None:
+        # ``replace`` hands the merged reads back with the new filter set, so
+        # the old one's filters would otherwise survive as if the author had
+        # declared them.
+        own = Parameter("limit", "integer")
+        spec = listing(reads=Parameters.of(own), filter_set=TitleFilter)
+        copy = dataclasses.replace(spec, filter_set=UserFilters)
+        assert copy.reads == listing(reads=Parameters.of(own), filter_set=UserFilters).reads
+        assert copy == listing(reads=Parameters.of(own), filter_set=UserFilters)
+
+    def test_a_copy_without_a_filter_set_reads_the_author_s_own_alone(self) -> None:
+        own = Parameter("limit", "integer")
+        spec = listing(reads=Parameters.of(own), filter_set=TitleFilter)
+        assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(own)
+
+    def test_a_read_the_author_declared_as_the_filter_does_survives_a_copy(self) -> None:
+        # Declared by the author and equal to the filter's, so never added as
+        # the filter's: dropping the filter set leaves it declared.
+        title = Parameter("title", "string")
+        spec = listing(reads=Parameters.of(title), filter_set=TitleFilter)
+        assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(title)
 
     def test_a_read_the_filter_declares_differently_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):

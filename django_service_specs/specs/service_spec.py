@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -18,7 +18,9 @@ from django_service_specs.specs.utils import (
     check_callable,
     check_metadata,
     check_permissions,
+    check_preconditions,
     check_presenter,
+    check_providers,
     check_reserved,
 )
 from django_service_specs.types.affordance import Affordance
@@ -34,7 +36,7 @@ class ServiceSpec:
     refused: the shape check and the closed argument set, class-level
     authorization, target resolution, object-level authorization, validation
     with the target in the Validator's context, the ``affordances``, the
-    service, then the output selector.
+    ``preconditions``, the service, then the output selector.
 
     Attributes:
         service: The operation. Called with the keywords it declares: the
@@ -45,6 +47,17 @@ class ServiceSpec:
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open
             operation says ``[Unrestricted()]``.
+        reads: The arguments the service, its providers and its preconditions
+            read with no Validator in front of them - the ``project_pk`` a
+            create's ``kwargs`` provider scopes by - as a selector spec's
+            ``reads`` are. Part of ``parameters()``, after the target selector's
+            and before the Validator's, so the schema, the closed argument set
+            and the shape check cover them; never handed to the Validator. A
+            name the target selector also reads is refused at construction,
+            and one the Validator declares when ``parameters()`` is assembled.
+        partial: Whether a call may leave out a required argument, as an HTTP
+            ``PATCH`` does: the shape check and the Validator are both told, and
+            only what the caller sent is validated.
         validator: Validates the arguments its own ``parameters()`` declare. A
             [`Validator`][django_service_specs.validation.validator.Validator]
             instance; ``None`` for an operation that takes no arguments beyond
@@ -96,11 +109,41 @@ class ServiceSpec:
             declared ``False``, or every spec ever written starts claiming it is
             not idempotent. ``atomic`` is a different question: it says a single
             call is all-or-nothing, not that a second call is a no-op.
+        preconditions: Raise-to-abort rules, a sequence of callables each called
+            with the keywords it declares from the service's pool, after the
+            ``affordances`` and before the service, outside its transaction. The
+            return value is ignored. Kept as a tuple in declaration order.
+        kwargs: A provider of extra pool entries: called with the keywords it
+            declares from the call's pool, it returns a mapping merged into the
+            pool the service is called from after the caller's arguments, so a
+            key it answers is the author's value whatever the caller sent. A
+            value of ``UNSET`` declines its key. Annotate its return as a
+            ``TypedDict`` and
+            [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
+            reads which keys it fills before it runs.
+        input_data: A provider of server-owned input: called with the keywords
+            it declares from the call's pool, the resolved target among them,
+            it returns a mapping merged onto the caller's arguments before the
+            Validator sees them, after the caller's, so its keys are the
+            author's values. A value of ``UNSET`` declines its key.
+        progress_reporter: A provider of a
+            [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
+            sink the service reports to beside the transport's - a task record,
+            an audit trail - called with the keywords it declares from the base
+            pool. Resolved on first use, so a call refused before its run never
+            calls it, and a provider returning ``None`` declines.
         metadata: A project's own per-operation facts, stored as given.
     """
 
     service: Callable[..., Any]
     permissions: Sequence[PermissionCheck] | None = None
+    # ``SelectorSpec``'s word for the arguments a callable reads with no
+    # Validator in front of it, so one word means one thing on both specs.
+    reads: Parameters = field(default_factory=Parameters)
+    # A bare bool rather than djangorestframework-services' ``bool | None``,
+    # where ``None`` reads the HTTP method: this package has no method to read,
+    # so the declaration is the answer.
+    partial: bool = False
     validator: Validator | None = None
     instance_selector_spec: SelectorSpec | None = None
     collection_selector_spec: SelectorSpec | None = None
@@ -124,6 +167,15 @@ class ServiceSpec:
     # that for "no side effects at all", which a write never is. ``bool | None``
     # rather than ``bool``, because silence must not read as a claim.
     idempotent: bool | None = None
+    # djangorestframework-services' names for the same declarations, so a spec
+    # moving between the two packages keeps its field names. Not ``guards``
+    # for the first: the create and collection guard is a permission check's.
+    # Typed open (``...``) because each is bound from the keyword pool, so its
+    # signature is whichever subset of the pool it declares.
+    preconditions: Sequence[Callable[..., None]] | None = None
+    kwargs: Callable[..., Mapping[str, Any]] | None = None
+    input_data: Callable[..., Mapping[str, Any]] | None = None
+    progress_reporter: Callable[..., Any] | None = None
     metadata: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -162,6 +214,12 @@ class ServiceSpec:
                 "value is presented once; keep the one that describes what is returned."
             )
         object.__setattr__(self, "affordances", _check_affordances(self))
+        _check_reads(self)
+        _check_nested(self)
+        check_providers(self, ("kwargs", "input_data", "progress_reporter"), label=label)
+        object.__setattr__(
+            self, "preconditions", check_preconditions(self.preconditions, label=label)
+        )
         check_metadata(self.metadata, label=label)
 
     def target_selector_spec(self) -> SelectorSpec | None:
@@ -169,16 +227,17 @@ class ServiceSpec:
         return self.instance_selector_spec or self.collection_selector_spec
 
     def parameters(self) -> Parameters:
-        """Everything this spec takes: its target selector's reads, then its Validator's.
+        """Everything this spec takes: its target selector's reads, its own, then its Validator's.
 
         Assembled on every call rather than at construction, because a
         Validator reading a model-backed declaration may need the app registry,
-        and specs are commonly built at import time. A name both sources declare
-        is refused here, as is one dispatch seeds itself.
+        and specs are commonly built at import time. A name two sources declare
+        is refused here, as is one dispatch seeds itself; the two that need no
+        Validator, the target's reads and the spec's, were refused at
+        construction already.
         """
-        target = self.target_selector_spec()
         own = self.validator.parameters() if self.validator is not None else Parameters()
-        assembled = (target.parameters() if target is not None else Parameters()) + own
+        assembled = _beside_the_target(self) + own
         return check_reserved(assembled, label="ServiceSpec.validator")
 
     def presenter_for_output(self) -> Presenter | None:
@@ -192,6 +251,64 @@ class ServiceSpec:
         """What this spec returns, as its presenter declares it, or ``None``."""
         presenter = self.presenter_for_output()
         return presenter.output() if presenter is not None else None
+
+
+def _beside_the_target(spec: ServiceSpec) -> Parameters:
+    """The target selector's reads, then the spec's own: the half known at construction."""
+    target = spec.target_selector_spec()
+    return (target.parameters() if target is not None else Parameters()) + spec.reads
+
+
+def _check_reads(spec: ServiceSpec) -> None:
+    """Refuse ``reads`` that are not Parameters, name a seed, or repeat the target's.
+
+    At construction, because none of it needs the Validator: a read the
+    target selector also declares is two sources of one argument, which ``+``
+    refuses, and refusing it here rather than on the first call keeps the
+    error beside the declaration.
+    """
+    if not isinstance(spec.reads, Parameters):
+        raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
+    check_reserved(spec.reads, label="ServiceSpec.reads")
+    _beside_the_target(spec)
+
+
+def _check_nested(spec: ServiceSpec) -> None:
+    """Refuse a nested selector declaring what dispatch never runs for it.
+
+    A nested selector is a step of this spec's run, not a run of its own, so
+    its ``preconditions`` and ``progress_reporter`` would be skipped in
+    silence, and a guard skipped in silence is the failure a construction
+    check exists to prevent. A target selector's ``kwargs`` scope its lookup
+    and run; an output selector re-reads what the service produced, with no
+    caller's arguments for a provider to stand beside, so its ``kwargs`` are
+    refused too.
+    """
+    for role in ("instance", "collection", "output"):
+        nested: SelectorSpec | None = getattr(spec, f"{role}_selector_spec")
+        if nested is None:
+            continue
+        label = f"ServiceSpec.{role}_selector_spec"
+        if nested.preconditions is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares preconditions, which are never run on a nested selector. "
+                "Declare them on this ServiceSpec, whose pool carries the resolved target."
+            )
+        if nested.progress_reporter is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares a progress_reporter, which is never run on a nested "
+                "selector. Declare it on this ServiceSpec, whose service is the run."
+            )
+        # Two conjuncts, each held by its own test in tests/specs/test_service_spec.py:
+        # TestEngineFields.test_a_target_selector_s_kwargs_provider_is_its_own_to_run
+        # fails without the first, and
+        # test_the_output_is_the_spec_presenters_or_else_the_output_selectors
+        # without the second.
+        if role == "output" and nested.kwargs is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares kwargs, which an output selector never runs: it re-reads "
+                "the service's result. Read what it needs from ``result`` or a pool seed."
+            )
 
 
 def _check_selector(spec: SelectorSpec | None, kind: SelectorKind, role: str) -> None:

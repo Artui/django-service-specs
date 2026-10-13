@@ -19,7 +19,9 @@ from django_service_specs.specs.utils import (
     check_callable,
     check_metadata,
     check_permissions,
+    check_preconditions,
     check_presenter,
+    check_providers,
     check_reserved,
 )
 from django_service_specs.types.utils import affordance_alias
@@ -84,6 +86,29 @@ class SelectorSpec:
             ``annotations``, or between two entries, is refused at
             construction, because a generated answer silently replacing a
             project's own annotation is the worst way for this to fail.
+        kwargs: A provider of extra pool entries: called with the keywords it
+            declares from the selector's pool, it returns a mapping merged into
+            that pool after the caller's arguments, so a key it answers is the
+            author's value whatever the caller sent - a tenant, a project scope.
+            A value of ``UNSET`` declines its key and leaves the caller's in
+            place. Annotate its return as a ``TypedDict`` and
+            [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
+            reads which keys it fills before it runs. On a target selector it
+            scopes the lookup; an output selector's is refused, since nothing
+            would run it.
+        preconditions: Raise-to-abort rules, a sequence of callables each called
+            with the keywords it declares from the same pool once the selector
+            has resolved, the row as ``instance`` or the rows as
+            ``collection``. The return value is ignored. Kept as a tuple in
+            declaration order. Refused on a nested selector, whose run is the
+            enclosing service spec's.
+        progress_reporter: A provider of a
+            [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
+            sink the run reports to beside the transport's - a task record, an
+            audit trail - called with the keywords it declares from the base
+            pool. Resolved on first use, so a call refused before its run never
+            calls it, and a provider returning ``None`` declines. Refused on a
+            nested selector.
         metadata: A project's own per-operation facts, stored as given and read
             back by its own checks or audit hooks.
     """
@@ -107,7 +132,22 @@ class SelectorSpec:
     # rather than taken from a registry, since a ``ServiceSpec`` does not know
     # what it is called.
     affordances: Mapping[str, ServiceSpec] | None = None
+    # djangorestframework-services' names for the same three declarations, so a
+    # spec moving between the two packages keeps its field names. Typed open
+    # (``...``) because each is bound from the keyword pool, so its signature
+    # is whichever subset of the pool it declares.
+    kwargs: Callable[..., Mapping[str, Any]] | None = None
+    preconditions: Sequence[Callable[..., None]] | None = None
+    progress_reporter: Callable[..., Any] | None = None
     metadata: Mapping[str, Any] | None = None
+    # The part of ``reads`` the constructor added from ``filter_set``, kept so a
+    # copy made with ``dataclasses.replace`` - which hands the merged ``reads``
+    # back with whatever ``filter_set`` the copy names - can take the previous
+    # filters out before reading the new ones. An init field because
+    # ``replace`` carries only those; private, because nothing but the
+    # constructor writes it. TestFilterSet.test_a_copy_with_another_filter_set_reads_only_its_filters
+    # fails without it.
+    _filter_reads: Parameters = field(default_factory=Parameters, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         label = "SelectorSpec"
@@ -124,7 +164,7 @@ class SelectorSpec:
             raise ImproperlyConfigured(f"{label}.reads must be Parameters.")
         if self.filter_set is not None:
             check_callable(self.filter_set, label=f"{label}.filter_set")
-            object.__setattr__(self, "reads", _with_filters(self.reads, self.filter_set))
+        _read_filters(self)
         # After the filters join, so a filter named ``user`` is refused as a
         # read named ``user`` is:
         # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
@@ -145,6 +185,10 @@ class SelectorSpec:
         if self.extend_queryset is not None:
             check_callable(self.extend_queryset, label=f"{label}.extend_queryset")
         _check_affordances(self)
+        check_providers(self, ("kwargs", "progress_reporter"), label=label)
+        object.__setattr__(
+            self, "preconditions", check_preconditions(self.preconditions, label=label)
+        )
         check_metadata(self.metadata, label=label)
 
     def parameters(self) -> Parameters:
@@ -156,18 +200,33 @@ class SelectorSpec:
         return self.presenter.output() if self.presenter is not None else None
 
 
-def _with_filters(reads: Parameters, filter_set: Any) -> Parameters:
-    """``reads`` with each filter's Parameter after them, once.
+def _read_filters(spec: SelectorSpec) -> None:
+    """Set ``reads`` to the author's own, then each filter's Parameter after them, once.
 
-    A filter already present and equal is skipped rather than added again,
-    because ``dataclasses.replace`` hands the merged ``reads`` back to the
-    constructor with the same ``filter_set``
-    (TestFilterSet.test_a_copy_reads_the_filters_once). One declared
-    differently reaches ``+`` and is refused as two sources of one name
-    (TestFilterSet.test_a_read_the_filter_declares_differently_is_refused).
+    The author's own are ``reads`` less what a previous construction added
+    from a filter set, so a copy naming another filter set, or none, reads only
+    its own (TestFilterSet.test_a_copy_with_another_filter_set_reads_only_its_filters,
+    TestFilterSet.test_a_copy_without_a_filter_set_reads_the_author_s_own_alone).
+    A filter equal to a read the author declared is not added, and so not
+    recorded as added: it stays the author's when the filter set goes
+    (TestFilterSet.test_a_read_the_author_declared_as_the_filter_does_survives_a_copy).
+    One declared differently reaches ``+`` and is refused as two sources of one
+    name (TestFilterSet.test_a_read_the_filter_declares_differently_is_refused).
     """
-    added = Parameters(tuple(p for p in filter_set_parameters(filter_set) if p not in reads.items))
-    return reads + added
+    previous = spec._filter_reads.items
+    # Nothing added before and nothing to add: ``reads`` stays the object the
+    # author passed (test_output_is_the_presenters holds the identity). Two
+    # conjuncts, each held by its own test:
+    # TestFilterSet.test_a_copy_without_a_filter_set_reads_the_author_s_own_alone
+    # fails without the first, TestFilterSet.test_its_filters_join_the_reads_after_the_author_s_own
+    # without the second.
+    if not previous and spec.filter_set is None:
+        return
+    own = Parameters(tuple(p for p in spec.reads.items if p not in previous))
+    filters = filter_set_parameters(spec.filter_set) if spec.filter_set is not None else ()
+    added = Parameters(tuple(p for p in filters if p not in own.items))
+    object.__setattr__(spec, "reads", own + added)
+    object.__setattr__(spec, "_filter_reads", added)
 
 
 def _check_affordances(spec: SelectorSpec) -> None:
