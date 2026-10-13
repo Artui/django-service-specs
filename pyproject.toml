@@ -53,6 +53,13 @@ pydantic = [
     # so the declared name would be one pydantic refuses.
     "pydantic>=2.11",
 ]
+filter = [
+    # For ``SelectorSpec.filter_set``, whose filters are read as Parameters. The
+    # core never imports django-filter, so the extra is opt-in. The floor is
+    # djangorestframework-services', which this package's selector spec must
+    # accept filter sets from unchanged.
+    "django-filter>=23.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/Artui/django-service-specs"
@@ -74,6 +81,7 @@ dev = [
     "django-stubs>=5.1.0",
     # The adapter's tests; the floor is the extra's, for the same reason.
     "pydantic>=2.11",
+    "django-filter>=23.1",
 ]
 docs = [
     "mkdocs>=1.6.0",
