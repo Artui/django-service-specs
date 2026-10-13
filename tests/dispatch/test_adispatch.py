@@ -704,3 +704,104 @@ async def test_an_async_selector_s_extend_queryset_refuses_a_read_left_out(ada: 
         await adispatch(spec, principal=ada, arguments={})
 
     assert caught.value.detail == {"title": ["This field is required."]}
+
+
+# --- Preconditions and the spec's progress provider on the async paths ------------------
+
+
+class _QueryingSink:
+    """A progress provider that queries, as finding a task record does; records each report."""
+
+    def __init__(self) -> None:
+        self.counted: list[int] = []
+        self.reports: list[float] = []
+
+    def __call__(self, *, user: Any) -> Any:
+        # On the event loop this raises ``SynchronousOnlyOperation``.
+        self.counted.append(Note.objects.count())
+        return lambda progress, **_: self.reports.append(progress)
+
+
+async def test_a_non_atomic_async_service_s_progress_provider_is_resolved_in_the_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    sink = _QueryingSink()
+
+    async def reporting(*, progress: Any) -> None:
+        progress(1.0)
+
+    spec = ServiceSpec(service=reporting, permissions=OPEN, atomic=False, progress_reporter=sink)
+    await adispatch(spec, principal=ada, arguments={})
+    assert (sink.counted, sink.reports, hops) == ([0], [1.0], ["_prepare"])
+
+
+async def test_a_non_atomic_async_service_s_precondition_runs_in_the_hop(ada: Any) -> None:
+    def precondition(*, user: Any) -> None:
+        # A query: on the event loop it would raise ``SynchronousOnlyOperation``.
+        if not Note.objects.filter(owner=user).exists():
+            raise Boom()
+
+    async def service() -> str:
+        return "ran"
+
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, atomic=False, preconditions=[precondition]
+    )
+    with pytest.raises(Boom):
+        await adispatch(spec, principal=ada, arguments={})
+
+
+async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the_await(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def reporting(*, user: Any, progress: Any) -> Any:
+        progress(1.0)
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=reporting, permissions=OPEN, progress_reporter=sink
+    )
+    await adispatch(spec, principal=ada, arguments={})
+    assert (sink.counted, sink.reports) == ([0], [1.0])
+
+
+async def test_an_async_selector_spec_s_preconditions_see_its_row(ada: Any) -> None:
+    note = await _create(owner=ada, title="Row")
+    seen: list[Any] = []
+
+    async def by_pk(*, pk: int) -> Any:
+        return Note.objects.filter(pk=pk)
+
+    def precondition(*, instance: Note) -> None:
+        seen.append(instance)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.RETRIEVE,
+        selector=by_pk,
+        reads=PK,
+        permissions=OPEN,
+        preconditions=[precondition],
+    )
+    await adispatch(spec, principal=ada, arguments={"pk": note.pk})
+    assert seen == [note]
+
+
+async def test_an_async_selector_spec_raising_does_not_exist_runs_no_precondition(
+    ada: Any,
+) -> None:
+    seen: list[Any] = []
+
+    async def missing() -> Any:
+        raise Note.DoesNotExist
+
+    spec = SelectorSpec(
+        kind=SelectorKind.RETRIEVE,
+        selector=missing,
+        permissions=OPEN,
+        allow_none=True,
+        preconditions=[seen.append],
+    )
+    result = await adispatch(spec, principal=ada, arguments={})
+    assert (result.value, seen) == (None, [])

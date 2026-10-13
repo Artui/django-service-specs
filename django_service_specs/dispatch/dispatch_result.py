@@ -22,7 +22,8 @@ class DispatchResult:
             or what its output selector re-read.
         service_result: The service's own return, before any output selector.
         instance: The resolved target - the row, or the collection's queryset.
-        data: The validated values the service received.
+        data: The Validator's ``data`` the service received: the validated
+            mapping, or the instance a dataclass Validator builds.
     """
 
     kind: Literal["instance", "list", "not_found"]

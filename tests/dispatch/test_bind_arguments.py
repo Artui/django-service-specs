@@ -171,3 +171,33 @@ def test_a_null_element_the_validator_takes_reaches_it() -> None:
     spec = ServiceSpec(service=service, validator=DataclassValidator(_Scores))
     bound = bind_arguments(spec, {"scores": [1, None]}, principal=PRINCIPAL)
     assert bound == {"scores": [1, None]}
+
+
+class _Both(Validator):
+    """Declares two required strings and returns only those it was handed; records the context."""
+
+    def __init__(self) -> None:
+        self.contexts: list[ValidationContext] = []
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(
+            Parameter("title", "string", required=True), Parameter("body", "string", required=True)
+        )
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.contexts.append(context)
+        return dict(arguments)
+
+
+def test_a_partial_spec_binds_a_call_leaving_out_a_required_argument() -> None:
+    validator = _Both()
+    spec = ServiceSpec(service=lambda: None, validator=validator, partial=True)
+    assert bind_arguments(spec, {"title": "T"}, principal=None) == {"title": "T"}
+    assert validator.contexts[0].partial is True
+
+
+def test_the_same_call_on_a_spec_that_is_not_partial_is_refused() -> None:
+    spec = ServiceSpec(service=lambda: None, validator=_Both())
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "T"}, principal=None)
+    assert caught.value.detail == {"body": ["This field is required."]}

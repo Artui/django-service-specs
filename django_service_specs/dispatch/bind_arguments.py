@@ -5,8 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
-from django_service_specs.dispatch.utils import validate_arguments
-from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.dispatch.utils import shape_check, validate_arguments
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
@@ -32,18 +31,23 @@ def bind_arguments(
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()``, under ``unknown_arguments``: the closed
-       argument set and the shape check, at every level.
+       argument set and the shape check, at every level, refusing no absent
+       argument when the service spec is ``partial``.
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
-       with a Validator, ``validate()`` on only the arguments the Validator's
-       own ``parameters()`` declare - never the target selector's ``reads`` -
-       with ``ValidationContext(principal, target)``.
+       with a Validator, ``validated()`` on only the arguments the Validator's
+       own ``parameters()`` declare - never a selector's or the spec's
+       ``reads`` - with ``ValidationContext(principal, target, partial)``.
 
     Returns the Validator's values. A service spec with no Validator returns
-    ``{}``, because every argument it takes is its target selector's and none
-    reaches the service. A
+    ``{}``, because every argument it takes is a read and none is validated. A
     [`SelectorSpec`][django_service_specs.specs.selector_spec.SelectorSpec]
     has no Validator and returns the checked arguments, which are what its
     selector is called with.
+
+    **It runs no provider.** The spec's ``input_data``, which dispatch merges
+    over the caller's arguments before the Validator, is not called here: it
+    reads the resolved target and the call's seeds, which this function is
+    not handed. A spec declaring one is bound on the caller's arguments alone.
 
     **It does not resolve or authorize.** Dispatch runs class-level
     authorization, target resolution and object-level authorization *between*
@@ -57,8 +61,11 @@ def bind_arguments(
             problem at once, and a Validator is only reached with well-shaped
             arguments.
     """
-    checked = check_arguments(spec.parameters(), arguments, unknown_arguments=unknown_arguments)
+    checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked
     # The step dispatch takes, the same function: the two cannot drift apart.
-    return validate_arguments(spec, checked, principal=principal, target=target)
+    validated = validate_arguments(
+        spec, checked, principal=principal, target=target, server_input={}
+    )
+    return validated.values
