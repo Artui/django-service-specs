@@ -538,3 +538,13 @@ class TestNothingElse:
             "x-mine"
             not in parameters_schema(AUTHOR)["properties"]["books"]["items"]["properties"]["title"]
         )
+
+
+def test_a_bound_is_stated_beside_the_type() -> None:
+    price = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
+    floor = Parameter("n", "integer", minimum=0, nullable=True)
+    schema = parameters_schema(Parameters.of(price, floor))
+    assert schema["properties"] == {
+        "price": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
+        "n": {"type": ["integer", "null"], "minimum": 0},
+    }

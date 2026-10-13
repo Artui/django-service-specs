@@ -58,13 +58,14 @@ def check_arguments(
 ) -> dict[str, Any]:
     """The shape check: what a caller can get wrong that the declaration can see.
 
-    Presence, JSON type, format, choices and nullability, at every level of
-    nesting, with no query. It is what runs at enqueue time and in front of an
+    Presence, JSON type, format, bounds, choices and nullability, at every
+    level of nesting, with no query. It is what runs at enqueue time and in front of an
     untrusted caller's Validator, so a malformed call is refused before it costs
     a row lookup, and **it is no stricter than the libraries behind it**, with
-    one exception named below: a decimal accepts a JSON number as well as a
-    string, because every decimal validator does, and a check stricter than
-    the worker refuses what would have run.
+    two exceptions named below, ASCII digits and a declared bound. So a
+    decimal accepts a JSON number as well as a string, because every decimal
+    validator does, and a check stricter than the worker refuses what would
+    have run.
 
     - A required parameter with a declared default is not refused when absent,
       because the Validator will supply the default. The default is not
@@ -109,6 +110,15 @@ def check_arguments(
       JSON has no spelling for either, so they are outside the ``number``
       type, and this is a type rule rather than a stricter check - although
       pydantic's ``float`` and the dataclass adapter's both take one.
+    - ``minimum`` and ``maximum`` bound a number inclusively, in the words
+      Django's ``MinValueValidator`` and ``MaxValueValidator`` use. **The
+      second exception**: a bound is the declaration's, and may be stricter
+      than the library behind it. ``filter_set_parameters`` draws
+      django-filter's ``1e50`` below zero and on a range's bounds too, where
+      django-filter draws none, because past it an integer column's
+      conversion builds every digit of the value. A decimal string is compared as the decimal it
+      spells, which reads its exponent and builds none of its digits, so
+      ``"1E+999999999"`` is refused as fast as ``"2"`` is taken.
     - ``choices`` constrain the value, and an array's choices constrain each of
       its elements, since an array is never one of a list of scalars.
     - An ``object`` with no ``fields`` is free-form: its type is checked and
@@ -199,6 +209,8 @@ def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
             fmt=param.format,
             fields=param.fields,
             choices=param.choices,
+            minimum=param.minimum,
+            maximum=param.maximum,
             walk=walk,
         )
     if not _is_json_type("array", value):
@@ -251,6 +263,8 @@ def _check_one(
     fmt: str | None = None,
     fields: Parameters | None = None,
     choices: tuple[Any, ...] | None = None,
+    minimum: float | None = None,
+    maximum: float | None = None,
     walk: _Walk,
 ) -> tuple[Any, Any]:
     """One value against one type: a parameter's own, or an array's element.
@@ -260,7 +274,7 @@ def _check_one(
     """
     # Read before the type check, which then sees a number and is unchanged.
     value = _integral(json_type, _numeric(json_type, value))
-    problem = _type_problem(json_type, fmt, value)
+    problem = _type_problem(json_type, fmt, value) or _bound_problem(value, minimum, maximum)
     if problem is not None:
         return None, [problem]
     if fields is not None:
@@ -273,6 +287,39 @@ def _check_one(
             % {"value": value}
         ]
     return value, None
+
+
+def _bound_problem(value: Any, minimum: float | None, maximum: float | None) -> str | None:
+    """The bound a well-typed number is past, or ``None``.
+
+    Read only once the type check has passed, so ``value`` is an ``int``, a
+    finite ``float`` or a string spelling a finite decimal, since ``Parameter``
+    takes a bound on nothing else. The string is compared as a ``Decimal``,
+    whose comparison with an ``int`` or a ``float`` is exact and reads the
+    exponent first: it is never converted to the integer it may name, which
+    for ``"1E+999999999"`` is a billion digits. A ``float`` bound is compared
+    as the float it is, as django-filter's ``MaxValueValidator(1e50)`` is, so
+    the two draw the line at the same value.
+
+    The first test is one branch to coverage, and test_a_bound_may_stand_alone
+    holds both conditions: without either, a parameter declaring only the
+    other bound is never checked.
+    """
+    if minimum is None and maximum is None:
+        return None
+    number = Decimal(value) if isinstance(value, str) else value
+    # Each ``is not None`` is held by test_a_bound_may_stand_alone, which
+    # passes a number inside the one bound declared, so the absent one is
+    # compared too: without the test, against ``None``, which raises.
+    if maximum is not None and number > maximum:
+        return gettext("Ensure this value is less than or equal to %(limit_value)s.") % {
+            "limit_value": maximum
+        }
+    if minimum is not None and number < minimum:
+        return gettext("Ensure this value is greater than or equal to %(limit_value)s.") % {
+            "limit_value": minimum
+        }
+    return None
 
 
 def _numeric(json_type: str | None, value: Any) -> Any:

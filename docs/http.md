@@ -133,7 +133,15 @@ file input only as a file. A POST's uploads are Django's own `request.FILES`;
 those in a PUT, PATCH or DELETE body are parsed here with its fields, by
 Django's own parser from the request's stream, so a file part is streamed to
 the upload handlers and `DATA_UPLOAD_MAX_MEMORY_SIZE` bounds the fields alone,
-as it does for a POST. An
+as it does for a POST. Like a POST, such a body is gone once parsed: reading
+`request.body` afterwards, or calling `request_arguments` on the request a
+second time, raises Django's `RawPostDataException`. The entry points here
+read the arguments once, so this reaches only code that reads the body after
+the view - a middleware, an audit log, an error reporter. Reading
+`request.body` before the view keeps the body, and the arguments are then
+parsed from it as often as they are asked for; that read is a whole-body
+read, so `DATA_UPLOAD_MAX_MEMORY_SIZE` bounds the whole body again, uploads
+included, and a larger one raises `RequestDataTooBig`. An
 upload under a name the spec does not declare reaches the closed argument set
 like any undeclared field, and is refused under `REJECT`; a file input left
 empty is no upload, so it is absent. Only a multipart body carries one.

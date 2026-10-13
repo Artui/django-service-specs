@@ -49,6 +49,10 @@ def parameters_schema(
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
       The shape check also accepts a JSON number, which this does not advertise.
+    - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared.
+      JSON Schema applies them to a number instance only, so on a decimal
+      string a validating client enforces neither; the shape check does, and
+      they tell a reader where the line is.
     - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too,
       and ``items_nullable`` does the same to an array's ``items``. A file's
       node states no type, so it admits null already and gains nothing.
@@ -78,8 +82,8 @@ def parameters_schema(
     No ``$defs`` or ``$ref`` ever: most MCP clients refuse a schema with a
     reference in it, so every schema is flat and self-contained, however deep
     the declaration nests. No ``$schema`` key, which a transport adds if its
-    wire wants one. And no bounds (``maxLength``, ``minimum``), which
-    Parameters does not carry yet; the Validator enforces them.
+    wire wants one. And no bound a Parameter does not declare (``maxLength``,
+    a Validator's ``max_value``): the Validator enforces those.
 
     Every call builds a new schema, so a transport may add its own keys to the
     result without reaching the declaration or another transport's copy.
@@ -124,6 +128,14 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         schema = {"type": param.type}
     if param.format is not None:
         schema["format"] = param.format
+    # Stated on a decimal string too, where a validating client passes them by:
+    # JSON Schema reads ``minimum`` and ``maximum`` on a number instance only.
+    # The shape check is what enforces them there, and a reader still learns
+    # the bound. Two arcs, each held by test_a_bound_is_stated_beside_the_type.
+    if param.minimum is not None:
+        schema["minimum"] = param.minimum
+    if param.maximum is not None:
+        schema["maximum"] = param.maximum
     # An array's choices describe its elements, and ``_items_schema`` states them.
     # One branch to coverage, so each condition is held by its own test:
     # test_a_scalar_states_its_type (the first: a parameter with no choices) and

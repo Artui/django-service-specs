@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -26,6 +27,7 @@ def test_defaults() -> None:
     )
     assert p.default is UNSET
     assert p.items_nullable is False
+    assert (p.minimum, p.maximum) == (None, None)
 
 
 def test_choices_are_normalized_to_a_tuple() -> None:
@@ -119,6 +121,59 @@ def test_a_file_has_no_choices(kwargs: dict) -> None:
     # A file is compared by identity, so no declared value could ever match.
     with pytest.raises(ImproperlyConfigured, match="a file is never one of a list of values"):
         Parameter("notes", **kwargs)
+
+
+# --- bounds ------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "bound",
+    [True, Decimal("1"), "1", float("inf"), float("nan")],
+    ids=["bool", "decimal", "string", "infinity", "nan"],
+)
+@pytest.mark.parametrize("side", ["minimum", "maximum"])
+def test_a_bound_must_be_a_finite_number(side: str, bound: Any) -> None:
+    # The schema states it as a JSON number, which none of these is.
+    with pytest.raises(ImproperlyConfigured, match=f"{side} .* is not a finite int or float"):
+        Parameter("price", "number", **{side: bound})
+
+
+def test_a_large_int_bound_is_taken_without_reading_it_as_a_float() -> None:
+    # ``math.isfinite`` would overflow on it.
+    assert Parameter("n", "integer", maximum=10**400).maximum == 10**400
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"type": "string"},
+        {"type": "string", "format": "date"},
+        {"type": "boolean"},
+        {"type": "array", "items": "number"},
+        {"type": "object"},
+        {"type": "file"},
+    ],
+    ids=["string", "date", "boolean", "array", "object", "file"],
+)
+def test_a_bound_describes_a_number(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(
+        ImproperlyConfigured, match="a bound describes a number or a decimal string"
+    ):
+        Parameter("price", maximum=1, **kwargs)
+
+
+def test_a_decimal_string_takes_a_bound() -> None:
+    p = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
+    assert (p.minimum, p.maximum) == (-1e50, 1e50)
+
+
+def test_a_minimum_past_the_maximum_is_refused() -> None:
+    with pytest.raises(ImproperlyConfigured, match="minimum 2 is past maximum 1"):
+        Parameter("n", "integer", minimum=2, maximum=1)
+
+
+def test_one_bound_may_equal_the_other() -> None:
+    assert Parameter("n", "integer", minimum=1, maximum=1.0).maximum == 1.0
 
 
 # --- choice labels ----------------------------------------------------------------------------

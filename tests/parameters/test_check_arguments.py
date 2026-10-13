@@ -771,6 +771,78 @@ def test_every_problem_is_reported_in_one_tree() -> None:
     }
 
 
+# --- bounds ------------------------------------------------------------------------------------
+
+ABOVE = "Ensure this value is less than or equal to %s."
+BELOW = "Ensure this value is greater than or equal to %s."
+
+
+@pytest.mark.parametrize("value", [1, 10, "10", 5.0])
+def test_a_bound_on_an_integer_is_inclusive(value: Any) -> None:
+    params = one(Parameter("n", "integer", minimum=1, maximum=10))
+    assert check_arguments(params, {"n": value}) == {"n": int(value)}
+
+
+@pytest.mark.parametrize(
+    ("value", "message"), [(0, BELOW % 1), (11, ABOVE % 10), ("11", ABOVE % 10)]
+)
+def test_an_integer_past_a_bound_is_refused_in_django_s_words(value: Any, message: str) -> None:
+    params = one(Parameter("n", "integer", minimum=1, maximum=10))
+    assert refusal(params, {"n": value}) == {"n": [message]}
+
+
+def test_a_bound_may_stand_alone() -> None:
+    # Each value sits inside the one bound declared, so the side left open is
+    # compared too: read against ``None`` it would raise.
+    floor = one(Parameter("n", "number", minimum=0))
+    ceiling = one(Parameter("n", "number", maximum=0))
+    assert check_arguments(floor, {"n": 5.5}) == {"n": 5.5}
+    assert check_arguments(ceiling, {"n": -5.5}) == {"n": -5.5}
+    assert refusal(floor, {"n": -0.5}) == {"n": [BELOW % 0]}
+    assert refusal(ceiling, {"n": 0.5}) == {"n": [ABOVE % 0]}
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("1e50", None),
+        ("-1e50", None),
+        (" 12.5 ", None),
+        (1e49, None),
+        # Read by exponent, never built as the integer it names. A cheap one
+        # all the same: a regression elsewhere must fail here, not hang.
+        ("1e400", [ABOVE % "1e+50"]),
+        ("-1e400", [BELOW % "-1e+50"]),
+        ("1.0000000000000001e50", [ABOVE % "1e+50"]),
+        (1e60, [ABOVE % "1e+50"]),
+        (-1e60, [BELOW % "-1e+50"]),
+    ],
+)
+def test_a_decimal_is_compared_as_the_decimal_it_spells(value: Any, detail: Any) -> None:
+    params = one(Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50))
+    if detail is None:
+        assert check_arguments(params, {"price": value}) == {"price": value}
+    else:
+        assert refusal(params, {"price": value}) == {"price": detail}
+
+
+def test_a_value_of_the_wrong_type_is_refused_as_that_not_as_out_of_bounds() -> None:
+    params = one(Parameter("price", "string", format="decimal", maximum=1))
+    assert refusal(params, {"price": "lots"}) == {"price": [NOT_A_NUMBER]}
+
+
+def test_a_bound_message_is_translated_through_djangos_own_catalog() -> None:
+    params = one(Parameter("n", "integer", maximum=10))
+    with translation.override("de"):
+        detail = refusal(params, {"n": 11})
+        expected = translation.gettext(
+            "Ensure this value is less than or equal to %(limit_value)s."
+        )
+    assert "%(limit_value)s" in expected
+    assert expected != ABOVE.replace("%s", "%(limit_value)s")
+    assert detail == {"n": [expected % {"limit_value": 10}]}
+
+
 # --- messages ----------------------------------------------------------------------------------------
 
 

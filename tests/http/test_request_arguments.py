@@ -459,6 +459,45 @@ class TestUploads:
         assert request.body
         assert contents(read(request, files())) == {"count": 2, "notes": b"A file."}
 
+    def test_a_multipart_body_parsed_from_the_stream_cannot_be_read_again(self) -> None:
+        # Django's own POST parse leaves the body the same way: the stream
+        # went to the parser and nothing kept a copy. A reader after the view
+        # - middleware, an audit log, an error reporter - meets this.
+        request = FACTORY.patch(
+            "/",
+            data=encode_multipart(BOUNDARY, {"count": "2"}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        assert read(request) == {"count": 2}
+        with pytest.raises(RawPostDataException):
+            request.body  # noqa: B018
+        with pytest.raises(RawPostDataException):
+            read(request)
+
+    def test_a_multipart_body_read_first_stays_readable_and_parses_again(self) -> None:
+        # Reading ``request.body`` before the parse keeps the buffer, which the
+        # parse then reads from, so both the body and the arguments survive.
+        body = encode_multipart(BOUNDARY, {"count": "2"})
+        request = FACTORY.patch(
+            "/", data=body, content_type=f"multipart/form-data; boundary={BOUNDARY}"
+        )
+        assert request.body == body
+        assert read(request) == {"count": 2}
+        assert read(request) == {"count": 2}
+        assert request.body == body
+
+    def test_reading_the_body_first_brings_the_size_limit_back_on_an_upload(self) -> None:
+        # The way round the spent stream is a whole-body read, which
+        # DATA_UPLOAD_MAX_MEMORY_SIZE bounds, file parts and all; the parse
+        # itself takes the same upload, as the test above it shows.
+        request = FACTORY.patch(
+            "/",
+            data=encode_multipart(BOUNDARY, {"notes": SimpleUploadedFile("a", b"x" * 3 * 1024**2)}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        with pytest.raises(RequestDataTooBig):
+            request.body  # noqa: B018
+
     def test_a_multipart_stream_read_without_a_buffer_is_refused(self) -> None:
         # Something read the stream and kept nothing, so the body is gone:
         # parsed anyway, it would be a call with no arguments.

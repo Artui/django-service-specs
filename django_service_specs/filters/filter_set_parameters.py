@@ -9,6 +9,19 @@ from django_service_specs.filters.utils import import_django_filters
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 
+_NUMBER_BOUND = 1e50
+"""The bound on every decimal a FilterSet reads: django-filter's own.
+
+``NumberFilter.get_max_validator`` returns ``MaxValueValidator(1e50)``, and it
+is the only bound django-filter puts on a number. A range's two
+``DecimalField`` bounds have none, and nothing bounds a number filter from
+below, so either side past it reached the integer field's ``int()`` and built
+every digit of the value: ``"1E+999999999"`` held a worker for minutes. Kept a
+``float``, as django-filter's is, so the line falls where its validator draws
+it. The minimum is the same bound mirrored: the kernel's own, with no
+django-filter counterpart, because the cost is the same on either side.
+"""
+
 
 def filter_set_parameters(filter_set: Any) -> Parameters:
     """The arguments a ``FilterSet`` reads, as the Parameters a caller sends.
@@ -35,7 +48,13 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     form field is a ``DecimalField`` and reads one exactly, where a float read
     on the way loses a key past ``2**53``; a JSON number is still taken. A CSV
     filter's numbers stay ``number``, which over HTTP is what splits
-    ``?pks=1,2``, and keep that float reading.
+    ``?pks=1,2``, and keep that float reading. **Each decimal is bounded**,
+    ``minimum=-1e50`` and ``maximum=1e50``: the line django-filter's number
+    filter draws above, drawn below too and on a range's bounds, which it
+    leaves open. A value past it is refused by the shape check before it
+    reaches the database's integer conversion, which builds every digit of
+    ``"1E+999999999"``. A float reading cannot reach that far, so a CSV
+    filter's numbers carry no bound.
 
     **Every one is optional**, because a filter narrows a read and never
     stands between a caller and it. ``help`` is the author's ``help_text`` when
@@ -78,12 +97,15 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     suffixes = getattr(getattr(filter_obj.field_class, "widget", None), "suffixes", None)
     if suffixes:
         type_, format_ = _bound_type(module, filter_obj)
+        minimum, maximum = _bounds(format_)
         for suffix in suffixes:
             yield Parameter(
                 f"{name}_{suffix}",
                 type_,
                 format=format_,
                 help=str(help_text) if help_text else f"The `{suffix}` bound of `{field_name}`.",
+                minimum=minimum,
+                maximum=maximum,
             )
         return
     help_ = _help(name, field_name, filter_obj, help_text)
@@ -101,7 +123,8 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
         # be: its key's type is not known without the database, so it is a
         # string the FilterSet resolves.
         type_, format_ = _scalar(module, filter_obj)
-        yield Parameter(name, type_, format=format_, help=help_)
+        minimum, maximum = _bounds(format_)
+        yield Parameter(name, type_, format=format_, help=help_, minimum=minimum, maximum=maximum)
 
 
 def _help(name: str, field_name: str, filter_obj: Any, help_text: Any) -> str | None:
@@ -173,6 +196,17 @@ def _bound_type(module: Any, filter_obj: Any) -> tuple[str, str | None]:
     if isinstance(filter_obj, (module.RangeFilter, module.NumericRangeFilter)):
         return "string", "decimal"
     return "string", None
+
+
+def _bounds(format_: str | None) -> tuple[float | None, float | None]:
+    """``minimum`` and ``maximum`` for a decimal, and nothing for any other value.
+
+    A decimal is what a number filter and a numeric range's bounds read, and
+    nothing else here is one, so the format is what names them.
+    """
+    if format_ == "decimal":
+        return -_NUMBER_BOUND, _NUMBER_BOUND
+    return None, None
 
 
 def _choices(extra: dict[str, Any]) -> tuple[str, tuple[Any, ...]] | None:
