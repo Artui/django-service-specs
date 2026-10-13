@@ -2039,7 +2039,12 @@ class _Echo(Validator):
 
 
 def test_a_partial_call_may_leave_out_a_validator_field_at_every_depth(ada: Any) -> None:
-    row = Parameters.of(Parameter("title", "string", required=True))
+    # ``tone`` is required with a default, which a relaxed copy must keep
+    # constructing: the declaration is rebuilt for the shape check.
+    row = Parameters.of(
+        Parameter("title", "string", required=True),
+        Parameter("tone", "string", required=True, default="plain"),
+    )
     declared = Parameters.of(
         Parameter("rows", "array", required=True, items=row),
         Parameter("meta", "object", required=True, fields=row),
@@ -2317,6 +2322,17 @@ def test_a_pre_resolved_target_reaches_the_providers_and_the_validator(ada: Any)
     dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "T"}, target=note)
     assert seen == [note]
     assert validator.calls[0][1].target == note
+
+
+def test_a_pre_resolved_target_s_reads_are_still_checked_as_declared(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    spec, service = _guarded(
+        Scoped(), instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK)
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={}, target=note)
+    assert caught.value.detail == {"pk": REQUIRED}
+    assert service.calls == []
 
 
 def test_a_pre_resolved_none_is_not_found_unless_allow_none(ada: Any) -> None:

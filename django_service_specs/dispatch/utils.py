@@ -187,9 +187,9 @@ def _relaxed(parameters: Parameters, everywhere: frozenset[str], top: frozenset[
     reader sees - the schema, ``required`` - is untouched.
     """
     # One arc to coverage, so each conjunct is held by its own test:
-    # test_an_input_data_provider_fills_a_required_validator_field_the_caller_left_out
-    # the first, and
     # test_a_partial_spec_dispatched_with_one_field_reaches_the_service_with_that_field_alone
+    # the first, and
+    # test_an_input_data_provider_fills_a_required_validator_field_the_caller_left_out
     # the second.
     if not everywhere and not top:
         return parameters

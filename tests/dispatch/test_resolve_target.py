@@ -257,6 +257,12 @@ def test_a_parameter_a_registered_seed_occupies_is_refused(ada: Any) -> None:
         resolve_target(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
 
+def test_a_spec_declaring_no_permissions_is_refused_as_dispatch_refuses_it(ada: Any) -> None:
+    spec = ServiceSpec(service=Record())
+    with pytest.raises(ImproperlyConfigured, match="declares no permissions"):
+        resolve_target(spec, principal=ada, arguments={})
+
+
 def test_a_selector_spec_is_refused(ada: Any) -> None:
     spec: Any = SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN)
     with pytest.raises(TypeError, match="resolve_target\\(\\) takes a ServiceSpec"):
