@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
@@ -23,6 +24,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
+from tests.parameters.utils import coded
 
 REQUIRED = "This field is required."
 NULL = "This field cannot be null."
@@ -937,7 +939,9 @@ def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> No
         expected = translation.gettext(REQUIRED)
     assert expected != REQUIRED
     assert detail == {"pk": [expected]}
-    assert all(type(message) is str for message in detail["pk"])
+    # Translated now, not a lazy proxy, which is no ``str``: the message is a
+    # ``CodedMessage``, so a ``str`` holding the translated words.
+    assert all(isinstance(message, str) for message in detail["pk"])
 
 
 class TestAny:
@@ -989,3 +993,149 @@ def test_a_minimum_is_compared_with_no_default_when_the_setting_is_none() -> Non
     params = one(Parameter("ids", "array", min_length=2))
     assert check_arguments(params, {"ids": [1, 2]}) == {"ids": [1, 2]}
     assert refusal(params, {"ids": [1]}) == {"ids": [TOO_FEW % 2]}
+
+
+# --- the code each refusal carries -------------------------------------------------
+
+PRICE = Parameter("price", "string", format="decimal")
+
+
+@pytest.mark.parametrize(
+    ("parameter", "arguments", "expected"),
+    [
+        pytest.param(
+            Parameter("title", "string", required=True),
+            {},
+            {"title": [(REQUIRED, "required")]},
+            id="required",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"title": None},
+            {"title": [(NULL, "null")]},
+            id="null",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"colour": "red"},
+            {"colour": [(UNKNOWN, "unknown")]},
+            id="unknown",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"title": 3},
+            {"title": [("Expected a string.", "invalid")]},
+            id="type",
+        ),
+        pytest.param(
+            Parameter("ids", "array"),
+            {"ids": "1"},
+            {"ids": [("Expected an array.", "not_a_list")]},
+            id="not-a-list",
+        ),
+        pytest.param(
+            Parameter("author", "object"),
+            {"author": 3},
+            {"author": [("Expected an object.", "invalid")]},
+            id="not-an-object",
+        ),
+        pytest.param(
+            Parameter("books", "array", items=BOOK),
+            {"books": ["Dune"]},
+            {"books": {0: {NON_FIELD_ERRORS: [("Expected an object.", "invalid")]}}},
+            id="row-not-an-object",
+        ),
+        pytest.param(
+            PRICE,
+            {"price": True},
+            {"price": [("Expected a decimal string or a number.", "invalid")]},
+            id="decimal-type",
+        ),
+        pytest.param(
+            PRICE,
+            {"price": "NaN"},
+            {"price": [(NOT_A_NUMBER, "invalid")]},
+            id="decimal-not-finite",
+        ),
+        pytest.param(
+            Parameter("n", "number"),
+            {"n": float("inf")},
+            {"n": [(NOT_A_NUMBER, "invalid")]},
+            id="number-not-finite",
+        ),
+        pytest.param(
+            Parameter("at", "string", format="date-time"),
+            {"at": "soon"},
+            {"at": [("Enter a valid date/time.", "invalid")]},
+            id="date-time",
+        ),
+        pytest.param(
+            Parameter("on", "string", format="date"),
+            {"on": "soon"},
+            {"on": [("Enter a valid date.", "invalid")]},
+            id="date",
+        ),
+        pytest.param(
+            Parameter("n", "integer", maximum=5),
+            {"n": 6},
+            {"n": [("Ensure this value is less than or equal to 5.", "max_value")]},
+            id="max-value",
+        ),
+        pytest.param(
+            Parameter("n", "integer", minimum=1),
+            {"n": 0},
+            {"n": [("Ensure this value is greater than or equal to 1.", "min_value")]},
+            id="min-value",
+        ),
+        pytest.param(
+            Parameter("c", "string", choices=("a", "b")),
+            {"c": "z"},
+            {
+                "c": [
+                    (
+                        "Select a valid choice. z is not one of the available choices.",
+                        "invalid_choice",
+                    )
+                ]
+            },
+            id="choice",
+        ),
+        pytest.param(
+            Parameter("ids", "array", max_length=1),
+            {"ids": [1, 2]},
+            {"ids": [("Ensure this field has no more than 1 elements.", "max_length")]},
+            id="max-length",
+        ),
+        pytest.param(
+            Parameter("ids", "array", min_length=2),
+            {"ids": [1]},
+            {"ids": [("Ensure this field has at least 2 elements.", "min_length")]},
+            id="min-length",
+        ),
+        pytest.param(
+            Parameter("scan", "file"),
+            {"scan": "scan.pdf"},
+            {"scan": [("Expected a file.", "invalid")]},
+            id="file",
+        ),
+    ],
+)
+def test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake(
+    parameter: Parameter, arguments: dict[str, Any], expected: dict[Any, Any]
+) -> None:
+    assert coded(refusal(one(parameter), arguments)) == expected
+
+
+def test_arguments_that_are_no_mapping_are_refused_as_a_serializer_refuses_them() -> None:
+    assert coded(refusal(AUTHOR, ["Ursula"])) == {
+        NON_FIELD_ERRORS: [("Expected an object.", "invalid")]
+    }
+
+
+def test_a_coded_refusal_is_its_plain_message_to_everything_but_its_code() -> None:
+    detail = refusal(AUTHOR, {"name": "Ursula", "books": [{"title": None}]})
+    # Equal to, and serialized as, the plain strings a tree without codes holds,
+    # so the wire a transport writes is unchanged by them.
+    assert detail == {"books": {0: {"title": [NULL]}}}
+    assert json.dumps(detail) == json.dumps({"books": {0: {"title": [NULL]}}})
+    assert NULL in {detail["books"][0]["title"][0]}

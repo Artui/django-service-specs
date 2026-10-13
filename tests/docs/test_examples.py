@@ -443,6 +443,13 @@ class TestArguments:
     def test_every_problem_comes_back_in_one_tree(self) -> None:
         assert arguments.refusal(arguments.ARGUMENTS) == arguments.REFUSED
 
+    def test_each_message_carries_its_code(self) -> None:
+        assert arguments.codes(arguments.refusal(arguments.ARGUMENTS)) == arguments.CODES
+
+    def test_a_message_with_no_code_reads_as_invalid(self) -> None:
+        # A Validator's own plain string, as DRF reads a message raised with no code.
+        assert arguments.codes({"title": ["Too dull."]}) == {"title": ["invalid"]}
+
     def test_the_tree_serializes_with_its_row_keys_as_strings(self) -> None:
         assert json.loads(json.dumps(arguments.REFUSED))["books"].keys() == {"1", "2"}
 

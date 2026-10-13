@@ -8,6 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `CodedMessage`, a `str` carrying a `code`, and every refusal of the shape
+  check, `coerce_flat` and `request_arguments` is one. The code is the one a
+  DRF field gives the same mistake - `required`, `null`, `invalid`,
+  `not_a_list`, `max_value`, `min_value`, `invalid_choice`, `max_length`,
+  `min_length` - plus `unknown` for a key refused under `REJECT` and
+  `parse_error` for a body that is not JSON, so an adapter building DRF's
+  error details reads each code off `InvalidArguments.detail` rather than
+  every one of those refusals reading as `invalid`. A `CodedMessage` equals,
+  hashes and serializes as its message, so the JSON body a transport writes
+  is unchanged; a copy and a pickle keep the code. Dispatch still hands on a
+  Validator's own messages as it raised them, a library's coded message
+  keeping its code and a plain `str` staying plain.
 - An output selector is handed the service's return as `instance` as well as
   `result`, as djangorestframework-services binds it, so a re-read written
   `def reread(*, instance)` runs rather than raising a `TypeError` for a

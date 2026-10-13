@@ -14,6 +14,7 @@ from django.utils.translation import gettext
 
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.http.utils import route_arguments
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -323,7 +324,13 @@ def _json_object(request: HttpRequest) -> dict[str, Any]:
         # and test_a_body_nested_past_the_decoder_is_refused_under_non_field_errors
         # (RecursionError).
         raise InvalidArguments(
-            {NON_FIELD_ERRORS: [gettext("The request body is not valid JSON.")]}
+            # DRF's parser refuses it with a ParseError, whose code this is:
+            # test_a_body_that_is_no_json_is_refused_as_drf_s_parser_refuses_it.
+            {
+                NON_FIELD_ERRORS: [
+                    CodedMessage(gettext("The request body is not valid JSON."), "parse_error")
+                ]
+            }
         ) from None
     if not isinstance(decoded, dict):
         raise InvalidArguments({NON_FIELD_ERRORS: [expected_type("object")]})

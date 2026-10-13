@@ -62,6 +62,7 @@ from tests.dispatch.utils import (
     shaping_refused,
 )
 from tests.dispatch_app.models import Note
+from tests.parameters.utils import coded
 from tests.specs.utils import Bare
 
 LIST = SelectorKind.LIST
@@ -3328,7 +3329,9 @@ class TestMany:
         )
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments={"items": []})
-        assert refused.value.detail == {"items": ["Ensure this field has at least 1 elements."]}
+        assert coded(refused.value.detail) == {
+            "items": [("Ensure this field has at least 1 elements.", "min_length")]
+        }
         assert service.calls == []
         # A list that meets it is checked as any other: the empty stand-in the
         # top level is checked with is never held to the minimum.
@@ -3355,3 +3358,95 @@ def test_a_json_list_past_the_default_maximum_is_refused_at_its_parameter(ada: A
         dispatch(spec, principal=ada, arguments={"ids": list(range(1001))})
     assert refused.value.detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
     assert service.calls == []
+
+
+class _Coded(str):
+    """A message carrying a code the way a library's own does: DRF's ``ErrorDetail``, for one."""
+
+    code = "blank"
+
+
+class Blank(Titled):
+    """``Titled``, refusing an empty title with a message that carries its own code."""
+
+    message = _Coded("This field may not be blank.")
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        values = super().validate(arguments, context)
+        if not values["title"]:
+            raise InvalidArguments({"title": [self.message]})
+        return values
+
+
+class TestRefusalCodes:
+    """Each refusal of a ``many`` call carries its code, whichever check answered it."""
+
+    def test_a_row_s_shape_refusal_carries_its_code(self, ada: Any) -> None:
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())
+        rows = [{"title": "fine"}, {}, {"title": 3}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        assert coded(refused.value.detail) == {
+            "items": {
+                1: {"title": [("This field is required.", "required")]},
+                2: {"title": [("Expected a string.", "invalid")]},
+            }
+        }
+
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            ({}, ("This field is required.", "required")),
+            ({"items": None}, ("This field cannot be null.", "null")),
+            ({"items": "fine"}, ("Expected an array.", "not_a_list")),
+        ],
+    )
+    def test_the_list_s_own_refusal_carries_its_code(
+        self, ada: Any, arguments: dict[str, Any], expected: tuple[str, str]
+    ) -> None:
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments=arguments)
+        assert coded(refused.value.detail) == {"items": [expected]}
+
+    def test_a_validator_s_own_messages_reach_the_tree_as_it_raised_them(self, ada: Any) -> None:
+        # Not rewrapped: a coded message is the same object, and a plain one stays plain.
+        validator = Blank()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": " "}]})
+        assert refused.value.detail["items"][0]["title"][0] is validator.message
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Rows())
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "bad"}]})
+        assert type(refused.value.detail["items"][0]["title"][0]) is str
+        # And on one call, where the Validator's tree is the refusal itself.
+        validator = Blank()
+        one = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(one, principal=ada, arguments={"title": " "})
+        assert refused.value.detail["title"][0] is validator.message
+
+    def test_a_row_the_shape_check_refuses_is_never_validated_as_on_one_call(
+        self, ada: Any
+    ) -> None:
+        # Row 0's title is blank and it carries an unknown key: the shape check
+        # answers it and the Validator never sees it, as a single call with the
+        # same arguments is refused before its Validator runs. Row 1 is
+        # well-shaped, so its blank title is the Validator's to refuse.
+        validator = Blank()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        rows = [{"title": " ", "colour": "red"}, {"title": " "}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        assert coded(refused.value.detail) == {
+            "items": {
+                0: {"colour": [("Unknown argument.", "unknown")]},
+                1: {"title": [("This field may not be blank.", "blank")]},
+            }
+        }
+        assert [arguments for arguments, _ in validator.calls] == [{"title": " "}]
+        one = ServiceSpec(service=Record(), permissions=OPEN, validator=Blank())
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(one, principal=ada, arguments=rows[0])
+        assert coded(refused.value.detail) == {"colour": [("Unknown argument.", "unknown")]}

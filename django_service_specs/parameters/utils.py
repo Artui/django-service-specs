@@ -16,6 +16,7 @@ from typing import Final
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext
 
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.settings import max_array_length
 
@@ -28,7 +29,7 @@ Django's and DRF's spelling of the same idea, so a transport rendering either's
 errors reads the kernel's without a translation table."""
 
 
-def expected_type(json_type: str) -> str:
+def expected_type(json_type: str) -> CodedMessage:
     """The refusal of a value that is not ``json_type``, as one sentence a translator sees whole.
 
     ``"decimal"`` and ``"file"`` are the two keys that are not JSON types: the
@@ -41,8 +42,16 @@ def expected_type(json_type: str) -> str:
     this one table, so a caller reads the same refusal whichever of them
     answered. Built on each call, because a translation looked up at import
     time needs configured settings before the package can be imported at all.
+
+    Its code is the one DRF gives the same mistake: ``"not_a_list"`` for an
+    array, as its ``ListField`` and ``ListSerializer`` both do, and
+    ``"invalid"`` for everything else, as each of its scalar fields, its
+    ``FileField`` and a nested ``Serializer`` handed something other than a
+    mapping do. A free-form ``object`` is ``"invalid"`` too, where DRF's
+    ``DictField`` would say ``"not_a_dict"``: one type here stands for both of
+    its fields, and the nested serializer is the one a declared object becomes.
     """
-    return {
+    message = {
         "string": gettext("Expected a string."),
         "integer": gettext("Expected an integer."),
         "number": gettext("Expected a number."),
@@ -52,6 +61,9 @@ def expected_type(json_type: str) -> str:
         "decimal": gettext("Expected a decimal string or a number."),
         "file": gettext("Expected a file."),
     }[json_type]
+    # test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake[not-a-list]
+    # holds the array's code, its [type] case everything else's.
+    return CodedMessage(message, "not_a_list" if json_type == "array" else "invalid")
 
 
 def max_length_in_force(param: Parameter) -> int | None:
@@ -88,23 +100,29 @@ def max_length_in_force(param: Parameter) -> int | None:
     return default
 
 
-def length_problem(param: Parameter, count: int) -> str | None:
+def length_problem(param: Parameter, count: int) -> CodedMessage | None:
     """The refusal of an array of ``count`` elements, or ``None`` where ``param`` takes that many.
 
     In DRF's words, its ``ListField`` and ``ListSerializer`` both: no Django
     catalog entry counts a list's elements (``MaxLengthValidator`` counts a
     string's characters), and DRF's catalog translates these wherever DRF is
     installed, which is where a djangorestframework-services caller already
-    reads them.
+    reads them, and with DRF's codes, ``"max_length"`` and ``"min_length"``.
     """
     most = max_length_in_force(param)
     if most is not None and count > most:
-        return gettext("Ensure this field has no more than {max_length} elements.").format(
-            max_length=most
+        return CodedMessage(
+            gettext("Ensure this field has no more than {max_length} elements.").format(
+                max_length=most
+            ),
+            "max_length",
         )
     if param.min_length is not None and count < param.min_length:
-        return gettext("Ensure this field has at least {min_length} elements.").format(
-            min_length=param.min_length
+        return CodedMessage(
+            gettext("Ensure this field has at least {min_length} elements.").format(
+                min_length=param.min_length
+            ),
+            "min_length",
         )
     return None
 
