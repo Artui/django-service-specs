@@ -16,6 +16,7 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
@@ -605,6 +606,16 @@ def test_a_partial_call_is_refused_as_the_spec_s_error(method: str) -> None:
         ),
     ):
         getattr(validator, method)({"price": "1.00"}, ValidationContext(None, partial=True))
+
+
+def test_a_partial_spec_over_it_is_refused_when_declared() -> None:
+    # Not on the first call: a spec reaches transports that dispatch it
+    # without ever asking, and every call would raise.
+    with pytest.raises(ImproperlyConfigured) as refused:
+        ServiceSpec(service=print, validator=DataclassValidator(_Price), partial=True)
+    message = str(refused.value)
+    assert "declares partial=True with a DataclassValidator" in message
+    assert "which cannot validate a partial call" in message
 
 
 def test_a_subclass_may_extend_validated_through_validate() -> None:

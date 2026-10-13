@@ -144,6 +144,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filter is spelt. So does an array of strings whose choices hold no comma,
   so a django-filter `OrderingFilter` takes `?o=title,-pk` as it does
   `?o=title&o=-pk`; any other array of strings is never split.
+- `Validator.supports_partial`, a class attribute saying whether a
+  Validator can honour a `partial` call by returning only what was sent.
+  `True` by default; `DataclassValidator` and `PydanticValidator` set it
+  `False`.
 
 ### Changed
 - **Breaking:** a `DataclassValidator` call's `data` is the dataclass
@@ -179,6 +183,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handing back an awaitable from a plain `def` is refused where it is
   resolved, and an `extend_queryset` doing so where it is called, where its
   coroutine stood in for the queryset and came back as a list's value.
+- **Breaking:** a `ServiceSpec` declaring `partial=True` is refused when it
+  is built, with `ImproperlyConfigured` naming the service, in two cases that
+  were accepted. With no `validator`, where it relaxed nothing, since only a
+  Validator's parameters are made optional. And over a Validator whose
+  `supports_partial` is `False`, `DataclassValidator` and `PydanticValidator`
+  among them, where the spec built and every call raised; the message names
+  the Validator's class and says a partial call needs one that can bind only
+  what was sent, such as a `FormValidator`. Each adapter still refuses a
+  partial call made to it directly.
 - A selector nested in a service spec that declares `preconditions` or a
   `progress_reporter` is refused when the service spec is built, as is an
   output selector declaring `kwargs`: dispatch never runs them.

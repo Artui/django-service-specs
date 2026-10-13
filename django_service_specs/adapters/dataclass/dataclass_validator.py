@@ -104,6 +104,9 @@ class DataclassValidator(Validator):
     annotation may name a class its module cannot resolve yet.
     """
 
+    # A partial spec over it is refused when declared: see ``validate()``.
+    supports_partial = False
+
     def __init__(self, cls: type[Any]) -> None:
         check_dataclass(cls, label="DataclassValidator")
         self.cls = cls
@@ -139,6 +142,9 @@ class DataclassValidator(Validator):
         ``__post_init__`` at all. A field an update may leave out is declared
         ``X | UnsetType``, which every call honours; a spec whose calls are
         partial uses a Validator that can return only what was sent.
+        ``supports_partial`` is ``False``, so a ``ServiceSpec`` declaring
+        ``partial=True`` over this Validator is refused when it is built, and
+        this refusal answers only a caller using it directly.
         """
         return self._validated(arguments, context)
 

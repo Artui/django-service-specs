@@ -43,7 +43,7 @@ def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
     # test_an_async_generator_precondition_is_refused the third.
     if sync and (is_async(value) or inspect.isasyncgenfunction(value)):
         raise ImproperlyConfigured(
-            f"{label} is {_name(value)}, an async callable. It is called from sync code "
+            f"{label} is {callable_name(value)}, an async callable. It is called from sync code "
             "and never awaited, on both entry points; declare it with def, since adispatch "
             "already runs it off the event loop."
         )
@@ -176,7 +176,7 @@ def check_reserved(parameters: Parameters, *, label: str) -> Parameters:
     return parameters
 
 
-def _name(value: Any) -> str:
+def callable_name(value: Any) -> str:
     """A callable's own name, or its type's for an instance or a ``functools.partial``."""
     return getattr(value, "__qualname__", None) or type(value).__name__
 

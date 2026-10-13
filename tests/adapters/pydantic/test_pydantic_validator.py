@@ -30,6 +30,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.relations.child_spec import ChildSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.dataclass import utils as dataclass_models
@@ -561,6 +562,15 @@ class TestPartial:
             getattr(PydanticValidator(Address), method)(
                 {"city": "Oslo"}, ValidationContext(None, partial=True)
             )
+
+    def test_a_partial_spec_over_it_is_refused_when_declared(self) -> None:
+        # Not on the first call: a spec reaches transports that dispatch it
+        # without ever asking, and every call would raise.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, validator=PydanticValidator(Address), partial=True)
+        message = str(refused.value)
+        assert "declares partial=True with a PydanticValidator" in message
+        assert "which cannot validate a partial call" in message
 
     def test_a_whole_call_is_the_mapping_as_its_data(self) -> None:
         validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
