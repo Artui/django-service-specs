@@ -1556,8 +1556,8 @@ def test_a_dataclass_validator_hands_the_service_its_instance_as_data(ada: Any) 
 class _Binds(Titled):
     """Binds ``bound`` for the call beside the values, as a library adapter binds its object."""
 
-    def __init__(self, bound: Mapping[str, Any]) -> None:
-        super().__init__()
+    def __init__(self, bound: Mapping[str, Any], returns: Mapping[str, Any] | None = None) -> None:
+        super().__init__(returns)
         self.bound = bound
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
@@ -1580,15 +1580,19 @@ def test_a_value_the_validator_binds_reaches_the_service_by_name(ada: Any) -> No
     [
         pytest.param({"user": "someone"}, "['user']", id="a-seed"),
         pytest.param({"title": "other"}, "['title']", id="a-validated-value"),
+        # A value the Validator returns without declaring it: no parameter
+        # names it, so only the validated values' own names refuse it.
+        pytest.param({"slug": "other"}, "['slug']", id="an-undeclared-validated-value"),
     ],
 )
 def test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused(
     ada: Any, bound: Mapping[str, Any], named: str
 ) -> None:
-    def create(*, user: Any, title: str) -> Any:
-        return (user, title)
+    def create(*, user: Any, title: str, slug: str) -> Any:
+        return (user, title, slug)
 
-    spec = ServiceSpec(service=create, permissions=OPEN, validator=_Binds(bound))
+    validator = _Binds(bound, returns={"title": "T", "slug": "t"})
+    spec = ServiceSpec(service=create, permissions=OPEN, validator=validator)
     with pytest.raises(ImproperlyConfigured, match=f"bound the key\\(s\\) {re.escape(named)}"):
         dispatch(spec, principal=ada, arguments={"title": "T"})
 
@@ -3001,6 +3005,21 @@ class TestMany:
             {"title": "from the server"},
             {"title": "from the server"},
         ]
+
+    def test_each_row_s_validator_sees_only_the_keys_it_declares(self, ada: Any) -> None:
+        # The shape check refuses an unknown key inside a row, so only a
+        # provider can put one there; a serializer ignores a key it has no
+        # field for, and so is the Validator never handed one.
+        validator = Titled()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            many=True,
+            validator=validator,
+            input_data=lambda: {"undeclared": 1},
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "mine"}]})
+        assert [args for args, _ in validator.calls] == [{"title": "mine"}]
 
     def test_a_value_a_row_binds_is_refused(self, ada: Any) -> None:
         class Binding(Titled):

@@ -896,6 +896,10 @@ def _validate_rows(
     data: list[Any] = []
     for index, row in checked.rows.items():
         merged = {**row, **server_input}
+        # Only the keys the Validator declares, as on a single call: a row's
+        # own unknown key was refused by the shape check, so only a
+        # provider's can reach here
+        # (test_each_row_s_validator_sees_only_the_keys_it_declares).
         own = {key: value for key, value in merged.items() if key in declared}
         try:
             validated = validator.validated(own, context)
@@ -1008,7 +1012,8 @@ def prepare_service(
     # the caller sent, or a field a partial call left out: either way the
     # service would read something other than what its name says. Each set is
     # held by its own case: test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused
-    # (``a-seed``, ``a-validated-value``) and
+    # (``a-seed``; ``an-undeclared-validated-value`` for the values, since
+    # ``a-validated-value`` names a parameter too) and
     # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``).
     named = reserved | values.keys() | spec.parameters().names()
     bound = sorted(validated.pool.keys() & named)
