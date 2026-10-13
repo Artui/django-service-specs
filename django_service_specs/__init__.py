@@ -105,6 +105,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
@@ -169,6 +170,7 @@ __all__ = [
     "UnsetType",
     "UnsupportedMediaType",
     "ValidationContext",
+    "Validated",
     "Validator",
     "ValueFormatter",
     "__version__",

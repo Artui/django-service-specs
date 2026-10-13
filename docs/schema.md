@@ -91,7 +91,14 @@ default, and `published_on` and `pk` may be null:
         "properties": {
           "title": {"type": "string"},
           "price": {"type": "string", "format": "decimal"},
-          "status": {"type": "string", "enum": ["draft", "published"], "default": "draft"},
+          "status": {
+            "type": "string",
+            "oneOf": [
+              {"const": "draft", "title": "Draft"},
+              {"const": "published", "title": "Published"}
+            ],
+            "default": "draft"
+          },
           "published_on": {"type": ["string", "null"], "format": "date", "default": null},
           "pk": {"type": ["integer", "null"], "default": null}
         },

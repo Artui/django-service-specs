@@ -25,6 +25,8 @@ importing the package root never imports pydantic.
 ## Validation
 
 ::: django_service_specs.validation.validator.Validator
+::: django_service_specs.validation.validated.Validated
+
 ::: django_service_specs.validation.validation_context.ValidationContext
 ::: django_service_specs.validation.unknown_arguments.UnknownArguments
 

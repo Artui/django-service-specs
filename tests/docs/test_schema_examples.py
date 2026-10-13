@@ -45,7 +45,14 @@ BOOK_IN = {
     "properties": {
         "title": {"type": "string"},
         "price": {"type": "string", "format": "decimal"},
-        "status": {"type": "string", "enum": ["draft", "published"], "default": "draft"},
+        "status": {
+            "type": "string",
+            "oneOf": [
+                {"const": "draft", "title": "Draft"},
+                {"const": "published", "title": "Published"},
+            ],
+            "default": "draft",
+        },
         "published_on": {"type": ["string", "null"], "format": "date", "default": None},
         "pk": {"type": ["integer", "null"], "default": None},
     },
