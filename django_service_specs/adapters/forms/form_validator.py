@@ -11,7 +11,7 @@ from typing import Any
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db import models
+from django.db import connections, models
 from django.utils.datastructures import MultiValueDict
 
 from django_service_specs.adapters.utils import element_format, scalar_type
@@ -73,6 +73,10 @@ _KEYS: tuple[tuple[type[models.Field[Any, Any]], str, str | None], ...] = (
 """The model fields a ``ModelChoiceField`` can match rows on, and the JSON type
 a caller sends for one."""
 
+_WIDEST_INTEGER = (-(2**63), 2**63 - 1)
+"""A signed 64-bit integer's range: the widest integer column any backend has,
+and the most SQLite's driver hands on."""
+
 _EMPTY_CHOICES = ("", None)
 """The values Django reads as the blank choice, as a model field's
 ``get_choices`` does. A form never matches a value against one: it reads an
@@ -124,7 +128,13 @@ class FormValidator(Validator):
       column's own spelling, so ``"12.50"`` names a row a two-place column
       holds and ``12.5`` names none. A date or a
       date-time key is an array of strings, since an element takes no other
-      format. They validate to the row, and to a queryset of rows.
+      format. They validate to the row, and to a queryset of rows. A key
+      past the range of the integer column rows are matched on names no row,
+      and is refused as the field refuses a key no row holds,
+      ``invalid_choice`` in its own words, before the form queries: Django
+      hands a ``ModelMultipleChoiceField``'s keys to the database driver,
+      which raises ``OverflowError`` for one, and so does a
+      ``ModelChoiceField``'s on Django 4.2.
     - No choice field declares a length, since Django's have none, so the
       shape check in front of this Validator holds a list to the
       ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
@@ -335,8 +345,18 @@ class FormValidator(Validator):
             }
             for name in form.fields.keys() - sent:
                 del form.fields[name]
-        if not form.is_valid():
-            raise InvalidArguments(_detail(form.errors.as_data()))
+        # Taken off the form and refused in its words, beside the rest: the
+        # field itself would hand the key to the driver.
+        beyond = _keys_beyond_the_column(form)
+        for name in beyond:
+            del form.fields[name]
+        # One branch to coverage, so each condition is held by its own test:
+        # test_a_list_naming_a_key_past_the_column_s_range_is_no_choice (the
+        # key: without it, the form refuses the rest and passes the key) and
+        # test_a_list_of_decimal_keys_is_matched_on_the_column_s_own_spelling
+        # (the form's own refusal).
+        if beyond or not form.is_valid():
+            raise InvalidArguments(_detail({**form.errors.as_data(), **beyond}))
         # One branch to coverage, so each condition is held by its own test:
         # test_a_whole_model_form_call_checks_uniqueness_once (the partial
         # call: a whole one has already checked every pair, and would query
@@ -604,12 +624,8 @@ def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | 
             f"{where}: a {type(field).__name__} with no queryset has no model to read "
             "its key from; declare the queryset on the field."
         )
+    key = _key_field(queryset, field.to_field_name)
     opts = queryset.model._meta
-    key: Any = opts.get_field(field.to_field_name) if field.to_field_name else opts.pk
-    while isinstance(key, models.ForeignKey):
-        # A multi-table child's primary key is the link to its parent, and a
-        # caller sends what that link holds.
-        key = key.target_field
     for cls, json_type, fmt in _KEYS:
         if isinstance(key, cls):
             return json_type, fmt
@@ -617,3 +633,66 @@ def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | 
         f"{where}: matches rows on {opts.label}.{key.name}, a {type(key).__name__}, "
         "which has no JSON type this adapter can declare."
     )
+
+
+def _key_field(queryset: models.QuerySet[Any], to_field_name: str | None) -> Any:
+    """The model field a choice field matches rows on: its ``to_field_name``, or the key."""
+    opts = queryset.model._meta
+    key: Any = opts.get_field(to_field_name) if to_field_name else opts.pk
+    while isinstance(key, models.ForeignKey):
+        # A multi-table child's primary key is the link to its parent, and a
+        # caller sends what that link holds.
+        key = key.target_field
+    return key
+
+
+def _keys_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationError]]:
+    """Each model choice field sent a key its integer column cannot hold, and its refusal.
+
+    The range is the database's own for the column, as Django reads it to
+    answer an exact lookup past it with no rows, from the connection the
+    field's queryset reads. A key no row can hold is refused as Django
+    refuses a key no row holds: ``invalid_choice``, in the field's own words.
+    Only an ``int`` is read, which is what the shape check hands on for an
+    integer key; anything else is the field's.
+    """
+    beyond: dict[str, list[ValidationError]] = {}
+    for name, field in form.fields.items():
+        # One branch to coverage, so each condition is held by its own test:
+        # test_a_list_naming_a_key_past_the_column_s_range_is_no_choice (the
+        # field: its ``title`` has no rows to match) and
+        # test_flat_strings_reach_the_form_through_coerce_flat_and_the_shape_check
+        # (the key sent: an optional choice field may be absent).
+        if not isinstance(field, forms.ModelChoiceField) or name not in form.data:
+            continue
+        # Never ``None``: the Validator refused a field with no queryset
+        # when it was built.
+        queryset: Any = field.queryset
+        key = _key_field(queryset, field.to_field_name)
+        # test_a_key_past_an_integer_range_on_a_text_column_is_matched fails
+        # without this: a text column holds any integer's digits.
+        if not isinstance(key, models.IntegerField):
+            continue
+        low, high = connections[queryset.db].ops.integer_field_range(key.get_internal_type())
+        # Django 4.2 states no range for SQLite, whose driver still refuses a
+        # key past 64 bits; from 5.0 it states exactly that one. No backend's
+        # integer column is wider, so it is the range where none is stated.
+        low = _WIDEST_INTEGER[0] if low is None else low
+        high = _WIDEST_INTEGER[1] if high is None else high
+        sent = form.data[name]
+        values = sent if isinstance(sent, list | tuple) else [sent]
+        # One branch to coverage, so each condition is held by its own test:
+        # test_a_key_sent_as_a_string_is_left_to_the_field (the ``int``:
+        # without it, a string is compared with the range and raises) and
+        # test_the_keys_at_either_end_of_the_column_s_range_are_matched (the
+        # range, at both of its ends).
+        past = [value for value in values if isinstance(value, int) and not low <= value <= high]
+        if past:
+            beyond[name] = [
+                ValidationError(
+                    field.error_messages["invalid_choice"],
+                    code="invalid_choice",
+                    params={"value": past[0]},
+                )
+            ]
+    return beyond

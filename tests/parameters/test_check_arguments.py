@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import sys
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
@@ -347,6 +348,22 @@ def test_a_number_s_string_is_handed_on_as_a_json_decoder_reads_its_digits(
     checked = check_arguments(one(Parameter("x", "number")), {"x": value})["x"]
     assert checked == number
     assert type(checked) is type(number)
+
+
+def test_a_number_s_string_past_int_s_digit_limit_is_refused_never_rounded() -> None:
+    # Zero-padded past the 4300 digits ``int`` reads from Python 3.10.7 on,
+    # these digits are still a finite ``float``, 2**53: refused as no number
+    # rather than handed on as that neighbour. With no limit they are exact.
+    padded = "0" * 4300 + str(2**53 + 1)
+    params = one(Parameter("x", "number"))
+    if getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0:
+        assert refusal(params, {"x": padded}) == {"x": ["Expected a number."]}
+    else:
+        assert check_arguments(params, {"x": padded}) == {"x": 2**53 + 1}
+    long = "9" * 4301
+    assert refusal(params, {"x": long}) == {"x": ["Expected a number."]}
+    integer = one(Parameter("x", "integer"))
+    assert refusal(integer, {"x": long}) == {"x": ["Expected an integer."]}
 
 
 @pytest.mark.parametrize("value", ["12.50", "\u0665", "\uff15", "\u0661\u0662.\u0665", " 5 "])
@@ -993,6 +1010,16 @@ def test_a_minimum_past_the_default_maximum_with_no_maximum_of_its_own_is_refuse
     params = one(Parameter("ids", "array", min_length=4))
     with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
         check_arguments(params, {"ids": [1, 2, 3, 4]})
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_at_the_default_maximum_is_met_by_a_list_of_exactly_that_many() -> None:
+    # The default bounds inclusively, so a minimum equal to it is meetable:
+    # only one past it is refused as a declaration no call could pass.
+    params = one(Parameter("ids", "array", min_length=3))
+    assert check_arguments(params, {"ids": [1, 2, 3]}) == {"ids": [1, 2, 3]}
+    assert refusal(params, {"ids": [1, 2]}) == {"ids": [TOO_FEW % 3]}
+    assert refusal(params, {"ids": [1, 2, 3, 4]}) == {"ids": [TOO_MANY % 3]}
 
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)

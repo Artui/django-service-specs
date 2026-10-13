@@ -11,19 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CodedMessage`, a `str` carrying a `code`, and every refusal the kernel and
   its shipped adapters make is one: the shape check's, `coerce_flat`'s,
   `request_arguments`', dispatch refusing a read a selector asks for and
-  nothing filled, a FilterSet's, and `DataclassValidator`'s, `FormValidator`'s
-  and `PydanticValidator`'s. The code is the one a DRF field gives the same
+  nothing filled, a FilterSet's, a relation write's, and
+  `DataclassValidator`'s, `FormValidator`'s and `PydanticValidator`'s. The
+  code is the one a DRF field gives the same
   mistake - `required`, `null`, `invalid`, `not_a_list`, `max_value`,
   `min_value`, `invalid_choice`, `max_length`, `min_length` - plus `unknown`
   for a key refused under `REJECT` and `parse_error` for a body that is not
   JSON. A message Django raised keeps Django's code (`unique_together` from a
   form, where DRF says `unique`), pydantic's error types map to DRF's codes,
-  and a `PydanticCustomError` keeps its own type. A relation write's `null`
-  row and its write-failure refusals still carry none. So an adapter
-  building DRF's error details reads each code off `InvalidArguments.detail`
-  rather than every one of those refusals reading as `invalid`. A `CodedMessage` equals,
-  hashes and serializes as its message, so the JSON body a transport writes
-  is unchanged; a copy and a pickle keep the code. Dispatch still hands on a
+  and a `PydanticCustomError` keeps its own type. So an adapter building
+  DRF's error details reads each code off `InvalidArguments.detail` rather
+  than every one of those refusals reading as `invalid`. A `CodedMessage`
+  equals, hashes, serializes and `repr`s as its message, so the JSON body a
+  transport writes and the text of a tree printed with `str` are unchanged; a
+  copy and a pickle keep the code. Dispatch still hands on a
   Validator's own messages as it raised them, a library's coded message
   keeping its code and a plain `str` staying plain.
 - An output selector is handed the service's return as `instance` as well as
@@ -57,7 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ImproperlyConfigured` where it is read. A `min_length` past it on a
   parameter with no `max_length` of its own, which no call could meet, is
   refused the same way at the call and when its schema is built.
-
 - `Parameter`'s `format`, `minimum` and `maximum` on an array describe each
   element, as its `choices` do. An array of `integer` or `number` takes a
   bound, and an array of `string` takes `format="decimal"` and then a bound
@@ -128,7 +128,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carried no bound at all on the rows it validated inside one transaction.
   The schema states the maximum in force as `"maxItems"` on every array input,
   so a client learns the bound it meets, and under a setting of `None` an
-  array with no `max_length` states none.
+  array with no `max_length` states none. Since the setting is read whenever
+  such an array is checked or described, `parameters_schema`,
+  `spec_input_schema`, `check_arguments` and `coerce_flat` raise
+  `ImproperlyConfigured` outside a configured Django for an array with no
+  `max_length`, where each returned a schema or the checked arguments. A
+  default stated before `settings.configure()` would describe a bound the
+  calls after it need not meet, so there is no fallback; configure settings,
+  or declare the `max_length`, before building such a schema.
 - **Breaking:** `SpecFormView`'s GET shows the row an update's post would
   act on. Every GET finds its target as dispatch would, through
   `resolve_target` on the route's kwargs - the row or set a target selector
@@ -192,6 +199,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   client reading codes found none where the shape check's refusals had one. A
   row service's refusal, re-rooted under its relation, keeps its messages as
   they were, codes included.
+- **`FormValidator` refuses a model choice key past its column's range.**
+  An integer key past the range of the column a `ModelMultipleChoiceField`
+  matches rows on reached the database driver through Django's `__in`
+  lookup, and SQLite's raised `OverflowError`, answered as a 500, on every
+  Django version; a `ModelChoiceField`'s did the same on Django 4.2. Such a
+  key names no row, so it is refused as the field refuses a key no row
+  holds, `invalid_choice` in its own words, beside the form's other
+  refusals and before the form queries. The range is the database's own for
+  the column. An integer argument a project's selector or service hands the
+  database is still the database's to range; declare a `minimum` and
+  `maximum` on one that reaches a column unchecked.
 - **A re-upload under the held file's name is written.** `update_from_input`,
   `aupdate_from_input` and `apply_input` compared a file field's new value
   with the held file by name, so an upload named as the file the row held -
@@ -206,9 +224,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a JSON decoder reads the same literal: digits alone are the exact `int`
   they spell, and a point or an exponent makes a `float`. Read through `float`
   alone, every integer past `2**53` was rounded to a neighbour, so a key
-  sent for a `number` matched the neighbour's row. The strings
-  accepted are unchanged, and `"3"` reaches the Validator as `3` rather than
-  `3.0`, as the JSON `3` always did.
+  sent for a `number` matched the neighbour's row. The strings accepted are
+  unchanged but one kind: digits alone that `int` refuses, past the 4300 it
+  reads from Python 3.10.7 on, which zeros in front can reach while `float`
+  still reads them as finite, are refused as no number, as they are no
+  integer, rather than rounded to a neighbour. And `"3"` reaches the
+  Validator as `3` rather than `3.0`, as the JSON `3` always did.
 - An `async def` selector spec's `progress_reporter` provider is called only
   once the selector's keywords are bound, and only for a selector that takes
   `progress`, as a service spec's is. It was resolved before the binding, so

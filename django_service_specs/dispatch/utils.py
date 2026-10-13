@@ -497,7 +497,8 @@ def with_run_progress(
 
     The provider is called from the base pool, as a service spec's is: the
     entries of ``pool`` under a seeded name, which are exactly
-    ``base_pool``'s, since no read and no provided key may take one.
+    ``base_pool``'s, since no read and no provided key may take one
+    (test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool).
     """
     if "progress" not in kwargs:
         return kwargs

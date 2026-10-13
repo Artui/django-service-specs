@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 import pytest
@@ -54,6 +55,25 @@ def test_a_number_is_what_a_json_decoder_makes_of_the_same_digits(
     coerced = coerce_flat(FLAT, {"ratio": value})["ratio"]
     assert coerced == number
     assert type(coerced) is type(number)
+
+
+# Digits past ``int``'s limit of 4300, which Python enforces from 3.10.7 on.
+# Padded with zeros, ``float`` still reads the value as a finite number.
+PADDED = "0" * 4300 + str(2**53 + 1)
+LIMITED = getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0
+
+
+def test_an_integer_literal_past_int_s_digit_limit_is_refused_never_rounded() -> None:
+    # Digits alone spell an integer, so where ``int`` refuses them they spell
+    # no number at all, rather than the float neighbour 2**53 that
+    # ``float`` makes of them. A Python with no digit limit reads them exactly.
+    if LIMITED:
+        assert refusal(FLAT, {"ratio": PADDED}) == {"ratio": ["Enter a number."]}
+    else:
+        assert coerce_flat(FLAT, {"ratio": PADDED}) == {"ratio": 2**53 + 1}
+    long = "9" * 4301
+    assert refusal(FLAT, {"ratio": long}) == {"ratio": ["Enter a number."]}
+    assert refusal(FLAT, {"count": long}) == {"count": ["Enter a whole number."]}
 
 
 @pytest.mark.parametrize(
