@@ -13,10 +13,12 @@ def allow_null(schema: dict[str, Any]) -> dict[str, Any]:
     the type it describes. A reader choosing a widget, or a model choosing a
     value, reads ``type`` first; an ``anyOf`` makes both go looking for it.
 
-    Returns a new mapping and never modifies ``schema``. Only a typed node is
-    passed here: every Parameter and OutputField declares its type, and an
-    array's untyped element (``{}``) already admits null.
+    Returns a new mapping and never modifies ``schema``. A node with no
+    ``type`` is copied as it is, since it admits null already: a file's, which
+    no JSON type describes, and an array's undeclared element (``{}``).
     """
+    if "type" not in schema:
+        return dict(schema)
     return {**schema, "type": [schema["type"], "null"]}
 
 

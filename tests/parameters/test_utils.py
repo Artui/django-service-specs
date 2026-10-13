@@ -19,3 +19,9 @@ def test_every_json_type_has_its_own_sentence(json_type: str) -> None:
 
 def test_the_decimal_format_names_both_the_forms_it_accepts() -> None:
     assert expected_type("decimal") == "Expected a decimal string or a number."
+
+
+def test_a_file_has_its_own_sentence() -> None:
+    # Not a JSON type, and refused as one all the same: a string or a mapping
+    # sent where a file is declared.
+    assert expected_type("file") == "Expected a file."

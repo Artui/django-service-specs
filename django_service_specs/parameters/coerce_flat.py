@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import math
-import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -11,6 +9,7 @@ from django.utils.translation import gettext
 
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import parse_number
 
 # Messages are translated where they are raised, never at import, and spelled as
 # a stock Django field spells them where one has the message, so Django's own
@@ -23,14 +22,6 @@ The libraries disagree about every other one - a Django ``BooleanField`` reads
 ``"no"``, ``"off"`` and ``"n"`` as true, because any other non-empty string is
 - so a refusal is the one answer they all share, and the only one that cannot
 set a flag the caller meant to clear."""
-
-_INTEGRAL_DECIMAL = re.compile(r"\.0*\s*$")
-"""A decimal point with nothing after it but zeros and space, stripped before ``int``.
-
-It is Django's own expression: ``forms.IntegerField`` strips exactly this, and
-DRF's ``IntegerField`` does too, so ``"5.0"`` and ``"5."`` are 5 to both while
-``"5.5"`` is still refused. A flat transport stricter than the fields behind it
-would refuse a value the worker reads as a whole number."""
 
 
 def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -108,18 +99,15 @@ def _coerce_one(json_type: str, value: Any) -> tuple[Any, str | None]:
     """``(value, None)``, or ``(None, message)`` for a string that does not parse."""
     if not isinstance(value, str):
         return value, None
-    if json_type == "integer":
-        try:
-            return int(_INTEGRAL_DECIMAL.sub("", value)), None
-        except ValueError:
-            return None, gettext("Enter a whole number.")
-    if json_type == "number":
-        try:
-            number = float(value)
-        except ValueError:
-            number = math.nan
-        # NaN and the infinities parse, and no JSON caller can send one.
-        return (number, None) if math.isfinite(number) else (None, gettext("Enter a number."))
+    if json_type in ("integer", "number"):
+        number = parse_number(json_type, value)
+        if number is not None:
+            return number, None
+        return None, (
+            gettext("Enter a whole number.")
+            if json_type == "integer"
+            else gettext("Enter a number.")
+        )
     if json_type == "boolean":
         lowered = value.lower()
         if lowered in _BOOLEANS:

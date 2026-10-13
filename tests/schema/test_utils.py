@@ -30,6 +30,16 @@ class TestAllowNull:
         assert schema == {"type": "integer"}
         assert widened is not schema
 
+    def test_an_untyped_node_admits_null_already_and_is_copied_as_it_is(self) -> None:
+        # A file's node, and an array's undeclared element: neither states a
+        # type, so null is among the values it admits without a word added.
+        schema = {"description": "The minutes."}
+
+        widened = allow_null(schema)
+
+        assert widened == {"description": "The minutes."}
+        assert widened is not schema
+
 
 class TestIsJsonNative:
     @pytest.mark.parametrize(
