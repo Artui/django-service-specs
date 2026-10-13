@@ -458,9 +458,13 @@ def run_progress(
     for an ``async def`` run, whose reports are made on an event loop, where a
     provider that queries cannot run: that one is resolved now, from sync
     code, which is why every caller of this function calls it only once every
-    check that can refuse the call has passed
+    check before the run that can refuse the call has passed
     (test_an_async_service_s_progress_provider_is_resolved_before_the_run).
-    With neither, ``null_progress``, as ``base_pool`` seeds it.
+    A selector spec's selector is its run, and the checks on what it
+    returned - the object-level and scope checks, its ``preconditions`` -
+    answer after it, so a selector spec those refuse may already have called
+    the provider, on either path. With neither, ``null_progress``, as
+    ``base_pool`` seeds it.
     """
     resolve = resolve_progress if is_async(run) else deferred_progress
     reporter = resolve(provider, base, transport=transport)

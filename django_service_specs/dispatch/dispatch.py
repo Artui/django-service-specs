@@ -72,8 +72,8 @@ def dispatch(
        on a retrieved row, and
        [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
        where no row is: on a list, a collection target's set, empty or not,
-       a create's ``None``, and the ``None`` a service spec's ``allow_none``
-       lets through. A selector spec's own ``None`` under ``allow_none`` is
+       a create's ``None``, and the ``None`` a service spec's instance
+       selector lets through under its ``allow_none``. A selector spec's own ``None`` under ``allow_none`` is
        asked of neither.
     5. A service spec's Validator, on only the arguments it declares, with
        its ``input_data`` provider's values merged over the caller's, and the
@@ -139,8 +139,12 @@ def dispatch(
     report, and one reporting after the service finished would read as the
     work restarting. The run alone also reports to the spec's
     ``progress_reporter``, called on the run's first report, or before an
-    ``async def`` run once nothing can refuse the call; either way a refused
-    call never calls it.
+    ``async def`` run once nothing before the run can refuse the call; either
+    way a call refused before its run never calls it. A selector spec's run
+    is its selector, and its step four and ``preconditions`` answer after it,
+    so a selector spec refused there may already have called it: by the
+    selector's first report, or, for an ``async def`` selector, before the
+    await.
 
     ``target`` is a service spec's target resolved by the caller - the row
     an HTTP view's ``get_object()`` found, or what ``resolve_target``

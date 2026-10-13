@@ -113,8 +113,10 @@ class SelectorSpec:
             sink the run reports to beside the transport's - a task record, an
             audit trail - called with the keywords it declares from the base
             pool. Resolved on first use, so a call refused before its run never
-            calls it, and a provider returning ``None`` declines. Refused on a
-            nested selector.
+            calls it, and a provider returning ``None`` declines. The
+            object-level and scope checks and the ``preconditions`` answer
+            after the selector, which is the run, so a call they refuse may
+            already have called it. Refused on a nested selector.
         metadata: A project's own per-operation facts, stored as given and read
             back by its own checks or audit hooks.
     """
