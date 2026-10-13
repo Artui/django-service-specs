@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Iterable, Mapping
 from dataclasses import KW_ONLY, dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -78,8 +79,15 @@ class Parameter:
     a list or dict default is as hashable as any other, while equality still
     tells two defaults apart.
 
-    There are no bounds (``maxLength``, ``minimum``) yet. The Validator enforces
-    those; adding them here is additive.
+    ``minimum`` and ``maximum`` bound a number, inclusively: an ``integer``, a
+    ``number``, or a ``decimal`` string, which is compared as the decimal it
+    spells, so ``"1E+999999999"`` is past a bound of ``1e50`` without ever
+    being built as the integer it names. Each is an ``int`` or a finite
+    ``float``, a JSON number the schema can state. They exist for the bound a
+    reader needs before any Validator runs: a filter whose form field has none
+    hands the value to the database's integer conversion, which builds every
+    digit. Any other bound - a length, a Validator's ``max_value`` - is still
+    the Validator's alone.
     """
 
     name: str
@@ -92,6 +100,8 @@ class Parameter:
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
     choice_labels: tuple[tuple[Any, str], ...] | None = None
+    minimum: int | float | None = None
+    maximum: int | float | None = None
     # Out of the hash and still in equality, so a list or dict default - which
     # the pydantic adapter reports as given - leaves the declaration hashable.
     # Equal Parameters still hash equal, which is all a hash promises; two that
@@ -149,6 +159,44 @@ class Parameter:
                 )
         if self.choice_labels is not None:
             self._normalize_choice_labels(where, self.choice_labels)
+        # One branch to coverage, each side held by its own half of
+        # test_a_bound_must_be_a_finite_number: [minimum-...] and [maximum-...].
+        if self.minimum is not None or self.maximum is not None:
+            self._check_bounds(where)
+
+    def _check_bounds(self, where: str) -> None:
+        """Refuse a bound no reader can act on: a non-number, or one on a value that is no number."""
+        for label, bound in (("minimum", self.minimum), ("maximum", self.maximum)):
+            # A JSON number the schema can state: ``bool`` is an ``int`` to Python
+            # and no number to JSON, which ``type() is`` keeps out, and NaN and the
+            # infinities have no JSON spelling. Read by type rather than through
+            # ``math.isfinite`` alone, which overflows on a large ``int`` and takes
+            # a ``Decimal``. One branch to coverage, so each condition is held by
+            # its own test: test_a_bound_may_stand_alone (``None``),
+            # test_a_bound_on_an_integer_is_inclusive (``int``) and
+            # test_a_bound_must_be_a_finite_number[decimal] and [infinity].
+            if bound is not None and not (
+                type(bound) is int or (type(bound) is float and math.isfinite(bound))
+            ):
+                raise ImproperlyConfigured(
+                    f"{where}: {label} {bound!r} is not a finite int or float."
+                )
+        # One branch to coverage, so each condition is held by its own test:
+        # test_a_bound_on_an_integer_is_inclusive (the type: without it, an
+        # integer's bound is refused) and test_a_decimal_string_takes_a_bound
+        # (the format).
+        if self.type not in ("integer", "number") and self.format != "decimal":
+            raise ImproperlyConfigured(
+                f"{where}: a bound describes a number or a decimal string; "
+                f"this parameter is {self.type!r}."
+            )
+        # One branch to coverage: test_one_bound_may_equal_the_other holds the
+        # comparison, and test_a_bound_may_stand_alone each ``is not None``,
+        # without which an absent bound is compared and raises.
+        if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
+            raise ImproperlyConfigured(
+                f"{where}: minimum {self.minimum!r} is past maximum {self.maximum!r}."
+            )
 
     def _normalize_choice_labels(
         self, where: str, labels: Mapping[Any, str] | Iterable[tuple[Any, str]]

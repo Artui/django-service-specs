@@ -237,6 +237,8 @@ class TestFilterSet:
         assert properties["pk_range_min"] == {
             "type": "string",
             "format": "decimal",
+            "minimum": -1e50,
+            "maximum": 1e50,
             "description": "The `min` bound of `pk`.",
         }
         assert properties["kinds"]["type"] == "array"

@@ -185,10 +185,12 @@ contradict, and states everything the declaration knows.
   rather than restated in a form the declaration did not choose. Leaving out
   only the unencodable choices would claim the others are refused.
 
-What stays incomplete is only what the declaration does not carry. There are
-no bounds (`maxLength`, `minimum`) because Parameters has none yet; the
-Validator enforces them, and adding them to Parameters would reach the schema
-too.
+What stays incomplete is only what the declaration does not carry. A
+Parameter's `minimum` and `maximum` are stated as `"minimum"` and
+`"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
+`max_value`, is not. JSON Schema reads `minimum` and `maximum` on a number
+instance alone, so on a decimal string a validating client enforces neither:
+the shape check does, and the schema tells a reader where the line is.
 
 ### The decimal convention
 

@@ -118,9 +118,14 @@ set and the shape check cover every filter, and a filter named like a read
 declared differently is refused. Every filter is optional. A number filter,
 and each bound of a numeric range, is a `decimal` string, which its
 `DecimalField` reads exactly: read as a float on the way, a key past `2**53`
-would match its neighbour's row. A JSON number is still taken. A CSV
-filter's numbers stay `number`, so `?pks=1,2` splits, and keep the float
-reading.
+would match its neighbour's row. A JSON number is still taken. Each such
+decimal is bounded at `minimum=-1e50` and `maximum=1e50`: django-filter's
+number filter refuses a value past `1e50` and leaves a range's bounds and
+every negative value open, while an integer column's conversion builds every
+digit of a value such as `"1E+999999999"`, which holds a worker for minutes.
+So the shape check refuses either side of the line before the FilterSet is
+reached. A CSV filter's numbers stay `number`, so `?pks=1,2` splits, and keep
+the float reading, which cannot reach that far.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its
@@ -302,6 +307,13 @@ the same declaration.
   is refused by the declaration rather than reaching a constructor.
 - **`choices`**, **`nullable`** and **`required`** mean what they say.
   `choices` on an array constrains each element.
+- **`minimum`** and **`maximum`** bound a number, inclusively: an `integer`, a
+  `number` or a `decimal` string, refused in the words Django's
+  `MinValueValidator` and `MaxValueValidator` use. Each is an `int` or a
+  finite `float`, and a bound on any other type is refused where it is
+  written. A decimal string is compared as the decimal it spells, by its
+  exponent, so `"1E+999999999"` is refused without building the integer it
+  names. The schema states both as `"minimum"` and `"maximum"`.
 - **`choice_labels`** names the choices for a reader, as a mapping of a choice
   to its label or as Django's pairs. The labels constrain nothing; the schema
   states each as a choice's `title`. A label may be a lazy translation.
@@ -314,8 +326,9 @@ the same declaration.
   applied: whether an omitted argument arrives as its default is the validating
   library's behaviour.
 
-There are no bounds (`maxLength`, `minimum`) on a Parameter; the Validator
-enforces those.
+Any other bound - a length, a Validator field's `max_value` - is the
+Validator's alone. A Parameter's bounds are for the line a caller must not
+cross before any Validator runs.
 
 [`Parameters`][django_service_specs.parameters.parameters.Parameters] is an
 ordered set of them. `Parameters.of(a, b)` builds one, `+` joins two, and a

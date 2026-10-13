@@ -75,8 +75,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of them is a parameter dispatch demands of the caller, so a transport
   subtracts the set from what `parameters()` lists.
 - `progress_reporter` on both specs: a provider of a `ProgressReporter` sink
-  the run reports to beside the transport's, resolved on the run's first
-  report, so a refused call never calls it.
+  the run reports to beside the transport's. On a service spec it is
+  resolved on the run's first report, so a call refused before its run never
+  calls it; a selector spec's selector is its run, so one refused after the
+  selector may already have.
 - `dispatch(..., target=)` and `adispatch(..., target=)`: a service spec's
   target resolved by the caller, which stands in for the lookup. It is still
   checked unless the grant says `target_checked`. A selector spec and a
@@ -92,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single row. Dispatch asks it of a collection target's set, empty or not,
   of the set a `LIST` selector spec reads, and of `None` for a create, a
   `many` spec and a missing row a service spec's `allow_none` lets through.
-  It allows by default, and `Grant.target_checked` skips it.
+  It allows by default, and `Grant.target_checked` skips it - on a service
+  spec only when the target is handed to dispatch as `target=`.
 - `Validator.validated(arguments, context)` and `Validated`: the values the
   service is spread with, the call's `data`, and any value the Validator binds
   for the call, which dispatch reads in place of `validate()`. The default
@@ -104,6 +107,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FileField` or `ImageField` as one and binds it as the form's `files`
   rather than refusing it, and its schema is `{}`, since no JSON value is
   one.
+- `Parameter.minimum` and `Parameter.maximum`, an inclusive bound on an
+  `integer`, a `number` or a `decimal` string, which the shape check enforces
+  in the words of Django's `MinValueValidator` and `MaxValueValidator` and the
+  schema states as `"minimum"` and `"maximum"`. A decimal string is compared
+  by its exponent, so `"1E+999999999"` is refused without building the
+  integer it names. Each bound is an `int` or a finite `float`, and a bound on
+  any other type is refused with `ImproperlyConfigured`.
 - `Parameter.choice_labels`, a label for each choice, which the schema
   carries as `"title"`. `FormValidator` labels every choice field's choices,
   and the dataclass and pydantic adapters label a Django `Choices` enum's;
@@ -120,7 +130,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   built, since it declares no Parameters and so would be handed none of the
   caller's data and never filter. A number filter, and each bound of a numeric range, is read as a
   `decimal` string, which its `DecimalField` reads exactly, so a key past
-  `2**53` matches its own row. A real FilterSet needs the new `filter` extra.
+  `2**53` matches its own row. Each is bounded at `minimum=-1e50` and
+  `maximum=1e50`, django-filter's number filter's limit drawn on both sides
+  and on a range's bounds, which django-filter leaves open: past it, a value
+  such as `"1E+999999999"` reached an integer column's conversion, which
+  builds every digit and held a worker for minutes. A real FilterSet needs
+  the new `filter` extra.
 - `run_selector`, `arun_selector`, `materialize_retrieve`,
   `amaterialize_retrieve` and `is_queryset`, the selector steps dispatch runs,
   exported for a transport that runs a selector itself.
@@ -198,19 +213,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   was read whole into memory before it was parsed, where a POST of the same
   upload was taken. It is parsed from the request's stream now, as Django
   parses a POST, so a file part streams to the upload handlers and the limit
-  bounds the fields alone.
+  bounds the fields alone. As after a POST, the body is then gone: reading
+  `request.body` after the view, or calling `request_arguments` again, raises
+  `RawPostDataException`, where it returned the body and the same arguments.
+  Code that reads the body after the view - a middleware, an audit log, an
+  error reporter - reads it first instead, and the arguments are parsed from
+  that copy.
 - **Security: an empty `permissions` sequence allowed every call.** A spec
   declaring `permissions=[]` or `()` had no check to fail, so anyone ran it.
   Every published release is affected, 0.4.2 included. `ServiceSpec` and
   `SelectorSpec` refuse it when built; declare `permissions=[Unrestricted()]`
   to mean that.
-- **Security: a `Grant` that checked one row admitted another.** A grant with
-  `target_checked` covers a service spec's target only when that target is
-  handed to `dispatch` or `adispatch` as `target=`. Without it dispatch runs
-  the object-level or scope check on the row it looks up itself, so a grant
-  `resolve_target` returned for one row no longer admits a different row named
-  in the arguments, and a create, a collection or a `many` call is scope
-  checked again.
+- **Security, and breaking: a `Grant` that checked one row admitted
+  another.** A grant with `target_checked` covers a service spec's target
+  only when that target is handed to `dispatch` or `adispatch` as `target=`.
+  Without it dispatch runs the object-level or scope check on the row it
+  looks up itself, so a grant `resolve_target` returned for one row no longer
+  admits a different row named in the arguments, and a create, a collection
+  or a `many` call is scope checked again. Every 0.4.2 caller passing
+  `Grant(..., target_checked=True)` is affected, because 0.4.2's dispatch
+  took no `target=`: such a grant could only skip the check on the row
+  dispatch looked up itself, and now `has_object_permission` and
+  `has_scope_permission` run on that row again. It fails closed: a call the
+  grant let through may now be refused with `NotPermitted`, never the other
+  way round.
 - `dispatch` and `adispatch` refuse a precondition that answers with a
   coroutine or an async generator, with `ImproperlyConfigured` naming it,
   instead of reading the unawaited answer as a pass and running the service.
