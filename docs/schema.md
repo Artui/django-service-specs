@@ -227,10 +227,12 @@ requires `title` and `body` has `"required": ["pk"]`.
 
 On a `many` spec the list stays required and each row requires nothing.
 `parameters()` is unchanged: it still says what a whole update needs, and
-the schema is where the relaxing happens. A read a `kwargs` provider fills
-is still listed as declared;
+the schema is where the relaxing happens, through the one function the shape
+check relaxes a partial call with, so the two cannot drift. A read a `kwargs`
+provider fills is still listed as declared;
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-is how a transport finds those.
+is how a transport finds those, and the schema's `required` less that set is
+exactly what dispatch refuses when it is absent.
 
 ### The decimal convention
 

@@ -74,6 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The schema states the maximum in force as `"maxItems"` on every array input,
   so a client learns the bound it meets, and under a setting of `None` an
   array with no `max_length` states none.
+- `spec_input_schema` and dispatch's shape check read what a `partial` call
+  may leave out through one function, where each kept its own copy of the
+  rule. Nothing either answers changes; the schema's `required` less
+  `server_owned_keys` is exactly what dispatch refuses when it is absent,
+  and a test now holds the two to that.
 
 ### Fixed
 - A string sent for a `number`, by a flat transport or in a JSON body, is read
