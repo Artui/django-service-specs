@@ -18,6 +18,8 @@ from django.db.models import QuerySet
 from django.db.models.manager import BaseManager
 from django.utils.translation import gettext
 
+from django_service_specs.filters.filter_set_parameters import filter_set_parameters
+from django_service_specs.filters.utils import import_django_filters
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.services.is_async import is_async
@@ -152,18 +154,25 @@ def apply_shaping(
     the names the selector beside it was bound with, so a read the caller left
     out is the same refusal whichever of the two takes it:
     test_a_read_left_out_is_refused_alike_by_whichever_callable_takes_it.
+
+    ``filter_set`` runs last, after ``extend_queryset``, so filtering composes
+    with the shaping and runs before a RETRIEVE collapses to its row; see
+    ``_filtered``. The nothing-to-shape guard is one arc to coverage, and its
+    ``filter_set`` condition is held by
+    TestFilterSet.test_it_alone_refuses_a_return_that_is_not_a_queryset.
     """
     if (
         spec.select_related is None
         and spec.prefetch_related is None
         and annotations is None
         and spec.extend_queryset is None
+        and spec.filter_set is None
     ):
         return queryset
     if not is_queryset(queryset):
         raise ImproperlyConfigured(
             "select_related / prefetch_related / annotations / extend_queryset "
-            f"are set on the spec but {source_label} returned "
+            f"/ filter_set are set on the spec but {source_label} returned "
             f"{type(queryset).__name__}, which is not a Django QuerySet. Drop "
             "the shaping fields or have the callable return a QuerySet."
         )
@@ -178,4 +187,79 @@ def apply_shaping(
         queryset = spec.extend_queryset(
             **call_keywords(spec.extend_queryset, extend_pool, fillable=fillable)
         )
+    if spec.filter_set is not None:
+        queryset = _filtered(spec.filter_set, queryset, pool)
     return queryset
+
+
+def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
+    """``queryset`` narrowed by ``filter_set``, from the arguments its filters read.
+
+    Its ``data`` is the pool's value for each name its filters read, which
+    ``SelectorSpec`` made reads, so the shape check has already judged them
+    and the pool carries exactly the ones the caller sent. Never the whole
+    pool, and never a pool entry called ``data``: a transport shaping rows
+    itself may hand over a pool with one, and it is a filter's argument only
+    under a filter's own name (test_a_pool_s_data_is_not_the_filters_data).
+
+    ``request`` is handed over when the pool carries one - a seed an HTTP
+    adapter registers - and the constructor declares it, by the
+    declare-to-receive rule of every pool-resolved callable, so a
+    request-scoped FilterSet sees the ``self.request`` it would behind
+    django-filter's own backend, and a stand-in taking ``(data, queryset)`` is
+    called as it always was.
+
+    A FilterSet that refuses its data is refused here, as ``InvalidArguments``
+    keyed as the FilterSet keys its errors. Reading ``.qs`` without
+    ``is_valid()`` would answer the **unfiltered** rows in django-filter's
+    default non-strict mode, so a bad value would read as a filter that matched
+    everything (test_a_value_the_filterset_refuses_is_refused_rather_than_ignored).
+    A stand-in with no ``is_valid`` is read as it answers
+    (test_a_stand_in_with_no_is_valid_is_read_as_it_answers). A range filter's
+    error is keyed by the filter's name, ``price``, where its arguments are
+    ``price_min`` and ``price_max``: django-filter validates the two as one
+    form field.
+    """
+    seen = {"request": pool["request"]} if "request" in pool else {}
+    bound = filter_set(
+        **resolve_callable_kwargs(filter_set, seen),
+        data=_filter_data(filter_set, pool),
+        queryset=queryset,
+    )
+    is_valid = getattr(bound, "is_valid", None)
+    if is_valid is not None and not is_valid():
+        raise InvalidArguments(
+            {
+                name: [str(message) for message in messages]
+                for name, messages in bound.errors.items()
+            }
+        )
+    return bound.qs
+
+
+def _filter_data(filter_set: Any, pool: Mapping[str, Any]) -> dict[str, Any]:
+    """The pool's value for each name ``filter_set``'s filters read, as django-filter reads it.
+
+    A CSV filter's list is joined into the comma-separated string its widget
+    splits, because the widget takes a list as it is only in later releases:
+    at the declared floor, 23.1, it calls ``.split`` on whatever it is handed
+    (test_a_csv_filter_s_list_reaches_it_as_the_string_it_splits). An element
+    holding a comma is split in two either way, which is the CSV filter's own
+    reading.
+    """
+    names = filter_set_parameters(filter_set).names()
+    data = {name: value for name, value in pool.items() if name in names}
+    if not data:
+        # Nothing sent, or a stand-in declaring no filters: no filter to ask
+        # about, and so no need for django-filter.
+        return data
+    module = import_django_filters()
+    for name, filter_obj in filter_set.base_filters.items():
+        value = data.get(name)
+        # One arc to coverage, a condition each:
+        # test_a_csv_filter_s_list_reaches_it_as_the_string_it_splits (the
+        # filter's kind: a multiple choice reads its list as a list) and
+        # test_a_csv_filter_sent_a_string_is_handed_it_unchanged (the value).
+        if isinstance(filter_obj, module.BaseCSVFilter) and isinstance(value, list):
+            data[name] = ",".join(str(element) for element in value)
+    return data
