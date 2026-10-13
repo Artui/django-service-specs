@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import KW_ONLY, dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -19,6 +20,14 @@ JSON_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "obje
 """The types a parameter may declare: JSON's own, because that is what crosses
 every wire this kernel has - a JSON-RPC call, a queue row, and argv once
 ``coerce_flat`` has read it."""
+
+PARAMETER_TYPES = JSON_TYPES | {"file"}
+"""The types a parameter may declare: JSON's, and ``file``.
+
+A file is what a multipart body carries beside its fields, and what a Python
+caller hands a command or a task as a Django ``File``. It is no JSON type, so a
+JSON caller cannot send one, and it is a parameter's alone: what comes out of an
+operation is still one of the JSON types."""
 
 FORMATS = frozenset({"decimal", "date-time", "date"})
 """The Python values a string argument decodes into. Each is a value JSON cannot
@@ -49,6 +58,18 @@ class Parameter:
     gaps are different declarations, and an array with no declared ``items``
     admits a ``null`` element already.
 
+    ``type`` is a JSON type or ``file``, which an array's ``items`` may name
+    too. A file is a Django ``File``, an upload included, and has no
+    ``choices``: it is matched by nothing a declaration could list.
+
+    ``choice_labels`` names the choices for a reader: a mapping of a choice to
+    its label, or Django's ``choices`` spelling, pairs of the two, which keeps
+    apart the ``1`` and ``True`` a mapping's keys would merge. A choice may go
+    unlabelled. The labels constrain nothing, so the shape check reads only
+    ``choices``; the schema carries them as titles. They are stored as a tuple
+    of pairs, and a label may be a lazy translation, rendered when the schema
+    is built.
+
     ``default`` is [`UNSET`][django_service_specs.types.unset.UNSET] when none is
     declared, so a default of ``None`` stays a real default. It is reported, not
     applied: whether an omitted argument arrives as the default, as ``None`` or
@@ -70,6 +91,7 @@ class Parameter:
     items_nullable: bool = False
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
+    choice_labels: tuple[tuple[Any, str], ...] | None = None
     # Out of the hash and still in equality, so a list or dict default - which
     # the pydantic adapter reports as given - leaves the declaration hashable.
     # Equal Parameters still hash equal, which is all a hash promises; two that
@@ -86,9 +108,10 @@ class Parameter:
         # so the error names the parameter rather than surfacing later as a
         # schema or a shape check that quietly ignores half of it.
         where = f"Parameter {self.name!r}"
-        if self.type not in JSON_TYPES:
+        if self.type not in PARAMETER_TYPES:
             raise ImproperlyConfigured(
-                f"{where}: type {self.type!r} is not a JSON type; use one of {sorted(JSON_TYPES)}."
+                f"{where}: type {self.type!r} is not a JSON type or a file; "
+                f"use one of {sorted(PARAMETER_TYPES)}."
             )
         if self.format is not None:
             if self.format not in FORMATS:
@@ -102,9 +125,9 @@ class Parameter:
         if self.items is not None:
             if self.type != "array":
                 raise ImproperlyConfigured(f"{where}: items describes an array's element.")
-            if isinstance(self.items, str) and self.items not in JSON_TYPES:
+            if isinstance(self.items, str) and self.items not in PARAMETER_TYPES:
                 raise ImproperlyConfigured(
-                    f"{where}: items {self.items!r} is not a JSON type; "
+                    f"{where}: items {self.items!r} is not a JSON type or a file; "
                     "pass a type name or the Parameters of an object."
                 )
         if self.items_nullable and self.items is None:
@@ -117,6 +140,33 @@ class Parameter:
             # Normalized rather than refused, so a list reads as naturally as a
             # tuple and the frozen declaration stays hashable.
             object.__setattr__(self, "choices", tuple(self.choices))
+            # The element's type for an array, since its choices constrain each
+            # element. One branch to coverage, so each operand is held by its
+            # own test: test_a_file_has_no_choices[file] and [array-of-files].
+            if "file" in (self.type, self.items):
+                raise ImproperlyConfigured(
+                    f"{where}: a file is never one of a list of values; declare no choices."
+                )
+        if self.choice_labels is not None:
+            self._normalize_choice_labels(where, self.choice_labels)
+
+    def _normalize_choice_labels(
+        self, where: str, labels: Mapping[Any, str] | Iterable[tuple[Any, str]]
+    ) -> None:
+        """Store ``choice_labels`` as pairs, refusing a label for no declared choice."""
+        pairs = tuple(
+            labels.items() if isinstance(labels, Mapping) else ((v, lb) for v, lb in labels)
+        )
+        if self.choices is None:
+            raise ImproperlyConfigured(
+                f"{where}: choice_labels name declared choices; declare choices."
+            )
+        stray = [value for value, _label in pairs if value not in self.choices]
+        if stray:
+            raise ImproperlyConfigured(
+                f"{where}: choice_labels label {stray!r}, which choices do not list."
+            )
+        object.__setattr__(self, "choice_labels", pairs)
 
     @property
     def nested(self) -> Parameters | None:

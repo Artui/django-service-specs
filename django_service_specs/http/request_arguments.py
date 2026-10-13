@@ -9,6 +9,7 @@ from typing import Any, NoReturn
 
 from django.http import HttpRequest, QueryDict
 from django.http.multipartparser import MultiPartParser
+from django.utils.datastructures import MultiValueDict
 from django.utils.translation import gettext
 
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
@@ -36,9 +37,9 @@ def request_arguments(
     - **GET and HEAD**: the query string, which is flat. Any body is ignored.
     - **Any other method, with an** ``application/json`` **body**: the body,
       read as it is. It must be a JSON object; an empty body is no arguments,
-      as DRF's parser reads one. Its values are not coerced: a JSON caller
-      that sends ``"5"`` for an integer has sent a string, and the shape check
-      says so.
+      as DRF's parser reads one. Its values are not coerced here: a ``"5"``
+      sent for an integer is the shape check's to read, as it reads one from
+      any caller.
     - **Any other method, with a form body** (``application/x-www-form-urlencoded``
       or ``multipart/form-data``): the fields, which are flat. Django parses
       one into ``request.POST`` for POST alone, so a PUT, PATCH or DELETE
@@ -63,10 +64,17 @@ def request_arguments(
     which leaves an undeclared key as it is, so the closed argument set in
     dispatch stays the one place that refuses it, under the caller's policy.
 
-    **Files are not arguments.** Parameters have no file type, so an upload in
-    a multipart body is never one. A POST's uploads are in ``request.FILES``,
-    which Django fills for POST alone: those in a PUT, PATCH or DELETE body
-    parsed here are dropped.
+    **An upload is an argument**, under the name its part carries, as each
+    field is: the upload itself, Django's ``UploadedFile``, for a parameter of
+    type ``file``, every upload under the name for an array, and the last
+    of repeated ones for anything else. It replaces a field of the same name,
+    since a browser sends a file input only as a file: a single value reads as
+    the upload in DRF's merged data too, where an array there would hold the
+    field and the uploads together. A POST's uploads are Django's own ``request.FILES``; those in a
+    PUT, PATCH or DELETE body are parsed here with its fields. An upload under
+    a name ``parameters`` do not declare passes through like an undeclared
+    field, for the closed argument set to refuse, and a file input left empty
+    is no upload, so it is absent. Only a multipart body carries one.
 
     **URL kwargs are merged last**, through ``coerce_flat`` as well since a
     path segment with no converter is a string. The route wins a clash, as it
@@ -90,7 +98,10 @@ def request_arguments(
         return coerce_flat(parameters, {**_flat(parameters, request.GET), **route})
     if request.content_type == "application/json":
         return {**_json_object(request), **coerce_flat(parameters, route)}
-    return coerce_flat(parameters, {**_flat(parameters, _form(request)), **route})
+    fields, uploads = _form(request)
+    return coerce_flat(
+        parameters, {**_flat(parameters, fields), **_uploads(parameters, uploads), **route}
+    )
 
 
 def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
@@ -153,8 +164,22 @@ def _takes_blank(json_type: object, param: Parameter, *, fmt: str | None = None)
     )
 
 
-def _form(request: HttpRequest) -> QueryDict:
-    """The form fields a request's body carries, whatever its method."""
+def _uploads(parameters: Parameters, source: MultiValueDict) -> dict[str, Any]:
+    """A body's uploads, by name: every one for an array, the last for anything else."""
+    # One branch to coverage, so each condition is held by its own test:
+    # test_an_undeclared_upload_passes_through_for_the_closed_set_to_refuse
+    # (the declaration) and test_a_file_takes_the_last_of_repeated_uploads (the
+    # array: without it every upload becomes a list).
+    return {
+        key: source.getlist(key)
+        if (param := parameters.get(key)) is not None and param.type == "array"
+        else source[key]
+        for key in source
+    }
+
+
+def _form(request: HttpRequest) -> tuple[QueryDict, MultiValueDict]:
+    """The form fields and the uploads a request's body carries, whatever its method."""
     if request.content_type not in (_URLENCODED, _MULTIPART):
         # Readable even once ``request.POST`` has been, as CsrfViewMiddleware
         # reads it: Django leaves the stream unread for a body it does not parse.
@@ -163,19 +188,19 @@ def _form(request: HttpRequest) -> QueryDict:
                 gettext('Unsupported media type "%(media_type)s" in request.')
                 % {"media_type": request.content_type}
             )
-        return QueryDict(encoding=request.encoding)
+        return QueryDict(encoding=request.encoding), MultiValueDict()
     if request.method == "POST":
         # Django's own parse, which CsrfViewMiddleware may already have done:
-        # the stream can be read once, and ``request.POST`` is where it went.
-        return request.POST
+        # the stream can be read once, and ``request.POST`` and
+        # ``request.FILES`` are where it went.
+        return request.POST, request.FILES
     if request.content_type == _URLENCODED:
-        return QueryDict(request.body, encoding=request.encoding)
-    # The parser Django runs for a POST, over the buffered body. Its files
-    # are discarded, since no parameter can declare one.
-    fields, _files = MultiPartParser(
+        return QueryDict(request.body, encoding=request.encoding), MultiValueDict()
+    # The parser Django runs for a POST, over the buffered body, which hands
+    # back the uploads beside the fields.
+    return MultiPartParser(
         request.META, BytesIO(request.body), request.upload_handlers, request.encoding
     ).parse()
-    return fields
 
 
 def _json_object(request: HttpRequest) -> dict[str, Any]:

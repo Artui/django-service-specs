@@ -95,3 +95,71 @@ def test_a_format_on_a_string_is_kept() -> None:
 def test_an_arrays_declared_element_may_be_nullable() -> None:
     assert Parameter("scores", "array", items="integer", items_nullable=True).items_nullable
     assert Parameter("books", "array", items=ROW, items_nullable=True).items_nullable
+
+
+# --- a file -------------------------------------------------------------------------------
+
+
+def test_a_file_is_a_parameter_type_and_an_element_type() -> None:
+    # Not a JSON type: only a multipart body or a Python caller carries one,
+    # and the output side, which shares the JSON types, never returns one.
+    assert Parameter("notes", "file").type == "file"
+    assert Parameter("notes", "array", items="file").items == "file"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"type": "file", "choices": ("a.txt",)},
+        {"type": "array", "items": "file", "choices": ("a.txt",)},
+    ],
+    ids=["file", "array-of-files"],
+)
+def test_a_file_has_no_choices(kwargs: dict) -> None:
+    # A file is compared by identity, so no declared value could ever match.
+    with pytest.raises(ImproperlyConfigured, match="a file is never one of a list of values"):
+        Parameter("notes", **kwargs)
+
+
+# --- choice labels ----------------------------------------------------------------------------
+
+
+def test_choice_labels_are_none_unless_declared() -> None:
+    assert Parameter("status", "string", choices=("a",)).choice_labels is None
+
+
+@pytest.mark.parametrize(
+    "labels",
+    [{"draft": "Draft", "live": "Published"}, [("draft", "Draft"), ("live", "Published")]],
+    ids=["mapping", "pairs"],
+)
+def test_choice_labels_are_normalized_to_pairs(labels: Any) -> None:
+    # A mapping is how a reader writes it and a list of pairs is how Django
+    # spells ``choices``, so both are read, and stored as a tuple of pairs so
+    # the declaration stays hashable.
+    status = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
+    assert status.choice_labels == (("draft", "Draft"), ("live", "Published"))
+    twin = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
+    assert hash(status) == hash(twin)
+    assert status != Parameter("status", "string", choices=("draft", "live"))
+
+
+def test_a_choice_may_go_unlabelled() -> None:
+    status = Parameter("status", "string", choices=("draft", "live"), choice_labels={"live": "On"})
+    assert status.choice_labels == (("live", "On"),)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"choice_labels": {"draft": "Draft"}}, "choice_labels name declared choices"),
+        (
+            {"choices": ("draft",), "choice_labels": {"live": "Published"}},
+            r"choice_labels label \['live'\], which choices do not list",
+        ),
+    ],
+)
+def test_a_label_for_no_declared_choice_is_refused(kwargs: dict, message: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match=message) as caught:
+        Parameter("status", "string", **kwargs)
+    assert "Parameter 'status'" in str(caught.value)

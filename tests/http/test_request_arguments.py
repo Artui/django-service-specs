@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
-from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test.client import encode_multipart
@@ -47,6 +47,25 @@ BLANKS = Parameters.of(
     Parameter("shelf", "string", choices=("", "top")),
     Parameter("labels", "array", items="string", choices=("a", "b")),
 )
+
+
+def files() -> Parameters:
+    """``FLAT`` and two uploads, built per test so the module imports where no file type exists."""
+    return Parameters(
+        (*FLAT, Parameter("notes", "file"), Parameter("scans", "array", items="file"))
+    )
+
+
+def contents(arguments: dict[str, Any]) -> dict[str, Any]:
+    """``arguments`` with each upload read, so a test compares what the file holds."""
+    return {
+        key: [one.read() for one in value]
+        if isinstance(value, list) and value and isinstance(value[0], UploadedFile)
+        else value.read()
+        if isinstance(value, UploadedFile)
+        else value
+        for key, value in arguments.items()
+    }
 
 
 def read(request: HttpRequest, parameters: Parameters = FLAT, **kwargs: Any) -> dict[str, Any]:
@@ -152,12 +171,11 @@ class TestFormBody:
         request = FACTORY.post("/", data={"csrfmiddlewaretoken": "t0k3n", "count": "2"})
         assert read(request) == {"count": 2}
 
-    def test_a_multipart_post_is_flat_and_its_files_are_not_arguments(self) -> None:
+    def test_a_multipart_post_is_flat_and_its_uploads_are_arguments(self) -> None:
         attached = SimpleUploadedFile("notes.txt", b"A file.")
         upload = FACTORY.post("/", data={"count": "2", "ids": ["1", "2"], "notes": attached})
         assert upload.content_type == "multipart/form-data"
-        assert read(upload) == {"count": 2, "ids": [1, 2]}
-        assert list(upload.FILES) == ["notes"]
+        assert contents(read(upload, files())) == {"count": 2, "ids": [1, 2], "notes": b"A file."}
 
     @pytest.mark.parametrize("method", ["put", "patch", "delete"])
     def test_a_form_encoded_body_is_read_whatever_the_method(self, method: str) -> None:
@@ -175,9 +193,10 @@ class TestFormBody:
             "/", data=body, content_type=f"multipart/form-data; boundary={BOUNDARY}"
         )
         assert request.POST == {}
-        assert read(request) == {"count": 2, "ids": [1, 2]}
-        # Django fills ``request.FILES`` for POST alone, as the page says.
+        # Django fills ``request.FILES`` for POST alone, so the upload is read
+        # from the body here rather than dropped with the parser's other half.
         assert not request.FILES
+        assert contents(read(request, files())) == {"count": 2, "ids": [1, 2], "notes": b"A file."}
 
     @pytest.mark.parametrize("method", ["post", "put"])
     def test_a_body_that_is_neither_form_nor_json_is_refused(self, method: str) -> None:
@@ -208,7 +227,7 @@ class TestFormBody:
         attached = SimpleUploadedFile("notes.txt", b"A file.")
         request = FACTORY.post("/", data={"count": "2", "notes": attached})
         assert request.POST["count"] == "2"
-        assert read(request) == {"count": 2}
+        assert contents(read(request, files())) == {"count": 2, "notes": b"A file."}
 
     def test_a_request_with_no_body_carries_no_arguments_whatever_its_label(self) -> None:
         # ``fetch(url, {method: "POST"})`` for an operation its route names.
@@ -218,6 +237,71 @@ class TestFormBody:
     def test_a_post_does_not_read_its_query_string(self) -> None:
         request = FACTORY.post("/?count=9", data="title=x", content_type=FORM)
         assert read(request) == {"title": "x"}
+
+
+class TestUploads:
+    def test_a_declared_file_is_the_upload_itself(self) -> None:
+        attached = SimpleUploadedFile("notes.txt", b"A file.", content_type="text/plain")
+        arguments = read(FACTORY.post("/", data={"notes": attached}), files())
+        assert isinstance(arguments["notes"], UploadedFile)
+        assert arguments["notes"].name == "notes.txt"
+        assert contents(arguments) == {"notes": b"A file."}
+
+    def test_an_array_of_files_takes_every_upload_under_its_key(self) -> None:
+        scans = [SimpleUploadedFile("a.png", b"A."), SimpleUploadedFile("b.png", b"B.")]
+        assert contents(read(FACTORY.post("/", data={"scans": scans}), files())) == {
+            "scans": [b"A.", b"B."]
+        }
+
+    def test_a_file_takes_the_last_of_repeated_uploads(self) -> None:
+        # The way a repeated field's scalar reads, and QueryDict's own reading.
+        notes = [SimpleUploadedFile("a.txt", b"A."), SimpleUploadedFile("b.txt", b"B.")]
+        assert contents(read(FACTORY.post("/", data={"notes": notes}), files())) == {"notes": b"B."}
+
+    def test_an_upload_wins_over_a_field_of_the_same_name(self) -> None:
+        # A browser sends a file input's part as a file, never as a field, so a
+        # field under the same name is something else, and the upload is what
+        # the parameter declares.
+        attached = SimpleUploadedFile("notes.txt", b"A file.")
+        request = FACTORY.generic(
+            "PUT",
+            "/",
+            data=_merged_multipart({"notes": "notes.txt"}, {"notes": attached}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        assert contents(read(request, files())) == {"notes": b"A file."}
+
+    def test_an_undeclared_upload_passes_through_for_the_closed_set_to_refuse(self) -> None:
+        attached = SimpleUploadedFile("notes.txt", b"A file.")
+        assert contents(read(FACTORY.post("/", data={"minutes": attached}))) == {
+            "minutes": b"A file."
+        }
+
+    def test_a_form_encoded_body_carries_no_file(self) -> None:
+        # Nothing to read: urlencoded has no upload part, and the declared
+        # file is simply absent rather than a crash on a parser that is not run.
+        request = FACTORY.put("/", data="count=2", content_type=FORM)
+        assert read(request, files()) == {"count": 2}
+
+    def test_a_file_input_left_empty_is_absent(self) -> None:
+        # A browser posts an empty file input as a part with no filename, and
+        # Django's parser skips it, so a required file reads as missing.
+        body = (
+            f"--{BOUNDARY}\r\n"
+            'Content-Disposition: form-data; name="notes"; filename=""\r\n'
+            "Content-Type: application/octet-stream\r\n\r\n\r\n"
+            f"--{BOUNDARY}--\r\n"
+        ).encode()
+        request = FACTORY.post(
+            "/", data=body, content_type=f"multipart/form-data; boundary={BOUNDARY}"
+        )
+        assert read(request, files()) == {}
+
+
+def _merged_multipart(fields: dict[str, Any], uploads: dict[str, Any]) -> bytes:
+    """One multipart body carrying ``fields`` and then ``uploads`` under the same names."""
+    head = encode_multipart(BOUNDARY, fields).rsplit(f"--{BOUNDARY}--".encode(), 1)[0]
+    return head + encode_multipart(BOUNDARY, uploads)
 
 
 class TestJsonBody:

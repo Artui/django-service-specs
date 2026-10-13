@@ -343,6 +343,133 @@ class TestChoices:
         }
 
 
+class TestChoiceLabels:
+    def test_labelled_choices_are_one_of_pairs_of_const_and_title(self) -> None:
+        status = Parameter(
+            "status",
+            "string",
+            choices=["draft", "live"],
+            choice_labels={"draft": "Draft", "live": "Published"},
+        )
+
+        assert one(status) == {
+            "type": "string",
+            "oneOf": [
+                {"const": "draft", "title": "Draft"},
+                {"const": "live", "title": "Published"},
+            ],
+        }
+
+    def test_labels_that_only_repeat_their_values_stay_an_enum(self) -> None:
+        # A title restating its constant tells a reader nothing the enum does
+        # not, so the schema a declaration had before it was labelled is kept.
+        rank = Parameter("rank", "integer", choices=[1, 2], choice_labels={1: "1", 2: "2"})
+
+        assert one(rank) == {"type": "integer", "enum": [1, 2]}
+
+    def test_an_unlabelled_choice_is_a_const_with_no_title(self) -> None:
+        status = Parameter(
+            "status", "string", choices=["draft", "live"], choice_labels={"live": "Published"}
+        )
+
+        assert one(status)["oneOf"] == [{"const": "draft"}, {"const": "live", "title": "Published"}]
+
+    def test_a_nullable_parameter_adds_an_untitled_null(self) -> None:
+        status = Parameter(
+            "status", "string", choices=["live"], choice_labels={"live": "On"}, nullable=True
+        )
+
+        assert check_arguments(Parameters.of(status), {"status": None}) == {"status": None}
+        assert one(status) == {
+            "type": ["string", "null"],
+            "oneOf": [{"const": "live", "title": "On"}, {"const": None}],
+        }
+
+    def test_a_labelled_null_is_listed_once(self) -> None:
+        status = Parameter(
+            "status",
+            "string",
+            choices=["live", None],
+            choice_labels={None: "Unset"},
+            nullable=True,
+        )
+
+        assert one(status)["oneOf"] == [{"const": "live"}, {"const": None, "title": "Unset"}]
+
+    def test_a_choice_declared_twice_is_one_entry(self) -> None:
+        # ``oneOf`` admits a value matching exactly one entry, so a second
+        # entry for it would refuse the value the declaration accepts. ``True``
+        # is not ``1`` to JSON, although Python finds them equal, so pairs keep
+        # the two labels apart where a mapping's keys would merge them.
+        rank = Parameter(
+            "rank", "integer", choices=[1, 1, True], choice_labels=[(1, "One"), (True, "Yes")]
+        )
+
+        assert one(rank)["oneOf"] == [{"const": 1, "title": "One"}, {"const": True, "title": "Yes"}]
+
+    def test_an_arrays_labelled_choices_go_on_its_items(self) -> None:
+        tags = Parameter(
+            "tags",
+            "array",
+            items="string",
+            items_nullable=True,
+            choices=["red"],
+            choice_labels={"red": "Red"},
+        )
+
+        assert one(tags) == {
+            "type": "array",
+            "items": {
+                "type": ["string", "null"],
+                "oneOf": [{"const": "red", "title": "Red"}, {"const": None}],
+            },
+        }
+
+    def test_a_lazy_label_is_rendered_in_the_active_language(self) -> None:
+        answer = Parameter(
+            "answer", "boolean", choices=[True], choice_labels={True: gettext_lazy("Yes")}
+        )
+        with translation.override("fr"):
+            title = one(answer)["oneOf"][0]["title"]
+
+        assert type(title) is str
+        assert title == "Oui"
+
+    def test_labelled_choices_json_cannot_carry_are_left_out_whole(self) -> None:
+        rate = Parameter(
+            "rate",
+            "string",
+            format="decimal",
+            choices=[Decimal("1")],
+            choice_labels={Decimal("1"): "One"},
+        )
+
+        assert one(rate) == {"type": "string", "format": "decimal"}
+
+
+class TestFiles:
+    def test_a_file_states_no_type(self) -> None:
+        # No JSON value is a file, so any JSON type stated here would be false;
+        # what a multipart body carries, a JSON Schema has no keyword for.
+        assert one(Parameter("notes", "file")) == {}
+
+    def test_a_nullable_file_is_still_untyped(self) -> None:
+        # An untyped node admits null already, so there is no type to widen.
+        notes = Parameter("notes", "file", nullable=True, help="The minutes.")
+
+        assert one(notes) == {"description": "The minutes."}
+
+    def test_an_array_of_files_has_untyped_items(self) -> None:
+        notes = Parameter("notes", "array", items="file", items_nullable=True)
+
+        assert one(notes) == {"type": "array", "items": {}}
+
+    def test_a_required_file_is_required(self) -> None:
+        schema = parameters_schema(Parameters.of(Parameter("notes", "file", required=True)))
+
+        assert schema["required"] == ["notes"]
+
+
 class TestDefaults:
     @pytest.mark.parametrize(
         "default", ["draft", 0, 1.5, False, None, ["a", 1], {"key": [None, True]}]

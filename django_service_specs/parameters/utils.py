@@ -9,6 +9,8 @@ its own and a transport learning several.
 
 from __future__ import annotations
 
+import math
+import re
 from typing import Final
 
 from django.utils.translation import gettext
@@ -25,8 +27,9 @@ errors reads the kernel's without a translation table."""
 def expected_type(json_type: str) -> str:
     """The refusal of a value that is not ``json_type``, as one sentence a translator sees whole.
 
-    ``"decimal"`` is the one key that is not a JSON type: the format arrives as
-    a string or a number, so its refusal names both.
+    ``"decimal"`` and ``"file"`` are the two keys that are not JSON types: the
+    format arrives as a string or a number, so its refusal names both, and a
+    file is a parameter's type that no JSON value is.
 
     One sentence per type rather than ``"Expected %(type)s"``, because an
     interpolated JSON type name would reach a translated sentence
@@ -43,4 +46,43 @@ def expected_type(json_type: str) -> str:
         "array": gettext("Expected an array."),
         "object": gettext("Expected an object."),
         "decimal": gettext("Expected a decimal string or a number."),
+        "file": gettext("Expected a file."),
     }[json_type]
+
+
+_INTEGRAL_DECIMAL = re.compile(r"\.0*\s*$")
+"""A decimal point with nothing after it but zeros and space, stripped before ``int``.
+
+It is Django's own expression: ``forms.IntegerField`` strips exactly this, and
+DRF's ``IntegerField`` does too, so ``"5.0"`` and ``"5."`` are 5 to both while
+``"5.5"`` is still refused. A reading stricter than the fields behind it would
+refuse a value the worker reads as a whole number."""
+
+
+def parse_number(json_type: str, text: str) -> int | float | None:
+    """The number ``text`` spells for an ``integer`` or a ``number``, or ``None`` if it spells none.
+
+    The one reading of a numeric string, shared by ``coerce_flat``, which reads
+    every flat transport's strings, and the shape check, which reads a string
+    a JSON caller sent for a number. One function, so the two accept exactly
+    the same strings and a query string and a JSON body carrying the same
+    ``"3"`` reach the Validator as the same 3.
+
+    An integer is read as Django's ``IntegerField`` reads one: ``"5.0"``,
+    ``"5."`` and ``" 5 "`` are 5, and ``"5.5"`` and ``"1e3"`` are no integer.
+    A number is Python's ``float``, as Django's ``FloatField`` reads it, so
+    ``"1e3"`` is 1000.0. NaN and the infinities parse and are no number, since
+    no JSON caller can send one. The caller decides what a ``None`` means: a
+    flat transport refuses it, and the shape check refuses the string as the
+    type it is not.
+    """
+    if json_type == "integer":
+        try:
+            return int(_INTEGRAL_DECIMAL.sub("", text))
+        except ValueError:
+            return None
+    try:
+        number = float(text)
+    except ValueError:
+        return None
+    return number if math.isfinite(number) else None

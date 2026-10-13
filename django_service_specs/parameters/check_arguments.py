@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable, Mapping
+from dataclasses import KW_ONLY, dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
+from django.core.files.base import File
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext
 
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type, parse_number
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
@@ -30,10 +32,13 @@ _PYTHON_TYPES: dict[str, type | tuple[type, ...]] = {
     "boolean": bool,
     "array": (list, tuple),
     "object": Mapping,
+    "file": File,
 }
-"""What each JSON type arrives as once a transport has decoded it. An ``int`` is a
+"""What each type arrives as once a transport has decoded it. An ``int`` is a
 number, because JSON has one numeric type and ``3`` is a valid number. ``bool``
-is handled before this table is read, since it subclasses ``int``."""
+is handled before this table is read, since it subclasses ``int``. A file is
+Django's ``File``, which an upload is and a ``ContentFile`` a Python caller
+builds is too."""
 
 _DATE_PARSERS: dict[str, Callable[[str], object]] = {
     "date-time": parse_datetime,
@@ -49,6 +54,7 @@ def check_arguments(
     arguments: Mapping[str, Any],
     *,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    partial: bool = False,
 ) -> dict[str, Any]:
     """The shape check: what a caller can get wrong that the declaration can see.
 
@@ -64,9 +70,24 @@ def check_arguments(
       because the Validator will supply the default. The default is not
       applied here: whether an omitted argument arrives as its default is the
       validating library's behaviour, not the shape check's.
+    - **Under** ``partial=True`` **no absent parameter is refused**, at any
+      depth: a partial update sends only what changes, and DRF skips an absent
+      field anywhere below a partial serializer. A value that is present is
+      checked as it would be otherwise, and an unknown key is still refused.
+    - **A string is read as the number it spells** where an ``integer`` or a
+      ``number`` is declared, wherever the declaration reaches, and the number
+      is handed on: ``"3"`` is 3, ``"3.0"`` and ``" 3 "`` are 3 too, and a
+      number's ``"1e3"`` is 1000.0. Django's forms, DRF and pydantic's lax mode
+      all read these strings so, and their common reading is the one
+      ``coerce_flat`` makes, which this shares. A string that spells no such
+      number is refused as the type it is not. The number goes on rather than
+      the string because a Validator stricter than those three, the dataclass
+      adapter's, refuses ``"3"`` for an ``int``.
     - ``bool`` is neither an ``integer`` nor a ``number``, although Python
       makes it an ``int``: a JSON ``true`` sent for a count is a caller's
       mistake, not the number one.
+    - A ``file`` is a Django ``File``, and nothing else is one: no JSON value
+      can be, so a JSON caller's string for it is refused at its name.
     - **An integral float is an** ``integer``, and is handed on as an ``int``
       wherever the declaration reaches. JSON Schema counts ``5.0`` as an
       integer, so the ``{"type": "integer"}`` this kernel advertises admits
@@ -100,8 +121,9 @@ def check_arguments(
     Returns a cleaned copy and never modifies ``arguments``. The containers it
     walks are new - the top-level mapping, each declared object, each array -
     while a value it does not look inside, such as a free-form object, is
-    passed through as the caller's. An integral float declared an integer is
-    the one value it replaces.
+    passed through as the caller's. The values it replaces are the two it
+    reads as numbers: an integral float declared an integer, and a numeric
+    string declared either.
 
     Raises:
         InvalidArguments: carrying **every** problem found as one tree
@@ -115,14 +137,23 @@ def check_arguments(
         # A JSON-RPC caller controls the whole ``arguments`` value, so a list
         # there is a caller's mistake to refuse, not a crash to raise.
         raise InvalidArguments({NON_FIELD_ERRORS: [expected_type("object")]})
-    cleaned, errors = _check_object(parameters, arguments, policy)
+    cleaned, errors = _check_object(parameters, arguments, _Walk(policy, partial=partial))
     if errors:
         raise InvalidArguments(errors)
     return cleaned
 
 
+@dataclass(frozen=True)
+class _Walk:
+    """What holds at every level of one call: its unknown-key policy, and whether it is partial."""
+
+    policy: UnknownArguments
+    _: KW_ONLY
+    partial: bool
+
+
 def _check_object(
-    parameters: Parameters, arguments: Mapping[str, Any], policy: UnknownArguments
+    parameters: Parameters, arguments: Mapping[str, Any], walk: _Walk
 ) -> tuple[dict[str, Any], dict[Any, Any]]:
     """One level: the cleaned mapping, and every problem found at or below it."""
     cleaned: dict[str, Any] = {}
@@ -130,19 +161,20 @@ def _check_object(
     for param in parameters:
         if param.name not in arguments:
             # One branch to coverage, so each condition is held by its own test:
-            # test_an_optional_parameter_may_be_absent_and_stays_absent and
-            # test_a_required_parameter_with_a_default_is_not_refused_when_absent.
-            if param.required and param.default is UNSET:
+            # test_an_optional_parameter_may_be_absent_and_stays_absent,
+            # test_a_required_parameter_with_a_default_is_not_refused_when_absent
+            # and test_a_partial_call_may_leave_out_a_required_parameter_at_every_depth.
+            if param.required and param.default is UNSET and not walk.partial:
                 errors[param.name] = [gettext("This field is required.")]
             continue
-        value, detail = _check_value(param, arguments[param.name], policy)
+        value, detail = _check_value(param, arguments[param.name], walk)
         if detail is None:
             cleaned[param.name] = value
         else:
             errors[param.name] = detail
     # Under IGNORE there is nothing to do: ``cleaned`` only ever receives a
     # declared name, so an undeclared one is dropped by never being copied.
-    if policy is UnknownArguments.REJECT:
+    if walk.policy is UnknownArguments.REJECT:
         declared = parameters.names()
         for key in arguments:
             if key not in declared:
@@ -150,7 +182,7 @@ def _check_object(
     return cleaned, errors
 
 
-def _check_value(param: Parameter, value: Any, policy: UnknownArguments) -> tuple[Any, Any]:
+def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
     """``(cleaned, None)``, or ``(None, detail)`` for a value that is refused."""
     if value is None:
         return None, (None if param.nullable else [gettext("This field cannot be null.")])
@@ -161,7 +193,7 @@ def _check_value(param: Parameter, value: Any, policy: UnknownArguments) -> tupl
             fmt=param.format,
             fields=param.fields,
             choices=param.choices,
-            policy=policy,
+            walk=walk,
         )
     if not _is_json_type("array", value):
         return None, [expected_type("array")]
@@ -189,7 +221,7 @@ def _check_value(param: Parameter, value: Any, policy: UnknownArguments) -> tupl
             element,
             fields=rows,
             choices=param.choices,
-            policy=policy,
+            walk=walk,
         )
         if detail is None:
             cleaned.append(checked)
@@ -213,20 +245,20 @@ def _check_one(
     fmt: str | None = None,
     fields: Parameters | None = None,
     choices: tuple[Any, ...] | None = None,
-    policy: UnknownArguments,
+    walk: _Walk,
 ) -> tuple[Any, Any]:
     """One value against one type: a parameter's own, or an array's element.
 
     ``json_type`` is ``None`` for the element of an array that declares no
     ``items``, which accepts anything.
     """
-    # Read before the type check, which then sees an int and is unchanged.
-    value = _integral(json_type, value)
+    # Read before the type check, which then sees a number and is unchanged.
+    value = _integral(json_type, _numeric(json_type, value))
     problem = _type_problem(json_type, fmt, value)
     if problem is not None:
         return None, [problem]
     if fields is not None:
-        value, errors = _check_object(fields, value, policy)
+        value, errors = _check_object(fields, value, walk)
         if errors:
             return None, errors
     if choices is not None and value not in choices:
@@ -237,6 +269,23 @@ def _check_one(
     return value, None
 
 
+def _numeric(json_type: str | None, value: Any) -> Any:
+    """``value``, or the number a string spells where an ``integer`` or a ``number`` is declared.
+
+    ``coerce_flat``'s own reading, so the two accept the same strings. A string
+    that spells no such number is left as it is, for the type check to refuse
+    as the type it is not. One branch to coverage, so each condition is held by
+    its own test: test_a_string_nothing_declares_a_number_stays_a_string (the
+    type: without it, a plain string's ``"3"`` becomes a number) and
+    test_true_is_still_no_number_and_no_integer (the string: without it,
+    ``True`` reaches the parser, which takes no ``bool``).
+    """
+    if json_type in ("integer", "number") and isinstance(value, str):
+        number = parse_number(json_type, value)
+        return value if number is None else number
+    return value
+
+
 def _integral(json_type: str | None, value: Any) -> Any:
     """``value``, or the ``int`` an integral float declared an integer stands for.
 
@@ -245,10 +294,10 @@ def _integral(json_type: str | None, value: Any) -> Any:
     each condition is held by its own test:
     ``test_a_float_nothing_declares_an_integer_stays_a_float`` (its ``number``:
     without the type, a number's float becomes an int), and
-    ``test_refuses_a_value_of_another_json_type``, by its ``"3"`` (without the
-    float, a string is asked ``is_integer``, and where an int has one, ``True``
-    becomes 1) and its ``1.5`` (without integral, ``int`` truncates it to an
-    accepted 1). NaN and the infinities are not integral, so the type check
+    ``test_refuses_a_value_of_another_json_type``, by its ``"three"`` (without
+    the float, a string is asked ``is_integer``, and where an int has one,
+    ``True`` becomes 1) and its ``1.5`` (without integral, ``int`` truncates it
+    to an accepted 1). NaN and the infinities are not integral, so the type check
     refuses them as it did.
     """
     if json_type == "integer" and isinstance(value, float) and value.is_integer():
