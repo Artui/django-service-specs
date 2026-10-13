@@ -21,6 +21,7 @@ from django_service_specs.mutations.child_collection_change import ChildCollecti
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
@@ -769,15 +770,39 @@ def _namespaced_row_error(
     ``str()`` would render as the repr of a list, and a field-keyed one (a
     model whose ``save()`` runs ``full_clean()``) keeps its field names, so the
     row's fields are addressed the way a validator would address them.
+
+    Each message Django raised keeps its own code, as a
+    [`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]:
+    Django's codes are DRF's for the same mistakes, and a message raised with
+    none is ``invalid``, as DRF's is. So is the message of a ``TypeError`` or
+    ``ValueError``, which has no code to keep. A refusal that already has a
+    tree is re-rooted with its messages as they were, codes and all.
     """
     if isinstance(exc, ServiceValidationError):
         return ServiceValidationError(path.namespace(exc.detail))
     if isinstance(exc, InvalidArguments):
         return InvalidArguments(path.namespace(exc.detail))
     if isinstance(exc, ValidationError):
-        detail: Any = exc.message_dict if hasattr(exc, "error_dict") else exc.messages
+        detail: Any = (
+            {field: _coded(errors) for field, errors in exc.error_dict.items()}
+            if hasattr(exc, "error_dict")
+            else _coded(exc.error_list)
+        )
         return InvalidArguments(path.namespace(detail))
-    return InvalidArguments(path.namespace([str(exc)]))
+    return InvalidArguments(path.namespace([CodedMessage(str(exc), "invalid")]))
+
+
+def _coded(errors: list[ValidationError]) -> list[CodedMessage]:
+    """Each of ``errors``' messages, rendered as ``messages`` renders it, with its own code.
+
+    Each of ``error_list`` holds one message, which ``messages`` renders
+    with its ``params``.
+    """
+    return [
+        CodedMessage(message, error.code or "invalid")
+        for error in errors
+        for message in error.messages
+    ]
 
 
 def _resolve_m2m(
@@ -1367,12 +1392,12 @@ def _collection_rows(items: Any, *, relation: str) -> list[dict[str, Any]]:
     or matched on nothing. A declaration may allow the gap (``list[Row | None]``
     passes the shape check), and nothing in a relation spec says what one
     stands for, so it is refused rather than guessed at. The message is Django's
-    own, which its catalog translates.
+    own, which its catalog translates, and its code is ``null``, DRF's.
     """
     rows = list(items or [])
     nulls = [index for index, row in enumerate(rows) if row is None]
     if nulls:
-        message = gettext("This field cannot be null.")
+        message = CodedMessage(gettext("This field cannot be null."), "null")
         raise InvalidArguments({relation: {i: {NON_FIELD_ERRORS: [message]} for i in nulls}})
     return [coerce_to_dict(row) for row in rows]
 

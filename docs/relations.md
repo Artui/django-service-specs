@@ -127,7 +127,8 @@ How each kind reads its value:
   are updated, the rest are created, and in `"replace"` mode the existing rows
   the input left out are removed. `"merge"` mode only upserts. A `null` row
   is refused, every one of them and before any row is written, with
-  `"This field cannot be null."` under the row's `non_field_errors`: a
+  `"This field cannot be null."`, coded `null`, under the row's
+  `non_field_errors`: a
   declaration may let one through (`list[Row | None]`), and nothing in a
   relation spec says what it stands for.
 
@@ -240,12 +241,18 @@ impossible to cascade.
 A refusal inside a row is **re-rooted under the row's address**, in the tree
 [Arguments and refusals](arguments.md#the-refusal-tree) describes, and keeps
 its class: a `ServiceValidationError` from a row stays one, an
-`InvalidArguments` stays one, because the class says who refused. A grandchild's
+`InvalidArguments` stays one, because the class says who refused. Its
+messages are kept as they were, each one's
+[code](arguments.md#the-codes-a-refusal-carries) included. A grandchild's
 refusal carries both addresses.
 
 Django's own failures to write a row's data - a value a field cannot coerce, a
 key the model has no field for - carry no detail and would otherwise escape as
 an unhandled error naming no row. They become `InvalidArguments` at the row.
+A `ValidationError` keeps each message's own code, which is the one DRF gives
+the same mistake, and its field names where it has them; a message raised
+with no code, and the message of a `TypeError` or `ValueError`, is coded
+`invalid`.
 
 Code the caller wrote is treated differently. Any other error a row service, a
 `scope` callable or an `m2m` callable raises passes through **untouched**, at

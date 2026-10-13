@@ -20,6 +20,7 @@ from django_service_specs.mutations.utils import _RowPath
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
+from tests.parameters.utils import coded
 from tests.relations_app.models import Catalog, Post, Section, Tag
 
 _RUDE: dict[str, Any] = {"title": ["Too rude."]}
@@ -107,6 +108,14 @@ class TestANullRowIsRefusedBeforeAnythingIsWritten:
         # first write, so the row at index 0 was not written either.
         assert excinfo.value.detail == {"sections": {1: _NULL, 3: _NULL}}
         assert not Section.objects.exists()
+
+    def test_each_carries_the_code_drf_gives_a_null(self) -> None:
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(Catalog, {"name": "c", "sections": [None]}, relations=_SECTIONS)
+
+        assert coded(excinfo.value.detail) == {
+            "sections": {0: {"non_field_errors": [("This field cannot be null.", "null")]}}
+        }
 
     def test_in_a_many_to_many(self) -> None:
         with pytest.raises(InvalidArguments) as excinfo:

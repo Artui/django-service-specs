@@ -111,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no argument belongs in `extend_queryset`.
 
 ### Fixed
+- **A nested write's own refusals carry codes.** A null row in a relation
+  write is refused with the code `null`, and Django's failures to write a
+  row's data keep theirs: each message of a `ValidationError` carries its own
+  `code`, or `invalid` where it was raised with none, and the message of a
+  `TypeError` or `ValueError` is `invalid`. They were plain strings, so a
+  client reading codes found none where the shape check's refusals had one. A
+  row service's refusal, re-rooted under its relation, keeps its messages as
+  they were, codes included.
 - **A re-upload under the held file's name is written.** `update_from_input`,
   `aupdate_from_input` and `apply_input` compared a file field's new value
   with the held file by name, so an upload named as the file the row held -
