@@ -169,7 +169,8 @@ selector sees only its own `reads`, and the Validator only its own parameters.
 `PATCH` does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 `ValidationContext.partial`. The spec's `reads` and its target selector's stay
-required as declared, so a partial update still names its row, and a value
+required as declared unless a `kwargs` provider fills them, so a partial
+update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.
 
@@ -238,10 +239,17 @@ never a seed.
 A provider annotated to return a `TypedDict` says which keys it fills before
 it runs, and [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
 reads them: `filled`, and `declinable` for a key whose value admits
-`UnsetType`.
+`UnsetType`. A filled key is not demanded of the caller where the provider's
+values reach it: a selector's `kwargs` fills that selector's `reads`, a
+service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
+A provider annotated to fill a parameter declared anywhere else -
+`input_data` naming a read, `kwargs` naming a Validator field or the target
+selector's read - is refused with `ImproperlyConfigured` when the spec is
+built or, for a Validator field, when `parameters()` is assembled.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-gathers what every provider of a spec fills, with the seeds' names, for a
-transport building an input schema of its own:
+gathers what every provider of a spec fills, with the seeds' names. None of
+them is a parameter dispatch demands, so a transport building an input schema
+of its own subtracts the set from what `parameters()` lists:
 
 ```python
 --8<--
@@ -332,7 +340,8 @@ Three things a newcomer may look for are absent on purpose:
   each validated on its own. `partial` arrives in the context, because it is
   the spec's statement about the call, not the Validator's.
 - **It is sync-only.** It may query, so the async entry point runs it in
-  Django's thread-sensitive executor, and it must not be `async def`.
+  Django's thread-sensitive executor; a `validate` or `validated` declared
+  `async def` is refused when the spec is built.
 
 ### The dataclass adapter
 
@@ -404,7 +413,8 @@ the Validator:
 - `present(value)` renders **one** value. Dispatch's
   [`present`][django_service_specs.dispatch.present.present] hands a list's
   items over one at a time, so a Presenter never has to guess whether it was
-  given a row or a collection. It may query, and it is sync-only.
+  given a row or a collection. It may query, and it is sync-only: an
+  `async def` `present` is refused when the spec is built.
 
 An `OutputField` carries what a reader needs beyond a name and a type: a
 `label`, `choices` as value-and-display pairs (a table shows the display, a
