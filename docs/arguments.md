@@ -44,14 +44,17 @@ two, the dataclass adapter's, refuses `"3"` for an `int`.
 alone are the exact integer they spell, and a point or an exponent makes a
 float. So `"9007199254740993"` goes on as that integer, as the JSON literal
 does, where a float would round it to its neighbour, and `"3"` goes on as the
-3 a JSON body's `3` is. A fraction finer than a float holds is rounded, as the
+3 a JSON body's `3` is. Digits alone that Python's `int` refuses, past the
+4300 it reads from Python 3.10.7 on, spell no number either, even where zeros
+in front leave a float able to read them. A fraction finer than a float holds is rounded, as the
 JSON literal is; a value that must be exact is declared a `decimal`, and so is
 each element of an array that must be: `items="string"` with
 `format="decimal"`, as a django-filter CSV number filter declares, keeps every
 digit of each element and still splits `?pks=1,2`.
 
 **Only an ASCII string spells an `integer` or a `number`**, and this is one of
-two places the check is stricter than Django's forms, the other being
+three places the check is stricter than the libraries behind it, the others
+being a declared `minimum` or `maximum` and
 [the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
 and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
@@ -95,7 +98,9 @@ declares no `max_length` is still bounded, by the
 another count, the line Django's `DATA_UPLOAD_MAX_NUMBER_FIELDS` draws for a
 form body, or `None`, which bounds no array. A declared `max_length` outranks
 the setting either way, wider or narrower. The setting is read at the call,
-so `override_settings` reaches a spec built at import.
+so `override_settings` reaches a spec built at import, and so checking an
+array with no `max_length`, by the shape check or `coerce_flat`, needs
+Django's settings configured.
 
 ```python
 --8<--
@@ -213,9 +218,7 @@ make is a
 [`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]: a
 `str` carrying a `code`. The code is the one a DRF field gives the same mistake,
 so an adapter building DRF's `ErrorDetail` from the tree maps each one across
-unchanged, and a client of both reads one `get_codes()`. Two refusals of a
-relation write still carry none: a `null` row in a relation's list, and a
-Django `ValidationError` or other write failure raised while a row is saved.
+unchanged, and a client of both reads one `get_codes()`.
 
 ```python
 --8<--
@@ -238,6 +241,8 @@ docs/examples/arguments.py:codes
 | A request body that is not a JSON object | `invalid` | `request_arguments` |
 | A read a selector, its `extend_queryset` or a precondition asks for that nothing filled | `required` | dispatch, as the shape check would |
 | A value a FilterSet refuses | its form field's own code, `invalid` where it has none | the FilterSet, through dispatch |
+| A `null` row in a relation's list | `null` | a [relation write](relations.md) |
+| A row's data Django fails to write | the `ValidationError`'s own code, `invalid` where it has none and for a `TypeError` or `ValueError` | a [relation write](relations.md) |
 
 The shipped Validators code theirs the same way:
 
@@ -271,7 +276,7 @@ unchanged by them. A copy and a pickle keep the code.
 row by row on a `many` call. Dispatch does not rewrap them: a library's own
 coded message, DRF's `ErrorDetail` among them, keeps its code, and a plain
 `str` stays one, with no code. So does a project's own Validator raising
-plain strings, and the two relation-write refusals above, so read a code with
+plain strings, so read a code with
 `getattr(message, "code", ...)` and choose the default, as the example's
 `"invalid"` is DRF's own for a message raised with none.
 

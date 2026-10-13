@@ -131,7 +131,9 @@ def max_length_in_force(param: Parameter) -> int | None:
     # default: without it, a minimum is compared with ``None`` and raises),
     # test_an_array_takes_a_thousand_elements_and_no_more_by_default (the
     # minimum, likewise) and test_a_declared_minimum_is_inclusive (the
-    # comparison: without it, every declared minimum is refused).
+    # comparison: without it, every declared minimum is refused), whose
+    # strictness test_a_minimum_at_the_default_maximum_is_met_by_a_list_of_exactly_that_many
+    # holds: a minimum equal to the default is met by that many.
     if default is not None and param.min_length is not None and param.min_length > default:
         raise ImproperlyConfigured(
             f"Parameter {param.name!r}: min_length {param.min_length} is past the default maximum "
@@ -199,11 +201,14 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     of the same literal, so ``"3"`` reaches the Validator as the JSON ``3``
     does. Through ``float`` alone, every integer past 2**53 was rounded to a
     neighbour, and a key sent for a ``number`` named the neighbour's row
-    (test_a_number_spelling_an_integer_is_that_exact_int). The ``float`` reading still decides what is a number, so the accepted
-    strings are unchanged, and a literal long enough to reach ``int``'s digit
-    limit is already infinite to ``float`` and refused. A fraction past a
-    ``float``'s precision is rounded, as a JSON decoder rounds it: a value
-    that must be exact is a ``decimal``.
+    (test_a_number_spelling_an_integer_is_that_exact_int). The ``float``
+    reading still decides what is a number. Digits alone that ``int`` refuses
+    - past the 4300 digits it reads from Python 3.10.7 on, which zeros in
+    front can reach while ``float`` still reads a finite value - spell no
+    number, rather than a ``float`` neighbour, as they spell no integer; a
+    Python with no limit reads them exactly. A fraction past a ``float``'s
+    precision is rounded, as a JSON decoder rounds it: a value that must be
+    exact is a ``decimal``.
 
     **Only an ASCII string spells one.** Python's ``int`` and ``float``,
     and so Django's fields, read Arabic-Indic and fullwidth digits and strip
@@ -234,4 +239,8 @@ def parse_number(json_type: str, text: str) -> int | float | None:
         # test_a_number_spelling_an_integer_is_that_exact_int fails without this.
         return int(text)
     except ValueError:
-        return number
+        # Spelled with neither a point nor an exponent, the digits are an
+        # integer, and one ``int`` refuses is past its digit limit: no number
+        # at all, never the neighbour ``float`` rounds it to
+        # (test_an_integer_literal_past_int_s_digit_limit_is_refused_never_rounded).
+        return number if any(mark in text for mark in ".eE") else None

@@ -418,8 +418,12 @@ def _page_form(spec: ServiceSpec, target: Any, **bound: Any) -> forms.BaseForm:
     if not isinstance(target, models.Model):
         return form_class(**bound)
     if issubclass(form_class, forms.BaseModelForm) and isinstance(target, form_class._meta.model):
-        # A copy, as for the Validator: a bound ModelForm writes what it
-        # cleans onto its instance, and the re-rendered form cleans.
+        # A copy, as for the Validator: a post builds this form before
+        # dispatch, on the very row it then hands dispatch as its target, so
+        # anything the form's constructor writes onto its instance - a
+        # default filled in - would reach the Validator and the service as
+        # the row's stored values
+        # (test_the_page_form_s_writes_never_reach_the_row_dispatch_is_handed).
         return form_class(**bound, instance=copy.copy(target))
     # ``base_fields`` is set by the metaclass, which the stubs do not declare.
     fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]

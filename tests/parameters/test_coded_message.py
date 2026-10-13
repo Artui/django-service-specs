@@ -33,10 +33,10 @@ def test_it_carries_its_code() -> None:
     assert CodedMessage(MESSAGE, code="required").code == "required"
 
 
-def test_its_repr_shows_the_code() -> None:
-    assert repr(CodedMessage(MESSAGE, "required")) == (
-        "CodedMessage('This field is required.', code='required')"
-    )
+def test_its_repr_is_its_message_s() -> None:
+    # So the text of a printed tree is the text a tree of plain strings makes.
+    assert repr(CodedMessage(MESSAGE, "required")) == repr(MESSAGE)
+    assert str({"n": [CodedMessage(MESSAGE, "required")]}) == "{'n': ['This field is required.']}"
 
 
 @pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))

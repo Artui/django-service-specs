@@ -135,6 +135,18 @@ class DocumentForm(forms.ModelForm):
         fields = ["title", "attachment"]
 
 
+class StampingForm(forms.ModelForm):
+    """Writes onto its instance as it is built, as a form filling in a default does."""
+
+    class Meta:
+        model = Document
+        fields = ["title"]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.instance.title = "Stamped"
+
+
 class NoteTitleForm(forms.Form):
     """A plain form naming one of a note's fields, and one no note has."""
 
@@ -460,8 +472,11 @@ class TestAnUpdatePage:
             get(form_view(spec), ada, pk=1)
 
     def test_a_route_value_the_target_refuses_is_a_bad_request(self, ada: Any) -> None:
-        with pytest.raises(BadRequest):
+        # Its text is the refusal's tree, printed as a tree of plain strings:
+        # a message's code is for a program, never part of the words.
+        with pytest.raises(BadRequest) as caught:
             get(form_view(row_spec()), ada, pk="first")
+        assert str(caught.value) == "{'pk': ['Enter a whole number.']}"
 
     def test_the_class_level_check_runs_once(self, ada: Any) -> None:
         # The grant the page's own check returned goes to the lookup.
@@ -528,6 +543,27 @@ class TestAnUpdatePost:
         assert spec.service.calls[0]["instance"] == note
         # Asked once, by the lookup in front of dispatch, which the grant tells.
         assert owner_only.rows == [note]
+
+    def test_the_page_form_s_writes_never_reach_the_row_dispatch_is_handed(
+        self, ada: Any, media: str
+    ) -> None:
+        # The page's form is built before dispatch, and the row it shows is
+        # the one dispatch is handed as its target: built on that row itself,
+        # what the form's constructor writes onto its instance would reach the
+        # service as the row's stored values.
+        row = stored_document()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=FormValidator(StampingForm),
+            instance_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE, selector=document_by_pk, reads=PK
+            ),
+        )
+        assert post(form_view(spec), ada, {"title": "Renamed"}, pk=str(row.pk)).status_code == 302
+        call = spec.service.calls[0]
+        assert (call["instance"].pk, call["instance"].title) == (row.pk, "Notes")
+        assert call["data"] == {"title": "Renamed"}
 
     def test_a_create_and_a_collection_post_as_before(self, ada: Any) -> None:
         created = entry_spec()

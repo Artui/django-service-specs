@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 from decimal import Decimal
 from typing import Any
 
@@ -12,6 +13,19 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET
 
 ROW = Parameters.of(Parameter("title", "string", required=True))
+
+
+def test_only_the_name_and_the_type_are_positional() -> None:
+    # Every other field is keyword-only, so a field added among them shifts no
+    # call written positionally, and their order is not part of the contract.
+    kinds = {name: param.kind for name, param in inspect.signature(Parameter).parameters.items()}
+    positional = [
+        name for name, kind in kinds.items() if kind is not inspect.Parameter.KEYWORD_ONLY
+    ]
+    assert positional == ["name", "type"]
+    assert Parameter.__match_args__ == ("name", "type")
+    with pytest.raises(TypeError):
+        Parameter("pk", "integer", True)
 
 
 def test_defaults() -> None:

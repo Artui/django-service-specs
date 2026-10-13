@@ -2152,6 +2152,37 @@ def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
     assert sink.resolved == []
 
 
+@pytest.mark.parametrize("asynchronous", [False, True], ids=["sync", "async"])
+def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
+    ada: Any, asynchronous: bool
+) -> None:
+    # As a service spec's is: the seeds, never the reads the caller sent, so a
+    # provider taking the whole pool sees what ``base_pool`` holds and no more.
+    seen: list[list[str]] = []
+
+    def provider(**pool: Any) -> Any:
+        seen.append(sorted(pool))
+        return None
+
+    def by_title(*, user: Any, title: str, progress: Any) -> Any:
+        progress(1.0)
+        return notes_of(user=user)
+
+    async def aby_title(*, user: Any, title: str, progress: Any) -> Any:
+        progress(1.0)
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=aby_title if asynchronous else by_title,
+        reads=Parameters.of(Parameter("title", "string")),
+        permissions=OPEN,
+        progress_reporter=provider,
+    )
+    dispatch(spec, principal=ada, arguments={"title": "Ada's"})
+    assert seen == [["progress", "user"]]
+
+
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
     ada: Any,
 ) -> None:

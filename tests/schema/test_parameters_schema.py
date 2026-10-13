@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
+import os
+import subprocess
+import sys
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -643,6 +648,45 @@ class TestAny:
 
     def test_an_anys_default_is_stated(self) -> None:
         assert one(Parameter("pk", "any", default="abc")) == {"default": "abc"}
+
+
+_UNCONFIGURED_PROBE = """
+import json
+from django.core.exceptions import ImproperlyConfigured
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.schema.parameters_schema import parameters_schema
+
+answers = []
+for parameter in (
+    Parameter("ids", "array", items="integer"),
+    Parameter("ids", "array", items="integer", max_length=5),
+):
+    try:
+        answers.append(parameters_schema(Parameters.of(parameter))["properties"]["ids"])
+    except ImproperlyConfigured:
+        answers.append("ImproperlyConfigured")
+print(json.dumps(answers))
+"""
+
+
+def test_an_undeclared_array_bound_needs_django_configured_to_describe() -> None:
+    # The setting is the bound in force, so it is read rather than guessed: a
+    # default stated before ``settings.configure()`` could describe a bound
+    # the calls after it never meet. A declared maximum needs no setting.
+    env = {key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"}
+    completed = subprocess.run(
+        [sys.executable, "-c", _UNCONFIGURED_PROBE],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == [
+        "ImproperlyConfigured",
+        {"type": "array", "items": {"type": "integer"}, "maxItems": 5},
+    ]
 
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
