@@ -194,6 +194,23 @@ class TestCallableConditions:
             dispatch(spec, principal=ada, arguments={})
         assert ran == []
 
+    def test_dispatch_does_not_run_a_service_whose_condition_is_async_def(self, ada: Any) -> None:
+        # The literal shape: an ``async def`` condition the declaration accepts
+        # today, so only the read stands between it and the call.
+        ran: list[Any] = []
+
+        def service() -> None:
+            ran.append(True)
+
+        spec = ServiceSpec(
+            service=service,
+            permissions=[Unrestricted()],
+            affordances=[Affordance(code="books_closed", reason="r", when=_books_closed)],
+        )
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            dispatch(spec, principal=ada, arguments={})
+        assert ran == []
+
     def test_a_condition_returning_nothing_refuses(self, ada: Any) -> None:
         silent = Affordance(code="silent", reason="r", when=lambda: None)
         spec = ServiceSpec(service=print, affordances=[silent])
