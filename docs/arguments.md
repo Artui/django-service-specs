@@ -40,8 +40,9 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
-**Only an ASCII string spells an `integer` or a `number`**, and this is the one
-place the check is stricter than Django's forms. Python's `int` and `float`,
+**Only an ASCII string spells an `integer` or a `number`**, and this is one of
+two places the check is stricter than Django's forms, the other being
+[the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
 and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
 them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
@@ -84,18 +85,14 @@ the setting either way, wider or narrower. The setting is read at the call,
 so `override_settings` reaches a spec built at import.
 
 ```python
-from django.test import override_settings
-
-ids = Parameters.of(Parameter("ids", "array", items="integer"))
-check_arguments(ids, {"ids": list(range(1001))})
-# InvalidArguments: {"ids": ["Ensure this field has no more than 1000 elements."]}
-
-with override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None):
-    check_arguments(ids, {"ids": list(range(1001))})  # taken
+--8<--
+docs/examples/arguments.py:length
+--8<--
 ```
 
-This is the second place the check can be stricter than the library behind
-it, on purpose: a list is a cost its caller controls the size of. Each row of
+Like the ASCII rule and a declared `minimum` or `maximum`, this is a place
+the check can be stricter than the library behind it, on purpose: a list is a
+cost its caller controls the size of. Each row of
 a [`many`](declaring.md#many-rows-in-one-call) call is a Validator run inside
 one transaction, and each value of a django-filter `in` lookup is one query
 variable, past whose limit the database refuses the query and the caller
@@ -104,8 +101,9 @@ declaration reaches - a row's own array included, a CSV filter's, a `many`
 call's list of rows - and a project whose Validator takes longer lists
 raises the setting or declares the `max_length`. A `min_length` past the
 setting on a parameter with no `max_length` of its own is a declaration no
-call could meet, refused as `ImproperlyConfigured` at the call, since the
-setting cannot be read where the parameter is written.
+call could meet, refused as `ImproperlyConfigured` at the call and when its
+schema is built, since the setting cannot be read where the parameter is
+written.
 
 The messages are DRF's, `"Ensure this field has no more than {max_length}
 elements."` and `"Ensure this field has at least {min_length} elements."`: no

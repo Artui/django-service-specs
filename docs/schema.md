@@ -209,7 +209,8 @@ unless the project sets another. It is the one bound stated without being
 declared, because [the shape check refuses past
 it](arguments.md#how-long-a-list-may-be) and a client told nothing would send
 a call that cannot run. Under a setting of `None`, an array with no
-`max_length` states none. The setting is read each time a schema is built. JSON Schema reads `minimum` and `maximum` on a number
+`max_length` states none. The setting is read each time a schema is built,
+so building one reads Django's settings and needs them configured. JSON Schema reads `minimum` and `maximum` on a number
 instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.
 

@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   at import, and anything but a non-negative `int` or `None` is refused as
   `ImproperlyConfigured` where it is read. A `min_length` past it on a
   parameter with no `max_length` of its own, which no call could meet, is
-  refused the same way at the call.
+  refused the same way at the call and when its schema is built.
 
 ### Changed
 - **Breaking:** every array argument is bounded. One whose parameter declares

@@ -65,8 +65,10 @@ def max_length_in_force(param: Parameter) -> int | None:
     Raises:
         ImproperlyConfigured: a ``min_length`` past the setting's maximum on a
             parameter that declares no maximum of its own, which no call could
-            meet. Found here because the setting is read only at the call, so
-            the declaration cannot be refused where it is written.
+            meet: at the call, and when the parameter's schema is built, so a
+            transport listing every schema fails on it too. Found here because
+            the setting is read only then, so the declaration cannot be
+            refused where it is written.
     """
     if param.max_length is not None:
         return param.max_length

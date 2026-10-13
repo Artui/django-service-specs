@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
@@ -625,3 +626,10 @@ class TestAny:
 
     def test_an_anys_default_is_stated(self) -> None:
         assert one(Parameter("pk", "any", default="abc")) == {"default": "abc"}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_no_call_could_meet_is_refused_when_the_schema_is_built() -> None:
+    # The schema states the maximum in force, which this declaration has none of.
+    with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
+        parameters_schema(Parameters.of(Parameter("ids", "array", min_length=4)))

@@ -50,6 +50,7 @@ from django_service_specs import (
     ServiceValidationError,
     SpecRegistry,
     ValidationContext,
+    check_arguments,
     coerce_flat,
     dispatch,
     error_response,
@@ -450,6 +451,23 @@ class TestArguments:
 
     def test_a_flat_transport_reads_strings_as_typed_json(self) -> None:
         assert arguments.from_argv(arguments.ARGV) == arguments.TYPED
+
+    def test_an_array_is_bounded_where_it_declares_no_maximum(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.IDS, {"ids": list(range(1001))})
+        assert refused.value.detail == arguments.TOO_LONG
+        assert check_arguments(arguments.IDS, {"ids": list(range(1000))})["ids"][-1] == 999
+
+    def test_a_declared_length_bounds_it_both_ways(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.PAGE, {"ids": []})
+        assert refused.value.detail == arguments.TOO_SHORT
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.PAGE, {"ids": list(range(51))})
+        assert refused.value.detail == {"ids": ["Ensure this field has no more than 50 elements."]}
+
+    def test_a_setting_of_none_bounds_no_array(self) -> None:
+        assert len(arguments.unbounded({"ids": list(range(1001))})["ids"]) == 1001
 
     def test_a_boolean_has_four_spellings(self) -> None:
         with pytest.raises(InvalidArguments) as refused:

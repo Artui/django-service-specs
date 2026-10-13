@@ -95,7 +95,12 @@ An array of numbers, integers or booleans also reads a value holding commas as
 its elements, `?ids=1,2` as `[1, 2]` with the space around each part trimmed:
 a comma cannot be part of such a value, and it is the spelling a django-filter
 CSV filter advertises. Repeated keys and commas may mix, and an empty part
-(`?ids=1,,2`) is refused at its index as any malformed element is. An array
+(`?ids=1,,2`) is refused at its index as any malformed element is. A list
+longer than the array takes - its `max_length`, or 1000 by the
+`SERVICE_SPECS_MAX_ARRAY_LENGTH` setting - is refused whole at its name, a 400
+rather than the 500 a database answers past its variable limit, and is never
+split further than one element past it: see
+[how long a list may be](arguments.md#how-long-a-list-may-be). An array
 of strings is split the same way when it declares choices and none of them
 holds a comma, as a django-filter `OrderingFilter`'s do: every element must be
 a choice, so `?o=title,-pk` can only be `["title", "-pk"]`. An array of
