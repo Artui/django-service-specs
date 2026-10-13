@@ -49,6 +49,7 @@ from tests.dispatch.utils import (
     OwnerOnly,
     Record,
     Refuse,
+    Scoped,
     Titled,
     make_user,
     note_by_pk,
@@ -2147,3 +2148,207 @@ def test_a_filled_key_naming_a_read_stays_required(ada: Any) -> None:
         input_data=server,
     )
     assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+
+
+# --- the scope check: a set, or nothing, asked where no row is resolved.
+
+
+def _guarded(check: Scoped, **kwargs: Any) -> tuple[ServiceSpec, Record]:
+    service = Record()
+    return ServiceSpec(service=service, permissions=[check], **kwargs), service
+
+
+def test_a_create_asks_the_scope_check_of_nothing(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    calls: list[None] = []
+    spec, service = _guarded(check, input_data=lambda: calls.append(None) or {})
+    with pytest.raises(NotPermitted) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.message == "Not within your scope."
+    assert check.scopes == [None]
+    # Before the providers, as djangorestframework-services guards before them.
+    assert calls == []
+    assert service.calls == []
+
+
+def test_a_collection_target_asks_the_scope_check_of_its_set(ada: Any, bob: Any) -> None:
+    mine = Note.objects.create(owner=ada, title="mine")
+    Note.objects.create(owner=bob, title="theirs")
+    check = Scoped(refuse_scope=True)
+    spec, service = _guarded(check, collection_selector_spec=nested(LIST, selector=notes_of))
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={})
+    assert check.scopes == [[mine]]
+    assert service.calls == []
+
+
+def test_an_empty_collection_is_asked_too(ada: Any) -> None:
+    check = Scoped()
+    spec, service = _guarded(check, collection_selector_spec=nested(LIST, selector=notes_of))
+    dispatch(spec, principal=ada, arguments={})
+    assert check.scopes == [[]]
+    assert len(service.calls) == 1
+
+
+def test_a_missing_row_allow_none_lets_through_asks_the_scope_check_of_nothing(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    spec, service = _guarded(
+        check,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK, allow_none=True),
+    )
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={"pk": 404})
+    assert check.scopes == [None]
+
+
+def test_a_found_row_is_object_checked_and_never_scope_checked(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    check = Scoped(refuse_scope=True)
+    spec, service = _guarded(
+        check, instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK)
+    )
+    dispatch(spec, principal=ada, arguments={"pk": note.pk})
+    assert (check.rows, check.scopes) == ([note], [])
+    assert service.calls[0]["instance"] == note
+
+
+def test_a_missing_row_without_allow_none_asks_no_check(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    spec, _ = _guarded(
+        check, instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK)
+    )
+    result = dispatch(spec, principal=ada, arguments={"pk": 404})
+    assert result.kind == "not_found"
+    assert (check.rows, check.scopes) == ([], [])
+
+
+def test_a_grant_that_checked_the_target_skips_the_scope_check(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    spec, service = _guarded(check)
+    dispatch(spec, principal=ada, arguments={}, grant=Grant(spec, ada, target_checked=True))
+    assert check.scopes == []
+    assert len(service.calls) == 1
+
+
+def test_a_list_selector_spec_asks_the_scope_check_of_its_rows(ada: Any) -> None:
+    mine = Note.objects.create(owner=ada, title="mine")
+    check = Scoped(refuse_scope=True)
+    precondition = _Precondition()
+    spec = SelectorSpec(
+        kind=LIST, selector=notes_of, permissions=[check], preconditions=[precondition]
+    )
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={})
+    assert check.scopes == [[mine]]
+    # Before the preconditions, as the object-level check runs before a row's.
+    assert precondition.calls == []
+
+
+def test_a_retrieve_selector_spec_s_none_under_allow_none_is_asked_nothing(ada: Any) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = retrieve(permissions=[check], allow_none=True)
+    result = dispatch(spec, principal=ada, arguments={"pk": 404})
+    assert (result.kind, result.value) == ("instance", None)
+    assert (check.rows, check.scopes) == ([], [])
+
+
+# --- target=: a target the caller resolved, used as the resolved one.
+
+
+class _Counting:
+    """A RETRIEVE target selector that counts its calls."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def __call__(self, *, pk: int) -> Any:
+        self.calls += 1
+        return Note.objects.filter(pk=pk)
+
+
+def test_a_pre_resolved_target_runs_no_lookup_and_is_object_checked_once(
+    ada: Any, bob: Any
+) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    selector = _Counting()
+    check = Scoped()
+    spec, service = _guarded(
+        check, instance_selector_spec=nested(RETRIEVE, selector=selector, reads=PK)
+    )
+    dispatch(spec, principal=ada, arguments={"pk": note.pk}, target=note)
+    assert selector.calls == 0
+    assert check.rows == [note]
+    assert service.calls[0]["instance"] == note
+    # Not a lookup skipped and a check with it: a row the principal may not
+    # touch is still refused.
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, target=theirs)
+
+
+def test_a_pre_resolved_target_under_a_grant_that_checked_it_is_checked_never(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    check = Scoped()
+    spec, service = _guarded(
+        check, instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK)
+    )
+    grant = Grant(spec, ada, target_checked=True)
+    dispatch(spec, principal=ada, arguments={"pk": note.pk}, target=note, grant=grant)
+    assert check.rows == []
+    assert service.calls[0]["instance"] == note
+
+
+def test_a_pre_resolved_target_reaches_the_providers_and_the_validator(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="Row")
+    seen: list[Any] = []
+
+    def server(*, instance: Note) -> dict[str, Any]:
+        seen.append(instance)
+        return {}
+
+    validator = Titled()
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=validator,
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        input_data=server,
+    )
+    dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "T"}, target=note)
+    assert seen == [note]
+    assert validator.calls[0][1].target == note
+
+
+def test_a_pre_resolved_none_is_not_found_unless_allow_none(ada: Any) -> None:
+    check = Scoped()
+    spec, service = _guarded(
+        check, instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK)
+    )
+    assert dispatch(spec, principal=ada, arguments={"pk": 1}, target=None).kind == "not_found"
+    assert service.calls == []
+
+
+def test_a_pre_resolved_collection_is_the_collection_and_scope_checked(ada: Any) -> None:
+    rows = [Note.objects.create(owner=ada, title="mine")]
+    check = Scoped()
+    spec, service = _guarded(check, collection_selector_spec=nested(LIST, selector=notes_of))
+    dispatch(spec, principal=ada, arguments={}, target=rows)
+    assert service.calls[0]["collection"] is rows
+    assert check.scopes == [rows]
+
+
+def test_a_create_takes_a_pre_resolved_none_and_refuses_a_row(ada: Any) -> None:
+    check = Scoped()
+    spec, service = _guarded(check)
+    dispatch(spec, principal=ada, arguments={}, target=None)
+    assert check.scopes == [None]
+    assert "instance" not in service.calls[0]
+    row = Note.objects.create(owner=ada, title="mine")
+    with pytest.raises(TypeError, match="declares no target selector"):
+        dispatch(spec, principal=ada, arguments={}, target=row)
+
+
+def test_a_selector_spec_refuses_a_pre_resolved_target(ada: Any) -> None:
+    spec = retrieve()
+    with pytest.raises(TypeError, match="target= is a ServiceSpec's"):
+        dispatch(spec, principal=ada, arguments={"pk": 1}, target=None)

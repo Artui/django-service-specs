@@ -19,6 +19,7 @@ from django_service_specs.dispatch.utils import (
     finish_service,
     open_call,
     prepare_service,
+    refuse_a_selector_spec_s_target,
     reraise_unless_retrieve,
     selector_pool,
     settle,
@@ -30,6 +31,7 @@ from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
@@ -43,6 +45,7 @@ async def adispatch(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
+    target: Any = UNSET,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
@@ -94,6 +97,11 @@ async def adispatch(
     called on the loop: for an ``async def`` run it is resolved inside the
     hop, once nothing before the run can refuse the call.
 
+    ``target`` is ``dispatch``'s: a service spec's target the caller resolved,
+    standing in for the lookup inside the one hop, and checked there unless
+    ``grant`` says ``target_checked``. A selector spec refuses it before any
+    hop.
+
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``.
         PrincipalUnavailable: ``principal_id`` names no principal who may act,
@@ -107,6 +115,7 @@ async def adispatch(
     # by test_principal_id_is_resolved_inside_the_one_hop (``principal_id`` alone).
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
+    refuse_a_selector_spec_s_target(spec, target)
     rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
@@ -115,8 +124,8 @@ async def adispatch(
         # One branch to coverage, so each condition is held by its own test:
         # test_a_non_atomic_sync_service_costs_one_hop (the first) and
         # test_an_atomic_async_service_joins_the_hop_and_rolls_back (the second).
-        return await _await_service(spec, *rest)
-    return await sync_to_async(_dispatch, thread_sensitive=True)(spec, *rest)
+        return await _await_service(spec, *rest, target)
+    return await sync_to_async(_dispatch, thread_sensitive=True)(spec, *rest, target)
 
 
 def _principal(principal: Any, principal_id: Any) -> Any:
@@ -132,6 +141,7 @@ def _dispatch(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
     return dispatch(
@@ -142,6 +152,7 @@ def _dispatch(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        target=target,
     )
 
 
@@ -154,6 +165,7 @@ def _prepare(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> Prepared | DispatchResult:
     return prepare_service(
         spec,
@@ -163,6 +175,7 @@ def _prepare(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        target=target,
     )
 
 
@@ -175,10 +188,19 @@ async def _await_service(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
     prepared = await sync_to_async(_prepare, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
+        spec,
+        principal,
+        principal_id,
+        arguments,
+        grant,
+        pool_seeds,
+        unknown_arguments,
+        progress,
+        target,
     )
     if isinstance(prepared, DispatchResult):
         return prepared

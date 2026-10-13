@@ -27,6 +27,7 @@ from django_service_specs.affordances.utils import (
     split_affordances,
 )
 from django_service_specs.authorization.authorize import authorize
+from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
@@ -49,6 +50,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
@@ -88,8 +90,12 @@ def open_call(
     grant: Grant | None,
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
+    parameters: Parameters | None = None,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
+
+    ``parameters`` is what is checked, ``spec.parameters()`` unless given:
+    ``resolve_target`` checks its target selector's alone.
 
     **A deactivated principal is refused before anything else**, as
     ``PrincipalUnavailable``, by the rule ``resolve_principal`` and the HTTP
@@ -114,7 +120,8 @@ def open_call(
     """
     if is_deactivated(principal):
         raise PrincipalUnavailable()
-    parameters = spec.parameters()
+    if parameters is None:
+        parameters = spec.parameters()
     taken = sorted(parameters.names() & pool_seeds.reserved)
     if taken:
         raise ImproperlyConfigured(
@@ -486,8 +493,12 @@ def conclude_selector(
     """Step four for a selector spec, its ``preconditions``, and its result.
 
     The object-level check runs on a retrieved row and never on a list: a
-    collection has no single object to check against. Nor on a ``None`` that
-    ``allow_none`` let through, which is not a row anyone could be refused.
+    collection has no single object to check against. A list is asked of
+    ``has_scope_permission`` instead, through ``authorize_scope``, empty or
+    not, as djangorestframework-services guards the resolved set. A ``None``
+    that ``allow_none`` let through is asked of neither, as there: it is not a
+    row anyone could be refused, nor a set
+    (test_a_retrieve_selector_spec_s_none_under_allow_none_is_asked_nothing).
 
     The ``preconditions`` run last, from the selector's ``pool`` with the rows
     as ``collection`` or the row as ``instance``, as djangorestframework-services
@@ -498,6 +509,7 @@ def conclude_selector(
     """
     fillable = spec.reads.names()
     if spec.kind is SelectorKind.LIST:
+        authorize_scope(spec, principal, value, grant=grant)
         run_preconditions(spec, {**pool, "collection": value}, fillable=fillable)
         return DispatchResult(kind="list", value=value)
     if value is not None:
@@ -506,6 +518,92 @@ def conclude_selector(
     elif not spec.allow_none:
         return NOT_FOUND
     return DispatchResult(kind="instance", value=value)
+
+
+def walk_target(
+    spec: ServiceSpec,
+    principal: Any,
+    checked: Mapping[str, Any],
+    *,
+    grant: Grant,
+    pool_seeds: PoolSeeds,
+    target: Any = UNSET,
+) -> dict[str, Any] | DispatchResult:
+    """Steps three and four for a service spec: its target, found and checked.
+
+    The one walk ``prepare_service`` and ``resolve_target`` both run once the
+    call is admitted, so a target resolved ahead of the call is the target
+    dispatch would have found. Returns the pool's entry for it - ``instance``
+    for an instance selector, ``collection`` for a collection one, nothing
+    for a create - or ``NOT_FOUND``.
+
+    - **A row**: ``authorize_target``, its ``has_object_permission``.
+    - **A missing row**: ``NOT_FOUND`` unless the selector says
+      ``allow_none``; then ``authorize_scope`` of ``None``, as
+      djangorestframework-services asks its guard of the ``None`` it lets
+      through.
+    - **A collection**, empty or not: ``authorize_scope`` of the set.
+    - **A create**, which resolves nothing: ``authorize_scope`` of ``None``.
+
+    ``target``, when given, is the target a caller resolved itself, and stands
+    in for the lookup alone: the checks above still run on it, unless
+    ``grant.target_checked`` says they ran already. A create takes ``None``
+    there and nothing else, since it has no target to stand in for.
+    """
+    instance_spec = spec.instance_selector_spec
+    collection_spec = spec.collection_selector_spec
+    # The target lookups get no live reporter, and nor does the output selector
+    # in ``finish_service``: neither is the run (see ``call_pool``).
+    if instance_spec is not None:
+        if target is UNSET:
+            pool = selector_pool(instance_spec, checked, principal=principal, pool_seeds=pool_seeds)
+            target = lookup(
+                instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
+            )
+        if target is not None:
+            authorize_target(spec, principal, target, grant=grant)
+        elif not instance_spec.allow_none:
+            return NOT_FOUND
+        else:
+            authorize_scope(spec, principal, None, grant=grant)
+        return {"instance": target}
+    if collection_spec is not None:
+        if target is UNSET:
+            pool = selector_pool(
+                collection_spec, checked, principal=principal, pool_seeds=pool_seeds
+            )
+            target = lookup(
+                collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
+            )
+        authorize_scope(spec, principal, target, grant=grant)
+        return {"collection": target}
+    # One arc to coverage, so each conjunct is held by its own test: a create
+    # dispatched with no ``target=`` (test_a_create_asks_the_scope_check_of_nothing)
+    # the first, test_a_create_takes_a_pre_resolved_none_and_refuses_a_row the second.
+    if target is not UNSET and target is not None:
+        raise TypeError(
+            "dispatch() was handed a target= for a ServiceSpec that declares no target "
+            "selector. A create acts on no existing row; pass target=None or nothing."
+        )
+    authorize_scope(spec, principal, None, grant=grant)
+    return {}
+
+
+def refuse_a_selector_spec_s_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
+    """Refuse ``target=`` on a selector spec, from either entry point, before anything runs.
+
+    A selector spec's selector is its run, so a target handed in would stand
+    in for the operation itself rather than for a lookup in front of it.
+    Refused rather than ignored, since ignoring it runs the selector the
+    caller meant to skip. One arc to coverage:
+    test_a_pre_resolved_target_runs_no_lookup_and_is_object_checked_once
+    holds the first conjunct, and every selector spec dispatched the second.
+    """
+    if isinstance(spec, SelectorSpec) and target is not UNSET:
+        raise TypeError(
+            "target= is a ServiceSpec's, standing in for its target selector's lookup; "
+            "a SelectorSpec's selector is its run."
+        )
 
 
 def validate_arguments(
@@ -548,9 +646,13 @@ def prepare_service(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any = UNSET,
 ) -> Prepared | DispatchResult:
     """Steps one to six for a service spec, its preconditions, and the keywords its run is called with.
 
+    The target is ``walk_target``'s: found by the target selector, or
+    ``target`` when the caller resolved it, then checked - a row by
+    ``has_object_permission``, a set or nothing by ``has_scope_permission``.
     Returns ``NOT_FOUND`` when the instance selector resolves nothing and
     ``allow_none`` is off: the service never runs, and neither a provider, the
     Validator nor an affordance is asked. The pool carries ``instance`` when
@@ -590,26 +692,14 @@ def prepare_service(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
     )
-    target: Any = None
-    resolved: dict[str, Any] = {}
-    instance_spec = spec.instance_selector_spec
-    collection_spec = spec.collection_selector_spec
-    # The target lookups get no live reporter, and nor does the output selector
-    # in ``finish_service``: neither is the run (see ``call_pool``).
-    if instance_spec is not None:
-        pool = selector_pool(instance_spec, checked, principal=principal, pool_seeds=pool_seeds)
-        target = lookup(instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved)
-        if target is not None:
-            authorize_target(spec, principal, target, grant=granted)
-        elif not instance_spec.allow_none:
-            return NOT_FOUND
-        resolved["instance"] = target
-    elif collection_spec is not None:
-        pool = selector_pool(collection_spec, checked, principal=principal, pool_seeds=pool_seeds)
-        target = lookup(
-            collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
-        )
-        resolved["collection"] = target
+    resolved = walk_target(
+        spec, principal, checked, grant=granted, pool_seeds=pool_seeds, target=target
+    )
+    if isinstance(resolved, DispatchResult):
+        return resolved
+    # The row, the set, or ``None`` for a create: what the Validator's context
+    # and the run's result carry.
+    target = next(iter(resolved.values()), None)
     reserved = pool_seeds.reserved
     # One base pool for the call, so a seed that queries resolves once for the
     # providers and the service alike. Its ``progress`` is the transport's: the
