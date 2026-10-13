@@ -187,8 +187,10 @@ A grant is bound **by identity** to one spec object and one principal object.
 Carried to another operation or another user it covers nothing, and dispatch
 refuses it with `NotPermitted`. It covers the class-level check only, unless
 it says `target_checked=True`, which a transport can claim once it has resolved
-the row and run the object-level check itself; otherwise dispatch still runs
-`has_object_permission` on the row it resolves. A grant stands in for neither
+the row and run the object-level check itself, and which covers a service
+spec's target only when that target is handed to `dispatch` as `target=`;
+otherwise dispatch still runs `has_object_permission` on the row it resolves.
+A selector spec's claim covers whatever its selector returns. A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And **a grant cannot be
 serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
@@ -200,7 +202,8 @@ re-authorizes by construction.
 and [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
 are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
-spec and principal, and the other two are skipped under `target_checked`.
+spec and principal, and the other two are skipped under `target_checked`
+where the target was handed in as `target=`.
 
 ### A target resolved ahead of the call
 
@@ -225,7 +228,9 @@ docs/examples/dispatching.py:resolve_target
 It returns `(target, grant)`: the row, the set, or `None` for a create, and a
 grant covering the spec and the principal with `target_checked` set. Both go
 to `dispatch(..., target=, grant=)`, which then looks nothing up and asks no
-object-level or scope check again. A missing row that `allow_none` does not
+object-level or scope check again. The grant is honoured only with the
+target it was resolved for: handed on without `target=`, dispatch looks the
+row up itself and runs the checks on it. A missing row that `allow_none` does not
 let through comes back as `DispatchResult(kind="not_found")`, so it is never
 mistaken for the `None` it lets through. A read, whose selector is its run,
 raises `TypeError`, and a `many` write, which has no target,
@@ -234,7 +239,8 @@ raises `TypeError`, and a `many` write, which has no target,
 
 `target=` on `dispatch` and `adispatch` takes any target the caller resolved -
 what an HTTP view's `get_object()` found, too - and stands in for step three.
-Step four still runs on it unless the grant says `target_checked`. `None` is a
+Step four still runs on it unless the grant says `target_checked`; without
+`target=` step four always runs. `None` is a
 missing row, not-found unless the instance selector says `allow_none`; a
 create takes `None` and refuses anything else. **Dispatch trusts it**: the
 target's `reads` are still checked as declared, and keeping them and the
@@ -402,6 +408,8 @@ service that declares `progress` runs unchanged on every transport and in
 tests. A spec's own `progress_reporter` provider adds a sink of the author's
 beside the transport's - a task record, an audit trail - for the run alone,
 called on its first report, or before an `async def` run once nothing can
-refuse the call, so a refused call never calls it. A target or output selector always gets `null_progress`: a lookup has
+refuse the call. A service spec refused before its run never calls it; a
+selector spec's selector is its run, so one refused at its object check, its
+scope check or a precondition may already have. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.

@@ -216,20 +216,27 @@ sync-only: an `async def` one is refused when the spec is built.
 
 - **`kwargs`** returns extra pool entries, merged after the caller's
   arguments, so a key it answers is the author's value whatever the caller
-  sent - a tenant, a scope. A value of `UNSET` declines its key and leaves
-  the caller's in place.
+  sent - a tenant, a scope. A value of `UNSET` declines a key the provider is
+  annotated as able to decline (or any key of an untyped provider) and leaves
+  the caller's in place; a key it is annotated to fill is the server's, so the
+  caller's value for it is checked and then dropped.
 - **`input_data`**, on a write alone, returns values merged over the caller's
   arguments before the Validator sees them, so a server-owned field - an
   owner, a status - is the author's. A Validator field it is annotated to fill
   is not demanded of the caller, and the Validator still refuses it if the
-  provider declines it.
+  provider declines it. A value the caller sends for a field the provider is
+  annotated to fill is dropped, not used in its place.
 - **`preconditions`** are raise-to-abort rules, in declaration order, after
   the affordances and before the service, outside its transaction. What the
-  first to raise raises reaches the caller as it is.
+  first to raise raises reaches the caller as it is. One answering with a
+  coroutine or an async generator is refused with `ImproperlyConfigured`
+  rather than read as a pass.
 - **`progress_reporter`** returns a
   [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
   the run reports to beside the transport's - a task record, an audit trail -
-  called on the run's first report, so a refused call never calls it.
+  called on the run's first report. A service spec refused before its run
+  never calls it; a selector spec's selector is its run, so one refused at
+  its object check, its scope check or a precondition may already have.
 
 Both providers are called from the base pool, the `reads` and the resolved
 target, and never see the Validator's values. A provider returning a name
@@ -240,7 +247,7 @@ A provider annotated to return a `TypedDict` says which keys it fills before
 it runs, and [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
 reads them: `filled`, and `declinable` for a key whose value admits
 `UnsetType`. A filled key is not demanded of the caller where the provider's
-values reach it: a selector's `kwargs` fills that selector's `reads`, a
+values reach it, and the caller's value for it is dropped: a selector's `kwargs` fills that selector's `reads`, a
 service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
 A provider annotated to fill a parameter declared anywhere else -
 `input_data` naming a read, `kwargs` naming a Validator field or the target
