@@ -197,12 +197,13 @@ it says `target_checked=True`, which a transport can claim once it has resolved
 the row and run the object-level check itself, and which covers a service
 spec's target only when that target is handed to `dispatch` as `target=`;
 otherwise dispatch still runs `has_object_permission` on the row it resolves.
-A selector spec's claim covers whatever its selector returns: a selector spec
-takes no `target=`, so there is no row handed in to bind the claim to, and
-dispatch skips the check on the row the arguments make the selector find. A
-transport claims it only when it has checked that very row, found from the
-same arguments; without the claim, the check sees the row the call returns,
-shaped and annotated, and the list it returns. A grant stands in for neither
+**On a selector spec the claim covers nothing**: a selector spec takes no
+`target=`, so there is no row handed in to bind the claim to, and the row
+the arguments make the selector find may be one the transport never
+checked. Dispatch runs the check on the row the call returns, shaped and
+annotated, and the scope check on the list it returns, whatever the grant
+says, as djangorestframework-services checks the row its selector returned.
+A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And **a grant cannot be
 serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
@@ -214,8 +215,8 @@ re-authorizes by construction.
 and [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
 are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
-spec and principal, and the other two are skipped under `target_checked`
-where the target was handed in as `target=`.
+spec and principal, and dispatch skips the other two under `target_checked`
+only where a service spec's target was handed in as `target=`.
 
 ### A target resolved ahead of the call
 

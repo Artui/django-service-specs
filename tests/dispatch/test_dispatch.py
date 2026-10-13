@@ -216,16 +216,35 @@ def test_a_grant_for_another_principal_is_refused(ada: Any, bob: Any) -> None:
     assert caught.value.message == "The grant does not cover this spec and principal."
 
 
-def test_a_grant_that_checked_the_target_skips_the_object_level_check(ada: Any, bob: Any) -> None:
+def test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds(
+    ada: Any, bob: Any
+) -> None:
+    # A selector spec takes no ``target=``, so a grant has no row to be bound
+    # to: whatever its transport checked, the row the arguments make the
+    # selector find is checked here, as a service spec's lookup is.
     theirs = Note.objects.create(owner=bob, title="theirs")
     check = OwnerOnly()
     spec = retrieve(permissions=[check])
     grant = Grant(spec, ada, target_checked=True)
 
-    result = dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, grant=grant)
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, grant=grant)
 
-    assert result.value == theirs
-    assert check.rows == []
+    assert check.rows == [theirs]
+
+
+def test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads(
+    ada: Any,
+) -> None:
+    Note.objects.create(owner=ada, title="mine")
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[check])
+    grant = Grant(spec, ada, target_checked=True)
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={}, grant=grant)
+
+    assert len(check.scopes) == 1
 
 
 def test_a_selector_spec_s_object_level_check_sees_the_row_the_call_returns(ada: Any) -> None:

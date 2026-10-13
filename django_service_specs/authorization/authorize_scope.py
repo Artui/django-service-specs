@@ -28,7 +28,9 @@ def authorize_scope(
     ``ImproperlyConfigured`` rather than being read as a pass.
 
     ``grant.target_checked`` skips the checks here as it does there: a
-    transport that already ran the object-level check has claimed it.
+    transport that already ran the target-level checks has claimed them.
+    Dispatch honours it, as there, only for a service spec's target handed
+    in as ``target=``, so never on the list a selector spec reads.
     """
     if grant.target_checked:
         return

@@ -818,6 +818,38 @@ async def test_a_precondition_answering_with_a_coroutine_refuses_the_call(ada: A
     assert ran == []
 
 
+async def test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds(
+    ada: Any, bob: Any
+) -> None:
+    theirs = await _create(owner=bob, title="theirs")
+    check = OwnerOnly()
+    spec = SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK, permissions=[check])
+
+    with pytest.raises(NotPermitted):
+        await adispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": theirs.pk},
+            grant=Grant(spec, ada, target_checked=True),
+        )
+
+    assert check.rows == [theirs]
+
+
+async def test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads(
+    ada: Any,
+) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(
+            spec, principal=ada, arguments={}, grant=Grant(spec, ada, target_checked=True)
+        )
+
+    assert len(check.scopes) == 1
+
+
 async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the_await(
     ada: Any,
 ) -> None:

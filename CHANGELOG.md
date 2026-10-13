@@ -146,6 +146,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a test now holds the two to that.
 
 ### Fixed
+- **Breaking, and a security fix: a `Grant` with `target_checked` skipped a
+  selector spec's checks on any row.** On a selector spec it skipped
+  `has_object_permission` on whatever row the selector found and
+  `has_scope_permission` on whatever list it read, although a selector spec
+  takes no `target=` to bind the claim to a row: a grant minted after
+  checking one row admitted another principal's, named in the arguments.
+  The flag now covers a selector spec's row and list never, as it covers a
+  service spec's lookup never, on `dispatch` and `adispatch` alike; the
+  grant still stands for the class-level check. Every caller handing a
+  selector spec `Grant(..., target_checked=True)` is affected: the checks
+  run again, so a call the grant let through may now be refused with
+  `NotPermitted`, never the other way round. `resolve_target` never minted
+  such a grant, since it refuses a read.
 - **A nested write's own refusals carry codes.** A null row in a relation
   write is refused with the code `null`, and Django's failures to write a
   row's data keep theirs: each message of a `ValidationError` carries its own

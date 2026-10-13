@@ -837,7 +837,18 @@ def conclude_selector(
     Never without a row, missing or
     ``None`` under ``allow_none``
     (test_a_selector_spec_s_preconditions_never_run_without_a_row).
+
+    **A** ``target_checked`` **grant covers nothing here**, as it covers
+    nothing on a service spec's lookup. It says the checks ran on the target
+    its transport found, and a selector spec takes no ``target=`` to hand
+    that target over, so the row or set its selector finds from the
+    arguments may be one the grant never saw; the checks run on what was
+    found, whatever the grant says. The grant still stands for the
+    class-level check it was minted for
+    (test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds,
+    test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads).
     """
+    grant = replace(grant, target_checked=False)
     fillable = spec.reads.names()
     if spec.kind is SelectorKind.LIST:
         authorize_scope(spec, principal, value, grant=grant)
