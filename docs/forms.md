@@ -166,9 +166,10 @@ refused as not a file.
 - **Checked with no upload**, the form cleans the field to `False`, its own
   value for a cleared file. `validate()` returns it under the field's name,
   `{"attachment": False}`, and nothing under the checkbox's. A `ModelForm`
-  writes it as no file through the model field's `save_form_data`, which is
-  how a service writes it too:
-  `Document._meta.get_field("attachment").save_form_data(row, attachment)`.
+  writes it as no file through the model field's `save_form_data`, and so do
+  the [mutation helpers](relations.md#the-helpers): a service handing the
+  validated values to `update_from_input(row, data)` clears the file with no
+  more code.
 - **Unchecked**, or absent, the file is kept.
 - **Checked beside an upload**, the form refuses the pair under the field's
   name, in its own words.

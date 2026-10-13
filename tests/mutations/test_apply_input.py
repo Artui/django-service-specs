@@ -8,6 +8,7 @@ import pytest
 
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.types.unset import UNSET
+from tests.mutations.utils import STORED, stored_document
 from tests.relations_app.models import Author, Post
 
 
@@ -101,3 +102,22 @@ class TestApplyInput:
         # Reload from DB; persisted value is unchanged.
         author.refresh_from_db()
         assert author.name == "orig"
+
+
+@pytest.mark.django_db
+class TestFileFields:
+    """As ``update_from_input``, in memory: ``None`` keeps a file, ``False`` clears it."""
+
+    def test_false_clears_the_file_in_memory(self, media: str) -> None:
+        row = stored_document()
+        result = apply_input(row, {"attachment": False})
+        assert row.attachment.name == ""
+        change = result.get_field_change("attachment")
+        assert change is not None
+        assert (change.old, change.new) == (STORED, "")
+
+    def test_none_keeps_the_file(self, media: str) -> None:
+        row = stored_document()
+        result = apply_input(row, {"attachment": None})
+        assert result.changes == ()
+        assert row.attachment.name == STORED

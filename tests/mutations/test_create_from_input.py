@@ -5,9 +5,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.types.unset import UNSET, UnsetType
+from tests.adapter_app.models import Document
+from tests.mutations.utils import stored_name
 from tests.relations_app.models import Author, Post, Tag
 
 
@@ -123,3 +126,30 @@ class TestCreateFromInput:
         author = Author.objects.create(name="a")
         result = create_from_input(Post, {"title": "x", "author": author})
         assert result.instance.author == author
+
+
+def _scan() -> SimpleUploadedFile:
+    return SimpleUploadedFile("scan.txt", b"scan")
+
+
+@pytest.mark.django_db
+class TestFileFields:
+    """A file field is written as a ``ModelForm`` writes it: ``None`` leaves it, ``False`` clears."""
+
+    def test_false_stores_no_file(self, media: str) -> None:
+        result = create_from_input(Document, {"title": "T", "attachment": False, "scan": _scan()})
+        assert stored_name(result.instance) == ""
+        change = result.get_field_change("attachment")
+        assert change is not None
+        assert change.new == ""
+        assert change.new is not False
+
+    def test_none_is_left_to_the_model(self, media: str) -> None:
+        result = create_from_input(Document, {"title": "T", "attachment": None, "scan": _scan()})
+        assert stored_name(result.instance) == ""
+        assert result.get_field_change("attachment") is None
+        assert result.changed_fields == ("title", "scan")
+
+    def test_an_upload_is_stored(self, media: str) -> None:
+        result = create_from_input(Document, {"title": "T", "scan": _scan()})
+        assert Document.objects.get(pk=result.instance.pk).scan.name == "scans/scan.txt"

@@ -12,7 +12,7 @@ from typing import Any, cast
 from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
-from django.db.models import Model
+from django.db.models import FileField, Model
 from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
@@ -111,13 +111,75 @@ def diff_attrs(
     instance: Model,
     new_values: dict[str, Any],
 ) -> tuple[FieldChange, ...]:
-    """Return the subset of ``new_values`` whose value differs from current."""
+    """Return the subset of ``new_values`` whose value differs from current.
+
+    A file field's value has been through ``form_values`` by now, so it is a
+    file or ``""``, which compares with the file a row holds by name.
+    """
     changes: list[FieldChange] = []
     for attr, new_value in new_values.items():
         old_value: Any = safe_getattr(instance, attr)
         if old_value != new_value:
             changes.append(FieldChange(field=attr, old=old_value, new=new_value))
     return tuple(changes)
+
+
+def file_fields(model: type[Model]) -> dict[str, FileField]:
+    """``model``'s file fields, ``ImageField`` included, by name."""
+    return {
+        field.name: field for field in model._meta.concrete_fields if isinstance(field, FileField)
+    }
+
+
+def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
+    """``values`` with each file field's read as a ``ModelForm`` writes it.
+
+    A form cleans an optional file field to ``None`` for "keep the file the
+    row holds" and to ``False`` for "clear it", and the model field's
+    ``save_form_data`` writes them so: nothing for ``None``, and ``""``, no
+    file, for any other false value. Read as they came, ``None`` against a
+    held file differs by name and was written over it, and ``False``
+    reached the column, where ``pre_save`` raises on it. ``save_form_data``
+    returns nothing to diff or report, so its reading is restated here,
+    ahead of the diff, and ``write_values`` still writes through it. Any
+    other field's value passes as it came. Each step is held by its own
+    test: test_none_and_false_on_any_other_field_are_written_as_they_came
+    (the file field), test_none_keeps_the_file (``None``) and
+    test_false_clears_the_file_and_reports_the_name_it_held (``""``).
+    """
+    files = file_fields(model)
+    read: dict[str, Any] = {}
+    for attr, value in values.items():
+        if attr in files:
+            if value is None:
+                continue
+            value = value or ""
+        read[attr] = value
+    return read
+
+
+def split_file_values(
+    model: type[Model], values: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """``values`` as two maps: the file fields' and every other one's."""
+    files = file_fields(model)
+    plain = {attr: value for attr, value in values.items() if attr not in files}
+    return plain, {attr: value for attr, value in values.items() if attr in files}
+
+
+def write_values(instance: Model, values: dict[str, Any]) -> None:
+    """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``.
+
+    As a ``ModelForm`` writes a file, so a field overriding how it stores
+    one is honoured; ``form_values`` has already read its value.
+    """
+    files = file_fields(type(instance))
+    for attr, value in values.items():
+        field = files.get(attr)
+        if field is None:
+            setattr(instance, attr, value)
+        else:
+            field.save_form_data(instance, value)
 
 
 def m2m_current_pks(instance: Model, attr: str) -> list[Any]:

@@ -170,7 +170,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `save_form_data`; on a partial call a checked checkbox alone sends its
   field. Only an optional field whose widget is a `ClearableFileInput`
   declares one, and a form field named as a checkbox is refused when the
-  Validator is built. Over HTTP it is a flat boolean, `true` or `1`.
+  Validator is built. Over HTTP it is a flat boolean, `true` or `1`. The
+  mutation helpers - `create_from_input`, `update_from_input`, `apply_input`
+  and the async forms, nested rows included - write a file field as a
+  `ModelForm` does, through the model field's `save_form_data`, so a service
+  handing them the validated values clears the file with no more code: the
+  `False` stores no file and is reported as a change to `""`, where it
+  reached the column, and on Django 6.1 raised `AttributeError`.
 
 ### Changed
 - **Breaking:** a `DataclassValidator` call's `data` is the dataclass
@@ -218,6 +224,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the Validator's class and says a partial call needs one that can bind only
   what was sent, such as a `FormValidator`. Each adapter still refuses a
   partial call made to it directly.
+- **Breaking:** `None` for a file field keeps the file, in
+  `update_from_input`, `aupdate_from_input` and `apply_input`, where it was
+  written over it and the row stored no file; it is no change, as it is to a
+  `ModelForm`, whose cleaned value it is for a file left alone. In
+  `create_from_input` and `acreate_from_input` it leaves the field to the
+  model. `False` clears a file.
 - A selector nested in a service spec that declares `preconditions` or a
   `progress_reporter` is refused when the service spec is built, as is an
   output selector declaring `kwargs`: dispatch never runs them.
@@ -292,6 +304,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value was used. A `declinable` key stays the caller's.
 - `resolve_target` refuses a spec any of whose parameters a registered pool
   seed occupies, a Validator field included, as `dispatch` does.
+- A `SpecFormView` page clears an optional file when its clear checkbox is
+  ticked. The widget reads a ticked box as `False`, which the view sent on as
+  the file and the shape check refused with `Expected a file.`; it now sends
+  the checkbox as the argument the `FormValidator` declares for it. Ticked
+  beside an upload, both are sent, and the form refuses the pair in its own
+  words rather than the shape check in its.
 
 ## [0.4.2] — 2026-10-06
 

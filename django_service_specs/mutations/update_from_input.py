@@ -15,11 +15,13 @@ from django_service_specs.mutations.utils import (
     diff_attrs,
     extract_relation_data,
     filter_input,
+    form_values,
     m2m_changes,
     reject_m2m_overlap,
     relation_map,
     resolve_update_fields,
     sync_relation_cache,
+    write_values,
 )
 from django_service_specs.relations.relation_spec import RelationSpec
 
@@ -43,6 +45,10 @@ def update_from_input(
     that list so they are refreshed alongside the mutation. Pass ``False`` to
     perform a full save, or an explicit list to control exactly which columns
     are written (no auto-injection in that case).
+
+    A file field is written as a ``ModelForm`` writes it, through the model
+    field's ``save_form_data``: a file replaces the one the row holds, ``None`` keeps it, and ``False``,
+    a form's value for a cleared file, leaves no file, reported as a change to ``""``.
 
     ``m2m`` assigns many-to-many rows that already exist, and only where the set
     of primary keys differs from the current one;
@@ -82,9 +88,9 @@ def update_from_input(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
+    new_values = form_values(type(instance), new_values)
     field_changes = diff_attrs(instance, new_values)
-    for change in field_changes:
-        setattr(instance, change.field, change.new)
+    write_values(instance, {change.field: change.new for change in field_changes})
     for relation, target in forward_values.items():
         sync_relation_cache(instance, relation, target)
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=False)

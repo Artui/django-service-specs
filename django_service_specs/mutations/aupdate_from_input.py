@@ -17,10 +17,12 @@ from django_service_specs.mutations.utils import (
     diff_attrs,
     extract_relation_data,
     filter_input,
+    form_values,
     reject_m2m_overlap,
     relation_map,
     resolve_update_fields,
     sync_relation_cache,
+    write_values,
 )
 from django_service_specs.relations.relation_spec import RelationSpec
 
@@ -52,9 +54,9 @@ async def aupdate_from_input(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
+    new_values = form_values(type(instance), new_values)
     field_changes = diff_attrs(instance, new_values)
-    for change in field_changes:
-        setattr(instance, change.field, change.new)
+    write_values(instance, {change.field: change.new for change in field_changes})
     for relation, target in forward_values.items():
         sync_relation_cache(instance, relation, target)
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=False)
