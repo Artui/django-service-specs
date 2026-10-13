@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any, Literal
@@ -16,10 +17,12 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET, UnsetType
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Status
 from tests.adapters.dataclass.utils import (
     Address,
+    Answer,
     Booking,
     Colour,
     Computed,
@@ -143,8 +146,22 @@ def test_parameters_map_every_supported_annotation() -> None:
         Parameter("price", "string", required=True, format="decimal"),
         Parameter("at", "string", required=True, format="date-time"),
         Parameter("on", "string", required=True, format="date"),
-        Parameter("status", "string", required=True, choices=("draft", "published")),
-        Parameter("priority", "integer", required=True, choices=(1, 2)),
+        # A Django ``Choices`` enum labels its values; a plain ``Enum`` and a
+        # ``Literal`` have no label of their own, as the presenter reads them.
+        Parameter(
+            "status",
+            "string",
+            required=True,
+            choices=("draft", "published"),
+            choice_labels=(("draft", "Draft"), ("published", "Published")),
+        ),
+        Parameter(
+            "priority",
+            "integer",
+            required=True,
+            choices=(1, 2),
+            choice_labels=((1, "Low"), (2, "High")),
+        ),
         Parameter("colour", "string", required=True, choices=("red", "blue")),
         Parameter("mode", "string", required=True, choices=("fast", "slow")),
         Parameter("tags", "array", required=True, items="string"),
@@ -530,3 +547,76 @@ def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
     with pytest.raises(InvalidArguments) as caught:
         check_arguments(params, {**arguments, "tags": [None]})
     assert caught.value.detail == {"tags": {0: ["Expected a string."]}}
+
+
+@dataclass
+class _Statuses:
+    statuses: list[Status]
+
+
+def test_a_list_of_django_choices_labels_each_element_s_choices() -> None:
+    (statuses,) = DataclassValidator(_Statuses).parameters()
+    assert statuses.choices == ("draft", "published")
+    assert statuses.choice_labels == (("draft", "Draft"), ("published", "Published"))
+
+
+@dataclass
+class _Poll:
+    answer: Answer
+
+
+def test_a_label_stays_lazy_until_a_reader_renders_it() -> None:
+    (answer,) = DataclassValidator(_Poll).parameters()
+    assert answer.choice_labels is not None
+    (_, label), _ = answer.choice_labels
+    # Not rendered here: the schema renders it, in the language active then.
+    with translation.override("fr"):
+        assert str(label) == "Oui"
+    assert str(label) == "Yes"
+
+
+def test_the_call_s_data_is_the_instance_and_its_fields_are_the_values() -> None:
+    validated = DataclassValidator(Everything).validated(_arguments(), CONTEXT)
+    assert isinstance(validated.data, Everything)
+    assert validated.values == DataclassValidator(Everything).validate(_arguments(), CONTEXT)
+    # The values are the instance's own, not a second build of it.
+    assert all(validated.values[name] is getattr(validated.data, name) for name in validated.values)
+    assert dict(validated.pool) == {}
+
+
+def test_the_values_leave_out_a_field_the_dataclass_computes() -> None:
+    validated = DataclassValidator(Computed).validated({"base": 2}, CONTEXT)
+    assert validated.values == {"base": 2}
+    assert validated.data == Computed(base=2)
+    assert validated.data.doubled == 4
+
+
+@pytest.mark.parametrize("method", ["validate", "validated"])
+def test_a_partial_call_is_refused_as_the_spec_s_error(method: str) -> None:
+    # A dataclass instance holds every field, so a call that may leave some out
+    # cannot build one; a refused caller could not fix it, so it is not
+    # InvalidArguments.
+    validator = DataclassValidator(_Price)
+    with pytest.raises(
+        ImproperlyConfigured,
+        match=re.escape(
+            "DataclassValidator(_Price) cannot validate a partial call: a dataclass "
+            "instance holds every field."
+        ),
+    ):
+        getattr(validator, method)({"price": "1.00"}, ValidationContext(None, partial=True))
+
+
+def test_a_subclass_may_extend_validated_through_validate() -> None:
+    # The base class's default reads this way round, so a subclass that adds a
+    # bound value on top of ``validate()`` must not loop back into itself.
+    class Binding(DataclassValidator):
+        def validated(self, arguments: Any, context: ValidationContext) -> Validated:
+            values = self.validate(arguments, context)
+            return Validated(values=values, data=values, pool={"bound": "yes"})
+
+    validated = Binding(_Price).validated({"price": "1.00"}, CONTEXT)
+    assert (validated.values, dict(validated.pool)) == (
+        {"price": Decimal("1.00")},
+        {"bound": "yes"},
+    )

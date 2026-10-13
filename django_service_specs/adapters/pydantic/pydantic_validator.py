@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
 from pydantic import BaseModel, ValidationError
 
 from django_service_specs.adapters.pydantic.utils import (
@@ -15,6 +16,7 @@ from django_service_specs.adapters.pydantic.utils import (
     inputs,
     read_fields,
 )
+from django_service_specs.adapters.utils import choice_labels
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -104,7 +106,22 @@ class PydanticValidator(Validator):
         with ``"principal"`` and ``"target"``, so a validator can check a
         value against the caller or the row being updated. Nested values stay
         model instances, which is what the mutation helpers read a row from.
+
+        **A partial call is refused** with ``ImproperlyConfigured``. pydantic
+        validates a model whole: a required field not sent is missing, and a
+        ``model_validator`` is written against every field being there, so
+        there is no partial validation to hand the call to. Validating only
+        the fields sent, one by one, would skip the model's own rules; a spec
+        whose calls are partial uses a Validator that can return only what was
+        sent. ``validated()`` is the default: the values are the call's
+        ``data``.
         """
+        if context.partial:
+            raise ImproperlyConfigured(
+                f"PydanticValidator({self.model.__qualname__}) cannot validate a partial call: "
+                "a pydantic model validates every field. Drop partial and give each field an "
+                "update may leave out a default, or validate with a FormValidator."
+            )
         try:
             instance = self.model.model_validate(
                 dict(arguments),
@@ -134,6 +151,7 @@ def _parameter(fs: FieldShape) -> Parameter:
         # A list's choices are its element's: an array's choices constrain each
         # element, and ``items`` can hold only the element's JSON type.
         choices=shape.choices if shape.items is None else shape.items.choices,
+        choice_labels=choice_labels((shape if shape.items is None else shape.items).enum),
         default=fs.default,
         nullable=shape.nullable,
         help=fs.help,

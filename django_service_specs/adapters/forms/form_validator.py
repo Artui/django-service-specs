@@ -12,6 +12,7 @@ from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
+from django.utils.datastructures import MultiValueDict
 
 from django_service_specs.adapters.utils import scalar_type
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -22,7 +23,6 @@ from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
 _REFUSED: tuple[tuple[type[forms.Field], str], ...] = (
-    (forms.FileField, "takes an uploaded file, which no JSON transport carries"),
     # Ahead of the CharField row below, since JSONField subclasses CharField.
     (forms.JSONField, "takes any JSON value, and a parameter declares one JSON type"),
     (
@@ -82,7 +82,7 @@ _SUPPORTED = (
     "BooleanField, NullBooleanField, IntegerField, FloatField, DecimalField, "
     "DateTimeField, DateField, TimeField, DurationField, CharField and its "
     "subclasses, ChoiceField and MultipleChoiceField with their typed variants, "
-    "and ModelChoiceField and ModelMultipleChoiceField"
+    "ModelChoiceField and ModelMultipleChoiceField, and FileField and ImageField"
 )
 
 
@@ -120,9 +120,19 @@ class FormValidator(Validator):
       an array of that. They validate to the row, and to a queryset of rows.
     - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
       ``string``.
+    - ``FileField`` and ``ImageField``: a ``file``, which no JSON caller can
+      send. A multipart request carries one, and a Python caller hands a
+      Django ``File``; the form is bound with it as its ``files``, where a
+      file field reads, and the form's own checks run on it. A ``ContentFile``
+      built with no name is refused by the form, which needs one.
+
+    Every choice field's choices carry their labels, as ``choice_labels``,
+    for a schema to show beside each value: the label Django displays, keyed
+    by the value as the caller sends it, so a plain ``ChoiceField``'s are
+    keyed by the string. A lazy label stays lazy until a schema renders it.
 
     Refused with ``ImproperlyConfigured``, naming the form, the field and its
-    class: a ``FileField`` or ``ImageField``, a ``JSONField``, a
+    class: a ``JSONField``, a
     ``MultiValueField`` such as ``SplitDateTimeField``, a ``ComboField``, any
     field the list does not cover, and a ``ModelChoiceField`` with no queryset
     or matching rows on a model field with no JSON type. The declaration is read at
@@ -167,7 +177,23 @@ class FormValidator(Validator):
     under ``UnknownArguments.REJECT`` the closed argument set refuses its key
     before the form is built. A field declared ``disabled`` is not a
     parameter either: the form ignores what a caller sends for it and cleans
-    its ``initial``, which ``validate()`` returns with the rest.
+    its ``initial``, which ``validate()`` returns with the rest on a whole
+    call.
+
+    **A partial call binds only the fields the caller sent.** When the
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    says ``partial``, every field the arguments do not name is taken off the
+    bound form before it validates, so it is neither required nor cleaned,
+    and ``validate()`` returns no key for it: an absent ``BooleanField`` does
+    not come back ``False``, nor an absent ``CharField`` ``''``, which an
+    update would write over the row. A value that is sent is checked exactly
+    as on a whole call, so a required field may be left out but not sent
+    empty. On a ``ModelForm`` the fields left out keep the target's values,
+    and its model and uniqueness checks skip them, as Django skips any model
+    field a form does not have. ``clean()`` sees only what was sent, so it
+    reads ``cleaned_data`` with ``get``, as Django advises for a field that
+    failed. ``parameters()`` is the same for both calls: ``required`` says
+    what a whole call needs.
 
     **A ``ModelForm`` is bound to a copy of the target.** When the
     [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
@@ -232,14 +258,28 @@ class FormValidator(Validator):
 
         A ``ModelChoiceField`` cleans to the row and a
         ``ModelMultipleChoiceField`` to a queryset, which is what the service
-        receives.
+        receives. On a partial call, only the fields the caller sent are
+        bound, and so only those are returned.
         """
         fields = {parameter.name: field for parameter, field in self._declared}
-        data = {
-            name: _as_bound(fields[name], value) if name in fields else value
-            for name, value in arguments.items()
-        }
-        form = self._bind(data, context.target)
+        data: dict[str, Any] = {}
+        # The type Django binds a request's uploads as, ``request.FILES``.
+        files: MultiValueDict[str, Any] = MultiValueDict()
+        for name, value in arguments.items():
+            field = fields.get(name)
+            if isinstance(field, forms.FileField):
+                # A file input's widget reads the form's ``files``, never its
+                # ``data``: bound as data, the upload would be no upload.
+                files[name] = value
+            else:
+                data[name] = value if field is None else _as_bound(field, value)
+        form = self._bind(data, files, context.target)
+        if context.partial:
+            # Off the form rather than made optional: an optional field still
+            # cleans to its empty value, runs its ``clean_<field>()`` on it and,
+            # on a ModelForm, is written onto the instance and validated there.
+            for name in form.fields.keys() - arguments.keys():
+                del form.fields[name]
         if not form.is_valid():
             raise InvalidArguments(
                 {
@@ -249,14 +289,16 @@ class FormValidator(Validator):
             )
         return dict(form.cleaned_data)
 
-    def _bind(self, data: dict[str, Any], target: Any) -> forms.BaseForm:
+    def _bind(
+        self, data: dict[str, Any], files: MultiValueDict[str, Any], target: Any
+    ) -> forms.BaseForm:
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
-            return form_class(data=data)
+            return form_class(data=data, files=files)
         # A copy, because validation writes the cleaned values onto the
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
-        return form_class(data=data, instance=instance)
+        return form_class(data=data, files=files, instance=instance)
 
 
 def _as_bound(field: forms.Field, value: Any) -> Any:
@@ -310,12 +352,16 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
     for refused, reason in _REFUSED:
         if isinstance(field, refused):
             raise ImproperlyConfigured(f"{where}: a {type(field).__name__} {reason}.")
+    if isinstance(field, forms.FileField):
+        # ImageField included. Never choices: a file is matched by nothing a
+        # declaration could list.
+        return Parameter(name, "file", required=field.required, nullable=not field.required)
     if isinstance(field, forms.NullBooleanField):
         # Its ``validate()`` is empty, so it cleans an absent value or ``null``
         # to ``None`` whatever ``required`` says; declaring either would make
         # the shape check refuse what the form takes.
         return Parameter(name, "boolean", nullable=True)
-    json_type, fmt, choices = _shape(field, where=where)
+    json_type, fmt, choices, labels = _shape(field, where=where)
     if isinstance(field, forms.MultipleChoiceField | forms.ModelMultipleChoiceField):
         # ``items`` holds a JSON type and no format, as for any flat list, and
         # an array's choices constrain each of its elements.
@@ -324,6 +370,7 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
             "array",
             items=json_type,
             choices=choices,
+            choice_labels=labels,
             required=field.required,
             nullable=not field.required,
         )
@@ -332,43 +379,60 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
         json_type,
         format=fmt,
         choices=choices,
+        choice_labels=labels,
         required=field.required,
         nullable=not field.required,
     )
 
 
-def _shape(field: forms.Field, *, where: str) -> tuple[str, str | None, tuple[Any, ...] | None]:
-    """The JSON type, format and choices of one value the field takes."""
+_Labels = tuple[tuple[Any, Any], ...] | None
+
+
+def _shape(
+    field: forms.Field, *, where: str
+) -> tuple[str, str | None, tuple[Any, ...] | None, _Labels]:
+    """The JSON type, format, choices and their labels of one value the field takes."""
     if isinstance(field, forms.ModelChoiceField):
         # No choices: they are rows, and reading them would query.
         json_type, fmt = _key_type(field, where=where)
-        return json_type, fmt, None
+        return json_type, fmt, None, None
     if isinstance(field, forms.ChoiceField):
-        json_type, choices = _choices(field, where=where)
-        return json_type, None, choices
+        json_type, choices, labels = _choices(field, where=where)
+        return json_type, None, choices, labels
     for cls, json_type, fmt in _SCALARS:
         if isinstance(field, cls):
-            return json_type, fmt, None
+            return json_type, fmt, None, None
     raise ImproperlyConfigured(
         f"{where}: a {type(field).__name__} is not a field this adapter can declare. "
         f"It declares {_SUPPORTED}."
     )
 
 
-def _choices(field: forms.ChoiceField, *, where: str) -> tuple[str, tuple[Any, ...] | None]:
-    """The JSON type a choice field's value is sent as, and the values it may be."""
+def _choices(
+    field: forms.ChoiceField, *, where: str
+) -> tuple[str, tuple[Any, ...] | None, _Labels]:
+    """The JSON type a choice field's value is sent as, the values it may be, and their labels."""
     choices = field.choices
     if not isinstance(choices, list):
         # Django keeps a choice set given as a callable as a lazy iterator, and
         # evaluates it per form: it may query, and reading it here would
         # freeze a set its author made dynamic.
-        return "string", None
-    values = tuple(value for value in _flatten(choices) if value not in _EMPTY_CHOICES)
+        return "string", None, None
+    # The labels as Django gives them, a lazy translation left lazy: the schema
+    # renders each in the language active when it is built.
+    pairs = tuple(
+        (value, label) for value, label in _flatten(choices) if value not in _EMPTY_CHOICES
+    )
+    values = tuple(value for value, _ in pairs)
     if not isinstance(field, forms.TypedChoiceField | forms.TypedMultipleChoiceField):
         # A plain choice field cleans with ``str`` and compares against each
         # choice's ``str``, so a caller sends the string whatever the choice was
-        # written as.
-        return "string", tuple(str(value) for value in values)
+        # written as, and a label names the string.
+        return (
+            "string",
+            tuple(str(value) for value in values),
+            tuple((str(value), label) for value, label in pairs),
+        )
     # With no values left the form refuses every non-empty value, and a string
     # is what every choice field takes.
     found = {scalar_type(value) for value in values} or {"string"}
@@ -378,16 +442,16 @@ def _choices(field: forms.ChoiceField, *, where: str) -> tuple[str, tuple[Any, .
             f"{where}: a {type(field).__name__} whose values {list(values)!r} share no "
             "JSON type cannot be declared; give every choice a value of one JSON type."
         )
-    return json_type, values
+    return json_type, values, pairs
 
 
-def _flatten(choices: list[Any]) -> Iterator[Any]:
-    """Every choice's value, with each option group's values in its place."""
+def _flatten(choices: list[Any]) -> Iterator[tuple[Any, Any]]:
+    """Every choice as its value and label, with each option group's choices in its place."""
     for value, label in choices:
         if isinstance(label, list | tuple):
-            yield from (inner for inner, _ in label)
+            yield from label
         else:
-            yield value
+            yield value, label
 
 
 def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | None]:
