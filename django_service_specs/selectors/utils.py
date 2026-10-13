@@ -17,7 +17,9 @@ from django.utils.translation import gettext
 
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.filters.utils import import_django_filters
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -84,10 +86,15 @@ def call_keywords(
         and name in fillable
     ]
     if missing:
-        # Translated where it is raised, spelled as Django spells it, as the
-        # shape check does: ``check_arguments`` refuses an absent required
-        # argument with the same message.
-        raise InvalidArguments({name: [gettext("This field is required.")] for name in missing})
+        # Translated where it is raised, spelled and coded as the shape check
+        # refuses an absent required argument, so a caller reads one refusal
+        # whichever of the two answered.
+        raise InvalidArguments(
+            {
+                name: [CodedMessage(gettext("This field is required."), "required")]
+                for name in missing
+            }
+        )
     return resolve_callable_kwargs(fn, dict(pool))
 
 
@@ -205,7 +212,9 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     everything (test_a_value_the_filterset_refuses_is_refused_rather_than_ignored).
     A range filter's error is keyed by the filter's name, ``price``, where its
     arguments are ``price_min`` and ``price_max``: django-filter validates the
-    two as one form field.
+    two as one form field. Each message keeps django-filter's own code, its
+    form field's, which reading it as a ``str`` would drop
+    (test_a_value_the_filterset_refuses_keeps_django_s_code).
     """
     seen = {"request": pool["request"]} if "request" in pool else {}
     bound = filter_set(
@@ -215,10 +224,7 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     )
     if not bound.is_valid():
         raise InvalidArguments(
-            {
-                name: [str(message) for message in messages]
-                for name, messages in bound.errors.items()
-            }
+            {name: coded_messages(errors) for name, errors in bound.errors.as_data().items()}
         )
     return bound.qs
 

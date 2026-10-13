@@ -53,3 +53,15 @@ def test_a_number_spelled_outside_ascii_spells_none(json_type: str, text: str) -
     # Python's ``int`` and ``float`` read each of these as 5; no JSON number is
     # spelled so, and pydantic's lax mode refuses every one.
     assert parse_number(json_type, text) is None
+
+
+@pytest.mark.parametrize(
+    ("text", "number"),
+    [("7", 7), (" 7 ", 7), ("+7", 7), (str(2**63 + 1), 2**63 + 1), ("7.0", 7.0), ("7e0", 7.0)],
+)
+def test_a_number_spelling_an_integer_is_that_exact_int(text: str, number: float) -> None:
+    # The integer a JSON decoder makes of the same literal, exact past 2**53,
+    # and a float only where a point or an exponent is spelled.
+    parsed = parse_number("number", text)
+    assert parsed == number
+    assert type(parsed) is type(number)

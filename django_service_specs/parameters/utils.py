@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterable
 from typing import Final
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils.translation import gettext
 
 from django_service_specs.parameters.coded_message import CodedMessage
@@ -64,6 +65,46 @@ def expected_type(json_type: str) -> CodedMessage:
     # test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake[not-a-list]
     # holds the array's code, its [type] case everything else's.
     return CodedMessage(message, "not_a_list" if json_type == "array" else "invalid")
+
+
+def coded_messages(errors: Iterable[ValidationError]) -> list[CodedMessage]:
+    """Every message Django's ``errors`` carry, in Django's words and with Django's code.
+
+    For a step that hands on a ``ValidationError`` Django or a library over it
+    raised - a form's errors, a FilterSet's, a model's uniqueness checks, a
+    dataclass's ``__post_init__`` - where reading each message as a ``str``
+    would drop its code. Rendered exactly as iterating the error renders it,
+    ``message % params`` where there are params, so the words are unchanged.
+    One raised with no code says ``"invalid"``, as DRF's ``get_error_detail``
+    defaults one. An error built from a dict is read field by field, in its
+    own order, as its ``messages`` flattens it.
+
+    Django's codes are Django's, which are not always DRF's: a ``unique_together``
+    collision says ``"unique_together"`` where a DRF serializer's validator
+    says ``"unique"``.
+    """
+    return [
+        CodedMessage(_rendered(leaf), leaf.code or "invalid")
+        for error in errors
+        for leaf in _leaves(error)
+    ]
+
+
+def _leaves(error: ValidationError) -> list[ValidationError]:
+    """The one-message errors ``error`` holds: its list, or each field's list in turn."""
+    if hasattr(error, "error_dict"):
+        # test_a_post_init_refusal_keeps_django_s_code_or_says_invalid[by-field]
+        # fails without this: a dict-built error has no ``error_list``.
+        return [leaf for field in error.error_dict.values() for leaf in field]
+    return error.error_list
+
+
+def _rendered(leaf: ValidationError) -> str:
+    """A one-message error's words, as ``ValidationError.__iter__`` renders them."""
+    message = leaf.message
+    if leaf.params:
+        message %= leaf.params
+    return str(message)
 
 
 def max_length_in_force(param: Parameter) -> int | None:
@@ -148,10 +189,23 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     An integer is read as Django's ``IntegerField`` reads one: ``"5.0"``,
     ``"5."``, ``"5 .0"`` and ``" 5 "`` are 5, and ``"5.5"`` and ``"1e3"`` are
     no integer. That is looser than pydantic's lax ``int``, which refuses
-    ``"5."`` and ``"5 .0"``. A number is Python's ``float``, as Django's
-    ``FloatField`` reads it, so ``"1e3"`` is 1000.0 and ``"5."`` is 5.0, as
-    pydantic reads them too, and ``"5 .0"`` is none. NaN and the infinities
+    ``"5."`` and ``"5 .0"``. A number is any string Python's ``float`` reads,
+    as Django's ``FloatField`` reads it, so ``"1e3"`` and ``"5."`` are numbers,
+    as pydantic reads them too, and ``"5 .0"`` is none. NaN and the infinities
     parse and are no number, since no JSON caller can send one.
+
+    **A number spelling an integer is that exact** ``int``, and a ``float``
+    only where a point or an exponent is spelled: what a JSON decoder makes
+    of the same literal, so ``"3"`` reaches the Validator as the JSON ``3``
+    does. Through ``float`` alone, every integer past 2**53 was rounded to a
+    neighbour, and a CSV filter's key, which is declared a ``number``, matched
+    the neighbour's row
+    (test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http).
+    The ``float`` reading still decides what is a number, so the accepted
+    strings are unchanged, and a literal long enough to reach ``int``'s digit
+    limit is already infinite to ``float`` and refused. A fraction past a
+    ``float``'s precision is rounded, as a JSON decoder rounds it: a value
+    that must be exact is a ``decimal``.
 
     **Only an ASCII string spells one.** Python's ``int`` and ``float``,
     and so Django's fields, read Arabic-Indic and fullwidth digits and strip
@@ -176,4 +230,10 @@ def parse_number(json_type: str, text: str) -> int | float | None:
         number = float(text)
     except ValueError:
         return None
-    return number if math.isfinite(number) else None
+    if not math.isfinite(number):
+        return None
+    try:
+        # test_a_number_spelling_an_integer_is_that_exact_int fails without this.
+        return int(text)
+    except ValueError:
+        return number

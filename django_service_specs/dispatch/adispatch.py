@@ -23,6 +23,7 @@ from django_service_specs.dispatch.utils import (
     reraise_unless_retrieve,
     selector_pool,
     settle,
+    with_run_progress,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.selectors.utils import call_keywords
@@ -229,7 +230,13 @@ def _open_selector(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
-) -> tuple[Any, Grant, dict[str, Any]]:
+) -> tuple[Any, Grant, dict[str, Any], dict[str, Any]]:
+    """Steps one and two, the selector's pool, and its keywords, in the one sync hop.
+
+    The keywords are bound here, a read the caller left out refused as on
+    every other path, and the run's reporter joined to them after that: its
+    provider may query, so it is resolved here rather than on the loop.
+    """
     who = _principal(principal, principal_id)
     checked, granted = open_call(
         spec,
@@ -240,7 +247,14 @@ def _open_selector(
         unknown_arguments=unknown_arguments,
     )
     pool = selector_pool(spec, checked, principal=who, pool_seeds=pool_seeds, progress=progress)
-    return who, granted, pool
+    kwargs = with_run_progress(
+        spec,
+        call_keywords(spec.selector, pool, fillable=spec.reads.names()),
+        pool,
+        reserved=pool_seeds.reserved,
+        transport=progress,
+    )
+    return who, granted, pool, kwargs
 
 
 def _settle_and_conclude(
@@ -275,15 +289,13 @@ async def _await_selector(
     and collapsing a RETRIEVE to its row is a query, so both go back to the
     executor, with the object-level check.
     """
-    who, granted, pool = await sync_to_async(_open_selector, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
-    )
-    fn = spec.selector
     # Bound before the await and outside the ``try``: a read the caller left
     # out is refused as a missing argument, as on every other path.
-    kwargs = call_keywords(fn, pool, fillable=spec.reads.names())
+    who, granted, pool, kwargs = await sync_to_async(_open_selector, thread_sensitive=True)(
+        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
+    )
     try:
-        raw = await fn(**kwargs)
+        raw = await spec.selector(**kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the

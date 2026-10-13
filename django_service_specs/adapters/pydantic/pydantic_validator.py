@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Final, get_args
 
 from django.core.exceptions import ImproperlyConfigured
 from pydantic import BaseModel, ValidationError
+from pydantic_core import ErrorDetails
+from pydantic_core.core_schema import ErrorType
 
 from django_service_specs.adapters.pydantic.utils import (
     FieldShape,
@@ -17,6 +19,7 @@ from django_service_specs.adapters.pydantic.utils import (
     read_fields,
 )
 from django_service_specs.adapters.utils import choice_labels
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -78,6 +81,20 @@ class PydanticValidator(Validator):
     model being validated. The kernel's shape check runs first and refuses a
     wrong JSON type in the kernel's words, so pydantic's are what a caller
     reads for its own rules: bounds, patterns, validators.
+
+    **Each message carries a code**, the one a DRF field gives the same
+    mistake where pydantic's error type has one: ``missing`` is
+    ``"required"``, a ``None`` refused by a type is ``"null"``, a string or a
+    list too long or too short ``"max_length"`` or ``"min_length"``, a number
+    past a bound ``"max_value"`` or ``"min_value"`` (an exclusive bound too,
+    which no DRF field has), a ``Literal`` or an ``Enum`` ``"invalid_choice"``,
+    a list's type ``"not_a_list"``, a decimal's digits ``"max_digits"``,
+    ``"max_decimal_places"`` and ``"max_whole_digits"``, and a forbidden extra
+    key the kernel's ``"unknown"``. Any other of pydantic's own types is
+    ``"invalid"``, DRF's code for a value it cannot take, and a
+    ``ValueError`` or an ``assert`` in a validator is too, as DRF says for a
+    message raised with no code. A ``PydanticCustomError``'s type is the
+    author's code, and is kept, as a Django ``ValidationError``'s is.
 
     **Time zones are pydantic's**: an offset-less date-time stays naive, where
     ``DataclassValidator`` makes it aware as Django's forms do. Declare the
@@ -177,12 +194,12 @@ def _detail(
 ) -> dict[Any, Any]:
     """pydantic's errors as the kernel's tree, each message at the node it is about."""
     top = Shape("object", python=model, fields=fields)
-    found: dict[tuple[Any, ...], list[str]] = {}
+    found: dict[tuple[Any, ...], list[CodedMessage]] = {}
     for error in exc.errors():
         address, about_a_model = _address(top, tuple(error["loc"]))
         if about_a_model:
             address = (*address, NON_FIELD_ERRORS)
-        found.setdefault(address, []).append(error["msg"])
+        found.setdefault(address, []).append(CodedMessage(error["msg"], _code(error)))
     tree: dict[Any, Any] = {}
     for address, messages in found.items():
         if any(len(other) > len(address) and other[: len(address)] == address for other in found):
@@ -195,6 +212,54 @@ def _detail(
             node = node.setdefault(key, {})
         node.setdefault(address[-1], []).extend(messages)
     return tree
+
+
+_CODES: Final[dict[str, str]] = {
+    "missing": "required",
+    "extra_forbidden": "unknown",
+    "string_too_short": "min_length",
+    "string_too_long": "max_length",
+    "too_short": "min_length",
+    "too_long": "max_length",
+    "greater_than": "min_value",
+    "greater_than_equal": "min_value",
+    "less_than": "max_value",
+    "less_than_equal": "max_value",
+    "literal_error": "invalid_choice",
+    "enum": "invalid_choice",
+    "list_type": "not_a_list",
+    "decimal_max_digits": "max_digits",
+    "decimal_max_places": "max_decimal_places",
+    "decimal_whole_digits": "max_whole_digits",
+}
+"""pydantic's error types with a DRF code for the same mistake, and that code.
+
+Data, so coverage cannot see a misspelled key, which would fall through to
+``"invalid"``: test_each_error_type_carries_its_code has a case for every
+entry, and fails with any one key renamed."""
+
+_BUILT_IN: Final[frozenset[str]] = frozenset(get_args(ErrorType))
+"""Every error type pydantic itself raises; any other is a ``PydanticCustomError``'s."""
+
+
+def _code(error: ErrorDetails) -> str:
+    """The code of one of pydantic's errors: DRF's for the same mistake, or the author's own.
+
+    A ``None`` a type refuses is ``"null"``, as DRF refuses one, whatever the
+    type: pydantic has no error type of its own for it. One branch to
+    coverage, so each condition is held by its own test:
+    test_each_error_type_carries_its_code[type] (the input: without it, a
+    wrong type is ``"null"``) and
+    test_each_error_type_carries_its_code[value-error-on-none] (the type:
+    without it, a validator refusing a ``None`` its field admits is
+    ``"null"`` rather than the validator's ``"invalid"``).
+    """
+    kind = error["type"]
+    if error["input"] is None and kind.endswith("_type"):
+        return "null"
+    if kind in _CODES:
+        return _CODES[kind]
+    return "invalid" if kind in _BUILT_IN else kind
 
 
 def _address(top: Shape, loc: tuple[Any, ...]) -> tuple[tuple[Any, ...], bool]:

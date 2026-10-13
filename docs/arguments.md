@@ -40,6 +40,13 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
+**A `number`'s string is read as a JSON decoder reads its literal**: digits
+alone are the exact integer they spell, and a point or an exponent makes a
+float. So `"9007199254740993"` goes on as that integer, as the JSON literal
+does, where a float would round it to its neighbour, and `"3"` goes on as the
+3 a JSON body's `3` is. A fraction finer than a float holds is rounded, as the
+JSON literal is; a value that must be exact is declared a `decimal`.
+
 **Only an ASCII string spells an `integer` or a `number`**, and this is one of
 two places the check is stricter than Django's forms, the other being
 [the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
@@ -47,8 +54,11 @@ and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
 them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
 type it is not, by the check and by `coerce_flat` alike. A `decimal` string is
-not read this way: it is checked as Python's `Decimal` reads it, which takes
-those digits too.
+not read this way, and on purpose: it is checked as Python's `Decimal` reads
+it, which takes those digits too, because every decimal field behind the check
+reads it so - Django's `DecimalField`, DRF's and pydantic's `Decimal` each hand
+the string to `Decimal` - and the string is handed on unchanged. `"\u0665"`
+sent for a decimal is 5 to all of them, as `"5"` is.
 
 A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its
@@ -186,8 +196,7 @@ Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The
 messages are spelled as Django's own form fields spell them wherever one has
 the message, so Django's catalogue translates them and a project adds nothing.
-The shape check's, `coerce_flat`'s and `request_arguments`' also carry a code,
-which the next section reads.
+Each also carries a code, which the next section reads.
 
 [`DataclassValidator`][django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator]
 answers in the same tree, and so does a relation write that refuses a row, so
@@ -196,12 +205,14 @@ a transport reads one shape whichever of them refused.
 ## The codes a refusal carries
 
 A message is for a person, and is translated. A program reading the tree needs
-something that is not, so every refusal of the shape check, `coerce_flat` and
-`request_arguments` is a
+something that is not, so every refusal the kernel and its shipped adapters
+make is a
 [`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]: a
 `str` carrying a `code`. The code is the one a DRF field gives the same mistake,
 so an adapter building DRF's `ErrorDetail` from the tree maps each one across
-unchanged, and a client of both reads one `get_codes()`.
+unchanged, and a client of both reads one `get_codes()`. Two refusals of a
+relation write still carry none: a `null` row in a relation's list, and a
+Django `ValidationError` or other write failure raised while a row is saved.
 
 ```python
 --8<--
@@ -222,6 +233,21 @@ docs/examples/arguments.py:codes
 | A flat string that spells no integer, number or boolean, or one sent for a parameter with nested parameters | `invalid` | `coerce_flat` |
 | A request body that is not JSON | `parse_error` | `request_arguments` |
 | A request body that is not a JSON object | `invalid` | `request_arguments` |
+| A read a selector, its `extend_queryset` or a precondition asks for that nothing filled | `required` | dispatch, as the shape check would |
+| A value a FilterSet refuses | its form field's own code, `invalid` where it has none | the FilterSet, through dispatch |
+
+The shipped Validators code theirs the same way:
+
+| Validator | Its refusals |
+| --- | --- |
+| `DataclassValidator` | `required`, `null`, `unknown`, `invalid_choice`, and `invalid` for a wrong type, a decimal or date that does not parse, and a `ValueError` from `__post_init__`; a Django `ValidationError` from `__post_init__` keeps its own code, `invalid` where it has none |
+| `FormValidator` | Django's own code on each message, the field's and the form's: `required`, `max_length`, `invalid_choice`, `unique_together` and the rest; `invalid` for a message raised with none |
+| `PydanticValidator` | pydantic's error type mapped to DRF's code: `missing` is `required`, a `None` a type refuses `null`, a length `max_length` or `min_length`, a bound (an exclusive one too) `max_value` or `min_value`, a `Literal` or `Enum` `invalid_choice`, a list's type `not_a_list`, a decimal's digits `max_digits`, `max_decimal_places` or `max_whole_digits`, a forbidden extra key `unknown`; any other of pydantic's own types, and a `ValueError` in a validator, `invalid`; a `PydanticCustomError` keeps its type as its code |
+
+**Django's codes are Django's**, and not always DRF's: a pair a model holds
+unique together says `unique_together` from a form, where DRF's serializer
+validator says `unique`. They come through as Django raised them rather than
+translated to a guess.
 
 Two have no DRF field to follow. DRF ignores a key a serializer does not
 declare, so it has no code for refusing one, and `unknown` names the
@@ -241,9 +267,9 @@ unchanged by them. A copy and a pickle keep the code.
 **A Validator's messages reach the tree as it raised them**, on one call and
 row by row on a `many` call. Dispatch does not rewrap them: a library's own
 coded message, DRF's `ErrorDetail` among them, keeps its code, and a plain
-`str` stays one, with no code. A message any other step of the kernel raises
-may be a plain `str` too, so read a code with `getattr(message, "code", ...)`
-and choose the default, as the example's
+`str` stays one, with no code. So does a project's own Validator raising
+plain strings, and the two relation-write refusals above, so read a code with
+`getattr(message, "code", ...)` and choose the default, as the example's
 `"invalid"` is DRF's own for a message raised with none.
 
 **One check answers a field.** The shape check runs before the Validator, so a
@@ -270,8 +296,11 @@ docs/examples/arguments.py:flat
 
 - An `integer` or a `number` is parsed. An integer is read as Django's
   `IntegerField` reads one: `"5.0"` and `"5."` are 5, and `"5.5"` is refused
-  with `"Enter a whole number."`. Each integer element of an array, a
-  repeated query-string key's included, is read the same way.
+  with `"Enter a whole number."`. A number is read as a JSON decoder reads
+  the same literal: `"3"` is the integer 3, exactly, and `"2.5"` and `"1e3"`
+  are floats, so `?pks=9007199254740993` is that key and not its neighbour.
+  Each element of an array, a repeated query-string key's included, is read
+  the same way.
 - A `boolean` is parsed from exactly four spellings - `true`, `false`, `1`, `0`,
   in any case - and anything else is refused with
   `"Enter true, false, 1 or 0."`. Libraries disagree about every other

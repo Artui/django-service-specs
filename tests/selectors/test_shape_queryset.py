@@ -27,6 +27,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.filters.utils import NoteFilters, RequestScopedFilter, TitleFilter
+from tests.parameters.utils import coded
 
 
 def _bare_selector() -> Any:
@@ -258,6 +259,22 @@ class TestFilterSet:
             "owner": ["Select a valid choice. That choice is not one of the available choices."]
         }
 
+    def test_a_value_the_filterset_refuses_keeps_django_s_code(self) -> None:
+        # The ModelChoiceField's own code, which ``str`` would strip.
+        _three_notes()
+        with pytest.raises(InvalidArguments) as caught:
+            shape_queryset(
+                Note.objects.all(), _filtered(NoteFilters), {"owner": "0"}, source_label="x"
+            )
+        assert coded(caught.value.detail) == {
+            "owner": [
+                (
+                    "Select a valid choice. That choice is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
+        }
+
     def test_a_range_filter_s_refusal_is_keyed_by_the_filter_s_name(self) -> None:
         # Its arguments are ``pk_range_min`` and ``pk_range_max``, and
         # django-filter validates the two as one form field, called ``pk_range``.
@@ -421,3 +438,18 @@ async def test_adispatch_filters_an_async_selector_s_rows() -> None:
     )
     result = await adispatch(spec, principal=ada, arguments={"archived": True})
     assert await sync_to_async(_titles)(result.value) == ["final"]
+
+
+@pytest.mark.django_db
+def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http() -> None:
+    # A CSV filter's numbers are declared ``number``, so the flat reading
+    # decides them. Read through ``float``, 2**53 + 1 became 2**53 and matched
+    # the neighbour's row; an integer's digits are read as the integer they spell.
+    ada = make_user("ada")
+    Note.objects.create(pk=2**53, owner=ada, title="neighbour")
+    Note.objects.create(pk=2**53 + 1, owner=ada, title="mine")
+    spec = _filtered(NoteFilters)
+    request = RequestFactory().get("/notes", {"pks": [str(2**53 + 1)]})
+    arguments = request_arguments(request, spec.parameters())
+    result = dispatch(spec, principal=ada, arguments=arguments)
+    assert _titles(result.value) == ["mine"]

@@ -834,6 +834,41 @@ async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the
     assert (sink.counted, sink.reports) == ([0], [1.0])
 
 
+async def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def by_title(*, user: Any, title: str, progress: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=by_title,
+        reads=Parameters.of(Parameter("title", "string")),
+        permissions=OPEN,
+        progress_reporter=sink,
+    )
+    with pytest.raises(InvalidArguments):
+        await adispatch(spec, principal=ada, arguments={})
+    assert sink.counted == []
+
+
+async def test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def silent(*, user: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=silent, permissions=OPEN, progress_reporter=sink
+    )
+    await adispatch(spec, principal=ada, arguments={})
+    assert sink.counted == []
+
+
 async def test_an_async_selector_spec_s_preconditions_see_its_row(ada: Any) -> None:
     note = await _create(owner=ada, title="Row")
     seen: list[Any] = []

@@ -8,14 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `CodedMessage`, a `str` carrying a `code`, and every refusal of the shape
-  check, `coerce_flat` and `request_arguments` is one. The code is the one a
-  DRF field gives the same mistake - `required`, `null`, `invalid`,
-  `not_a_list`, `max_value`, `min_value`, `invalid_choice`, `max_length`,
-  `min_length` - plus `unknown` for a key refused under `REJECT` and
-  `parse_error` for a body that is not JSON, so an adapter building DRF's
-  error details reads each code off `InvalidArguments.detail` rather than
-  every one of those refusals reading as `invalid`. A `CodedMessage` equals,
+- `CodedMessage`, a `str` carrying a `code`, and every refusal the kernel and
+  its shipped adapters make is one: the shape check's, `coerce_flat`'s,
+  `request_arguments`', dispatch refusing a read a selector asks for and
+  nothing filled, a FilterSet's, and `DataclassValidator`'s, `FormValidator`'s
+  and `PydanticValidator`'s. The code is the one a DRF field gives the same
+  mistake - `required`, `null`, `invalid`, `not_a_list`, `max_value`,
+  `min_value`, `invalid_choice`, `max_length`, `min_length` - plus `unknown`
+  for a key refused under `REJECT` and `parse_error` for a body that is not
+  JSON. A message Django raised keeps Django's code (`unique_together` from a
+  form, where DRF says `unique`), pydantic's error types map to DRF's codes,
+  and a `PydanticCustomError` keeps its own type. A relation write's `null`
+  row and its write-failure refusals still carry none. So an adapter
+  building DRF's error details reads each code off `InvalidArguments.detail`
+  rather than every one of those refusals reading as `invalid`. A `CodedMessage` equals,
   hashes and serializes as its message, so the JSON body a transport writes
   is unchanged; a copy and a pickle keep the code. Dispatch still hands on a
   Validator's own messages as it raised them, a library's coded message
@@ -129,6 +135,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value. The held file handed back as itself, which is what a form's file
   field cleans to when nothing is uploaded, is still no change; `None` still
   keeps the file and `False` still clears it.
+- `spec_input_schema` and dispatch's shape check read what a `partial` call
+  may leave out through one function, where each kept its own copy of the
+  rule. Nothing either answers changes; the schema's `required` less
+  `server_owned_keys` is exactly what dispatch refuses when it is absent,
+  and a test now holds the two to that.
+
+- A string sent for a `number`, by a flat transport or in a JSON body, is read
+  as a JSON decoder reads the same literal: digits alone are the exact `int`
+  they spell, and a point or an exponent makes a `float`. Read through `float`
+  alone, every integer past `2**53` was rounded to a neighbour, so a
+  django-filter CSV filter's key, declared a `number`, matched the
+  neighbour's row; `?pks=9007199254740993` now matches its own. The strings
+  accepted are unchanged, and `"3"` reaches the Validator as `3` rather than
+  `3.0`, as the JSON `3` always did.
+- An `async def` selector spec's `progress_reporter` provider is called only
+  once the selector's keywords are bound, and only for a selector that takes
+  `progress`, as a service spec's is. It was resolved before the binding, so
+  a call refused for a read the caller left out had already called it, and a
+  selector that could never report called it on every call. The selector
+  spec's affordance conditions, `extend_queryset` and preconditions now read
+  the transport's reporter, as a service spec's do; the spec's own sink is
+  the run's alone.
 
 ## [0.5.0] — 2026-10-13
 

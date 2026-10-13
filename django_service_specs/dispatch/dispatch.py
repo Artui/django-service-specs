@@ -138,13 +138,13 @@ def dispatch(
     always get ``null_progress``: a lookup has nothing to
     report, and one reporting after the service finished would read as the
     work restarting. The run alone also reports to the spec's
-    ``progress_reporter``, called on the run's first report, or before an
-    ``async def`` run once nothing before the run can refuse the call; either
-    way a call refused before its run never calls it. A selector spec's run
-    is its selector, and its step four and ``preconditions`` answer after it,
-    so a selector spec refused there may already have called it: by the
-    selector's first report, or, for an ``async def`` selector, before the
-    await.
+    ``progress_reporter``, and only a run that takes ``progress``: called on
+    the run's first report, or before an ``async def`` run once nothing before
+    the run can refuse the call; either way a call refused before its run
+    never calls it. A selector spec's run is its selector, and its step four
+    and ``preconditions`` answer after it, so a selector spec refused there
+    may already have called it: by the selector's first report, or, for an
+    ``async def`` selector, before the await.
 
     ``target`` is a service spec's target resolved by the caller - the row
     an HTTP view's ``get_object()`` found, or what ``resolve_target``
@@ -204,7 +204,14 @@ def dispatch(
         pool = selector_pool(
             spec, checked, principal=principal, pool_seeds=pool_seeds, progress=progress
         )
-        value = lookup(spec, pool, source=SELECTOR_SOURCE, reserved=pool_seeds.reserved)
+        value = lookup(
+            spec,
+            pool,
+            source=SELECTOR_SOURCE,
+            reserved=pool_seeds.reserved,
+            run=True,
+            transport=progress,
+        )
         return conclude_selector(spec, value, principal=principal, grant=granted, pool=pool)
     prepared = prepare_service(
         spec,

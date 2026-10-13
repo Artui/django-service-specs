@@ -262,9 +262,10 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
         ("integer", "3.0", 3),
         ("integer", " 3 ", 3),
         ("integer", "-4.", -4),
-        ("number", "3", 3.0),
+        # A number's integer spelling is the exact int a JSON decoder makes of it.
+        ("number", "3", 3),
         ("number", "3.0", 3.0),
-        ("number", " 3 ", 3.0),
+        ("number", " 3 ", 3),
         ("number", "1e3", 1000.0),
         ("number", "2.5", 2.5),
     ],
@@ -333,11 +334,30 @@ def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: st
     ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
 
 
-def test_a_decimal_string_outside_ascii_is_read_as_decimal_reads_it() -> None:
+@pytest.mark.parametrize(
+    ("value", "number"),
+    [(str(2**53 + 1), 2**53 + 1), ("-12", -12), ("12.5", 12.5), ("1e3", 1000.0)],
+)
+def test_a_number_s_string_is_handed_on_as_a_json_decoder_reads_its_digits(
+    value: str, number: float
+) -> None:
+    # A JSON body carrying the literal 9007199254740993 hands on that exact
+    # ``int``; the same digits sent as a string are read the same way, not
+    # rounded through ``float`` to their neighbour.
+    checked = check_arguments(one(Parameter("x", "number")), {"x": value})["x"]
+    assert checked == number
+    assert type(checked) is type(number)
+
+
+@pytest.mark.parametrize("value", ["12.50", "\u0665", "\uff15", "\u0661\u0662.\u0665", " 5 "])
+def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(value: str) -> None:
     # Not a number's reading: a decimal is checked as Python's ``Decimal``
-    # parses it, which takes an Arabic-Indic five, and is handed on unchanged.
+    # parses it, which takes Arabic-Indic and fullwidth digits, and is handed
+    # on unchanged. Deliberately: Django's ``DecimalField``, DRF's and
+    # pydantic's ``Decimal`` each hand the string to ``Decimal`` and take them,
+    # so refusing them would be stricter than every Validator behind the check.
     params = one(Parameter("price", "string", format="decimal"))
-    assert check_arguments(params, {"price": "\u0665"}) == {"price": "\u0665"}
+    assert check_arguments(params, {"price": value}) == {"price": value}
 
 
 def test_true_is_still_no_number_and_no_integer() -> None:

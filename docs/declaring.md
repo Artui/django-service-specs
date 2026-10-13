@@ -133,8 +133,9 @@ number filter refuses a value past `1e50` and leaves a range's bounds and
 every negative value open, while an integer column's conversion builds every
 digit of a value such as `"1E+999999999"`, which holds a worker for minutes.
 So the shape check refuses either side of the line before the FilterSet is
-reached. A CSV filter's numbers stay `number`, so `?pks=1,2` splits, and keep
-the float reading, which cannot reach that far.
+reached. A CSV filter's numbers stay `number`, so `?pks=1,2` splits, and an
+element spelling an integer is read as that exact integer, so a key past
+`2**53` matches its own row.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its

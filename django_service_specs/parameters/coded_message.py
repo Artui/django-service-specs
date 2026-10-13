@@ -7,12 +7,18 @@ class CodedMessage(str):
     """A message in an [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments] tree, carrying the code of the mistake it names.
 
     The words are for a person and are translated; the ``code`` is for a
-    program and is not. Every refusal of the shape check, ``coerce_flat`` and
-    ``request_arguments`` carries one, and the code
-    is the one a DRF field gives the same mistake (``"required"``, ``"null"``,
+    program and is not. Every refusal the kernel and its shipped adapters
+    make carries one - the shape check, ``coerce_flat``, ``request_arguments``,
+    a selector or ``extend_queryset`` refusing a read nothing filled, a
+    FilterSet refusing its data, and ``DataclassValidator``,
+    ``FormValidator`` and ``PydanticValidator`` - and the code is the one a
+    DRF field gives the same mistake (``"required"``, ``"null"``,
     ``"invalid"``, ``"not_a_list"``, ``"max_length"`` and the rest), so an
-    adapter building DRF's error details maps each one across unchanged. The
-    arguments page lists them, refusal by refusal.
+    adapter building DRF's error details maps each one across unchanged.
+    Where Django or pydantic refused, their own code comes through: Django's
+    as it raised it, and pydantic's error type as DRF's code for the same
+    mistake. The arguments page lists them, refusal by refusal, with the two
+    a relation write still raises without one.
 
     **It is its message to everything that reads a string.** Equality,
     hashing, ``json.dumps`` and ``%``-formatting all see the plain ``str``, and

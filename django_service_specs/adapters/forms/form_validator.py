@@ -15,10 +15,11 @@ from django.db import models
 from django.utils.datastructures import MultiValueDict
 
 from django_service_specs.adapters.utils import scalar_type
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -326,7 +327,7 @@ class FormValidator(Validator):
             for name in form.fields.keys() - sent:
                 del form.fields[name]
         if not form.is_valid():
-            raise InvalidArguments(_detail(form.errors))
+            raise InvalidArguments(_detail(form.errors.as_data()))
         # One branch to coverage, so each condition is held by its own test:
         # test_a_whole_model_form_call_checks_uniqueness_once (the partial
         # call: a whole one has already checked every pair, and would query
@@ -391,11 +392,15 @@ def _checked(arguments: Mapping[str, Any], clear: str) -> bool:
     return bool(forms.CheckboxInput().value_from_datadict(arguments, MultiValueDict(), clear))
 
 
-def _detail(errors: Mapping[str, Any]) -> dict[str, list[Any]]:
-    """Django's errors as a refusal's detail, the form-wide ones under ``non_field_errors``."""
+def _detail(errors: Mapping[str, list[ValidationError]]) -> dict[str, list[CodedMessage]]:
+    """Django's errors as a refusal's detail, the form-wide ones under ``non_field_errors``.
+
+    Each message keeps Django's own code (see ``coded_messages``), which the
+    strings ``form.errors`` reads them as would drop.
+    """
     return {
-        NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: list(messages)
-        for key, messages in errors.items()
+        NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: coded_messages(found)
+        for key, found in errors.items()
     }
 
 
@@ -414,13 +419,15 @@ def _check_unique_as_whole(instance: models.Model, names: frozenset[str]) -> Non
     all sent is checked again, and passes again.
     """
     exclude = {field.name for field in instance._meta.fields if field.name not in names}
-    errors: dict[str, list[Any]] = {}
+    errors: dict[str, list[ValidationError]] = {}
     for check in (instance.validate_unique, instance.validate_constraints):
         try:
             check(exclude=exclude)
         except ValidationError as error:
-            for key, messages in error.message_dict.items():
-                errors.setdefault(key, []).extend(messages)
+            # Both raise a dict-built error, read by field so each message
+            # keeps its code, as ``message_dict`` would not.
+            for key, found in error.error_dict.items():
+                errors.setdefault(key, []).extend(found)
     if errors:
         raise InvalidArguments(_detail(errors))
 
