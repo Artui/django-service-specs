@@ -24,10 +24,11 @@ from django_service_specs.adapters.dataclass.utils import (
     scalar_type,
 )
 from django_service_specs.adapters.utils import choice_labels
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages, expected_type
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
@@ -166,7 +167,7 @@ class DataclassValidator(Validator):
 class _Refused(Exception):
     """One value refused: a leaf of the detail tree, carried to the key it belongs under."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: CodedMessage) -> None:
         super().__init__(message)
         self.message = message
 
@@ -218,7 +219,9 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
     inputs = _inputs(fields)
     declared = {fs.name for fs in inputs}
     errors: dict[Any, Any] = {
-        key: [gettext("Unknown argument.")] for key in arguments if key not in declared
+        key: [CodedMessage(gettext("Unknown argument."), "unknown")]
+        for key in arguments
+        if key not in declared
     }
     values: dict[str, Any] = {}
     for fs in inputs:
@@ -230,7 +233,7 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
             if fs.omittable:
                 values[fs.name] = UNSET
             else:
-                errors[fs.name] = [gettext("This field is required.")]
+                errors[fs.name] = [CodedMessage(gettext("This field is required."), "required")]
             continue
         try:
             values[fs.name] = _decode(fs.shape, arguments[fs.name])
@@ -245,9 +248,11 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
     except ValueError as exc:
         # ``__post_init__`` is the only place a dataclass can state a rule
         # across its fields, and raising is how it states one.
-        raise InvalidArguments({NON_FIELD_ERRORS: [str(exc)]}) from exc
+        # A ``ValueError`` carries no code, so it says ``"invalid"``, DRF's
+        # default for a message raised with none.
+        raise InvalidArguments({NON_FIELD_ERRORS: [CodedMessage(str(exc), "invalid")]}) from exc
     except ValidationError as exc:
-        raise InvalidArguments({NON_FIELD_ERRORS: exc.messages}) from exc
+        raise InvalidArguments({NON_FIELD_ERRORS: coded_messages([exc])}) from exc
 
 
 def _decode(shape: Shape, value: Any) -> Any:
@@ -259,7 +264,7 @@ def _decode(shape: Shape, value: Any) -> Any:
     if value is None:
         if shape.nullable:
             return None
-        raise _Refused(gettext("This field cannot be null."))
+        raise _Refused(CodedMessage(gettext("This field cannot be null."), "null"))
     if shape.fields is not None:
         if not isinstance(value, Mapping):
             raise _Refused(expected_type("object"))
@@ -301,8 +306,11 @@ def _decode_choice(shape: Shape, choices: tuple[Any, ...], value: Any) -> Any:
         raise _Refused(expected_type(shape.type))
     if value not in choices:
         raise _Refused(
-            gettext("Select a valid choice. %(value)s is not one of the available choices.")
-            % {"value": value}
+            CodedMessage(
+                gettext("Select a valid choice. %(value)s is not one of the available choices.")
+                % {"value": value},
+                "invalid_choice",
+            )
         )
     enum_cls = shape.enum
     return value if enum_cls is None else enum_cls(value)
@@ -329,18 +337,18 @@ def _decode_decimal(value: Any) -> Decimal:
         # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``.
         decoded = Decimal(str(value))
     except InvalidOperation:
-        raise _Refused(gettext("Enter a number.")) from None
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
     if not decoded.is_finite():
         # Django's DecimalField refuses NaN and infinity too; neither is an
         # amount, and neither can be stored.
-        raise _Refused(gettext("Enter a number."))
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid"))
     return decoded
 
 
 def _decode_datetime(value: Any) -> dt.datetime:
     parsed = _parse(parse_datetime, value)
     if parsed is None:
-        raise _Refused(gettext("Enter a valid date/time."))
+        raise _Refused(CodedMessage(gettext("Enter a valid date/time."), "invalid"))
     if settings.USE_TZ and timezone.is_naive(parsed):
         # What forms.DateTimeField does, and what pydantic does not: the
         # kernel sides with forms, so an offset-less value means the same
@@ -352,7 +360,7 @@ def _decode_datetime(value: Any) -> dt.datetime:
 def _decode_date(value: Any) -> dt.date:
     parsed = _parse(parse_date, value)
     if parsed is None:
-        raise _Refused(gettext("Enter a valid date."))
+        raise _Refused(CodedMessage(gettext("Enter a valid date."), "invalid"))
     return parsed
 
 

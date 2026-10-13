@@ -34,6 +34,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Document, Edition
+from tests.parameters.utils import coded
 from tests.relations_app.models import Post, Timestamped
 
 User = get_user_model()
@@ -556,7 +557,12 @@ class TestValidate:
     def test_every_leaf_is_a_list_of_str(self) -> None:
         detail = _refusal(_form("Pair", a=forms.IntegerField(max_value=1)), {"a": 2})
         assert detail == {"a": ["Ensure this value is less than or equal to 1."]}
-        assert all(type(m) is str for messages in detail.values() for m in messages)
+        # A ``str`` each, never a lazy translation or Django's error object,
+        # carrying the field's own code beside its words.
+        assert all(isinstance(m, str) for messages in detail.values() for m in messages)
+        assert coded(detail) == {
+            "a": [("Ensure this value is less than or equal to 1.", "max_value")]
+        }
 
     def test_the_form_is_built_from_the_arguments_alone(self) -> None:
         class ForUser(forms.Form):
@@ -1133,3 +1139,50 @@ def _refusal_partial(form_class: type[forms.BaseForm], arguments: dict[str, Any]
     with pytest.raises(InvalidArguments) as caught:
         FormValidator(form_class).validate(arguments, _partial())
     return caught.value.detail
+
+
+class _CodedForm(forms.Form):
+    title = forms.CharField(max_length=3)
+    count = forms.IntegerField(required=False)
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean()
+        # One message with a code of its own and one with none, which DRF
+        # reports as ``invalid``.
+        if cleaned.get("count") == 13:
+            raise ValidationError(["Unlucky.", ValidationError("Taken.", code="taken")])
+        return cleaned
+
+
+class TestRefusalCodes:
+    """Django's own code on each message, which ``form.errors`` read as strings drops."""
+
+    def test_a_field_s_refusal_keeps_its_code(self) -> None:
+        assert coded(_refusal(_CodedForm, {"count": "x"})) == {
+            "title": [("This field is required.", "required")],
+            "count": [("Enter a whole number.", "invalid")],
+        }
+
+    def test_a_rendered_message_keeps_its_code(self) -> None:
+        # ``max_length``'s message is rendered from its params, as Django renders it.
+        assert coded(_refusal(_CodedForm, {"title": "long"})) == {
+            "title": [
+                ("Ensure this value has at most 3 characters (it has 4).", "max_length"),
+            ]
+        }
+
+    def test_a_form_wide_refusal_keeps_its_code_or_says_invalid(self) -> None:
+        assert coded(_refusal(_CodedForm, {"title": "ok", "count": 13})) == {
+            "non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]
+        }
+
+    @pytest.mark.django_db
+    def test_a_unique_pair_s_refusal_keeps_django_s_code_whole_and_partial(self) -> None:
+        taken, target, whole = _a_pair_and_its_collision("edition")
+        refused = coded(_refusal(_EditionForm, whole, target))
+        with pytest.raises(InvalidArguments) as caught:
+            FormValidator(_EditionForm).validate(
+                {"number": taken}, ValidationContext(None, target, partial=True)
+            )
+        assert coded(caught.value.detail) == refused
+        assert [code for _, code in refused["non_field_errors"]] == ["unique_together"]

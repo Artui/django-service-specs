@@ -27,6 +27,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.filters.utils import NoteFilters, RequestScopedFilter, TitleFilter
+from tests.parameters.utils import coded
 
 
 def _bare_selector() -> Any:
@@ -256,6 +257,22 @@ class TestFilterSet:
             )
         assert caught.value.detail == {
             "owner": ["Select a valid choice. That choice is not one of the available choices."]
+        }
+
+    def test_a_value_the_filterset_refuses_keeps_django_s_code(self) -> None:
+        # The ModelChoiceField's own code, which ``str`` would strip.
+        _three_notes()
+        with pytest.raises(InvalidArguments) as caught:
+            shape_queryset(
+                Note.objects.all(), _filtered(NoteFilters), {"owner": "0"}, source_label="x"
+            )
+        assert coded(caught.value.detail) == {
+            "owner": [
+                (
+                    "Select a valid choice. That choice is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
         }
 
     def test_a_range_filter_s_refusal_is_keyed_by_the_filter_s_name(self) -> None:

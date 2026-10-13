@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any, Literal
 
 import pytest
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.test import override_settings
 from django.utils import translation
 
@@ -33,6 +33,7 @@ from tests.adapters.dataclass.utils import (
     Range,
     Schedule,
 )
+from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
 
@@ -442,7 +443,9 @@ def test_the_tree_holds_int_row_keys_and_str_messages() -> None:
     detail = _refusal(Everything, _arguments(name=None, lines=[_line(), _line(sku=1)]))
     (row,) = detail["lines"]
     assert type(row) is int
-    assert all(type(message) is str for message in detail["name"])
+    # A ``str`` each, carrying its code: never a lazy translation.
+    assert all(isinstance(message, str) for message in detail["name"])
+    assert coded(detail["name"]) == [("This field cannot be null.", "null")]
 
 
 def test_every_failure_is_collected_across_levels() -> None:
@@ -659,3 +662,108 @@ def test_a_subclass_may_extend_validated_through_validate() -> None:
         {"price": Decimal("1.00")},
         {"bound": "yes"},
     )
+
+
+@dataclass
+class _Coded:
+    title: str
+    kind: Literal["draft", "final"] = "draft"
+    price: Decimal = Decimal("1")
+    at: dt.datetime | None = None
+    on: dt.date | None = None
+
+
+class TestRefusalCodes:
+    """Each refusal carries the code a DRF field gives the same mistake."""
+
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            pytest.param({}, {"title": [("This field is required.", "required")]}, id="required"),
+            pytest.param(
+                {"title": None}, {"title": [("This field cannot be null.", "null")]}, id="null"
+            ),
+            pytest.param(
+                {"title": "t", "extra": 1},
+                {"extra": [("Unknown argument.", "unknown")]},
+                id="unknown",
+            ),
+            pytest.param(
+                {"title": "t", "kind": "gone"},
+                {
+                    "kind": [
+                        (
+                            "Select a valid choice. gone is not one of the available choices.",
+                            "invalid_choice",
+                        )
+                    ]
+                },
+                id="choice",
+            ),
+            pytest.param(
+                {"title": "t", "price": "abc"},
+                {"price": [("Enter a number.", "invalid")]},
+                id="decimal",
+            ),
+            pytest.param(
+                {"title": "t", "price": "NaN"},
+                {"price": [("Enter a number.", "invalid")]},
+                id="decimal-not-finite",
+            ),
+            pytest.param(
+                {"title": "t", "at": "soon"},
+                {"at": [("Enter a valid date/time.", "invalid")]},
+                id="date-time",
+            ),
+            pytest.param(
+                {"title": "t", "on": "soon"},
+                {"on": [("Enter a valid date.", "invalid")]},
+                id="date",
+            ),
+            pytest.param({"title": 3}, {"title": [("Expected a string.", "invalid")]}, id="type"),
+        ],
+    )
+    def test_each_refusal_carries_its_code(
+        self, arguments: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        assert coded(_refusal(_Coded, arguments)) == expected
+
+    @pytest.mark.parametrize(
+        ("raised", "expected"),
+        [
+            pytest.param(
+                ValueError("Out of range."), [("Out of range.", "invalid")], id="value-error"
+            ),
+            pytest.param(
+                ValidationError("Taken.", code="taken"), [("Taken.", "taken")], id="its-own-code"
+            ),
+            pytest.param(ValidationError("Bad."), [("Bad.", "invalid")], id="no-code"),
+            pytest.param(
+                ValidationError("Over %(limit)s.", code="over", params={"limit": 3}),
+                [("Over 3.", "over")],
+                id="params",
+            ),
+            pytest.param(
+                ValidationError(
+                    {
+                        "title": [ValidationError("Short.", code="short")],
+                        "body": [ValidationError("Empty.")],
+                    }
+                ),
+                [("Short.", "short"), ("Empty.", "invalid")],
+                id="by-field",
+            ),
+        ],
+    )
+    def test_a_post_init_refusal_keeps_django_s_code_or_says_invalid(
+        self, raised: Exception, expected: list[tuple[str, str]]
+    ) -> None:
+        # DRF's own default for a message raised with no code is ``invalid``.
+        @dataclass
+        class Checked:
+            title: str
+
+            def __post_init__(self) -> None:
+                raise raised
+
+        assert coded(_refusal(Checked, {"title": "t"})) == {"non_field_errors": expected}

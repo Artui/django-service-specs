@@ -11,9 +11,10 @@ from __future__ import annotations
 
 import math
 import re
+from collections.abc import Iterable
 from typing import Final
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils.translation import gettext
 
 from django_service_specs.parameters.coded_message import CodedMessage
@@ -64,6 +65,46 @@ def expected_type(json_type: str) -> CodedMessage:
     # test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake[not-a-list]
     # holds the array's code, its [type] case everything else's.
     return CodedMessage(message, "not_a_list" if json_type == "array" else "invalid")
+
+
+def coded_messages(errors: Iterable[ValidationError]) -> list[CodedMessage]:
+    """Every message Django's ``errors`` carry, in Django's words and with Django's code.
+
+    For a step that hands on a ``ValidationError`` Django or a library over it
+    raised - a form's errors, a FilterSet's, a model's uniqueness checks, a
+    dataclass's ``__post_init__`` - where reading each message as a ``str``
+    would drop its code. Rendered exactly as iterating the error renders it,
+    ``message % params`` where there are params, so the words are unchanged.
+    One raised with no code says ``"invalid"``, as DRF's ``get_error_detail``
+    defaults one. An error built from a dict is read field by field, in its
+    own order, as its ``messages`` flattens it.
+
+    Django's codes are Django's, which are not always DRF's: a ``unique_together``
+    collision says ``"unique_together"`` where a DRF serializer's validator
+    says ``"unique"``.
+    """
+    return [
+        CodedMessage(_rendered(leaf), leaf.code or "invalid")
+        for error in errors
+        for leaf in _leaves(error)
+    ]
+
+
+def _leaves(error: ValidationError) -> list[ValidationError]:
+    """The one-message errors ``error`` holds: its list, or each field's list in turn."""
+    if hasattr(error, "error_dict"):
+        # test_a_post_init_refusal_keeps_django_s_code_or_says_invalid[by-field]
+        # fails without this: a dict-built error has no ``error_list``.
+        return [leaf for field in error.error_dict.values() for leaf in field]
+    return error.error_list
+
+
+def _rendered(leaf: ValidationError) -> str:
+    """A one-message error's words, as ``ValidationError.__iter__`` renders them."""
+    message = leaf.message
+    if leaf.params:
+        message %= leaf.params
+    return str(message)
 
 
 def max_length_in_force(param: Parameter) -> int | None:

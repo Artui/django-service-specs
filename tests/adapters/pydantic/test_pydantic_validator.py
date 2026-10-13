@@ -20,6 +20,7 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
@@ -44,6 +45,7 @@ from tests.adapters.pydantic.utils import (
     Range,
     Schedule,
 )
+from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
 
@@ -576,3 +578,67 @@ class TestPartial:
         validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
         assert validated.values == {"city": "Oslo", "postcode": None}
         assert validated.data is validated.values
+
+
+class _Coded(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(max_length=3)
+    count: int = Field(default=1, ge=1, le=9, multiple_of=1)
+    even: int = Field(default=2, multiple_of=2)
+    kind: Literal["draft", "final"] = "draft"
+    tags: list[str] = []
+    slug: str = "ok"
+    note: str | None = "fine"
+
+    @field_validator("note")
+    @classmethod
+    def _note(cls, value: str | None) -> str | None:
+        # A refusal of ``None`` that is no type's: its code is the validator's.
+        if value is None:
+            raise ValueError("Say something.")
+        return value
+
+    @field_validator("slug")
+    @classmethod
+    def _slug(cls, value: str) -> str:
+        if value == "raise":
+            raise ValueError("No.")
+        if value == "custom":
+            raise PydanticCustomError("not_a_slug", "Not a slug.")
+        return value
+
+
+class TestRefusalCodes:
+    """pydantic's error types mapped to the code a DRF field gives the same mistake."""
+
+    @pytest.mark.parametrize(
+        ("arguments", "field", "code"),
+        [
+            pytest.param({}, "title", "required", id="missing"),
+            pytest.param({"title": None}, "title", "null", id="none"),
+            pytest.param({"title": "long"}, "title", "max_length", id="string-too-long"),
+            pytest.param({"title": "t", "count": 0}, "count", "min_value", id="below"),
+            pytest.param({"title": "t", "count": 10}, "count", "max_value", id="above"),
+            pytest.param({"title": "t", "kind": "gone"}, "kind", "invalid_choice", id="literal"),
+            pytest.param({"title": "t", "tags": "a"}, "tags", "not_a_list", id="list-type"),
+            pytest.param({"title": "t", "nope": 1}, "nope", "unknown", id="extra"),
+            pytest.param({"title": 3}, "title", "invalid", id="type"),
+            pytest.param({"title": "t", "count": "x"}, "count", "invalid", id="parsing"),
+            pytest.param({"title": "t", "slug": "raise"}, "slug", "invalid", id="value-error"),
+            pytest.param({"title": "t", "note": None}, "note", "invalid", id="value-error-on-none"),
+            pytest.param({"title": "t", "even": 3}, "even", "invalid", id="no-drf-code"),
+            pytest.param({"title": "t", "slug": "custom"}, "slug", "not_a_slug", id="custom"),
+        ],
+    )
+    def test_each_error_type_carries_its_code(
+        self, arguments: dict[str, Any], field: str, code: str
+    ) -> None:
+        # On ``validate()`` itself: through dispatch, the shape check answers
+        # an absent, a null and a wrongly typed argument first.
+        refused = coded(_refusal(_Coded, arguments))
+        assert [found for _, found in refused[field]] == [code]
+
+    def test_a_missing_row_field_carries_required_at_its_address(self) -> None:
+        refused = coded(_refusal(_AuthorIn, {"name": "Ada", "books": [{}]}))
+        assert {code for _, code in refused["books"][0]["title"]} == {"required"}

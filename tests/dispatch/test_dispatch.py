@@ -1243,6 +1243,15 @@ def test_an_optional_read_a_selector_requires_is_refused_when_not_sent(ada: Any)
     assert caught.value.detail == {"tenant": REQUIRED}
 
 
+def test_a_read_a_selector_asks_for_and_nothing_fills_carries_the_required_code(ada: Any) -> None:
+    # The shape check's own code for the same absence, so a caller reads one
+    # code whichever of the two refused the read.
+    spec = SelectorSpec(kind=LIST, selector=_by_tenant, reads=TENANT_READ, permissions=OPEN)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert coded(caught.value.detail) == {"tenant": [("This field is required.", "required")]}
+
+
 def test_a_target_selector_s_unfilled_parameter_is_refused_before_it_runs(ada: Any) -> None:
     service = Record()
     spec = ServiceSpec(
