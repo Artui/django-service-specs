@@ -22,13 +22,17 @@ JSON_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "obje
 every wire this kernel has - a JSON-RPC call, a queue row, and argv once
 ``coerce_flat`` has read it."""
 
-PARAMETER_TYPES = JSON_TYPES | {"file"}
-"""The types a parameter may declare: JSON's, and ``file``.
+PARAMETER_TYPES = JSON_TYPES | {"file", "any"}
+"""The types a parameter may declare: JSON's, ``file`` and ``any``.
 
 A file is what a multipart body carries beside its fields, and what a Python
 caller hands a command or a task as a Django ``File``. It is no JSON type, so a
 JSON caller cannot send one, and it is a parameter's alone: what comes out of an
-operation is still one of the JSON types."""
+operation is still one of the JSON types.
+
+``any`` is a parameter that declares no type: what an unannotated argument
+takes, a key that may be ``3`` or ``"abc"``. It is a parameter's alone too, and
+no array's element, since an array with no ``items`` takes any element already."""
 
 FORMATS = frozenset({"decimal", "date-time", "date"})
 """The Python values a string argument decodes into. Each is a value JSON cannot
@@ -62,6 +66,15 @@ class Parameter:
     ``type`` is a JSON type or ``file``, which an array's ``items`` may name
     too. A file is a Django ``File``, an upload included, and has no
     ``choices``: it is matched by nothing a declaration could list.
+
+    ``type`` may also be ``any``, for a parameter that declares no type, as an
+    unannotated argument does: ``3`` and ``"abc"`` are both one. Its value is
+    handed on exactly as it arrived, never read as a number or a boolean, so
+    a query string's ``"3"`` stays the string ``"3"``; ``null`` is accepted
+    only where ``nullable`` says so, as for every other type. Having no type,
+    it describes nothing a type would - no ``choices``, ``format``, ``fields``,
+    ``items`` or bound - and an array's ``items`` never name it, since an
+    array that declares no ``items`` takes any element already.
 
     ``choice_labels`` names the choices for a reader: a mapping of a choice to
     its label, or Django's ``choices`` spelling, pairs of the two, which keeps
@@ -120,7 +133,7 @@ class Parameter:
         where = f"Parameter {self.name!r}"
         if self.type not in PARAMETER_TYPES:
             raise ImproperlyConfigured(
-                f"{where}: type {self.type!r} is not a JSON type or a file; "
+                f"{where}: type {self.type!r} is not a JSON type, a file or any; "
                 f"use one of {sorted(PARAMETER_TYPES)}."
             )
         if self.format is not None:
@@ -135,6 +148,13 @@ class Parameter:
         if self.items is not None:
             if self.type != "array":
                 raise ImproperlyConfigured(f"{where}: items describes an array's element.")
+            # Before the type list, which names ``any``: one spelling for an
+            # element of any type, and the array with no items is it. Held by
+            # test_an_array_does_not_declare_any_as_its_element.
+            if self.items == "any":
+                raise ImproperlyConfigured(
+                    f"{where}: an array with no items takes any element already; declare no items."
+                )
             if isinstance(self.items, str) and self.items not in PARAMETER_TYPES:
                 raise ImproperlyConfigured(
                     f"{where}: items {self.items!r} is not a JSON type or a file; "
@@ -156,6 +176,12 @@ class Parameter:
             if "file" in (self.type, self.items):
                 raise ImproperlyConfigured(
                     f"{where}: a file is never one of a list of values; declare no choices."
+                )
+            # A list of values says what type they are; held by test_any_has_no_choices.
+            if self.type == "any":
+                raise ImproperlyConfigured(
+                    f"{where}: an untyped value is matched by no list; declare its type to list "
+                    "choices."
                 )
         if self.choice_labels is not None:
             self._normalize_choice_labels(where, self.choice_labels)

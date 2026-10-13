@@ -854,3 +854,38 @@ def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> No
     assert expected != REQUIRED
     assert detail == {"pk": [expected]}
     assert all(type(message) is str for message in detail["pk"])
+
+
+class TestAny:
+    @pytest.mark.parametrize(
+        "value",
+        [3, "abc", "3", 2.5, True, [1, "a"], {"a": [1]}, ""],
+        ids=["int", "string", "numeric-string", "float", "bool", "list", "dict", "blank"],
+    )
+    def test_any_value_is_handed_on_unchanged(self, value: Any) -> None:
+        params = Parameters.of(Parameter("pk", "any", required=True))
+
+        cleaned = check_arguments(params, {"pk": value})
+
+        # No coercion: a numeric string stays the string, a float stays a float.
+        assert cleaned == {"pk": value}
+        assert type(cleaned["pk"]) is type(value)
+
+    def test_null_is_refused_unless_nullable(self) -> None:
+        strict = Parameters.of(Parameter("pk", "any"))
+        loose = Parameters.of(Parameter("pk", "any", nullable=True))
+
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(strict, {"pk": None})
+        assert refused.value.detail == {"pk": ["This field cannot be null."]}
+        assert check_arguments(loose, {"pk": None}) == {"pk": None}
+
+    def test_a_required_any_is_refused_when_absent(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(Parameters.of(Parameter("pk", "any", required=True)), {})
+        assert refused.value.detail == {"pk": ["This field is required."]}
+
+    def test_nan_is_no_json_value_and_is_refused(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": float("nan")})
+        assert refused.value.detail == {"pk": ["Enter a number."]}

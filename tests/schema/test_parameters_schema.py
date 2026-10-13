@@ -344,7 +344,10 @@ class TestChoices:
 
 
 class TestChoiceLabels:
-    def test_labelled_choices_are_one_of_pairs_of_const_and_title(self) -> None:
+    def test_labelled_choices_are_any_of_pairs_of_const_and_title(self) -> None:
+        # ``anyOf`` rather than ``oneOf``: the entries are disjoint, so the two
+        # admit the same values, and ``oneOf`` is the one keyword an OpenAI
+        # strict schema and Gemini's both refuse.
         status = Parameter(
             "status",
             "string",
@@ -354,7 +357,7 @@ class TestChoiceLabels:
 
         assert one(status) == {
             "type": "string",
-            "oneOf": [
+            "anyOf": [
                 {"const": "draft", "title": "Draft"},
                 {"const": "live", "title": "Published"},
             ],
@@ -372,9 +375,12 @@ class TestChoiceLabels:
             "status", "string", choices=["draft", "live"], choice_labels={"live": "Published"}
         )
 
-        assert one(status)["oneOf"] == [{"const": "draft"}, {"const": "live", "title": "Published"}]
+        assert one(status)["anyOf"] == [{"const": "draft"}, {"const": "live", "title": "Published"}]
 
     def test_a_nullable_parameter_adds_an_untitled_null(self) -> None:
+        # ``{"type": "null"}`` rather than ``{"const": null}``: Google's schema
+        # transform drops a null ``const`` and leaves ``{}``, which matches
+        # every value.
         status = Parameter(
             "status", "string", choices=["live"], choice_labels={"live": "On"}, nullable=True
         )
@@ -382,7 +388,7 @@ class TestChoiceLabels:
         assert check_arguments(Parameters.of(status), {"status": None}) == {"status": None}
         assert one(status) == {
             "type": ["string", "null"],
-            "oneOf": [{"const": "live", "title": "On"}, {"const": None}],
+            "anyOf": [{"const": "live", "title": "On"}, {"type": "null"}],
         }
 
     def test_a_labelled_null_is_listed_once(self) -> None:
@@ -394,18 +400,18 @@ class TestChoiceLabels:
             nullable=True,
         )
 
-        assert one(status)["oneOf"] == [{"const": "live"}, {"const": None, "title": "Unset"}]
+        assert one(status)["anyOf"] == [{"const": "live"}, {"type": "null", "title": "Unset"}]
 
     def test_a_choice_declared_twice_is_one_entry(self) -> None:
-        # ``oneOf`` admits a value matching exactly one entry, so a second
-        # entry for it would refuse the value the declaration accepts. ``True``
+        # Listed once, so the entries stay disjoint and a reader meets each
+        # value under one title. ``True``
         # is not ``1`` to JSON, although Python finds them equal, so pairs keep
         # the two labels apart where a mapping's keys would merge them.
         rank = Parameter(
             "rank", "integer", choices=[1, 1, True], choice_labels=[(1, "One"), (True, "Yes")]
         )
 
-        assert one(rank)["oneOf"] == [{"const": 1, "title": "One"}, {"const": True, "title": "Yes"}]
+        assert one(rank)["anyOf"] == [{"const": 1, "title": "One"}, {"const": True, "title": "Yes"}]
 
     def test_an_arrays_labelled_choices_go_on_its_items(self) -> None:
         tags = Parameter(
@@ -421,7 +427,7 @@ class TestChoiceLabels:
             "type": "array",
             "items": {
                 "type": ["string", "null"],
-                "oneOf": [{"const": "red", "title": "Red"}, {"const": None}],
+                "anyOf": [{"const": "red", "title": "Red"}, {"type": "null"}],
             },
         }
 
@@ -430,7 +436,7 @@ class TestChoiceLabels:
             "answer", "boolean", choices=[True], choice_labels={True: gettext_lazy("Yes")}
         )
         with translation.override("fr"):
-            title = one(answer)["oneOf"][0]["title"]
+            title = one(answer)["anyOf"][0]["title"]
 
         assert type(title) is str
         assert title == "Oui"
@@ -548,3 +554,22 @@ def test_a_bound_is_stated_beside_the_type() -> None:
         "price": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
         "n": {"type": ["integer", "null"], "minimum": 0},
     }
+
+
+class TestAny:
+    def test_any_states_no_type(self) -> None:
+        # Any JSON value is one, so any type stated here would be false.
+        pk = Parameter("pk", "any", required=True, help="A key or a slug.")
+
+        assert parameters_schema(Parameters.of(pk)) == {
+            "type": "object",
+            "properties": {"pk": {"description": "A key or a slug."}},
+            "required": ["pk"],
+            "additionalProperties": False,
+        }
+
+    def test_a_nullable_any_is_still_untyped(self) -> None:
+        assert one(Parameter("pk", "any", nullable=True)) == {}
+
+    def test_an_anys_default_is_stated(self) -> None:
+        assert one(Parameter("pk", "any", default="abc")) == {"default": "abc"}

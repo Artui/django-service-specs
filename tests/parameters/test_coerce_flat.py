@@ -183,3 +183,10 @@ def test_argv_through_coerce_flat_reads_as_typed_json_to_the_shape_check() -> No
     raw = {"count": "3", "ratio": "0.5", "active": "false", "ids": "4", "price": "9.99"}
     typed = {"count": 3, "ratio": 0.5, "active": False, "ids": [4], "price": "9.99"}
     assert check_arguments(FLAT, coerce_flat(FLAT, raw)) == check_arguments(FLAT, typed)
+
+
+def test_an_any_parameter_keeps_the_string_it_arrived_as() -> None:
+    # A query string's "3" stays "3": ``any`` names no type to read it as.
+    params = Parameters.of(Parameter("pk", "any"), Parameter("on", "any"))
+
+    assert coerce_flat(params, {"pk": "3", "on": "true"}) == {"pk": "3", "on": "true"}

@@ -45,6 +45,8 @@ def parameters_schema(
       would be false, and JSON Schema has no keyword for a multipart part.
       What is still known is the rest: whether it is required, its
       ``"description"``. An array of files has ``{}`` for its items.
+    - **An** ``any`` is ``{}`` too, since every JSON value is one; its
+      ``"default"`` and ``"description"`` are stated as on any other node.
     - **A scalar** is ``{"type": t}`` with its ``"format"`` when it declares one.
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
@@ -55,22 +57,30 @@ def parameters_schema(
       they tell a reader where the line is.
     - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too,
       and ``items_nullable`` does the same to an array's ``items``. A file's
-      node states no type, so it admits null already and gains nothing.
+      node and an ``any``'s state no type, so they admit null already and
+      gain nothing; a non-nullable one's ``null`` is refused by the shape
+      check alone.
     - **Choices** are an ``"enum"`` beside the ``"type"`` the parameter
       declares. On an array they go on ``items``, because the shape check
       applies them to each element. A nullable parameter's enum gains ``None``
       when its choices do not list it, since an enum claims the whole set of
       accepted values. An array's items do so by ``items_nullable`` alone,
       whether or not the array itself may be null.
-    - **Labelled choices** are a ``"oneOf"`` of ``{"const": value, "title":
+    - **Labelled choices** are an ``"anyOf"`` of ``{"const": value, "title":
       label}`` in its place, where some label says more than its value does;
       labels that only repeat their values keep the ``"enum"``. A choice with
-      no label is a bare ``{"const": value}``, and so is the ``None`` a
-      nullable parameter gains. A choice declared twice is listed once,
-      since ``oneOf`` refuses a value two entries match; ``True`` and ``1`` are
-      two values to JSON, although Python finds them equal. A title is
-      ``str()`` of the label, so a lazy one is rendered in the language active
-      now, and it constrains nothing.
+      no label is a bare ``{"const": value}``. A ``None`` is ``{"type":
+      "null"}`` instead, titled when it is labelled, and so is the ``None`` a
+      nullable parameter gains. A choice declared twice is listed once, so
+      the entries are disjoint and each value has one title; ``True`` and
+      ``1`` are two values to JSON, although Python finds them equal.
+      ``anyOf`` rather than ``oneOf``, which admits the same values over
+      disjoint entries: an OpenAI strict schema refuses ``oneOf``, and Gemini
+      refuses it too, where pydantic-ai rewrites it only on a node with no
+      ``"type"``. And ``{"type": "null"}`` rather than ``{"const": null}``,
+      which Google's transform empties into ``{}``, a schema every value
+      matches. A title is ``str()`` of the label, so a lazy one is rendered in
+      the language active now, and it constrains nothing.
     - **A default** is emitted when one is declared and survives JSON encoding;
       a ``Decimal``, a date or a callable is left out rather than misstated. So
       is a choice set holding such a value, since listing only some of the
@@ -122,7 +132,9 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
     elif param.fields is not None:
         # Only an object carries ``fields``; ``Parameter`` refuses them elsewhere.
         schema = _object_schema(param.fields, policy)
-    elif param.type == "file":
+    elif param.type in ("file", "any"):
+        # One branch to coverage, so each type is held by its own test:
+        # test_a_file_states_no_type and test_any_states_no_type.
         schema = {}
     else:
         schema = {"type": param.type}
@@ -185,7 +197,7 @@ def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
 
 
 def _choices(param: Parameter, *, nullable: bool) -> dict[str, Any]:
-    """``{"enum": ...}`` or ``{"oneOf": ...}`` for the accepted values, or ``{}`` when one cannot be stated."""
+    """``{"enum": ...}`` or ``{"anyOf": ...}`` for the accepted values, or ``{}`` when one cannot be stated."""
     choices = param.choices or ()
     if not all(is_json_native(value) for value in choices):
         return {}
@@ -202,26 +214,33 @@ def _choices(param: Parameter, *, nullable: bool) -> dict[str, Any]:
         if nullable and None not in values:
             values.append(None)
         return {"enum": values}
+    listed: list[Any] = []
     entries: list[dict[str, Any]] = []
     for value in choices:
-        if any(_same(value, entry["const"]) for entry in entries):
+        # Each value once, so the entries stay disjoint: held by
+        # test_a_choice_declared_twice_is_one_entry.
+        if any(_same(value, seen) for seen in listed):
             continue
-        entry: dict[str, Any] = {"const": value}
+        listed.append(value)
+        entry: dict[str, Any] = {"type": "null"} if value is None else {"const": value}
         label = next((label for known, label in labels if _same(known, value)), None)
         if label is not None:
             entry["title"] = str(label)
         entries.append(entry)
     # The ``None`` the enum gains, as the enum gains it. One branch to coverage,
     # so each condition is held by its own test:
-    # test_labelled_choices_are_one_of_pairs_of_const_and_title (nullability)
-    # and test_a_labelled_null_is_listed_once (the null already listed).
+    # test_labelled_choices_are_any_of_pairs_of_const_and_title (nullability) and
+    # test_a_labelled_null_is_listed_once (the null already listed).
     if nullable and None not in choices:
-        entries.append({"const": None})
-    return {"oneOf": entries}
+        entries.append({"type": "null"})
+    return {"anyOf": entries}
 
 
 def _same(one: Any, other: Any) -> bool:
     """Whether two choices are one JSON value: Python's equality, with ``True`` apart from ``1``.
+
+    So a choice declared twice is one ``anyOf`` entry, and ``True`` and ``1``
+    are two.
 
     The second condition is held by test_a_choice_declared_twice_is_one_entry.
     """

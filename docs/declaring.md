@@ -185,6 +185,9 @@ required as declared unless a `kwargs` provider fills them, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.
+[`spec_input_schema`](schema.md#a-partial-update) is what a client reads, so
+it requires none of the Validator's parameters at any depth, and keeps the
+reads required as dispatch does.
 
 A Validator returns only the fields the caller sent, or refuses the call.
 [`FormValidator`](forms.md#partial-updates) binds only the sent fields;
@@ -299,6 +302,12 @@ the same declaration.
   one other type is **`file`**, a Django `File`: what a multipart body carries
   beside its fields, and what a Python caller hands a command or a task. No
   JSON caller can send one, and it declares no choices.
+  **`any`** declares no type, as an unannotated argument does: a key that may
+  be `3` or `"abc"`. The value is handed on as it arrived, with no coercion,
+  so a query string's `"3"` stays the string `"3"`, and the schema states no
+  `"type"` for it. It takes no `choices`, `format`, `fields`, `items` or
+  bound, and an array's `items` never name it: an array with no `items` takes
+  any element already.
 - **`format`** is `decimal`, `date-time` or `date`, on a `string`: a value JSON
   cannot carry, which travels as a string for the Validator to decode.
 - **`items`** is an array's element: a JSON type name for a flat list, or the

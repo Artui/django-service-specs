@@ -94,7 +94,7 @@ default, and `published_on` and `pk` may be null:
           "price": {"type": "string", "format": "decimal"},
           "status": {
             "type": "string",
-            "oneOf": [
+            "anyOf": [
               {"const": "draft", "title": "Draft"},
               {"const": "published", "title": "Published"}
             ],
@@ -165,20 +165,33 @@ contradict, and states everything the declaration knows.
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on `items`, and gain `null` there by
   the element's nullability alone, never by the array's.
-- **Labelled choices are a `oneOf`** of `{"const": value, "title": label}` in
-  place of the `enum`, where some label says more than its value, as the
+- **Labelled choices are an `anyOf`** of `{"const": value, "title": label}`
+  in place of the `enum`, where some label says more than its value, as the
   book's `status` above shows; labels that only repeat their values keep the
-  `enum`. A choice with no label is a bare `{"const": value}`, and so is the
-  `null` a nullable parameter gains. A title is rendered when the schema is
-  built, so a lazy label is in the language active then, and it constrains
-  nothing.
+  `enum`. A choice with no label is a bare `{"const": value}`, and a `null`
+  is `{"type": "null"}`, titled when it is labelled: the `null` a nullable
+  parameter gains among them. Each value is listed once, so the entries are
+  disjoint and `anyOf` admits exactly what `oneOf` would. It is `anyOf`
+  because a model provider's schema dialect is narrower than JSON Schema: an
+  OpenAI strict schema refuses `oneOf`, and so does Gemini, while Google's
+  transform empties a `{"const": null}` into `{}`, which matches every
+  value. A title is rendered when the schema is built, so a lazy label is in
+  the language active then, and it constrains nothing. What a spec returns
+  still states labelled choices as a `oneOf`.
 - **A file is `{}`.** No JSON value is one, so any type stated for it would be
   false, and JSON Schema has no keyword for a multipart part. Whether it is
   required, and its `description`, are still stated.
+- **An `any` is `{}` too**, since every JSON value is one; its `default` and
+  `description` are stated as on any other node. Like a file's, its node
+  admits `null` whether or not it is `nullable`, and the shape check is what
+  refuses a `null` it does not allow.
 - **`required` lists what the shape check refuses when absent**: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it
   is not listed.
+- **A partial update requires only its reads.** A `partial` spec's
+  Validator parameters are listed in no `required`, at any depth, because
+  dispatch refuses none of them absent; see [a partial update](#a-partial-update).
 - **A value JSON cannot carry is left out whole.** A default of
   `Decimal("9.99")` or `date.today`, or a choice set holding one, would break
   the encoding every transport performs on the schema, so it is not stated
@@ -191,6 +204,24 @@ Parameter's `minimum` and `maximum` are stated as `"minimum"` and
 `max_value`, is not. JSON Schema reads `minimum` and `maximum` on a number
 instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.
+
+### A partial update
+
+A spec declaring `partial=True` takes any subset of its Validator's
+parameters, so its schema lists none of them in `required`: not at the top,
+not in an object's fields, not in an array's rows. A client reading
+`required` to decide what to send would otherwise never send the partial call
+the spec exists for. The spec's `reads` and its target selector's keep their
+`required`, as dispatch keeps them, so the schema still says which row the
+update names. An update whose target selector reads `pk` and whose Validator
+requires `title` and `body` has `"required": ["pk"]`.
+
+On a `many` spec the list stays required and each row requires nothing.
+`parameters()` is unchanged: it still says what a whole update needs, and
+the schema is where the relaxing happens. A read a `kwargs` provider fills
+is still listed as declared;
+[`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+is how a transport finds those.
 
 ### The decimal convention
 

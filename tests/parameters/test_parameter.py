@@ -218,3 +218,39 @@ def test_a_label_for_no_declared_choice_is_refused(kwargs: dict, message: str) -
     with pytest.raises(ImproperlyConfigured, match=message) as caught:
         Parameter("status", "string", **kwargs)
     assert "Parameter 'status'" in str(caught.value)
+
+
+# --- any ---------------------------------------------------------------------------------------
+
+
+def test_any_is_a_parameter_type() -> None:
+    # What an unannotated read declares: ``lambda pk: ...`` takes 3 and "abc" alike.
+    p = Parameter("pk", "any", required=True, nullable=True, help="A key.", default=None)
+
+    assert (p.type, p.required, p.nullable, p.default) == ("any", True, True, None)
+
+
+def test_any_has_no_choices() -> None:
+    with pytest.raises(ImproperlyConfigured, match="an untyped value is matched by no list"):
+        Parameter("pk", "any", choices=[1, "a"])
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"format": "date"}, "a format describes a string; this parameter is 'any'"),
+        ({"minimum": 1}, "a bound describes a number or a decimal string; this parameter is 'any'"),
+        ({"items": "string"}, "items describes an array's element"),
+        ({"fields": ROW}, "fields describes an object's own parameters"),
+    ],
+    ids=["format", "bound", "items", "fields"],
+)
+def test_any_carries_nothing_a_type_would_describe(kwargs: dict, message: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match=message):
+        Parameter("pk", "any", **kwargs)
+
+
+def test_an_array_does_not_declare_any_as_its_element() -> None:
+    # An array with no ``items`` takes any element already: one spelling for it.
+    with pytest.raises(ImproperlyConfigured, match="takes any element already; declare no items"):
+        Parameter("ids", "array", items="any")

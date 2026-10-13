@@ -36,6 +36,9 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
     left as the string it arrived as. **A decimal, a date-time and a date stay
     strings**, for the Validator to decode, exactly as they would arrive off a
     JSON wire.
+    **So does an** ``any``: it declares no type to read the string as, so a
+    query string's ``"3"`` reaches the shape check and the Validator as
+    ``"3"``.
 
     - An integer is read as Django's ``IntegerField`` reads one: ``"5.0"`` and
       ``"5."`` are 5, and ``"5.5"`` is refused. An array's integer elements

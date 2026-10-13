@@ -5,6 +5,8 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.dispatch.utils import shape_check
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
@@ -130,3 +132,135 @@ def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
         "required": ["items"],
         "additionalProperties": False,
     }
+
+
+TAG = Parameters.of(Parameter("label", "string", required=True))
+
+
+class Article(Validator):
+    """Required fields at every depth: the top, an object's fields, an array's rows."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(
+            Parameter("title", "string", required=True),
+            Parameter("body", "string", required=True),
+            Parameter("meta", "object", fields=TAG, required=True),
+            Parameter("tags", "array", items=TAG, required=True),
+        )
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+def article_spec(*, partial: bool) -> ServiceSpec:
+    return ServiceSpec(
+        service=edit,
+        permissions=OPEN,
+        validator=Article(),
+        partial=partial,
+        reads=Parameters.of(Parameter("project", "integer", required=True)),
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK
+        ),
+    )
+
+
+class TestPartial:
+    def test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth(
+        self,
+    ) -> None:
+        schema = spec_input_schema(article_spec(partial=True))
+
+        # The reads still name the row and its scope; the Validator's fields,
+        # an object's and each row's included, may each be left out.
+        assert schema["required"] == ["pk", "project"]
+        assert "required" not in schema["properties"]["meta"]
+        assert "required" not in schema["properties"]["tags"]["items"]
+
+    def test_a_spec_that_is_not_partial_requires_every_required_parameter(self) -> None:
+        schema = spec_input_schema(article_spec(partial=False))
+
+        assert schema["required"] == ["pk", "project", "title", "body", "meta", "tags"]
+        assert schema["properties"]["meta"]["required"] == ["label"]
+        assert schema["properties"]["tags"]["items"]["required"] == ["label"]
+
+    def test_a_partial_spec_with_no_target_keeps_its_reads_required(self) -> None:
+        spec = ServiceSpec(
+            service=edit,
+            permissions=OPEN,
+            validator=Article(),
+            partial=True,
+            reads=Parameters.of(Parameter("project", "integer", required=True)),
+        )
+
+        assert spec_input_schema(spec)["required"] == ["project"]
+
+    def test_a_partial_spec_leaves_its_parameters_declaration_as_it_was(self) -> None:
+        spec = article_spec(partial=True)
+
+        spec_input_schema(spec)
+
+        assert spec.parameters().get("title") == Parameter("title", "string", required=True)
+
+    @pytest.mark.parametrize("partial", [True, False])
+    def test_the_schema_requires_exactly_what_the_shape_check_refuses_when_absent(
+        self, partial: bool
+    ) -> None:
+        spec = article_spec(partial=partial)
+        whole = {
+            "pk": 1,
+            "project": 2,
+            "title": "t",
+            "body": "b",
+            "meta": {"label": "m"},
+            "tags": [{"label": "x"}],
+        }
+        schema = spec_input_schema(spec)
+
+        for name in whole:
+            call = {key: value for key, value in whole.items() if key != name}
+            assert (name in schema.get("required", ())) == _refused(spec, call)
+        for name, inner in (("meta", schema["properties"]["meta"]), ("tags", None)):
+            node = inner if inner is not None else schema["properties"]["tags"]["items"]
+            empty: Any = {} if name == "meta" else [{}]
+            call = {**whole, name: empty}
+            assert ("label" in node.get("required", ())) == _refused(spec, call)
+
+
+def _refused(spec: ServiceSpec, call: Mapping[str, Any]) -> bool:
+    try:
+        shape_check(spec, spec.parameters(), call, unknown_arguments=UnknownArguments.REJECT)
+    except InvalidArguments:
+        return True
+    return False
+
+
+class TestPartialMany:
+    def test_a_partial_many_spec_requires_the_list_and_its_reads_and_nothing_in_a_row(
+        self,
+    ) -> None:
+        class Row(Validator):
+            def parameters(self) -> Parameters:
+                return Parameters.of(
+                    Parameter("title", "string", required=True),
+                    Parameter("meta", "object", fields=TAG, required=True),
+                )
+
+            def validate(
+                self, arguments: Mapping[str, Any], context: ValidationContext
+            ) -> dict[str, Any]:
+                return dict(arguments)
+
+        # A read may share a row field's name, and stays required as declared.
+        reads = Parameters.of(Parameter("title", "string", required=True))
+        spec = ServiceSpec(
+            service=print, permissions=OPEN, many=True, partial=True, validator=Row(), reads=reads
+        )
+
+        schema = spec_input_schema(spec)
+
+        assert schema["required"] == ["title", "items"]
+        row = schema["properties"]["items"]["items"]
+        assert "required" not in row
+        assert "required" not in row["properties"]["meta"]
+        assert not _refused(spec, {"title": "t", "items": [{}, {"meta": {}}]})
