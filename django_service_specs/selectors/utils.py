@@ -143,11 +143,42 @@ def apply_shaping(
         queryset = queryset.annotate(**annotations)
     if spec.extend_queryset is not None:
         extend_pool = {**pool, "queryset": queryset}
-        queryset = spec.extend_queryset(
-            **call_keywords(spec.extend_queryset, extend_pool, fillable=fillable)
+        queryset = _settled(
+            spec.extend_queryset,
+            spec.extend_queryset(
+                **call_keywords(spec.extend_queryset, extend_pool, fillable=fillable)
+            ),
         )
     if spec.filter_set is not None:
         queryset = _filtered(spec.filter_set, queryset, pool)
+    return queryset
+
+
+def _settled(extend_queryset: Callable[..., Any], queryset: Any) -> Any:
+    """``extend_queryset``'s return, refusing one that is still to be awaited.
+
+    The seat is sync-only and its return is never awaited. The spec refuses an
+    ``async def`` one when it is built, and a plain ``def`` handing back a
+    coroutine - a lambda calling an ``async def`` - is refused here, where
+    it would otherwise stand in for the queryset and come back from dispatch
+    as the value of a list. A coroutine is closed first, so it does not linger
+    to warn that it was never awaited. Two disjuncts, each held in
+    ``tests/selectors/test_utils.py``'s
+    ``TestAnExtendQuerysetAnsweringWithAnAwaitable``:
+    ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
+    first and ``test_an_async_generator_is_refused`` without the second, since
+    an async generator is not awaitable.
+    """
+    if inspect.isawaitable(queryset) or inspect.isasyncgen(queryset):
+        if inspect.iscoroutine(queryset):
+            queryset.close()
+        name = getattr(extend_queryset, "__qualname__", None) or type(extend_queryset).__name__
+        raise ImproperlyConfigured(
+            f"extend_queryset {name} answered with an awaitable ({type(queryset).__name__}) "
+            "where a queryset was asked for. It is called from sync code and never "
+            "awaited, so the value is refused rather than shaped; declare it with def "
+            "and return the queryset."
+        )
     return queryset
 
 

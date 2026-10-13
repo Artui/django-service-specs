@@ -149,7 +149,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a pool seed's resolver, and the new providers and preconditions. One
   declared so at import time stops the project at import. A seed resolver
   handing back an awaitable from a plain `def` is refused where it is
-  resolved.
+  resolved, and an `extend_queryset` doing so where it is called, where its
+  coroutine stood in for the queryset and came back as a list's value.
 - A selector nested in a service spec that declares `preconditions` or a
   `progress_reporter` is refused when the service spec is built, as is an
   output selector declaring `kwargs`: dispatch never runs them.
