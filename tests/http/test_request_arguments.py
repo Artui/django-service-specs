@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+import django_filters
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
@@ -18,11 +19,18 @@ from django.http import HttpRequest
 from django.test import RequestFactory
 from django.test.client import encode_multipart
 
+from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
+from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
+from tests.dispatch.utils import make_user
+from tests.dispatch_app.models import Note
 from tests.http.utils import DEEP_JSON
 
 FACTORY = RequestFactory()
@@ -125,7 +133,19 @@ CSV = Parameters.of(
     Parameter("words", "array", items="string"),
     Parameter("tags", "array"),
     Parameter("books", "array", items=BOOK),
+    # An ordering, as django-filter's OrderingFilter offers it: no choice
+    # holds a comma, so a comma can only be separating two of them.
+    Parameter("o", "array", items="string", choices=("title", "-title", "pk", "-pk")),
+    # Choices that hold a comma, so a comma may be part of one.
+    Parameter("places", "array", items="string", choices=("Paris, France", "Paris")),
+    # Choices with no element type: whatever an element is, it is not read as
+    # a string the declaration promised, so it is taken whole.
+    Parameter("marks", "array", choices=("a", "b")),
 )
+
+
+class _Ordered(django_filters.FilterSet):
+    o = django_filters.OrderingFilter(fields=["title", "pk"])
 
 
 class TestCommaSeparatedArrays:
@@ -133,11 +153,9 @@ class TestCommaSeparatedArrays:
 
     Splitting is the element type's to allow. A number, an integer and a
     boolean can never hold a comma, so the split is unambiguous; a string
-    can, so a string array (declared or not) takes its value whole. The one
-    guard, ``param.items in (...)``, is held on both sides: the three splitting
-    types by the first three tests, and the types that must not split by
-    ``test_a_string_array_is_not_split`` and
-    ``test_an_array_with_no_declared_element_is_not_split``.
+    can, so a string array (declared or not) takes its value whole, unless
+    its choices hold no comma, when a value holding one can only be several
+    choices. ``_splits`` names the test holding each condition.
     """
 
     def test_a_number_array_reads_a_comma_separated_value_as_its_elements(self) -> None:
@@ -167,6 +185,31 @@ class TestCommaSeparatedArrays:
     def test_a_string_array_is_not_split(self) -> None:
         # A comma is part of a string; the whole value is the element.
         assert read(FACTORY.get("/?words=a,b&words=c"), CSV) == {"words": ["a,b", "c"]}
+
+    def test_a_string_array_whose_choices_hold_no_comma_is_split(self) -> None:
+        # ``?o=title,-pk``: the spelling django-filter's OrderingFilter takes. No
+        # choice holds a comma, so a value holding one is several choices.
+        assert read(FACTORY.get("/?o=title,-pk&o=pk"), CSV) == {"o": ["title", "-pk", "pk"]}
+
+    def test_a_string_array_whose_choices_hold_a_comma_is_not_split(self) -> None:
+        # One choice holds a comma, so the whole value may be that choice.
+        assert read(FACTORY.get("/?places=Paris, France&places=Paris"), CSV) == {
+            "places": ["Paris, France", "Paris"]
+        }
+
+    def test_an_array_with_no_declared_element_is_not_split_by_its_choices(self) -> None:
+        assert read(FACTORY.get("/?marks=a,b"), CSV) == {"marks": ["a,b"]}
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("query", ["o=title,-pk", "o=title&o=-pk"])
+    def test_an_ordering_by_two_fields_orders_the_rows(self, query: str) -> None:
+        ada = make_user("ada")
+        rows = [Note.objects.create(owner=ada, title=title) for title in ("b", "a", "a")]
+        params = filter_set_parameters(_Ordered)
+        checked = check_arguments(params, read(FACTORY.get(f"/?{query}"), params))
+        spec = SelectorSpec(kind=SelectorKind.LIST, selector=lambda: None, filter_set=_Ordered)
+        ordered = shape_queryset(Note.objects.all(), spec, checked, source_label="x")
+        assert list(ordered.values_list("pk", flat=True)) == [rows[2].pk, rows[1].pk, rows[0].pk]
 
     def test_an_array_with_no_declared_element_is_not_split(self) -> None:
         assert read(FACTORY.get("/?tags=a,b"), CSV) == {"tags": ["a,b"]}

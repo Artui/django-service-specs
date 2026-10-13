@@ -115,7 +115,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported for a transport that runs a selector itself.
 - Over HTTP, an array of numbers, integers or booleans reads a value holding
   commas as its elements, so `?ids=1,2` is `[1, 2]`, as a django-filter CSV
-  filter is spelt. An array of strings is never split.
+  filter is spelt. So does an array of strings whose choices hold no comma,
+  so a django-filter `OrderingFilter` takes `?o=title,-pk` as it does
+  `?o=title&o=-pk`; any other array of strings is never split.
 
 ### Changed
 - **Breaking:** a `DataclassValidator` call's `data` is the dataclass
