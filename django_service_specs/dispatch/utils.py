@@ -12,6 +12,7 @@ transport takes when it binds input for itself.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Literal
@@ -428,9 +429,54 @@ def run_preconditions(
     ignored. Bound as the callable it guards is, through ``call_keywords``
     with the same ``fillable``, since a precondition reads the same pool and
     the caller could fill exactly what the run lets them fill.
+
+    Ignored, except for one still to be awaited. An ``async def`` precondition
+    is refused when the spec is built, but a plain ``def`` handing back a
+    coroutine - a decorated ``async def``, a lambda calling one - looks sync
+    until it answers, and its refusal would sit unraised inside the coroutine
+    while the call went ahead. ``sync_result`` refuses that answer, so the
+    call fails closed with ``ImproperlyConfigured`` rather than running.
     """
     for precondition in spec.preconditions or ():
-        precondition(**call_keywords(precondition, pool, fillable=fillable))
+        sync_result(
+            precondition(**call_keywords(precondition, pool, fillable=fillable)),
+            asked=f"The precondition {_name(precondition)}",
+            seat="A precondition",
+        )
+
+
+def sync_result(answer: Any, *, asked: str, seat: str) -> Any:
+    """Return what a sync-only callable answered, refusing an answer that is still to be awaited.
+
+    For the seats dispatch and ``present`` call from sync code and never await:
+    a precondition, whose answer would otherwise be ignored as a pass, and a
+    presenter, whose answer would otherwise be handed back as the payload. A
+    plain ``def`` returning a coroutine or an async generator - a decorated
+    ``async def``, a partial or lambda over one - is not refused when the spec
+    is built, so the answer is checked where it is read. ``asked`` names the
+    callable and ``seat`` the kind of thing it is, for the message.
+
+    A coroutine is closed first, so it is not left behind to warn that it was
+    never awaited. Two disjuncts, each held in ``tests/dispatch/test_utils.py``'s
+    ``TestAPreconditionAnsweringWithAnAwaitable``:
+    ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
+    first and ``test_an_async_generator_is_refused`` without the second, since
+    an async generator is not awaitable.
+    """
+    if inspect.isawaitable(answer) or inspect.isasyncgen(answer):
+        if inspect.iscoroutine(answer):
+            answer.close()
+        raise ImproperlyConfigured(
+            f"{asked} answered with an awaitable ({type(answer).__name__}). {seat} is "
+            "sync-only and is never awaited, so its answer is refused rather than used; "
+            "declare it with def."
+        )
+    return answer
+
+
+def _name(value: Any) -> str:
+    """A callable's qualified name for a message, or its type's name when it has none."""
+    return getattr(value, "__qualname__", None) or type(value).__name__
 
 
 def call_pool(
@@ -621,7 +667,9 @@ def conclude_selector(
     The ``preconditions`` run last, from the selector's ``pool`` with the rows
     as ``collection`` or the row as ``instance``, as djangorestframework-services
     runs them: after the object-level check, so a principal refused the row is
-    never told what a rule over it says. Never without a row, missing or
+    never told what a rule over it says
+    (test_a_retrieve_selector_spec_s_preconditions_never_run_on_a_row_the_principal_is_refused).
+    Never without a row, missing or
     ``None`` under ``allow_none``
     (test_a_selector_spec_s_preconditions_never_run_without_a_row).
     """

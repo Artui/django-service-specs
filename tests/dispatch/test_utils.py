@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
+from collections.abc import Generator
 from typing import Any
 
 import pytest
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import (
     NOT_FOUND,
     call_pool,
     reraise_unless_retrieve,
+    run_preconditions,
     validate_arguments,
 )
 from django_service_specs.pool.null_progress import null_progress
@@ -85,3 +88,53 @@ def test_seeds_resolve_before_the_call_s_own_entries_exist() -> None:
         "pk": 1,
         "data": {},
     }
+
+
+class _NotACoroutine:
+    """Awaitable without being a coroutine, as a ``Future`` or a task is."""
+
+    def __await__(self) -> Generator[None, None, None]:
+        yield
+
+
+async def _refuse() -> None:
+    raise RuntimeError("closed")
+
+
+async def _refuse_lazily() -> Any:
+    raise RuntimeError("closed")
+    yield
+
+
+class TestAPreconditionAnsweringWithAnAwaitable:
+    """A precondition's answer is ignored, unless it is one still to be awaited: refused, never a pass.
+
+    Each precondition is a plain callable returning the object, a shape no
+    declaration can refuse. Each shape holds one condition of ``sync_result``.
+    """
+
+    @staticmethod
+    def _spec(answer: Any) -> ServiceSpec:
+        def precondition() -> Any:
+            return answer
+
+        return ServiceSpec(service=Record(), permissions=OPEN, preconditions=[precondition])
+
+    def test_a_coroutine_is_refused_and_closed(self) -> None:
+        answer = _refuse()
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable") as caught:
+            run_preconditions(self._spec(answer), {}, fillable=frozenset())
+        assert "precondition" in str(caught.value)
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+    def test_an_awaitable_that_is_not_a_coroutine_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            run_preconditions(self._spec(_NotACoroutine()), {}, fillable=frozenset())
+
+    def test_an_async_generator_is_refused(self) -> None:
+        # Not awaitable, so ``isawaitable`` alone would read it as a pass.
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            run_preconditions(self._spec(_refuse_lazily()), {}, fillable=frozenset())
+
+    def test_any_other_answer_is_ignored(self) -> None:
+        run_preconditions(self._spec(False), {}, fillable=frozenset())

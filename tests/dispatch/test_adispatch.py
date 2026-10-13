@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.authorization.grant import Grant
@@ -750,6 +751,23 @@ async def test_a_non_atomic_async_service_s_precondition_runs_in_the_hop(ada: An
     )
     with pytest.raises(Boom):
         await adispatch(spec, principal=ada, arguments={})
+
+
+async def test_a_precondition_answering_with_a_coroutine_refuses_the_call(ada: Any) -> None:
+    async def refuse() -> None:
+        raise Boom()
+
+    ran: list[str] = []
+
+    async def service() -> None:
+        ran.append("service")
+
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, atomic=False, preconditions=[lambda: refuse()]
+    )
+    with pytest.raises(ImproperlyConfigured, match="A precondition is sync-only"):
+        await adispatch(spec, principal=ada, arguments={})
+    assert ran == []
 
 
 async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the_await(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -1822,6 +1823,58 @@ def test_a_list_selector_spec_s_preconditions_see_the_collection(ada: Any) -> No
     )
     dispatch(spec, principal=ada, arguments={})
     assert list(precondition.calls[0]["collection"]) == [note]
+
+
+def test_a_retrieve_selector_spec_s_preconditions_never_run_on_a_row_the_principal_is_refused(
+    ada: Any, bob: Any
+) -> None:
+    # The object check answers first, so a principal refused the row is never
+    # told what a rule over it says.
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    precondition = _Precondition(Boom())
+    spec = retrieve(permissions=[OwnerOnly()], preconditions=[precondition])
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk})
+    assert precondition.calls == []
+
+
+def _refuses_later(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """A decorator whose plain ``def`` wrapper hides the ``async def`` it wraps."""
+
+    @functools.wraps(fn)
+    def wrapper(**kwargs: Any) -> Any:
+        return fn(**kwargs)
+
+    return wrapper
+
+
+@_refuses_later
+async def _closed_for_the_night() -> None:
+    raise Boom()
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda pre: ServiceSpec(service=Record(), permissions=OPEN, preconditions=[pre]),
+        lambda pre: SelectorSpec(
+            kind=LIST, selector=notes_of, permissions=OPEN, preconditions=[pre]
+        ),
+    ],
+    ids=["service-spec", "selector-spec"],
+)
+def test_a_precondition_answering_with_a_coroutine_refuses_the_call(
+    ada: Any, make: Callable[[Any], ServiceSpec | SelectorSpec]
+) -> None:
+    spec = make(_closed_for_the_night)
+    with pytest.raises(ImproperlyConfigured) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert str(caught.value).startswith(
+        "The precondition _closed_for_the_night answered with an awaitable (coroutine). "
+        "A precondition is sync-only"
+    )
+    run = getattr(spec, "service", None)
+    assert run is None or run.calls == []
 
 
 @pytest.mark.parametrize("allow_none", [False, True])
