@@ -928,6 +928,15 @@ class TestPartial:
             FormValidator(Username).validate({"username": "carol"}, ValidationContext(ada, ada))
 
     @pytest.mark.django_db
+    def test_a_partial_call_with_no_target_row_checks_nothing_it_was_not_sent(self) -> None:
+        # Bound as a create, the form's instance holds the model's defaults for
+        # every field not sent, which nothing will write: checked, an empty
+        # username that a row already holds refused a call that never sent one.
+        User.objects.create(username="")
+        context = ValidationContext(None, None, partial=True)
+        assert FormValidator(Username).validate({}, context) == {}
+
+    @pytest.mark.django_db
     def test_a_partial_update_checks_no_pair_the_form_does_not_declare(self) -> None:
         # The whole call of a form without ``content_type`` excludes the pair,
         # as Django excludes any model field a form does not have, and a

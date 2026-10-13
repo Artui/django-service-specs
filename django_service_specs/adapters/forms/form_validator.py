@@ -196,7 +196,10 @@ class FormValidator(Validator):
     declares, as a whole call does. So an update that sends one field of a
     ``unique_together`` pair or a ``UniqueConstraint`` and collides is refused
     as the whole call would be, under ``non_field_errors``, rather than
-    failing with an ``IntegrityError`` when the row is saved. ``clean()``
+    failing with an ``IntegrityError`` when the row is saved. That needs a
+    target row: a partial call bound as a create checks only what was sent,
+    since the rest would be the model's defaults, which nothing writes.
+    ``clean()``
     sees only what was sent, so it
     reads ``cleaned_data`` with ``get``, as Django advises for a field that
     failed. ``parameters()`` is the same for both calls: ``required`` says
@@ -285,7 +288,7 @@ class FormValidator(Validator):
                 files[name] = value
             else:
                 data[name] = value if field is None else _as_bound(field, value)
-        form = self._bind(data, files, context.target)
+        form, row = self._bind(data, files, context.target)
         if context.partial:
             # Off the form rather than made optional: an optional field still
             # cleans to its empty value, runs its ``clean_<field>()`` on it and,
@@ -297,22 +300,25 @@ class FormValidator(Validator):
         # One branch to coverage, so each condition is held by its own test:
         # test_a_whole_model_form_call_checks_uniqueness_once (the partial
         # call: a whole one has already checked every pair, and would query
-        # for each again) and test_a_partial_call_returns_only_the_fields_the_caller_sent
-        # (the ModelForm: a plain form has no row to check).
-        if context.partial and isinstance(form, forms.BaseModelForm):
-            _check_unique_as_whole(form.instance, self._names)
+        # for each again) and
+        # test_a_partial_call_with_no_target_row_checks_nothing_it_was_not_sent
+        # (the row: a form bound as a create holds the model's defaults for
+        # what was not sent, which nothing writes).
+        if context.partial and row is not None:
+            _check_unique_as_whole(row, self._names)
         return dict(form.cleaned_data)
 
     def _bind(
         self, data: dict[str, Any], files: MultiValueDict[str, Any], target: Any
-    ) -> forms.BaseForm:
+    ) -> tuple[forms.BaseForm, models.Model | None]:
+        """The bound form, and the copy of the target it edits, or ``None`` for no row."""
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
-            return form_class(data=data, files=files)
+            return form_class(data=data, files=files), None
         # A copy, because validation writes the cleaned values onto the
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
-        return form_class(data=data, files=files, instance=instance)
+        return form_class(data=data, files=files, instance=instance), instance
 
 
 def _detail(errors: Mapping[str, Any]) -> dict[str, list[Any]]:

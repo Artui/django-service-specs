@@ -143,7 +143,8 @@ on top of the target's values, and leave out only the model fields the form
 never declares, as a whole call does. An update that sends one field of a
 `unique_together` pair or a `UniqueConstraint` and collides is refused as the
 whole call would be, under `non_field_errors`, rather than failing with an
-`IntegrityError` when the row is saved. `clean()` sees only
+`IntegrityError` when the row is saved. That needs a target row: a partial
+call with none checks only what was sent. `clean()` sees only
 what was sent, so it reads `cleaned_data` with `get`. The parameters are the
 same for both calls: `required` says what a whole call needs.
 
