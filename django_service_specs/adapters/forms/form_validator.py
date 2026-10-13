@@ -163,7 +163,9 @@ class FormValidator(Validator):
     - ``nullable`` is ``not required``, and always true for a
       ``NullBooleanField``. A form reads ``None`` as an empty value for every
       field, so an optional field takes ``null`` and cleans it to its empty
-      value, and a required one refuses it.
+      value, and a required one refuses it. A clear checkbox is no field:
+      it is optional and never ``null``, since unchecked and absent are
+      the one answer the widget reads.
     - ``default`` is always
       [`UNSET`][django_service_specs.types.unset.UNSET]: a field's ``initial``
       is what an unbound form displays, and a bound form cleans an absent

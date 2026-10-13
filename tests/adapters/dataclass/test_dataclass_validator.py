@@ -618,6 +618,16 @@ def test_a_partial_spec_over_it_is_refused_when_declared() -> None:
     assert "which cannot validate a partial call" in message
 
 
+def test_a_subclass_that_handles_a_partial_call_says_so() -> None:
+    # The flag is the class's statement, so a subclass that returns only what
+    # was sent sets it back and is declared partial.
+    class _PartialPrice(DataclassValidator):
+        supports_partial = True
+
+    spec = ServiceSpec(service=print, validator=_PartialPrice(_Price), partial=True)
+    assert spec.partial is True
+
+
 def test_a_subclass_may_extend_validated_through_validate() -> None:
     # The base class's default reads this way round, so a subclass that adds a
     # bound value on top of ``validate()`` must not loop back into itself.
