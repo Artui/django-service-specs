@@ -254,6 +254,24 @@ def test_a_decimal_takes_a_string_or_a_json_number(argument: Any, expected: Deci
     assert str(values["price"]) == str(expected)
 
 
+@pytest.mark.parametrize(
+    ("argument", "expected"),
+    [
+        ("12.50", Decimal("12.50")),
+        ("\u0661\u0662.\u0665", Decimal("12.5")),
+        ("\uff15", Decimal("5")),
+    ],
+)
+def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(
+    argument: str, expected: Decimal
+) -> None:
+    # Django's ``DecimalField``, DRF's and pydantic's ``Decimal`` all hand the
+    # string to ``Decimal``, which reads Arabic-Indic and fullwidth digits, so
+    # the adapter takes the digits each of them takes, the plain ones alike.
+    values = DataclassValidator(_Price).validate({"price": argument}, CONTEXT)
+    assert str(values["price"]) == str(expected)
+
+
 def test_unset_type_with_no_default_is_filled_with_unset() -> None:
     assert DataclassValidator(_Patch).validate({}, CONTEXT) == {"bio": UNSET}
     assert DataclassValidator(_Patch).validate({"bio": None}, CONTEXT) == {"bio": None}

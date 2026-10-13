@@ -54,8 +54,11 @@ and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
 them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
 type it is not, by the check and by `coerce_flat` alike. A `decimal` string is
-not read this way: it is checked as Python's `Decimal` reads it, which takes
-those digits too.
+not read this way, and on purpose: it is checked as Python's `Decimal` reads
+it, which takes those digits too, because every decimal field behind the check
+reads it so - Django's `DecimalField`, DRF's and pydantic's `Decimal` each hand
+the string to `Decimal` - and the string is handed on unchanged. `"\u0665"`
+sent for a decimal is 5 to all of them, as `"5"` is.
 
 A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its
