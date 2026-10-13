@@ -44,6 +44,9 @@ def spec_output_schema(
       whatever its ``allow_none`` says: once the service has run, a re-read
       that finds nothing is ``None`` rather than not-found, because reporting
       not-found would tell the caller a committed write did not happen.
+    - **A ``many`` service spec with no output selector** presents the rows it
+      wrote as ``{"type": "array", "items": <item>}``, which gains ``"null"``
+      when the spec declares ``allow_none``.
     - **A service spec with no output selector** presents what the service
       returned, described by its presenter as the item, which gains
       ``"null"`` when the spec declares ``allow_none``. Undeclared, a ``None``
@@ -100,8 +103,12 @@ def spec_output_schema(
     else:
         # One value, the service's return, which may be ``None`` only where the
         # spec says so: test_a_service_allowing_none_admits_null and
-        # test_a_service_presenting_its_own_return_is_the_item.
-        return allow_null(item) if spec.allow_none else item
+        # test_a_service_presenting_its_own_return_is_the_item. A ``many``
+        # service returns the rows it wrote, which dispatch presents as a list
+        # (test_a_many_service_presents_an_array_of_its_item); a ``None`` return
+        # is still presented as ``None``, so ``allow_none`` wraps the array.
+        whole: dict[str, Any] = {"type": "array", "items": item} if spec.many else item
+        return allow_null(whole) if spec.allow_none else whole
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}
         return _paged(array) if paginate else array
