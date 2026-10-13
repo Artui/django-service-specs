@@ -1,0 +1,43 @@
+"""``CodedMessage`` - a refusal's message, with a code a program reads beside the words a person does."""
+
+from __future__ import annotations
+
+
+class CodedMessage(str):
+    """A message in an [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments] tree, carrying the code of the mistake it names.
+
+    The words are for a person and are translated; the ``code`` is for a
+    program and is not. Every refusal of the shape check, ``coerce_flat`` and
+    ``request_arguments`` carries one, and the code
+    is the one a DRF field gives the same mistake (``"required"``, ``"null"``,
+    ``"invalid"``, ``"not_a_list"``, ``"max_length"`` and the rest), so an
+    adapter building DRF's error details maps each one across unchanged. The
+    arguments page lists them, refusal by refusal.
+
+    **It is its message to everything that reads a string.** Equality,
+    hashing, ``json.dumps`` and ``%``-formatting all see the plain ``str``, and
+    the code takes no part in any of them: a tree with codes compares equal to
+    the same tree written with plain strings, and the body a transport writes
+    is unchanged by them. That is the difference from DRF's ``ErrorDetail``,
+    whose equality reads the code too, and why this is not one. Read the code
+    with ``getattr(message, "code", None)``, since a Validator's own messages
+    reach the same tree as it raised them, a plain ``str`` among them.
+
+    A copy, a deep copy and a pickle each keep the code.
+    """
+
+    code: str
+    """The mistake, as DRF's codes name it. Never translated."""
+
+    def __new__(cls, message: str, code: str) -> CodedMessage:
+        instance = super().__new__(cls, message)
+        instance.code = code
+        return instance
+
+    def __reduce__(self) -> tuple[type[CodedMessage], tuple[str, str]]:
+        # ``str`` pickles by its value alone, which would rebuild this with no
+        # code; one hook serves pickle at every protocol, ``copy`` and ``deepcopy``.
+        return (type(self), (str(self), self.code))
+
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}({str.__repr__(self)}, code={self.code!r})"

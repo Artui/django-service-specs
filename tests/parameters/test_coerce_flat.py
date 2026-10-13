@@ -10,6 +10,7 @@ from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from tests.parameters.utils import coded
 
 NESTED = "This argument has nested parameters, which a flat transport cannot send."
 
@@ -205,3 +206,29 @@ def test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read()
 def test_an_array_at_its_maximum_is_read_element_by_element() -> None:
     ids = Parameters.of(Parameter("ids", "array", items="integer"))
     assert coerce_flat(ids, {"ids": ["1"] * 1000}) == {"ids": [1] * 1000}
+
+
+def test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake() -> None:
+    raw = {
+        "count": "three",
+        "ratio": "half",
+        "active": "maybe",
+        "ids": ["1", "x"],
+        "author": "Ursula",
+    }
+    parameters = Parameters.of(*FLAT, Parameter("author", "object", fields=BOOK))
+    assert coded(refusal(parameters, raw)) == {
+        "count": [("Enter a whole number.", "invalid")],
+        "ratio": [("Enter a number.", "invalid")],
+        "active": [("Enter true, false, 1 or 0.", "invalid")],
+        "ids": {1: [("Enter a whole number.", "invalid")]},
+        # A nested serializer handed a string refuses it as ``invalid`` too.
+        "author": [(NESTED, "invalid")],
+    }
+
+
+def test_a_list_past_its_maximum_carries_the_length_code() -> None:
+    parameters = Parameters.of(Parameter("ids", "array", items="integer", max_length=1))
+    assert coded(refusal(parameters, {"ids": ["1", "2"]})) == {
+        "ids": [("Ensure this field has no more than 1 elements.", "max_length")]
+    }

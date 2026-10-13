@@ -58,6 +58,7 @@ from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -124,6 +125,7 @@ __all__ = [
     "ChangeResult",
     "ChildCollectionChange",
     "ChildSpec",
+    "CodedMessage",
     "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "DataclassPresenter",

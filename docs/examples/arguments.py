@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django.test import override_settings
@@ -54,6 +55,25 @@ REFUSED = {
     },
 }
 # --8<-- [end:tree]
+
+
+# --8<-- [start:codes]
+def codes(detail: Any) -> Any:
+    """The tree with each message's code in its place, and ``"invalid"`` where it has none."""
+    if isinstance(detail, Mapping):
+        return {key: codes(value) for key, value in detail.items()}
+    if isinstance(detail, list):
+        return [codes(message) for message in detail]
+    return getattr(detail, "code", "invalid")
+
+
+CODES = {
+    "books": {
+        1: {"title": ["required"], "price": ["invalid"], "colour": ["unknown"]},
+        2: {"non_field_errors": ["invalid"]},
+    },
+}
+# --8<-- [end:codes]
 
 
 # --8<-- [start:ignore]
