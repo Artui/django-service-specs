@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-13
+
 ### Added
 - `ServiceSpec.reads`, the arguments a service, its providers and its
   preconditions read with no Validator in front of them - the `project_pk` a
@@ -745,7 +747,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0
