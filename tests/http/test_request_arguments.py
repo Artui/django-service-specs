@@ -118,6 +118,94 @@ class TestQueryString:
         assert read(FACTORY.get("/?colour=red&shade=")) == {"colour": "red", "shade": ""}
 
 
+CSV = Parameters.of(
+    Parameter("pks", "array", items="number"),
+    Parameter("ids", "array", items="integer"),
+    Parameter("flags", "array", items="boolean"),
+    Parameter("words", "array", items="string"),
+    Parameter("tags", "array"),
+    Parameter("books", "array", items=BOOK),
+)
+
+
+class TestCommaSeparatedArrays:
+    """``?pks=1,2``: the spelling django-filter's CSV filters advertise.
+
+    Splitting is the element type's to allow. A number, an integer and a
+    boolean can never hold a comma, so the split is unambiguous; a string
+    can, so a string array (declared or not) takes its value whole. The one
+    guard, ``param.items in (...)``, is held on both sides: the three splitting
+    types by the first three tests, and the types that must not split by
+    ``test_a_string_array_is_not_split`` and
+    ``test_an_array_with_no_declared_element_is_not_split``.
+    """
+
+    def test_a_number_array_reads_a_comma_separated_value_as_its_elements(self) -> None:
+        assert read(FACTORY.get("/?pks=1,2.5"), CSV) == {"pks": [1.0, 2.5]}
+
+    def test_an_integer_array_reads_a_comma_separated_value_as_its_elements(self) -> None:
+        assert read(FACTORY.get("/?ids=1,2,3"), CSV) == {"ids": [1, 2, 3]}
+
+    def test_a_boolean_array_reads_a_comma_separated_value_as_its_elements(self) -> None:
+        assert read(FACTORY.get("/?flags=true,0,False"), CSV) == {"flags": [True, False, False]}
+
+    def test_space_around_a_part_is_trimmed(self) -> None:
+        # A boolean is the type that cares: " true" is no spelling of one,
+        # where an integer already ignores the space.
+        assert read(FACTORY.get("/?flags=true, false ,1"), CSV) == {"flags": [True, False, True]}
+
+    def test_repeated_keys_still_make_a_list(self) -> None:
+        assert read(FACTORY.get("/?ids=1&ids=2"), CSV) == {"ids": [1, 2]}
+
+    def test_repeated_keys_and_commas_mix_with_each_value_split(self) -> None:
+        assert read(FACTORY.get("/?ids=1,2&ids=3&ids=4,5"), CSV) == {"ids": [1, 2, 3, 4, 5]}
+
+    def test_a_form_body_splits_too(self) -> None:
+        request = FACTORY.post("/", data="ids=1,2&pks=3", content_type=FORM)
+        assert read(request, CSV) == {"ids": [1, 2], "pks": [3.0]}
+
+    def test_a_string_array_is_not_split(self) -> None:
+        # A comma is part of a string; the whole value is the element.
+        assert read(FACTORY.get("/?words=a,b&words=c"), CSV) == {"words": ["a,b", "c"]}
+
+    def test_an_array_with_no_declared_element_is_not_split(self) -> None:
+        assert read(FACTORY.get("/?tags=a,b"), CSV) == {"tags": ["a,b"]}
+
+    def test_an_array_of_rows_is_not_split_and_stays_refused_by_name(self) -> None:
+        assert refusal(FACTORY.get("/?books=a,b"), CSV) == {
+            "books": ["This argument has nested parameters, which a flat transport cannot send."]
+        }
+
+    @pytest.mark.parametrize(
+        ("query", "index"),
+        [("ids=1,,3", 1), ("ids=1,", 1), ("ids=,1", 0), ("ids=1, ,3", 1)],
+    )
+    def test_an_empty_part_is_refused_at_its_index_as_a_malformed_element(
+        self, query: str, index: int
+    ) -> None:
+        # Not dropped as a blank element is: a stray comma is a mistake in the
+        # value, and the reader's wording for one is the element's own.
+        assert refusal(FACTORY.get(f"/?{query}"), CSV) == {
+            "ids": {index: ["Enter a whole number."]}
+        }
+
+    def test_the_refused_part_is_named_by_its_index_in_the_whole_list(self) -> None:
+        assert refusal(FACTORY.get("/?ids=1&ids=2,,3"), CSV) == {
+            "ids": {2: ["Enter a whole number."]}
+        }
+
+    def test_a_part_that_does_not_parse_is_refused_at_its_index(self) -> None:
+        assert refusal(FACTORY.get("/?ids=1,x,2.5&flags=true,maybe&pks=1,y"), CSV) == {
+            "ids": {1: ["Enter a whole number."], 2: ["Enter a whole number."]},
+            "flags": {1: ["Enter true, false, 1 or 0."]},
+            "pks": {1: ["Enter a number."]},
+        }
+
+    def test_a_blank_value_is_still_absent(self) -> None:
+        assert read(FACTORY.get("/?ids=&ids=1,2"), CSV) == {"ids": [1, 2]}
+        assert read(FACTORY.get("/?ids="), CSV) == {}
+
+
 class TestBlanks:
     def test_a_blank_value_for_a_type_that_is_not_a_string_is_absent(self) -> None:
         # Without the rule, ``""`` reaches coerce_flat as an integer and is
