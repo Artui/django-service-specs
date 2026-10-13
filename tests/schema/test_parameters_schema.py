@@ -572,6 +572,23 @@ def test_a_bound_is_stated_beside_the_type() -> None:
     }
 
 
+def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself() -> None:
+    # The shape check reads them on each element, so the array node carries
+    # neither: stated there, a reader would take ``minimum`` for a count.
+    pks = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    ids = Parameter("ids", "array", items="integer", minimum=1, max_length=5, items_nullable=True)
+    assert one(pks) == {
+        "type": "array",
+        "items": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
+        "maxItems": 1000,
+    }
+    assert one(ids) == {
+        "type": "array",
+        "items": {"type": ["integer", "null"], "minimum": 1},
+        "maxItems": 5,
+    }
+
+
 # --- array length ------------------------------------------------------------------------------------
 
 

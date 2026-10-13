@@ -58,7 +58,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter with no `max_length` of its own, which no call could meet, is
   refused the same way at the call and when its schema is built.
 
+- `Parameter`'s `format`, `minimum` and `maximum` on an array describe each
+  element, as its `choices` do. An array of `integer` or `number` takes a
+  bound, and an array of `string` takes `format="decimal"` and then a bound
+  too; the shape check reads each element as a scalar of that declaration
+  and refuses one past a bound at its index, with the code `max_value` or
+  `min_value`. The schema states them on `"items"`, never on the array. Over
+  HTTP a decimal array splits `?pks=1,2` as a number array does, since no
+  decimal holds a comma, and drops a blank element. Any other format on an
+  array, and a format or a bound on an element that cannot carry it, is
+  refused at construction.
+
 ### Changed
+- **Breaking:** a django-filter CSV number filter (`BaseInFilter` or
+  `BaseRangeFilter` over a `NumberFilter`) is declared an array of bounded
+  decimal strings, `items="string", format="decimal", minimum=-1e50,
+  maximum=1e50`, as a scalar number filter is, where it was an array of
+  `number`. Each element reaches the FilterSet as the string it was sent, so
+  a fraction keeps every digit where a float rounded it, and one past
+  `1e50` either way is refused at its index before the FilterSet runs, where
+  the CSV filter carried no bound. `filter_set_parameters` and the schema a
+  selector spec states change accordingly: its `items` are `{"type":
+  "string", "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}`
+  rather than `{"type": "number"}`. A malformed element is refused with
+  `"Enter a number."` by the shape check, where a JSON caller's was
+  `"Expected a number."`.
 - `SelectorSpec.allow_none` is accepted on a `LIST`, where it was refused at
   construction since 0.1.0. A list selector declaring it may return `None` for
   "no rows", and the result is the empty list wherever the selector runs: a
@@ -143,9 +167,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A string sent for a `number`, by a flat transport or in a JSON body, is read
   as a JSON decoder reads the same literal: digits alone are the exact `int`
   they spell, and a point or an exponent makes a `float`. Read through `float`
-  alone, every integer past `2**53` was rounded to a neighbour, so a
-  django-filter CSV filter's key, declared a `number`, matched the
-  neighbour's row; `?pks=9007199254740993` now matches its own. The strings
+  alone, every integer past `2**53` was rounded to a neighbour, so a key
+  sent for a `number` matched the neighbour's row. The strings
   accepted are unchanged, and `"3"` reaches the Validator as `3` rather than
   `3.0`, as the JSON `3` always did.
 - An `async def` selector spec's `progress_reporter` provider is called only

@@ -849,6 +849,70 @@ def test_a_decimal_is_compared_as_the_decimal_it_spells(value: Any, detail: Any)
         assert refusal(params, {"price": value}) == {"price": detail}
 
 
+# --- an array's element: its format and its bounds ------------------------------------------
+
+FORTY_DIGITS = "0.1234567890123456789012345678901234567891"
+"""A fraction no float holds: read through one, it comes back as 0.12345678901234568."""
+
+
+def _decimals() -> Parameters:
+    """A django-filter CSV number filter's declaration, built in the test so a tree refusing it fails there."""
+    return one(
+        Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    )
+
+
+def test_each_element_of_a_decimal_array_is_handed_on_as_it_was_sent() -> None:
+    # Exact: a string stays the string it spells, never a float on the way, and
+    # a JSON number is taken as a scalar decimal takes one.
+    sent = ["1", 2, FORTY_DIGITS, " 12.5 ", 1.5, "1e50", "-1e50"]
+    assert check_arguments(_decimals(), {"pks": sent}) == {"pks": sent}
+
+
+def test_an_element_past_its_bound_is_refused_at_its_index_with_django_s_code() -> None:
+    # Compared by exponent, so a billion-digit integer is never built: a
+    # regression must fail here rather than hang the suite.
+    detail = refusal(_decimals(), {"pks": ["1", "1E+999999999", "-1E+999999999", 1e60]})
+    assert coded(detail) == {
+        "pks": {
+            1: [(ABOVE % "1e+50", "max_value")],
+            2: [(BELOW % "-1e+50", "min_value")],
+            3: [(ABOVE % "1e+50", "max_value")],
+        }
+    }
+
+
+def test_an_element_that_spells_no_decimal_is_refused_at_its_index() -> None:
+    detail = refusal(_decimals(), {"pks": ["1", "x", "", True, "NaN", None]})
+    assert coded(detail) == {
+        "pks": {
+            1: [(NOT_A_NUMBER, "invalid")],
+            2: [(NOT_A_NUMBER, "invalid")],
+            3: [("Expected a decimal string or a number.", "invalid")],
+            4: [(NOT_A_NUMBER, "invalid")],
+            # A gap the element does not allow is refused as the type it is not.
+            5: [("Expected a decimal string or a number.", "invalid")],
+        }
+    }
+
+
+def test_a_decimal_array_s_null_element_is_kept_where_its_element_is_nullable() -> None:
+    params = one(
+        Parameter("pks", "array", items="string", format="decimal", maximum=1, items_nullable=True)
+    )
+    assert check_arguments(params, {"pks": ["1", None]}) == {"pks": ["1", None]}
+    assert refusal(params, {"pks": [None, "2"]}) == {"pks": {1: [ABOVE % 1]}}
+
+
+@pytest.mark.parametrize("items", ["integer", "number"])
+def test_each_element_of_a_number_array_is_bounded(items: str) -> None:
+    params = one(Parameter("ids", "array", items=items, minimum=1, maximum=10))
+    assert check_arguments(params, {"ids": [1, "10", 5.0]}) == {"ids": [1, 10, 5]}
+    assert coded(refusal(params, {"ids": [1, 11, "0"]})) == {
+        "ids": {1: [(ABOVE % 10, "max_value")], 2: [(BELOW % 1, "min_value")]}
+    }
+
+
 def test_a_value_of_the_wrong_type_is_refused_as_that_not_as_out_of_bounds() -> None:
     params = one(Parameter("price", "string", format="decimal", maximum=1))
     assert refusal(params, {"price": "lots"}) == {"price": [NOT_A_NUMBER]}

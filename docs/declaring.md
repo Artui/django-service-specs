@@ -133,9 +133,12 @@ number filter refuses a value past `1e50` and leaves a range's bounds and
 every negative value open, while an integer column's conversion builds every
 digit of a value such as `"1E+999999999"`, which holds a worker for minutes.
 So the shape check refuses either side of the line before the FilterSet is
-reached. A CSV filter's numbers stay `number`, so `?pks=1,2` splits, and an
-element spelling an integer is read as that exact integer, so a key past
-`2**53` matches its own row.
+reached. A CSV number filter is an array of the same bounded decimals:
+`Parameter("pks", "array", items="string", format="decimal",
+minimum=-1e50, maximum=1e50)`, whose format and bounds describe each
+element. `?pks=1,2` still splits, since no decimal holds a comma, each value
+reaches the filter with every digit it was sent with, a fraction included,
+and one past the line is refused at its index in the list.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its
@@ -341,7 +344,11 @@ the same declaration.
   bound, and an array's `items` never name it: an array with no `items` takes
   any element already.
 - **`format`** is `decimal`, `date-time` or `date`, on a `string`: a value JSON
-  cannot carry, which travels as a string for the Validator to decode.
+  cannot carry, which travels as a string for the Validator to decode. On an
+  array it describes each element, as `choices` do, and is `decimal` on
+  `items="string"` alone: a number element is read as a float on the way and
+  loses a fraction's digits past a float's precision, where a decimal string
+  is handed on as it was sent.
 - **`items`** is an array's element: a JSON type name for a flat list, or the
   `Parameters` of the object each row is. **`fields`** is the same for an
   `object`. Nesting is what lets a write declare its rows, so a malformed row
@@ -354,7 +361,12 @@ the same declaration.
   finite `float`, and a bound on any other type is refused where it is
   written. A decimal string is compared as the decimal it spells, by its
   exponent, so `"1E+999999999"` is refused without building the integer it
-  names. The schema states both as `"minimum"` and `"maximum"`.
+  names. The schema states both as `"minimum"` and `"maximum"`. On an array
+  they bound each element, as its `format` describes each: an array of
+  `integer` or `number`, or of `decimal` strings, takes them, and an element
+  past one is refused at its index. The list's own count is `min_length` and
+  `max_length`'s, so an array may carry both pairs, and the schema states
+  the element's on `"items"`.
 - **`min_length`** and **`max_length`** bound how many elements an `array`
   takes, inclusively, each a non-negative `int`, and are refused on any other
   type. An array that declares no `max_length` is still bounded, by the

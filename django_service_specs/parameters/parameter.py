@@ -102,6 +102,17 @@ class Parameter:
     digit. Any other bound - a string's length, a Validator's ``max_value`` -
     is still the Validator's alone.
 
+    **On an array,** ``format``, ``minimum`` **and** ``maximum`` **describe
+    each element**, as ``choices`` do: an array of ``integer`` or ``number``
+    takes a bound, and an array of ``string`` takes ``format="decimal"`` and
+    then a bound too, which is what a django-filter CSV number filter
+    declares. A decimal is the one format an element takes: a number element
+    is read as a float on the way, which rounds a fraction past a float's
+    precision, where a decimal string is compared and handed on as it was
+    sent. Any other format on an array, and a format or a bound on an
+    element that cannot carry it, is refused. The list's own count is
+    ``min_length`` and ``max_length``'s, so an array may carry both pairs.
+
     ``min_length`` and ``max_length`` bound how many elements an ``array``
     takes, inclusively, and are refused on anything else: each a
     non-negative ``int``. They are checked on the list whole, before any
@@ -159,7 +170,9 @@ class Parameter:
                 raise ImproperlyConfigured(
                     f"{where}: format {self.format!r} is not one of {sorted(FORMATS)}."
                 )
-            if self.type != "string":
+            if self.type == "array":
+                self._check_element_format(where)
+            elif self.type != "string":
                 raise ImproperlyConfigured(
                     f"{where}: a format describes a string; this parameter is {self.type!r}."
                 )
@@ -229,11 +242,24 @@ class Parameter:
                 raise ImproperlyConfigured(
                     f"{where}: {label} {bound!r} is not a finite int or float."
                 )
+        if self.type == "array":
+            # Each element's, as an array's choices are, and so the element's
+            # type is asked. One branch to coverage, so each condition is held
+            # by its own test: test_a_bound_on_an_array_of_numbers_bounds_each_element
+            # (the type) and test_a_decimal_array_reads_each_element_as_a_bounded_decimal
+            # (the format, which ``_check_element_format`` allows on a string
+            # element alone).
+            if self.items not in ("integer", "number") and self.format != "decimal":
+                raise ImproperlyConfigured(
+                    f"{where}: a bound on an array describes each element, which must be a "
+                    "number or a decimal string; declare items 'integer' or 'number', or "
+                    "items 'string' with format 'decimal'."
+                )
         # One branch to coverage, so each condition is held by its own test:
         # test_a_bound_on_an_integer_is_inclusive (the type: without it, an
         # integer's bound is refused) and test_a_decimal_string_takes_a_bound
         # (the format).
-        if self.type not in ("integer", "number") and self.format != "decimal":
+        elif self.type not in ("integer", "number") and self.format != "decimal":
             raise ImproperlyConfigured(
                 f"{where}: a bound describes a number or a decimal string; "
                 f"this parameter is {self.type!r}."
@@ -244,6 +270,29 @@ class Parameter:
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise ImproperlyConfigured(
                 f"{where}: minimum {self.minimum!r} is past maximum {self.maximum!r}."
+            )
+
+    def _check_element_format(self, where: str) -> None:
+        """Refuse a format on an array that its element cannot carry: anything but a decimal string.
+
+        On an array a format describes each element, as its choices do. Only
+        ``decimal`` is read there, because it is the one an element needs: a
+        number element is read as a float on the way, and a fraction past a
+        float's precision loses digits, where a decimal string is compared and
+        handed on as it was sent. A date or a date-time element stays the
+        string its Validator decodes; refused rather than read, since
+        Django's date-time parser takes a comma before the fraction of a
+        second, and a decimal is what a flat reader may split on commas.
+        """
+        if self.items != "string":
+            raise ImproperlyConfigured(
+                f"{where}: a format on an array describes each element, which must be a "
+                "string; declare items 'string'."
+            )
+        if self.format != "decimal":
+            raise ImproperlyConfigured(
+                f"{where}: an array's element takes no format but 'decimal'; "
+                f"{self.format!r} describes a string parameter alone."
             )
 
     def _check_lengths(self, where: str) -> None:

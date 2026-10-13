@@ -442,9 +442,9 @@ async def test_adispatch_filters_an_async_selector_s_rows() -> None:
 
 @pytest.mark.django_db
 def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http() -> None:
-    # A CSV filter's numbers are declared ``number``, so the flat reading
-    # decides them. Read through ``float``, 2**53 + 1 became 2**53 and matched
-    # the neighbour's row; an integer's digits are read as the integer they spell.
+    # Read through ``float``, 2**53 + 1 became 2**53 and matched the
+    # neighbour's row. A CSV filter's numbers are decimal strings, handed on
+    # with every digit they were sent with.
     ada = make_user("ada")
     Note.objects.create(pk=2**53, owner=ada, title="neighbour")
     Note.objects.create(pk=2**53 + 1, owner=ada, title="mine")
