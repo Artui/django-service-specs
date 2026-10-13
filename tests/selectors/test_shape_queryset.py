@@ -11,10 +11,12 @@ from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, QuerySet
+from django.test import RequestFactory
 
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -313,6 +315,35 @@ class TestFilterSet:
             shape_queryset([{"id": 1}], _filtered(TitleFilter), {}, source_label="x")
 
 
+class _Recorded(NoteFilters):
+    """``NoteFilters``, keeping the data it was bound with."""
+
+    seen: ClassVar[list[Any]] = []
+
+    def __init__(self, data: Any = None, queryset: Any = None, **kwargs: Any) -> None:
+        type(self).seen.append(data)
+        super().__init__(data=data, queryset=queryset, **kwargs)
+
+
+@pytest.mark.django_db
+class TestFilterData:
+    def test_a_csv_filter_s_list_reaches_it_as_the_string_it_splits(self) -> None:
+        # At django-filter's declared floor the CSV widget calls ``.split`` on
+        # what it is handed, so a list would raise there. A multiple choice
+        # reads a list as a list, and is handed one.
+        _Recorded.seen.clear()
+        pool = {"pks": [1, 2], "kinds": ["draft", "final"]}
+        shape_queryset(Note.objects.all(), _filtered(_Recorded), pool, source_label="x")
+        assert _Recorded.seen == [{"pks": "1,2", "kinds": ["draft", "final"]}]
+
+    def test_a_csv_filter_sent_a_string_is_handed_it_unchanged(self) -> None:
+        # A transport shaping rows itself may hand over the query string's own
+        # spelling, which is already what the widget splits.
+        _Recorded.seen.clear()
+        shape_queryset(Note.objects.all(), _filtered(_Recorded), {"pks": "1,2"}, source_label="x")
+        assert _Recorded.seen == [{"pks": "1,2"}]
+
+
 @pytest.mark.django_db
 class TestFilterSetThroughDispatch:
     def test_a_filter_argument_narrows_the_list(self) -> None:
@@ -351,6 +382,29 @@ class TestFilterSetThroughDispatch:
         )
         result = dispatch(spec, principal=ada, arguments={"title": "other"})
         assert result.value.title == "other"
+
+
+@pytest.mark.django_db
+def test_a_query_string_reaches_the_filters_through_the_http_transport() -> None:
+    # What a FilterSet is mostly for: ``?archived=false`` read by the HTTP
+    # transport against the spec's Parameters, then dispatched.
+    ada = _three_notes()
+    spec = _filtered(NoteFilters)
+    request = RequestFactory().get("/notes", {"archived": "false", "kinds": ["draft", "final"]})
+    arguments = request_arguments(request, spec.parameters())
+    result = dispatch(spec, principal=ada, arguments=arguments)
+    assert _titles(result.value) == ["draft"]
+
+
+@pytest.mark.django_db
+def test_a_csv_filter_takes_its_values_as_repeated_keys_over_http() -> None:
+    ada = _three_notes()
+    pks = sorted(Note.objects.values_list("pk", flat=True))
+    spec = _filtered(NoteFilters)
+    request = RequestFactory().get("/notes", {"pks": [str(pks[0]), str(pks[2])]})
+    arguments = request_arguments(request, spec.parameters())
+    result = dispatch(spec, principal=ada, arguments=arguments)
+    assert _titles(result.value) == ["draft", "other"]
 
 
 @pytest.mark.django_db(transaction=True)

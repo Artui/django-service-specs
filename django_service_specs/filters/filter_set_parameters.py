@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
+from django_service_specs.filters.utils import import_django_filters
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 
@@ -48,7 +49,7 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     base_filters: dict[str, Any] = dict(getattr(filter_set, "base_filters", None) or {})
     if not base_filters:
         return Parameters()
-    module = _import_django_filters()
+    module = import_django_filters()
     return Parameters(
         tuple(
             parameter
@@ -56,20 +57,6 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
             for parameter in _parameters_for(module, name, filter_obj)
         )
     )
-
-
-def _import_django_filters() -> Any:
-    # Function-local under the optional-dependency exemption: the package never
-    # imports django-filter at the top (a ``filter_set`` is applied by duck
-    # typing), and only reading a declared filter's kind needs its classes.
-    try:
-        import django_filters
-    except ImportError as exc:
-        raise ImportError(
-            "Reading a FilterSet's filters requires the `django-filter` package. "
-            'Install it with `pip install "django-service-specs[filter]"`.'
-        ) from exc
-    return django_filters
 
 
 def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Parameter]:

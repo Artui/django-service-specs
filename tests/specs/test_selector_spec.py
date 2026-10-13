@@ -10,11 +10,12 @@ from django.db.models import Q
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
-from tests.filters.utils import TitleFilter
+from tests.filters.utils import NoteFilters, TitleFilter
 from tests.specs.utils import PK, Named, Nobody
 
 
@@ -180,6 +181,15 @@ class TestFilterSet:
 
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.reads"):
             listing(filter_set=ByUser)
+
+    def test_the_input_schema_describes_each_filter(self) -> None:
+        properties = spec_input_schema(listing(filter_set=NoteFilters))["properties"]
+        assert properties["pk_range_min"] == {
+            "type": "number",
+            "description": "The `min` bound of `pk`.",
+        }
+        assert properties["kinds"]["type"] == "array"
+        assert properties["kinds"]["items"]["enum"] == ["draft", "final"]
 
     def test_it_must_be_callable(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):

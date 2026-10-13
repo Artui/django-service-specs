@@ -14,11 +14,18 @@ from django_service_specs.filters.filter_set_parameters import filter_set_parame
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.filters.utils import NoteFilters, UserFilters
 
 CSV_HELP = "Multiple values may be separated by commas."
+
+
+def _spec(filter_set: Any) -> SelectorSpec:
+    return SelectorSpec(kind=SelectorKind.LIST, selector=list, filter_set=filter_set)
 
 
 def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
@@ -202,17 +209,6 @@ def test_an_object_with_no_filters_reads_as_nothing_and_needs_no_django_filter(
     assert filter_set_parameters(lambda data, queryset: queryset) == Parameters()
 
 
-def test_filters_without_django_filter_installed_name_the_extra(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    class Declares:
-        base_filters: dict[str, Any] = {"title": object()}
-
-    monkeypatch.setitem(sys.modules, "django_filters", None)
-    with pytest.raises(ImportError, match=r"django-service-specs\[filter\]"):
-        filter_set_parameters(Declares)
-
-
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     ("arguments", "titles"),
@@ -230,14 +226,14 @@ def test_an_argument_shaped_by_its_parameter_narrows_the_rows(
 ) -> None:
     # The reading is right only if the argument it describes is the one the
     # FilterSet reads: shaped by the Parameter, passed by the shape check,
-    # accepted by the FilterSet, and narrowing the rows.
+    # accepted by the FilterSet as ``shape_queryset`` binds it, and narrowing
+    # the rows.
     ada = make_user("ada")
     for title, archived in (("draft", False), ("final", True), ("other", False)):
         Note.objects.create(owner=ada, title=title, archived=archived)
     checked = check_arguments(filter_set_parameters(NoteFilters), arguments)
-    bound = NoteFilters(data=checked, queryset=Note.objects.all())
-    assert bound.is_valid(), bound.errors
-    assert sorted(bound.qs.values_list("title", flat=True)) == titles
+    rows = shape_queryset(Note.objects.all(), _spec(NoteFilters), checked, source_label="x")
+    assert sorted(rows.values_list("title", flat=True)) == titles
 
 
 @pytest.mark.django_db
@@ -254,9 +250,8 @@ def test_the_number_shapes_narrow_the_rows(arguments: Any) -> None:
     ada = make_user("ada")
     pks = [Note.objects.create(owner=ada, title=str(n)).pk for n in range(3)]
     checked = check_arguments(filter_set_parameters(NoteFilters), arguments(pks))
-    bound = NoteFilters(data=checked, queryset=Note.objects.all())
-    assert bound.is_valid(), bound.errors
-    assert sorted(bound.qs.values_list("pk", flat=True)) == pks[1:]
+    rows = shape_queryset(Note.objects.all(), _spec(NoteFilters), checked, source_label="x")
+    assert sorted(rows.values_list("pk", flat=True)) == pks[1:]
 
 
 @pytest.mark.django_db
@@ -266,9 +261,8 @@ def test_a_related_row_is_named_by_its_key_as_a_string() -> None:
     Note.objects.create(owner=bob, title="b")
     arguments = {"owner": str(bob.pk), "owners": [str(bob.pk)]}
     checked = check_arguments(filter_set_parameters(NoteFilters), arguments)
-    bound = NoteFilters(data=checked, queryset=Note.objects.all())
-    assert bound.is_valid(), bound.errors
-    assert list(bound.qs.values_list("title", flat=True)) == ["b"]
+    rows = shape_queryset(Note.objects.all(), _spec(NoteFilters), checked, source_label="x")
+    assert list(rows.values_list("title", flat=True)) == ["b"]
 
 
 @pytest.mark.django_db
@@ -286,6 +280,5 @@ def test_the_date_shapes_narrow_the_rows() -> None:
         "joined_at_before": "2026-01-02T11:00:00Z",
     }
     checked = check_arguments(filter_set_parameters(UserFilters), arguments)
-    bound = UserFilters(data=checked, queryset=User.objects.all())
-    assert bound.is_valid(), bound.errors
-    assert list(bound.qs.values_list("username", flat=True)) == ["ada"]
+    rows = shape_queryset(User.objects.all(), _spec(UserFilters), checked, source_label="x")
+    assert list(rows.values_list("username", flat=True)) == ["ada"]
