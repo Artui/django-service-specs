@@ -937,7 +937,9 @@ cannot drift from what it describes:</p>
   <code>read_only</code> above - and never with the call's target, its validated values
   or a client's argument: the caller does not get to decide whether the
   operation is available. Its result is read for truth, so a callable that
-  returns nothing means unavailable.</li>
+  returns nothing means unavailable. It is sync-only and never awaited: an
+  answer still to be awaited is refused with <code>ImproperlyConfigured</code> rather
+  than read as met, since a coroutine is truthy.</li>
 </ul>
 <p><strong>A Python callable over the row is refused.</strong> A rule that has to run once per
 row turns every list reporting availability into a query per row, and
@@ -954,7 +956,9 @@ asked:</p>
 <li>an ORM expression that is not boolean, such as <code>F("title")</code>;</li>
 <li>a callable naming <code>data</code>, <code>instance</code>, <code>collection</code>, <code>result</code> or <code>queryset</code>,
   the names dispatch seeds per call;</li>
-<li>a <code>when</code> that is neither an expression nor a callable;</li>
+<li>a <code>when</code> that is neither an expression nor a callable, or is an async
+  callable - an <code>async def</code>, an object whose <code>__call__</code> is one, or an async
+  generator function;</li>
 <li><code>affordances</code> that is not a sequence - a single <code>Affordance</code>, a set whose
   order would decide which refusal a caller sees, a generator the first call
   would exhaust;</li>

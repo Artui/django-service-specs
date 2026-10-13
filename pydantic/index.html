@@ -1026,7 +1026,7 @@ same parameter:</p>
 </tr>
 <tr>
 <td><code>Literal[...]</code>, an <code>Enum</code> (Django's <code>TextChoices</code> and <code>IntegerChoices</code> included)</td>
-<td>Choices.</td>
+<td>Choices. A Django <code>Choices</code> enum's labels are its <code>choice_labels</code>; a plain <code>Enum</code> and a <code>Literal</code> label nothing.</td>
 </tr>
 <tr>
 <td><code>list[X]</code></td>
@@ -1114,6 +1114,13 @@ reads for the model's own rules: bounds, patterns, validators.</p>
 <p>The context reaches pydantic's validators as <code>info.context</code>, a dict with
 <code>"principal"</code> and <code>"target"</code>, so a <code>field_validator</code> can check a value against
 the caller or the row being updated.</p>
+<p><strong>A partial spec is refused</strong> with <code>ImproperlyConfigured</code> when it is built,
+as one over the dataclass adapter is, and so is a partial call made to the
+Validator directly. pydantic validates a model whole, and a
+<code>model_validator</code> is written against every field being there, so validating
+only the fields sent would skip the model's own rules. A spec whose calls are
+<a href="../declaring/#partial-updates"><code>partial</code></a> uses a <code>FormValidator</code>, or a
+Validator of its own that returns only what was sent.</p>
 <h2 id="output">Output<a class="headerlink" href="#output" title="Permanent link">&para;</a></h2>
 <p><code>PydanticPresenter</code> declares the model's fields in order, then its
 <code>computed_field</code>s. A field declared <code>exclude=True</code> is not output, and a field

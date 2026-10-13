@@ -434,6 +434,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-target-resolved-ahead-of-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A target resolved ahead of the call
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#principals-off-http" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -860,6 +871,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-target-resolved-ahead-of-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A target resolved ahead of the call
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#principals-off-http" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -973,25 +995,43 @@ the async entry point:</p>
 <ol>
 <li><strong>The shape check and the closed argument set</strong>, over <code>spec.parameters()</code>:
    presence, JSON type, format, choices and nullability at every level of
-   nesting, with no query. An argument no parameter declares is refused.</li>
+   nesting, with no query. An argument no parameter declares is refused. A
+   <a href="../declaring/#partial-updates"><code>partial</code></a> write's absent Validator
+   parameters are not refused, nor one its <code>input_data</code> provider is annotated
+   to fill.</li>
 <li><strong>Class-level authorization</strong>: every permission check's <code>has_permission</code>,
    or the <a href="#grants">grant</a> a transport passed instead.</li>
 <li><strong>Target resolution</strong>: a read's own selector, or a write's instance or
-   collection selector, called with the arguments its <code>reads</code> declare, then
-   shaped. A retrieve that finds nothing is <code>kind="not_found"</code>, unless the
-   selector allows <code>None</code>.</li>
-<li><strong>Object-level authorization</strong>: every check's <code>has_object_permission</code>, on a
-   retrieved row. Never on a list, which has no single object to check, and
-   never on a <code>None</code> that <code>allow_none</code> let through.</li>
-<li><strong>Validation</strong>: a write's Validator, on only the arguments it declares, with
-   the resolved target in its context.</li>
-<li><strong>Affordances</strong>: a write's <code>affordances</code>, in declaration order. The first
-   one not met refuses the call with <code>ActionUnavailable</code>, carrying its <code>code</code>.</li>
+   collection selector, called with the arguments its <code>reads</code> declare and
+   what its <code>kwargs</code> provider returns, then shaped. A retrieve that finds
+   nothing is <code>kind="not_found"</code>, unless the selector allows <code>None</code>. A
+   <a href="#a-target-resolved-ahead-of-the-call"><code>target=</code></a> the caller passed stands
+   in for this step.</li>
+<li><strong>Object-level authorization</strong>: every check's <code>has_object_permission</code> on a
+   retrieved row, and its <a href="#permissions"><code>has_scope_permission</code></a> where no
+   single row is: a list a read returns or a write's collection, empty or not,
+   and the <code>None</code> of a create, of a <code>many</code> write and of a missing row a
+   write's <code>allow_none</code> lets through. A read's own <code>None</code> under <code>allow_none</code>
+   is asked of neither.</li>
+<li><strong>Validation</strong>: a write's <code>input_data</code> provider, then its Validator on only
+   the arguments it declares, with the provider's values merged over the
+   caller's, and the resolved target and <code>partial</code> in its context.</li>
+<li><strong>Affordances, then preconditions</strong>: a write's <code>affordances</code>, in
+   declaration order - the first one not met refuses the call with
+   <code>ActionUnavailable</code>, carrying its <code>code</code> - then its <code>preconditions</code>, the
+   first to raise aborting the call with what it raised.</li>
 <li><strong>The run</strong>: the service, inside <code>transaction.atomic()</code> unless the spec says
-   <code>atomic=False</code>, then the output selector if one is declared.</li>
+   <code>atomic=False</code>, called with what its <code>kwargs</code> provider returns beside the
+   validated values, then the output selector if one is declared.</li>
 </ol>
-<p>A read stops after step four: its selector is its run. Its <code>affordances</code> are
-answers about each row, for a list to report, and refuse nothing.</p>
+<p>A read stops after step four and its <code>preconditions</code>, which run on what its
+selector found: its selector is its run. Its <code>affordances</code> are answers about
+each row, for a list to report, and refuse nothing.</p>
+<p>A <a href="../declaring/#many-rows-in-one-call"><code>many</code></a> write resolves nothing in steps
+three and four, where its scope check is asked of <code>None</code>, never of the
+caller's rows. Step one raises only the top level's refusal; a row's is raised
+in step five, beside the Validator's refusals of the other rows, so a
+principal refused in step two learns nothing about the rows it sent.</p>
 <p>The order is the design, and each place reads as if it could move:</p>
 <ul>
 <li><strong>The shape check comes first</strong> because it costs nothing and reveals nothing
@@ -1008,7 +1048,9 @@ answers about each row, for a list to report, and refuse nothing.</p>
   was handed over, named by <code>principal_id</code> or read off <code>request.user</code>.</li>
 <li><strong>Affordances come after object-level authorization and validation</strong>, so a
   principal who may not see the row is never told what state it is in. They
-  come before the run's transaction opens, so a refusal never opens one.</li>
+  come before the run's transaction opens, so a refusal never opens one.
+  Preconditions follow them, in the same place, as djangorestframework-services
+  orders the two.</li>
 </ul>
 <h2 id="the-result">The result<a class="headerlink" href="#the-result" title="Permanent link">&para;</a></h2>
 <p>A <code>DispatchResult</code> has a <code>kind</code> and a <code>value</code>:</p>
@@ -1023,7 +1065,7 @@ answers about each row, for a list to report, and refuse nothing.</p>
 <tbody>
 <tr>
 <td><code>"list"</code></td>
-<td>A <code>LIST</code> read, or a write whose output selector is a <code>LIST</code></td>
+<td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> write with no output selector whose service returned something</td>
 <td>The rows, a queryset when the selector returned one</td>
 </tr>
 <tr>
@@ -1040,7 +1082,8 @@ answers about each row, for a list to report, and refuse nothing.</p>
 </table>
 <p>A write's result also carries <code>service_result</code> (the service's own return,
 before any output selector), <code>instance</code> (the resolved target) and <code>data</code> (the
-validated values the service received).</p>
+Validator's <code>data</code> the service received: the validated values, or the
+instance a <code>DataclassValidator</code> built, or a <code>many</code> write's list of them).</p>
 <p><strong>Not-found is reported, not raised.</strong> A transport decides what a missing row
 means on its own wire - a 404, an exit code, a tool error - and most transports
 have no status codes for the kernel to choose from.</p>
@@ -1099,8 +1142,20 @@ most transports have neither. Checks are <strong>instances</strong>, so a check 
 its own configuration - a codename, a group - and a spec reads as the list of
 checks it applies. <code>has_permission</code> is the class-level check;
 <code>has_object_permission</code> runs on a resolved row and allows unless overridden;
-<code>message</code> is what <a class="autorefs autorefs-internal" title="NotPermitted" href="../reference/#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
-says when the check refuses. A check is sync-only: it may query.</p>
+<code>has_scope_permission</code> is the same question for a call that resolves no
+single row - asked of the set a collection write acts on or a list read
+returns, and of <code>None</code> where the call acts on no existing row, a create - and
+allows unless overridden too. It is a method of its own rather than
+<code>has_object_permission</code> handed a set or <code>None</code>, because a check written for a
+row reads an attribute off it and would fail on either. <code>message</code> is what
+<a class="autorefs autorefs-internal" title="NotPermitted" href="../reference/#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
+says when the check refuses.</p>
+<p><strong>A check is sync-only</strong>: it may query, so the async entry point runs it in
+the executor. An <code>async def</code> method would answer with a coroutine, which is
+truthy and would allow every call, so a spec refuses a check declaring one
+when it is built, with <code>ImproperlyConfigured</code> naming the method. A method that
+hands back a coroutine from a plain <code>def</code> - a decorated <code>async def</code> - is
+refused where its answer is read, so the call fails closed.</p>
 <p><strong>A spec with no permission check is refused</strong>, with <code>ImproperlyConfigured</code>, at
 dispatch and at <a href="../registry/">registration</a>. Off HTTP there is no view whose
 policy an undeclared operation could inherit, and running it anyway is how an
@@ -1128,18 +1183,71 @@ skipping the check, and pays for one class-level evaluation instead of two:</p>
 Carried to another operation or another user it covers nothing, and dispatch
 refuses it with <code>NotPermitted</code>. It covers the class-level check only, unless
 it says <code>target_checked=True</code>, which a transport can claim once it has resolved
-the row and run the object-level check itself; otherwise dispatch still runs
-<code>has_object_permission</code> on the row it resolves. A grant stands in for neither
+the row and run the object-level check itself, and which covers a service
+spec's target only when that target is handed to <code>dispatch</code> as <code>target=</code>;
+otherwise dispatch still runs <code>has_object_permission</code> on the row it resolves.
+A selector spec's claim covers whatever its selector returns. A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And <strong>a grant cannot be
 serialized</strong>: pickling one raises <code>TypeError</code>, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.</p>
-<p><a class="autorefs autorefs-internal" title="authorize" href="../reference/#django_service_specs.authorization.authorize.authorize"><code>authorize</code></a> and
+<p><a class="autorefs autorefs-internal" title="authorize" href="../reference/#django_service_specs.authorization.authorize.authorize"><code>authorize</code></a>,
 <a class="autorefs autorefs-internal" title="authorize_target" href="../reference/#django_service_specs.authorization.authorize_target.authorize_target"><code>authorize_target</code></a>
-are the two checks dispatch runs, exported for a transport that runs them
+and <a class="autorefs autorefs-internal" title="authorize_scope" href="../reference/#django_service_specs.authorization.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
+are the three checks dispatch runs, exported for a transport that runs them
 itself; <code>authorize</code> returns the grant it honoured or a new one covering the
-spec and principal.</p>
+spec and principal, and the other two are skipped under <code>target_checked</code>
+where the target was handed in as <code>target=</code>.</p>
+<h3 id="a-target-resolved-ahead-of-the-call">A target resolved ahead of the call<a class="headerlink" href="#a-target-resolved-ahead-of-the-call" title="Permanent link">&para;</a></h3>
+<p>A page that shows the row before the call acts on it - the form in front of
+an update, the confirmation in front of a delete - must show the row dispatch
+would find, refused where dispatch would refuse it.
+<a class="autorefs autorefs-internal" title="resolve_target" href="../reference/#django_service_specs.dispatch.resolve_target.resolve_target"><code>resolve_target</code></a>
+runs dispatch's own steps for a write's target and nothing else: the
+deactivated principal, the shape check over <strong>the target selector's
+parameters alone</strong>, class-level authorization, then the very lookup and checks
+dispatch runs. A Validator field is neither required nor unknown there, and a
+target read the selector's <code>kwargs</code> provider fills is not required, as in
+dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
+does.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_page</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">found</span> <span class="o">=</span> <span class="n">resolve_target</span><span class="p">(</span><span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">pk</span><span class="p">})</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">found</span><span class="p">,</span> <span class="n">DispatchResult</span><span class="p">):</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>        <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># not found: the answer dispatch would give</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">note</span><span class="p">,</span> <span class="n">grant</span> <span class="o">=</span> <span class="n">found</span>  <span class="c1"># NotPermitted was raised already for anyone else</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">if</span> <span class="n">title</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>        <span class="k">return</span> <span class="n">note</span>  <span class="c1"># the GET: the row the form will act on</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>    <span class="c1"># The POST acts on the row already found and checked: no second lookup,</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="c1"># and the grant says has_object_permission was asked.</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>        <span class="n">rename_note_spec</span><span class="p">,</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>        <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>        <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">pk</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>        <span class="n">target</span><span class="o">=</span><span class="n">note</span><span class="p">,</span>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>        <span class="n">grant</span><span class="o">=</span><span class="n">grant</span><span class="p">,</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="p">)</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="k">return</span> <span class="n">present</span><span class="p">(</span><span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+</span></code></pre></div>
+<p>It returns <code>(target, grant)</code>: the row, the set, or <code>None</code> for a create, and a
+grant covering the spec and the principal with <code>target_checked</code> set. Both go
+to <code>dispatch(..., target=, grant=)</code>, which then looks nothing up and asks no
+object-level or scope check again. The grant is honoured only with the
+target it was resolved for: handed on without <code>target=</code>, dispatch looks the
+row up itself and runs the checks on it. A missing row that <code>allow_none</code> does not
+let through comes back as <code>DispatchResult(kind="not_found")</code>, so it is never
+mistaken for the <code>None</code> it lets through. A read, whose selector is its run,
+raises <code>TypeError</code>, and a <code>many</code> write, which has no target,
+<code>ImproperlyConfigured</code>. It is sync; an async caller hops once with
+<code>sync_to_async</code>.</p>
+<p><code>target=</code> on <code>dispatch</code> and <code>adispatch</code> takes any target the caller resolved -
+what an HTTP view's <code>get_object()</code> found, too - and stands in for step three.
+Step four still runs on it unless the grant says <code>target_checked</code>; without
+<code>target=</code> step four always runs. <code>None</code> is a
+missing row, not-found unless the instance selector says <code>allow_none</code>; a
+create takes <code>None</code> and refuses anything else. <strong>Dispatch trusts it</strong>: the
+target's <code>reads</code> are still checked as declared, and keeping them and the
+target in agreement is the caller's.</p>
 <h3 id="principals-off-http">Principals off HTTP<a class="headerlink" href="#principals-off-http" title="Permanent link">&para;</a></h3>
 <p>HTTP has a session to resolve a user from; a queue payload, a command argument
 or an agent's notion of who is asking carries an identifier.
@@ -1157,12 +1265,16 @@ and <code>dispatch</code> refuses one it is handed, by the same rule.</p>
 before it opens a transaction, a queue validating a task in the worker.
 <a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
 runs the same two steps dispatch does - the shape check over
-<code>spec.parameters()</code>, then the Validator on its own arguments - so a transport
-that binds for itself cannot drift from the gate dispatch applies.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">bind_rename</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="c1"># A transport that binds input itself authorizes and resolves first, then</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="c1"># runs the same shape check and Validator dispatch would have run.</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">return</span> <span class="n">bind_arguments</span><span class="p">(</span><span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">arguments</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">note</span><span class="p">)</span>
+<code>spec.parameters()</code>, relaxing what dispatch relaxes for <code>partial</code> and for a provider's
+filled keys, then the Validator on its own arguments - so a
+transport that binds for itself cannot drift from the gate dispatch applies.
+It runs no provider: a field an <code>input_data</code> provider would fill passes the
+shape check and, left out, is the Validator's to refuse; a read a <code>kwargs</code>
+provider would fill passes too.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">bind_rename</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="c1"># A transport that binds input itself authorizes and resolves first, then</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="c1"># runs the same shape check and Validator dispatch would have run.</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">return</span> <span class="n">bind_arguments</span><span class="p">(</span><span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">arguments</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">target</span><span class="o">=</span><span class="n">note</span><span class="p">)</span>
 </span></code></pre></div>
 <p>It returns the Validator's values: <code>{"title": "Final"}</code> here, without the <code>pk</code>
 the instance selector reads. A read has no Validator, and gets its checked
@@ -1187,9 +1299,22 @@ steps in the same order, from async code, and
 <p><strong>Only the run may be <code>async def</code></strong>: a write's service, or a read's own
 selector. Every other callable a spec carries is sync-only - a permission
 check, a Validator, a Presenter, a selector nested in a write,
-<code>extend_queryset</code>, a seed's resolver - because each may query, and because a
-spec is written once for both entry points: a check written <code>async def</code> could
-not be called from <code>dispatch</code>. The run is the one callable no step shares.</p>
+<code>extend_queryset</code>, <code>filter_set</code>, an affordance's condition, the providers, the
+preconditions, a seed's resolver - each refused with <code>ImproperlyConfigured</code>
+naming its seat if declared <code>async def</code>, when the spec is built - because each may query, and because a spec
+is written once for both entry points: a check written <code>async def</code> could not
+be called from <code>dispatch</code>. The run is the one callable no step shares.</p>
+<p>Most of them are refused when they are declared <code>async def</code>, with
+<code>ImproperlyConfigured</code> naming the seat: a permission check's methods,
+<code>extend_queryset</code>, <code>filter_set</code>, the providers and the preconditions when the
+spec is built, an affordance's condition when it is declared, and a seed's
+resolver when <code>PoolSeeds</code> is built. Each is called from sync code and never
+awaited, and its unawaited answer is truthy, so a check would allow every
+call and a condition would read as met. An answer still to be awaited from a
+plain <code>def</code> is refused where it is read, for a permission check, a condition,
+a seed and <code>extend_queryset</code> alike, so the call fails closed: a lambda calling
+an <code>async def</code> from <code>extend_queryset</code> would otherwise hand dispatch a coroutine
+for the queryset, and a list's value would be that coroutine.</p>
 <p>So <code>adispatch</code> runs the steps in <strong>one</strong> thread-sensitive executor hop, and the
 run's shape decides only what joins it:</p>
 <ul>
@@ -1205,38 +1330,38 @@ run's shape decides only what joins it:</p>
 </ul>
 <p>Every refusal before the run is made inside that hop, an affordance included:
 a condition on the row is a query.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServiceSpec</span><span class="p">,</span> <span class="n">adispatch</span><span class="p">,</span> <span class="n">apresent</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.quickstart</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsOwner</span><span class="p">,</span> <span class="n">rename_note_spec</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">rename_note_async</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">instance</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="k">await</span> <span class="n">instance</span><span class="o">.</span><span class="n">asave</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="k">return</span> <span class="n">instance</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a><span class="c1"># The same declaration as the sync quickstart, with an async run. The permission</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="c1"># check, the selector and the Validator stay sync: adispatch runs them in one</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="c1"># executor hop, and runs this service inside the transaction ``atomic`` opens.</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">arename_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="n">service</span><span class="o">=</span><span class="n">rename_note_async</span><span class="p">,</span>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsOwner</span><span class="p">()],</span>
-</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">validator</span><span class="p">,</span>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">instance_selector_spec</span><span class="p">,</span>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">presenter</span><span class="p">,</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="p">)</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>
-</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>
-</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">rename_from_a_worker</span><span class="p">(</span><span class="n">user_id</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    <span class="c1"># A queue carries an identifier, not a user: adispatch resolves it, and a</span>
-</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>    <span class="c1"># missing or deactivated user is refused with PrincipalUnavailable.</span>
-</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">adispatch</span><span class="p">(</span><span class="n">arename_note_spec</span><span class="p">,</span> <span class="n">principal_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="n">arguments</span><span class="p">)</span>
-</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"not_found"</span><span class="p">:</span>
-</span><span id="__span-5-31"><a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a>        <span class="k">return</span> <span class="kc">None</span>
-</span><span id="__span-5-32"><a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>    <span class="k">return</span> <span class="k">await</span> <span class="n">apresent</span><span class="p">(</span><span class="n">arename_note_spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">ServiceSpec</span><span class="p">,</span> <span class="n">adispatch</span><span class="p">,</span> <span class="n">apresent</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.quickstart</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsOwner</span><span class="p">,</span> <span class="n">rename_note_spec</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">rename_note_async</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">instance</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="k">await</span> <span class="n">instance</span><span class="o">.</span><span class="n">asave</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="k">return</span> <span class="n">instance</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a><span class="c1"># The same declaration as the sync quickstart, with an async run. The permission</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="c1"># check, the selector and the Validator stay sync: adispatch runs them in one</span>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a><span class="c1"># executor hop, and runs this service inside the transaction ``atomic`` opens.</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a><span class="n">arename_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>    <span class="n">service</span><span class="o">=</span><span class="n">rename_note_async</span><span class="p">,</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsOwner</span><span class="p">()],</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">validator</span><span class="p">,</span>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">instance_selector_spec</span><span class="p">,</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="o">.</span><span class="n">presenter</span><span class="p">,</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a><span class="p">)</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">rename_from_a_worker</span><span class="p">(</span><span class="n">user_id</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>    <span class="c1"># A queue carries an identifier, not a user: adispatch resolves it, and a</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>    <span class="c1"># missing or deactivated user is refused with PrincipalUnavailable.</span>
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">adispatch</span><span class="p">(</span><span class="n">arename_note_spec</span><span class="p">,</span> <span class="n">principal_id</span><span class="o">=</span><span class="n">user_id</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="n">arguments</span><span class="p">)</span>
+</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>    <span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">"not_found"</span><span class="p">:</span>
+</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>        <span class="k">return</span> <span class="kc">None</span>
+</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>    <span class="k">return</span> <span class="k">await</span> <span class="n">apresent</span><span class="p">(</span><span class="n">arename_note_spec</span><span class="p">,</span> <span class="n">result</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>adispatch</code> takes exactly one of <code>principal</code> and <code>principal_id</code>. An identifier
 is resolved with <code>resolve_principal</code> inside the hop, since resolving it is a
@@ -1265,26 +1390,29 @@ correlation id, a locale, a clock. A
 channel. Each registration is a name and a resolver, and the resolver's value
 is in every pool dispatch builds - the service's, each selector's,
 <code>extend_queryset</code>'s - for any of them to declare:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">seeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">signature</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">get_username</span><span class="p">())</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">sign_note</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">signature</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="k">return</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">title</span><span class="si">}</span><span class="s2">, by </span><span class="si">{</span><span class="n">signature</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>
-</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">sign_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>    <span class="n">service</span><span class="o">=</span><span class="n">sign_note</span><span class="p">,</span>
-</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
-</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">)</span>
-</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>
-</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>
-</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_signed_note</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span><span class="p">:</span>
-</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="k">return</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">sign_note_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">pool_seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="n">seeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">signature</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">get_username</span><span class="p">())</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">sign_note</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">signature</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">return</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">title</span><span class="si">}</span><span class="s2">, by </span><span class="si">{</span><span class="n">signature</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="n">sign_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>    <span class="n">service</span><span class="o">=</span><span class="n">sign_note</span><span class="p">,</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="p">)</span>
+</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
+</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_signed_note</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span><span class="p">:</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>    <span class="k">return</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">sign_note_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">pool_seeds</span><span class="o">=</span><span class="n">seeds</span><span class="p">)</span>
 </span></code></pre></div>
 <p>A resolver declares what it wants from the pool like any other callable, and
 sees the principal, never an argument: a seed is ambient, and a caller must not
-steer one by naming an argument after something its resolver reads.</p>
+steer one by naming an argument after something its resolver reads. A resolver
+is sync-only: an <code>async def</code> one is refused with <code>ImproperlyConfigured</code> when
+it is registered, and a plain <code>def</code> handing back an awaitable is refused where
+it is resolved.</p>
 <p>A registered name is <strong>reserved</strong>, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
 <code>ImproperlyConfigured</code>; a caller that sends it is refused like any other
@@ -1309,31 +1437,36 @@ pool of the call's run - the service, or a read's own selector - and of that
 spec's callable affordance conditions. A reporter must not raise, because nothing
 between it and the service catches it. Under <code>adispatch</code> a sync run calls it
 on the executor thread, and an <code>async def</code> run on an event loop.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">notes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">))</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="k">for</span> <span class="n">done</span><span class="p">,</span> <span class="n">note</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">notes</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>        <span class="n">progress</span><span class="p">(</span><span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span> <span class="n">message</span><span class="o">=</span><span class="s2">"retitling notes"</span><span class="p">)</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="n">retitle_all_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>    <span class="n">service</span><span class="o">=</span><span class="n">retitle_all</span><span class="p">,</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="p">)</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all_reporting</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">report</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>    <span class="c1"># The transport's own reporter; with none, the service gets null_progress.</span>
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">retitle_all_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">progress</span><span class="o">=</span><span class="n">report</span><span class="p">)</span>
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a>    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">value</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">notes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">))</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">for</span> <span class="n">done</span><span class="p">,</span> <span class="n">note</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">notes</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">title</span> <span class="o">=</span> <span class="n">title</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="n">progress</span><span class="p">(</span><span class="n">done</span><span class="p">,</span> <span class="n">total</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">),</span> <span class="n">message</span><span class="o">=</span><span class="s2">"retitling notes"</span><span class="p">)</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">notes</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="n">retitle_all_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="n">service</span><span class="o">=</span><span class="n">retitle_all</span><span class="p">,</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">Rename</span><span class="p">),</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a><span class="p">)</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">retitle_all_reporting</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">report</span><span class="p">:</span> <span class="n">ProgressReporter</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</span><span id="__span-8-18"><a id="__codelineno-8-18" name="__codelineno-8-18" href="#__codelineno-8-18"></a>    <span class="c1"># The transport's own reporter; with none, the service gets null_progress.</span>
+</span><span id="__span-8-19"><a id="__codelineno-8-19" name="__codelineno-8-19" href="#__codelineno-8-19"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">retitle_all_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"title"</span><span class="p">:</span> <span class="n">title</span><span class="p">},</span> <span class="n">progress</span><span class="o">=</span><span class="n">report</span><span class="p">)</span>
+</span><span id="__span-8-20"><a id="__codelineno-8-20" name="__codelineno-8-20" href="#__codelineno-8-20"></a>    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">value</span>
 </span></code></pre></div>
 <p>With no reporter the pool carries
 <a class="autorefs autorefs-internal" title="null_progress" href="../reference/#django_service_specs.pool.null_progress.null_progress"><code>null_progress</code></a>, so a
 service that declares <code>progress</code> runs unchanged on every transport and in
-tests. A target or output selector always gets <code>null_progress</code>: a lookup has
+tests. A spec's own <code>progress_reporter</code> provider adds a sink of the author's
+beside the transport's - a task record, an audit trail - for the run alone,
+called on its first report, or before an <code>async def</code> run once nothing can
+refuse the call. A service spec refused before its run never calls it; a
+selector spec's selector is its run, so one refused at its object check, its
+scope check or a precondition may already have. A target or output selector always gets <code>null_progress</code>: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.</p>
 

@@ -628,6 +628,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-partial-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A partial update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-decimal-convention" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -810,6 +821,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#a-partial-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A partial update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#the-decimal-convention" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -923,7 +945,8 @@ happened to install.</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="spec_input_schema" href="../reference/#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema(spec, *, unknown_arguments=REJECT)</code></a>
   describes everything <code>spec.parameters()</code> declares: the arguments dispatch
-  checks.</li>
+  checks. A <code>many</code> service spec's is its <code>reads</code> and the one required list
+  <code>many_argument</code> names, each row an object of the Validator's parameters.</li>
 <li><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)</code></a>
   describes what <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a>
   returns for the spec, or <code>None</code> when the spec declares no output. With
@@ -1000,18 +1023,25 @@ default, and <code>published_on</code> and <code>pk</code> may be null:</p>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">        </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="w">          </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">},</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="w">          </span><span class="nt">"price"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"decimal"</span><span class="p">},</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">          </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="nt">"enum"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"draft"</span><span class="p">,</span><span class="w"> </span><span class="s2">"published"</span><span class="p">],</span><span class="w"> </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="s2">"draft"</span><span class="p">},</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">          </span><span class="nt">"published_on"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="s2">"null"</span><span class="p">],</span><span class="w"> </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"date"</span><span class="p">,</span><span class="w"> </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">},</span>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">          </span><span class="nt">"pk"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"null"</span><span class="p">],</span><span class="w"> </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">        </span><span class="p">},</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">        </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span><span class="w"> </span><span class="s2">"price"</span><span class="p">],</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">        </span><span class="nt">"additionalProperties"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">      </span><span class="p">}</span>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">  </span><span class="p">},</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"name"</span><span class="p">],</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">  </span><span class="nt">"additionalProperties"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="p">}</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="w">          </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="w">            </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="w">            </span><span class="nt">"anyOf"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="w">              </span><span class="p">{</span><span class="nt">"const"</span><span class="p">:</span><span class="w"> </span><span class="s2">"draft"</span><span class="p">,</span><span class="w"> </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Draft"</span><span class="p">},</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="w">              </span><span class="p">{</span><span class="nt">"const"</span><span class="p">:</span><span class="w"> </span><span class="s2">"published"</span><span class="p">,</span><span class="w"> </span><span class="nt">"title"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Published"</span><span class="p">}</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="w">            </span><span class="p">],</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a><span class="w">            </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="s2">"draft"</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="w">          </span><span class="p">},</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="w">          </span><span class="nt">"published_on"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"string"</span><span class="p">,</span><span class="w"> </span><span class="s2">"null"</span><span class="p">],</span><span class="w"> </span><span class="nt">"format"</span><span class="p">:</span><span class="w"> </span><span class="s2">"date"</span><span class="p">,</span><span class="w"> </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">},</span>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="w">          </span><span class="nt">"pk"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"integer"</span><span class="p">,</span><span class="w"> </span><span class="s2">"null"</span><span class="p">],</span><span class="w"> </span><span class="nt">"default"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">}</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a><span class="w">        </span><span class="p">},</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a><span class="w">        </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span><span class="w"> </span><span class="s2">"price"</span><span class="p">],</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a><span class="w">        </span><span class="nt">"additionalProperties"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a><span class="w">      </span><span class="p">}</span>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"name"</span><span class="p">],</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a><span class="w">  </span><span class="nt">"additionalProperties"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-3-30"><a id="__codelineno-3-30" name="__codelineno-3-30" href="#__codelineno-3-30"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>Its output selector re-reads the author once the write has committed, so the
 output may be null (see <a href="#what-a-spec-returns">what a spec returns</a>), and the
@@ -1061,20 +1091,60 @@ contradict, and states everything the declaration knows.</p>
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on <code>items</code>, and gain <code>null</code> there by
   the element's nullability alone, never by the array's.</li>
+<li><strong>Labelled choices are an <code>anyOf</code></strong> of <code>{"const": value, "title": label}</code>
+  in place of the <code>enum</code>, where some label says more than its value, as the
+  book's <code>status</code> above shows; labels that only repeat their values keep the
+  <code>enum</code>. A choice with no label is a bare <code>{"const": value}</code>, and a <code>null</code>
+  is <code>{"type": "null"}</code>, titled when it is labelled: the <code>null</code> a nullable
+  parameter gains among them. Each value is listed once, so the entries are
+  disjoint and <code>anyOf</code> admits exactly what <code>oneOf</code> would. It is <code>anyOf</code>
+  because a model provider's schema dialect is narrower than JSON Schema: an
+  OpenAI strict schema refuses <code>oneOf</code>, and so does Gemini, while Google's
+  transform empties a <code>{"const": null}</code> into <code>{}</code>, which matches every
+  value. A title is rendered when the schema is built, so a lazy label is in
+  the language active then, and it constrains nothing. What a spec returns
+  still states labelled choices as a <code>oneOf</code>.</li>
+<li><strong>A file is <code>{}</code>.</strong> No JSON value is one, so any type stated for it would be
+  false, and JSON Schema has no keyword for a multipart part. Whether it is
+  required, and its <code>description</code>, are still stated.</li>
+<li><strong>An <code>any</code> is <code>{}</code> too</strong>, since every JSON value is one; its <code>default</code> and
+  <code>description</code> are stated as on any other node. Like a file's, its node
+  admits <code>null</code> whether or not it is <code>nullable</code>, and the shape check is what
+  refuses a <code>null</code> it does not allow.</li>
 <li><strong><code>required</code> lists what the shape check refuses when absent</strong>: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it
   is not listed.</li>
+<li><strong>A partial update requires only its reads.</strong> A <code>partial</code> spec's
+  Validator parameters are listed in no <code>required</code>, at any depth, because
+  dispatch refuses none of them absent; see <a href="#a-partial-update">a partial update</a>.</li>
 <li><strong>A value JSON cannot carry is left out whole.</strong> A default of
   <code>Decimal("9.99")</code> or <code>date.today</code>, or a choice set holding one, would break
   the encoding every transport performs on the schema, so it is not stated
   rather than restated in a form the declaration did not choose. Leaving out
   only the unencodable choices would claim the others are refused.</li>
 </ul>
-<p>What stays incomplete is only what the declaration does not carry. There are
-no bounds (<code>maxLength</code>, <code>minimum</code>) because Parameters has none yet; the
-Validator enforces them, and adding them to Parameters would reach the schema
-too.</p>
+<p>What stays incomplete is only what the declaration does not carry. A
+Parameter's <code>minimum</code> and <code>maximum</code> are stated as <code>"minimum"</code> and
+<code>"maximum"</code>; a bound only the Validator holds, a <code>maxLength</code> or a form field's
+<code>max_value</code>, is not. JSON Schema reads <code>minimum</code> and <code>maximum</code> on a number
+instance alone, so on a decimal string a validating client enforces neither:
+the shape check does, and the schema tells a reader where the line is.</p>
+<h3 id="a-partial-update">A partial update<a class="headerlink" href="#a-partial-update" title="Permanent link">&para;</a></h3>
+<p>A spec declaring <code>partial=True</code> takes any subset of its Validator's
+parameters, so its schema lists none of them in <code>required</code>: not at the top,
+not in an object's fields, not in an array's rows. A client reading
+<code>required</code> to decide what to send would otherwise never send the partial call
+the spec exists for. The spec's <code>reads</code> and its target selector's keep their
+<code>required</code>, as dispatch keeps them, so the schema still says which row the
+update names. An update whose target selector reads <code>pk</code> and whose Validator
+requires <code>title</code> and <code>body</code> has <code>"required": ["pk"]</code>.</p>
+<p>On a <code>many</code> spec the list stays required and each row requires nothing.
+<code>parameters()</code> is unchanged: it still says what a whole update needs, and
+the schema is where the relaxing happens. A read a <code>kwargs</code> provider fills
+is still listed as declared;
+<a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
+is how a transport finds those.</p>
 <h3 id="the-decimal-convention">The decimal convention<a class="headerlink" href="#the-decimal-convention" title="Permanent link">&para;</a></h3>
 <p>A decimal is <code>{"type": "string", "format": "decimal"}</code>. The shape check also
 accepts a JSON number for one, because every decimal validator does, and the
@@ -1147,6 +1217,10 @@ on its presenter:</p>
 <td>A service spec with no output selector, with <code>allow_none=True</code></td>
 <td>the item, with <code>"null"</code> in its type</td>
 </tr>
+<tr>
+<td>A <code>many</code> service spec with no output selector</td>
+<td><code>{"type": "array", "items": &lt;item&gt;}</code>, with <code>"null"</code> in its type under <code>allow_none=True</code></td>
+</tr>
 </tbody>
 </table>
 <p>A <code>RETRIEVE</code> selector spec without <code>allow_none</code> answers a missing row as
@@ -1186,9 +1260,10 @@ an output selector, <code>allow_none</code> changes nothing: a <code>RETRIEVE</c
 service's return.</p>
 <h2 id="what-is-deliberately-not-emitted">What is deliberately not emitted<a class="headerlink" href="#what-is-deliberately-not-emitted" title="Permanent link">&para;</a></h2>
 <ul>
-<li><strong>No <code>title</code> on input.</strong> A Parameter has no label. On output, a field's
-  <code>label</code> becomes its <code>title</code>, and adapters set a label only where the author
-  wrote one, so a title is never the field's name restated.</li>
+<li><strong>No <code>title</code> on an input property.</strong> A Parameter has no label of its own;
+  on input a <code>title</code> is only ever a choice's. On output, a field's <code>label</code>
+  becomes its <code>title</code>, and adapters set a label only where the author wrote
+  one, so a title is never the field's name restated.</li>
 <li><strong>No <code>additionalProperties</code> on output.</strong> Output is not a set a caller can get
   wrong, and a transport may add keys of its own to what it sends.</li>
 <li><strong>No <code>default</code> or <code>description</code> on output.</strong> A default says what happens when

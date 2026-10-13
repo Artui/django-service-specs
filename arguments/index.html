@@ -842,6 +842,33 @@ type check and bounds read the int. <code>5.5</code> is still refused, and a <co
 keeps its float. DRF's <code>IntegerField</code>, like Django's form field, reads
 <code>str(value)</code>, so given <code>1e16</code> it reads <code>"1e+16"</code> and refuses it; the check
 follows JSON Schema and hands on <code>10000000000000000</code>.</p>
+<p><strong>A string spelling a number is that number</strong> where an <code>integer</code> or a
+<code>number</code> is declared, wherever the declaration reaches, and the number is
+handed on: <code>"3"</code>, <code>"3.0"</code> and <code>" 3 "</code> are 3, and a number's <code>"1e3"</code> is
+1000.0. Django's forms and pydantic's lax mode both read these strings so,
+and the reading is the one <a href="#flat-transports"><code>coerce_flat</code></a> makes, which the
+check shares. Where the two differ it is Django's: an integer's <code>"5."</code> and
+<code>"5 .0"</code> are 5, which pydantic's <code>int</code> refuses. A string that spells no such
+number is refused as the type it is not, and <code>true</code> is still neither. The
+number goes on rather than the string because a Validator stricter than those
+two, the dataclass adapter's, refuses <code>"3"</code> for an <code>int</code>.</p>
+<p><strong>Only an ASCII string spells an <code>integer</code> or a <code>number</code></strong>, and this is the one
+place the check is stricter than Django's forms. Python's <code>int</code> and <code>float</code>,
+and so Django's number fields, read Arabic-Indic and fullwidth digits and
+strip any Unicode space; no JSON number is spelled so, and pydantic refuses
+them. <code>"\u0665"</code>, the JSON spelling of an Arabic-Indic five, is refused as the
+type it is not, by the check and by <code>coerce_flat</code> alike. A <code>decimal</code> string is
+not read this way: it is checked as Python's <code>Decimal</code> reads it, which takes
+those digits too.</p>
+<p>A <strong><code>file</code></strong> is a Django <code>File</code>, an upload included, and nothing else is one:
+no JSON value can be, so a JSON caller's string for one is refused at its
+name.</p>
+<p>An <strong><code>any</code></strong> declares no type, so every value is one and is handed on exactly
+as it arrived: a <code>"3"</code> stays the string, never read as the number it spells.
+<code>null</code> is still refused unless the parameter is <code>nullable</code>, and NaN and the
+infinities are still no JSON value. Nothing is checked against a type, so a
+value of no JSON type is handed on too: a Python caller's, or a multipart
+upload sent under the parameter's name.</p>
 <p>NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
 <code>number</code> type, and only a decoder reading an overflowing literal such as <code>1e400</code>,
@@ -852,6 +879,14 @@ refused with <code>"Enter a number."</code>; any other type refuses one as the w
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.</p>
+<p>Under <code>partial=True</code> no absent parameter is refused, at any depth: a partial
+update sends only what changes. A value that is present is checked as it would
+be otherwise, and an unknown key is still refused. Dispatch relaxes a
+<a href="../declaring/#partial-updates"><code>partial</code></a> write's Validator parameters, and a
+parameter a provider is annotated to fill, so a transport checking a call as
+dispatch will calls
+<a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
+rather than <code>check_arguments(partial=True)</code>.</p>
 <p>It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument
 passes without exercising the Validator.</p>
@@ -943,6 +978,12 @@ first, as one tree in <code>.detail</code> addressed by path:</p>
   DRF's spelling of the same idea, so a transport that renders either's errors
   reads these without a translation table.</li>
 </ul>
+<p>A <a href="../declaring/#many-rows-in-one-call"><code>many</code></a> write's rows are addressed the
+same way, under its <code>many_argument</code>: <code>{"items": {2: {"title": [...]}}}</code>, a
+message about a row itself under <code>non_field_errors</code> inside it, and the list's
+own refusal - absent, null, not a list - as <code>{"items": [...]}</code>. The shape
+check's refusals of some rows and the Validator's of others come back in the
+one tree.</p>
 <p>Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what <code>json.dumps</code> does. The
 messages are spelled as Django's own form fields spell them wherever one has
@@ -983,6 +1024,8 @@ directed by the declaration.</p>
   one answer that cannot set a flag the caller meant to clear.</li>
 <li>A decimal, a date-time and a date <strong>stay strings</strong>, for the Validator to
   decode, exactly as they would arrive off a JSON wire.</li>
+<li><strong>An <code>any</code> stays the string it arrived as</strong>: it declares no type to read the
+  string as, so <code>?pk=3</code> reaches the Validator as <code>"3"</code>, not 3.</li>
 <li>An array's elements are coerced by its <code>items</code> type, and a single value
   becomes a one-element list, since a flat transport sends a one-element list
   as a bare value.</li>

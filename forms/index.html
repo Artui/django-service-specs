@@ -584,6 +584,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#partial-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial updates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clearing-a-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clearing a file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-modelform-behind-an-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -792,6 +814,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#partial-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Partial updates
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#clearing-a-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Clearing a file
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#a-modelform-behind-an-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -967,17 +1011,22 @@ extends.</p>
 <td>An <code>array</code> of the same. It validates to a queryset.</td>
 </tr>
 <tr>
+<td><code>FileField</code>, <code>ImageField</code></td>
+<td>A <code>file</code>, which a multipart request carries and a Python caller hands as a Django <code>File</code>. The form is bound with it as its <code>files</code>, where a file field reads, and its own checks run on it. An optional one also declares its <a href="#clearing-a-file">clear checkbox</a>.</td>
+</tr>
+<tr>
 <td>any other <code>CharField</code> (<code>EmailField</code>, <code>URLField</code>, <code>SlugField</code>, <code>UUIDField</code>, <code>RegexField</code>, <code>GenericIPAddressField</code>)</td>
 <td>A <code>string</code>.</td>
 </tr>
 </tbody>
 </table>
-<p>A choice set given as a callable is computed per form and may query, so it is
-not read: the field is declared as a <code>string</code> with no choices, which every
+<p>Every choice field's choices carry their labels as <code>choice_labels</code>, the label
+Django displays keyed by the value as the caller sends it, so a schema states
+each as a <code>title</code>. A choice set given as a callable is computed per form and
+may query, so it is not read: the field is declared as a <code>string</code> with no choices, which every
 choice field accepts, and the form checks the choice when it validates.</p>
 <p>Refused, with <code>ImproperlyConfigured</code>:</p>
 <ul>
-<li><code>FileField</code> and <code>ImageField</code>: an upload does not cross a JSON transport.</li>
 <li><code>JSONField</code>: it takes any JSON value, and a parameter declares one type.</li>
 <li><code>MultiValueField</code>, such as <code>SplitDateTimeField</code>: it is cleaned from several
   widget values at once, which only an HTML form sends. Declare a field per
@@ -1022,6 +1071,55 @@ returns with the rest.</p>
 <p>The form is built from the arguments alone - <code>data=</code>, and <code>instance=</code> for a
 <code>ModelForm</code> - so a form whose <code>__init__</code> requires anything more, such as the
 signed-in user, cannot be used as it is.</p>
+<h2 id="partial-updates">Partial updates<a class="headerlink" href="#partial-updates" title="Permanent link">&para;</a></h2>
+<p>On a <a href="../declaring/#partial-updates"><code>partial</code></a> spec's call, every field the
+arguments do not name is taken off the bound form before it validates, so it
+is neither required nor cleaned, and <code>validate()</code> returns no key for it: an
+absent <code>BooleanField</code> does not come back <code>False</code>, nor an absent <code>CharField</code>
+<code>''</code>, which an update would write over the row. A value that is sent is
+checked exactly as on a whole call, so a required field may be left out but
+not sent empty. On a <code>ModelForm</code> the fields left out keep the target's
+values, and each one's own model check skips them. Its uniqueness checks and
+constraints do not: they run over the row as it would be saved, what was sent
+on top of the target's values, and leave out only the model fields the form
+never declares, as a whole call does. An update that sends one field of a
+<code>unique_together</code> pair or a <code>UniqueConstraint</code> and collides is refused as the
+whole call would be, under <code>non_field_errors</code>, rather than failing with an
+<code>IntegrityError</code> when the row is saved. That needs a target row: a partial
+call with none checks only what was sent. <code>clean()</code> sees only
+what was sent, so it reads <code>cleaned_data</code> with <code>get</code>. The parameters are the
+same for both calls: <code>required</code> says what a whole call needs.</p>
+<h2 id="clearing-a-file">Clearing a file<a class="headerlink" href="#clearing-a-file" title="Permanent link">&para;</a></h2>
+<p>Django clears an optional file through its widget's clear checkbox, which a
+<code>ClearableFileInput</code> - the default widget of a <code>FileField</code> and an
+<code>ImageField</code> - posts beside the file as <code>&lt;name&gt;-clear</code>. The adapter declares
+that checkbox as a parameter of its own, a <code>boolean</code> right after the file, so
+the closed argument set, the shape check and the schema all know it. A
+<code>ModelForm</code> over <code>title</code>, an <code>attachment</code> declared <code>blank=True</code> and a
+required <code>scan</code> declares <code>title</code>, <code>attachment</code>, <code>attachment-clear</code> and
+<code>scan</code>, in that order.</p>
+<p>It is the only way a caller clears a file: <code>null</code> keeps the file the row
+holds, as a form reads no data beside an initial value, and <code>false</code> is
+refused as not a file.</p>
+<ul>
+<li><strong>Checked with no upload</strong>, the form cleans the field to <code>False</code>, its own
+  value for a cleared file. <code>validate()</code> returns it under the field's name,
+  <code>{"attachment": False}</code>, and nothing under the checkbox's. A <code>ModelForm</code>
+  writes it as no file through the model field's <code>save_form_data</code>, and so do
+  the <a href="../relations/#the-helpers">mutation helpers</a>: a service handing the
+  validated values to <code>update_from_input(row, data)</code> clears the file with no
+  more code.</li>
+<li><strong>Unchecked</strong>, or absent, the file is kept.</li>
+<li><strong>Checked beside an upload</strong>, the form refuses the pair under the field's
+  name, in its own words.</li>
+<li><strong>On a partial call</strong>, a checked checkbox sends its file field, so
+  <code>{"attachment-clear": true}</code> alone clears the file; an unchecked one is
+  what an absent one is, and leaves the field out.</li>
+</ul>
+<p>A required file field has no checkbox, since its widget never reads one, and
+neither has a file field whose widget is not a <code>ClearableFileInput</code>. A form
+field already named as a checkbox would read the same argument, so it is
+refused when the Validator is built.</p>
 <h2 id="a-modelform-behind-an-update">A ModelForm behind an update<a class="headerlink" href="#a-modelform-behind-an-update" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">User</span> <span class="o">=</span> <span class="n">get_user_model</span><span class="p">()</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
