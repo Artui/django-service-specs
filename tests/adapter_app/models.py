@@ -50,6 +50,26 @@ class Document(models.Model):
         app_label = "adapter_app"
 
 
+class Photo(models.Model):
+    """A row whose image stores its dimensions in two columns of its own.
+
+    ``ImageField`` writes ``w`` and ``h`` on the instance whenever the file is
+    set, so a save narrowed to the image column leaves the stored dimensions
+    behind. ``thumbnail`` declares no dimension columns, so clearing it writes
+    nothing else. ``book`` lets a nested write reach a photo; no test needs
+    Pillow, since a cleared image has no dimensions to read.
+    """
+
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True, related_name="photos")
+    image = models.ImageField(upload_to="photos", blank=True, width_field="w", height_field="h")
+    w = models.PositiveIntegerField(null=True)
+    h = models.PositiveIntegerField(null=True)
+    thumbnail = models.ImageField(upload_to="thumbnails", blank=True)
+
+    class Meta:
+        app_label = "adapter_app"
+
+
 class Edition(models.Model):
     """A printing of a book, one per number, held by a ``UniqueConstraint``.
 

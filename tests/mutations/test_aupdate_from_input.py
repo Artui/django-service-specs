@@ -12,7 +12,14 @@ from django.utils import timezone
 
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.types.unset import UNSET
-from tests.mutations.utils import STORED, stored_document, stored_name
+from tests.adapter_app.models import Document
+from tests.mutations.utils import (
+    STORED,
+    stored_document,
+    stored_name,
+    stored_photo,
+    stored_photo_columns,
+)
 from tests.relations_app.models import Author, Post, Tag, Timestamped
 
 
@@ -153,3 +160,27 @@ class TestFileFields:
         replaced = await aupdate_from_input(row, {"attachment": upload})
         assert replaced.changed_fields == ("attachment",)
         assert await sync_to_async(stored_name)(row) == "documents/new.txt"
+
+    async def test_a_file_is_written_through_its_field_s_save_form_data(self, media: str) -> None:
+        # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
+        row = await sync_to_async(stored_document)()
+        attachment = Document._meta.get_field("attachment")
+        with patch.object(attachment, "save_form_data") as save_form_data:
+            await aupdate_from_input(row, {"attachment": False, "title": "New"})
+        save_form_data.assert_called_once_with(row, "")
+        assert row.title == "New"
+
+
+@pytest.mark.django_db(transaction=True)
+class TestImageDimensions:
+    """As ``update_from_input``: an image's dimension columns are saved with it."""
+
+    async def test_clearing_an_image_clears_its_stored_dimensions(self) -> None:
+        row = await sync_to_async(stored_photo)()
+        await aupdate_from_input(row, {"image": False})
+        assert await sync_to_async(stored_photo_columns)(row) == {
+            "image": "",
+            "w": None,
+            "h": None,
+            "thumbnail": "thumbnails/x.png",
+        }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 from asgiref.sync import sync_to_async
@@ -107,3 +108,14 @@ class TestFileFields:
             {"title": "T", "attachment": None, "scan": SimpleUploadedFile("scan.txt", b"s")},
         )
         assert left.changed_fields == ("title", "scan")
+
+    async def test_a_file_is_written_through_its_field_s_save_form_data(self, media: str) -> None:
+        # Last, as ``construct_instance`` writes a ModelForm's files.
+        scan = SimpleUploadedFile("scan.txt", b"s")
+        scan_field = Document._meta.get_field("scan")
+        with patch.object(
+            scan_field, "save_form_data", wraps=scan_field.save_form_data
+        ) as save_form_data:
+            result = await acreate_from_input(Document, {"title": "T", "scan": scan})
+        save_form_data.assert_called_once_with(result.instance, scan)
+        assert await sync_to_async(stored_name)(result.instance, "scan") == "scans/scan.txt"

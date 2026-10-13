@@ -15,7 +15,8 @@ runs, and the helpers own persistence only.
   builds a row from `data`, saves it, then writes its relations.
 - [`update_from_input(instance, data, ...)`][django_service_specs.mutations.update_from_input.update_from_input]
   writes only the fields whose value changed, with a minimal
-  `save(update_fields=...)` (`auto_now` fields are added to it), then
+  `save(update_fields=...)` (`auto_now` fields, and a changed image's
+  `width_field` and `height_field`, are added to it), then
   reconciles its relations. `update_fields=False` makes it a full save, and a
   list names the columns exactly.
 - [`apply_input(instance, data)`][django_service_specs.mutations.apply_input.apply_input]
