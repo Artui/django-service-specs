@@ -40,8 +40,9 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
-**Only an ASCII string spells an `integer` or a `number`**, and this is the one
-place the check is stricter than Django's forms. Python's `int` and `float`,
+**Only an ASCII string spells an `integer` or a `number`**, and this is one of
+two places the check is stricter than Django's forms, the other being
+[the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
 and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
 them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
@@ -70,6 +71,44 @@ refused with `"Enter a number."`; any other type refuses one as the wrong type.
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.
+
+### How long a list may be
+
+**An array's length is read before any of its elements**, so a list longer
+than it takes is refused whole, at its name, and costs no per-element work.
+A parameter's `min_length` and `max_length` bound it inclusively. One that
+declares no `max_length` is still bounded, by the
+**`SERVICE_SPECS_MAX_ARRAY_LENGTH`** setting: 1000 unless the project sets
+another count, the line Django's `DATA_UPLOAD_MAX_NUMBER_FIELDS` draws for a
+form body, or `None`, which bounds no array. A declared `max_length` outranks
+the setting either way, wider or narrower. The setting is read at the call,
+so `override_settings` reaches a spec built at import.
+
+```python
+--8<--
+docs/examples/arguments.py:length
+--8<--
+```
+
+Like the ASCII rule and a declared `minimum` or `maximum`, this is a place
+the check can be stricter than the library behind it, on purpose: a list is a
+cost its caller controls the size of. Each row of
+a [`many`](declaring.md#many-rows-in-one-call) call is a Validator run inside
+one transaction, and each value of a django-filter `in` lookup is one query
+variable, past whose limit the database refuses the query and the caller
+gets a 500 rather than a refusal. The default reaches every array the
+declaration reaches - a row's own array included, a CSV filter's, a `many`
+call's list of rows - and a project whose Validator takes longer lists
+raises the setting or declares the `max_length`. A `min_length` past the
+setting on a parameter with no `max_length` of its own is a declaration no
+call could meet, refused as `ImproperlyConfigured` at the call and when its
+schema is built, since the setting cannot be read where the parameter is
+written.
+
+The messages are DRF's, `"Ensure this field has no more than {max_length}
+elements."` and `"Ensure this field has at least {min_length} elements."`: no
+Django catalog entry counts a list's elements, and DRF's catalog translates
+these wherever DRF is installed.
 
 Under `partial=True` no absent parameter is refused, at any depth: a partial
 update sends only what changes. A value that is present is checked as it would
@@ -181,7 +220,12 @@ docs/examples/arguments.py:flat
   string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value
   becomes a one-element list, since a flat transport sends a one-element list
-  as a bare value.
+  as a bare value. **An array longer than it takes is refused whole**, before
+  any element is parsed, by [the same length rule](#how-long-a-list-may-be) as
+  the shape check's. A query string's `?ids=1,2,3` is split into no more
+  than one element past the most the array takes, so a value of a million
+  commas is refused without becoming a million elements first: Django's
+  `DATA_UPLOAD_MAX_NUMBER_FIELDS` counts keys, and a comma list is one.
 - **A parameter with nested Parameters is refused by name** - an object, or an
   array of rows, has no flat spelling - with `"This argument has nested
   parameters, which a flat transport cannot send."`, rather than passing the

@@ -15,7 +15,12 @@ from django.utils.translation import gettext
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type, parse_number
+from django_service_specs.parameters.utils import (
+    NON_FIELD_ERRORS,
+    expected_type,
+    length_problem,
+    parse_number,
+)
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
@@ -58,11 +63,12 @@ def check_arguments(
 ) -> dict[str, Any]:
     """The shape check: what a caller can get wrong that the declaration can see.
 
-    Presence, JSON type, format, bounds, choices and nullability, at every
+    Presence, JSON type, format, bounds, length, choices and nullability, at every
     level of nesting, with no query. It is what runs at enqueue time and in front of an
     untrusted caller's Validator, so a malformed call is refused before it costs
     a row lookup, and **it is no stricter than the libraries behind it**, with
-    two exceptions named below, ASCII digits and a declared bound. So a
+    three exceptions named below: ASCII digits, a declared bound, and the
+    length of an array. So a
     decimal accepts a JSON number as well as a string, because every decimal
     validator does, and a check stricter than the worker refuses what would
     have run.
@@ -126,6 +132,14 @@ def check_arguments(
       conversion builds every digit of the value. A decimal string is compared as the decimal it
       spells, which reads its exponent and builds none of its digits, so
       ``"1E+999999999"`` is refused as fast as ``"2"`` is taken.
+    - **An array's length** is read before any of its elements: within its
+      ``min_length`` and ``max_length``, and where it declares no maximum,
+      within the ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the
+      project says otherwise. **The third exception**, since that default is
+      the kernel's and may be stricter than the library behind it: a list is
+      a cost its caller controls the size of, one Validator run per row of a
+      ``many`` call and one query variable per value of an ``in`` filter.
+      The refusal is the list's own, at its name, in DRF's words.
     - ``choices`` constrain the value, and an array's choices constrain each of
       its elements, since an array is never one of a list of scalars.
     - An ``object`` with no ``fields`` is free-form: its type is checked and
@@ -224,6 +238,11 @@ def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
         )
     if not _is_json_type("array", value):
         return None, [expected_type("array")]
+    # The list whole, before any element is read, so one past its maximum
+    # costs no per-element work: test_an_array_past_its_maximum_is_refused_before_any_element_is_read.
+    problem = length_problem(param, len(value))
+    if problem is not None:
+        return None, [problem]
     items = param.items
     rows: Parameters | None
     if isinstance(items, Parameters):

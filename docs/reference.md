@@ -8,6 +8,18 @@ The pydantic adapters are the one exception. pydantic is an optional extra,
 so they are exported from `django_service_specs.adapters.pydantic` alone, and
 importing the package root never imports pydantic.
 
+## Settings
+
+One Django setting, read at the call rather than at import, so
+`override_settings` reaches a spec built before it.
+
+- **`SERVICE_SPECS_MAX_ARRAY_LENGTH`**: the most elements an array argument
+  takes where its parameter declares no `max_length`, and the most rows a
+  `many` call carries where its spec declares no `many_max_length`. `1000`
+  when unset; `None` bounds no array. Anything but a non-negative `int` or
+  `None` is refused as `ImproperlyConfigured` where it is read. See
+  [how long a list may be](arguments.md#how-long-a-list-may-be).
+
 ## Specs
 
 ::: django_service_specs.specs.service_spec.ServiceSpec

@@ -98,6 +98,19 @@ class ServiceSpec:
             once for the whole call - a confirmation - is a read. Naming
             anything but the default on a spec that is not ``many`` is
             refused, since nothing would read it.
+        many_min_length: The fewest rows a ``many`` call may carry, as the
+            list's own ``min_length``. ``None`` by default, so an empty list
+            runs the service on no rows; ``1`` is how a spec refuses an empty
+            one. A list short of it is refused at ``many_argument``, as a
+            whole, before any row is checked.
+        many_max_length: The most rows a ``many`` call may carry, as the
+            list's own ``max_length``. Where it is ``None``, as by default, the
+            ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting bounds the list, 1000
+            unless the project sets another, since every row is one Validator
+            run inside one transaction. A list past it is refused at
+            ``many_argument``, as a whole, before any row is checked. Each of
+            the two is refused on a spec that is not ``many``, and a pair no
+            list could meet when the spec is built.
         validator: Validates the arguments its own ``parameters()`` declare. A
             [`Validator`][django_service_specs.validation.validator.Validator]
             instance; ``None`` for an operation that takes no arguments beyond
@@ -205,6 +218,11 @@ class ServiceSpec:
     # the name in force and no transport restates the default.
     many: bool = False
     many_argument: str = _DEFAULT_MANY_ARGUMENT
+    # The list's own ``min_length`` and ``max_length``, under ``many_``: the
+    # list is an array parameter, so its bounds are an array's rather than a
+    # second concept, and ``allow_empty=False`` is ``many_min_length=1``.
+    many_min_length: int | None = None
+    many_max_length: int | None = None
     validator: Validator | None = None
     instance_selector_spec: SelectorSpec | None = None
     collection_selector_spec: SelectorSpec | None = None
@@ -342,7 +360,7 @@ class ServiceSpec:
             self, [*_read_seats(self), ("ServiceSpec.validator", own, "ServiceSpec.input_data")]
         )
         if self.many:
-            own = Parameters.of(_the_list(self.many_argument, items=own))
+            own = Parameters.of(_the_list(self, items=own))
         assembled = _beside_the_target(self) + own
         return check_reserved(assembled, label="ServiceSpec.validator")
 
@@ -365,9 +383,16 @@ def _beside_the_target(spec: ServiceSpec) -> Parameters:
     return (target.parameters() if target is not None else Parameters()) + spec.reads
 
 
-def _the_list(name: str, *, items: Parameters | None = None) -> Parameter:
-    """A ``many`` spec's list: required, each element a row of ``items``."""
-    return Parameter(name, "array", required=True, items=items)
+def _the_list(spec: ServiceSpec, *, items: Parameters | None = None) -> Parameter:
+    """A ``many`` spec's list: required, bounded as declared, each element a row of ``items``."""
+    return Parameter(
+        spec.many_argument,
+        "array",
+        required=True,
+        items=items,
+        min_length=spec.many_min_length,
+        max_length=spec.many_max_length,
+    )
 
 
 def _check_many(spec: ServiceSpec) -> None:
@@ -399,6 +424,18 @@ def _check_many(spec: ServiceSpec) -> None:
                 "the argument a list of rows travels under, and this spec takes no list; "
                 "set many=True or remove it."
             )
+        # Each name held by its own case of test_a_length_without_many_is_refused,
+        # since coverage cannot see one dropped from the tuple; a ``None``
+        # written out declares nothing
+        # (test_a_length_of_none_written_out_without_many_is_not_a_declaration).
+        for field_name in ("many_min_length", "many_max_length"):
+            length = getattr(spec, field_name)
+            if length is not None:
+                raise ImproperlyConfigured(
+                    f"ServiceSpec declares {field_name}={length!r} without many=True. It bounds "
+                    "the list of rows a many call carries, and this spec takes no list; set "
+                    "many=True or remove it."
+                )
         return
     if spec.validator is None:
         raise ImproperlyConfigured(
@@ -415,7 +452,17 @@ def _check_many(spec: ServiceSpec) -> None:
     # The list beside the reads is two sources of one argument if a read shares
     # its name, which ``+`` refuses, and a seed's name is refused as any
     # parameter's is. Neither needs the Validator, so both are refused here.
-    check_reserved(spec.reads + Parameters.of(_the_list(name)), label="ServiceSpec.many_argument")
+    # The list's own Parameter reads the two lengths, so a length no list could
+    # meet is refused by the one rule every array's is
+    # (test_a_length_no_list_could_meet_is_refused_at_construction).
+    try:
+        the_list = _the_list(spec)
+    except ImproperlyConfigured as refused:
+        raise ImproperlyConfigured(
+            "ServiceSpec.many_min_length and many_max_length bound the list under "
+            f"ServiceSpec.many_argument, which takes no such bound: {refused}"
+        ) from refused
+    check_reserved(spec.reads + Parameters.of(the_list), label="ServiceSpec.many_argument")
 
 
 def _check_partial(spec: ServiceSpec) -> None:

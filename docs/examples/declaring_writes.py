@@ -30,6 +30,8 @@ add_notes_spec = ServiceSpec(
     permissions=[IsSignedIn()],
     validator=DataclassValidator(NoteIn),  # what each row is
     many=True,  # the rows travel under "items"
+    many_min_length=1,  # an empty list is refused rather than run on no rows
+    many_max_length=200,  # and so is one past 200, before any row is read
     reads=Parameters.of(Parameter("archived", "boolean")),  # asked once, beside the list
 )
 # --8<-- [end:many]

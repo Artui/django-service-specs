@@ -50,11 +50,13 @@ from django_service_specs import (
     ServiceValidationError,
     SpecRegistry,
     ValidationContext,
+    check_arguments,
     coerce_flat,
     dispatch,
     error_response,
     present,
     server_owned_keys,
+    spec_input_schema,
     update_from_input,
 )
 from docs.examples import (
@@ -229,6 +231,31 @@ class TestDeclaringWrites:
             "Apples",
             "Pears",
         ]
+
+    def test_an_empty_list_is_refused_at_the_list(self, ada: Any) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(declaring_writes.add_notes_spec, principal=ada, arguments={"items": []})
+        assert refused.value.detail == {"items": ["Ensure this field has at least 1 elements."]}
+
+    def test_a_list_past_its_maximum_is_refused_before_any_row_is_read(self, ada: Any) -> None:
+        # Every row is malformed, and none is addressed: the list is refused whole.
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                declaring_writes.add_notes_spec,
+                principal=ada,
+                arguments={"items": [{"title": 3}] * 201},
+            )
+        assert refused.value.detail == {
+            "items": ["Ensure this field has no more than 200 elements."]
+        }
+        assert not Note.objects.exists()
+
+    def test_the_schema_states_both_lengths(self) -> None:
+        schema = spec_input_schema(declaring_writes.add_notes_spec)
+        assert (
+            schema["properties"]["items"]["minItems"],
+            schema["properties"]["items"]["maxItems"],
+        ) == (1, 200)
 
     def test_another_argument_beside_the_list_is_refused(self, ada: Any) -> None:
         with pytest.raises(InvalidArguments) as refused:
@@ -424,6 +451,23 @@ class TestArguments:
 
     def test_a_flat_transport_reads_strings_as_typed_json(self) -> None:
         assert arguments.from_argv(arguments.ARGV) == arguments.TYPED
+
+    def test_an_array_is_bounded_where_it_declares_no_maximum(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.IDS, {"ids": list(range(1001))})
+        assert refused.value.detail == arguments.TOO_LONG
+        assert check_arguments(arguments.IDS, {"ids": list(range(1000))})["ids"][-1] == 999
+
+    def test_a_declared_length_bounds_it_both_ways(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.PAGE, {"ids": []})
+        assert refused.value.detail == arguments.TOO_SHORT
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(arguments.PAGE, {"ids": list(range(51))})
+        assert refused.value.detail == {"ids": ["Ensure this field has no more than 50 elements."]}
+
+    def test_a_setting_of_none_bounds_no_array(self) -> None:
+        assert len(arguments.unbounded({"ids": list(range(1001))})["ids"]) == 1001
 
     def test_a_boolean_has_four_spellings(self) -> None:
         with pytest.raises(InvalidArguments) as refused:

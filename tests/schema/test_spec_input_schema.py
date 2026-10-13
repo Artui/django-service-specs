@@ -82,6 +82,7 @@ class TestSpecInputSchema:
             "properties": {
                 "rows": {
                     "type": "array",
+                    "maxItems": 1000,
                     "items": {
                         "type": "object",
                         "properties": {"title": {"type": "string"}},
@@ -123,6 +124,7 @@ def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
             "confirmed": {"type": "boolean"},
             "items": {
                 "type": "array",
+                "maxItems": 1000,
                 "items": {
                     "type": "object",
                     "properties": {"title": {"type": "string"}},

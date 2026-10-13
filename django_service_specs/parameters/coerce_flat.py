@@ -9,7 +9,7 @@ from django.utils.translation import gettext
 
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import parse_number
+from django_service_specs.parameters.utils import length_problem, parse_number
 
 # Messages are translated where they are raised, never at import, and spelled as
 # a stock Django field spells them where one has the message, so Django's own
@@ -45,6 +45,9 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
       are read the same way, a repeated query-string key's included. A string
       outside ASCII spells no integer or number, Arabic-Indic or fullwidth digits
       included, although Django's fields read them: see ``parse_number``.
+    - **An array longer than it takes is refused whole**, at its name, before
+      any element is read: the shape check's own length rule, which this
+      shares, so a flat list of a million malformed values costs one message.
     - An array's elements are each coerced by its ``items`` type, and a single
       value becomes a one-element list, since a flat transport sends a
       one-element list as a bare value. ``None`` is not wrapped: an option
@@ -86,6 +89,12 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
         # undeclared element is left as the string it arrived as.
         item_type = param.items if isinstance(param.items, str) else "string"
         elements = list(value) if isinstance(value, list | tuple) else [value]
+        # Before any element is parsed, so a long list costs no per-element work:
+        # test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read.
+        problem = length_problem(param, len(elements))
+        if problem is not None:
+            errors[key] = [problem]
+            continue
         found: dict[int, list[str]] = {}
         for index, element in enumerate(elements):
             elements[index], problem = _coerce_one(item_type, element)

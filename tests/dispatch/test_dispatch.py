@@ -15,6 +15,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
+from django.test import override_settings
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
 
@@ -3279,3 +3280,78 @@ class TestMany:
         result = dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
         assert result.kind == "instance"
         assert present(spec, result) is None
+
+    def test_a_list_of_rows_past_the_default_maximum_is_refused_at_the_list(self, ada: Any) -> None:
+        # Refused before any row is checked or validated: one transaction over
+        # every row and one Validator run each is the cost being bounded.
+        service = Record()
+        validator = Titled()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
+        rows = [{"title": 3}] * 1001
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        assert refused.value.detail == {
+            "items": ["Ensure this field has no more than 1000 elements."]
+        }
+        assert validator.calls == []
+        assert service.calls == []
+
+    @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2)
+    def test_a_list_past_its_maximum_is_refused_beside_the_top_level_s_own_refusals(
+        self, ada: Any
+    ) -> None:
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            many=True,
+            validator=Titled(),
+            reads=Parameters.of(Parameter("confirm", "boolean", required=True)),
+        )
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}] * 3})
+        assert refused.value.detail == {
+            "confirm": ["This field is required."],
+            "items": ["Ensure this field has no more than 2 elements."],
+        }
+
+    @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2)
+    def test_a_list_at_its_maximum_runs(self, ada: Any) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Titled())
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        assert service.calls[0]["data"] == [{"title": "a"}, {"title": "b"}]
+
+    def test_many_min_length_is_the_rule_an_empty_list_is_refused_by(self, ada: Any) -> None:
+        service = Record()
+        spec = ServiceSpec(
+            service=service, permissions=OPEN, many=True, validator=Titled(), many_min_length=1
+        )
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": []})
+        assert refused.value.detail == {"items": ["Ensure this field has at least 1 elements."]}
+        assert service.calls == []
+        # A list that meets it is checked as any other: the empty stand-in the
+        # top level is checked with is never held to the minimum.
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+        assert service.calls[0]["data"] == [{"title": "a"}]
+
+    def test_many_max_length_outranks_the_default(self, ada: Any) -> None:
+        spec = ServiceSpec(
+            service=Record(), permissions=OPEN, many=True, validator=Titled(), many_max_length=2
+        )
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}] * 3})
+        assert refused.value.detail == {"items": ["Ensure this field has no more than 2 elements."]}
+
+
+def test_a_json_list_past_the_default_maximum_is_refused_at_its_parameter(ada: Any) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        reads=Parameters.of(Parameter("ids", "array", items="integer")),
+    )
+    with pytest.raises(InvalidArguments) as refused:
+        dispatch(spec, principal=ada, arguments={"ids": list(range(1001))})
+    assert refused.value.detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
+    assert service.calls == []
