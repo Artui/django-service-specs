@@ -463,9 +463,12 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
             continue
         for where, declared, reaching in seats:
             stray = sorted(keys.filled & declared.names())
-            # One arc to coverage: the second conjunct is held by every test
-            # of a provider filling what it reaches, such as
-            # test_a_provider_filling_the_parameters_its_values_reach_is_accepted.
+            # One arc to coverage, so each conjunct is held by its own test:
+            # test_a_key_no_parameter_declares_is_accepted the first (a spec
+            # with no provider reads as one filling nothing, so every spec
+            # would be refused without it), and
+            # test_a_provider_filling_the_parameters_its_values_reach_is_accepted
+            # the second.
             if stray and name != reaching:
                 raise ImproperlyConfigured(
                     f"{name} is annotated to fill {stray}, which {where} declares, and its "
