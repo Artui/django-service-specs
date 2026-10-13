@@ -26,6 +26,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.present import present
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -2693,3 +2694,11 @@ class TestMany:
         dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
         assert asked == ["affordance"]
         assert seen == [[{"title": "a"}, {"title": "b"}]]
+
+    def test_a_many_service_returning_none_presents_none(self, ada: Any) -> None:
+        # The write has committed by the time the result is presented, so a
+        # bulk service with nothing to return must not be refused there.
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())
+        result = dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+        assert result.kind == "instance"
+        assert present(spec, result) is None

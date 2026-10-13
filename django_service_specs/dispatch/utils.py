@@ -85,7 +85,7 @@ class Prepared:
 
 
 @dataclass(frozen=True)
-class CheckedRows:
+class _CheckedRows:
     """A ``many`` spec's list after the shape check: each row's checked arguments, or its refusal.
 
     Carried in the checked arguments under ``many_argument`` rather than
@@ -186,7 +186,7 @@ def shape_check(
     list and the ``reads`` stay required as declared
     (test_partial_leaves_the_list_and_the_reads_required). The list's own
     refusal - absent, null, not a list - and the top level's are raised here;
-    each row's is carried to ``validate_arguments`` as ``CheckedRows``, to be
+    each row's is carried to ``validate_arguments`` as ``_CheckedRows``, to be
     reported with the Validator's.
     """
     # One arc to coverage, each conjunct held by bind_arguments' tests:
@@ -247,7 +247,7 @@ def _check_bulk(
             cleaned[index] = check_arguments(rows, row, unknown_arguments=unknown_arguments)
         except InvalidArguments as refused:
             errors[index] = refused.detail
-    checked[name] = CheckedRows(cleaned, errors)
+    checked[name] = _CheckedRows(cleaned, errors)
     return checked
 
 
@@ -731,7 +731,7 @@ def validate_arguments(
 
 def _validate_rows(
     validator: Validator,
-    checked: CheckedRows,
+    checked: _CheckedRows,
     name: str,
     context: ValidationContext,
     server_input: Mapping[str, Any],
@@ -961,8 +961,13 @@ def finish_service(
     value = result
     # A ``many`` spec's return is the rows it wrote, presented as a list, as
     # djangorestframework-services renders it; an output selector's kind
-    # still decides what its re-read is.
-    kind: Literal["instance", "list"] = "list" if spec.many else "instance"
+    # still decides what its re-read is. A ``None`` it returns stays one
+    # value, presented as ``None`` as any service's is: as a list it would be
+    # refused by ``present`` after the write had committed. One arc to
+    # coverage: test_the_service_runs_once_with_every_validated_row holds the
+    # first conjunct, test_a_many_service_returning_none_presents_none the
+    # second.
+    kind: Literal["instance", "list"] = "list" if spec.many and result is not None else "instance"
     if output_spec is not None:
         pool = call_pool(prepared.principal, pool_seeds, {"result": result})
         value = lookup(

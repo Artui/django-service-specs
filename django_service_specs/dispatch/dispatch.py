@@ -123,7 +123,8 @@ def dispatch(
       conditions on no row, since one on the row is refused when the spec is
       declared - and the ``preconditions`` are answered once.
 
-    ``kind`` is ``"list"`` for it, unless an output selector says otherwise.
+    ``kind`` is ``"list"`` for it, unless an output selector says otherwise
+    or the service returned ``None``, which is presented as ``None``.
 
     ``progress`` is the transport's own progress reporter, seeded under the
     reserved name ``progress`` into the pool of whatever is this call's run -
@@ -150,8 +151,8 @@ def dispatch(
     ``target`` in agreement is the caller's. A selector spec refuses it.
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
-    selector is a LIST, or a ``many`` service with no output selector, and
-    ``"instance"`` otherwise. Nothing is presented here;
+    selector is a LIST, or a ``many`` service with no output selector that
+    returned something, and ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
     transport that hands the object to a template never pays for rendering it.
 
