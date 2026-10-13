@@ -128,11 +128,18 @@ class SelectorSpec:
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
             sink the run reports to beside the transport's - a task record, an
             audit trail - called with the keywords it declares from the base
-            pool. Resolved on first use, so a call refused before its run never
-            calls it, and a provider returning ``None`` declines. The
-            object-level and scope checks and the ``preconditions`` answer
-            after the selector, which is the run, so a call they refuse may
-            already have called it. Refused on a nested selector.
+            pool. The run is the selector, and the provider is called only for
+            a selector that takes ``progress``, once its keywords are bound:
+            a sync selector calls it on its first report, and an ``async
+            def`` one before the await. So a call refused before the run,
+            a read the caller left out included, never calls it, and a
+            provider returning ``None`` declines. The object-level and scope
+            checks and the ``preconditions`` answer after the selector, so a
+            call they refuse may already have called it. Nothing but the
+            selector reports to it: ``extend_queryset``, the
+            ``preconditions`` and the affordance conditions answered for the
+            rows read ``progress`` from the pool, which is the transport's
+            reporter. Refused on a nested selector.
         metadata: A project's own per-operation facts, stored as given and read
             back by its own checks or audit hooks.
     """

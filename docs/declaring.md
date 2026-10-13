@@ -288,9 +288,14 @@ sync-only: an `async def` one is refused when the spec is built.
 - **`progress_reporter`** returns a
   [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
   the run reports to beside the transport's - a task record, an audit trail -
-  called on the run's first report. A service spec refused before its run
-  never calls it; a selector spec's selector is its run, so one refused at
-  its object check, its scope check or a precondition may already have.
+  called only for a run that takes `progress`, once its keywords are bound:
+  on the run's first report, or before the await of an `async def` run. A
+  call refused before its run never calls it; a selector spec's selector is
+  its run, so one refused at its object check, its scope check or a
+  precondition may already have. Nothing but the run reports to it: a
+  selector spec's `extend_queryset`, its preconditions and the affordance
+  conditions answered for its rows read `progress` from the pool, the
+  transport's reporter, as a service spec's conditions do.
 
 Both providers are called from the base pool, the `reads` and the resolved
 target, and never see the Validator's values. A provider returning a name

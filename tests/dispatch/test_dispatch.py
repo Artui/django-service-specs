@@ -2079,6 +2079,60 @@ def test_a_selector_spec_s_precondition_reports_to_the_transport_and_not_the_spe
     assert (sink.reports, transport) == ([1.0], [1.0, 0.5])
 
 
+def test_a_selector_spec_s_queryset_step_and_row_conditions_read_the_transport_s_reporter(
+    ada: Any,
+) -> None:
+    # Only the selector, the run, reports to the spec's sink: what shapes its
+    # rows and what answers each row's affordances are handed the reporter
+    # the transport passed, as a service spec's conditions are.
+    Note.objects.create(owner=ada, title="Row")
+    sink = _Sink()
+    reporter = _Reporter()
+    handed: dict[str, Any] = {}
+
+    def narrowing(*, queryset: Any, progress: Any) -> Any:
+        handed["extend_queryset"] = progress
+        return queryset
+
+    def condition(*, progress: Any) -> bool:
+        handed["condition"] = progress
+        return True
+
+    renaming = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[Affordance(code="open", reason="Closed.", when=condition)],
+    )
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=notes_of,
+        permissions=OPEN,
+        extend_queryset=narrowing,
+        affordances={"rename": renaming},
+        progress_reporter=sink,
+    )
+    rows = list(dispatch(spec, principal=ada, arguments={}, progress=reporter).value)
+
+    assert rows[0].affordance__rename__open is True
+    assert handed == {"extend_queryset": reporter, "condition": reporter}
+    assert sink.resolved == []
+
+
+def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
+    ada: Any,
+) -> None:
+    # Bound and handed a reporter, a selector that never reports never calls
+    # the provider: a sync run resolves it on the first report.
+    sink = _Sink()
+
+    def quiet(*, user: Any, progress: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(kind=LIST, selector=quiet, permissions=OPEN, progress_reporter=sink)
+    dispatch(spec, principal=ada, arguments={})
+    assert sink.resolved == []
+
+
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
     ada: Any,
 ) -> None:
