@@ -13,7 +13,7 @@ transport takes when it binds input for itself.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -33,10 +33,12 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
@@ -131,18 +133,79 @@ def shape_check(
     *,
     unknown_arguments: UnknownArguments,
 ) -> dict[str, Any]:
-    """``check_arguments`` over ``parameters``, told whether the spec's calls are partial.
+    """``check_arguments`` over ``parameters``, leaving out what the Validator will be handed anyway.
 
     One function for ``open_call`` and ``bind_arguments``, so a transport that
-    binds for itself honours ``partial`` exactly where dispatch does. Only a
-    service spec declares ``partial``; a selector spec's call is never one.
+    binds for itself relaxes exactly what dispatch relaxes. Two things, both
+    about the Validator's own parameters and nothing else:
+
+    - **Under** ``partial`` **an absent Validator field is not refused**, at
+      any depth, as djangorestframework-services relaxes only its serializer.
+      A ``reads`` argument and a target selector's read, the ``pk`` among
+      them, stay required as declared: a partial update still needs to say
+      which row it updates
+      (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
+    - **A Validator field the spec's ``input_data`` provider is annotated to
+      fill is not demanded of the caller**, at the top level, since the
+      provider's values are merged over the caller's before the Validator
+      sees them; ``server_owned_keys`` tells a transport to hide exactly that
+      field. It is still required of the merged result, so the Validator
+      refuses it if the provider declines it after all
+      (test_a_filled_field_the_provider_declines_is_refused_by_the_validator).
+      A provider whose return says nothing about its keys relaxes nothing.
+
+    A present value is checked as declared either way, and an unknown key is
+    still refused. Only a service spec has a Validator; a selector spec's call
+    is checked as declared.
     """
-    # One arc to coverage: every selector spec dispatched holds the first
-    # conjunct (a ``SelectorSpec`` has no ``partial``), and
-    # test_the_same_call_on_a_spec_that_is_not_partial_is_refused the second.
-    partial = isinstance(spec, ServiceSpec) and spec.partial
-    return check_arguments(
-        parameters, arguments, unknown_arguments=unknown_arguments, partial=partial
+    # One arc to coverage, each conjunct held by bind_arguments' tests:
+    # test_a_selector_spec_returns_its_checked_arguments (the first: a selector
+    # spec has no ``validator``) and
+    # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
+    if isinstance(spec, ServiceSpec) and spec.validator is not None:
+        own = spec.validator.parameters().names()
+        # ``own`` and not every key the provider fills: ``input_data`` feeds
+        # the Validator alone, so a read it names would reach nothing
+        # (test_a_filled_key_naming_a_read_stays_required).
+        keys = provider_keys(spec.input_data)
+        filled = own & keys.filled if keys is not None else frozenset()
+        parameters = _relaxed(parameters, own if spec.partial else frozenset(), filled)
+    return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+
+
+def _relaxed(parameters: Parameters, everywhere: frozenset[str], top: frozenset[str]) -> Parameters:
+    """``parameters`` with the named ones optional: ``everywhere`` at every depth, ``top`` at the top.
+
+    A copy, made for the shape check alone, so the declaration every other
+    reader sees - the schema, ``required`` - is untouched.
+    """
+    # One arc to coverage, so each conjunct is held by its own test:
+    # test_an_input_data_provider_fills_a_required_validator_field_the_caller_left_out
+    # the first, and
+    # test_a_partial_spec_dispatched_with_one_field_reaches_the_service_with_that_field_alone
+    # the second.
+    if not everywhere and not top:
+        return parameters
+    return Parameters.of(
+        *(
+            _optional(param)
+            if param.name in everywhere
+            else replace(param, required=False)
+            if param.name in top
+            else param
+            for param in parameters
+        )
+    )
+
+
+def _optional(param: Parameter) -> Parameter:
+    """``param`` and everything declared below it made optional, as a partial serializer reads it."""
+    items = param.items
+    return replace(
+        param,
+        required=False,
+        fields=None if param.fields is None else Parameters.of(*map(_optional, param.fields)),
+        items=Parameters.of(*map(_optional, items)) if isinstance(items, Parameters) else items,
     )
 
 

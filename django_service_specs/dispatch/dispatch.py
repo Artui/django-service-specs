@@ -47,8 +47,11 @@ def dispatch(
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()`` under ``unknown_arguments``: the closed
-       argument set and the shape check, which under a service spec's
-       ``partial`` refuses no absent argument. A parameter a registered seed in
+       argument set and the shape check. It refuses no absent Validator field
+       under a service spec's ``partial``, at any depth, while a ``reads``
+       argument and the target's read stay required; nor one the spec's
+       ``input_data`` provider is annotated to fill, which the Validator still
+       refuses if the provider declines it. A parameter a registered seed in
        ``pool_seeds`` occupies is refused before that, as a configuration error.
     2. [`authorize`][django_service_specs.authorization.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything

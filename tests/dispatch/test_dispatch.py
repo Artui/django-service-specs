@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
@@ -15,6 +15,7 @@ from django.db import connection
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
 from pydantic import BaseModel, Field
+from typing_extensions import TypedDict
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
@@ -35,6 +36,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validated import Validated
@@ -1980,3 +1982,168 @@ def test_an_async_run_refused_before_it_starts_never_calls_the_progress_provider
     with pytest.raises(Boom):
         dispatch(spec, principal=ada, arguments={})
     assert sink.resolved == []
+
+
+# --- what the shape check may leave out: under ``partial``, the Validator's
+# fields alone; and a field the spec's ``input_data`` provider fills.
+
+
+def _refused_at_the_shape_check(spec: ServiceSpec, principal: Any, arguments: Any) -> Any:
+    """The shape check's refusal, where a class-level refusal would answer next.
+
+    Each spec here refuses every principal at class level, so a call the shape
+    check lets through is refused as ``NotPermitted`` instead. Without that, an
+    argument the shape check leaves out is refused one step later in the same
+    words, by the selector or the service that asks for it.
+    """
+    with pytest.raises(DispatchError) as caught:
+        dispatch(spec, principal=principal, arguments=arguments)
+    assert isinstance(caught.value, InvalidArguments), caught.value
+    return caught.value.detail
+
+
+def test_a_partial_call_omitting_a_read_is_refused_at_the_shape_check(ada: Any) -> None:
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=PROJECT,
+        validator=FormValidator(_NoteForm),
+        partial=True,
+    )
+    assert _refused_at_the_shape_check(spec, ada, {"title": "Kept"}) == {"project_pk": REQUIRED}
+
+
+def test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check(ada: Any) -> None:
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        validator=FormValidator(_NoteForm),
+        partial=True,
+    )
+    assert _refused_at_the_shape_check(spec, ada, {"title": "Kept"}) == {"pk": REQUIRED}
+
+
+class _Echo(Validator):
+    """Declares ``parameters`` and hands back what it was sent: the shape check's own subject."""
+
+    def __init__(self, parameters: Parameters) -> None:
+        self._parameters = parameters
+
+    def parameters(self) -> Parameters:
+        return self._parameters
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+def test_a_partial_call_may_leave_out_a_validator_field_at_every_depth(ada: Any) -> None:
+    row = Parameters.of(Parameter("title", "string", required=True))
+    declared = Parameters.of(
+        Parameter("rows", "array", required=True, items=row),
+        Parameter("meta", "object", required=True, fields=row),
+        Parameter("tags", "array", items="string"),
+    )
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=_Echo(declared), partial=True)
+    arguments = {"rows": [{}], "meta": {}, "tags": ["a"]}
+    dispatch(spec, principal=ada, arguments=arguments)
+    assert service.calls[0]["data"] == arguments
+    # A present value is still checked, and an unknown key still refused, below
+    # the top as at it.
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"rows": [{"title": 1, "x": 2}]})
+    assert caught.value.detail == {
+        "rows": {0: {"title": ["Expected a string."], "x": ["Unknown argument."]}}
+    }
+
+
+class _ServerTitle(TypedDict):
+    title: str
+
+
+class _ServerProject(TypedDict):
+    project_pk: int
+    title: str
+
+
+def _title_provider(title: Any = "server's") -> tuple[Callable[[], _ServerTitle], list[None]]:
+    """An ``input_data`` provider annotated to fill ``title``, and the list its calls append to.
+
+    A function rather than a recording object: ``provider_keys`` reads a
+    function's return annotation.
+    """
+    calls: list[None] = []
+
+    def server() -> _ServerTitle:
+        calls.append(None)
+        return {"title": title}
+
+    return server, calls
+
+
+def test_an_input_data_provider_fills_a_required_validator_field_the_caller_left_out(
+    ada: Any,
+) -> None:
+    validator = Titled()
+    spec = ServiceSpec(
+        service=Record(), permissions=OPEN, validator=validator, input_data=_title_provider()[0]
+    )
+    dispatch(spec, principal=ada, arguments={})
+    assert validator.calls[0][0] == {"title": "server's"}
+
+
+def test_a_filled_field_the_provider_declines_is_refused_by_the_validator(ada: Any) -> None:
+    provider, calls = _title_provider(title=UNSET)
+
+    class _TitleForm(forms.Form):
+        title = forms.CharField()
+
+    spec = ServiceSpec(
+        service=Record(), permissions=OPEN, validator=FormValidator(_TitleForm), input_data=provider
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"title": REQUIRED}
+    # The Validator answered, since the shape check let the field through: the
+    # provider ran, and it runs after the shape check.
+    assert calls == [None]
+
+
+def test_a_field_the_provider_does_not_name_stays_required(ada: Any) -> None:
+    provider, calls = _title_provider()
+    spec = ServiceSpec(
+        service=Record(), permissions=OPEN, validator=FormValidator(_NoteForm), input_data=provider
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"body": REQUIRED}
+    assert calls == []
+
+
+def test_an_untyped_input_data_provider_relaxes_nothing(ada: Any) -> None:
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=Titled(),
+        input_data=lambda: {"title": "server's"},
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"title": REQUIRED}
+
+
+def test_a_filled_key_naming_a_read_stays_required(ada: Any) -> None:
+    # ``input_data`` feeds the Validator alone, so a read it names is never
+    # filled by it: relaxed, the read would reach nothing at all.
+    def server() -> _ServerProject:
+        return {"project_pk": 1, "title": "server's"}
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=PROJECT,
+        validator=Titled(),
+        input_data=server,
+    )
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
