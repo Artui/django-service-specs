@@ -13,7 +13,7 @@ from typing import Any
 
 import django_filters
 import pytest
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
 from django.http.request import RawPostDataException
@@ -432,6 +432,19 @@ class TestUploads:
             content_type=f"multipart/form-data; boundary={BOUNDARY}",
         )
         assert contents(read(request, files())) == {"count": 2, "notes": scan}
+
+    @pytest.mark.parametrize("method", ["POST", "PATCH"])
+    def test_a_field_past_the_body_size_limit_is_still_refused(self, method: str) -> None:
+        # The limit bounds what is read into memory, and a form field is: only
+        # a file part streams past it.
+        request = FACTORY.generic(
+            method,
+            "/",
+            data=encode_multipart(BOUNDARY, {"title": "x" * (3 * 1024 * 1024)}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        with pytest.raises(RequestDataTooBig):
+            read(request)
 
     def test_a_multipart_body_already_read_is_parsed_from_what_was_read(self) -> None:
         # Something before the view read ``request.body``, so the stream is
