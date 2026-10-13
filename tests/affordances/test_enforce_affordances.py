@@ -7,6 +7,7 @@ is what a transport running a service itself hands it.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import pytest
@@ -14,6 +15,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
+from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -29,6 +32,16 @@ NOT_ARCHIVED = Affordance(
     code="note_archived", reason="An archived note cannot be renamed.", when=Q(archived=False)
 )
 TITLED = Affordance(code="untitled", reason="Give it a title first.", when=~Q(title=""))
+
+
+async def _books_closed() -> bool:
+    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
+    return False
+
+
+def _books_closed_answer() -> Any:
+    """A plain callable handing back the coroutine, which no declaration can refuse."""
+    return _books_closed()
 
 
 def spec_with(*affordances: Affordance) -> ServiceSpec:
@@ -151,6 +164,35 @@ class TestCallableConditions:
             ServiceSpec(service=print, affordances=[closed]), pool_for(ada, None), None
         )
         assert (refused.message, refused.code) == ("The books are closed.", "books_closed")
+
+    def test_a_condition_answering_with_a_coroutine_is_refused_not_read_as_met(
+        self, ada: Any
+    ) -> None:
+        answer = _books_closed()
+        spec = ServiceSpec(
+            service=print,
+            affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
+        )
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            enforce_affordances(spec, pool_for(ada, None), instance=None)
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+    def test_dispatch_does_not_run_a_service_whose_condition_answered_with_a_coroutine(
+        self, ada: Any
+    ) -> None:
+        ran: list[Any] = []
+
+        def service() -> None:
+            ran.append(True)
+
+        spec = ServiceSpec(
+            service=service,
+            permissions=[Unrestricted()],
+            affordances=[Affordance(code="books_closed", reason="r", when=_books_closed_answer)],
+        )
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            dispatch(spec, principal=ada, arguments={})
+        assert ran == []
 
     def test_a_condition_returning_nothing_refuses(self, ada: Any) -> None:
         silent = Affordance(code="silent", reason="r", when=lambda: None)

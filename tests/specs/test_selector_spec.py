@@ -244,3 +244,33 @@ class TestFilterSet:
     def test_it_must_be_callable(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):
             listing(filter_set=3)
+
+
+async def _extend(queryset: object) -> object:
+    return queryset
+
+
+class _AsyncFilterSet:
+    """Called as ``filter_set(data=..., queryset=...)`` like a FilterSet, but ``async def``."""
+
+    async def __call__(self, data: object, queryset: object) -> object:
+        return queryset
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "named"),
+    [
+        ("extend_queryset", _extend, "SelectorSpec.extend_queryset is _extend"),
+        ("filter_set", _AsyncFilterSet(), "SelectorSpec.filter_set is _AsyncFilterSet"),
+    ],
+)
+def test_an_async_shaping_callable_is_refused(field: str, value: object, named: str) -> None:
+    # Called from sync code while the rows are shaped, never awaited: the
+    # coroutine would stand where the queryset should.
+    with pytest.raises(ImproperlyConfigured, match=named + ", an async callable"):
+        listing(**{field: value})
+
+
+def test_a_filterset_class_is_not_mistaken_for_an_async_callable() -> None:
+    # A class's ``__call__`` is its metaclass's, which is sync.
+    assert listing(filter_set=TitleFilter).filter_set is TitleFilter

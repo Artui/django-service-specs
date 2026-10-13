@@ -43,3 +43,42 @@ class RefuseWithMessage(PermissionCheck):
 
     def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
         return False
+
+
+class AnswersWith(PermissionCheck):
+    """Answers every level with the object it was built with, from a plain ``def``.
+
+    The shape construction cannot see: each method is sync, so a spec accepts
+    the check, and what comes back is whatever the test handed in - a
+    coroutine, as a decorated or partial-wrapped ``async def`` returns one.
+    """
+
+    def __init__(self, answer: Any) -> None:
+        self.answer = answer
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return self.answer
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        return self.answer
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        return self.answer
+
+
+async def refuses() -> bool:
+    """Awaited, a refusal. Called sync, a coroutine, which is truthy."""
+    return False
+
+
+class NotACoroutine:
+    """Awaitable through ``__await__`` alone: no ``close()`` to call on it."""
+
+    def __await__(self) -> Any:
+        yield
+        return False
+
+
+async def refuses_lazily() -> Any:
+    """An async generator: not awaitable, never started, and truthy."""
+    yield False

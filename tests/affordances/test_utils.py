@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Iterator
 from typing import Any
 from unittest import mock
@@ -108,6 +109,54 @@ class TestAnswerOperationCondition:
     @pytest.mark.parametrize(("returned", "met"), [(None, False), (0, False), ("yes", True)])
     def test_the_answer_is_read_for_truth(self, returned: Any, met: bool) -> None:
         assert answer_operation_condition(lambda: returned, {}, reserved=RESERVED_POOL_SEEDS) is met
+
+
+async def _books_closed() -> bool:
+    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
+    return False
+
+
+class _NotACoroutine:
+    """Awaitable through ``__await__`` alone: no ``close()`` to call on it."""
+
+    def __await__(self) -> Any:
+        yield
+        return False
+
+
+async def _books_closed_lazily() -> Any:
+    """An async generator: not awaitable, never started, and truthy."""
+    yield False
+
+
+class TestAnAnswerThatIsNotAnAnswer:
+    """A condition is sync-only, and an unawaited answer is truthy: refused, never read as met.
+
+    Each condition is a plain callable returning the object, a shape no
+    declaration can refuse - a lambda, a partial, a decorated ``async def``.
+    Each shape holds one condition of the guard.
+    """
+
+    def test_a_coroutine_is_refused_and_closed(self) -> None:
+        answer = _books_closed()
+
+        def when() -> Any:
+            return answer
+
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable") as caught:
+            answer_operation_condition(when, {}, reserved=RESERVED_POOL_SEEDS)
+        assert "when" in str(caught.value)
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+    def test_an_awaitable_that_is_not_a_coroutine_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            answer_operation_condition(lambda: _NotACoroutine(), {}, reserved=RESERVED_POOL_SEEDS)
+
+    def test_an_async_generator_is_refused(self) -> None:
+        # Not awaitable, so ``isawaitable`` alone would read it as met.
+        answer = _books_closed_lazily()
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            answer_operation_condition(lambda: answer, {}, reserved=RESERVED_POOL_SEEDS)
 
 
 @pytest.mark.django_db
@@ -263,6 +312,19 @@ class TestRowsOfAQuerySet:
         _rows, queries, calls = run(listing(affordances={"edit": EDIT}), ada)
 
         assert (queries, calls) == (1, [])
+
+    def test_a_condition_answering_with_a_coroutine_is_refused_not_projected_as_met(
+        self, ada: Any, two_notes: Any
+    ) -> None:
+        answer = _books_closed()
+        closed = ServiceSpec(
+            service=lambda: None,
+            permissions=OPEN,
+            affordances=[Affordance(code="books_closed", reason="Closed.", when=lambda: answer)],
+        )
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            rows_of(listing(affordances={"rename": closed}), ada)
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
 
     def test_a_callable_condition_is_answered_once_per_call_from_the_seeds_alone(
         self, ada: Any, two_notes: Any

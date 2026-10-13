@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import inspect
+from typing import Any
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
@@ -7,9 +10,19 @@ from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
-from tests.authorization.utils import Allow, Refuse, RefuseWithMessage
+from django_service_specs.specs.service_spec import ServiceSpec
+from tests.authorization.utils import (
+    Allow,
+    AnswersWith,
+    NotACoroutine,
+    Refuse,
+    RefuseWithMessage,
+    refuses,
+    refuses_lazily,
+)
 
 
 def _spec(permissions: list | None) -> SelectorSpec:
@@ -72,3 +85,55 @@ def test_every_check_runs_when_all_pass() -> None:
     authorize(spec, principal)
     assert first.class_level_calls == 1
     assert second.class_level_calls == 1
+
+
+class TestAnAnswerThatIsNotAnAnswer:
+    """A check is sync-only, and an unawaited answer is truthy: refused, never read as a pass.
+
+    Every check here is a plain ``def`` returning the object, the shape a spec
+    cannot refuse at construction, so the refusal comes from where the answer
+    is read. Each shape holds one condition of that guard.
+    """
+
+    def test_a_coroutine_is_refused_and_closed(self) -> None:
+        answer = refuses()
+        spec = _spec([AnswersWith(answer)])
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable") as caught:
+            authorize(spec, object())
+        assert "AnswersWith.has_permission" in str(caught.value)
+        # Not the construction refusal: the spec was accepted, and this is the read.
+        assert "an async callable" not in str(caught.value)
+        # Closed, so nothing is left to warn that it was never awaited.
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+    def test_an_awaitable_that_is_not_a_coroutine_is_refused(self) -> None:
+        spec = _spec([AnswersWith(NotACoroutine())])
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            authorize(spec, object())
+
+    def test_an_async_generator_is_refused(self) -> None:
+        # Not awaitable, so ``isawaitable`` alone would let it through as true.
+        answer = refuses_lazily()
+        spec = _spec([AnswersWith(answer)])
+        with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+            authorize(spec, object())
+
+    def test_the_checks_after_it_are_not_asked(self) -> None:
+        answer, after = refuses(), Allow()
+        with pytest.raises(ImproperlyConfigured):
+            authorize(_spec([AnswersWith(answer), after]), object())
+        assert after.class_level_calls == 0
+
+
+@pytest.mark.django_db
+def test_dispatch_does_not_run_a_service_its_check_answered_with_a_coroutine() -> None:
+    ran: list[Any] = []
+
+    def service() -> None:
+        ran.append(True)
+
+    answer = refuses()
+    spec = ServiceSpec(service=service, permissions=[AnswersWith(answer)])
+    with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+        dispatch(spec, principal=object(), arguments={})
+    assert ran == []

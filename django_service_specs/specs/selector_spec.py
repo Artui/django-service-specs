@@ -65,7 +65,8 @@ class SelectorSpec:
             selector returns something else is refused at dispatch.
         extend_queryset: Applied last, called with the keywords it declares from
             the same pool plus ``queryset``, the shaped queryset so far. It
-            returns the queryset to use.
+            returns the queryset to use. Sync-only, like ``filter_set``: either
+            one declared ``async def`` is refused at construction.
         filter_set: Applied after ``extend_queryset``: a django-filter
             ``FilterSet`` class, or anything called as
             ``filter_set(data=..., queryset=...)`` that answers ``.qs``. Its
@@ -162,7 +163,7 @@ class SelectorSpec:
         if not isinstance(self.reads, Parameters):
             raise ImproperlyConfigured(f"{label}.reads must be Parameters.")
         if self.filter_set is not None:
-            check_callable(self.filter_set, label=f"{label}.filter_set")
+            check_callable(self.filter_set, label=f"{label}.filter_set", sync=True)
         _read_filters(self)
         # After the filters join, so a filter named ``user`` is refused as a
         # read named ``user`` is:
@@ -182,7 +183,7 @@ class SelectorSpec:
                     )
                 object.__setattr__(self, name, tuple(value))
         if self.extend_queryset is not None:
-            check_callable(self.extend_queryset, label=f"{label}.extend_queryset")
+            check_callable(self.extend_queryset, label=f"{label}.extend_queryset", sync=True)
         _check_affordances(self)
         check_providers(self, ("kwargs", "progress_reporter"), label=label)
         object.__setattr__(
