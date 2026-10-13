@@ -47,7 +47,7 @@ BOOK_IN = {
         "price": {"type": "string", "format": "decimal"},
         "status": {
             "type": "string",
-            "oneOf": [
+            "anyOf": [
                 {"const": "draft", "title": "Draft"},
                 {"const": "published", "title": "Published"},
             ],

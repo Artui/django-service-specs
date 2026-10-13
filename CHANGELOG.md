@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PydanticValidator` and `DataclassValidator` refuse a partial call with
   `ImproperlyConfigured`, because each validates every field. A service
   parameter a partial call left out is not refused as missing.
+  `spec_input_schema` lists none of a partial spec's Validator parameters in
+  `required`, at any depth, a `many` spec's rows included, while its `reads`
+  and its target selector's stay required as declared, a read a provider
+  fills among them, which `server_owned_keys` names for a transport to take
+  out; `parameters()` still says what a whole update needs.
 - `ServiceSpec.many` and `many_argument`, for a call carrying a list of rows
   under one argument, `"items"` by default, for one run of the service over
   all of them inside one transaction. Each row is shape-checked and
@@ -107,6 +112,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FileField` or `ImageField` as one and binds it as the form's `files`
   rather than refusing it, and its schema is `{}`, since no JSON value is
   one.
+- An `any` Parameter type, for a parameter that declares no type, as an
+  unannotated argument does: `3` and `"abc"` are both one. Its value is
+  handed on as it arrived, with no coercion, so a query string's `"3"` stays
+  the string `"3"`; `null` is accepted only where it is `nullable`. Its schema
+  is `{}` with its `description` and `default`. `choices` on one, and an
+  array declaring `items="any"`, are refused with `ImproperlyConfigured`, as
+  `format`, `fields`, `items` and a bound already are on anything they do not
+  describe.
 - `Parameter.minimum` and `Parameter.maximum`, an inclusive bound on an
   `integer`, a `number` or a `decimal` string, which the shape check enforces
   in the words of Django's `MinValueValidator` and `MaxValueValidator` and the
@@ -165,10 +178,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carries, in any method's body. An upload the spec declares no parameter for
   was dropped; it now reaches the closed argument set, which refuses it under
   `REJECT`. An upload replaces a form field of the same name.
-- **Breaking:** a parameter whose choices carry labels is described with a
-  `"oneOf"` of `{"const": value, "title": label}` in place of its `"enum"`.
-  That is every choice field of a form, and every Django `Choices` enum in a
-  dataclass or a pydantic model, where a label says more than its value.
+- **Breaking:** a parameter whose choices carry labels is described with an
+  `"anyOf"` of `{"const": value, "title": label}` in place of its `"enum"`,
+  with `{"type": "null"}` for a `null` among them. That is every choice field
+  of a form, and every Django `Choices` enum in a dataclass or a pydantic
+  model, where a label says more than its value. `anyOf` rather than `oneOf`,
+  over entries that are disjoint so the two admit the same values, because
+  an OpenAI strict schema and Gemini both refuse `oneOf`.
 - **Breaking:** an `async def` callable in a seat that is called from sync
   code and never awaited is refused when it is declared, with
   `ImproperlyConfigured` naming the seat: a permission check's methods, a

@@ -53,6 +53,13 @@ A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its
 name.
 
+An **`any`** declares no type, so every value is one and is handed on exactly
+as it arrived: a `"3"` stays the string, never read as the number it spells.
+`null` is still refused unless the parameter is `nullable`, and NaN and the
+infinities are still no JSON value. Nothing is checked against a type, so a
+value of no JSON type is handed on too: a Python caller's, or a multipart
+upload sent under the parameter's name.
+
 NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
 `number` type, and only a decoder reading an overflowing literal such as `1e400`,
@@ -170,6 +177,8 @@ docs/examples/arguments.py:flat
   one answer that cannot set a flag the caller meant to clear.
 - A decimal, a date-time and a date **stay strings**, for the Validator to
   decode, exactly as they would arrive off a JSON wire.
+- **An `any` stays the string it arrived as**: it declares no type to read the
+  string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value
   becomes a one-element list, since a flat transport sends a one-element list
   as a bare value.

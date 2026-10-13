@@ -95,6 +95,13 @@ def check_arguments(
       mistake, not the number one.
     - A ``file`` is a Django ``File``, and nothing else is one: no JSON value
       can be, so a JSON caller's string for it is refused at its name.
+    - **An** ``any`` **is handed on as it arrived**: no type is declared, so
+      nothing is read as a number, and ``"3"`` stays the string ``"3"``. A
+      ``null`` is still refused unless it is ``nullable``, and NaN and the
+      infinities are still no JSON value. A container is not walked, as an
+      undeclared array element's is not, and a value of no JSON type - a
+      Python caller's, or a multipart upload sent under its name - is handed
+      on too.
     - **An integral float is an** ``integer``, and is handed on as an ``int``
       wherever the declaration reaches. JSON Schema counts ``5.0`` as an
       integer, so the ``{"type": "integer"}`` this kernel advertises admits
@@ -204,7 +211,9 @@ def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
         return None, (None if param.nullable else [gettext("This field cannot be null.")])
     if param.type != "array":
         return _check_one(
-            param.type,
+            # ``any`` is the type an undeclared array element has, ``None``:
+            # test_any_value_is_handed_on_unchanged fails without it.
+            None if param.type == "any" else param.type,
             value,
             fmt=param.format,
             fields=param.fields,
