@@ -125,8 +125,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** a string spelling a number is accepted where an `integer` or a
   `number` is declared, and the number is handed on: `"3"` is 3, and a
   number's `"1e3"` is 1000.0. The shape check refused it, from a JSON body
-  too; it now reads it as Django's forms, DRF and pydantic do. A string
-  spelling no number is still refused, and so is `true`.
+  too; it now reads it as Django's forms and pydantic's lax mode do, and as
+  Django's `IntegerField` where the two differ, so an integer's `"5."` is 5.
+  A string spelling no number is still refused, and so is `true`.
+- **Breaking:** only an ASCII string spells a number, in a query string, an
+  argv call and a JSON string alike. Arabic-Indic and fullwidth digits, and a
+  number padded with a Unicode space, were read as the number by a flat
+  transport, as Python's `int` and Django's fields read them; they are now
+  refused as the type they are not, as pydantic and JSON refuse them.
 - **Breaking:** a multipart upload is an argument, under the name its part
   carries, in any method's body. An upload the spec declares no parameter for
   was dropped; it now reaches the closed argument set, which refuses it under

@@ -39,7 +39,9 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
 
     - An integer is read as Django's ``IntegerField`` reads one: ``"5.0"`` and
       ``"5."`` are 5, and ``"5.5"`` is refused. An array's integer elements
-      are read the same way, a repeated query-string key's included.
+      are read the same way, a repeated query-string key's included. A string
+      outside ASCII spells no number, Arabic-Indic or fullwidth digits
+      included, although Django's fields read them: see ``parse_number``.
     - An array's elements are each coerced by its ``items`` type, and a single
       value becomes a one-element list, since a flat transport sends a
       one-element list as a bare value. ``None`` is not wrapped: an option

@@ -299,7 +299,8 @@ def test_a_string_that_is_no_number_is_refused_as_its_type(
 
 
 @pytest.mark.parametrize(
-    "value", ["3", "3.0", " 3 ", "-4.", "1e3", "3.5", "", "abc", "nan", "inf", "1_000"]
+    "value",
+    ["3", "3.0", " 3 ", "-4.", "1e3", "3.5", "", "abc", "nan", "inf", "1_000", "\u0665", "\u00a03"],
 )
 @pytest.mark.parametrize("json_type", ["integer", "number"])
 def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
@@ -317,6 +318,16 @@ def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
     except InvalidArguments:
         checked = None
     assert checked == flat
+
+
+@pytest.mark.parametrize("value", ["\u0665", "\uff15", "\u0665.0", "\u00a05"])
+def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: str) -> None:
+    # Python's ``int`` and ``float`` read Arabic-Indic and fullwidth digits, and
+    # a no-break space around them, and pydantic's lax mode reads none of them.
+    assert refusal(
+        Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number")),
+        {"count": value, "ratio": value},
+    ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
 
 
 def test_true_is_still_no_number_and_no_integer() -> None:

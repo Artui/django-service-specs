@@ -32,12 +32,19 @@ follows JSON Schema and hands on `10000000000000000`.
 **A string spelling a number is that number** where an `integer` or a
 `number` is declared, wherever the declaration reaches, and the number is
 handed on: `"3"`, `"3.0"` and `" 3 "` are 3, and a number's `"1e3"` is
-1000.0. Django's forms, DRF and pydantic's lax mode all read these strings
-so, and their common reading is the one [`coerce_flat`](#flat-transports)
-makes, which the check shares. A string that spells no such number is refused
-as the type it is not, and `true` is still neither. The number goes on rather
-than the string because a Validator stricter than those three, the dataclass
-adapter's, refuses `"3"` for an `int`.
+1000.0. Django's forms and pydantic's lax mode both read these strings so,
+and the reading is the one [`coerce_flat`](#flat-transports) makes, which the
+check shares. Where the two differ it is Django's: an integer's `"5."` and
+`"5 .0"` are 5, which pydantic's `int` refuses. A string that spells no such
+number is refused as the type it is not, and `true` is still neither. The
+number goes on rather than the string because a Validator stricter than those
+two, the dataclass adapter's, refuses `"3"` for an `int`.
+
+**Only an ASCII string spells a number**, and this is the one place the check
+is stricter than Django's forms. Python's `int` and `float`, and so Django's
+number fields, read Arabic-Indic and fullwidth digits and strip any Unicode
+space; no JSON number is spelled so, and pydantic refuses them. `"\u0665"`, the
+JSON spelling of an Arabic-Indic five, is refused as the type it is not, by the check and by `coerce_flat` alike.
 
 A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its
