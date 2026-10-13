@@ -148,6 +148,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Validator can honour a `partial` call by returning only what was sent.
   `True` by default; `DataclassValidator` and `PydanticValidator` set it
   `False`.
+- An optional file field of a `FormValidator` can be cleared. Its widget's
+  clear checkbox, `<name>-clear`, is declared as a `boolean` parameter right
+  after the file, so the closed argument set, which refused it, takes it,
+  and the shape check and the schema describe it. Checked with no upload,
+  the form cleans the field to `False`, returned under the field's name,
+  which a `ModelForm` writes as no file through the model field's
+  `save_form_data`; on a partial call a checked checkbox alone sends its
+  field. Only an optional field whose widget is a `ClearableFileInput`
+  declares one, and a form field named as a checkbox is refused when the
+  Validator is built. Over HTTP it is a flat boolean, `true` or `1`.
 
 ### Changed
 - **Breaking:** a `DataclassValidator` call's `data` is the dataclass

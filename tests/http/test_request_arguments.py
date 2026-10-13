@@ -13,6 +13,7 @@ from typing import Any
 
 import django_filters
 import pytest
+from django import forms
 from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
@@ -20,6 +21,7 @@ from django.http.request import RawPostDataException
 from django.test import RequestFactory
 from django.test.client import encode_multipart
 
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
@@ -523,6 +525,26 @@ class TestUploads:
             "/", data=body, content_type=f"multipart/form-data; boundary={BOUNDARY}"
         )
         assert read(request, files()) == {}
+
+
+class _Cover(forms.Form):
+    cover = forms.FileField(required=False)
+
+
+class TestAClearCheckbox:
+    """An optional file field's clear checkbox, as a ``FormValidator`` declares it."""
+
+    def test_it_is_a_boolean_spelt_as_every_flat_boolean_is(self) -> None:
+        parameters = FormValidator(_Cover).parameters()
+        request = FACTORY.post("/", data={"cover-clear": "true"})
+        assert read(request, parameters) == {"cover-clear": True}
+
+    def test_a_browser_s_default_on_is_refused(self) -> None:
+        # A checkbox with no value attribute posts "on", which a flat boolean
+        # does not spell: the page sets value="true".
+        parameters = FormValidator(_Cover).parameters()
+        request = FACTORY.post("/", data={"cover-clear": "on"})
+        assert refusal(request, parameters) == {"cover-clear": ["Enter true, false, 1 or 0."]}
 
 
 def _merged_multipart(fields: dict[str, Any], uploads: dict[str, Any]) -> bytes:

@@ -68,7 +68,7 @@ extends.
 | `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. |
 | `ModelChoiceField` | The JSON type of the model field rows are matched on - `to_field_name`, or the primary key - and no choices: they are rows, and listing them would query. It validates to the row. |
 | `ModelMultipleChoiceField` | An `array` of the same. It validates to a queryset. |
-| `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. |
+| `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. An optional one also declares its [clear checkbox](#clearing-a-file). |
 | any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
 
 Every choice field's choices carry their labels as `choice_labels`, the label
@@ -147,6 +147,39 @@ whole call would be, under `non_field_errors`, rather than failing with an
 call with none checks only what was sent. `clean()` sees only
 what was sent, so it reads `cleaned_data` with `get`. The parameters are the
 same for both calls: `required` says what a whole call needs.
+
+## Clearing a file
+
+Django clears an optional file through its widget's clear checkbox, which a
+`ClearableFileInput` - the default widget of a `FileField` and an
+`ImageField` - posts beside the file as `<name>-clear`. The adapter declares
+that checkbox as a parameter of its own, a `boolean` right after the file, so
+the closed argument set, the shape check and the schema all know it. A
+`ModelForm` over `title`, an `attachment` declared `blank=True` and a
+required `scan` declares `title`, `attachment`, `attachment-clear` and
+`scan`, in that order.
+
+It is the only way a caller clears a file: `null` keeps the file the row
+holds, as a form reads no data beside an initial value, and `false` is
+refused as not a file.
+
+- **Checked with no upload**, the form cleans the field to `False`, its own
+  value for a cleared file. `validate()` returns it under the field's name,
+  `{"attachment": False}`, and nothing under the checkbox's. A `ModelForm`
+  writes it as no file through the model field's `save_form_data`, which is
+  how a service writes it too:
+  `Document._meta.get_field("attachment").save_form_data(row, attachment)`.
+- **Unchecked**, or absent, the file is kept.
+- **Checked beside an upload**, the form refuses the pair under the field's
+  name, in its own words.
+- **On a partial call**, a checked checkbox sends its file field, so
+  `{"attachment-clear": true}` alone clears the file; an unchecked one is
+  what an absent one is, and leaves the field out.
+
+A required file field has no checkbox, since its widget never reads one, and
+neither has a file field whose widget is not a `ClearableFileInput`. A form
+field already named as a checkbox would read the same argument, so it is
+refused when the Validator is built.
 
 ## A ModelForm behind an update
 

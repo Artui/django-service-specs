@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-from collections.abc import Callable
+import tempfile
+from collections.abc import Callable, Iterator
 from decimal import Decimal
 from typing import Any
 
@@ -19,14 +20,20 @@ from django.utils import translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
-from tests.adapter_app.models import Author, Book, Edition
+from tests.adapter_app.models import Author, Book, Document, Edition
 from tests.relations_app.models import Post, Timestamped
 
 User = get_user_model()
@@ -733,6 +740,8 @@ class TestFiles:
             Parameter("title", "string", required=True),
             Parameter("attachment", "file", required=True),
             Parameter("cover", "file", nullable=True),
+            # Its clear checkbox, which only an optional file offers.
+            Parameter("cover-clear", "boolean"),
         ]
 
     def test_the_upload_is_read_from_the_call_s_arguments(self) -> None:
@@ -754,6 +763,162 @@ class TestFiles:
         validator = FormValidator(_Upload)
         checked = check_arguments(validator.parameters(), {"title": "Notes", "attachment": upload})
         assert validator.validate(checked, CONTEXT)["attachment"] is upload
+
+
+class _DocumentForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["title", "attachment", "scan"]
+
+
+class _BareUpload(forms.Form):
+    # An optional file whose widget offers no clear checkbox.
+    cover = forms.FileField(required=False, widget=forms.FileInput)
+
+
+def _clashing(*, disabled: bool) -> type[forms.BaseForm]:
+    """A form whose field is named as another field's clear checkbox.
+
+    Only reachable through ``base_fields`` set by hand, since a class
+    attribute cannot carry a hyphen.
+    """
+    return type(
+        "_Clashing",
+        (forms.BaseForm,),
+        {
+            "base_fields": {
+                "cover": forms.FileField(required=False),
+                "cover-clear": forms.BooleanField(required=False, disabled=disabled),
+            }
+        },
+    )
+
+
+@pytest.fixture
+def media(settings: Any) -> Iterator[str]:
+    """Default storage in a directory removed after the test, so no upload outlives it."""
+    with tempfile.TemporaryDirectory() as root:
+        settings.MEDIA_ROOT = root
+        yield root
+
+
+def _stored(title: str = "Notes") -> Document:
+    """A saved row holding both files, in the test's media directory."""
+    row = Document(title=title)
+    row.attachment.save("notes.txt", ContentFile(b"notes"), save=False)
+    row.scan.save("scan.txt", ContentFile(b"scan"), save=False)
+    row.save()
+    return row
+
+
+def _row(target: Document) -> ValidationContext:
+    return ValidationContext(None, target)
+
+
+class TestClearingAFile:
+    def test_a_custom_widget_with_no_clear_checkbox_offers_none(self) -> None:
+        assert list(FormValidator(_BareUpload).parameters()) == [
+            Parameter("cover", "file", nullable=True)
+        ]
+
+    def test_a_model_form_s_optional_file_offers_one_and_its_required_one_none(self) -> None:
+        names = [parameter.name for parameter in FormValidator(_DocumentForm).parameters()]
+        assert names == ["title", "attachment", "attachment-clear", "scan"]
+
+    @pytest.mark.parametrize("disabled", [False, True], ids=["a-field", "a-disabled-field"])
+    def test_a_field_named_as_a_clear_checkbox_is_refused(self, disabled: bool) -> None:
+        # A disabled field is no parameter, and still reads the same data key.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            FormValidator(_clashing(disabled=disabled))
+        message = str(refused.value)
+        assert "_Clashing.cover: its clear checkbox, 'cover-clear', is also the name" in message
+        assert "rename the field" in message
+
+    @pytest.mark.django_db
+    def test_without_it_null_keeps_the_file_and_false_is_no_file(self, media: str) -> None:
+        # Why the checkbox is declared: neither JSON value clears a file.
+        row = _stored()
+        validator = FormValidator(_DocumentForm)
+        cleaned = validator.validate({"title": "Notes", "attachment": None}, _row(row))
+        assert cleaned["attachment"] == row.attachment
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(validator.parameters(), {"title": "Notes", "attachment": False})
+        assert refused.value.detail["attachment"] == ["Expected a file."]
+
+    @pytest.mark.django_db
+    def test_the_checkbox_clears_the_file_as_the_form_cleans_it(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"title": "Notes", "attachment-clear": True}, _row(row)
+        )
+        # The form's own value for a cleared file: False, under the field's
+        # name, and nothing under the checkbox's.
+        assert cleaned["attachment"] is False
+        assert "attachment-clear" not in cleaned
+        assert cleaned["scan"] == row.scan
+
+    @pytest.mark.django_db
+    def test_an_unchecked_box_keeps_the_file(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"title": "Notes", "attachment-clear": False}, _row(row)
+        )
+        assert cleaned["attachment"] == row.attachment
+
+    @pytest.mark.django_db
+    def test_an_upload_and_a_checked_box_together_are_refused_in_the_form_s_words(
+        self, media: str
+    ) -> None:
+        upload = SimpleUploadedFile("new.txt", b"new")
+        with pytest.raises(InvalidArguments) as refused:
+            FormValidator(_DocumentForm).validate(
+                {"title": "Notes", "attachment": upload, "attachment-clear": True}, _row(_stored())
+            )
+        contradiction = forms.FileField.default_error_messages["contradiction"]
+        assert refused.value.detail == {"attachment": [contradiction]}
+
+    @pytest.mark.django_db
+    def test_a_partial_call_sending_only_the_checkbox_clears_the_file(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"attachment-clear": True}, ValidationContext(None, row, partial=True)
+        )
+        assert cleaned == {"attachment": False}
+
+    @pytest.mark.django_db
+    def test_a_partial_call_sending_the_box_unchecked_leaves_the_file_out(self, media: str) -> None:
+        # Unchecked is what absent is on a whole call, so it is on a partial
+        # one too: nothing about the file was sent.
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"attachment-clear": False}, ValidationContext(None, _stored(), partial=True)
+        )
+        assert cleaned == {}
+
+    @pytest.mark.django_db
+    def test_dispatch_takes_the_checkbox_and_the_service_clears_the_row(self, media: str) -> None:
+        def clear(instance: Document, attachment: Any) -> Document:
+            # A ModelForm's own write: ``save_form_data`` stores a cleared
+            # file as the empty name.
+            Document._meta.get_field("attachment").save_form_data(instance, attachment)
+            instance.save()
+            return instance
+
+        spec = ServiceSpec(
+            service=clear,
+            permissions=[Unrestricted()],
+            validator=FormValidator(_DocumentForm),
+            instance_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE,
+                selector=lambda pk: Document.objects.get(pk=pk),
+                reads=Parameters.of(Parameter("pk", "integer", required=True)),
+            ),
+            partial=True,
+        )
+        row = _stored()
+        dispatch(spec, principal=None, arguments={"pk": row.pk, "attachment-clear": True})
+        row.refresh_from_db()
+        assert row.attachment.name == ""
+        assert row.scan.name.startswith("scans/")
 
 
 class _Profile(forms.Form):

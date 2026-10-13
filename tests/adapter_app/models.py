@@ -35,6 +35,21 @@ class Book(models.Model):
         ordering = ("pk",)
 
 
+class Document(models.Model):
+    """A row with an optional file and a required one.
+
+    The optional one is what a ``ClearableFileInput`` can clear, and the
+    required one is what it never offers to.
+    """
+
+    title = models.CharField(max_length=100)
+    attachment = models.FileField(upload_to="documents", blank=True)
+    scan = models.FileField(upload_to="scans")
+
+    class Meta:
+        app_label = "adapter_app"
+
+
 class Edition(models.Model):
     """A printing of a book, one per number, held by a ``UniqueConstraint``.
 
