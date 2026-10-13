@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import abc
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, ClassVar
 
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.validation.validated import Validated
@@ -36,6 +36,15 @@ class Validator(abc.ABC):
     Ignoring the flag is the one wrong answer, since the omitted fields would
     come back cleaned to blanks and an update would write them.
 
+    ``supports_partial`` says which of the two a Validator does, so a spec
+    learns it when it is declared rather than on its first call: a
+    ``ServiceSpec`` declaring ``partial=True`` over a Validator whose
+    ``supports_partial`` is ``False`` is refused when it is built. ``True``
+    by default; ``DataclassValidator`` and ``PydanticValidator`` set it
+    ``False``, since each builds every field, and a subclass of either that
+    does handle a partial call sets it back. The refusal at the call stays,
+    for a Validator called directly.
+
     **Sync-only.** A Validator may query - a uniqueness check does - so dispatch
     runs it in the executor on the async path, and it must not be ``async def``.
 
@@ -52,6 +61,10 @@ class Validator(abc.ABC):
     where the library leaves an object the service may want; the rest need
     not touch it.
     """
+
+    # A class attribute rather than a method: it describes what the class
+    # can do with any call, and the spec reads it before there is one.
+    supports_partial: ClassVar[bool] = True
 
     @abc.abstractmethod
     def parameters(self) -> Parameters:

@@ -145,6 +145,11 @@ included, and a larger one raises `RequestDataTooBig`. An
 upload under a name the spec does not declare reaches the closed argument set
 like any undeclared field, and is refused under `REJECT`; a file input left
 empty is no upload, so it is absent. Only a multipart body carries one.
+An optional file's [clear checkbox](forms.md#clearing-a-file) is a field of
+the same body, `attachment-clear=true`, and is read as every flat `boolean`
+is: `true`, `false`, `1` or `0`. A checkbox with no `value` attribute posts
+`on`, which is refused, so a page posting to a `SpecView` gives it
+`value="true"`.
 
 **The URL kwargs are arguments too**, merged last so the route wins a clash, as
 it does in djangorestframework-services. A client-supplied value must not move

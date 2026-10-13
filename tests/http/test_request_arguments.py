@@ -13,6 +13,7 @@ from typing import Any
 
 import django_filters
 import pytest
+from django import forms
 from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
@@ -20,6 +21,7 @@ from django.http.request import RawPostDataException
 from django.test import RequestFactory
 from django.test.client import encode_multipart
 
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
@@ -261,6 +263,14 @@ class TestBlanks:
         # Holds ``type != "string"`` in the blank guard: a string's blank is a
         # value, the empty string, and dropping it would make it unsendable.
         assert read(FACTORY.get("/?title=")) == {"title": ""}
+
+    def test_a_blank_untyped_read_is_kept(self) -> None:
+        # Holds ``"any"`` in the blank guard: an untyped read is handed what
+        # was sent, so ``?pk=`` reaches it as the empty string, as a string's
+        # does, rather than being dropped. Built in the body, so the module
+        # imports on a release whose Parameter has no such type.
+        untyped = Parameters.of(Parameter("pk", "any"))
+        assert read(FACTORY.get("/?pk="), untyped) == {"pk": ""}
 
     def test_blank_elements_of_a_non_string_array_are_dropped(self) -> None:
         assert read(FACTORY.get("/?ids=1&ids=&ids=3")) == {"ids": [1, 3]}
@@ -523,6 +533,26 @@ class TestUploads:
             "/", data=body, content_type=f"multipart/form-data; boundary={BOUNDARY}"
         )
         assert read(request, files()) == {}
+
+
+class _Cover(forms.Form):
+    cover = forms.FileField(required=False)
+
+
+class TestAClearCheckbox:
+    """An optional file field's clear checkbox, as a ``FormValidator`` declares it."""
+
+    def test_it_is_a_boolean_spelt_as_every_flat_boolean_is(self) -> None:
+        parameters = FormValidator(_Cover).parameters()
+        request = FACTORY.post("/", data={"cover-clear": "true"})
+        assert read(request, parameters) == {"cover-clear": True}
+
+    def test_a_browser_s_default_on_is_refused(self) -> None:
+        # A checkbox with no value attribute posts "on", which a flat boolean
+        # does not spell: the page sets value="true".
+        parameters = FormValidator(_Cover).parameters()
+        request = FACTORY.post("/", data={"cover-clear": "on"})
+        assert refusal(request, parameters) == {"cover-clear": ["Enter true, false, 1 or 0."]}
 
 
 def _merged_multipart(fields: dict[str, Any], uploads: dict[str, Any]) -> bytes:

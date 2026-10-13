@@ -139,8 +139,9 @@ The context reaches pydantic's validators as `info.context`, a dict with
 `"principal"` and `"target"`, so a `field_validator` can check a value against
 the caller or the row being updated.
 
-**A partial call is refused** with `ImproperlyConfigured`, as the dataclass
-adapter refuses one. pydantic validates a model whole, and a
+**A partial spec is refused** with `ImproperlyConfigured` when it is built,
+as one over the dataclass adapter is, and so is a partial call made to the
+Validator directly. pydantic validates a model whole, and a
 `model_validator` is written against every field being there, so validating
 only the fields sent would skip the model's own rules. A spec whose calls are
 [`partial`](declaring.md#partial-updates) uses a `FormValidator`, or a

@@ -89,6 +89,9 @@ class PydanticValidator(Validator):
     first use.
     """
 
+    # A partial spec over it is refused when declared: see ``validate()``.
+    supports_partial = False
+
     def __init__(self, model: type[BaseModel]) -> None:
         check_model(model, label="PydanticValidator")
         self.model = model
@@ -113,8 +116,10 @@ class PydanticValidator(Validator):
         there is no partial validation to hand the call to. Validating only
         the fields sent, one by one, would skip the model's own rules; a spec
         whose calls are partial uses a Validator that can return only what was
-        sent. ``validated()`` is the default: the values are the call's
-        ``data``.
+        sent. ``supports_partial`` is ``False``, so a ``ServiceSpec``
+        declaring ``partial=True`` over this Validator is refused when it is
+        built, and this refusal answers only a caller using it directly.
+        ``validated()`` is the default: the values are the call's ``data``.
         """
         if context.partial:
             raise ImproperlyConfigured(

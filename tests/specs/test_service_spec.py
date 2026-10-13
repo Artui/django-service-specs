@@ -151,12 +151,68 @@ class TestInputDataNeedsAValidator:
         assert ServiceSpec(service=print).input_data is None
 
 
+class _WholeOnly(Titled):
+    """A Validator that builds every field, and says so."""
+
+    supports_partial = False
+
+
+def _a_service() -> None: ...
+
+
+class TestPartialNeedsAValidatorThatCanBindPart:
+    """``partial`` is refused when the spec is declared wherever no call could honour it."""
+
+    def test_partial_with_no_validator_is_refused_at_construction(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=_a_service, permissions=[Unrestricted()], partial=True)
+        message = str(refused.value)
+        assert "ServiceSpec for _a_service declares partial=True with no validator" in message
+        assert "declare a validator, or drop partial" in message
+
+    def test_partial_with_no_validator_answers_before_many_does(self) -> None:
+        # Both refuse a spec with no Validator; the partial one is checked
+        # first, so the message names the declaration that does nothing.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=_a_service, many=True, partial=True)
+        message = str(refused.value)
+        assert "declares partial=True with no validator" in message
+        assert "many=True" not in message
+
+    def test_partial_with_a_validator_that_cannot_bind_part_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=_a_service, validator=_WholeOnly(), partial=True)
+        message = str(refused.value)
+        assert "ServiceSpec for _a_service declares partial=True with a _WholeOnly" in message
+        assert "which cannot validate a partial call" in message
+        assert "bind only what was sent, such as FormValidator, or a custom one" in message
+
+    def test_the_same_validator_on_a_whole_spec_is_accepted(self) -> None:
+        # The refusal is about the pair: a Validator that builds every field
+        # serves every spec that is not partial.
+        assert ServiceSpec(service=_a_service, validator=_WholeOnly()).partial is False
+
+    def test_a_validator_that_can_bind_part_is_accepted(self) -> None:
+        assert Titled.supports_partial is True
+        spec = ServiceSpec(service=_a_service, validator=Titled(), partial=True)
+        assert spec.partial is True
+
+    def test_a_validator_class_is_refused_as_not_an_instance_first(self) -> None:
+        # A class has the attribute too, so the instance check must answer
+        # before the partial one reads it.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=_a_service, validator=_WholeOnly, partial=True)
+        message = str(refused.value)
+        assert "is the class _WholeOnly, which is not a Validator instance" in message
+        assert "partial" not in message
+
+
 class TestEngineFields:
     """The fields a dispatch reads beyond the declaration: partial, preconditions, providers."""
 
     def test_partial_is_kept_as_declared_and_off_by_default(self) -> None:
         assert ServiceSpec(service=print).partial is False
-        assert ServiceSpec(service=print, partial=True).partial is True
+        assert ServiceSpec(service=print, validator=Titled(), partial=True).partial is True
 
     def test_the_providers_and_preconditions_are_kept_in_declaration_order(self) -> None:
         def scope() -> dict:

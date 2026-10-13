@@ -191,10 +191,21 @@ reads required as dispatch does.
 
 A Validator returns only the fields the caller sent, or refuses the call.
 [`FormValidator`](forms.md#partial-updates) binds only the sent fields;
-`DataclassValidator` and `PydanticValidator` refuse a partial call with
-`ImproperlyConfigured`, because each builds or validates every field. With
+`DataclassValidator` and `PydanticValidator` cannot, because each builds or
+validates every field, and say so with `supports_partial = False`. With
 those, an update a caller may send in part declares each such field
 optional, as `AuthorPatch` below does.
+
+Two declarations are refused with `ImproperlyConfigured` when the spec is
+built, rather than on every call:
+
+- `partial=True` with no `validator`. Only a Validator's parameters are
+  relaxed, so with none the declaration changes nothing.
+- `partial=True` over a Validator whose `supports_partial` is `False`, such
+  as the dataclass and pydantic adapters. Every call would be refused. The
+  message names the service and the Validator's class; a partial spec needs
+  a Validator that can bind only what was sent, such as a `FormValidator`,
+  or one of its own.
 
 ### Many rows in one call
 
@@ -347,7 +358,7 @@ name declared twice is refused either way.
 
 A [`Validator`][django_service_specs.validation.validator.Validator] turns
 JSON-like arguments into the values a service receives. The contract is two
-methods, and a third with a default:
+methods, and a third method and an attribute with defaults:
 
 - `parameters()` declares what it takes, as `Parameters`. It must never query,
   because a transport describes a spec before any call.
@@ -368,6 +379,10 @@ methods, and a third with a default:
   `data` and nothing bound, so a Validator overrides it only where its `data`
   is not that mapping. A bound value named after a seed, a validated value or
   a parameter is refused.
+- `supports_partial`, a class attribute, says whether `validate()` can honour
+  a [`partial`](#partial-updates) call by returning only what was sent. It is
+  `True` by default. A Validator that builds every field sets it `False`, and
+  a partial spec over it is then refused when the spec is built.
 
 Three things a newcomer may look for are absent on purpose:
 
@@ -391,7 +406,8 @@ the standard library and Django. It reads a dataclass's fields and annotations
 into `Parameters`, and builds the instance from the arguments, nested
 dataclasses included. The call's `data` is the instance it built, so a
 service declaring `data` receives an `AuthorIn` and one declaring the fields
-by name receives them as before. It refuses a partial call.
+by name receives them as before. It cannot validate a partial call, so a
+partial spec over it is refused when the spec is built.
 
 ```python
 --8<--

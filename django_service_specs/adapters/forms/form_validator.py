@@ -125,6 +125,18 @@ class FormValidator(Validator):
       Django ``File``; the form is bound with it as its ``files``, where a
       file field reads, and the form's own checks run on it. A ``ContentFile``
       built with no name is refused by the form, which needs one.
+    - an optional file field whose widget is a ``ClearableFileInput``, as a
+      ``FileField``'s and an ``ImageField``'s are by default, declares its
+      clear checkbox as well: a ``boolean`` named as the widget names it,
+      ``<name>-clear``, right after the file. Checked with no upload, the
+      form cleans the field to ``False``, its own value for a cleared file,
+      which ``validate()`` returns under the field's name and a
+      ``ModelForm`` writes as no file through the model field's
+      ``save_form_data``; checked beside an upload, the form refuses the
+      pair. It is the only way to clear one, since ``null`` keeps the file
+      a row holds and ``false`` is not a file. A required file field, or one
+      whose widget has no checkbox, declares none, and a field named as a
+      checkbox is refused.
 
     Every choice field's choices carry their labels, as ``choice_labels``,
     for a schema to show beside each value: the label Django displays, keyed
@@ -151,7 +163,9 @@ class FormValidator(Validator):
     - ``nullable`` is ``not required``, and always true for a
       ``NullBooleanField``. A form reads ``None`` as an empty value for every
       field, so an optional field takes ``null`` and cleans it to its empty
-      value, and a required one refuses it.
+      value, and a required one refuses it. A clear checkbox is no field:
+      it is optional and never ``null``, since unchecked and absent are
+      the one answer the widget reads.
     - ``default`` is always
       [`UNSET`][django_service_specs.types.unset.UNSET]: a field's ``initial``
       is what an unbound form displays, and a bound form cleans an absent
@@ -188,7 +202,8 @@ class FormValidator(Validator):
     not come back ``False``, nor an absent ``CharField`` ``''``, which an
     update would write over the row. A value that is sent is checked exactly
     as on a whole call, so a required field may be left out but not sent
-    empty. On a ``ModelForm`` the fields left out keep the target's values,
+    empty. A checked clear checkbox sends its file field, and an unchecked
+    one is what an absent one is. On a ``ModelForm`` the fields left out keep the target's values,
     and each one's own model check skips them, as Django skips any model
     field a form does not have. **Its uniqueness checks and constraints do
     not**: they run over the row as it would be saved, what was sent on top
@@ -254,18 +269,28 @@ class FormValidator(Validator):
             # argument that does nothing.
             if not field.disabled
         )
+        # Each optional file field's clear checkbox, by the field's name: see
+        # ``_clear_checkbox``.
+        self._clears: dict[str, str] = {
+            parameter.name: clear
+            for parameter, field in self._declared
+            if (clear := _clear_checkbox(form_class, parameter.name, field)) is not None
+        }
 
     def parameters(self) -> Parameters:
         """The form's class-level fields, in declaration order, as Parameters. Never queries."""
-        return Parameters(
-            tuple(
-                # ``help_text`` is commonly a lazy translation, so it is made a
-                # string here, per call, rather than frozen at import in
-                # whichever language was active then.
-                dataclasses.replace(parameter, help=str(field.help_text) or None)
-                for parameter, field in self._declared
-            )
-        )
+        declared: list[Parameter] = []
+        for parameter, field in self._declared:
+            # ``help_text`` is commonly a lazy translation, so it is made a
+            # string here, per call, rather than frozen at import in whichever
+            # language was active then.
+            declared.append(dataclasses.replace(parameter, help=str(field.help_text) or None))
+            clear = self._clears.get(parameter.name)
+            if clear is not None:
+                # Right after its file, as the widget renders it. Optional and
+                # never null: unchecked and absent are one answer to the form.
+                declared.append(Parameter(clear, "boolean"))
+        return Parameters(tuple(declared))
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
         """The form's ``cleaned_data``, or ``InvalidArguments`` carrying its errors.
@@ -293,7 +318,12 @@ class FormValidator(Validator):
             # Off the form rather than made optional: an optional field still
             # cleans to its empty value, runs its ``clean_<field>()`` on it and,
             # on a ModelForm, is written onto the instance and validated there.
-            for name in form.fields.keys() - arguments.keys():
+            # A checked clear checkbox sends its file field, which the widget
+            # then cleans to ``False``; unchecked, it is what absent is.
+            sent = arguments.keys() | {
+                name for name, clear in self._clears.items() if _checked(arguments, clear)
+            }
+            for name in form.fields.keys() - sent:
                 del form.fields[name]
         if not form.is_valid():
             raise InvalidArguments(_detail(form.errors))
@@ -319,6 +349,46 @@ class FormValidator(Validator):
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
         return form_class(data=data, files=files, instance=instance), instance
+
+
+def _clear_checkbox(form_class: type[forms.BaseForm], name: str, field: forms.Field) -> str | None:
+    """The clear checkbox an optional file field's widget offers, or ``None`` for none.
+
+    Django clears an optional file through a ``ClearableFileInput``'s
+    checkbox, posted beside the file under the name the widget gives it,
+    ``<name>-clear``: checked with no upload, the widget reads the field as
+    ``False``, which the field cleans to ``False`` and a ``ModelForm``
+    writes as no file. Without the checkbox a JSON caller could never clear
+    one, since ``null`` keeps the file a row holds and ``false`` is not a
+    file. So it is declared as a parameter of its own, which the closed
+    argument set, the shape check and the schema all read.
+
+    Only where the widget would read it: a required field's never does, and
+    a widget that is not a ``ClearableFileInput`` has no checkbox. Each
+    condition is held by its own test:
+    test_a_model_form_s_optional_file_offers_one_and_its_required_one_none
+    (the required ``scan``) and
+    test_a_custom_widget_with_no_clear_checkbox_offers_none (the widget).
+    A form field already named as the checkbox would read the same key, so
+    it is refused, disabled or not, since a disabled field is no parameter
+    and still shares the data.
+    """
+    if field.required or not isinstance(field.widget, forms.ClearableFileInput):
+        return None
+    clear = field.widget.clear_checkbox_name(name)
+    # ``base_fields``, as ``__init__`` reads it: the stubs declare it on
+    # neither Form nor ModelForm.
+    if clear in form_class.base_fields:  # ty: ignore[unresolved-attribute]
+        raise ImproperlyConfigured(
+            f"{form_class.__qualname__}.{name}: its clear checkbox, {clear!r}, is also the "
+            "name of a field, and the two would read one argument; rename the field."
+        )
+    return clear
+
+
+def _checked(arguments: Mapping[str, Any], clear: str) -> bool:
+    """Whether ``arguments`` check the clear checkbox, read as the widget reads it."""
+    return bool(forms.CheckboxInput().value_from_datadict(arguments, MultiValueDict(), clear))
 
 
 def _detail(errors: Mapping[str, Any]) -> dict[str, list[Any]]:

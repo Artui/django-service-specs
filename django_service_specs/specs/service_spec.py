@@ -18,6 +18,7 @@ from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
+    callable_name,
     check_callable,
     check_metadata,
     check_permissions,
@@ -73,8 +74,13 @@ class ServiceSpec:
             refuse an absent one, at any depth, and the Validator is told
             through ``ValidationContext.partial``. The spec's ``reads`` and its
             target selector's stay required as declared, so a partial update
-            still names its row, unless a ``kwargs`` provider fills them. On a ``many`` spec it holds inside every row,
-            and the list itself stays required.
+            still names its row, unless a ``kwargs`` provider fills them. On a
+            ``many`` spec it holds inside every row, and the list itself stays
+            required. Declared with a ``validator`` whose ``supports_partial``
+            is true, such as a ``FormValidator``: with no Validator it would
+            relax nothing, and over a Validator that builds every field, as
+            ``DataclassValidator`` and ``PydanticValidator`` do, every call
+            would be refused, so both are refused when the spec is built.
         many: Whether the call carries a list of rows, each validated by the
             ``validator``, under the one argument ``many_argument`` names, for
             one run of the service over all of them. The service receives the
@@ -256,6 +262,7 @@ class ServiceSpec:
                 check_callable(
                     getattr(self.validator, method), label=f"{label}.validator.{method}", sync=True
                 )
+        _check_partial(self)
         _check_selector(self.instance_selector_spec, SelectorKind.RETRIEVE, "instance")
         _check_selector(self.collection_selector_spec, SelectorKind.LIST, "collection")
         if self.instance_selector_spec is not None and self.collection_selector_spec is not None:
@@ -408,6 +415,44 @@ def _check_many(spec: ServiceSpec) -> None:
     # its name, which ``+`` refuses, and a seed's name is refused as any
     # parameter's is. Neither needs the Validator, so both are refused here.
     check_reserved(spec.reads + Parameters.of(_the_list(name)), label="ServiceSpec.many_argument")
+
+
+def _check_partial(spec: ServiceSpec) -> None:
+    """Refuse ``partial`` where no call could honour it: with no Validator, or one that builds every field.
+
+    After the Validator is known to be an instance, so a class given in its
+    place is refused as one (test_a_validator_class_is_refused_as_not_an_instance_first),
+    and before ``_check_many``, which refuses a spec with no Validator too and
+    would name the other declaration
+    (test_partial_with_no_validator_answers_before_many_does).
+
+    With no Validator, ``partial`` relaxes nothing: the spec's ``reads`` and
+    its target's stay required on a partial call, and only a Validator's
+    parameters are made optional, so the declaration is inert, as
+    ``many_argument`` without ``many`` is. A Validator whose
+    ``supports_partial`` is ``False`` refuses every partial call, so the
+    spec would build and every call raise; it is refused here instead, where
+    the error sits beside the declaration. That Validator's own refusal at
+    the call stays, for a caller that uses it directly.
+    """
+    if not spec.partial:
+        return
+    validator = spec.validator
+    service = callable_name(spec.service)
+    if validator is None:
+        raise ImproperlyConfigured(
+            f"ServiceSpec for {service} declares partial=True with no validator. partial "
+            "lets a call leave out the Validator's parameters, and with no Validator there "
+            "are none, so it would change nothing: declare a validator, or drop partial."
+        )
+    if not validator.supports_partial:
+        raise ImproperlyConfigured(
+            f"ServiceSpec for {service} declares partial=True with a "
+            f"{type(validator).__qualname__}, which cannot validate a partial call: it "
+            "builds every field, and a partial call may leave any out. A partial call needs "
+            "a Validator that can bind only what was sent, such as FormValidator, or a "
+            "custom one; drop partial, or change the validator."
+        )
 
 
 def _check_reads(spec: ServiceSpec) -> None:
