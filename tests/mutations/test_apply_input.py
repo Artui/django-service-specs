@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.types.unset import UNSET
+from tests.adapter_app.models import Document
 from tests.mutations.utils import STORED, stored_document
 from tests.relations_app.models import Author, Post
 
@@ -121,3 +123,12 @@ class TestFileFields:
         result = apply_input(row, {"attachment": None})
         assert result.changes == ()
         assert row.attachment.name == STORED
+
+    def test_a_file_is_set_through_its_field_s_save_form_data(self, media: str) -> None:
+        # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
+        row = stored_document()
+        attachment = Document._meta.get_field("attachment")
+        with patch.object(attachment, "save_form_data") as save_form_data:
+            apply_input(row, {"attachment": False, "title": "New"})
+        save_form_data.assert_called_once_with(row, "")
+        assert row.title == "New"

@@ -171,7 +171,8 @@ def write_values(instance: Model, values: dict[str, Any]) -> None:
     """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``.
 
     As a ``ModelForm`` writes a file, so a field overriding how it stores
-    one is honoured; ``form_values`` has already read its value.
+    one is honoured; ``form_values`` has already read its value. Held by
+    test_a_file_is_set_through_its_field_s_save_form_data.
     """
     files = file_fields(type(instance))
     for attr, value in values.items():

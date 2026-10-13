@@ -20,6 +20,6 @@ def stored_document(*, attachment: bool = True) -> Document:
     return row
 
 
-def stored_name(row: Document) -> str:
-    """The optional file's name as the database holds it, rather than as the instance does."""
-    return Document.objects.values_list("attachment", flat=True).get(pk=row.pk)
+def stored_name(row: Document, field: str = "attachment") -> str:
+    """A file's name as the database holds it, rather than as the instance does."""
+    return Document.objects.values_list(field, flat=True).get(pk=row.pk)

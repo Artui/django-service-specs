@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any
-from unittest.mock import patch
 
 import pytest
 from django.core.exceptions import ObjectDoesNotExist
@@ -17,11 +16,9 @@ from django_service_specs.mutations.utils import (
     m2m_target_pks,
     resolve_update_fields,
     safe_getattr,
-    write_values,
 )
 from django_service_specs.types.unset import UNSET
-from tests.adapter_app.models import Document
-from tests.relations_app.models import Author, Post, Timestamped
+from tests.relations_app.models import Author, Timestamped
 
 
 class _RaisingFK:
@@ -103,9 +100,13 @@ class TestSafeGetattr:
 
 class TestDiffAttrs:
     def test_only_returns_diffs(self) -> None:
-        changes = diff_attrs(Post(title="t", views=2), {"title": "t", "views": 99})
+        class _Obj:
+            x = 1
+            y = 2
+
+        changes = diff_attrs(_Obj(), {"x": 1, "y": 99})
         assert len(changes) == 1
-        assert changes[0].field == "views"
+        assert changes[0].field == "y"
         assert changes[0].new == 99
         assert changes[0].old == 2
 
@@ -158,14 +159,3 @@ class TestResolveUpdateFields:
     def test_auto_now_field_already_in_changed_no_dup(self) -> None:
         result = resolve_update_fields(True, ("updated_at", "title"), ("updated_at",))
         assert result == ["updated_at", "title"]
-
-
-class TestWriteValues:
-    def test_a_file_is_written_through_its_field_s_save_form_data(self) -> None:
-        # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
-        row = Document(title="Notes")
-        attachment = Document._meta.get_field("attachment")
-        with patch.object(attachment, "save_form_data") as save_form_data:
-            write_values(row, {"title": "New", "attachment": ""})
-        save_form_data.assert_called_once_with(row, "")
-        assert row.title == "New"
