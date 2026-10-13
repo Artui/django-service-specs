@@ -24,7 +24,8 @@ def authorize_target(
 
     ``grant.target_checked`` lets a transport that resolved the row itself and
     already ran the object-level check claim it once, so dispatch does not pay
-    for it twice; otherwise every check's ``has_object_permission`` must pass,
+    for it twice; dispatch honours it on a service spec only for a target
+    handed in as ``target=`` (see ``Grant``); otherwise every check's ``has_object_permission`` must pass,
     in order, and the first refusal raises
     [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     with that check's own message. An answer still to be awaited raises

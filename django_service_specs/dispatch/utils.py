@@ -715,7 +715,18 @@ def walk_target(
     in for the lookup alone: the checks above still run on it, unless
     ``grant.target_checked`` says they ran already. A create takes ``None``
     there and nothing else, since it has no target to stand in for.
+
+    **A** ``target_checked`` **grant is honoured only with a** ``target``.
+    It says the checks ran on the target the caller found, and that is the
+    target only when the caller hands it over: a lookup this walk runs itself
+    finds whatever the arguments name, which may be another principal's row
+    the grant never saw. So without ``target`` the checks run on what was
+    found, whatever the grant says
+    (test_a_grant_that_checked_another_row_does_not_cover_the_row_dispatch_finds,
+    test_a_grant_that_checked_the_target_skips_the_scope_check_only_for_a_target_handed_in).
     """
+    if target is UNSET:
+        grant = replace(grant, target_checked=False)
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector

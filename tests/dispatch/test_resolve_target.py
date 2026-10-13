@@ -221,18 +221,26 @@ def test_the_scope_check_refuses_with_its_own_message(
 
 
 @pytest.mark.parametrize(
-    ("make", "arguments"),
-    [(_bulk, {}), (_create, {}), (lambda check: _update(check, allow_none=True), {"pk": 404})],
+    ("make", "arguments", "scope"),
+    [
+        (_bulk, {}, []),
+        (_create, {}, None),
+        (lambda check: _update(check, allow_none=True), {"pk": 404}, None),
+    ],
     ids=["a-set", "a-create", "an-allow-none-miss"],
 )
-def test_a_grant_that_checked_the_target_skips_the_scope_check(
-    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any]
+def test_a_grant_that_checked_a_target_does_not_skip_the_checks_on_what_it_finds(
+    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any], scope: Any
 ) -> None:
+    # resolve_target looks its target up itself, so a grant claiming the
+    # checks ran says nothing about what this lookup finds: as dispatch with
+    # no target=, it asks them.
     check = Scoped(refuse_scope=True)
     spec = make(check)
     grant = Grant(spec, ada, target_checked=True)
-    resolve_target(spec, principal=ada, arguments=arguments, grant=grant)
-    assert check.scopes == []
+    with pytest.raises(NotPermitted):
+        resolve_target(spec, principal=ada, arguments=arguments, grant=grant)
+    assert check.scopes == [scope]
 
 
 # --- dispatch's order, before any lookup -----------------------------------------------
@@ -312,7 +320,9 @@ def test_a_many_spec_is_refused_before_anything_runs(
 # --- handed on to dispatch --------------------------------------------------------------
 
 
-def test_its_grant_covers_the_spec_and_principal_and_the_target(ada: Any) -> None:
+def test_its_grant_covers_the_spec_and_principal_and_says_the_target_was_checked(
+    ada: Any,
+) -> None:
     note = Note.objects.create(owner=ada, title="mine")
     spec = _update()
     _, grant = _found(resolve_target(spec, principal=ada, arguments={"pk": note.pk}))
@@ -331,3 +341,18 @@ def test_dispatch_handed_its_result_looks_up_nothing_and_checks_the_row_once(ada
     assert selector.calls == 1
     assert check.rows == [note]
     assert result.instance == note
+
+
+def test_its_grant_handed_on_without_the_target_covers_no_other_row(ada: Any, bob: Any) -> None:
+    # The grant says the checks ran on the row resolve_target found; dispatch
+    # finding a different row itself, from the arguments, asks them again.
+    mine = Note.objects.create(owner=ada, title="mine")
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    check = Scoped()
+    spec = _update(check)
+    target, grant = _found(resolve_target(spec, principal=ada, arguments={"pk": mine.pk}))
+    assert target == mine
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk, "title": "T"}, grant=grant)
+    assert check.rows == [mine, theirs]
+    assert spec.service.calls == []

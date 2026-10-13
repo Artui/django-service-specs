@@ -99,7 +99,8 @@ async def adispatch(
 
     ``target`` is ``dispatch``'s: a service spec's target the caller resolved,
     standing in for the lookup inside the one hop, and checked there unless
-    ``grant`` says ``target_checked``. A selector spec and a ``many`` spec
+    ``grant`` says ``target_checked``; without ``target``, checked whatever
+    the grant says. A selector spec and a ``many`` spec
     refuse it before any hop.
 
     A ``many`` spec checks, validates and writes its rows as ``dispatch``

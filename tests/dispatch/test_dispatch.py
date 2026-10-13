@@ -2423,12 +2423,43 @@ def test_a_missing_row_without_allow_none_asks_no_check(ada: Any) -> None:
     assert (check.rows, check.scopes) == ([], [])
 
 
-def test_a_grant_that_checked_the_target_skips_the_scope_check(ada: Any) -> None:
+def test_a_grant_that_checked_the_target_skips_the_scope_check_only_for_a_target_handed_in(
+    ada: Any,
+) -> None:
     check = Scoped(refuse_scope=True)
     spec, service = _guarded(check)
-    dispatch(spec, principal=ada, arguments={}, grant=Grant(spec, ada, target_checked=True))
+    grant = Grant(spec, ada, target_checked=True)
+    # Handed the target the grant was minted for, dispatch asks nothing twice.
+    dispatch(spec, principal=ada, arguments={}, grant=grant, target=None)
     assert check.scopes == []
     assert len(service.calls) == 1
+    # Without it, the grant says nothing about what dispatch resolves itself.
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={}, grant=grant)
+    assert check.scopes == [None]
+    assert len(service.calls) == 1
+
+
+def test_a_grant_that_checked_another_row_does_not_cover_the_row_dispatch_finds(
+    ada: Any, bob: Any
+) -> None:
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    check = OwnerOnly()
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+    )
+    with pytest.raises(NotPermitted):
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": theirs.pk},
+            grant=Grant(spec, ada, target_checked=True),
+        )
+    assert check.rows == [theirs]
+    assert service.calls == []
 
 
 def test_a_list_selector_spec_asks_the_scope_check_of_its_rows(ada: Any) -> None:

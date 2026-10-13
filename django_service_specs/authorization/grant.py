@@ -23,9 +23,24 @@ class Grant:
     **Bound to one spec and one principal**, by identity: a grant carried to
     another operation or another user covers nothing, and dispatch refuses it.
 
-    ``target_checked`` says whether the object-level check ran too, which a
-    transport can only claim once it has resolved the row itself. Without it,
-    dispatch still runs ``has_object_permission`` on the row it resolves.
+    ``target_checked`` says the target-level checks ran too -
+    ``has_object_permission`` on a row, ``has_scope_permission`` on a set or
+    on nothing - which a transport can only claim once it has resolved the
+    target itself. What it covers depends on the spec:
+
+    - **A service spec**: the target handed to dispatch as ``target=``, and
+      nothing else. Dispatch skips the checks only on that target; when it
+      looks the target up itself, from the arguments, it runs them whatever
+      the grant says, since the row it finds may not be the one the grant
+      was minted for. ``resolve_target`` mints such a grant for the target it
+      returns, to be handed on with it.
+    - **A selector spec**, whose selector is its run and takes no
+      ``target=``: whatever that selector returns. Dispatch skips
+      ``has_object_permission`` on the row it retrieves and
+      ``has_scope_permission`` on the list, so a transport claims it only
+      when it has checked what this very call will return.
+
+    Without it, dispatch runs those checks on what it resolves.
 
     **Not serializable.** Pickling one raises ``TypeError``, so a grant cannot
     ride a queue into a worker: a task runs minutes later against state that

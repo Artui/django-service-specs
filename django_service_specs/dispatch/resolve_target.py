@@ -50,7 +50,11 @@ def resolve_target(
     covering ``spec`` and ``principal`` with ``target_checked`` set, which
     is what ``dispatch(spec, ..., target=target, grant=grant)`` takes. So a
     call resolved here looks nothing up again and asks no object-level or
-    scope check twice. A missing row ``allow_none`` does not let through
+    scope check twice. The grant vouches for that target alone: handed to
+    dispatch without ``target=``, it covers the class-level check and nothing
+    else, and dispatch checks the row its own lookup finds. A
+    ``target_checked`` grant handed *in* here is read the same way, since
+    this function looks its target up itself. A missing row ``allow_none`` does not let through
     returns ``DispatchResult(kind="not_found")``, dispatch's own answer, so it
     is never mistaken for the ``None`` it lets through.
 
