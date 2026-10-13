@@ -137,9 +137,13 @@ def open_call(
     """
     if is_deactivated(principal):
         raise PrincipalUnavailable()
+    # Against the spec's whole parameters, whatever ``parameters`` narrows the
+    # shape check to: the declaration is wrong for every caller, so
+    # ``resolve_target`` refuses it as dispatch does
+    # (test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
+    taken = sorted(spec.parameters().names() & pool_seeds.reserved)
     if parameters is None:
         parameters = spec.parameters()
-    taken = sorted(parameters.names() & pool_seeds.reserved)
     if taken:
         raise ImproperlyConfigured(
             f"{type(spec).__name__} declares the parameter(s) {taken}, which a registered "

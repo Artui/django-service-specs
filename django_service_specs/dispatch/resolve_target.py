@@ -66,7 +66,9 @@ def resolve_target(
         InvalidArguments: a target read the arguments leave out or get wrong.
         NotPermitted: the class-level, object-level or scope check.
         ImproperlyConfigured: as ``dispatch``, for a spec declaring no
-            permissions or a read a registered seed occupies.
+            permissions or any parameter a registered seed occupies - a
+            Validator field too, though this checks no Validator field's
+            value.
         ImproperlyConfigured: also a ``many`` spec, which declares no lookup:
             its rows are the call's arguments, and none is found ahead of it.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than

@@ -24,6 +24,7 @@ from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -315,6 +316,24 @@ def test_a_parameter_a_registered_seed_occupies_is_refused(ada: Any) -> None:
     )
     with pytest.raises(ImproperlyConfigured, match=r"\['tenant'\], which a registered pool seed"):
         resolve_target(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+
+def test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it(
+    ada: Any,
+) -> None:
+    # The field is not among the target selector's parameters, which are all
+    # resolve_target checks; the declaration is still wrong for every caller.
+    note = Note.objects.create(owner=ada, title="mine")
+    seeds = DEFAULT_POOL_SEEDS.extend(title=lambda *, user: "seeded")
+    spec = _update()
+    for call, arguments in (
+        (resolve_target, {"pk": note.pk}),
+        (dispatch, {"pk": note.pk, "title": "T"}),
+    ):
+        with pytest.raises(
+            ImproperlyConfigured, match=r"\['title'\], which a registered pool seed"
+        ):
+            call(spec, principal=ada, arguments=arguments, pool_seeds=seeds)
 
 
 def test_a_spec_declaring_no_permissions_is_refused_as_dispatch_refuses_it(ada: Any) -> None:
