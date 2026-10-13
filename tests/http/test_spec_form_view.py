@@ -478,6 +478,79 @@ class TestAnUpdatePage:
         assert validated(spec) == 0
 
 
+class TestAnUpdatePost:
+    """A post finds its target as the page does, before the form is built or read."""
+
+    def test_a_refused_post_shows_the_held_file_and_its_clear_checkbox(
+        self, ada: Any, media: str
+    ) -> None:
+        row = stored_document()
+        response = post(form_view(document_spec()), ada, {"title": ""}, pk=str(row.pk))
+        assert response.status_code == 400
+        page = response.render()
+        form = page.context_data["form"]
+        assert form.is_bound
+        assert refused(page) == {"title": [REQUIRED]}
+        # Built on a copy of the row, as the page's GET builds it.
+        assert (form.instance.pk, form.instance is row) == (row.pk, False)
+        assert b'type="checkbox" name="attachment-clear"' in page.content
+        assert f'href="/media/{STORED}"'.encode() in page.content
+
+    def test_a_refused_post_on_a_plain_form_keeps_the_row_s_values_as_its_initial(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="Ada's")
+        spec = row_spec(validator=Watched(NoteTitleForm))
+        response = post(form_view(spec), ada, {"title": ""}, pk=note.pk)
+        assert response.status_code == 400
+        assert response.context_data["form"].initial == {"title": "Ada's"}
+
+    def test_the_object_check_refuses_before_a_malformed_post_is_read(self, ada: Any) -> None:
+        # The row is found and checked first, so a principal the row refuses
+        # is answered 403 rather than shown the page with the post's errors.
+        note = Note.objects.create(owner=make_user("bob"), title="Bob's")
+        spec = row_spec(permissions=[OwnerOnly()])
+        with pytest.raises(PermissionDenied, match=r"^Only the owner may touch this note\.$"):
+            post(form_view(spec), ada, {"title": "Hi", "count": "x"}, pk=note.pk)
+        assert validated(spec) == 0
+
+    def test_a_missing_row_is_http404_before_a_malformed_post_is_read(self, ada: Any) -> None:
+        spec = row_spec()
+        with pytest.raises(Http404):
+            post(form_view(spec), ada, {"count": "x"}, pk=404)
+        assert validated(spec) == 0
+
+    def test_the_row_found_is_the_row_the_service_receives_checked_once(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Ada's")
+        owner_only = OwnerOnly()
+        spec = row_spec(permissions=[owner_only])
+        assert post(form_view(spec), ada, {"title": "Hi"}, pk=note.pk).status_code == 302
+        assert spec.service.calls[0]["instance"] == note
+        # Asked once, by the lookup in front of dispatch, which the grant tells.
+        assert owner_only.rows == [note]
+
+    def test_a_create_and_a_collection_post_as_before(self, ada: Any) -> None:
+        created = entry_spec()
+        assert post(form_view(created), ada, {"title": "Hi"}).status_code == 302
+        assert "instance" not in created.service.calls[0]
+        note = Note.objects.create(owner=ada, title="Ada's")
+        listed = entry_spec(
+            collection_selector_spec=SelectorSpec(
+                kind=SelectorKind.LIST, selector=lambda: Note.objects.all()
+            )
+        )
+        assert post(form_view(listed), ada, {"title": "Hi"}).status_code == 302
+        assert list(listed.service.calls[0]["collection"]) == [note]
+
+    def test_a_create_the_scope_check_refuses_is_refused_before_the_post_is_read(
+        self, ada: Any
+    ) -> None:
+        spec = entry_spec(permissions=[NoCreating()])
+        with pytest.raises(PermissionDenied, match=r"^Nothing may be created here\.$"):
+            post(form_view(spec), ada, {"count": "x"})
+        assert validated(spec) == 0
+
+
 class TestSuccess:
     def test_a_valid_post_redirects_to_the_success_url(self, ada: Any) -> None:
         spec = entry_spec()
@@ -684,9 +757,9 @@ class TestRefusals:
         )
 
     def test_an_update_page_never_calls_its_own_unchanged_value_taken(self, ada: Any) -> None:
-        # The page's own form is bound to no row, so its uniqueness check
-        # counted ada's username against her; the Validator's form is bound to
-        # her row and passed it. The service's refusal is the page's only error.
+        # The Validator's form is bound to her row and passed her username;
+        # whatever the page's own form found, the service's refusal is the
+        # page's only error.
         def busy(**pool: Any) -> None:
             raise ServiceConflict("Busy.")
 
@@ -918,6 +991,12 @@ class TestConfiguration:
                 return "/entries/"
 
         assert callable(ToTheEntry.as_view())
+
+    def test_a_many_spec_is_refused(self) -> None:
+        # A form posts one row, and a many spec takes a list of them.
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Watched())
+        with pytest.raises(ImproperlyConfigured, match="many spec"):
+            form_view(spec)
 
     def test_a_misspelt_setting_is_djangos_own_refusal(self) -> None:
         with pytest.raises(TypeError, match="invalid keyword 'sepc'"):

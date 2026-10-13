@@ -305,8 +305,20 @@ page again, and dispatch's shape check comes before its own permission check,
 so without it a principal the spec refuses would be shown the page - every
 row a choice field lists, and `extra_context` - by posting a malformed form,
 and a form whose constructor reads rows would read them for that principal.
-The `Grant` the check returns goes to dispatch, so it runs once; the
-object-level check is still dispatch's.
+The `Grant` the check returns goes to dispatch, so it runs once.
+
+**Then the post finds its target, as the page does**, before the form is
+built or read. So the form a refused post re-renders is built on the row as
+the page's was, and shows its held file and the clear checkbox beside it. And
+the target answers **before the shape check**: a principal the object-level or
+scope check refuses is `PermissionDenied`, and a missing row `Http404`, even
+for a post that is malformed, where dispatch's own order would refuse the
+malformed post first and re-render the page for them. Dispatch is handed the
+target and the grant `resolve_target` returns, so it looks nothing up again and
+asks no check twice. One case is left to dispatch: a route value the target's
+reads refuse, which comes back in dispatch's one refusal beside the form's
+own, as a non-field error. A create resolves `None` and a collection target
+its set, each handed on the same way.
 
 **POST** then binds the form to the post and reads the arguments **through
 the form's own widgets**, which is how Django reads a form:
@@ -360,8 +372,8 @@ The first two rows place the refusal on the form, and a service's string or
 list detail is about the whole form. Every other re-rendered refusal is its
 message, among the form's non-field errors. **The re-rendered form carries
 the refusal and nothing else**, so the page says what dispatch decided. The
-page's own form is bound to no row, so its own errors would tell an update
-page that an unchanged unique value was taken. So after a shape-check
+page's own errors are cleared before the refusal is placed, so nothing the
+Validator did not decide reaches it. So after a shape-check
 refusal - a required field left blank, a date that does not parse - the
 form's further checks, such as a length, `clean()` or uniqueness, answer the
 next post rather than this one. The statuses are
@@ -370,8 +382,9 @@ or Turbo, which will not render a failed post answered 200 - reads it the
 same way it reads the JSON views.
 
 `as_view()` refuses, when the URLconf is imported, a view with no
-`ServiceSpec`, a spec whose Validator is not a `FormValidator`, and a view
-with neither a `success_url` nor its own `get_success_url`. The view is **sync
+`ServiceSpec`, a spec whose Validator is not a `FormValidator`, a `many`
+spec, whose list of rows no form posts, and a view with neither a
+`success_url` nor its own `get_success_url`. The view is **sync
 only** in this release.
 
 ### A refusal, placed on the form

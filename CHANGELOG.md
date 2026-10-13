@@ -89,6 +89,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the spec's parameters refuse raises Django's `BadRequest`; each of these
   rendered the page before. A create, a collection target and a missing row
   `allow_none` lets through still show an empty form.
+- **Breaking:** `SpecFormView`'s POST finds its target as its GET does,
+  before the form is built or read, and hands dispatch that target with the
+  grant `resolve_target` returns, so nothing is looked up or checked twice.
+  The form a refused post re-renders is built on the row, so it shows the held
+  file and its clear checkbox, which it lost on every refusal. The target now
+  answers before the shape check: a principal the object-level or scope check
+  refuses gets `PermissionDenied`, and a missing row `Http404`, for a
+  malformed post too, where the page was re-rendered at 400 with the post's
+  errors. A route value the target's reads refuse is still refused in
+  dispatch's one tree beside the form's errors. `as_view()` refuses a `many`
+  spec, whose list of rows no form posts.
 - **Breaking:** a `SelectorSpec.filter_set` that declares no filters is
   refused at construction unless it is a django-filter `FilterSet` class. Only
   one with no `base_filters` attribute at all was refused, so a duck-typed
