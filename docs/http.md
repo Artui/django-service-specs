@@ -265,9 +265,36 @@ and `spec` beside it: the names Django's `FormView` uses, with
 `extra_context` merged in as Django's `ContextMixin` does. The spec's
 class-level permission check runs first, so the page is never offered to a
 principal the post would refuse: an anonymous visitor above gets Django's own
-`PermissionDenied`, which the host's 403 page answers. The form is always
-unbound; showing an update's current row as its initial data is a page of its
-own, which this view does not build.
+`PermissionDenied`, which the host's 403 page answers.
+
+**An update's page shows the row it updates.** Where the spec declares a
+target selector, GET finds the target as dispatch would, through
+[`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
+on the route's kwargs, coerced as a post's are:
+
+- The object-level check refuses a row the post would be refused, as
+  `PermissionDenied`; a missing row, or a selector's `ServiceNotFound`, is
+  `Http404`; and a route value the target's reads refuse is Django's
+  `BadRequest`, which the host's 400 page answers.
+- The form stays unbound, and shows the row's values for its own fields. A
+  `ModelForm` of the row's model is built on a copy of the row, as the
+  [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
+  binds it, so its own `__init__` sees the row it edits. Any other form takes
+  the row's values for the fields it names as its `initial`, and a field no
+  model field matches keeps its own.
+- So a file the row holds is shown, linked, with the
+  [clear checkbox](forms.md#clearing-a-file) an optional file's
+  `ClearableFileInput` offers beside it.
+- A create, a collection target and a missing row the instance selector's
+  `allow_none` lets through show an empty form.
+
+```python
+--8<--
+docs/examples/http_forms.py:update
+--8<--
+```
+
+The URLconf above routes it as `books/<int:pk>/edit/`.
 
 **POST starts as GET does**: the route first, then the same check, and only
 then is the form built from the post. A refused post is answered with the

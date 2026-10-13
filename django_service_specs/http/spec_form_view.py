@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import datetime
 import math
 from collections.abc import Callable, Mapping
@@ -9,7 +10,14 @@ from decimal import Decimal
 from typing import Any, Final, cast
 
 from django import forms
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied, ValidationError
+from django.core.exceptions import (
+    BadRequest,
+    ImproperlyConfigured,
+    PermissionDenied,
+    ValidationError,
+)
+from django.db import models
+from django.forms.models import model_to_dict
 from django.forms.widgets import FILE_INPUT_CONTRADICTION
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase, HttpResponseRedirect
 from django.shortcuts import resolve_url
@@ -24,6 +32,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.utils import request_principal, route_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
@@ -72,9 +81,21 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
     ``extra_context`` merged in as Django's ``ContextMixin`` does. The spec's
     class-level permission check runs first, through
     [`authorize`][django_service_specs.authorization.authorize.authorize], so
-    a page is never offered to a principal the post would refuse. The form is
-    always unbound: showing an update's current row as its initial data is a
-    page of its own, which this view does not build.
+    a page is never offered to a principal the post would refuse.
+
+    **An update's page shows the row it updates.** Where the spec declares a
+    target selector, GET finds the target as dispatch would, through
+    [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
+    on the route's kwargs: the object-level check refuses a row the post
+    would be refused, as ``PermissionDenied``, a missing row is ``Http404``,
+    and a route value the target's reads refuse is Django's ``BadRequest``.
+    The form shows a row's values for its own fields: a ``ModelForm`` of the
+    row's model is built on a copy of it, as the Validator binds one, and any
+    other form takes the row's values for the fields it names as its
+    ``initial``. So a file the row holds is shown, with the clear checkbox
+    an optional file's ``ClearableFileInput`` offers beside it. A create, a
+    collection target and a missing row ``allow_none`` lets through show an
+    empty form.
 
     **POST starts as GET does**: the route first, then that check, and only
     then is the form built from the post. A refused post is answered with the
@@ -159,10 +180,11 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
         return view
 
     def get(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
-        """The page, with an unbound form, for a principal the spec's class check admits."""
+        """The page, with an unbound form showing the target row, for a principal admitted to it."""
         spec = self.served_spec()
-        _admitted(spec, request, kwargs)
-        return self.render_to_response(self.get_context_data(form=_form_class(spec)()))
+        principal, grant = _admitted(spec, request, kwargs)
+        target = _page_target(spec, principal, grant, kwargs, self.pool_seeds)
+        return self.render_to_response(self.get_context_data(form=_page_form(spec, target)))
 
     def post(self, request: HttpRequest, *args: Any, **kwargs: Any) -> HttpResponse:
         """Dispatch the posted form: a redirect on success, the form re-rendered on a refusal."""
@@ -302,6 +324,65 @@ def _admitted(
         return principal, authorize(spec, principal)
     except (NotPermitted, PrincipalUnavailable) as refused:
         raise PermissionDenied(refused.message) from refused
+
+
+def _page_target(
+    spec: ServiceSpec,
+    principal: Any,
+    grant: Grant,
+    url_kwargs: Mapping[str, Any],
+    pool_seeds: PoolSeeds,
+) -> Any:
+    """The row, set or ``None`` the page's post would act on, refused as the post would be.
+
+    A spec with no target selector - a create - resolves ``None``. The
+    route's kwargs are coerced as a post's are, since a route captures
+    strings and the target's reads are typed, so a value the spec refuses is
+    refused on the page as on its post.
+    """
+    parameters = spec.parameters()
+    try:
+        resolved = resolve_target(
+            spec,
+            principal=principal,
+            arguments=coerce_flat(parameters, route_arguments(parameters, url_kwargs)),
+            grant=grant,
+            pool_seeds=pool_seeds,
+        )
+    except (NotPermitted, PrincipalUnavailable) as refused:
+        raise PermissionDenied(refused.message) from refused
+    except ServiceNotFound as refused:
+        raise Http404(refused.message) from refused
+    except InvalidArguments as refused:
+        # No form to place it on: the route names a row its reads refuse,
+        # which the post would answer at 400 too.
+        raise BadRequest(str(refused.detail)) from refused
+    if isinstance(resolved, DispatchResult):
+        raise Http404
+    return resolved[0]
+
+
+def _page_form(spec: ServiceSpec, target: Any) -> forms.BaseForm:
+    """The page's unbound form, showing ``target``'s values where it is a row.
+
+    A ``ModelForm`` of the row's model is built on a copy of it, as
+    ``FormValidator`` binds one, so its own ``__init__`` sees the row it
+    edits; any other form takes the row's values for the fields it names, its
+    own fields alone, as its ``initial``. One branch to coverage, so each
+    condition is held by its own test:
+    test_a_plain_form_shows_the_row_s_values_for_its_own_fields (a
+    ``ModelForm``: a plain form takes no ``instance``) and
+    test_a_model_form_of_another_model_is_built_as_a_create (the row's model,
+    as the Validator binds it).
+    """
+    form_class = _form_class(spec)
+    if not isinstance(target, models.Model):
+        return form_class()
+    if issubclass(form_class, forms.BaseModelForm) and isinstance(target, form_class._meta.model):
+        return form_class(instance=copy.copy(target))
+    # ``base_fields`` is set by the metaclass, which the stubs do not declare.
+    names = list(form_class.base_fields)  # ty: ignore[unresolved-attribute]
+    return form_class(initial=model_to_dict(target, fields=names))
 
 
 def _form_arguments(
