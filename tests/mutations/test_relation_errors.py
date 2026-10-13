@@ -23,6 +23,7 @@ from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -30,6 +31,7 @@ from django_service_specs.relations.generic_relation_spec import GenericRelation
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from tests.parameters.utils import coded
 from tests.relations_app.models import (
     Attachment,
     Author,
@@ -539,6 +541,84 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             )
 
         assert excinfo.value.detail == {"sections": {0: {"title": ["Not this one."]}}}
+
+    def test_a_validation_error_keeps_each_message_s_own_code(self) -> None:
+        # Django's code, which is DRF's for the same mistake; a message
+        # raised with none is ``invalid``, as DRF's ValidationError's is.
+        refusal = ValidationError(
+            {
+                "title": [
+                    ValidationError("Too long.", code="max_length"),
+                    ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
+                    "No code.",
+                ]
+            }
+        )
+
+        with (
+            patch.object(Section, "save", side_effect=refusal),
+            pytest.raises(InvalidArguments) as excinfo,
+        ):
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        assert coded(excinfo.value.detail) == {
+            "sections": {
+                0: {
+                    "title": [
+                        ("Too long.", "max_length"),
+                        ("Not this.", "blocked"),
+                        ("No code.", "invalid"),
+                    ]
+                }
+            }
+        }
+
+    def test_a_coerced_value_s_refusal_keeps_django_s_code(self) -> None:
+        # A ``ValidationError`` with no field, from the field's ``to_python``.
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Author,
+                {"name": "a", "posts": [{"title": "t", "published": "maybe"}]},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
+            )
+
+        [(_, code)] = coded(excinfo.value.detail)["posts"][0]["non_field_errors"]
+        assert code == "invalid"
+
+    def test_a_key_the_model_has_no_field_for_is_invalid(self) -> None:
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t", "bogus": 1}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        [(_, code)] = coded(excinfo.value.detail)["sections"][0]["non_field_errors"]
+        assert code == "invalid"
+
+    def test_a_row_service_s_coded_refusal_keeps_its_codes_under_the_relation(self) -> None:
+        # Re-rooted under the relation and row, with its messages as they were.
+        refused = InvalidArguments({"title": [CodedMessage("Taken.", "unique")]})
+
+        def section_service(**pool: Any) -> Any:
+            raise refused
+
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={
+                    "sections": ChildSpec(
+                        model=Section, fk="catalog", create_service=section_service
+                    )
+                },
+            )
+
+        assert coded(excinfo.value.detail) == {"sections": {0: {"title": [("Taken.", "unique")]}}}
 
     def test_an_integrity_error_is_left_alone(self) -> None:
         # A constraint is a conflict with rows that exist rather than a shape,

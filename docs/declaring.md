@@ -112,10 +112,14 @@ them on a selector that returns something other than a queryset is refused at
 dispatch.
 
 `filter_set` is a django-filter `FilterSet` class, installed with the
-`filter` extra. An object with no `base_filters` - a duck-typed stand-in
-taking `(data, queryset)` - is refused with `ImproperlyConfigured` when the
-spec is built: it declares no Parameters, so it would be handed none of the
-caller's data and never filter. Its filters are reads: each is read as a Parameter by
+`filter` extra. One that declares no filters - its `base_filters` missing,
+empty or `None` - is refused with `ImproperlyConfigured` when the spec is
+built, unless it is a django-filter `FilterSet` class: it declares no
+Parameters, so it would be handed none of the caller's data and never
+filter. A duck-typed stand-in taking `(data, queryset)` declares its filters
+in `base_filters`, and a step narrowing the queryset by no argument belongs
+in `extend_queryset`. A real `FilterSet` declaring no filters is accepted,
+and narrows nothing. Its filters are reads: each is read as a Parameter by
 [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument

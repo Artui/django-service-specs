@@ -74,6 +74,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The schema states the maximum in force as `"maxItems"` on every array input,
   so a client learns the bound it meets, and under a setting of `None` an
   array with no `max_length` states none.
+- **Breaking:** `SpecFormView`'s GET shows the row an update's post would
+  act on. Every GET finds its target as dispatch would, through
+  `resolve_target` on the route's kwargs - the row or set a target selector
+  resolves, or `None` for a create - and the unbound form shows a row's values
+  for its own fields: a `ModelForm` of the row's model is built on a copy of
+  the row, as `FormValidator` binds it, and any other form takes those values
+  for its enabled fields as its `initial`. So a held file is shown with the
+  clear checkbox an optional file's `ClearableFileInput` offers, where it
+  appeared only when the form class declared an initial file. The page is
+  refused where the post would be: an object-level or scope check refusing
+  the target, a create's `None` included, raises `PermissionDenied`, a missing
+  row or a selector's `ServiceNotFound` raises `Http404`, and a route value
+  the spec's parameters refuse raises Django's `BadRequest`; each of these
+  rendered the page before. A create, a collection target and a missing row
+  `allow_none` lets through still show an empty form.
+- **Breaking:** `SpecFormView`'s POST finds its target as its GET does,
+  before the form is built or read, and hands dispatch that target with the
+  grant `resolve_target` returns, so nothing is looked up or checked twice.
+  The form a refused post re-renders is built on the row, so it shows the held
+  file and its clear checkbox, which it lost on every refusal. The target now
+  answers before the shape check: a principal the object-level or scope check
+  refuses gets `PermissionDenied`, and a missing row `Http404`, for a
+  malformed post too, where the page was re-rendered at 400 with the post's
+  errors. A route value the target's reads refuse is still refused in
+  dispatch's one tree beside the form's errors. `as_view()` refuses a `many`
+  spec, whose list of rows no form posts.
+- **Breaking:** a `SelectorSpec.filter_set` that declares no filters is
+  refused at construction unless it is a django-filter `FilterSet` class. Only
+  one with no `base_filters` attribute at all was refused, so a duck-typed
+  stand-in whose `base_filters` was empty or `None` was accepted, declared no
+  arguments, and was handed none of the caller's data. A real `FilterSet`
+  declaring no filters is still accepted and narrows nothing. The check reads
+  django-filter only if it is already loaded, so a duck is refused in the same
+  words with or without the `filter` extra. A step narrowing the queryset by
+  no argument belongs in `extend_queryset`.
+
+### Fixed
+- **A nested write's own refusals carry codes.** A null row in a relation
+  write is refused with the code `null`, and Django's failures to write a
+  row's data keep theirs: each message of a `ValidationError` carries its own
+  `code`, or `invalid` where it was raised with none, and the message of a
+  `TypeError` or `ValueError` is `invalid`. They were plain strings, so a
+  client reading codes found none where the shape check's refusals had one. A
+  row service's refusal, re-rooted under its relation, keeps its messages as
+  they were, codes included.
+- **A re-upload under the held file's name is written.** `update_from_input`,
+  `aupdate_from_input` and `apply_input` compared a file field's new value
+  with the held file by name, so an upload named as the file the row held -
+  any re-upload to a field whose `upload_to` is empty - was taken for no
+  change: nothing was written and nothing reported, where a `ModelForm` writes
+  every upload. An upload, or any `File` that is not one a row holds, is now
+  always a change, written and reported with the replaced file as its old
+  value. The held file handed back as itself, which is what a form's file
+  field cleans to when nothing is uploaded, is still no change; `None` still
+  keeps the file and `False` still clears it.
 
 ## [0.5.0] — 2026-10-13
 
