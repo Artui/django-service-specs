@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import enum
 import math
 import re
 from dataclasses import dataclass
@@ -580,11 +581,20 @@ class TestPartial:
         assert validated.data is validated.values
 
 
+class _Colour(enum.Enum):
+    RED = "red"
+
+
 class _Coded(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(max_length=3)
+    short: str = Field(default="ok", min_length=2)
     count: int = Field(default=1, ge=1, le=9, multiple_of=1)
+    ratio: float = Field(default=0.5, gt=0, lt=1)
+    few: list[int] = Field(default=[1], min_length=1, max_length=2)
+    colour: _Colour = _Colour.RED
+    price: Decimal = Field(default=Decimal(1), max_digits=4, decimal_places=2)
     even: int = Field(default=2, multiple_of=2)
     kind: Literal["draft", "final"] = "draft"
     tags: list[str] = []
@@ -618,9 +628,24 @@ class TestRefusalCodes:
             pytest.param({}, "title", "required", id="missing"),
             pytest.param({"title": None}, "title", "null", id="none"),
             pytest.param({"title": "long"}, "title", "max_length", id="string-too-long"),
+            pytest.param(
+                {"title": "t", "short": "s"}, "short", "min_length", id="string-too-short"
+            ),
+            pytest.param({"title": "t", "few": []}, "few", "min_length", id="list-too-short"),
+            pytest.param({"title": "t", "few": [1, 2, 3]}, "few", "max_length", id="list-too-long"),
             pytest.param({"title": "t", "count": 0}, "count", "min_value", id="below"),
             pytest.param({"title": "t", "count": 10}, "count", "max_value", id="above"),
+            pytest.param({"title": "t", "ratio": 0}, "ratio", "min_value", id="exclusive-below"),
+            pytest.param({"title": "t", "ratio": 1}, "ratio", "max_value", id="exclusive-above"),
             pytest.param({"title": "t", "kind": "gone"}, "kind", "invalid_choice", id="literal"),
+            pytest.param({"title": "t", "colour": "blue"}, "colour", "invalid_choice", id="enum"),
+            pytest.param({"title": "t", "price": "12345"}, "price", "max_digits", id="digits"),
+            pytest.param(
+                {"title": "t", "price": "1.234"}, "price", "max_decimal_places", id="places"
+            ),
+            pytest.param(
+                {"title": "t", "price": "123.4"}, "price", "max_whole_digits", id="whole-digits"
+            ),
             pytest.param({"title": "t", "tags": "a"}, "tags", "not_a_list", id="list-type"),
             pytest.param({"title": "t", "nope": 1}, "nope", "unknown", id="extra"),
             pytest.param({"title": 3}, "title", "invalid", id="type"),

@@ -2053,6 +2053,32 @@ def test_a_selector_spec_s_progress_provider_hears_its_selector(ada: Any) -> Non
     assert sink.reports == [1.0]
 
 
+def test_a_selector_spec_s_precondition_reports_to_the_transport_and_not_the_spec_s_sink(
+    ada: Any,
+) -> None:
+    # The spec's sink is the run's, and a selector spec's run is its selector:
+    # a precondition answering after it reports where a service spec's does.
+    sink = _Sink()
+    transport: list[float] = []
+
+    def reporting(*, user: Any, progress: Any) -> Any:
+        progress(1.0)
+        return notes_of(user=user)
+
+    def checking(*, progress: Any) -> None:
+        progress(0.5)
+
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=reporting,
+        permissions=OPEN,
+        progress_reporter=sink,
+        preconditions=[checking],
+    )
+    dispatch(spec, principal=ada, arguments={}, progress=lambda p, **_: transport.append(p))
+    assert (sink.reports, transport) == ([1.0], [1.0, 0.5])
+
+
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
     ada: Any,
 ) -> None:

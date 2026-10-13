@@ -232,7 +232,11 @@ _CODES: Final[dict[str, str]] = {
     "decimal_max_places": "max_decimal_places",
     "decimal_whole_digits": "max_whole_digits",
 }
-"""pydantic's error types with a DRF code for the same mistake, and that code."""
+"""pydantic's error types with a DRF code for the same mistake, and that code.
+
+Data, so coverage cannot see a misspelled key, which would fall through to
+``"invalid"``: test_each_error_type_carries_its_code has a case for every
+entry, and fails with any one key renamed."""
 
 _BUILT_IN: Final[frozenset[str]] = frozenset(get_args(ErrorType))
 """Every error type pydantic itself raises; any other is a ``PydanticCustomError``'s."""
