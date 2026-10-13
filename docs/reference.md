@@ -126,6 +126,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
 ::: django_service_specs.pool.null_progress.null_progress
+::: django_service_specs.pool.provider_keys.provider_keys
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations
@@ -180,5 +181,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.unset.UnsetType
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
+::: django_service_specs.types.provider_keys.ProviderKeys
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter

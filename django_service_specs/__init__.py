@@ -63,6 +63,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.registry.registered_spec import RegisteredSpec
@@ -102,6 +103,7 @@ from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.provider_keys import ProviderKeys
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
@@ -145,6 +147,7 @@ __all__ = [
     "Presenter",
     "PrincipalUnavailable",
     "ProgressReporter",
+    "ProviderKeys",
     "RESERVED_POOL_SEEDS",
     "RegisteredSpec",
     "RelatedObjectChange",
@@ -204,6 +207,7 @@ __all__ = [
     "is_queryset",
     "materialize_retrieve",
     "null_progress",
+    "provider_keys",
     "operation_affordances",
     "output_schema",
     "paginate_output",
