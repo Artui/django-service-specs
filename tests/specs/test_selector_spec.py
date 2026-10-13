@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
+
+import django_filters
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
@@ -11,6 +14,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from tests.filters.utils import TitleFilter
 from tests.specs.utils import PK, Named, Nobody
 
 
@@ -145,3 +149,38 @@ class TestAffordances:
             "SelectorSpec.affordances['a'] and ['a__b'] both generate the annotation "
             "'affordance__a__b__c'."
         )
+
+
+class TestFilterSet:
+    """A FilterSet's filters are reads: declared, described and checked as any other."""
+
+    def test_its_filters_join_the_reads_after_the_author_s_own(self) -> None:
+        own = Parameter("limit", "integer")
+        spec = listing(reads=Parameters.of(own), filter_set=TitleFilter)
+        assert spec.reads == Parameters.of(own, Parameter("title", "string"))
+        assert spec.parameters() is spec.reads
+        assert spec.filter_set is TitleFilter
+
+    def test_a_copy_reads_the_filters_once(self) -> None:
+        # ``replace`` hands the merged reads back to the constructor, where the
+        # same filters arrive again: they are already there, not a second
+        # declaration of the same name.
+        spec = listing(filter_set=TitleFilter)
+        copy = dataclasses.replace(spec, allow_none=False)
+        assert copy == spec
+        assert copy.reads == Parameters.of(Parameter("title", "string"))
+
+    def test_a_read_the_filter_declares_differently_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):
+            listing(reads=Parameters.of(Parameter("title", "integer")), filter_set=TitleFilter)
+
+    def test_a_filter_named_after_a_reserved_seed_is_refused(self) -> None:
+        class ByUser(django_filters.FilterSet):
+            user = django_filters.CharFilter(field_name="owner__username")
+
+        with pytest.raises(ImproperlyConfigured, match="SelectorSpec.reads"):
+            listing(filter_set=ByUser)
+
+    def test_it_must_be_callable(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):
+            listing(filter_set=3)

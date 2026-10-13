@@ -1,15 +1,21 @@
-"""Tests for ``shape_queryset`` — the five... now four shaping fields, minus filter_set."""
+"""Tests for ``shape_queryset`` — the five shaping fields, ``filter_set`` last."""
 
 from __future__ import annotations
 
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, ClassVar
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, QuerySet
 
+from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
@@ -18,6 +24,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
+from tests.filters.utils import NoteFilters, RequestScopedFilter, TitleFilter
 
 
 def _bare_selector() -> Any:
@@ -189,3 +196,174 @@ class TestNonQuerysetReturn:
         )
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.selector"):
             shape_queryset(object(), spec, {}, source_label="SelectorSpec.selector")
+
+
+def _titles(rows: Any) -> list[str]:
+    return sorted(row.title for row in rows)
+
+
+def _three_notes() -> Any:
+    ada = make_user("ada")
+    for title, archived in (("draft", False), ("final", True), ("other", False)):
+        Note.objects.create(owner=ada, title=title, archived=archived)
+    return ada
+
+
+def _filtered(filter_set: Any, **kwargs: Any) -> SelectorSpec:
+    return SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=_notes,
+        permissions=[Unrestricted()],
+        filter_set=filter_set,
+        **kwargs,
+    )
+
+
+def _notes() -> QuerySet[Note]:
+    return Note.objects.all()
+
+
+class _BareFilter:
+    """The duck type at its smallest: ``(data, queryset)`` in, ``.qs`` out, no ``is_valid``."""
+
+    seen: ClassVar[list[dict[str, Any]]] = []
+
+    def __init__(self, data: Any, queryset: Any) -> None:
+        type(self).seen.append({"data": data})
+        self.qs = queryset.filter(archived=True)
+
+
+@pytest.mark.django_db
+class TestFilterSet:
+    def test_the_filters_read_their_arguments_from_the_pool(self) -> None:
+        _three_notes()
+        spec = _filtered(NoteFilters)
+        rows = shape_queryset(Note.objects.all(), spec, {"archived": False}, source_label="x")
+        assert _titles(rows) == ["draft", "other"]
+
+    def test_a_filter_not_sent_narrows_nothing(self) -> None:
+        _three_notes()
+        rows = shape_queryset(Note.objects.all(), _filtered(TitleFilter), {}, source_label="x")
+        assert _titles(rows) == ["draft", "final", "other"]
+
+    def test_a_pool_s_data_is_not_the_filters_data(self) -> None:
+        # An output selector's pool carries the service's ``data``; the filters
+        # read only the names they declare, never a mapping under that key.
+        _three_notes()
+        pool = {"data": {"title": "draft"}}
+        rows = shape_queryset(Note.objects.all(), _filtered(TitleFilter), pool, source_label="x")
+        assert _titles(rows) == ["draft", "final", "other"]
+
+    def test_a_value_the_filterset_refuses_is_refused_rather_than_ignored(self) -> None:
+        # Read without ``is_valid()``, a non-strict FilterSet answers the
+        # unfiltered rows for a value it cannot use.
+        _three_notes()
+        with pytest.raises(InvalidArguments) as caught:
+            shape_queryset(
+                Note.objects.all(), _filtered(NoteFilters), {"owner": "0"}, source_label="x"
+            )
+        assert caught.value.detail == {
+            "owner": ["Select a valid choice. That choice is not one of the available choices."]
+        }
+
+    def test_a_stand_in_with_no_is_valid_is_read_as_it_answers(self) -> None:
+        _BareFilter.seen.clear()
+        _three_notes()
+        rows = shape_queryset(Note.objects.all(), _filtered(_BareFilter), {}, source_label="x")
+        assert _titles(rows) == ["final"]
+        # It declares no filters, so nothing in the pool is its argument.
+        assert _BareFilter.seen == [{"data": {}}]
+
+    def test_the_request_reaches_a_filterset_that_takes_one(self) -> None:
+        ada = _three_notes()
+        Note.objects.create(owner=make_user("bob"), title="bob's")
+        pool = {"mine": True, "request": SimpleNamespace(user=ada)}
+        rows = shape_queryset(
+            Note.objects.all(), _filtered(RequestScopedFilter), pool, source_label="x"
+        )
+        assert _titles(rows) == ["draft", "final", "other"]
+
+    def test_a_filter_that_takes_no_request_is_not_handed_one(self) -> None:
+        _BareFilter.seen.clear()
+        _three_notes()
+        pool = {"request": SimpleNamespace(user=None)}
+        rows = shape_queryset(Note.objects.all(), _filtered(_BareFilter), pool, source_label="x")
+        assert _titles(rows) == ["final"]
+
+    def test_it_runs_after_extend_queryset(self) -> None:
+        # ``extend_queryset`` sees the declaratively shaped rows and no filter,
+        # so a slice or an ordering it applies is never made over filtered rows
+        # it did not ask for.
+        _three_notes()
+        received: list[QuerySet[Any]] = []
+
+        def extend(*, queryset: QuerySet[Any]) -> QuerySet[Any]:
+            received.append(queryset)
+            return queryset.filter(archived=False)
+
+        spec = _filtered(TitleFilter, extend_queryset=extend)
+        rows = shape_queryset(Note.objects.all(), spec, {"title": "draft"}, source_label="x")
+        assert _titles(rows) == ["draft"]
+        assert _titles(received[0]) == ["draft", "final", "other"]
+
+    def test_it_alone_refuses_a_return_that_is_not_a_queryset(self) -> None:
+        # The fifth condition of the nothing-to-shape guard: without it, a
+        # list met by a filter would be returned unfiltered.
+        with pytest.raises(ImproperlyConfigured, match="not a Django QuerySet"):
+            shape_queryset([{"id": 1}], _filtered(TitleFilter), {}, source_label="x")
+
+
+@pytest.mark.django_db
+class TestFilterSetThroughDispatch:
+    def test_a_filter_argument_narrows_the_list(self) -> None:
+        ada = _three_notes()
+        result = dispatch(_filtered(NoteFilters), principal=ada, arguments={"kind": "final"})
+        assert _titles(result.value) == ["final"]
+
+    def test_a_filter_argument_of_the_wrong_shape_is_refused_by_the_shape_check(self) -> None:
+        ada = _three_notes()
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(_filtered(NoteFilters), principal=ada, arguments={"kind": "neither"})
+        assert caught.value.detail == {
+            "kind": ["Select a valid choice. neither is not one of the available choices."]
+        }
+
+    def test_a_value_only_the_filterset_can_judge_is_refused_by_it(self) -> None:
+        # The shape check accepts any string for a related row's key; the
+        # FilterSet is the one that knows no such row exists, and its message,
+        # not the shape check's, is the one that comes back.
+        ada = _three_notes()
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(_filtered(NoteFilters), principal=ada, arguments={"owner": "0"})
+        [message] = caught.value.detail["owner"]
+        assert message == "Select a valid choice. That choice is not one of the available choices."
+        # The shape check's own wording names the value it refused.
+        assert "0 is not one of" not in message
+
+    def test_a_retrieve_is_filtered_before_it_collapses_to_its_row(self) -> None:
+        ada = _three_notes()
+        spec = SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=_notes,
+            permissions=[Unrestricted()],
+            filter_set=TitleFilter,
+            allow_none=True,
+        )
+        result = dispatch(spec, principal=ada, arguments={"title": "other"})
+        assert result.value.title == "other"
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_adispatch_filters_an_async_selector_s_rows() -> None:
+    async def notes() -> QuerySet[Note]:
+        return Note.objects.all()
+
+    ada = await sync_to_async(_three_notes)()
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=notes,
+        permissions=[Unrestricted()],
+        filter_set=NoteFilters,
+    )
+    result = await adispatch(spec, principal=ada, arguments={"archived": True})
+    assert await sync_to_async(_titles)(result.value) == ["final"]

@@ -10,6 +10,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, QuerySet
 
 from django_service_specs.authorization.permission_check import PermissionCheck
+from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
@@ -63,6 +64,16 @@ class SelectorSpec:
         extend_queryset: Applied last, called with the keywords it declares from
             the same pool plus ``queryset``, the shaped queryset so far. It
             returns the queryset to use.
+        filter_set: Applied after ``extend_queryset``: a django-filter
+            ``FilterSet`` class, or anything called as
+            ``filter_set(data=..., queryset=...)`` that answers ``.qs``. Its
+            filters are reads: read as Parameters by
+            [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
+            and added to ``reads`` after the author's own, so the schema, the
+            closed argument set and the shape check all cover them, and a
+            filter named like a read declared differently is refused here. Its
+            ``data`` is the arguments the call was sent for those names. Needs
+            the ``[filter]`` extra to read a real FilterSet.
         affordances: What can be done to each row right now. A mapping from a
             name the caller chooses to the
             [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
@@ -87,6 +98,9 @@ class SelectorSpec:
     prefetch_related: Sequence[str | Prefetch] | None = None
     annotations: Mapping[str, Any] | None = None
     extend_queryset: Callable[..., QuerySet[Any]] | None = None
+    # ``Any`` because the package never imports django-filter: a FilterSet is
+    # read and applied by duck typing, so a stand-in answering ``.qs`` is one.
+    filter_set: Any = None
     # The same word as ``ServiceSpec.affordances``, because it is the same
     # declaration read from the other side: there the conditions an operation
     # needs, here the answer for each row. Keyed by a name the caller chooses
@@ -108,6 +122,12 @@ class SelectorSpec:
         object.__setattr__(self, "permissions", check_permissions(self.permissions, label=label))
         if not isinstance(self.reads, Parameters):
             raise ImproperlyConfigured(f"{label}.reads must be Parameters.")
+        if self.filter_set is not None:
+            check_callable(self.filter_set, label=f"{label}.filter_set")
+            object.__setattr__(self, "reads", _with_filters(self.reads, self.filter_set))
+        # After the filters join, so a filter named ``user`` is refused as a
+        # read named ``user`` is:
+        # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
         check_reserved(self.reads, label=f"{label}.reads")
         check_presenter(self.presenter, label=label)
         if self.allow_none and kind is not SelectorKind.RETRIEVE:
@@ -134,6 +154,20 @@ class SelectorSpec:
     def output(self) -> Output | None:
         """What this spec returns, as its presenter declares it, or ``None``."""
         return self.presenter.output() if self.presenter is not None else None
+
+
+def _with_filters(reads: Parameters, filter_set: Any) -> Parameters:
+    """``reads`` with each filter's Parameter after them, once.
+
+    A filter already present and equal is skipped rather than added again,
+    because ``dataclasses.replace`` hands the merged ``reads`` back to the
+    constructor with the same ``filter_set``
+    (TestFilterSet.test_a_copy_reads_the_filters_once). One declared
+    differently reaches ``+`` and is refused as two sources of one name
+    (TestFilterSet.test_a_read_the_filter_declares_differently_is_refused).
+    """
+    added = Parameters(tuple(p for p in filter_set_parameters(filter_set) if p not in reads.items))
+    return reads + added
 
 
 def _check_affordances(spec: SelectorSpec) -> None:
