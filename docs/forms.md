@@ -71,6 +71,15 @@ extends.
 | `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. An optional one also declares its [clear checkbox](#clearing-a-file). |
 | any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
 
+A key past the range of the integer column rows are matched on names no row,
+so either field refuses it as it refuses a key no row holds: `invalid_choice`,
+in its own words, beside the form's other refusals. The adapter answers it
+before the form queries, because Django hands a `ModelMultipleChoiceField`'s
+keys to the database driver in an `__in` lookup, and SQLite's raises
+`OverflowError` for one past 64 bits on every Django version, as it does for a
+`ModelChoiceField`'s on Django 4.2. The range is the database's own for the
+column, as Django reads it to answer an exact lookup past it with no rows.
+
 Every choice field's choices carry their labels as `choice_labels`, the label
 Django displays keyed by the value as the caller sends it, so a schema states
 each as a `title`. A choice set given as a callable is computed per form and

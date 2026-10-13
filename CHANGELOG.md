@@ -198,6 +198,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   client reading codes found none where the shape check's refusals had one. A
   row service's refusal, re-rooted under its relation, keeps its messages as
   they were, codes included.
+- **`FormValidator` refuses a model choice key past its column's range.**
+  An integer key past the range of the column a `ModelMultipleChoiceField`
+  matches rows on reached the database driver through Django's `__in`
+  lookup, and SQLite's raised `OverflowError`, answered as a 500, on every
+  Django version; a `ModelChoiceField`'s did the same on Django 4.2. Such a
+  key names no row, so it is refused as the field refuses a key no row
+  holds, `invalid_choice` in its own words, beside the form's other
+  refusals and before the form queries. The range is the database's own for
+  the column. An integer argument a project's selector or service hands the
+  database is still the database's to range; declare a `minimum` and
+  `maximum` on one that reaches a column unchecked.
 - **A re-upload under the held file's name is written.** `update_from_input`,
   `aupdate_from_input` and `apply_input` compared a file field's new value
   with the held file by name, so an upload named as the file the row held -

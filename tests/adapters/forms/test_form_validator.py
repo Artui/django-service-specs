@@ -93,6 +93,14 @@ class _NoModel(forms.ModelForm):
     """A ModelForm Django accepts as a class and refuses only when one is built."""
 
 
+_BEYOND_THE_COLUMN = 2**63
+"""One past the largest key SQLite's integer column holds, and so past every backend's."""
+
+
+def _many_books() -> forms.ModelMultipleChoiceField:
+    return forms.ModelMultipleChoiceField(queryset=Book.objects.all())
+
+
 def _form(form_name: str, /, **fields: forms.Field) -> type[forms.Form]:
     return type(form_name, (forms.Form,), fields)
 
@@ -421,6 +429,94 @@ class TestModelChoices:
                 )
             ]
         }
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
+    def test_a_list_naming_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
+        # Django's ``ModelMultipleChoiceField`` matches the list with an
+        # ``__in`` lookup, which hands a key past the integer column's range
+        # to the database driver and raises ``OverflowError`` on every Django
+        # version. No row can hold that key, so the list is no choice: refused
+        # in the field's own words, beside the form's other refusals.
+        validator = FormValidator(_form("Pick", rows=_many_books(), title=forms.CharField()))
+        arguments = check_arguments(validator.parameters(), {"rows": [key], "title": "Lathe"})
+        assert coded(_refusal(validator.form_class, {**arguments, "title": ""})) == {
+            "title": [("This field is required.", "required")],
+            "rows": [
+                (
+                    f"Select a valid choice. {key} is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ],
+        }
+
+    @pytest.mark.django_db
+    def test_django_s_own_list_field_hands_such_a_key_to_the_driver(self) -> None:
+        # Why the adapter answers first: the field alone raises, on every
+        # Django version the package supports. Fails, and says the adapter's
+        # check can go, once Django answers it.
+        with pytest.raises(OverflowError):
+            _many_books().clean([_BEYOND_THE_COLUMN])
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
+    def test_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
+        # Django 5.0 answers an exact lookup past the range with no rows, so
+        # ``ModelChoiceField`` refuses it there; Django 4.2 raises
+        # ``OverflowError`` from its ``get``. Refused before the query, the
+        # answer is the field's own on both.
+        field = forms.ModelChoiceField(queryset=Book.objects.all())
+        validator = FormValidator(_form("Pick", row=field))
+        arguments = check_arguments(validator.parameters(), {"row": key})
+        assert coded(_refusal(validator.form_class, arguments)) == {
+            "row": [
+                (
+                    "Select a valid choice. That choice is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
+        }
+
+    @pytest.mark.django_db
+    def test_the_keys_at_either_end_of_the_column_s_range_are_matched(self) -> None:
+        author = Author.objects.create(name="Ursula")
+        ends = [
+            Book.objects.create(pk=key, author=author, title="End", price=Decimal("1.00"))
+            for key in (-_BEYOND_THE_COLUMN, _BEYOND_THE_COLUMN - 1)
+        ]
+        validator = FormValidator(
+            _form(
+                "Pick", rows=_many_books(), row=forms.ModelChoiceField(queryset=Book.objects.all())
+            )
+        )
+        cleaned = validator.validate(
+            {"rows": [book.pk for book in ends], "row": ends[1].pk}, CONTEXT
+        )
+        assert (sorted(book.pk for book in cleaned["rows"]), cleaned["row"]) == (
+            [book.pk for book in ends],
+            ends[1],
+        )
+
+    @pytest.mark.django_db
+    def test_a_key_past_an_integer_range_on_a_text_column_is_matched(self) -> None:
+        # Only an integer column has a range: a title is matched as the text
+        # the integer spells, as Django matches it.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(
+            author=author, title=str(_BEYOND_THE_COLUMN), price=Decimal("1.00")
+        )
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="title")
+        validator = FormValidator(_form("Pick", rows=field))
+        assert list(validator.validate({"rows": [_BEYOND_THE_COLUMN]}, CONTEXT)["rows"]) == [book]
+
+    @pytest.mark.django_db
+    def test_a_key_sent_as_a_string_is_left_to_the_field(self) -> None:
+        # Dispatch's shape check hands an integer key on as an ``int``; a
+        # caller handing ``validate`` the string is answered by the field.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(author=author, title="Lathe", price=Decimal("1.00"))
+        validator = FormValidator(_form("Pick", rows=_many_books()))
+        assert list(validator.validate({"rows": [str(book.pk)]}, CONTEXT)["rows"]) == [book]
 
     def test_a_list_of_rows_declares_no_length_and_the_setting_bounds_it(self) -> None:
         field = forms.ModelMultipleChoiceField(queryset=Book.objects.all())

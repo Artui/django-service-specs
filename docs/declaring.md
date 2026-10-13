@@ -371,7 +371,14 @@ the same declaration.
   `integer` or `number`, or of `decimal` strings, takes them, and an element
   past one is refused at its index. The list's own count is `min_length` and
   `max_length`'s, so an array may carry both pairs, and the schema states
-  the element's on `"items"`.
+  the element's on `"items"`. **No `integer` is bounded unless it says so**,
+  and one a selector or a service hands the database past its column's range
+  is the database's to answer: from Django 5.0 an exact or a comparison
+  lookup past it finds no rows, while an `__in` lookup, any lookup on Django
+  4.2, and a write raise SQLite's `OverflowError` past 64 bits. Bound an
+  integer that reaches a column unchecked, as a key a selector looks rows up
+  by does. The forms adapter refuses such a key to a model choice field
+  itself ([the forms adapter](forms.md#what-each-field-declares)).
 - **`min_length`** and **`max_length`** bound how many elements an `array`
   takes, inclusively, each a non-negative `int`, and are refused on any other
   type. An array that declares no `max_length` is still bounded, by the
