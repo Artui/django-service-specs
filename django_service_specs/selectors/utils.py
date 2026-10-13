@@ -12,15 +12,18 @@ import inspect
 from collections.abc import Callable, Mapping
 from typing import Any, Final
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import FieldDoesNotExist, ImproperlyConfigured
+from django.db.models import ForeignKey
+from django.db.models.constants import LOOKUP_SEP
 from django.utils.translation import gettext
 
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
-from django_service_specs.filters.utils import import_django_filters
+from django_service_specs.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.relations.utils import integer_column_range, integer_range_refusal
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
 
@@ -215,6 +218,10 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     two as one form field. Each message keeps django-filter's own code, its
     form field's, which reading it as a ``str`` would drop
     (test_a_value_the_filterset_refuses_keeps_django_s_code).
+
+    A value the FilterSet accepts and its filter's integer column cannot hold
+    is refused next, before any lookup is built with it; see
+    ``_past_their_columns``.
     """
     seen = {"request": pool["request"]} if "request" in pool else {}
     bound = filter_set(
@@ -226,7 +233,135 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
         raise InvalidArguments(
             {name: coded_messages(errors) for name, errors in bound.errors.as_data().items()}
         )
+    past = _past_their_columns(bound, queryset)
+    if past:
+        raise InvalidArguments(past)
     return bound.qs
+
+
+def _past_their_columns(bound: Any, queryset: Any) -> dict[str, Any]:
+    """Each argument carrying a number its filter's integer column cannot hold, and its refusal.
+
+    The driver refuses such a number with ``OverflowError`` as the query
+    runs: for an ``in`` or a ``range`` lookup and for any lookup on a foreign
+    key's own column (``owner_key``) on every Django, and for any lookup on
+    Django 4.2's SQLite, which states no range. Django 5.0 and later answer
+    the rest, the exact and comparison lookups on an integer column itself,
+    without the query - an exact match or a lower bound past the top with no
+    rows, an upper bound past it with every row - and they are refused here
+    all the same, so a call has one answer on every Django and backend.
+    The 1e50 bound every number filter is held to is not this one, because it
+    must hold for a decimal or float column too.
+
+    The refusal is the one a model integer field gives: ``max_value`` or
+    ``min_value``, in the words of Django's range validators, read off the
+    database the queryset reads. It is keyed at the argument that carried
+    the number: a range filter's bound at ``price_min`` or ``price_max``, the
+    keys the caller sent, and a CSV filter's element at its index, as the
+    shape check keys a number past 1e50.
+
+    The value is the one the FilterSet cleaned, read as the column's own
+    lookup reads it, so a fraction is the integer it truncates to. Left to the
+    filter, and so to the database: a filter with a ``method``, which decides
+    what its value means (test_a_filter_with_a_method_is_left_to_its_method);
+    a lookup that does not read its value as the column's, such as
+    ``contains`` (test_a_lookup_reading_the_value_as_text_is_left_to_it); a
+    path that names no integer column (``_column``); a value no integer column
+    reads as a number, such as the row a model choice filter cleans to, or a
+    choice filter's empty value and ``null`` choice, which it reads as nothing
+    sent and as a null; and an object that is no
+    FilterSet, which has no cleaned data to read
+    (test_an_object_that_is_no_filterset_is_left_to_the_database).
+    """
+    refusals: dict[str, Any] = {}
+    if not isinstance(bound, import_django_filters().FilterSet):
+        return refusals
+    for name, filter_obj in bound.filters.items():
+        if filter_obj.method is not None:
+            continue
+        column = _column(queryset.model, filter_obj.field_name)
+        bounds = integer_column_range(column, queryset.db)
+        # One arc to coverage, a condition each:
+        # test_a_decimal_column_takes_a_number_past_any_integer_s (the
+        # column) and test_a_lookup_reading_the_value_as_text_is_left_to_it
+        # (the lookup). A lookup preparing its value hands it to the column's
+        # ``get_prep_value``, which is the conversion the driver then refuses.
+        if bounds is None or not getattr(
+            column.get_lookup(filter_obj.lookup_expr), "prepare_rhs", False
+        ):
+            continue
+        for key, index, value in _sent(name, filter_obj, bound.form.cleaned_data.get(name)):
+            try:
+                number = column.get_prep_value(value)
+            except (TypeError, ValueError):
+                # Not a number of the column's, and so the filter's to read:
+                # the row a model choice filter cleans to
+                # (test_a_related_row_is_matched_as_its_key), or the empty
+                # string a choice filter left out cleans to, which it reads as
+                # nothing sent (test_the_date_shapes_narrow_the_rows' ``level``),
+                # and its ``null`` choice (test_a_choice_filter_s_null_choice_is_left_to_it).
+                continue
+            refusal = integer_range_refusal(number, bounds)
+            if refusal is None:
+                continue
+            if index is None:
+                refusals[key] = coded_messages([refusal])
+            else:
+                refusals.setdefault(key, {})[index] = coded_messages([refusal])
+    return refusals
+
+
+def _column(model: Any, path: str) -> Any:
+    """The model field a filter's ``field_name`` ends on, or ``None`` where it names none.
+
+    Each part of the path is a field of the model the part before it relates
+    to, and ``pk`` is the model's key, as Django reads a lookup's path. A
+    foreign key's column holds the key of the row it points at, so the field
+    is that key (``owner_key`` in
+    test_it_is_refused_at_the_argument_that_sent_it). ``None`` past a field
+    that relates to nothing, which is a transform such as ``year``
+    (test_a_transform_on_the_filter_s_path_is_left_to_the_lookup), and for a
+    name no model declares, such as an annotation
+    (test_a_filter_on_an_annotation_is_left_to_the_database).
+    """
+    opts: Any = model._meta
+    column: Any = None
+    for part in path.split(LOOKUP_SEP):
+        if opts is None:
+            return None
+        try:
+            column = opts.pk if part == "pk" else opts.get_field(part)
+        except FieldDoesNotExist:
+            return None
+        related = column.related_model
+        opts = None if related is None else related._meta
+    while isinstance(column, ForeignKey):
+        column = column.target_field
+    return column
+
+
+def _sent(name: str, filter_obj: Any, value: Any) -> list[tuple[str, int | None, Any]]:
+    """Each value a filter's cleaned ``value`` holds: the argument it came in, its index, the value.
+
+    A range filter cleans its two bounds to a ``slice``, each from its own
+    argument; a CSV filter cleans to a list, each value at its index. A value
+    left out cleans to ``None``, and nothing was sent there.
+    """
+    if isinstance(value, slice):
+        # Not strict: a filter cleaning to a slice with no keys of its own to
+        # name has no argument to key a refusal at, and is left to the
+        # database.
+        keyed = [
+            (f"{name}_{suffix}", None, end)
+            for suffix, end in zip(
+                range_suffixes(filter_obj), (value.start, value.stop), strict=False
+            )
+        ]
+    elif isinstance(value, list):
+        keyed = [(name, index, element) for index, element in enumerate(value)]
+    else:
+        keyed = [(name, None, value)]
+    return [entry for entry in keyed if entry[2] is not None]
 
 
 def _filter_data(filter_set: Any, pool: Mapping[str, Any]) -> dict[str, Any]:

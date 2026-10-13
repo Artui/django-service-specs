@@ -241,6 +241,7 @@ docs/examples/arguments.py:codes
 | A request body that is not a JSON object | `invalid` | `request_arguments` |
 | A read a selector, its `extend_queryset` or a precondition asks for that nothing filled | `required` | dispatch, as the shape check would |
 | A value a FilterSet refuses | its form field's own code, `invalid` where it has none | the FilterSet, through dispatch |
+| A number a filter's integer column cannot hold, a range filter's bound at its own argument and a CSV filter's element at its index | `max_value`, `min_value` | dispatch, applying the FilterSet |
 | A `null` row in a relation's list | `null` | a [relation write](relations.md) |
 | A row's data Django fails to write | the `ValidationError`'s own code, `invalid` where it has none and for a `TypeError` or `ValueError` | a [relation write](relations.md) |
 

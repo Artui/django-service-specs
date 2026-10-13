@@ -47,7 +47,10 @@ def paginate_output(
     The upper clamp on ``page`` is why ``total`` is counted **before** the
     slice: ``(page - 1) * limit`` on an unclamped page is an arbitrarily large
     SQL ``OFFSET``, which a backend either scans towards or refuses outright
-    with a ``DatabaseError`` this does not catch.
+    with a ``DatabaseError`` this does not catch. No slice is longer than
+    ``total`` for the same reason, so a ``limit`` past any integer a database
+    holds, which no ``max_page_size`` bounded, still serves every row; the
+    page reports the ``limit`` asked for.
 
     A queryset is counted with ``COUNT`` and sliced lazily, so the page's
     ``items`` is still a queryset: present them, as
@@ -75,8 +78,15 @@ def paginate_output(
     # served is never one the same payload then says does not exist.
     served_page: int = min(max(1, 1 if page is None else page), max(1, -(-total // served_limit)))
     start: int = (served_page - 1) * served_limit
+    # No page is longer than the rows counted: with no ceiling a limit is any
+    # integer, and a SQL ``LIMIT`` past 64 bits is refused by the database
+    # (test_a_limit_past_any_integer_column_serves_every_row). Bounding the
+    # page's length rather than its end keeps the ``LIMIT`` a limit no larger
+    # than the rows asks for. The offset needs no such bound, since the page's
+    # clamp keeps it inside the rows counted.
+    length: int = min(served_limit, total)
     return OutputPage(
-        items=rows[start : start + served_limit],
+        items=rows[start : start + length],
         page=served_page,
         limit=served_limit,
         total=total,

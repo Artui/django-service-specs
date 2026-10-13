@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from django_service_specs.filters.utils import import_django_filters
+from django_service_specs.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 
@@ -93,11 +93,7 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     field_name: str = getattr(filter_obj, "field_name", None) or name
     extra: dict[str, Any] = getattr(filter_obj, "extra", None) or {}
     help_text: Any = extra.get("help_text")
-    # A range's widget names the keys it reads; nothing else in django-filter
-    # carries ``suffixes``. Read off the field class rather than ``.field``,
-    # which would build the form field and, for a related-row filter, its
-    # queryset.
-    suffixes = getattr(getattr(filter_obj.field_class, "widget", None), "suffixes", None)
+    suffixes = range_suffixes(filter_obj)
     if suffixes:
         type_, format_ = _bound_type(module, filter_obj)
         minimum, maximum = _bounds(format_)

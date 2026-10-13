@@ -1,14 +1,14 @@
 """Internal helpers shared across the ``relations`` package.
 
-``pk_input_targets``, ``integer_column_range`` and ``key_past_its_column``
-are the exceptions to the package name. The write path in ``mutations``
-shares the first, so the three spellings of a primary key are written down
-once rather than agreed between two modules. The other two are shared by
-the lookups the kernel makes itself with a key a caller sent - a relation
-write's scoped match, the forms adapter's model choice field and
-``ModelForm`` integer column, and ``resolve_principal`` - so each is held to
-one reading of the column's range. A FilterSet's lookups are django-filter's
-to build, and are not among them.
+``pk_input_targets``, ``integer_column_range``, ``integer_range_refusal``
+and ``key_past_its_column`` are the exceptions to the package name. The
+write path in ``mutations`` shares the first, so the three spellings of a
+primary key are written down once rather than agreed between two modules.
+The others are shared by every place a number a caller sent reaches an
+integer column - a relation write's scoped match, the forms adapter's model
+choice field and ``ModelForm`` integer column, ``resolve_principal``, and
+the selector applying a FilterSet's filters - so each is held to one reading
+of the column's range, and refused past it in one set of words.
 """
 
 from __future__ import annotations
@@ -16,7 +16,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import connections
 from django.db.models import ForeignKey, IntegerField, Model
 
@@ -126,6 +127,23 @@ def integer_column_range(field: Any, using: str) -> tuple[int, int] | None:
         WIDEST_INTEGER[0] if low is None else low,
         WIDEST_INTEGER[1] if high is None else high,
     )
+
+
+def integer_range_refusal(number: int, bounds: tuple[int, int]) -> ValidationError | None:
+    """The refusal of ``number`` past ``bounds``, an integer column's range, or ``None`` inside it.
+
+    In the words, and with the code, of the validator Django's model integer
+    field carries from 5.0, where the backend states the column's range:
+    ``min_value`` past its bottom, ``max_value`` past its top. Both ends are
+    inclusive, as the column's are.
+    """
+    low, high = bounds
+    try:
+        MinValueValidator(low)(number)
+        MaxValueValidator(high)(number)
+    except ValidationError as error:
+        return error
+    return None
 
 
 def key_past_its_column(queryset: Any, name: str, key: Any) -> bool:

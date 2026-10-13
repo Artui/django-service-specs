@@ -233,7 +233,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column's top, `min_value` past its bottom. A value the field refuses
   itself is still refused in the field's words, its own bounds included. A
   `clean_<field>()` method is not run on a value past the range, where
-  Django 5.0 or later, refusing it itself, ran the method first.
+  Django 5.0 or later, refusing it itself, ran the method first. That order
+  is the one change on Django 5.0 and later, and it is **Breaking** for a
+  `clean_<field>()` that turned a value past the range into one inside it.
+  On Django 4.2 it is a fix: such a value raised the driver's
+  `OverflowError` once a check queried with it or the row was written.
 - **A relation write's key past its column's range names no row.** A
   forward relation's or a many-to-many's `match_key` past the range of the
   integer column it is matched on reached the database driver through the
@@ -246,6 +250,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `resolve_principal` refuses an identifier past its integer key's range with
   `PrincipalUnavailable`, as a key no row holds, where it raised the same
   way.
+- **Breaking on Django 5.0 and later, and otherwise a fix: a FilterSet's
+  number past its integer column's range is refused.** A number a selector
+  spec's FilterSet accepted, for a filter on an integer column - a key, a
+  foreign key, or either reached through a relation - reached the database
+  driver past the column's range, and SQLite's raised `OverflowError`,
+  answered as a 500: for an `in` or a `range` lookup, a CSV filter's and a
+  `RangeFilter`'s, and for any lookup on a foreign key's own column, on
+  every Django version, and for any lookup on Django 4.2. It is refused before the query, in the words and with the code of
+  Django's range validators, `max_value` past the column's top and
+  `min_value` past its bottom, at the argument that carried it: a range
+  filter's bound at its own `_min` or `_max` argument, and a CSV filter's
+  value at its index, as the shape check refuses a number past 1e50. The
+  range is the database's own for the column, so a decimal or float column
+  still takes any number inside 1e50. **Breaking** only where Django 5.0 and
+  later answered without the query: an `exact`, `gt`, `gte`, `lt` or `lte`
+  lookup past the range on the integer column itself, its own or one reached
+  through a relation, a `RangeFilter` given one bound included, answered no
+  rows or every row, and is refused now, so a call has one answer on every
+  version. A filter with a `method`, a lookup that reads its value as
+  text such as `contains`, a path through a transform or to an annotation,
+  and a `filter_set` that is not a django-filter `FilterSet` are left to the
+  database.
+- **`paginate_output` serves a `limit` past 64 bits.** With no
+  `max_page_size`, a `limit` past a signed 64-bit integer reached the
+  queryset's slice whole, and SQLite refused the `LIMIT` with
+  `IntegrityError: datatype mismatch`, answered as a 500, on every Django
+  version. No page is longer than the rows counted now, so such a limit
+  serves every row, and the page reports the `limit` asked for. A `limit`
+  past the rows asks for a `LIMIT` of the rows counted rather than of the
+  limit; the rows served are the same. A page past the end already clamped
+  to the last one before its offset was computed, so no offset reaches past
+  the rows.
 - **A re-upload under the held file's name is written.** `update_from_input`,
   `aupdate_from_input` and `apply_input` compared a file field's new value
   with the held file by name, so an upload named as the file the row held -
@@ -264,8 +300,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged but one kind: digits alone that `int` refuses, past the 4300 it
   reads from Python 3.10.7 on, which zeros in front can reach while `float`
   still reads them as finite, are refused as no number, as they are no
-  integer, rather than rounded to a neighbour. And `"3"` reaches the
-  Validator as `3` rather than `3.0`, as the JSON `3` always did.
+  integer, rather than rounded to a neighbour; that refusal is **Breaking**
+  for a call that sent such digits and was answered with the neighbour. And
+  `"3"` reaches the Validator as `3` rather than `3.0`, as the JSON `3`
+  always did.
 - An `async def` selector spec's `progress_reporter` provider is called only
   once the selector's keywords are bound, and only for a selector that takes
   `progress`, as a service spec's is. It was resolved before the binding, so

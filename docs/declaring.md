@@ -383,9 +383,22 @@ the same declaration.
   adapter's model choice field and a `ModelForm`'s integer column
   ([the forms adapter](forms.md#what-each-field-declares)), a relation
   write's scoped match ([relations](relations.md#matching-scope-and-orphans))
-  and `resolve_principal`. A FilterSet's lookups are django-filter's, so a
-  number filter's value past the range is still the database's to answer,
-  as above.
+  and `resolve_principal`. A FilterSet's filters are held to their columns
+  too: where a filter's path ends on an integer column, or on a foreign key
+  to one, and its lookup reads the value as the column's - `exact`, `gt`,
+  `gte`, `lt`, `lte`, `in` and `range`, a `RangeFilter`'s bounds and a CSV
+  filter's elements included - a number past the column's range is refused
+  before the query, as `max_value` or `min_value` at the argument that
+  carried it, on every version
+  ([the codes a refusal carries](arguments.md#the-codes-a-refusal-carries)).
+  Django 5.0 and later would answer an exact or a comparison lookup on the
+  integer column itself, its own or one reached through a relation, with no
+  rows or every row, where on a foreign key's own column the driver raised;
+  they are refused all the same, so a call has one answer on every version.
+  A filter with a `method`, a lookup that reads its value
+  as text, such as `contains`, a path through a transform or to an
+  annotation, and an object that is not a django-filter `FilterSet` are left
+  to the database, as above.
 - **`min_length`** and **`max_length`** bound how many elements an `array`
   takes, inclusively, each a non-negative `int`, and are refused on any other
   type. An array that declares no `max_length` is still bounded, by the

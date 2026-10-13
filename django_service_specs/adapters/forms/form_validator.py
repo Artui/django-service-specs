@@ -11,7 +11,6 @@ from typing import Any
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models, router
 from django.utils.datastructures import MultiValueDict
 
@@ -21,7 +20,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
-from django_service_specs.relations.utils import integer_column_range
+from django_service_specs.relations.utils import integer_column_range, integer_range_refusal
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -761,10 +760,7 @@ def _values_beyond_the_column(form: forms.BaseForm) -> dict[str, list[Validation
         # this: an optional field sent nothing cleans to ``None``.
         if type(value) is not int:
             continue
-        low, high = bounds
-        try:
-            MinValueValidator(low)(value)
-            MaxValueValidator(high)(value)
-        except ValidationError as error:
-            beyond[name] = [error]
+        refusal = integer_range_refusal(value, bounds)
+        if refusal is not None:
+            beyond[name] = [refusal]
     return beyond
