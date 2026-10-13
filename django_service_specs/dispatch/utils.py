@@ -12,6 +12,7 @@ transport takes when it binds input for itself.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any, Literal
@@ -136,9 +137,14 @@ def open_call(
     """
     if is_deactivated(principal):
         raise PrincipalUnavailable()
+    # Against the spec's whole parameters, whatever ``parameters`` narrows the
+    # shape check to: the declaration is wrong for every caller, so
+    # ``resolve_target`` refuses it as dispatch does
+    # (test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
+    declared = spec.parameters()
+    taken = sorted(declared.names() & pool_seeds.reserved)
     if parameters is None:
-        parameters = spec.parameters()
-    taken = sorted(parameters.names() & pool_seeds.reserved)
+        parameters = declared
     if taken:
         raise ImproperlyConfigured(
             f"{type(spec).__name__} declares the parameter(s) {taken}, which a registered "
@@ -164,17 +170,26 @@ def shape_check(
 
     - **A parameter a typed provider is annotated to fill**, which is always
       one that provider's values reach (see ``_server_filled``): not
-      demanded of the caller, since
-      the provider's values are merged over the caller's before the callable
-      reading it is called; ``server_owned_keys`` tells a transport to hide
-      exactly such a key. It is still required of the merged result: a
+      demanded of the caller, since it is the server's:
+      ``server_owned_keys`` tells a transport to hide exactly such a key.
+      **A value the caller sends for it anyway is checked as declared, then
+      dropped** from what this returns, so it reaches no merge and the
+      provider's answer is the only one
+      (test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s).
+      It is still required of the merged result: a
       provider that declines it after all, with ``UNSET`` or by leaving it
-      out, leaves the usual refusal to the step that reads it - the
+      out, leaves the key absent rather than the caller's, and the usual
+      refusal to the step that reads it - the
       Validator for one of its fields
       (test_a_filled_field_the_provider_declines_is_refused_by_the_validator),
       ``call_keywords`` for a read the service or a selector asks for
       (test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
-      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks).
+      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks),
+      whether or not the caller sent it
+      (test_a_filled_read_the_caller_sends_is_refused_where_the_service_asks_if_the_provider_declines).
+      djangorestframework-services drops the caller's value for a
+      server-owned key at every site that spreads caller input, and this is
+      that rule.
     - **Under** ``partial`` **an absent Validator field**, at any depth, as
       djangorestframework-services relaxes only its serializer. A ``reads``
       argument and a target selector's read, the ``pk`` among them, stay
@@ -211,11 +226,30 @@ def shape_check(
                 arguments,
                 name=spec.many_argument,
                 unknown_arguments=unknown_arguments,
+                owned=reads,
+                owned_in_rows=fields,
             )
-        parameters = _relaxed(parameters, everywhere, reads | fields)
+        reads |= fields
+        parameters = _relaxed(parameters, everywhere, reads)
     else:
         parameters = _relaxed(parameters, frozenset(), reads)
-    return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    return _without(
+        check_arguments(parameters, arguments, unknown_arguments=unknown_arguments), reads
+    )
+
+
+def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
+    """``checked`` less every key a typed provider fills: the caller's value for one is never used.
+
+    Checked first, so a value the caller sends is held to its declaration as
+    any other is. Then dropped, so it reaches no merge: a provider that
+    answers the key outranks nothing, and one that omits it or returns
+    ``UNSET`` leaves the key absent rather than the caller's, to be refused
+    where it is read. Otherwise a ``total=False`` provider - one that fills a
+    tenant for the users who have one - would hand the caller the choice for
+    everyone else.
+    """
+    return {name: value for name, value in checked.items() if name not in owned}
 
 
 def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
@@ -245,7 +279,10 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
     declares is one this relaxes. The rule is still read per provider rather
     than as that union, so the relaxing never outruns the delivery.
 
-    Only ``filled`` keys: a ``declinable`` one stays the caller's. And a
+    Only ``filled`` keys: a ``declinable`` one stays the caller's, required
+    of the caller as declared and kept when the provider declines it
+    (test_a_declinable_key_stays_required_of_the_caller,
+    test_a_declinable_key_stays_the_caller_s). And a
     provider whose return says nothing about its keys relaxes nothing
     (test_an_untyped_kwargs_provider_relaxes_no_read).
     """
@@ -269,8 +306,14 @@ def _check_bulk(
     *,
     name: str,
     unknown_arguments: UnknownArguments,
+    owned: frozenset[str],
+    owned_in_rows: frozenset[str],
 ) -> dict[str, Any]:
     """The top level of a ``many`` call checked here, and each row checked on its own.
+
+    ``owned`` is what a typed ``kwargs`` provider fills at the top level and
+    ``owned_in_rows`` what ``input_data`` fills in each row: dropped from
+    each once checked (see ``_without``).
 
     A list is checked at the top level as an empty one, so the list itself
     and every argument beside it are checked as declared while no row is: a
@@ -281,8 +324,9 @@ def _check_bulk(
     value = arguments.get(name) if isinstance(arguments, Mapping) else None
     if not isinstance(value, (list, tuple)):
         return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
-    checked = check_arguments(
-        parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments
+    checked = _without(
+        check_arguments(parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments),
+        owned,
     )
     cleaned: dict[int, dict[str, Any]] = {}
     errors: dict[int, Any] = {}
@@ -291,7 +335,9 @@ def _check_bulk(
         # row nested in a declared array too: the same unknown-key policy, and
         # a row that is no object refused under ``non_field_errors``.
         try:
-            cleaned[index] = check_arguments(rows, row, unknown_arguments=unknown_arguments)
+            cleaned[index] = _without(
+                check_arguments(rows, row, unknown_arguments=unknown_arguments), owned_in_rows
+            )
         except InvalidArguments as refused:
             errors[index] = refused.detail
     checked[name] = _CheckedRows(cleaned, errors)
@@ -350,6 +396,9 @@ def selector_pool(
     those reads, and what it returns is merged after them, so a key it answers
     is the author's whatever the caller sent: on a target selector it scopes
     the lookup (test_a_target_selector_s_kwargs_provider_scopes_the_lookup).
+    A read it is annotated to fill never carries the caller's value here at
+    all: ``shape_check`` dropped it, so a provider that leaves it out leaves
+    it absent.
 
     ``progress`` is passed only for a selector spec's own selector, which is
     that spec's run (see ``call_pool``), and only that run hears the spec's
@@ -410,9 +459,13 @@ def run_progress(
     for an ``async def`` run, whose reports are made on an event loop, where a
     provider that queries cannot run: that one is resolved now, from sync
     code, which is why every caller of this function calls it only once every
-    check that can refuse the call has passed
+    check before the run that can refuse the call has passed
     (test_an_async_service_s_progress_provider_is_resolved_before_the_run).
-    With neither, ``null_progress``, as ``base_pool`` seeds it.
+    A selector spec's selector is its run, and the checks on what it
+    returned - the object-level and scope checks, its ``preconditions`` -
+    answer after it, so a selector spec those refuse may already have called
+    the provider, on either path. With neither, ``null_progress``, as
+    ``base_pool`` seeds it.
     """
     resolve = resolve_progress if is_async(run) else deferred_progress
     reporter = resolve(provider, base, transport=transport)
@@ -428,9 +481,54 @@ def run_preconditions(
     ignored. Bound as the callable it guards is, through ``call_keywords``
     with the same ``fillable``, since a precondition reads the same pool and
     the caller could fill exactly what the run lets them fill.
+
+    Ignored, except for one still to be awaited. An ``async def`` precondition
+    is refused when the spec is built, but a plain ``def`` handing back a
+    coroutine - a decorated ``async def``, a lambda calling one - looks sync
+    until it answers, and its refusal would sit unraised inside the coroutine
+    while the call went ahead. ``sync_result`` refuses that answer, so the
+    call fails closed with ``ImproperlyConfigured`` rather than running.
     """
     for precondition in spec.preconditions or ():
-        precondition(**call_keywords(precondition, pool, fillable=fillable))
+        sync_result(
+            precondition(**call_keywords(precondition, pool, fillable=fillable)),
+            asked=f"The precondition {_name(precondition)}",
+            seat="A precondition",
+        )
+
+
+def sync_result(answer: Any, *, asked: str, seat: str) -> Any:
+    """Return what a sync-only callable answered, refusing an answer that is still to be awaited.
+
+    For the seats dispatch and ``present`` call from sync code and never await:
+    a precondition, whose answer would otherwise be ignored as a pass, and a
+    presenter, whose answer would otherwise be handed back as the payload. A
+    plain ``def`` returning a coroutine or an async generator - a decorated
+    ``async def``, a partial or lambda over one - is not refused when the spec
+    is built, so the answer is checked where it is read. ``asked`` names the
+    callable and ``seat`` the kind of thing it is, for the message.
+
+    A coroutine is closed first, so it is not left behind to warn that it was
+    never awaited. Two disjuncts, each held in ``tests/dispatch/test_utils.py``'s
+    ``TestAPreconditionAnsweringWithAnAwaitable``:
+    ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
+    first and ``test_an_async_generator_is_refused`` without the second, since
+    an async generator is not awaitable.
+    """
+    if inspect.isawaitable(answer) or inspect.isasyncgen(answer):
+        if inspect.iscoroutine(answer):
+            answer.close()
+        raise ImproperlyConfigured(
+            f"{asked} answered with an awaitable ({type(answer).__name__}). {seat} is "
+            "sync-only and is never awaited, so its answer is refused rather than used; "
+            "declare it with def."
+        )
+    return answer
+
+
+def _name(value: Any) -> str:
+    """A callable's qualified name for a message, or its type's name when it has none."""
+    return getattr(value, "__qualname__", None) or type(value).__name__
 
 
 def call_pool(
@@ -621,7 +719,9 @@ def conclude_selector(
     The ``preconditions`` run last, from the selector's ``pool`` with the rows
     as ``collection`` or the row as ``instance``, as djangorestframework-services
     runs them: after the object-level check, so a principal refused the row is
-    never told what a rule over it says. Never without a row, missing or
+    never told what a rule over it says
+    (test_a_retrieve_selector_spec_s_preconditions_never_run_on_a_row_the_principal_is_refused).
+    Never without a row, missing or
     ``None`` under ``allow_none``
     (test_a_selector_spec_s_preconditions_never_run_without_a_row).
     """
@@ -667,7 +767,18 @@ def walk_target(
     in for the lookup alone: the checks above still run on it, unless
     ``grant.target_checked`` says they ran already. A create takes ``None``
     there and nothing else, since it has no target to stand in for.
+
+    **A** ``target_checked`` **grant is honoured only with a** ``target``.
+    It says the checks ran on the target the caller found, and that is the
+    target only when the caller hands it over: a lookup this walk runs itself
+    finds whatever the arguments name, which may be another principal's row
+    the grant never saw. So without ``target`` the checks run on what was
+    found, whatever the grant says
+    (test_a_grant_that_checked_another_row_does_not_cover_the_row_dispatch_finds,
+    test_a_grant_that_checked_the_target_skips_the_scope_check_only_for_a_target_handed_in).
     """
+    if target is UNSET:
+        grant = replace(grant, target_checked=False)
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector
@@ -790,6 +901,10 @@ def _validate_rows(
     data: list[Any] = []
     for index, row in checked.rows.items():
         merged = {**row, **server_input}
+        # Only the keys the Validator declares, as on a single call: a row's
+        # own unknown key was refused by the shape check, so only a
+        # provider's can reach here
+        # (test_each_row_s_validator_sees_only_the_keys_it_declares).
         own = {key: value for key, value in merged.items() if key in declared}
         try:
             validated = validator.validated(own, context)
@@ -902,7 +1017,8 @@ def prepare_service(
     # the caller sent, or a field a partial call left out: either way the
     # service would read something other than what its name says. Each set is
     # held by its own case: test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused
-    # (``a-seed``, ``a-validated-value``) and
+    # (``a-seed``; ``an-undeclared-validated-value`` for the values, since
+    # ``a-validated-value`` names a parameter too) and
     # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``).
     named = reserved | values.keys() | spec.parameters().names()
     bound = sorted(validated.pool.keys() & named)

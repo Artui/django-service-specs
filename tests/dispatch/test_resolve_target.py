@@ -24,6 +24,7 @@ from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -221,18 +222,70 @@ def test_the_scope_check_refuses_with_its_own_message(
 
 
 @pytest.mark.parametrize(
-    ("make", "arguments"),
-    [(_bulk, {}), (_create, {}), (lambda check: _update(check, allow_none=True), {"pk": 404})],
+    ("make", "arguments", "scope"),
+    [
+        (_bulk, {}, []),
+        (_create, {}, None),
+        (lambda check: _update(check, allow_none=True), {"pk": 404}, None),
+    ],
     ids=["a-set", "a-create", "an-allow-none-miss"],
 )
-def test_a_grant_that_checked_the_target_skips_the_scope_check(
-    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any]
+def test_a_grant_that_checked_a_target_does_not_skip_the_checks_on_what_it_finds(
+    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any], scope: Any
+) -> None:
+    # resolve_target looks its target up itself, so a grant claiming the
+    # checks ran says nothing about what this lookup finds: as dispatch with
+    # no target=, it asks them.
+    check = Scoped(refuse_scope=True)
+    spec = make(check)
+    grant = Grant(spec, ada, target_checked=True)
+    with pytest.raises(NotPermitted):
+        resolve_target(spec, principal=ada, arguments=arguments, grant=grant)
+    assert check.scopes == [scope]
+
+
+@pytest.mark.parametrize(
+    ("make", "arguments", "target"),
+    [
+        (_bulk, {}, []),
+        (_create, {"title": "T"}, None),
+        (lambda check: _update(check, allow_none=True), {"pk": 404, "title": "T"}, None),
+    ],
+    ids=["a-set", "a-create", "an-allow-none-miss"],
+)
+def test_dispatch_handed_the_target_with_a_grant_that_checked_it_skips_the_scope_check(
+    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any], target: Any
 ) -> None:
     check = Scoped(refuse_scope=True)
     spec = make(check)
     grant = Grant(spec, ada, target_checked=True)
-    resolve_target(spec, principal=ada, arguments=arguments, grant=grant)
+    dispatch(spec, principal=ada, arguments=arguments, grant=grant, target=target)
     assert check.scopes == []
+
+
+class _ServerPk(TypedDict, total=False):
+    pk: int
+
+
+def test_a_filled_target_read_the_caller_sends_never_reaches_the_lookup(ada: Any, bob: Any) -> None:
+    # The provider leaves the key out, as one that fills it for some users only
+    # would: the caller's pk is dropped rather than looked up, as in dispatch.
+    theirs = Note.objects.create(owner=bob, title="theirs")
+
+    def scoped() -> _ServerPk:
+        return {}
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK, kwargs=scoped
+        ),
+    )
+    for call in (resolve_target, dispatch):
+        with pytest.raises(InvalidArguments) as caught:
+            call(spec, principal=ada, arguments={"pk": theirs.pk})
+        assert caught.value.detail == {"pk": REQUIRED}
 
 
 # --- dispatch's order, before any lookup -----------------------------------------------
@@ -284,6 +337,24 @@ def test_a_parameter_a_registered_seed_occupies_is_refused(ada: Any) -> None:
         resolve_target(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
 
+def test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it(
+    ada: Any,
+) -> None:
+    # The field is not among the target selector's parameters, which are all
+    # resolve_target checks; the declaration is still wrong for every caller.
+    note = Note.objects.create(owner=ada, title="mine")
+    seeds = DEFAULT_POOL_SEEDS.extend(title=lambda *, user: "seeded")
+    spec = _update()
+    for call, arguments in (
+        (resolve_target, {"pk": note.pk}),
+        (dispatch, {"pk": note.pk, "title": "T"}),
+    ):
+        with pytest.raises(
+            ImproperlyConfigured, match=r"\['title'\], which a registered pool seed"
+        ):
+            call(spec, principal=ada, arguments=arguments, pool_seeds=seeds)
+
+
 def test_a_spec_declaring_no_permissions_is_refused_as_dispatch_refuses_it(ada: Any) -> None:
     spec = ServiceSpec(service=Record())
     with pytest.raises(ImproperlyConfigured, match="declares no permissions"):
@@ -312,7 +383,9 @@ def test_a_many_spec_is_refused_before_anything_runs(
 # --- handed on to dispatch --------------------------------------------------------------
 
 
-def test_its_grant_covers_the_spec_and_principal_and_the_target(ada: Any) -> None:
+def test_its_grant_covers_the_spec_and_principal_and_says_the_target_was_checked(
+    ada: Any,
+) -> None:
     note = Note.objects.create(owner=ada, title="mine")
     spec = _update()
     _, grant = _found(resolve_target(spec, principal=ada, arguments={"pk": note.pk}))
@@ -331,3 +404,18 @@ def test_dispatch_handed_its_result_looks_up_nothing_and_checks_the_row_once(ada
     assert selector.calls == 1
     assert check.rows == [note]
     assert result.instance == note
+
+
+def test_its_grant_handed_on_without_the_target_covers_no_other_row(ada: Any, bob: Any) -> None:
+    # The grant says the checks ran on the row resolve_target found; dispatch
+    # finding a different row itself, from the arguments, asks them again.
+    mine = Note.objects.create(owner=ada, title="mine")
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    check = Scoped()
+    spec = _update(check)
+    target, grant = _found(resolve_target(spec, principal=ada, arguments={"pk": mine.pk}))
+    assert target == mine
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk, "title": "T"}, grant=grant)
+    assert check.rows == [mine, theirs]
+    assert spec.service.calls == []

@@ -21,9 +21,14 @@ def resolve_provider(
     so a provider names what it reads - ``user``, a seed, a ``reads``
     argument - or takes ``**kwargs`` for the whole pool. A key whose value is
     ``UNSET`` is dropped: the provider is declining it, not setting it to
-    ``UNSET``, so the caller's value survives the merge rather than a
-    fallback ``None`` silently widening a scope. Declining is for benign keys
-    only; a provider owning a scoping key must always answer it.
+    ``UNSET``, so the key is left to the caller rather than a fallback
+    ``None`` silently widening a scope. Whose value that is depends on how the
+    key is annotated: one declared ``declinable`` (its value admits
+    ``UnsetType``), or any key of an untyped provider, keeps the caller's
+    value; one the provider is annotated to fill is the server's, and dispatch
+    dropped the caller's value for it after the shape check, so declining it
+    leaves it absent and the step that reads it refuses the call. So a scoping
+    key belongs in a ``TypedDict`` that does not admit ``UNSET``.
 
     ``label`` names the field in the refusal of a return that is no mapping,
     which would otherwise surface as an ``AttributeError`` from inside the

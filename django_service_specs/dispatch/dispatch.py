@@ -56,7 +56,8 @@ def dispatch(
        typed provider is annotated to fill - a read the ``kwargs`` of the
        spec declaring it fills, a Validator field ``input_data`` fills -
        which is still refused, where it is read, if the provider declines
-       it. A parameter a registered seed in
+       it. Such a parameter is the server's: a value the caller sends for it
+       is checked, then dropped, so it never stands in for the provider's. A parameter a registered seed in
        ``pool_seeds`` occupies is refused before that, as a configuration error.
     2. [`authorize`][django_service_specs.authorization.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything
@@ -71,8 +72,8 @@ def dispatch(
        on a retrieved row, and
        [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
        where no row is: on a list, a collection target's set, empty or not,
-       a create's ``None``, and the ``None`` a service spec's ``allow_none``
-       lets through. A selector spec's own ``None`` under ``allow_none`` is
+       a create's ``None``, and the ``None`` a service spec's instance
+       selector lets through under its ``allow_none``. A selector spec's own ``None`` under ``allow_none`` is
        asked of neither.
     5. A service spec's Validator, on only the arguments it declares, with
        its ``input_data`` provider's values merged over the caller's, and the
@@ -138,15 +139,22 @@ def dispatch(
     report, and one reporting after the service finished would read as the
     work restarting. The run alone also reports to the spec's
     ``progress_reporter``, called on the run's first report, or before an
-    ``async def`` run once nothing can refuse the call; either way a refused
-    call never calls it.
+    ``async def`` run once nothing before the run can refuse the call; either
+    way a call refused before its run never calls it. A selector spec's run
+    is its selector, and its step four and ``preconditions`` answer after it,
+    so a selector spec refused there may already have called it: by the
+    selector's first report, or, for an ``async def`` selector, before the
+    await.
 
     ``target`` is a service spec's target resolved by the caller - the row
     an HTTP view's ``get_object()`` found, or what ``resolve_target``
     returned - and stands in for step three: no lookup runs, and the call's
     ``instance`` or ``collection`` is ``target``. Step four still runs on it,
     unless ``grant`` says ``target_checked``, so with that grant
-    ``has_object_permission`` is asked once across both. ``None`` is a missing
+    ``has_object_permission`` is asked once across both. Without ``target``
+    a service spec's step four runs whatever the grant says: the grant
+    vouches for the target the caller found, not for what the arguments make
+    the lookup find. ``None`` is a missing
     row, not-found unless the instance selector says ``allow_none``; a create
     takes ``None`` and refuses anything else. **Dispatch trusts it**: the
     target's ``reads`` are still checked as declared, and keeping them and
@@ -179,8 +187,9 @@ def dispatch(
             a validated, bound or provided value named after a seed, a bound
             value named after a validated one, any value bound for a row of a
             ``many`` call, shaping declared on a
-            selector that returned something other than a queryset, or a
-            condition on the row with no row to answer it for.
+            selector that returned something other than a queryset, a
+            condition on the row with no row to answer it for, or a
+            precondition answering with a coroutine or an async generator.
     """
     refuse_target(spec, target)
     if isinstance(spec, SelectorSpec):

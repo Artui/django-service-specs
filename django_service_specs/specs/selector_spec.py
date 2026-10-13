@@ -49,7 +49,8 @@ class SelectorSpec:
             spec's run, and the run is the one callable allowed to be.
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open read
-            says ``[Unrestricted()]``. **Not read when the spec is nested**:
+            says ``[Unrestricted()]``. An empty sequence is refused when the
+            spec is built, since no checks would pass everyone. **Not read when the spec is nested**:
             authorization belongs to the spec being dispatched.
         reads: The arguments the selector reads with no Validator in front of
             it - its filters, its ordering, the key of the row it retrieves.
@@ -92,7 +93,9 @@ class SelectorSpec:
             that pool after the caller's arguments, so a key it answers is the
             author's value whatever the caller sent - a tenant, a project scope.
             A value of ``UNSET`` declines its key and leaves the caller's in
-            place. Annotate its return as a ``TypedDict`` and ``provider_keys``
+            place, unless the key is one its ``TypedDict`` return annotation
+            says it fills: the caller's value for that is dropped once
+            checked, so declining or leaving it out leaves it absent. Annotate its return as a ``TypedDict`` and ``provider_keys``
             reads which keys it fills before it runs, and a read it fills is
             not demanded of the caller. On a target selector it scopes the
             lookup, and a filled key that the service spec's ``reads`` or its
@@ -102,16 +105,19 @@ class SelectorSpec:
         preconditions: Raise-to-abort rules, a sequence of callables each called
             with the keywords it declares from the same pool once the selector
             has resolved, the row as ``instance`` or the rows as
-            ``collection``. The return value is ignored. Kept as a tuple in
-            declaration order. Refused on a nested selector, whose run is the
+            ``collection``. The return value is ignored, unless it is still to
+            be awaited, which refuses the call with ``ImproperlyConfigured``.
+            Kept as a tuple in declaration order. Refused on a nested selector, whose run is the
             enclosing service spec's.
         progress_reporter: A provider of a
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
             sink the run reports to beside the transport's - a task record, an
             audit trail - called with the keywords it declares from the base
             pool. Resolved on first use, so a call refused before its run never
-            calls it, and a provider returning ``None`` declines. Refused on a
-            nested selector.
+            calls it, and a provider returning ``None`` declines. The
+            object-level and scope checks and the ``preconditions`` answer
+            after the selector, which is the run, so a call they refuse may
+            already have called it. Refused on a nested selector.
         metadata: A project's own per-operation facts, stored as given and read
             back by its own checks or audit hooks.
     """

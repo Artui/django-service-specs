@@ -8,6 +8,8 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.affordances.utils import rendered_affordances, with_affordances
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.utils import sync_result
+from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 
@@ -51,6 +53,9 @@ def present(spec: ServiceSpec | SelectorSpec, result: DispatchResult) -> Any:
             to present them through; a presented row is not an object, or
             already has an ``affordances`` key; or a row carries no answer,
             because it did not come through the selector that declares them.
+            Also a presenter answering with a coroutine or an async generator,
+            which is never awaited, so it is refused rather than handed back
+            as the payload.
     """
     if result.kind == "not_found":
         raise ValueError(
@@ -77,7 +82,7 @@ def present(spec: ServiceSpec | SelectorSpec, result: DispatchResult) -> Any:
         items = list(value)
         if presenter is None:
             return items
-        payload = [presenter.present(item) for item in items]
+        payload = [_presented(presenter, item) for item in items]
         if affordances is None:
             return payload
         return with_affordances(payload, items, affordances, many=True)
@@ -86,7 +91,24 @@ def present(spec: ServiceSpec | SelectorSpec, result: DispatchResult) -> Any:
     # test_an_instance_with_no_presenter_is_returned_as_it_is (the second).
     if value is None or presenter is None:
         return value
-    presented = presenter.present(value)
+    presented = _presented(presenter, value)
     if affordances is None:
         return presented
     return with_affordances(presented, value, affordances, many=False)
+
+
+def _presented(presenter: Presenter, value: Any) -> Any:
+    """``presenter.present(value)``, refusing an answer still to be awaited.
+
+    ``present`` is sync-only and runs after the write has committed, so an
+    answer that is a coroutine - a decorated ``async def present`` - would
+    otherwise be returned as the payload and serialized as garbage, or not at
+    all. Each kind of result reaches it: a list's rows
+    (test_a_presenter_answering_with_a_coroutine_is_refused, ``list``) and one
+    row (the same test, ``instance``).
+    """
+    return sync_result(
+        presenter.present(value),
+        asked=f"{type(presenter).__qualname__}.present",
+        seat="A presenter",
+    )

@@ -178,6 +178,32 @@ class TestAnAsyncPermissionCheckIsRefused:
             )
 
 
+@pytest.mark.parametrize("empty", [[], ()], ids=["list", "tuple"])
+@pytest.mark.parametrize(
+    ("make", "label"),
+    [
+        (lambda permissions: ServiceSpec(service=_service, permissions=permissions), "ServiceSpec"),
+        (
+            lambda permissions: SelectorSpec(
+                kind=SelectorKind.LIST, selector=_selector, permissions=permissions
+            ),
+            "SelectorSpec",
+        ),
+    ],
+    ids=["service-spec", "selector-spec"],
+)
+def test_an_empty_permissions_sequence_is_refused(make: Any, label: str, empty: Any) -> None:
+    # Every check passing is vacuously true of no checks, so an empty list
+    # would let anyone run the operation; it is a list computed by accident
+    # as often as a decision, and the decision has its own name.
+    with pytest.raises(ImproperlyConfigured) as caught:
+        make(empty)
+    assert str(caught.value) == (
+        f"{label}.permissions is empty, which would let anyone run it. Declare "
+        "permissions=[Unrestricted()] to mean that."
+    )
+
+
 class _AsyncPresent(Named):
     async def present(self, value: Any) -> Any:  # A coroutine where the payload should be.
         return {"name": str(value)}

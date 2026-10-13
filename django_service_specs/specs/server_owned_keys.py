@@ -26,9 +26,10 @@ def server_owned_keys(
     - the keys each provider the dispatch runs is annotated to fill, as
       [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
       reads them: the spec's ``kwargs`` and, on a service spec, its
-      ``input_data`` and its target selector's ``kwargs``. A provider's values
-      are merged after the caller's, so a key it fills holds the author's
-      value whatever the caller sent.
+      ``input_data`` and its target selector's ``kwargs``. Dispatch drops the
+      caller's value for a key a provider fills once it has been checked, so
+      the key holds the author's value whatever the caller sent, or nothing
+      at all when the provider leaves it out or returns ``UNSET``.
 
     **No name here is a parameter dispatch demands of the caller**, so a key
     a provider fills is the server's for the whole call. Each provider's

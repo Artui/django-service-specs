@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -39,7 +40,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
-from django_service_specs.types.unset import UNSET
+from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
@@ -842,11 +843,14 @@ def test_an_unmet_affordance_refuses_the_call_and_the_service_never_runs(
     note = Note.objects.create(owner=ada, title="old", archived=True)
     service = Record()
     spec = _renaming(service, NOT_ARCHIVED)
-    # A grant that claims both checks ran still leaves the row's state to ask.
-    grant = Grant(spec, ada, target_checked=True) if granted else None
+    # A grant that claims both checks ran, on the row handed over with it,
+    # still leaves the row's state to ask.
+    extra: dict[str, Any] = (
+        {"grant": Grant(spec, ada, target_checked=True), "target": note} if granted else {}
+    )
 
     with pytest.raises(ActionUnavailable) as caught:
-        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}, grant=grant)
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}, **extra)
 
     assert (caught.value.code, caught.value.message) == (
         "note_archived",
@@ -1555,8 +1559,8 @@ def test_a_dataclass_validator_hands_the_service_its_instance_as_data(ada: Any) 
 class _Binds(Titled):
     """Binds ``bound`` for the call beside the values, as a library adapter binds its object."""
 
-    def __init__(self, bound: Mapping[str, Any]) -> None:
-        super().__init__()
+    def __init__(self, bound: Mapping[str, Any], returns: Mapping[str, Any] | None = None) -> None:
+        super().__init__(returns)
         self.bound = bound
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
@@ -1579,15 +1583,19 @@ def test_a_value_the_validator_binds_reaches_the_service_by_name(ada: Any) -> No
     [
         pytest.param({"user": "someone"}, "['user']", id="a-seed"),
         pytest.param({"title": "other"}, "['title']", id="a-validated-value"),
+        # A value the Validator returns without declaring it: no parameter
+        # names it, so only the validated values' own names refuse it.
+        pytest.param({"slug": "other"}, "['slug']", id="an-undeclared-validated-value"),
     ],
 )
 def test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused(
     ada: Any, bound: Mapping[str, Any], named: str
 ) -> None:
-    def create(*, user: Any, title: str) -> Any:
-        return (user, title)
+    def create(*, user: Any, title: str, slug: str) -> Any:
+        return (user, title, slug)
 
-    spec = ServiceSpec(service=create, permissions=OPEN, validator=_Binds(bound))
+    validator = _Binds(bound, returns={"title": "T", "slug": "t"})
+    spec = ServiceSpec(service=create, permissions=OPEN, validator=validator)
     with pytest.raises(ImproperlyConfigured, match=f"bound the key\\(s\\) {re.escape(named)}"):
         dispatch(spec, principal=ada, arguments={"title": "T"})
 
@@ -1822,6 +1830,58 @@ def test_a_list_selector_spec_s_preconditions_see_the_collection(ada: Any) -> No
     )
     dispatch(spec, principal=ada, arguments={})
     assert list(precondition.calls[0]["collection"]) == [note]
+
+
+def test_a_retrieve_selector_spec_s_preconditions_never_run_on_a_row_the_principal_is_refused(
+    ada: Any, bob: Any
+) -> None:
+    # The object check answers first, so a principal refused the row is never
+    # told what a rule over it says.
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    precondition = _Precondition(Boom())
+    spec = retrieve(permissions=[OwnerOnly()], preconditions=[precondition])
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk})
+    assert precondition.calls == []
+
+
+def _refuses_later(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """A decorator whose plain ``def`` wrapper hides the ``async def`` it wraps."""
+
+    @functools.wraps(fn)
+    def wrapper(**kwargs: Any) -> Any:
+        return fn(**kwargs)
+
+    return wrapper
+
+
+@_refuses_later
+async def _closed_for_the_night() -> None:
+    raise Boom()
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        lambda pre: ServiceSpec(service=Record(), permissions=OPEN, preconditions=[pre]),
+        lambda pre: SelectorSpec(
+            kind=LIST, selector=notes_of, permissions=OPEN, preconditions=[pre]
+        ),
+    ],
+    ids=["service-spec", "selector-spec"],
+)
+def test_a_precondition_answering_with_a_coroutine_refuses_the_call(
+    ada: Any, make: Callable[[Any], ServiceSpec | SelectorSpec]
+) -> None:
+    spec = make(_closed_for_the_night)
+    with pytest.raises(ImproperlyConfigured) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert str(caught.value).startswith(
+        "The precondition _closed_for_the_night answered with an awaitable (coroutine). "
+        "A precondition is sync-only"
+    )
+    run = getattr(spec, "service", None)
+    assert run is None or run.calls == []
 
 
 @pytest.mark.parametrize("allow_none", [False, True])
@@ -2298,6 +2358,178 @@ def test_a_many_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_cal
     assert service.calls[0]["project_pk"] == 7
 
 
+# A key a typed provider fills is the server's for the whole call: the caller's
+# value for it is checked and then dropped, so a provider that leaves it out or
+# declines it with ``UNSET`` leaves it absent rather than the caller's.
+
+
+class _MaybeTenant(TypedDict, total=False):
+    tenant: str
+
+
+TENANT = Parameters.of(Parameter("tenant", "string", required=True))
+
+
+def test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s(ada: Any) -> None:
+    # A provider that fills the tenant for the users who have one, and this
+    # user has none: ``total=False`` still reads as filled.
+    def tenant_of(*, user: Any) -> _MaybeTenant:
+        return {}
+
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN, reads=TENANT, kwargs=tenant_of)
+    dispatch(spec, principal=ada, arguments={"tenant": "victim-corp"})
+    assert "tenant" not in service.calls[0]
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_filled_read_the_caller_sends_is_refused_where_the_service_asks_if_the_provider_declines(
+    ada: Any, declined: Any
+) -> None:
+    provider, calls = _project_provider(project_pk=declined)
+    ran: list[int] = []
+
+    def create(*, project_pk: int) -> None:
+        ran.append(project_pk)
+
+    spec = ServiceSpec(service=create, permissions=OPEN, reads=PROJECT, kwargs=provider)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"project_pk": 99})
+    assert caught.value.detail == {"project_pk": REQUIRED}
+    assert calls == [None]
+    assert ran == []
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_filled_target_read_the_caller_sends_never_reaches_the_lookup(
+    ada: Any, bob: Any, declined: Any
+) -> None:
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    provider, calls = _pk_provider(declined)
+    service = Record()
+    target = nested(RETRIEVE, selector=note_by_pk, reads=PK, kwargs=provider)
+    spec = ServiceSpec(service=service, permissions=OPEN, instance_selector_spec=target)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk})
+    assert caught.value.detail == {"pk": REQUIRED}
+    assert calls == [None]
+    assert service.calls == []
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_selector_spec_s_filled_read_the_caller_sends_never_reaches_its_selector(
+    ada: Any, bob: Any, declined: Any
+) -> None:
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    spec = SelectorSpec(
+        kind=RETRIEVE,
+        selector=note_by_pk,
+        permissions=OPEN,
+        reads=PK,
+        kwargs=_pk_provider(declined)[0],
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk})
+    assert caught.value.detail == {"pk": REQUIRED}
+
+
+class _TitleForm(forms.Form):
+    title = forms.CharField()
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_filled_field_the_caller_sends_is_refused_by_the_validator_if_the_provider_declines(
+    ada: Any, declined: Any
+) -> None:
+    def server() -> _ServerTitle:
+        return {} if declined is _OMITTED else {"title": declined}
+
+    spec = ServiceSpec(
+        service=Record(), permissions=OPEN, validator=FormValidator(_TitleForm), input_data=server
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"title": "caller's"})
+    assert caught.value.detail == {"title": REQUIRED}
+
+
+def test_a_filled_field_a_many_row_sends_is_refused_by_the_validator_if_the_provider_declines(
+    ada: Any,
+) -> None:
+    provider, _ = _title_provider(title=UNSET)
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        many=True,
+        validator=FormValidator(_TitleForm),
+        input_data=provider,
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "caller's"}]})
+    assert caught.value.detail == {"items": {0: {"title": REQUIRED}}}
+    assert service.calls == []
+
+
+def test_a_many_spec_s_filled_read_the_caller_sends_is_refused_where_the_service_asks(
+    ada: Any,
+) -> None:
+    provider, calls = _project_provider(project_pk=_OMITTED)
+    ran: list[int] = []
+
+    def create(*, project_pk: int) -> None:
+        ran.append(project_pk)
+
+    spec = ServiceSpec(
+        service=create,
+        permissions=OPEN,
+        many=True,
+        validator=Titled(),
+        reads=PROJECT,
+        kwargs=provider,
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}], "project_pk": 99})
+    assert caught.value.detail == {"project_pk": REQUIRED}
+    assert calls == [None]
+    assert ran == []
+
+
+class _DecliningProject(TypedDict):
+    project_pk: int | UnsetType
+
+
+def _declining_project(calls: list[None]) -> Callable[[], _DecliningProject]:
+    def server() -> _DecliningProject:
+        calls.append(None)
+        return {"project_pk": UNSET}
+
+    return server
+
+
+def test_a_declinable_key_stays_the_caller_s(ada: Any) -> None:
+    # Not filled, so neither relaxed nor dropped: the caller's value is the
+    # one the service receives when the provider declines.
+    calls: list[None] = []
+    service = Record()
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, reads=PROJECT, kwargs=_declining_project(calls)
+    )
+    dispatch(spec, principal=ada, arguments={"project_pk": 3})
+    assert service.calls[0]["project_pk"] == 3
+    assert calls == [None]
+
+
+def test_a_declinable_key_stays_required_of_the_caller(ada: Any) -> None:
+    # Refused by the shape check, which answers before the class-level check
+    # refuses this principal: relaxed, the call would reach that refusal.
+    calls: list[None] = []
+    spec = ServiceSpec(
+        service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=_declining_project(calls)
+    )
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+    assert calls == []
+
+
 # --- the scope check: a set, or nothing, asked where no row is resolved.
 
 
@@ -2370,12 +2602,43 @@ def test_a_missing_row_without_allow_none_asks_no_check(ada: Any) -> None:
     assert (check.rows, check.scopes) == ([], [])
 
 
-def test_a_grant_that_checked_the_target_skips_the_scope_check(ada: Any) -> None:
+def test_a_grant_that_checked_the_target_skips_the_scope_check_only_for_a_target_handed_in(
+    ada: Any,
+) -> None:
     check = Scoped(refuse_scope=True)
     spec, service = _guarded(check)
-    dispatch(spec, principal=ada, arguments={}, grant=Grant(spec, ada, target_checked=True))
+    grant = Grant(spec, ada, target_checked=True)
+    # Handed the target the grant was minted for, dispatch asks nothing twice.
+    dispatch(spec, principal=ada, arguments={}, grant=grant, target=None)
     assert check.scopes == []
     assert len(service.calls) == 1
+    # Without it, the grant says nothing about what dispatch resolves itself.
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={}, grant=grant)
+    assert check.scopes == [None]
+    assert len(service.calls) == 1
+
+
+def test_a_grant_that_checked_another_row_does_not_cover_the_row_dispatch_finds(
+    ada: Any, bob: Any
+) -> None:
+    theirs = Note.objects.create(owner=bob, title="theirs")
+    check = OwnerOnly()
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+    )
+    with pytest.raises(NotPermitted):
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": theirs.pk},
+            grant=Grant(spec, ada, target_checked=True),
+        )
+    assert check.rows == [theirs]
+    assert service.calls == []
 
 
 def test_a_list_selector_spec_asks_the_scope_check_of_its_rows(ada: Any) -> None:
@@ -2745,6 +3008,21 @@ class TestMany:
             {"title": "from the server"},
             {"title": "from the server"},
         ]
+
+    def test_each_row_s_validator_sees_only_the_keys_it_declares(self, ada: Any) -> None:
+        # The shape check refuses an unknown key inside a row, so only a
+        # provider can put one there; a serializer ignores a key it has no
+        # field for, and so is the Validator never handed one.
+        validator = Titled()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            many=True,
+            validator=validator,
+            input_data=lambda: {"undeclared": 1},
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "mine"}]})
+        assert [args for args, _ in validator.calls] == [{"title": "mine"}]
 
     def test_a_value_a_row_binds_is_refused(self, ada: Any) -> None:
         class Binding(Titled):

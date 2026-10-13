@@ -51,10 +51,12 @@ def bind_arguments(
     over the caller's arguments before the Validator, is not called here: it
     reads the resolved target and the call's seeds, which this function is
     not handed. A spec declaring one is bound on the caller's arguments alone,
-    so a field the provider is annotated to fill passes the shape check and,
-    left out, is the Validator's to refuse. No ``kwargs`` provider is called
-    either: a read one fills passes the shape check, and is absent from a
-    selector spec's checked arguments when the caller left it out.
+    so a field the provider is annotated to fill passes the shape check and
+    is the Validator's to refuse: left out, or sent, since a value the caller
+    sends for a field the server owns is checked and then dropped, as in
+    dispatch. No ``kwargs`` provider is called either: a read one fills
+    passes the shape check, and is absent from a selector spec's checked
+    arguments whether or not the caller sent it.
 
     **It does not resolve or authorize.** Dispatch runs class-level
     authorization, target resolution and object-level authorization *between*

@@ -50,7 +50,11 @@ def resolve_target(
     covering ``spec`` and ``principal`` with ``target_checked`` set, which
     is what ``dispatch(spec, ..., target=target, grant=grant)`` takes. So a
     call resolved here looks nothing up again and asks no object-level or
-    scope check twice. A missing row ``allow_none`` does not let through
+    scope check twice. The grant vouches for that target alone: handed to
+    dispatch without ``target=``, it covers the class-level check and nothing
+    else, and dispatch checks the row its own lookup finds. A
+    ``target_checked`` grant handed *in* here is read the same way, since
+    this function looks its target up itself. A missing row ``allow_none`` does not let through
     returns ``DispatchResult(kind="not_found")``, dispatch's own answer, so it
     is never mistaken for the ``None`` it lets through.
 
@@ -62,7 +66,9 @@ def resolve_target(
         InvalidArguments: a target read the arguments leave out or get wrong.
         NotPermitted: the class-level, object-level or scope check.
         ImproperlyConfigured: as ``dispatch``, for a spec declaring no
-            permissions or a read a registered seed occupies.
+            permissions or any parameter a registered seed occupies - a
+            Validator field too, though this checks no Validator field's
+            value.
         ImproperlyConfigured: also a ``many`` spec, which declares no lookup:
             its rows are the call's arguments, and none is found ahead of it.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than
