@@ -25,6 +25,7 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.adispatch_request import adispatch_request
@@ -222,6 +223,7 @@ __all__ = [
     "resolve_callable_kwargs",
     "server_owned_keys",
     "resolve_principal",
+    "resolve_target",
     "run_selector",
     "run_service",
     "shape_queryset",

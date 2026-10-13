@@ -62,7 +62,10 @@ def bind_arguments(
     Raises:
         InvalidArguments: from either step. The shape check's tree carries every
             problem at once, and a Validator is only reached with well-shaped
-            arguments.
+            arguments. A ``many`` spec is the one exception, row by row: the
+            Validator runs on each row that passed the shape check, and a
+            shape refusal and a Validator refusal on different rows come back
+            as one tree keyed by row index.
     """
     checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
