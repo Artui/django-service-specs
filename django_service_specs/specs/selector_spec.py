@@ -69,9 +69,11 @@ class SelectorSpec:
             returns the queryset to use. Sync-only, like ``filter_set``: either
             one declared ``async def`` is refused at construction.
         filter_set: Applied after ``extend_queryset``: a django-filter
-            ``FilterSet`` class, or anything called as
-            ``filter_set(data=..., queryset=...)`` that answers ``.qs``. Its
-            filters are reads: read as Parameters by
+            ``FilterSet`` class, called as ``filter_set(data=..., queryset=...)``
+            and answering ``.qs``. An object with no ``base_filters`` - a
+            duck-typed stand-in - is refused at construction, because it
+            declares no Parameters and so would be handed none of the
+            caller's data. Its filters are reads: read as Parameters by
             [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
             and added to ``reads`` after the author's own, so the schema, the
             closed argument set and the shape check all cover them, and a
@@ -133,7 +135,8 @@ class SelectorSpec:
     annotations: Mapping[str, Any] | None = None
     extend_queryset: Callable[..., QuerySet[Any]] | None = None
     # ``Any`` because the package never imports django-filter: a FilterSet is
-    # read and applied by duck typing, so a stand-in answering ``.qs`` is one.
+    # read and applied by its attributes (``base_filters``, ``.qs``) rather than
+    # by class, so the import stays behind the ``filter`` extra.
     filter_set: Any = None
     # The same word as ``ServiceSpec.affordances``, because it is the same
     # declaration read from the other side: there the conditions an operation
@@ -173,6 +176,22 @@ class SelectorSpec:
             raise ImproperlyConfigured(f"{label}.reads must be Parameters.")
         if self.filter_set is not None:
             check_callable(self.filter_set, label=f"{label}.filter_set", sync=True)
+            # The attribute's absence, not its emptiness: a real FilterSet
+            # declaring no filters is legal and narrows nothing, where an
+            # object without ``base_filters`` declares no Parameters either
+            # and so is handed none of the caller's data
+            # (TestFilterSet.test_one_with_no_base_filters_is_refused_naming_it;
+            # test_a_filterset_declaring_no_filters_is_accepted holds the other
+            # side). After the callable check, so a value that is no callable
+            # is still refused as one.
+            if not hasattr(self.filter_set, "base_filters"):
+                named = getattr(self.filter_set, "__name__", type(self.filter_set).__name__)
+                raise ImproperlyConfigured(
+                    f"{label}.filter_set is {named}, which has no base_filters. A filter_set "
+                    "must be a django-filter FilterSet: its filters are declared as the "
+                    "selector's arguments, and an object that declares none is handed none "
+                    "of the caller's data and never filters."
+                )
         _read_filters(self)
         # After the filters join, so a filter named ``user`` is refused as a
         # read named ``user`` is:

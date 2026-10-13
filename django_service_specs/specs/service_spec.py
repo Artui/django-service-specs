@@ -169,7 +169,11 @@ class ServiceSpec:
             caller's value for it is dropped once checked, in each row of a
             ``many`` call too. A Validator field it fills is not demanded
             of the caller, and a filled key a read declares is refused, since
-            its values reach only the Validator.
+            its values reach only the Validator. Declared with a ``validator``,
+            since the Validator is what consumes it and the service is handed
+            none of it directly; a spec with no Validator is refused when it
+            is built, and ``kwargs`` is the provider for a value the service
+            reads.
         progress_reporter: A provider of a
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
             sink the service reports to beside the transport's - a task record,
@@ -278,6 +282,19 @@ class ServiceSpec:
         _check_reads(self)
         _check_nested(self)
         check_providers(self, ("kwargs", "input_data", "progress_reporter"), label=label)
+        # After ``check_providers`` has proved it callable, so a value that is
+        # no callable is still refused as one (the ``{"input_data": 3}`` case of
+        # test_refuses_at_construction, which has no validator either). Two
+        # conjuncts, each held by its own test: TestInputDataNeedsAValidator.test_input_data_beside_a_validator_is_accepted
+        # fails without the second, and
+        # TestInputDataNeedsAValidator.test_a_spec_without_input_data_needs_no_validator
+        # without the first.
+        if self.input_data is not None and self.validator is None:
+            raise ImproperlyConfigured(
+                f"{label}.input_data merges over the Validator's arguments, and this {label} "
+                "has no validator, so it would reach nothing: the service is handed none of "
+                "it. Declare a validator, or use kwargs for a value the service reads."
+            )
         # After the providers are known to be callables, and after the reads
         # and the target are: the seats it compares need nothing else. The
         # Validator's fields are compared in ``parameters()``.
