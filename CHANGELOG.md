@@ -87,8 +87,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and pydantic do and as it did for one decimal, where it refused one as no
   string; it refuses an element that is no decimal at its index, in the
   words it uses for one decimal; and a query string's `?prices=1.5,2.25` is two
-  elements rather than one string. A list of dates or date-times is still an
-  array of strings, since an element takes no other format.
+  elements rather than one string. Django matches a
+  `ModelMultipleChoiceField`'s keys against the column's own spelling, so
+  `"12.50"` names a row a two-place column holds and `12.5`, which the shape
+  check now passes, is refused by the form as no choice. A list of dates or
+  date-times is still an array of strings, since an element takes no other
+  format.
 
 ### Changed
 - **Breaking:** a django-filter CSV number filter (`BaseInFilter` or

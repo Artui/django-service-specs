@@ -815,3 +815,17 @@ class TestDeclaredLengths:
         assert refused["keyword"] == [
             ("List should have at most 1500 items after validation, not 1501", "max_length")
         ]
+
+    def test_a_number_s_bounds_stay_the_model_s_in_its_words(self) -> None:
+        # ``ge`` and ``le`` could be stated as a parameter's inclusive bounds,
+        # ``gt`` and ``lt`` could not, so neither pair is, and one model's
+        # bounds are answered in one dialect.
+        parameters = PydanticValidator(_Coded).parameters()
+        bounds = {p.name: (p.minimum, p.maximum) for p in parameters}
+        assert (bounds["count"], bounds["ratio"]) == ((None, None), (None, None))
+        arguments = {"title": "t", "count": 10, "ratio": 1.0}
+        assert check_arguments(parameters, arguments) == arguments
+        assert coded(_refusal(_Coded, arguments)) == {
+            "count": [("Input should be less than or equal to 9", "max_value")],
+            "ratio": [("Input should be less than 1", "max_value")],
+        }
