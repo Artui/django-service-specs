@@ -11,6 +11,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from asgiref.sync import sync_to_async
 from django.db.models import QuerySet
 from django.db.models.manager import BaseManager
 
@@ -174,3 +175,44 @@ def test_a_manager_built_on_base_manager_is_paged_too() -> None:
 
     assert (page.total, page.page, page.has_next) == (3, 1, True)
     assert len(page.items) == 2
+
+
+def _five_notes() -> None:
+    owner = make_user("ada")
+    Note.objects.bulk_create([Note(owner=owner, title=f"n{index}") for index in range(5)])
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("limit", [2**63, 2**70])
+def test_a_limit_past_any_integer_column_serves_every_row(limit: int) -> None:
+    # With no ceiling, the slice's end was the limit itself, and a ``LIMIT``
+    # past 64 bits is refused by the database as ``datatype mismatch``. The
+    # page served ends at the rows counted, and the limit reported is the one
+    # asked for.
+    _five_notes()
+
+    page = paginate_output(Note.objects.order_by("pk"), limit=limit)
+
+    assert [note.title for note in page.items] == ["n0", "n1", "n2", "n3", "n4"]
+    assert (page.page, page.limit, page.total_pages, page.has_next) == (1, limit, 1, False)
+
+
+@pytest.mark.django_db
+def test_a_page_past_any_integer_column_never_reaches_the_offset() -> None:
+    # The page clamps to the last one that exists before the offset is
+    # computed, so the offset stays inside the rows counted.
+    _five_notes()
+
+    page = paginate_output(Note.objects.order_by("pk"), page=2**70, limit=2)
+
+    assert page.page == 3
+    assert [note.title for note in page.items] == ["n4"]
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_a_limit_past_any_integer_column_serves_every_row_read_async() -> None:
+    await sync_to_async(_five_notes)()
+
+    page = await sync_to_async(paginate_output)(Note.objects.order_by("pk"), limit=2**70)
+
+    assert [note.title async for note in page.items] == ["n0", "n1", "n2", "n3", "n4"]

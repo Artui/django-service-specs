@@ -69,6 +69,21 @@ class UserFilters(django_filters.FilterSet):
     spent = django_filters.DurationFilter(field_name="pk")
 
 
+class NoteKeyFilters(django_filters.FilterSet):
+    """Number filters on a note's integer columns, reached each way a filter can name one."""
+
+    pk = django_filters.NumberFilter()
+    owner_key = django_filters.NumberFilter(field_name="owner")
+    owner_min = django_filters.NumberFilter(field_name="owner__id", lookup_expr="gte")
+    pk_digits = django_filters.NumberFilter(field_name="pk", lookup_expr="contains")
+    joined_in = django_filters.NumberFilter(field_name="owner__date_joined__year")
+    pk_or_any = django_filters.NumberFilter(field_name="pk", method="filter_pk_or_any")
+
+    def filter_pk_or_any(self, queryset: Any, name: str, value: Any) -> Any:
+        """A key no note can have matches every note: the method's own reading."""
+        return queryset if value >= 2**63 else queryset.filter(pk=value)
+
+
 class TitleFilter(django_filters.FilterSet):
     """One filter, for the tests about applying rather than reading."""
 
