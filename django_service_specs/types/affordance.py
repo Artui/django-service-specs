@@ -80,8 +80,10 @@ class Affordance:
         ImproperlyConfigured: ``code`` or ``reason`` is not a non-empty string;
             ``when`` is an ORM expression that is not boolean; ``when`` is a
             callable naming ``data``, ``instance``, ``collection``, ``result``
-            or ``queryset``; or ``when`` is neither an expression nor a
-            callable.
+            or ``queryset``; ``when`` is an async callable - an ``async
+            def``, an object whose ``__call__`` is one, or an async generator
+            function - since a condition is never awaited; or ``when`` is
+            neither an expression nor a callable.
     """
 
     code: str
@@ -112,7 +114,46 @@ class Affordance:
                 f"(a condition on the row) or a callable (a condition on nothing in "
                 f"particular); got {type(self.when).__name__}."
             )
+        _refuse_async(self.code, self.when)
         _refuse_per_call_names(self.code, self.when)
+
+
+def _refuse_async(code: str, when: Callable[..., Any]) -> None:
+    """Refuse a condition that answers with something still to be awaited.
+
+    A condition is sync-only and is never awaited: dispatch, the list that
+    reports availability and the check before a call all read its answer for
+    truth from sync code. An ``async def`` one answers with a coroutine, which
+    is truthy, so it would report every unmet condition as met. Where the
+    answer is read, ``affordances/utils.py`` refuses it at every call; here it
+    is refused once, when the operation is declared, naming the affordance.
+
+    Inline rather than through ``services/is_async.py``: ``types/`` imports
+    nothing else in the package. What this cannot see - a plain ``def`` that
+    hands back a coroutine, a decorated ``async def`` - is still refused where
+    the answer is read.
+
+    Three disjuncts, each held in ``tests/types/test_affordance.py``'s
+    ``TestAnAsyncCondition``: ``test_an_async_def_is_refused`` fails without
+    the first, ``test_an_object_whose_call_is_async_is_refused`` without the
+    second, and ``test_an_async_generator_function_is_refused`` without the
+    third, since an async generator's answer is not awaitable and is truthy
+    too.
+    """
+    # ``B004`` does not apply: this reads the class-level ``__call__`` to find
+    # one that is ``async def``, not to test callability.
+    type_call: Any = getattr(type(when), "__call__", None)  # noqa: B004
+    if (
+        inspect.iscoroutinefunction(when)
+        or inspect.iscoroutinefunction(type_call)
+        or inspect.isasyncgenfunction(when)
+    ):
+        name = getattr(when, "__qualname__", None) or type(when).__name__
+        raise ImproperlyConfigured(
+            f"Affordance {code!r}: `when` is an async callable ({name}). A condition is "
+            "sync-only and is never awaited, and an unawaited answer is truthy, so it "
+            "would read every unmet condition as met; declare it with def."
+        )
 
 
 def _refuse_per_call_names(code: str, when: Callable[..., Any]) -> None:

@@ -16,6 +16,7 @@ from django.db.models import Q
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
@@ -194,22 +195,35 @@ class TestCallableConditions:
             dispatch(spec, principal=ada, arguments={})
         assert ran == []
 
-    def test_dispatch_does_not_run_a_service_whose_condition_is_async_def(self, ada: Any) -> None:
-        # The literal shape: an ``async def`` condition the declaration accepts
-        # today, so only the read stands between it and the call.
+    @pytest.mark.django_db(transaction=True)
+    @pytest.mark.parametrize("atomic", [True, False], ids=["atomic", "non-atomic"])
+    async def test_adispatch_does_not_run_a_service_whose_condition_answered_with_a_coroutine(
+        self, atomic: bool
+    ) -> None:
+        # An ``async def`` service, so both of adispatch's paths are walked: run
+        # inside the hop when atomic, awaited after it when not. The condition
+        # is answered inside the hop either way, before the run.
         ran: list[Any] = []
 
-        def service() -> None:
+        async def service() -> None:
             ran.append(True)
 
         spec = ServiceSpec(
             service=service,
             permissions=[Unrestricted()],
-            affordances=[Affordance(code="books_closed", reason="r", when=_books_closed)],
+            affordances=[Affordance(code="books_closed", reason="r", when=_books_closed_answer)],
+            atomic=atomic,
         )
         with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
-            dispatch(spec, principal=ada, arguments={})
+            await adispatch(spec, principal=object(), arguments={})
         assert ran == []
+
+    def test_an_async_def_condition_is_refused_before_any_call_can_be_made(self) -> None:
+        # The literal shape is refused when it is declared, so no spec carrying
+        # it exists to dispatch. What a declaration cannot see, a plain ``def``
+        # handing back the coroutine, is the test above.
+        with pytest.raises(ImproperlyConfigured, match="`when` is an async callable"):
+            Affordance(code="books_closed", reason="r", when=_books_closed)
 
     def test_a_condition_returning_nothing_refuses(self, ada: Any) -> None:
         silent = Affordance(code="silent", reason="r", when=lambda: None)

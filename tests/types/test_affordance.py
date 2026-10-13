@@ -139,3 +139,60 @@ class TestWhen:
         with pytest.raises(ImproperlyConfigured) as refused:
             Affordance(code="c", reason="r", when=when)
         assert "reads `instance`" in str(refused.value)
+
+
+async def _books_closed() -> bool:
+    return False
+
+
+async def _books_closed_lazily() -> Any:
+    yield False
+
+
+class _BooksClosed:
+    """A callable object whose ``__call__`` is ``async def``: the function itself is not."""
+
+    async def __call__(self) -> bool:
+        return False
+
+
+class TestAnAsyncCondition:
+    """A condition is sync-only and is never awaited: an async one is refused when declared.
+
+    Each reads only the seeds, so the per-call-name check has nothing to say
+    and the refusal that answers is the one this class names. One shape per
+    disjunct of the guard.
+    """
+
+    def test_an_async_def_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Affordance(code="books_closed", reason="r", when=_books_closed)
+        message = str(refused.value)
+        assert message.startswith("Affordance 'books_closed': `when` is an async callable")
+        assert "_books_closed" in message
+
+    def test_an_object_whose_call_is_async_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Affordance(code="books_closed", reason="r", when=_BooksClosed())
+        assert str(refused.value).startswith(
+            "Affordance 'books_closed': `when` is an async callable"
+        )
+
+    def test_an_async_generator_function_is_refused(self) -> None:
+        # Not a coroutine function, and what it returns is not awaitable
+        # either, but it is truthy and never runs.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Affordance(code="books_closed", reason="r", when=_books_closed_lazily)
+        assert str(refused.value).startswith(
+            "Affordance 'books_closed': `when` is an async callable"
+        )
+
+    @pytest.mark.parametrize(
+        "when",
+        [Q(archived=False), Exists(Note.objects.filter(pk=OuterRef("pk")))],
+        ids=["q", "exists"],
+    )
+    def test_an_expression_is_still_a_condition_on_the_row(self, when: Any) -> None:
+        # The row check returns before the async check is asked, so an
+        # expression is never mistaken for a callable of either kind.
+        assert Affordance(code="c", reason="r", when=when).when is when

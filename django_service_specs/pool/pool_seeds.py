@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
+
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.services.is_async import is_async
 
 # A single registration: ``(name, resolver)``. A tuple rather than a mapping so
 # the registry stays frozen and the resolution order is the registration order,
@@ -52,16 +56,48 @@ class PoolSeeds:
     spec callable: it names the pool entries it wants (``user``, an adapter's own
     entry) and receives only those, or takes ``**kwargs`` for all of them.
 
+    **A resolver is sync-only.** A seed is a resolver - a callable whose
+    return is the value - and resolvers are called from sync code and never
+    awaited. An ``async def``
+    one would seed a coroutine, which is truthy, so an affordance condition or
+    a precondition reading the seed would read an answer nobody computed. One
+    is refused when the registry is built, with ``ImproperlyConfigured``; a
+    plain ``def`` handing back an awaitable is refused where it is resolved,
+    by ``base_pool``.
+
     Attributes:
         seeds: The registrations, in registration order.
     """
 
     seeds: tuple[_Seed, ...] = ()
 
+    def __post_init__(self) -> None:
+        # Here rather than in ``extend``, because ``extend`` builds its registry
+        # through ``replace``, which runs this too, and the dataclass is public:
+        # a registry constructed directly is refused the same way. Three
+        # disjuncts between ``is_async`` and this line, each held in
+        # tests/pool/test_pool_seeds.py's ``TestAnAsyncResolverIsRefused``:
+        # ``test_an_async_def_is_refused`` fails without the coroutine-function
+        # check, ``test_an_object_whose_call_is_async_is_refused`` without the
+        # class-level ``__call__`` one, and
+        # ``test_an_async_generator_function_is_refused`` without the third.
+        for name, resolver in self.seeds:
+            if is_async(resolver) or inspect.isasyncgenfunction(resolver):
+                label = getattr(resolver, "__qualname__", None) or type(resolver).__name__
+                raise ImproperlyConfigured(
+                    f"The pool seed {name!r} has an async resolver ({label}). A resolver "
+                    "is called from sync code and never awaited, and its unawaited value "
+                    "is truthy, so whatever reads the seed would read an answer nobody "
+                    "computed; declare it with def."
+                )
+
     def extend(self, **seeds: Callable[..., Any]) -> PoolSeeds:
         """Return a new registry with ``seeds`` appended.
 
         Raises:
+            ImproperlyConfigured: A resolver is async - an ``async def``, an
+                object whose ``__call__`` is one, or an async generator
+                function. A resolver is never awaited.
             ValueError: A name is one of the dispatcher's own, or is already
                 registered here. Both are refused at **registration** rather
                 than at dispatch, because a silent last-wins is the exact

@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 
 
 def test_seeds_are_the_documented_ones() -> None:
@@ -110,3 +116,102 @@ def test_a_resolver_sees_the_caller_s_reporter() -> None:
 
     seeds = DEFAULT_POOL_SEEDS.extend(sink=lambda *, progress: progress)
     assert base_pool(user="u", progress=reporter, seeds=seeds)["sink"] is reporter
+
+
+async def _books_open() -> bool:
+    """Awaited, the books are closed. Called sync, a coroutine, which is truthy."""
+    return False
+
+
+async def _books_open_lazily() -> Any:
+    yield False
+
+
+class _NotACoroutine:
+    """Awaitable through ``__await__`` alone: no ``close()`` to call on it."""
+
+    def __await__(self) -> Any:
+        yield
+        return False
+
+
+class TestAResolverAnsweringWithAnAwaitable:
+    """A plain ``def`` handing back a coroutine looks sync until it answers.
+
+    The registry cannot refuse it, so the value is refused where it is
+    resolved, before it enters a pool. One shape per disjunct of the guard.
+    """
+
+    def test_a_coroutine_is_refused_and_closed(self) -> None:
+        answer = _books_open()
+        seeds = DEFAULT_POOL_SEEDS.extend(books_open=lambda: answer)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            base_pool(user="u", seeds=seeds)
+        assert str(refused.value).startswith(
+            "The pool seed 'books_open' resolved to an awaitable (coroutine)"
+        )
+        # Closed, so nothing is left to warn that it was never awaited.
+        assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+    def test_an_awaitable_that_is_not_a_coroutine_is_refused(self) -> None:
+        seeds = DEFAULT_POOL_SEEDS.extend(books_open=lambda: _NotACoroutine())
+        with pytest.raises(ImproperlyConfigured, match="resolved to an awaitable"):
+            base_pool(user="u", seeds=seeds)
+
+    def test_an_async_generator_is_refused(self) -> None:
+        # Not awaitable, so ``isawaitable`` alone would seed it as it is.
+        answer = _books_open_lazily()
+        seeds = DEFAULT_POOL_SEEDS.extend(books_open=lambda: answer)
+        with pytest.raises(ImproperlyConfigured, match="resolved to an awaitable"):
+            base_pool(user="u", seeds=seeds)
+
+
+@pytest.mark.django_db
+class TestDispatchDoesNotRunOnAnAwaitableSeed:
+    """End to end: the seed's coroutine would have read as met, and the service run.
+
+    Each reader answers with a real ``bool`` or raises, so the refusal that
+    lands can only be the seed's, never the guard on a condition's answer.
+    """
+
+    def test_through_an_affordance(self) -> None:
+        ran: list[Any] = []
+
+        def service() -> None:
+            ran.append(True)
+
+        spec = ServiceSpec(
+            service=service,
+            permissions=[Unrestricted()],
+            affordances=[
+                Affordance(
+                    code="books_closed",
+                    reason="The books are closed.",
+                    when=lambda *, books_open: bool(books_open),
+                )
+            ],
+        )
+        seeds = DEFAULT_POOL_SEEDS.extend(books_open=lambda: _books_open())
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=object(), arguments={}, pool_seeds=seeds)
+        assert "resolved to an awaitable" in str(refused.value)
+        assert "answered with an awaitable" not in str(refused.value)
+        assert ran == []
+
+    def test_through_a_precondition(self) -> None:
+        ran: list[Any] = []
+
+        def service() -> None:
+            ran.append(True)
+
+        def books_must_be_open(*, books_open: Any) -> None:
+            if not books_open:
+                raise ValueError("The books are closed.")
+
+        spec = ServiceSpec(
+            service=service, permissions=[Unrestricted()], preconditions=[books_must_be_open]
+        )
+        seeds = DEFAULT_POOL_SEEDS.extend(books_open=lambda: _books_open())
+        with pytest.raises(ImproperlyConfigured, match="resolved to an awaitable"):
+            dispatch(spec, principal=object(), arguments={}, pool_seeds=seeds)
+        assert ran == []
