@@ -156,63 +156,110 @@ def shape_check(
     *,
     unknown_arguments: UnknownArguments,
 ) -> dict[str, Any]:
-    """``check_arguments`` over ``parameters``, leaving out what the Validator will be handed anyway.
+    """``check_arguments`` over ``parameters``, leaving out what the server will fill anyway.
 
-    One function for ``open_call`` and ``bind_arguments``, so a transport that
-    binds for itself relaxes exactly what dispatch relaxes. Two things, both
-    about the Validator's own parameters and nothing else:
+    One function for ``open_call``, ``resolve_target`` and ``bind_arguments``,
+    so a transport that binds for itself relaxes exactly what dispatch
+    relaxes. Two things are relaxed:
 
-    - **Under** ``partial`` **an absent Validator field is not refused**, at
-      any depth, as djangorestframework-services relaxes only its serializer.
-      A ``reads`` argument and a target selector's read, the ``pk`` among
-      them, stay required as declared: a partial update still needs to say
-      which row it updates
+    - **A parameter a typed provider is annotated to fill**, which is always
+      one that provider's values reach (see ``_server_filled``): not
+      demanded of the caller, since
+      the provider's values are merged over the caller's before the callable
+      reading it is called; ``server_owned_keys`` tells a transport to hide
+      exactly such a key. It is still required of the merged result: a
+      provider that declines it after all, with ``UNSET`` or by leaving it
+      out, leaves the usual refusal to the step that reads it - the
+      Validator for one of its fields
+      (test_a_filled_field_the_provider_declines_is_refused_by_the_validator),
+      ``call_keywords`` for a read the service or a selector asks for
+      (test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
+      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks).
+    - **Under** ``partial`` **an absent Validator field**, at any depth, as
+      djangorestframework-services relaxes only its serializer. A ``reads``
+      argument and a target selector's read, the ``pk`` among them, stay
+      required as declared unless a provider fills them: a partial update
+      still needs to say which row it updates
       (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
-    - **A Validator field the spec's ``input_data`` provider is annotated to
-      fill is not demanded of the caller**, at the top level, since the
-      provider's values are merged over the caller's before the Validator
-      sees them; ``server_owned_keys`` tells a transport to hide exactly that
-      field. It is still required of the merged result, so the Validator
-      refuses it if the provider declines it after all
-      (test_a_filled_field_the_provider_declines_is_refused_by_the_validator).
-      A provider whose return says nothing about its keys relaxes nothing.
 
     A present value is checked as declared either way, and an unknown key is
-    still refused. Only a service spec has a Validator; a selector spec's call
-    is checked as declared.
+    still refused
+    (test_a_relaxed_read_the_caller_sends_is_still_checked_and_the_provider_outranks_it).
 
     **On a** ``many`` **spec the Validator's parameters are each row's**, so
-    both relaxings apply inside every row and none at the top level, where the
-    list and the ``reads`` stay required as declared
-    (test_partial_leaves_the_list_and_the_reads_required). The list's own
-    refusal - absent, null, not a list - and the top level's are raised here;
-    each row's is carried to ``validate_arguments`` as ``_CheckedRows``, to be
-    reported with the Validator's.
+    the Validator's relaxings apply inside every row and none at the top
+    level, where the list stays required and a read is relaxed only as a
+    provider fills it (test_partial_leaves_the_list_and_the_reads_required,
+    test_a_many_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller).
+    The list's own refusal - absent, null, not a list - and the top level's
+    are raised here; each row's is carried to ``validate_arguments`` as
+    ``_CheckedRows``, to be reported with the Validator's.
     """
+    reads = _server_filled(spec)
     # One arc to coverage, each conjunct held by bind_arguments' tests:
     # test_a_selector_spec_returns_its_checked_arguments (the first: a selector
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
         declared = spec.validator.parameters()
-        own = declared.names()
-        # ``own`` and not every key the provider fills: ``input_data`` feeds
-        # the Validator alone, so a read it names would reach nothing
-        # (test_a_filled_key_naming_a_read_stays_required).
-        keys = provider_keys(spec.input_data)
-        filled = own & keys.filled if keys is not None else frozenset()
-        everywhere = own if spec.partial else frozenset()
+        fields = _filled(spec.input_data, declared)
+        everywhere = declared.names() if spec.partial else frozenset()
         if spec.many:
-            rows = _relaxed(declared, everywhere, filled)
             return _check_bulk(
-                parameters,
-                rows,
+                _relaxed(parameters, frozenset(), reads),
+                _relaxed(declared, everywhere, fields),
                 arguments,
                 name=spec.many_argument,
                 unknown_arguments=unknown_arguments,
             )
-        parameters = _relaxed(parameters, everywhere, filled)
+        parameters = _relaxed(parameters, everywhere, reads | fields)
+    else:
+        parameters = _relaxed(parameters, frozenset(), reads)
     return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+
+
+def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
+    """The reads a typed ``kwargs`` provider fills where its values reach them: no caller's to send.
+
+    **A provider relaxes only the parameters its values reach**, so a key it
+    is annotated to fill is relaxed where the callable reading it is called
+    with the provider's value:
+
+    - A selector's own ``kwargs`` is merged over its ``reads`` in
+      ``selector_pool``, so it relaxes that selector's reads: a selector
+      spec's
+      (test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller),
+      and a service spec's target selector's
+      (test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded_of_the_caller).
+    - A service spec's ``kwargs`` is merged into the service's pool after
+      the caller's ``reads``, so it relaxes the spec's ``reads``
+      (test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded_of_the_caller).
+    - ``input_data`` is merged into the Validator's arguments alone, so it
+      relaxes the Validator's fields, in ``shape_check``.
+
+    A filled key naming a parameter in any other seat - a read named by
+    ``input_data``, a target read or a Validator field named by the spec's
+    ``kwargs``, a spec read or a Validator field named by the target
+    selector's ``kwargs`` - is refused by ``ServiceSpec`` before any call
+    reaches here, so every name ``server_owned_keys`` lists that a parameter
+    declares is one this relaxes. The rule is still read per provider rather
+    than as that union, so the relaxing never outruns the delivery.
+
+    Only ``filled`` keys: a ``declinable`` one stays the caller's. And a
+    provider whose return says nothing about its keys relaxes nothing
+    (test_an_untyped_kwargs_provider_relaxes_no_read).
+    """
+    if isinstance(spec, SelectorSpec):
+        return _filled(spec.kwargs, spec.reads)
+    target = spec.target_selector_spec()
+    lookup = frozenset() if target is None else _filled(target.kwargs, target.reads)
+    return lookup | _filled(spec.kwargs, spec.reads)
+
+
+def _filled(provider: Callable[..., Any] | None, parameters: Parameters) -> frozenset[str]:
+    """The names in ``parameters`` that ``provider`` is annotated to fill; none if it does not say."""
+    keys = provider_keys(provider)
+    return parameters.names() & keys.filled if keys is not None else frozenset()
 
 
 def _check_bulk(

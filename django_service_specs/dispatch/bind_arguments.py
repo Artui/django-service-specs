@@ -33,7 +33,9 @@ def bind_arguments(
        over ``spec.parameters()``, under ``unknown_arguments``: the closed
        argument set and the shape check, at every level, relaxing what
        dispatch relaxes: an absent Validator field when the service spec is
-       ``partial``, and one its ``input_data`` provider is annotated to fill.
+       ``partial``, one its ``input_data`` provider is annotated to fill, and
+       a read the ``kwargs`` provider of the spec declaring it is annotated
+       to fill.
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
        with a Validator, ``validated()`` on only the arguments the Validator's
        own ``parameters()`` declare - never a selector's or the spec's
@@ -50,7 +52,9 @@ def bind_arguments(
     reads the resolved target and the call's seeds, which this function is
     not handed. A spec declaring one is bound on the caller's arguments alone,
     so a field the provider is annotated to fill passes the shape check and,
-    left out, is the Validator's to refuse.
+    left out, is the Validator's to refuse. No ``kwargs`` provider is called
+    either: a read one fills passes the shape check, and is absent from a
+    selector spec's checked arguments when the caller left it out.
 
     **It does not resolve or authorize.** Dispatch runs class-level
     authorization, target resolution and object-level authorization *between*

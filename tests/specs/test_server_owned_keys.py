@@ -69,9 +69,9 @@ def test_a_registered_seed_is_owned_with_the_dispatcher_s_own() -> None:
 
 
 def test_a_service_spec_owns_its_providers_and_its_target_lookup_s() -> None:
-    # Each provider is one part of the union, so a key one of them fills is
-    # the server's for the whole call: the lookup and the service read the
-    # arguments of one call.
+    # Each provider is one part of the union. A key one of them fills is the
+    # server's for the whole call, because a parameter declaring it where
+    # that provider's values never reach is refused when the spec is built.
     target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, kwargs=owner)
     spec = ServiceSpec(
         service=print,

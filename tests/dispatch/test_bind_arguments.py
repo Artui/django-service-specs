@@ -249,3 +249,44 @@ def test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provide
         bind_arguments(spec, {}, principal=PRINCIPAL)
     assert caught.value.detail == {"title": ["The merged input has no title."]}
     assert validator.calls == [{}]
+
+
+# --- a read a kwargs provider fills -------------------------------------------------
+
+
+class _ServerPk(TypedDict):
+    pk: int
+
+
+def _server_pk() -> _ServerPk:
+    return {"pk": 1}
+
+
+def test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded() -> None:
+    # The selector is called with the provider's value, which this function
+    # does not call, so the checked arguments carry only what was sent.
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk)
+    assert bind_arguments(spec, {}, principal=PRINCIPAL) == {}
+
+
+def test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded() -> None:
+    target = SelectorSpec(
+        kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk
+    )
+    spec = ServiceSpec(service=service, instance_selector_spec=target)
+    assert bind_arguments(spec, {}, principal=PRINCIPAL, target=ROW) == {}
+
+
+def test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded() -> None:
+    spec = ServiceSpec(service=service, reads=PK, kwargs=_server_pk, validator=Recording())
+    assert bind_arguments(spec, {"title": "Dune"}, principal=PRINCIPAL) == {
+        "title": "DUNE",
+        "validated": True,
+    }
+
+
+def test_a_read_an_untyped_kwargs_provider_returns_stays_required() -> None:
+    spec = ServiceSpec(service=service, reads=PK, kwargs=lambda: {"pk": 1})
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {}, principal=PRINCIPAL)
+    assert caught.value.detail == {"pk": ["This field is required."]}

@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from typing_extensions import TypedDict
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.grant import Grant
@@ -114,6 +115,31 @@ def test_a_row_is_the_row_dispatch_acts_on(ada: Any) -> None:
     assert target == note
     result = dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "T"})
     assert result.instance == target
+
+
+class _ServerPk(TypedDict):
+    pk: int
+
+
+def test_a_read_the_lookup_s_kwargs_provider_fills_is_not_demanded_as_dispatch_does_not(
+    ada: Any,
+) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+
+    def server() -> _ServerPk:
+        return {"pk": note.pk}
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=FormValidator(_NoteForm),
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK, kwargs=server
+        ),
+    )
+    target, _ = _found(resolve_target(spec, principal=ada, arguments={}))
+    assert target == note
+    assert dispatch(spec, principal=ada, arguments={"title": "T"}).instance == note
 
 
 def test_a_missing_row_is_dispatch_s_not_found(ada: Any) -> None:
