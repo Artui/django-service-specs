@@ -137,7 +137,14 @@ absent `BooleanField` does not come back `False`, nor an absent `CharField`
 `''`, which an update would write over the row. A value that is sent is
 checked exactly as on a whole call, so a required field may be left out but
 not sent empty. On a `ModelForm` the fields left out keep the target's
-values, and its model and uniqueness checks skip them. `clean()` sees only
+values, and each one's own model check skips them. Its uniqueness checks and
+constraints do not: they run over the row as it would be saved, what was sent
+on top of the target's values, and leave out only the model fields the form
+never declares, as a whole call does. An update that sends one field of a
+`unique_together` pair or a `UniqueConstraint` and collides is refused as the
+whole call would be, under `non_field_errors`, rather than failing with an
+`IntegrityError` when the row is saved. That needs a target row: a partial
+call with none checks only what was sent. `clean()` sees only
 what was sent, so it reads `cleaned_data` with `get`. The parameters are the
 same for both calls: `required` says what a whole call needs.
 

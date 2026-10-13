@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declared unless a `kwargs` provider fills them, and a present value is checked as on a whole call. The Validator
   is told through `ValidationContext.partial`. `FormValidator` binds only the
   fields the caller sent and returns no key for any other, so an absent
-  `BooleanField` does not come back `False` nor an absent `CharField` `''`;
+  `BooleanField` does not come back `False` nor an absent `CharField` `''`,
+  while a `ModelForm`'s uniqueness checks and constraints still read the
+  whole row, so one field of a unique pair sent alone is refused as a whole
+  call refuses it rather than raising `IntegrityError` on save;
   `PydanticValidator` and `DataclassValidator` refuse a partial call with
   `ImproperlyConfigured`, because each validates every field. A service
   parameter a partial call left out is not refused as missing.
@@ -109,13 +112,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SelectorSpec.filter_set`, a django-filter `FilterSet` applied after
   `extend_queryset`, whose filters are read as Parameters and join the
   selector's `reads` after the author's own; and `filter_set_parameters`, that
-  reading. A real FilterSet needs the new `filter` extra.
+  reading. A number filter, and each bound of a numeric range, is read as a
+  `decimal` string, which its `DecimalField` reads exactly, so a key past
+  `2**53` matches its own row. A real FilterSet needs the new `filter` extra.
 - `run_selector`, `arun_selector`, `materialize_retrieve`,
   `amaterialize_retrieve` and `is_queryset`, the selector steps dispatch runs,
   exported for a transport that runs a selector itself.
 - Over HTTP, an array of numbers, integers or booleans reads a value holding
   commas as its elements, so `?ids=1,2` is `[1, 2]`, as a django-filter CSV
-  filter is spelt. An array of strings is never split.
+  filter is spelt. So does an array of strings whose choices hold no comma,
+  so a django-filter `OrderingFilter` takes `?o=title,-pk` as it does
+  `?o=title&o=-pk`; any other array of strings is never split.
 
 ### Changed
 - **Breaking:** a `DataclassValidator` call's `data` is the dataclass
@@ -125,8 +132,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** a string spelling a number is accepted where an `integer` or a
   `number` is declared, and the number is handed on: `"3"` is 3, and a
   number's `"1e3"` is 1000.0. The shape check refused it, from a JSON body
-  too; it now reads it as Django's forms, DRF and pydantic do. A string
-  spelling no number is still refused, and so is `true`.
+  too; it now reads it as Django's forms and pydantic's lax mode do, and as
+  Django's `IntegerField` where the two differ, so an integer's `"5."` is 5.
+  A string spelling no number is still refused, and so is `true`.
+- **Breaking:** only an ASCII string spells an `integer` or a `number`, in a
+  query string, an argv call and a JSON string alike. Arabic-Indic and fullwidth digits, and a
+  number padded with a Unicode space, were read as the number by a flat
+  transport, as Python's `int` and Django's fields read them; they are now
+  refused as the type they are not, as pydantic and JSON refuse them.
 - **Breaking:** a multipart upload is an argument, under the name its part
   carries, in any method's body. An upload the spec declares no parameter for
   was dropped; it now reaches the closed argument set, which refuses it under
@@ -143,7 +156,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a pool seed's resolver, and the new providers and preconditions. One
   declared so at import time stops the project at import. A seed resolver
   handing back an awaitable from a plain `def` is refused where it is
-  resolved.
+  resolved, and an `extend_queryset` doing so where it is called, where its
+  coroutine stood in for the queryset and came back as a list's value.
 - A selector nested in a service spec that declares `preconditions` or a
   `progress_reporter` is refused when the service spec is built, as is an
   output selector declaring `kwargs`: dispatch never runs them.
@@ -167,6 +181,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the call fails closed instead of running. A pool seed's resolver declared
   `async def` is refused when it is declared, and one handing back an
   awaitable from a plain `def` where it is resolved.
+- A dataclass field declared `init=False` was written to the row by the
+  mutation helpers, although the dataclass computes it and no caller sends
+  it: `create_from_input`, `update_from_input`, their async twins and
+  `apply_input` read every field of a dataclass row, the rows of a relation a
+  `DataclassValidator` hands over as instances included. Only its `__init__`
+  fields are written now, at every depth.
+- A multipart PUT, PATCH or DELETE body past `DATA_UPLOAD_MAX_MEMORY_SIZE`
+  (2.5 MB by default) was refused with `RequestDataTooBig`, because its body
+  was read whole into memory before it was parsed, where a POST of the same
+  upload was taken. It is parsed from the request's stream now, as Django
+  parses a POST, so a file part streams to the upload handlers and the limit
+  bounds the fields alone.
 
 ## [0.4.2] — 2026-10-06
 

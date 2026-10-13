@@ -235,7 +235,8 @@ class TestFilterSet:
     def test_the_input_schema_describes_each_filter(self) -> None:
         properties = spec_input_schema(listing(filter_set=NoteFilters))["properties"]
         assert properties["pk_range_min"] == {
-            "type": "number",
+            "type": "string",
+            "format": "decimal",
             "description": "The `min` bound of `pk`.",
         }
         assert properties["kinds"]["type"] == "array"

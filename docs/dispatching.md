@@ -309,8 +309,10 @@ spec is built, an affordance's condition when it is declared, and a seed's
 resolver when `PoolSeeds` is built. Each is called from sync code and never
 awaited, and its unawaited answer is truthy, so a check would allow every
 call and a condition would read as met. An answer still to be awaited from a
-plain `def` is refused where it is read, for a permission check, a condition
-and a seed alike, so the call fails closed.
+plain `def` is refused where it is read, for a permission check, a condition,
+a seed and `extend_queryset` alike, so the call fails closed: a lambda calling
+an `async def` from `extend_queryset` would otherwise hand dispatch a coroutine
+for the queryset, and a list's value would be that coroutine.
 
 So `adispatch` runs the steps in **one** thread-sensitive executor hop, and the
 run's shape decides only what joins it:

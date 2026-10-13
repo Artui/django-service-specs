@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pytest
 
@@ -15,6 +15,16 @@ from tests.relations_app.models import Author, Post, Tag
 class _PostInput:
     title: str
     body: str = "default-body"
+
+
+@dataclass
+class _ComputedPostInput:
+    title: str
+    # Computed by the dataclass and never taken, so never written either.
+    views: int = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.views = len(self.title) * 100
 
 
 @pytest.mark.django_db
@@ -39,6 +49,12 @@ class TestCreateFromInput:
         assert result.instance.body == "default-body"
         assert "title" in result.changed_fields
         assert "body" in result.changed_fields
+
+    def test_a_field_declared_init_false_is_not_written(self) -> None:
+        result = create_from_input(Post, _ComputedPostInput(title="hi"))
+        result.instance.refresh_from_db()
+        assert result.instance.views == 0
+        assert result.changed_fields == ("title",)
 
     def test_unset_fields_omitted_from_create(self) -> None:
         @dataclass

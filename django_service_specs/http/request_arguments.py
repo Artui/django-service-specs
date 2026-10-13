@@ -27,7 +27,8 @@ _COMMA_SEPARABLE = ("number", "integer", "boolean")
 """The element types a comma can never be part of, so ``?ids=1,2`` is two elements, not one.
 
 A string can hold a comma, and so can anything the reader leaves as a string
-(a decimal, a date), so those arrays take a value whole."""
+(a decimal, a date), so those arrays take a value whole, unless choices say
+otherwise: see ``_splits``."""
 
 _URLENCODED = "application/x-www-form-urlencoded"
 _MULTIPART = "multipart/form-data"
@@ -64,8 +65,10 @@ def request_arguments(
     a comma cannot be part of such a value and it is the spelling a
     django-filter CSV filter advertises; repeated keys and commas may mix. An
     empty part (``?ids=1,,2``) is not dropped as a blank element is: it is
-    refused at its index as any malformed element is. A string array is never
-    split, since a comma is part of a string. **A blank value is
+    refused at its index as any malformed element is. A string array is
+    split only where its choices hold no comma, as an ordering's do, so
+    ``?o=title,-pk`` is ``["title", "-pk"]``; otherwise it is never split,
+    since a comma is part of a string. **A blank value is
     absent unless** ``""`` **is one the parameter can take**: a plain string
     can, and a number, a boolean, a date, a decimal, or a string whose
     choices leave the blank out cannot. A flat wire has no other spelling of
@@ -130,14 +133,11 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
         # second, without which every declared value would become a list).
         if param is not None and param.type == "array":
             keep = _takes_blank(param.items, param)
-            # One branch to coverage; the element type decides whether a value
-            # is split: test_a_number_array_reads_a_comma_separated_value_as_its_elements
-            # (and the integer and boolean ones) hold the types that split, and
-            # test_a_string_array_is_not_split and
-            # test_an_array_with_no_declared_element_is_not_split the ones that
-            # must not. A blank is dropped first, so an empty part left by a
-            # stray comma is the reader's malformed element rather than a blank.
-            split = param.items in _COMMA_SEPARABLE
+            # The element type and its choices decide whether a value is split,
+            # and _splits names the test holding each condition. A blank is
+            # dropped first, so an empty part left by a stray comma is the
+            # reader's malformed element rather than a blank.
+            split = _splits(param)
             values: list[str] = []
             for value in source.getlist(key):
                 # One branch to coverage, so each condition is held by its own
@@ -168,6 +168,35 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
             continue
         raw[key] = value
     return raw
+
+
+def _splits(param: Parameter) -> bool:
+    """Whether a comma in one of the array's values separates elements, so ``?o=a,-b`` is two.
+
+    An element type that can never hold a comma splits. So does an array of
+    strings whose declared choices hold none: every element must be one of
+    them, so a value holding a comma can only be several, and refused whole it
+    would refuse the spelling django-filter's ``OrderingFilter`` takes,
+    ``?o=title,-pk``. Without choices, or with one choice that holds a comma,
+    a string array takes each value whole, since a comma may be part of it.
+    Repeated keys make a list either way, and the two may mix.
+
+    One branch to coverage, so each condition is held by its own test:
+    test_a_number_array_reads_a_comma_separated_value_as_its_elements (the
+    types that split),
+    test_an_array_with_no_declared_element_is_not_split_by_its_choices
+    (``"string"``: without it an undeclared element with comma-free choices
+    would split), test_a_string_array_is_not_split (the choices declared),
+    test_a_string_array_whose_choices_hold_a_comma_is_not_split (none holds a
+    comma), and test_a_string_array_whose_choices_hold_no_comma_is_split.
+    """
+    if param.items in _COMMA_SEPARABLE:
+        return True
+    return (
+        param.items == "string"
+        and param.choices is not None
+        and not any("," in str(choice) for choice in param.choices)
+    )
 
 
 def _takes_blank(json_type: object, param: Parameter, *, fmt: str | None = None) -> bool:
@@ -228,11 +257,23 @@ def _form(request: HttpRequest) -> tuple[QueryDict, MultiValueDict]:
         return request.POST, request.FILES
     if request.content_type == _URLENCODED:
         return QueryDict(request.body, encoding=request.encoding), MultiValueDict()
-    # The parser Django runs for a POST, over the buffered body, which hands
-    # back the uploads beside the fields.
-    return MultiPartParser(
-        request.META, BytesIO(request.body), request.upload_handlers, request.encoding
-    ).parse()
+    # The parser Django runs for a POST, which hands back the uploads beside
+    # the fields, fed from the request's own stream while nothing has read it.
+    # Read whole first, a body past DATA_UPLOAD_MAX_MEMORY_SIZE was refused
+    # with RequestDataTooBig, where the parser streams a file part to the
+    # upload handlers and bounds only the fields, so a PATCH refused the
+    # upload a POST took. Once the stream has been read, ``request.body`` is
+    # the buffer if something kept one, and raises RawPostDataException if
+    # not: parsing the spent stream would read no arguments at all and say
+    # nothing, where Django's own POST parse does the same.
+    # test_an_upload_past_the_body_size_limit_is_read_whatever_the_method
+    # holds the stream, and test_a_multipart_stream_read_without_a_buffer_is_refused
+    # the read one; a buffered body would parse from either, since Django
+    # rewinds the stream onto the buffer it keeps. ``_read_started`` is the flag Django's own POST parse
+    # reads to make the same choice; the stubs do not declare it.
+    started: bool = request._read_started  # ty: ignore[unresolved-attribute]
+    stream = BytesIO(request.body) if started else request
+    return MultiPartParser(request.META, stream, request.upload_handlers, request.encoding).parse()
 
 
 def _json_object(request: HttpRequest) -> dict[str, Any]:

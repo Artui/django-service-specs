@@ -96,8 +96,11 @@ its elements, `?ids=1,2` as `[1, 2]` with the space around each part trimmed:
 a comma cannot be part of such a value, and it is the spelling a django-filter
 CSV filter advertises. Repeated keys and commas may mix, and an empty part
 (`?ids=1,,2`) is refused at its index as any malformed element is. An array
-of strings, decimals or dates is never split, since a comma can be part of a
-string.
+of strings is split the same way when it declares choices and none of them
+holds a comma, as a django-filter `OrderingFilter`'s do: every element must be
+a choice, so `?o=title,-pk` can only be `["title", "-pk"]`. An array of
+strings with no choices, or with a choice holding a comma, and an array of
+decimals or dates, is never split, since a comma can be part of a string.
 A blank value is absent unless `""` is one the parameter can take: a plain
 string can, and a number, a boolean, a date, a decimal, or a string whose
 `choices` leave the blank out cannot. A flat wire has no other spelling of
@@ -127,7 +130,10 @@ the upload itself, Django's `UploadedFile`, for a parameter of type `file`,
 every upload under the name for an array, and the last of repeated ones for
 anything else. It replaces a field of the same name, since a browser sends a
 file input only as a file. A POST's uploads are Django's own `request.FILES`;
-those in a PUT, PATCH or DELETE body are parsed here with its fields. An
+those in a PUT, PATCH or DELETE body are parsed here with its fields, by
+Django's own parser from the request's stream, so a file part is streamed to
+the upload handlers and `DATA_UPLOAD_MAX_MEMORY_SIZE` bounds the fields alone,
+as it does for a POST. An
 upload under a name the spec does not declare reaches the closed argument set
 like any undeclared field, and is refused under `REJECT`; a file input left
 empty is no upload, so it is absent. Only a multipart body carries one.

@@ -269,9 +269,9 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
 def test_a_numeric_string_is_read_and_the_number_handed_on(
     json_type: str, value: str, number: float
 ) -> None:
-    # Django's forms, DRF and pydantic's lax mode all read these strings as the
-    # number, so refusing them was stricter than every library behind the
-    # check. The parsed number is what goes on: a dataclass Validator refuses
+    # Django's forms read every one of these strings as the number, and
+    # pydantic's lax mode all but the integer "-4.", so refusing them was
+    # stricter than every library behind the check. The parsed number is what goes on: a dataclass Validator refuses
     # the string "3" for an ``int``.
     cleaned = check_arguments(one(Parameter("x", json_type)), {"x": value})
     assert cleaned == {"x": number}
@@ -294,12 +294,13 @@ def test_a_string_that_is_no_number_is_refused_as_its_type(
 ) -> None:
     # The refusal is the type's, as before: a string that does not read as the
     # number is a string, which is not the declared type. "1e3" is no integer
-    # to any of the three libraries, although each reads it as a number.
+    # to Django's forms or pydantic, although both read it as a number.
     assert refusal(one(Parameter("x", json_type)), {"x": value}) == {"x": [message]}
 
 
 @pytest.mark.parametrize(
-    "value", ["3", "3.0", " 3 ", "-4.", "1e3", "3.5", "", "abc", "nan", "inf", "1_000"]
+    "value",
+    ["3", "3.0", " 3 ", "-4.", "1e3", "3.5", "", "abc", "nan", "inf", "1_000", "\u0665", "\u00a03"],
 )
 @pytest.mark.parametrize("json_type", ["integer", "number"])
 def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
@@ -317,6 +318,23 @@ def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
     except InvalidArguments:
         checked = None
     assert checked == flat
+
+
+@pytest.mark.parametrize("value", ["\u0665", "\uff15", "\u0665.0", "\u00a05"])
+def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: str) -> None:
+    # Python's ``int`` and ``float`` read Arabic-Indic and fullwidth digits, and
+    # a no-break space around them, and pydantic's lax mode reads none of them.
+    assert refusal(
+        Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number")),
+        {"count": value, "ratio": value},
+    ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
+
+
+def test_a_decimal_string_outside_ascii_is_read_as_decimal_reads_it() -> None:
+    # Not a number's reading: a decimal is checked as Python's ``Decimal``
+    # parses it, which takes an Arabic-Indic five, and is handed on unchanged.
+    params = one(Parameter("price", "string", format="decimal"))
+    assert check_arguments(params, {"price": "\u0665"}) == {"price": "\u0665"}
 
 
 def test_true_is_still_no_number_and_no_integer() -> None:

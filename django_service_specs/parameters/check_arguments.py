@@ -61,10 +61,10 @@ def check_arguments(
     Presence, JSON type, format, choices and nullability, at every level of
     nesting, with no query. It is what runs at enqueue time and in front of an
     untrusted caller's Validator, so a malformed call is refused before it costs
-    a row lookup, and **it is no stricter than the libraries behind it**: a
-    decimal accepts a JSON number as well as a string, because every decimal
-    validator does, and a check stricter than the worker refuses what would
-    have run.
+    a row lookup, and **it is no stricter than the libraries behind it**, with
+    one exception named below: a decimal accepts a JSON number as well as a
+    string, because every decimal validator does, and a check stricter than
+    the worker refuses what would have run.
 
     - A required parameter with a declared default is not refused when absent,
       because the Validator will supply the default. The default is not
@@ -77,11 +77,17 @@ def check_arguments(
     - **A string is read as the number it spells** where an ``integer`` or a
       ``number`` is declared, wherever the declaration reaches, and the number
       is handed on: ``"3"`` is 3, ``"3.0"`` and ``" 3 "`` are 3 too, and a
-      number's ``"1e3"`` is 1000.0. Django's forms, DRF and pydantic's lax mode
-      all read these strings so, and their common reading is the one
-      ``coerce_flat`` makes, which this shares. A string that spells no such
-      number is refused as the type it is not. The number goes on rather than
-      the string because a Validator stricter than those three, the dataclass
+      number's ``"1e3"`` is 1000.0. Django's forms and pydantic's lax mode
+      both read these strings so, and the reading is the one ``coerce_flat``
+      makes, which this shares. Where the two differ it is Django's: an
+      integer's ``"5."`` and ``"5 .0"`` are 5, which pydantic's ``int``
+      refuses, so this is looser than pydantic there. **The exception** is a
+      string outside ASCII for an ``integer`` or a ``number``, not a
+      ``decimal``: Django's fields read Arabic-Indic or fullwidth
+      digits and Unicode spaces as Python's ``int`` does, and this refuses
+      them, as pydantic and JSON do. A string that spells no such number is
+      refused as the type it is not. The number goes on rather than the
+      string because a Validator stricter than those two, the dataclass
       adapter's, refuses ``"3"`` for an ``int``.
     - ``bool`` is neither an ``integer`` nor a ``number``, although Python
       makes it an ``int``: a JSON ``true`` sent for a count is a caller's

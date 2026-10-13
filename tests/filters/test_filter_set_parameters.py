@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from typing import Any
 
@@ -9,8 +10,11 @@ import django_filters
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
+from django.http import HttpRequest
+from django.test import RequestFactory
 
 from django_service_specs.filters.filter_set_parameters import filter_set_parameters
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -22,6 +26,11 @@ from tests.dispatch_app.models import Note
 from tests.filters.utils import NoteFilters, UserFilters
 
 CSV_HELP = "Multiple values may be separated by commas."
+FACTORY = RequestFactory()
+
+
+def _json(payload: Any) -> HttpRequest:
+    return FACTORY.post("/", data=json.dumps(payload), content_type="application/json")
 
 
 def _spec(filter_set: Any) -> SelectorSpec:
@@ -33,15 +42,15 @@ def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
         Parameter("title", "string"),
         Parameter("title_contains", "string", help="Matches `title` with the `icontains` lookup."),
         Parameter("archived", "boolean"),
-        Parameter("min_pk", "number", help="Matches `pk` with the `gte` lookup."),
+        Parameter("min_pk", "string", format="decimal", help="Matches `pk` with the `gte` lookup."),
         # django-filter gives every CSV filter this ``help_text`` of its own, and
         # it holds for the query string, where ``?pks=1,2`` is the spelling.
         Parameter("pks", "array", items="number", help=CSV_HELP),
         Parameter("pk_between", "array", items="number", help=CSV_HELP),
         # Two arguments, because django-filter reads ``pk_range_min`` and
         # ``pk_range_max`` off the data and never a ``pk_range`` of its own.
-        Parameter("pk_range_min", "number", help="The `min` bound of `pk`."),
-        Parameter("pk_range_max", "number", help="The `max` bound of `pk`."),
+        Parameter("pk_range_min", "string", format="decimal", help="The `min` bound of `pk`."),
+        Parameter("pk_range_max", "string", format="decimal", help="The `max` bound of `pk`."),
         Parameter(
             "kind",
             "string",
@@ -180,13 +189,29 @@ def test_a_suffixed_filter_of_an_unknown_kind_reads_as_strings() -> None:
     )
 
 
+def test_a_csv_filter_of_text_reads_strings() -> None:
+    class CharInFilter(django_filters.BaseInFilter, django_filters.CharFilter): ...
+
+    class Titled(django_filters.FilterSet):
+        titles = CharInFilter(field_name="title", lookup_expr="in")
+
+    assert filter_set_parameters(Titled) == Parameters.of(
+        Parameter(
+            "titles",
+            "array",
+            items="string",
+            help=CSV_HELP,
+        ),
+    )
+
+
 def test_an_author_s_help_text_names_both_bounds_of_a_range() -> None:
     class Priced(django_filters.FilterSet):
         pk_range = django_filters.RangeFilter(field_name="pk", help_text="Rows in this pk window.")
 
     assert filter_set_parameters(Priced) == Parameters.of(
-        Parameter("pk_range_min", "number", help="Rows in this pk window."),
-        Parameter("pk_range_max", "number", help="Rows in this pk window."),
+        Parameter("pk_range_min", "string", format="decimal", help="Rows in this pk window."),
+        Parameter("pk_range_max", "string", format="decimal", help="Rows in this pk window."),
     )
 
 
@@ -252,6 +277,52 @@ def test_the_number_shapes_narrow_the_rows(arguments: Any) -> None:
     checked = check_arguments(filter_set_parameters(NoteFilters), arguments(pks))
     rows = shape_queryset(Note.objects.all(), _spec(NoteFilters), checked, source_label="x")
     assert sorted(rows.values_list("pk", flat=True)) == pks[1:]
+
+
+class _ById(django_filters.FilterSet):
+    pk = django_filters.NumberFilter()
+    pk_range = django_filters.RangeFilter(field_name="pk")
+
+
+_BIG = 2**53
+"""The first integer past which a binary float cannot tell neighbours apart."""
+
+
+@pytest.fixture
+def big_ids() -> list[int]:
+    ada = make_user("ada")
+    return [Note.objects.create(pk=pk, owner=ada, title=str(pk)).pk for pk in (_BIG, _BIG + 1)]
+
+
+def _matched(request: Any) -> list[int]:
+    params = filter_set_parameters(_ById)
+    checked = check_arguments(params, request_arguments(request, params))
+    rows = shape_queryset(Note.objects.all(), _spec(_ById), checked, source_label="x")
+    return list(rows.values_list("pk", flat=True))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "request_for",
+    [
+        pytest.param(lambda pk: FACTORY.get(f"/?pk={pk}"), id="query-string"),
+        pytest.param(lambda pk: _json({"pk": str(pk)}), id="json-string"),
+        # A JSON number was already exact: the decoder makes it an int.
+        pytest.param(lambda pk: _json({"pk": pk}), id="json-number"),
+        pytest.param(
+            lambda pk: FACTORY.get(f"/?pk_range_min={pk}&pk_range_max={pk}"), id="range-bounds"
+        ),
+    ],
+)
+@pytest.mark.parametrize("index", [0, 1])
+def test_a_number_filter_matches_a_key_past_a_float_s_precision_exactly(
+    big_ids: list[int], request_for: Any, index: int
+) -> None:
+    # A number filter's form field is a ``DecimalField``, which reads a string
+    # exactly. Declared a JSON number, its string was read as a float on the
+    # way, and 2**53 + 1 came back as 2**53: the filter answered with the
+    # neighbouring row.
+    assert _matched(request_for(big_ids[index])) == [big_ids[index]]
 
 
 @pytest.mark.django_db
