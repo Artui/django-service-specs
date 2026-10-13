@@ -51,7 +51,9 @@ class Affordance:
       the condition is true; a ``NULL`` is not true.
     - **A callable** is a condition on nothing in particular - "refunds are
       closed during month-end". It is resolved through the keyword pool like any
-      other spec callable and returns a ``bool``, and it sees the pool's seeds
+      other spec callable and returns a ``bool``. It is sync-only, declared
+      with ``def``: it is never awaited, so an ``async def`` one is refused
+      when the affordance is declared. It sees the pool's seeds
       only: ``user``, ``progress`` and any registered pool seed, an HTTP
       adapter's ``request`` among them. Never the call's target or input, and
       never a client argument - the caller does not get to decide whether the
