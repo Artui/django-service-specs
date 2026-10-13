@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
+
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import open_call, walk_target
@@ -60,6 +62,8 @@ def resolve_target(
         NotPermitted: the class-level, object-level or scope check.
         ImproperlyConfigured: as ``dispatch``, for a spec declaring no
             permissions or a read a registered seed occupies.
+        ImproperlyConfigured: also a ``many`` spec, which declares no lookup:
+            its rows are the call's arguments, and none is found ahead of it.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than
             a lookup in front of one.
     """
@@ -67,6 +71,11 @@ def resolve_target(
         raise TypeError(
             f"resolve_target() takes a ServiceSpec; got {type(spec).__name__}. A "
             "SelectorSpec's selector is its run: dispatch it."
+        )
+    if spec.many:
+        raise ImproperlyConfigured(
+            "resolve_target() was handed a many spec, which declares no target selector: its "
+            "rows are the call's arguments, and there is no target to find ahead of it."
         )
     target_spec = spec.target_selector_spec()
     parameters = target_spec.parameters() if target_spec is not None else Parameters()

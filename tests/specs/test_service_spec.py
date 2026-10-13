@@ -284,3 +284,110 @@ class TestAffordances:
     def test_a_row_condition_on_a_one_row_operation_is_fine(self) -> None:
         spec = ServiceSpec(service=print, instance_selector_spec=RETRIEVE, affordances=[ON_THE_ROW])
         assert spec.affordances == (ON_THE_ROW,)
+
+
+class TestMany:
+    """``many``: a list of rows, each validated by the spec's Validator.
+
+    Every spec here is built inside its test rather than at module level, so a
+    tree without the field fails each test on its own rather than the module.
+    """
+
+    def test_off_by_default_with_items_as_the_list_s_name(self) -> None:
+        spec = ServiceSpec(service=print)
+        assert spec.many is False
+        assert spec.many_argument == "items"
+
+    def test_the_top_level_is_the_reads_then_the_list_of_rows(self) -> None:
+        reads = Parameters.of(Parameter("confirmed", "boolean"))
+        spec = ServiceSpec(service=print, many=True, validator=Titled("title"), reads=reads)
+        assert spec.parameters() == Parameters.of(
+            Parameter("confirmed", "boolean"),
+            Parameter(
+                "items",
+                "array",
+                required=True,
+                items=Parameters.of(Parameter("title", "string")),
+            ),
+        )
+
+    def test_the_list_travels_under_its_declared_name(self) -> None:
+        spec = ServiceSpec(service=print, many=True, many_argument="rows", validator=Titled())
+        assert spec.parameters().names() == frozenset({"rows"})
+
+    def test_a_row_field_may_share_a_read_s_name(self) -> None:
+        # A row's fields are not top-level arguments, so a ``title`` read
+        # beside the list is a different argument from each row's ``title``.
+        reads = Parameters.of(Parameter("title", "string"))
+        spec = ServiceSpec(service=print, many=True, validator=Titled("title"), reads=reads)
+        assert spec.parameters().names() == frozenset({"title", "items"})
+
+    @pytest.mark.parametrize("name", ["", "1st", "two words", "rows!", "röws", 3])
+    def test_a_name_that_is_not_an_ascii_identifier_is_refused(self, name: object) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True, many_argument=name, validator=Titled())
+        assert str(refused.value).startswith(
+            f"ServiceSpec.many_argument must be an ASCII identifier; got {name!r}."
+        )
+
+    def test_a_declared_name_without_many_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many_argument="rows")
+        assert str(refused.value).startswith(
+            "ServiceSpec declares many_argument='rows' without many=True."
+        )
+
+    def test_the_default_name_written_out_without_many_is_not_a_declaration(self) -> None:
+        # The other half of the guard above: the field carries its default on
+        # every spec, so the default alone refuses nothing.
+        assert ServiceSpec(service=print, many_argument="items").many is False
+
+    def test_a_many_spec_needs_a_validator(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True)
+        assert str(refused.value).startswith("ServiceSpec declares many=True with no validator.")
+
+    @pytest.mark.parametrize(
+        ("role", "selector"),
+        [("instance", RETRIEVE), ("collection", LIST)],
+    )
+    def test_a_target_selector_beside_many_is_refused(
+        self, role: str, selector: SelectorSpec
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(
+                service=print,
+                many=True,
+                validator=Titled(),
+                **{f"{role}_selector_spec": selector},
+            )
+        assert str(refused.value).startswith(
+            f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
+            "resolves no target"
+        )
+
+    def test_a_list_named_after_a_read_is_refused(self) -> None:
+        reads = Parameters.of(Parameter("items", "string"))
+        with pytest.raises(ImproperlyConfigured, match="declared by two sources"):
+            ServiceSpec(service=print, many=True, validator=Titled(), reads=reads)
+
+    def test_a_list_named_after_a_seed_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True, many_argument="data", validator=Titled())
+        assert str(refused.value).startswith(
+            "ServiceSpec.many_argument declares the parameter(s) ['data'], which dispatch seeds"
+        )
+
+    def test_a_row_condition_on_a_many_spec_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(
+                service=print, many=True, validator=Titled(), affordances=[ON_NOTHING, ON_THE_ROW]
+            )
+        assert str(refused.value).startswith(
+            "ServiceSpec.affordances[1] ('note_archived') is a condition on the row, and this "
+            "spec operates on a list of rows (many=True)"
+        )
+
+    def test_a_callable_condition_on_a_many_spec_is_fine(self) -> None:
+        spec = ServiceSpec(service=print, many=True, validator=Titled(), affordances=[ON_NOTHING])
+        assert spec.affordances == (ON_NOTHING,)

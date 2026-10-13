@@ -33,6 +33,7 @@ from tests.dispatch.utils import (
     Record,
     Refuse,
     Scoped,
+    Titled,
     make_user,
     note_by_pk,
     notes_of,
@@ -267,6 +268,19 @@ def test_a_selector_spec_is_refused(ada: Any) -> None:
     spec: Any = SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN)
     with pytest.raises(TypeError, match="resolve_target\\(\\) takes a ServiceSpec"):
         resolve_target(spec, principal=ada, arguments={})
+
+
+def test_a_many_spec_is_refused_before_anything_runs(
+    ada: Any, django_assert_num_queries: Any
+) -> None:
+    # Before the class-level check, which would refuse this principal: the
+    # spec is the wrong kind for the question, whoever asks it.
+    spec = ServiceSpec(service=Record(), permissions=[Refuse()], many=True, validator=Titled())
+    with django_assert_num_queries(0), pytest.raises(ImproperlyConfigured) as refused:
+        resolve_target(spec, principal=ada, arguments={"items": []})
+    assert str(refused.value).startswith(
+        "resolve_target() was handed a many spec, which declares no target selector"
+    )
 
 
 # --- handed on to dispatch --------------------------------------------------------------

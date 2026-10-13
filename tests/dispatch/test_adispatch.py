@@ -883,3 +883,40 @@ async def test_an_async_selector_spec_refuses_a_target_before_any_hop(
         await adispatch(spec, principal=ada, arguments={}, target=[])
 
     assert hops == []
+
+
+# --- many: every row inside the one hop ---------------------------------------------------
+
+
+async def test_a_many_spec_validates_every_row_and_writes_them_in_one_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    async def write_then_fail(*, user: Any, data: list[dict[str, Any]]) -> None:
+        for row in data:
+            await Note.objects.acreate(owner=user, title=row["title"])
+        raise Boom
+
+    spec = ServiceSpec(service=write_then_fail, permissions=OPEN, many=True, validator=Titled())
+
+    with pytest.raises(Boom):
+        await adispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+
+    # One transaction for every row, and the rows validated in the same hop.
+    assert await Note.objects.aexists() is False
+    assert len(hops) == 1
+
+
+async def test_a_many_spec_refuses_its_rows_by_index(ada: Any, hops: list[str]) -> None:
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
+    with pytest.raises(InvalidArguments) as refused:
+        await adispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {}]})
+    assert refused.value.detail == {"items": {1: {"title": ["This field is required."]}}}
+
+
+async def test_a_many_spec_refuses_a_pre_resolved_target_before_any_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
+    with pytest.raises(TypeError, match="a many spec resolves no target"):
+        await adispatch(spec, principal=ada, arguments={"items": []}, target=None)
+    assert hops == []

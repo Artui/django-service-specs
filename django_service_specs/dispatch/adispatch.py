@@ -19,7 +19,7 @@ from django_service_specs.dispatch.utils import (
     finish_service,
     open_call,
     prepare_service,
-    refuse_a_selector_spec_s_target,
+    refuse_target,
     reraise_unless_retrieve,
     selector_pool,
     settle,
@@ -99,8 +99,11 @@ async def adispatch(
 
     ``target`` is ``dispatch``'s: a service spec's target the caller resolved,
     standing in for the lookup inside the one hop, and checked there unless
-    ``grant`` says ``target_checked``. A selector spec refuses it before any
-    hop.
+    ``grant`` says ``target_checked``. A selector spec and a ``many`` spec
+    refuse it before any hop.
+
+    A ``many`` spec checks, validates and writes its rows as ``dispatch``
+    does, every row inside the one hop.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``.
@@ -115,7 +118,7 @@ async def adispatch(
     # by test_principal_id_is_resolved_inside_the_one_hop (``principal_id`` alone).
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
-    refuse_a_selector_spec_s_target(spec, target)
+    refuse_target(spec, target)
     rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):

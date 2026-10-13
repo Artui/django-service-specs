@@ -97,3 +97,36 @@ class TestSpecInputSchema:
         spec_input_schema(spec)
 
         assert validator.asked == 2
+
+
+def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
+    # Built here rather than at module level, so a tree without ``many``
+    # fails this test alone.
+    class Row(Validator):
+        def parameters(self) -> Parameters:
+            return Parameters.of(Parameter("title", "string", required=True))
+
+        def validate(
+            self, arguments: Mapping[str, Any], context: ValidationContext
+        ) -> dict[str, Any]:
+            return dict(arguments)
+
+    reads = Parameters.of(Parameter("confirmed", "boolean"))
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Row(), reads=reads)
+    assert spec_input_schema(spec) == {
+        "type": "object",
+        "properties": {
+            "confirmed": {"type": "boolean"},
+            "items": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {"title": {"type": "string"}},
+                    "required": ["title"],
+                    "additionalProperties": False,
+                },
+            },
+        },
+        "required": ["items"],
+        "additionalProperties": False,
+    }

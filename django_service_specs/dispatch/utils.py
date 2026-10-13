@@ -34,6 +34,7 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
@@ -54,6 +55,7 @@ from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
+from django_service_specs.validation.validator import Validator
 
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
@@ -80,6 +82,20 @@ class Prepared:
     # The Validator's ``data``: a mapping, or the instance a dataclass one builds.
     data: Any
     kwargs: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class _CheckedRows:
+    """A ``many`` spec's list after the shape check: each row's checked arguments, or its refusal.
+
+    Carried in the checked arguments under ``many_argument`` rather than
+    raised, so the Validator's refusals of the other rows join the same tree:
+    every failing row is reported at once, as DRF's ``ListSerializer`` reports
+    them. Both mappings are keyed by the row's ``int`` index.
+    """
+
+    rows: dict[int, dict[str, Any]]
+    errors: dict[int, Any]
 
 
 def open_call(
@@ -164,20 +180,75 @@ def shape_check(
     A present value is checked as declared either way, and an unknown key is
     still refused. Only a service spec has a Validator; a selector spec's call
     is checked as declared.
+
+    **On a** ``many`` **spec the Validator's parameters are each row's**, so
+    both relaxings apply inside every row and none at the top level, where the
+    list and the ``reads`` stay required as declared
+    (test_partial_leaves_the_list_and_the_reads_required). The list's own
+    refusal - absent, null, not a list - and the top level's are raised here;
+    each row's is carried to ``validate_arguments`` as ``_CheckedRows``, to be
+    reported with the Validator's.
     """
     # One arc to coverage, each conjunct held by bind_arguments' tests:
     # test_a_selector_spec_returns_its_checked_arguments (the first: a selector
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        own = spec.validator.parameters().names()
+        declared = spec.validator.parameters()
+        own = declared.names()
         # ``own`` and not every key the provider fills: ``input_data`` feeds
         # the Validator alone, so a read it names would reach nothing
         # (test_a_filled_key_naming_a_read_stays_required).
         keys = provider_keys(spec.input_data)
         filled = own & keys.filled if keys is not None else frozenset()
-        parameters = _relaxed(parameters, own if spec.partial else frozenset(), filled)
+        everywhere = own if spec.partial else frozenset()
+        if spec.many:
+            rows = _relaxed(declared, everywhere, filled)
+            return _check_bulk(
+                parameters,
+                rows,
+                arguments,
+                name=spec.many_argument,
+                unknown_arguments=unknown_arguments,
+            )
+        parameters = _relaxed(parameters, everywhere, filled)
     return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+
+
+def _check_bulk(
+    parameters: Parameters,
+    rows: Parameters,
+    arguments: Mapping[str, Any],
+    *,
+    name: str,
+    unknown_arguments: UnknownArguments,
+) -> dict[str, Any]:
+    """The top level of a ``many`` call checked here, and each row checked on its own.
+
+    A list is checked at the top level as an empty one, so the list itself
+    and every argument beside it are checked as declared while no row is: a
+    row checked there would raise with the others, before the Validator could
+    add its own refusals of the rest. Anything that is not a list is checked
+    as it was sent, and refused.
+    """
+    value = arguments.get(name) if isinstance(arguments, Mapping) else None
+    if not isinstance(value, (list, tuple)):
+        return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    checked = check_arguments(
+        parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments
+    )
+    cleaned: dict[int, dict[str, Any]] = {}
+    errors: dict[int, Any] = {}
+    for index, row in enumerate(value):
+        # Each row as a top-level call, which is how the shape check reads a
+        # row nested in a declared array too: the same unknown-key policy, and
+        # a row that is no object refused under ``non_field_errors``.
+        try:
+            cleaned[index] = check_arguments(rows, row, unknown_arguments=unknown_arguments)
+        except InvalidArguments as refused:
+            errors[index] = refused.detail
+    checked[name] = _CheckedRows(cleaned, errors)
+    return checked
 
 
 def _relaxed(parameters: Parameters, everywhere: frozenset[str], top: frozenset[str]) -> Parameters:
@@ -589,20 +660,28 @@ def walk_target(
     return {}
 
 
-def refuse_a_selector_spec_s_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
-    """Refuse ``target=`` on a selector spec, from either entry point, before anything runs.
+def refuse_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
+    """Refuse ``target=`` where nothing is looked up for it to stand in for, before anything runs.
 
     A selector spec's selector is its run, so a target handed in would stand
     in for the operation itself rather than for a lookup in front of it.
     Refused rather than ignored, since ignoring it runs the selector the
-    caller meant to skip. One arc to coverage:
-    test_a_pre_resolved_target_runs_no_lookup_and_is_object_checked_once
-    holds the first conjunct, and every selector spec dispatched the second.
+    caller meant to skip. A ``many`` spec's rows are the caller's arguments
+    and it resolves no target, so a target there, ``None`` included, stands
+    in for nothing; ``resolve_target`` refuses the spec too, so no caller
+    holds one to pass.
     """
-    if isinstance(spec, SelectorSpec) and target is not UNSET:
+    if target is UNSET:
+        return
+    if isinstance(spec, SelectorSpec):
         raise TypeError(
             "target= is a ServiceSpec's, standing in for its target selector's lookup; "
             "a SelectorSpec's selector is its run."
+        )
+    if spec.many:
+        raise TypeError(
+            "target= stands in for a target selector's lookup, and a many spec resolves no "
+            "target: its rows are the call's arguments."
         )
 
 
@@ -627,14 +706,63 @@ def validate_arguments(
     ``ValidationContext.partial`` is the spec's ``partial``. A spec with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
+
+    **A** ``many`` **spec's Validator is run once per row**, on every row the
+    shape check let through, each with ``server_input`` merged over it. A row
+    it refuses is re-rooted under the row's index, beside the shape check's
+    refusals, and the whole tree is raised as one ``InvalidArguments`` under
+    ``many_argument`` once every row has been seen. Otherwise ``data`` is the
+    list of each row's ``data`` and ``values`` holds the list of each row's
+    values under ``many_argument``: neither is spread by field.
     """
     validator = spec.validator
     if validator is None:
         return Validated(values={}, data={})
     declared = validator.parameters().names()
+    if spec.many:
+        context = ValidationContext(principal, target, partial=spec.partial)
+        return _validate_rows(
+            validator, checked[spec.many_argument], spec.many_argument, context, server_input
+        )
     merged = {**checked, **server_input}
     own = {name: value for name, value in merged.items() if name in declared}
     return validator.validated(own, ValidationContext(principal, target, partial=spec.partial))
+
+
+def _validate_rows(
+    validator: Validator,
+    checked: _CheckedRows,
+    name: str,
+    context: ValidationContext,
+    server_input: Mapping[str, Any],
+) -> Validated:
+    """``validated()`` on each row the shape check passed, and one refusal for every failing row."""
+    declared = validator.parameters().names()
+    errors = dict(checked.errors)
+    values: list[dict[str, Any]] = []
+    data: list[Any] = []
+    for index, row in checked.rows.items():
+        merged = {**row, **server_input}
+        own = {key: value for key, value in merged.items() if key in declared}
+        try:
+            validated = validator.validated(own, context)
+        except InvalidArguments as refused:
+            errors[index] = refused.detail
+            continue
+        # A value bound for the call has no seat on a call of many rows: each
+        # row would bind its own, and the service is called once. Refused
+        # rather than dropped, as a bound value with no name of its own is.
+        if validated.pool:
+            raise ImproperlyConfigured(
+                f"The Validator bound the key(s) {sorted(validated.pool)} for row {index} of a "
+                "many call. A many spec's service is called once for every row, so a value "
+                "bound for one row has nowhere to go; bind nothing on a many spec."
+            )
+        values.append(validated.values)
+        data.append(validated.data)
+    if errors:
+        raise InvalidArguments({name: dict(sorted(errors.items()))})
+    return Validated(values={name: values}, data=data)
 
 
 def prepare_service(
@@ -766,12 +894,16 @@ def prepare_service(
     # caller's to fill, since a partial call may leave out any of them:
     # test_a_partial_call_never_refuses_a_service_parameter_the_caller_left_out
     # holds that conjunct, and every service spec with no Validator dispatched
-    # the other, such as
-    # test_a_service_parameter_no_validator_declares_is_the_author_s_error.
+    # the first, such as
+    # test_a_service_parameter_no_validator_declares_is_the_author_s_error. On
+    # a ``many`` spec the Validator's parameters are each row's and are never
+    # spread, so nothing a caller sends fills one by name:
+    # test_a_service_parameter_named_after_a_row_field_is_the_author_s_error
+    # holds the third.
     validator = spec.validator
     asked = (
         validator.parameters().names()
-        if validator is not None and not spec.partial
+        if validator is not None and not spec.partial and not spec.many
         else frozenset()
     )
     fillable = (declared_reads | asked) - checked.keys()
@@ -827,7 +959,15 @@ def finish_service(
         prepared.target._prefetched_objects_cache = {}
     output_spec = spec.output_selector_spec
     value = result
-    kind: Literal["instance", "list"] = "instance"
+    # A ``many`` spec's return is the rows it wrote, presented as a list, as
+    # djangorestframework-services renders it; an output selector's kind
+    # still decides what its re-read is. A ``None`` it returns stays one
+    # value, presented as ``None`` as any service's is: as a list it would be
+    # refused by ``present`` after the write had committed. One arc to
+    # coverage: test_the_service_runs_once_with_every_validated_row holds the
+    # first conjunct, test_a_many_service_returning_none_presents_none the
+    # second.
+    kind: Literal["instance", "list"] = "list" if spec.many and result is not None else "instance"
     if output_spec is not None:
         pool = call_pool(prepared.principal, pool_seeds, {"result": result})
         value = lookup(
@@ -837,8 +977,7 @@ def finish_service(
             reserved=pool_seeds.reserved,
             after_the_run=True,
         )
-        if output_spec.kind is SelectorKind.LIST:
-            kind = "list"
+        kind = "list" if output_spec.kind is SelectorKind.LIST else "instance"
     return DispatchResult(
         kind=kind,
         value=value,

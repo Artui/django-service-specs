@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -11,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -26,6 +28,13 @@ from django_service_specs.specs.utils import (
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.utils import is_row_condition
 from django_service_specs.validation.validator import Validator
+
+# The default ``many_argument``, djangorestframework-services' own, so a spec
+# moving between the two packages keeps the argument a caller sends.
+_DEFAULT_MANY_ARGUMENT = "items"
+# ASCII by the class rather than ``str.isidentifier``, which admits any
+# Unicode letter a header, a form field or a shell may not carry.
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -57,6 +66,24 @@ class ServiceSpec:
             and one the Validator declares when ``parameters()`` is assembled.
         partial: Whether a call may leave out a required argument, as an HTTP
             ``PATCH`` does: the shape check and the Validator are both told.
+            On a ``many`` spec that holds for every row.
+        many: Whether the call carries a list of rows, each validated by the
+            ``validator``, under the one argument ``many_argument`` names, for
+            one run of the service over all of them. The service receives the
+            validated rows as ``data``, a list, and the validated values as
+            ``many_argument``, a list of their mappings; neither is spread by
+            field. Every row is checked and validated before the service runs,
+            and every failing row is refused in one ``InvalidArguments``,
+            addressed by its ``int`` index under ``many_argument``. Declared
+            with a ``validator``, since the rows are the arguments it validates,
+            and with no target selector, since a list of rows resolves no
+            target.
+        many_argument: The argument a ``many`` spec's list travels under, an
+            ASCII identifier. ``"items"`` by default. Beside it a ``many``
+            spec takes its ``reads`` and nothing else, so an argument asked
+            once for the whole call - a confirmation - is a read. Naming
+            anything but the default on a spec that is not ``many`` is
+            refused, since nothing would read it.
         validator: Validates the arguments its own ``parameters()`` declare. A
             [`Validator`][django_service_specs.validation.validator.Validator]
             instance; ``None`` for an operation that takes no arguments beyond
@@ -142,6 +169,12 @@ class ServiceSpec:
     # where ``None`` reads the HTTP method: this package has no method to read,
     # so the declaration is the answer.
     partial: bool = False
+    # djangorestframework-services' names for the same declaration, so a spec
+    # moving between the two packages keeps its field names. A plain ``str``
+    # carrying its default rather than ``None`` meaning it, so every reader sees
+    # the name in force and no transport restates the default.
+    many: bool = False
+    many_argument: str = _DEFAULT_MANY_ARGUMENT
     validator: Validator | None = None
     instance_selector_spec: SelectorSpec | None = None
     collection_selector_spec: SelectorSpec | None = None
@@ -211,6 +244,7 @@ class ServiceSpec:
                 f"{label} declares a presenter and so does its output selector. One "
                 "value is presented once; keep the one that describes what is returned."
             )
+        _check_many(self)
         object.__setattr__(self, "affordances", _check_affordances(self))
         _check_reads(self)
         _check_nested(self)
@@ -227,6 +261,12 @@ class ServiceSpec:
     def parameters(self) -> Parameters:
         """Everything this spec takes: its target selector's reads, its own, then its Validator's.
 
+        On a ``many`` spec the Validator's parameters are each row's, so the
+        top level is the spec's ``reads`` and then the list itself: a
+        required array under ``many_argument`` whose rows are the Validator's
+        parameters. A row's field is no top-level argument, so it may share a
+        read's name.
+
         Assembled on every call rather than at construction, because a
         Validator reading a model-backed declaration may need the app registry,
         and specs are commonly built at import time. A name two sources declare
@@ -235,6 +275,8 @@ class ServiceSpec:
         construction already.
         """
         own = self.validator.parameters() if self.validator is not None else Parameters()
+        if self.many:
+            own = Parameters.of(_the_list(self.many_argument, items=own))
         assembled = _beside_the_target(self) + own
         return check_reserved(assembled, label="ServiceSpec.validator")
 
@@ -255,6 +297,59 @@ def _beside_the_target(spec: ServiceSpec) -> Parameters:
     """The target selector's reads, then the spec's own: the half known at construction."""
     target = spec.target_selector_spec()
     return (target.parameters() if target is not None else Parameters()) + spec.reads
+
+
+def _the_list(name: str, *, items: Parameters | None = None) -> Parameter:
+    """A ``many`` spec's list: required, each element a row of ``items``."""
+    return Parameter(name, "array", required=True, items=items)
+
+
+def _check_many(spec: ServiceSpec) -> None:
+    """Refuse a ``many_argument`` no caller could send, and a ``many`` spec nothing could run.
+
+    At construction, as every check here: a spec reaches transports that
+    dispatch it without ever asking. A ``many`` spec with no Validator would
+    hand the service rows nobody declared or checked; one with a target
+    selector would declare a lookup dispatch never runs, since a list of rows
+    resolves no target.
+    """
+    name: Any = spec.many_argument
+    # Two operands, each held by its own case of
+    # test_a_name_that_is_not_an_ascii_identifier_is_refused: ``3`` the first,
+    # since the pattern raises ``TypeError`` on a non-string, and ``"1st"`` the
+    # second. ``fullmatch``, or a valid prefix passes (``"rows!"``).
+    if not isinstance(name, str) or _IDENTIFIER.fullmatch(name) is None:
+        raise ImproperlyConfigured(
+            f"ServiceSpec.many_argument must be an ASCII identifier; got {name!r}. It is the "
+            "name a caller sends a many spec's list of rows under."
+        )
+    if not spec.many:
+        # Only a name other than the default: the field carries its default on
+        # every spec, so writing it out declares nothing
+        # (test_the_default_name_written_out_without_many_is_not_a_declaration).
+        if name != _DEFAULT_MANY_ARGUMENT:
+            raise ImproperlyConfigured(
+                f"ServiceSpec declares many_argument={name!r} without many=True. It names "
+                "the argument a list of rows travels under, and this spec takes no list; "
+                "set many=True or remove it."
+            )
+        return
+    if spec.validator is None:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares many=True with no validator. Each row is validated by "
+            "the spec's Validator, which also declares what a row is; declare one."
+        )
+    for role in ("instance", "collection"):
+        if getattr(spec, f"{role}_selector_spec") is not None:
+            raise ImproperlyConfigured(
+                f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
+                "resolves no target, so dispatch would never run the lookup; remove it, or "
+                "drop many=True."
+            )
+    # The list beside the reads is two sources of one argument if a read shares
+    # its name, which ``+`` refuses, and a seed's name is refused as any
+    # parameter's is. Neither needs the Validator, so both are refused here.
+    check_reserved(spec.reads + Parameters.of(_the_list(name)), label="ServiceSpec.many_argument")
 
 
 def _check_reads(spec: ServiceSpec) -> None:
@@ -353,16 +448,25 @@ def _check_affordances(spec: ServiceSpec) -> tuple[Affordance, ...] | None:
                 "unique within a spec."
             )
         codes.add(affordance.code)
-        # Two conjuncts, each held by its own test in tests/specs/test_service_spec.py:
+        # Three operands, each held by its own test in tests/specs/test_service_spec.py:
         # ``test_a_callable_condition_on_a_collection_operation_is_fine`` fails
-        # without the first, ``test_a_row_condition_on_a_one_row_operation_is_fine``
-        # without the second.
-        if is_row_condition(affordance.when) and spec.collection_selector_spec is not None:
+        # without the first,
+        # ``test_a_row_condition_on_a_collection_operation_is_refused`` without the
+        # second, ``test_a_row_condition_on_a_many_spec_is_refused`` without the
+        # third, and ``test_a_row_condition_on_a_one_row_operation_is_fine`` if the
+        # last two are dropped together.
+        if is_row_condition(affordance.when) and (
+            spec.collection_selector_spec is not None or spec.many
+        ):
+            what = (
+                "a list of rows (many=True)"
+                if spec.many
+                else "a collection (a collection_selector_spec)"
+            )
             raise ImproperlyConfigured(
                 f"ServiceSpec.affordances[{index}] ({affordance.code!r}) is a condition on "
-                "the row, and this spec operates on a collection (a "
-                "collection_selector_spec) with no single row to evaluate it against. "
-                "Declare it on the per-row operation, or express a rule about the "
-                "collection in the service."
+                f"the row, and this spec operates on {what} with no single row to evaluate "
+                "it against. Declare it on the per-row operation, or express a rule about "
+                "the rows in the service."
             )
     return declared
