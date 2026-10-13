@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -16,6 +16,40 @@ from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 def check_callable(value: Any, *, label: str) -> None:
     if not callable(value):
         raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
+
+
+def check_providers(spec: Any, names: tuple[str, ...], *, label: str) -> None:
+    """Refuse a provider field holding anything but a callable; ``None`` declares none."""
+    for name in names:
+        value = getattr(spec, name)
+        if value is not None:
+            check_callable(value, label=f"{label}.{name}")
+
+
+def check_preconditions(
+    preconditions: Sequence[Callable[..., None]] | None, *, label: str
+) -> tuple[Callable[..., None], ...] | None:
+    """Normalize ``preconditions`` to a tuple in declaration order, refusing what is not one.
+
+    ``Sequence`` alone refuses a bare callable, the likeliest mistake, as well
+    as a set, whose order would decide which refusal a caller sees, and a
+    generator, which the first call would exhaust. A string is a sequence of
+    non-callables and is refused by name rather than per character. One arc
+    to coverage: the ``"print"`` case of each spec's
+    ``test_refuses_at_construction`` holds the first disjunct, its ``print``
+    case the second.
+    """
+    if preconditions is None:
+        return None
+    if isinstance(preconditions, str | bytes) or not isinstance(preconditions, Sequence):
+        raise ImproperlyConfigured(
+            f"{label}.preconditions takes a sequence of callables; got "
+            f"{type(preconditions).__name__}. Wrap a single one in a list: preconditions=[...]."
+        )
+    declared = tuple(preconditions)
+    for index, precondition in enumerate(declared):
+        check_callable(precondition, label=f"{label}.preconditions[{index}]")
+    return declared
 
 
 def check_permissions(

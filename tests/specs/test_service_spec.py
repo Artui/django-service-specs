@@ -5,11 +5,14 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from tests.filters.utils import TitleFilter
 from tests.specs.utils import PK, Named, Titled
 
 RETRIEVE = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK)
@@ -98,11 +101,131 @@ def test_the_output_is_the_spec_presenters_or_else_the_output_selectors() -> Non
             "declares a presenter and so does its output selector",
         ),
         ({"metadata": 1}, "metadata must be a mapping"),
+        ({"kwargs": {"tenant": 1}}, "ServiceSpec.kwargs must be callable; got dict"),
+        ({"input_data": 3}, "ServiceSpec.input_data must be callable; got int"),
+        ({"progress_reporter": 3}, "ServiceSpec.progress_reporter must be callable; got int"),
+        ({"preconditions": print}, "ServiceSpec.preconditions takes a sequence of callables"),
+        ({"preconditions": [3]}, r"ServiceSpec.preconditions\[0\] must be callable; got int"),
+        ({"reads": [PK.items[0]]}, "ServiceSpec.reads must be Parameters"),
+        ({"reads": Parameters.of(Parameter("user", "integer"))}, r"\['user'\], which dispatch"),
+        (
+            {"reads": PK, "instance_selector_spec": RETRIEVE},
+            r"\['pk'\] are declared by two sources",
+        ),
     ],
 )
 def test_refuses_at_construction(kwargs: dict, message: str) -> None:
     with pytest.raises(ImproperlyConfigured, match=message):
         ServiceSpec(**{"service": print, **kwargs})
+
+
+class TestEngineFields:
+    """The fields a dispatch reads beyond the declaration: partial, preconditions, providers."""
+
+    def test_partial_is_kept_as_declared_and_off_by_default(self) -> None:
+        assert ServiceSpec(service=print).partial is False
+        assert ServiceSpec(service=print, partial=True).partial is True
+
+    def test_the_providers_and_preconditions_are_kept_in_declaration_order(self) -> None:
+        def scope() -> dict:
+            return {}
+
+        spec = ServiceSpec(
+            service=print,
+            kwargs=scope,
+            input_data=dict,
+            progress_reporter=print,
+            preconditions=[print, len],
+        )
+        assert spec.kwargs is scope
+        assert spec.input_data is dict
+        assert spec.progress_reporter is print
+        assert spec.preconditions == (print, len)
+        bare = ServiceSpec(service=print)
+        assert (bare.kwargs, bare.input_data, bare.progress_reporter, bare.preconditions) == (
+            None,
+            None,
+            None,
+            None,
+        )
+
+    def test_a_target_selector_s_kwargs_provider_is_its_own_to_run(self) -> None:
+        # Not refused: a nested lookup's ``kwargs`` scopes the lookup, as
+        # djangorestframework-services runs it.
+        target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, kwargs=dict)
+        assert ServiceSpec(service=print, instance_selector_spec=target).instance_selector_spec
+
+
+class TestReads:
+    """``reads``: what a service spec takes with no Validator in front of it."""
+
+    def test_reads_sit_between_the_target_s_and_the_validator_s(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            reads=Parameters.of(Parameter("project_pk", "integer", required=True)),
+            validator=Titled(),
+            instance_selector_spec=RETRIEVE,
+        )
+        assert [p.name for p in spec.parameters()] == ["pk", "project_pk", "title"]
+        assert ServiceSpec(service=print).reads == Parameters()
+
+    def test_the_input_schema_describes_each_read(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            reads=Parameters.of(Parameter("project_pk", "integer", required=True)),
+            validator=Titled(),
+        )
+        schema = spec_input_schema(spec)
+        assert schema["properties"]["project_pk"] == {"type": "integer"}
+        assert schema["required"] == ["project_pk"]
+
+    def test_a_read_the_validator_also_declares_is_refused_when_read(self) -> None:
+        # The Validator's names are read lazily, as everywhere in parameters().
+        spec = ServiceSpec(
+            service=print,
+            reads=Parameters.of(Parameter("title", "string")),
+            validator=Titled(),
+        )
+        with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):
+            spec.parameters()
+
+    def test_a_target_selector_s_filters_are_its_service_s_parameters(self) -> None:
+        collection = SelectorSpec(kind=SelectorKind.LIST, selector=list, filter_set=TitleFilter)
+        spec = ServiceSpec(service=print, collection_selector_spec=collection)
+        assert spec.parameters() == Parameters.of(Parameter("title", "string"))
+
+
+@pytest.mark.parametrize(
+    ("role", "nested", "message"),
+    [
+        (
+            "instance_selector_spec",
+            {"kind": SelectorKind.RETRIEVE, "preconditions": [print]},
+            "ServiceSpec.instance_selector_spec declares preconditions, which are never run "
+            "on a nested selector",
+        ),
+        (
+            "collection_selector_spec",
+            {"kind": SelectorKind.LIST, "progress_reporter": print},
+            "ServiceSpec.collection_selector_spec declares a progress_reporter, which is "
+            "never run on a nested selector",
+        ),
+        (
+            "output_selector_spec",
+            {"kind": SelectorKind.LIST, "kwargs": dict},
+            "ServiceSpec.output_selector_spec declares kwargs, which an output selector never runs",
+        ),
+    ],
+)
+def test_a_nested_selector_declaring_what_never_runs_is_refused(
+    role: str, nested: dict, message: str
+) -> None:
+    # Built inside the test, so the declaration the refusal is about is the
+    # one that fails, rather than this module's collection.
+    selector_spec = SelectorSpec(selector=list, **nested)
+    with pytest.raises(ImproperlyConfigured) as refused:
+        ServiceSpec(service=print, **{role: selector_spec})
+    assert str(refused.value).startswith(message)
 
 
 def test_a_presenter_beside_an_unpresented_output_selector_is_fine() -> None:
