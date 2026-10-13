@@ -12,7 +12,7 @@ transport takes when it binds input for itself.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -33,17 +33,22 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
 from django_service_specs.selectors.run_selector import run_selector
 from django_service_specs.selectors.utils import apply_shaping, call_keywords
+from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 
 NOT_FOUND = DispatchResult(kind="not_found")
@@ -68,7 +73,8 @@ class Prepared:
 
     principal: Any
     target: Any
-    data: dict[str, Any]
+    # The Validator's ``data``: a mapping, or the instance a dataclass one builds.
+    data: Any
     kwargs: dict[str, Any]
 
 
@@ -114,8 +120,30 @@ def open_call(
             "pool seed occupies. An argument must never meet a seed in one pool; rename "
             "the parameter."
         )
-    checked = check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
     return checked, authorize(spec, principal, grant=grant)
+
+
+def shape_check(
+    spec: ServiceSpec | SelectorSpec,
+    parameters: Parameters,
+    arguments: Mapping[str, Any],
+    *,
+    unknown_arguments: UnknownArguments,
+) -> dict[str, Any]:
+    """``check_arguments`` over ``parameters``, told whether the spec's calls are partial.
+
+    One function for ``open_call`` and ``bind_arguments``, so a transport that
+    binds for itself honours ``partial`` exactly where dispatch does. Only a
+    service spec declares ``partial``; a selector spec's call is never one.
+    """
+    # One arc to coverage: every selector spec dispatched holds the first
+    # conjunct (a ``SelectorSpec`` has no ``partial``), and
+    # test_the_same_call_on_a_spec_that_is_not_partial_is_refused the second.
+    partial = isinstance(spec, ServiceSpec) and spec.partial
+    return check_arguments(
+        parameters, arguments, unknown_arguments=unknown_arguments, partial=partial
+    )
 
 
 def selector_pool(
@@ -126,20 +154,95 @@ def selector_pool(
     pool_seeds: PoolSeeds,
     progress: ProgressReporter | None = None,
 ) -> dict[str, Any]:
-    """The pool a selector is called from: the base pool, plus the arguments its ``reads`` declare.
+    """The pool a selector is called from: the base pool, its ``reads``, then its ``kwargs``.
 
     Only its own reads. A service spec's checked arguments also carry its
     Validator's, which have not been validated yet and are not the selector's
-    to see. ``progress`` is passed only for a selector spec's own selector,
-    which is that spec's run; see ``call_pool``.
+    to see. The spec's ``kwargs`` provider is called from the base pool and
+    those reads, and what it returns is merged after them, so a key it answers
+    is the author's whatever the caller sent: on a target selector it scopes
+    the lookup (test_a_target_selector_s_kwargs_provider_scopes_the_lookup).
+
+    ``progress`` is passed only for a selector spec's own selector, which is
+    that spec's run (see ``call_pool``), and only that run hears the spec's
+    ``progress_reporter``: a nested selector declaring one is refused when the
+    service spec is built.
     """
     reads = selector_spec.reads.names()
-    return call_pool(
-        principal,
-        pool_seeds,
-        {name: value for name, value in checked.items() if name in reads},
-        progress=progress,
+    base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    pool = {**base, **{name: value for name, value in checked.items() if name in reads}}
+    pool.update(
+        provide(
+            selector_spec.kwargs, pool, label="SelectorSpec.kwargs", reserved=pool_seeds.reserved
+        )
     )
+    pool["progress"] = run_progress(
+        selector_spec.progress_reporter, selector_spec.selector, base, transport=progress
+    )
+    return pool
+
+
+def provide(
+    provider: Callable[..., Any] | None,
+    pool: Mapping[str, Any],
+    *,
+    label: str,
+    reserved: frozenset[str],
+) -> dict[str, Any]:
+    """A ``kwargs`` provider's entries, refusing one that names a key dispatch seeds.
+
+    The provider's values are merged after the caller's on purpose, so it can
+    outrank an argument; it must never outrank a seed. A provider returning
+    ``user`` would run the operation as whoever it named, and one returning
+    ``data`` or ``instance`` would replace what the Validator validated or
+    the row the object-level check passed. Refused rather than dropped, as a
+    Validator returning one is, so the bug is found.
+    """
+    provided = resolve_provider(provider, pool, label=label)
+    taken = sorted(provided.keys() & reserved)
+    if taken:
+        raise ImproperlyConfigured(
+            f"{label} returned the key(s) {taken}, which dispatch seeds itself. A "
+            "provider's value must never outrank a seeded one; rename the key."
+        )
+    return provided
+
+
+def run_progress(
+    provider: Callable[..., Any] | None,
+    run: Callable[..., Any],
+    base: Mapping[str, Any],
+    *,
+    transport: ProgressReporter | None,
+) -> ProgressReporter:
+    """The reporter ``run`` reports to: the transport's, beside the spec's ``progress_reporter``.
+
+    The provider is called from ``base``, the base pool, and only once a
+    report is made, so a call refused before its run never calls it. Except
+    for an ``async def`` run, whose reports are made on an event loop, where a
+    provider that queries cannot run: that one is resolved now, from sync
+    code, which is why every caller of this function calls it only once every
+    check that can refuse the call has passed
+    (test_an_async_service_s_progress_provider_is_resolved_before_the_run).
+    With neither, ``null_progress``, as ``base_pool`` seeds it.
+    """
+    resolve = resolve_progress if is_async(run) else deferred_progress
+    reporter = resolve(provider, base, transport=transport)
+    return null_progress if reporter is None else reporter
+
+
+def run_preconditions(
+    spec: ServiceSpec | SelectorSpec, pool: Mapping[str, Any], *, fillable: frozenset[str]
+) -> None:
+    """Call each of ``spec``'s ``preconditions`` from ``pool``, in declaration order.
+
+    Raise-to-abort: the first to raise stops the call, and a return value is
+    ignored. Bound as the callable it guards is, through ``call_keywords``
+    with the same ``fillable``, since a precondition reads the same pool and
+    the caller could fill exactly what the run lets them fill.
+    """
+    for precondition in spec.preconditions or ():
+        precondition(**call_keywords(precondition, pool, fillable=fillable))
 
 
 def call_pool(
@@ -149,11 +252,12 @@ def call_pool(
     *,
     progress: ProgressReporter | None = None,
 ) -> dict[str, Any]:
-    """The base pool, then this call's own entries on top of it.
+    """The base pool, then this call's own entries on top of it: the output selector's pool.
 
     ``progress`` is the caller's reporter, and is passed only for a pool a run
-    is called from: a service's, or a selector spec's own selector's. A target
-    or output selector's pool gets ``base_pool``'s no-op instead, deliberately,
+    is called from: a service's, or a selector spec's own selector's, which
+    ``prepare_service`` and ``selector_pool`` build the same way. A target or
+    output selector's pool gets ``base_pool``'s no-op instead, deliberately,
     as djangorestframework-services does: a lookup has no progress to report,
     and one reporting after the service finished would read to a watching
     client as the work having restarted.
@@ -166,9 +270,10 @@ def call_pool(
     keywords, so a parameter named ``seeds`` would be a ``TypeError`` there.
 
     Nothing here overwrites a seed. ``open_call`` refused every parameter a
-    seed occupies, ``prepare_service`` every validated key, and the entries
-    dispatch adds itself (``data``, ``instance``, ``collection``, ``result``)
-    are names no project can register.
+    seed occupies, ``prepare_service`` every validated, bound or provided key,
+    ``provide`` a selector's provided one, and the entries dispatch adds
+    itself (``data``, ``instance``, ``collection``, ``result``) are names no
+    project can register.
     """
     pool = base_pool(user=principal, progress=progress, seeds=pool_seeds)
     pool.update(entries)
@@ -313,40 +418,62 @@ def lookup(
 
 
 def conclude_selector(
-    spec: SelectorSpec, value: Any, *, principal: Any, grant: Grant
+    spec: SelectorSpec, value: Any, *, principal: Any, grant: Grant, pool: Mapping[str, Any]
 ) -> DispatchResult:
-    """Step four for a selector spec, and its result.
+    """Step four for a selector spec, its ``preconditions``, and its result.
 
     The object-level check runs on a retrieved row and never on a list: a
     collection has no single object to check against. Nor on a ``None`` that
     ``allow_none`` let through, which is not a row anyone could be refused.
+
+    The ``preconditions`` run last, from the selector's ``pool`` with the rows
+    as ``collection`` or the row as ``instance``, as djangorestframework-services
+    runs them: after the object-level check, so a principal refused the row is
+    never told what a rule over it says. Never without a row, missing or
+    ``None`` under ``allow_none``
+    (test_a_selector_spec_s_preconditions_never_run_without_a_row).
     """
+    fillable = spec.reads.names()
     if spec.kind is SelectorKind.LIST:
+        run_preconditions(spec, {**pool, "collection": value}, fillable=fillable)
         return DispatchResult(kind="list", value=value)
     if value is not None:
         authorize_target(spec, principal, value, grant=grant)
+        run_preconditions(spec, {**pool, "instance": value}, fillable=fillable)
     elif not spec.allow_none:
         return NOT_FOUND
     return DispatchResult(kind="instance", value=value)
 
 
 def validate_arguments(
-    spec: ServiceSpec, checked: Mapping[str, Any], *, principal: Any, target: Any
-) -> dict[str, Any]:
-    """Step five: the Validator, on only the arguments its own ``parameters()`` declare.
+    spec: ServiceSpec,
+    checked: Mapping[str, Any],
+    *,
+    principal: Any,
+    target: Any,
+    server_input: Mapping[str, Any],
+) -> Validated:
+    """Step five: the Validator's whole result, on only the arguments its own ``parameters()`` declare.
 
-    Never the target selector's ``reads``, which were the selector's to consume
-    and are not the service's input. A spec with no Validator returns ``{}``:
-    every argument it takes is its target selector's, and none reaches the
-    service. The shape check has already run, so a Validator is only ever
-    handed well-shaped arguments.
+    Never the target selector's ``reads`` nor the spec's, which are not the
+    Validator's to see (test_a_reads_argument_reaches_the_service_and_never_the_validator).
+    ``server_input`` is the spec's ``input_data``, merged over the caller's
+    arguments so its values are the author's; a key the Validator does not
+    declare is not handed to it, as a serializer ignores a key it has no field
+    for. The caller's arguments have been through the shape check, and the
+    server's are the author's own values, which the Validator checks.
+
+    ``ValidationContext.partial`` is the spec's ``partial``. A spec with no
+    Validator validates nothing: its ``data`` is ``{}``, and every argument it
+    takes is a read.
     """
     validator = spec.validator
     if validator is None:
-        return {}
+        return Validated(values={}, data={})
     declared = validator.parameters().names()
-    own = {name: value for name, value in checked.items() if name in declared}
-    return validator.validate(own, ValidationContext(principal, target))
+    merged = {**checked, **server_input}
+    own = {name: value for name, value in merged.items() if name in declared}
+    return validator.validated(own, ValidationContext(principal, target, partial=spec.partial))
 
 
 def prepare_service(
@@ -359,15 +486,38 @@ def prepare_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
 ) -> Prepared | DispatchResult:
-    """Steps one to six for a service spec, and the keywords its run is called with.
+    """Steps one to six for a service spec, its preconditions, and the keywords its run is called with.
 
     Returns ``NOT_FOUND`` when the instance selector resolves nothing and
-    ``allow_none`` is off: the service never runs, and neither the Validator
-    nor an affordance is asked. The pool carries ``instance`` when the spec
-    declares an instance selector - the row, or ``None`` under ``allow_none``,
-    so an upsert's service can declare it without a default - and
-    ``collection`` when it declares a collection selector. A create carries
-    neither.
+    ``allow_none`` is off: the service never runs, and neither a provider, the
+    Validator nor an affordance is asked. The pool carries ``instance`` when
+    the spec declares an instance selector - the row, or ``None`` under
+    ``allow_none``, so an upsert's service can declare it without a default -
+    and ``collection`` when it declares a collection selector. A create
+    carries neither.
+
+    **The service's pool, in the order its entries are merged**, each later
+    one outranking an earlier one of the same name:
+
+    1. The base pool: ``user``, ``progress`` and every registered seed.
+    2. The validated ``values``, each by name.
+    3. The spec's ``reads``, as the caller sent them.
+    4. ``data``, the Validator's ``data``, and what else the Validator binds
+       for the call (its ``Validated.pool``).
+    5. The spec's ``kwargs`` provider, the author's values after the caller's.
+    6. ``instance`` or ``collection``.
+
+    No entry outranks a seed: a parameter named after one is refused by
+    ``open_call``, and a validated value, a bound value or a provider key
+    named after one here, as is a bound value named after a validated value
+    or a parameter. A
+    read and a Validator parameter of one name are refused when
+    ``parameters()`` is assembled, so a read outranks only a value the
+    Validator returns without declaring it, as djangorestframework-services'
+    route captures outrank the spread body
+    (test_a_read_outranks_a_validated_value_of_its_name). The two providers are called from the base pool, the
+    ``reads`` and the resolved target, and never see the Validator's values:
+    ``input_data`` runs before the Validator, and ``kwargs`` is read the same.
     """
     checked, granted = open_call(
         spec,
@@ -397,24 +547,60 @@ def prepare_service(
             collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
         )
         resolved["collection"] = target
-    data = validate_arguments(spec, checked, principal=principal, target=target)
+    reserved = pool_seeds.reserved
+    # One base pool for the call, so a seed that queries resolves once for the
+    # providers and the service alike. Its ``progress`` is the transport's: the
+    # spec's own sink is the run's alone, and joins the run's keywords last.
+    base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    declared_reads = spec.reads.names()
+    reads = {name: value for name, value in checked.items() if name in declared_reads}
+    providers_pool = {**base, **reads, **resolved}
+    server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
+    validated = validate_arguments(
+        spec, checked, principal=principal, target=target, server_input=server_input
+    )
+    values = validated.values
     # A Validator returning ``user`` is a bug, and letting its value outrank the
     # seed silently would be the worse one: the service would act as whoever
     # the arguments named. Refused rather than dropped, so the bug is found.
-    seeded = sorted(data.keys() & pool_seeds.reserved)
+    seeded = sorted(values.keys() & reserved)
     if seeded:
         raise ImproperlyConfigured(
             f"The Validator returned the key(s) {seeded}, which dispatch seeds itself. A "
             "validated value must never outrank a seeded one; rename the value."
         )
-    pool = call_pool(principal, pool_seeds, {**data, "data": data, **resolved}, progress=progress)
+    # A value bound for the call is not one a caller's argument names, so it
+    # may not stand in for a seed, a validated value or a parameter - a read
+    # the caller sent, or a field a partial call left out: either way the
+    # service would read something other than what its name says. Each set is
+    # held by its own case: test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused
+    # (``a-seed``, ``a-validated-value``) and
+    # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``).
+    named = reserved | values.keys() | spec.parameters().names()
+    bound = sorted(validated.pool.keys() & named)
+    if bound:
+        raise ImproperlyConfigured(
+            f"The Validator bound the key(s) {bound}, which dispatch seeds, the Validator "
+            "returned as a value, or the spec declares as a parameter. A value bound for "
+            "the call needs a name of its own."
+        )
+    author = provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved)
+    pool = {
+        **base,
+        **values,
+        **reads,
+        "data": validated.data,
+        **validated.pool,
+        **author,
+        **resolved,
+    }
     # Before the affordances, as the Validator is: a refusal of the call itself
     # answers before one describing the row's state.
     # test_a_missing_argument_answers_before_an_affordance fails without it.
-    # Only the Validator's parameters reach the service from a caller, and of
-    # those only the ones the caller left out are still theirs to fill; with no
-    # Validator, nothing is. A target selector's read was the selector's to
-    # consume, never the service's to ask for:
+    # Only the spec's reads and its Validator's parameters reach the service
+    # from a caller, and of those only the ones the caller left out are still
+    # theirs to fill; with neither, nothing is. A target selector's read was
+    # the selector's to consume, never the service's to ask for:
     # test_a_service_parameter_named_after_a_target_read_is_the_author_s_error
     # fails if the spec's whole argument set counts. One the caller sent and the
     # Validator did not hand back under that name - a form popping it in
@@ -423,11 +609,19 @@ def prepare_service(
     # own mistake; ``checked`` is exactly what was sent, since the shape check
     # applies no default:
     # test_a_validator_parameter_the_caller_sent_is_the_author_s_error fails
-    # without the subtraction.
+    # without the subtraction. Under ``partial`` no Validator parameter is the
+    # caller's to fill, since a partial call may leave out any of them:
+    # test_a_partial_call_never_refuses_a_service_parameter_the_caller_left_out
+    # holds that conjunct, and every service spec with no Validator dispatched
+    # the other, such as
+    # test_a_service_parameter_no_validator_declares_is_the_author_s_error.
     validator = spec.validator
-    fillable = (
-        validator.parameters().names() - checked.keys() if validator is not None else frozenset()
+    asked = (
+        validator.parameters().names()
+        if validator is not None and not spec.partial
+        else frozenset()
     )
+    fillable = (declared_reads | asked) - checked.keys()
     kwargs = call_keywords(spec.service, pool, fillable=fillable)
     # Step six, in djangorestframework-services' place for it: after the
     # object-level check and the Validator, so a principal who may not see the
@@ -440,8 +634,19 @@ def prepare_service(
     # test_a_condition_reads_a_registered_seed_through_dispatch fails without it.
     # ``instance`` is the row, never a collection: a condition on the row beside
     # a ``collection_selector_spec`` is refused when the spec is declared.
-    enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=pool_seeds.reserved)
-    return Prepared(principal, target, data, kwargs)
+    enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=reserved)
+    # Then the preconditions, still before the run and in the same hop: after
+    # the affordances, djangorestframework-services' order
+    # (test_an_affordance_answers_before_a_precondition).
+    run_preconditions(spec, pool, fillable=fillable)
+    # Last, once nothing can refuse the call: the run's reporter, with the
+    # spec's own sink beside the transport's. Only for a service that takes
+    # ``progress``, so one that never could report never calls the provider.
+    if "progress" in kwargs:
+        kwargs["progress"] = run_progress(
+            spec.progress_reporter, spec.service, base, transport=progress
+        )
+    return Prepared(principal, target, validated.data, kwargs)
 
 
 def finish_service(

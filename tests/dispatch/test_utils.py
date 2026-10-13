@@ -40,9 +40,11 @@ def test_the_validator_sees_only_the_arguments_it_declares() -> None:
         ),
     )
 
-    data = validate_arguments(spec, {"pk": 1, "title": " t "}, principal=PRINCIPAL, target=ROW)
+    validated = validate_arguments(
+        spec, {"pk": 1, "title": " t "}, principal=PRINCIPAL, target=ROW, server_input={}
+    )
 
-    assert data == {"title": "t"}
+    assert validated.values == validated.data == {"title": "t"}
     ((arguments, context),) = validator.calls
     assert arguments == {"title": " t "}
     assert context.principal is PRINCIPAL
@@ -52,7 +54,10 @@ def test_the_validator_sees_only_the_arguments_it_declares() -> None:
 def test_a_spec_with_no_validator_validates_to_nothing() -> None:
     spec = ServiceSpec(service=Record(), permissions=OPEN)
 
-    assert validate_arguments(spec, {"pk": 1}, principal=PRINCIPAL, target=ROW) == {}
+    validated = validate_arguments(
+        spec, {"pk": 1}, principal=PRINCIPAL, target=ROW, server_input={}
+    )
+    assert validated.values == validated.data == {}
 
 
 @pytest.mark.parametrize("kind", [SelectorKind.RETRIEVE, SelectorKind.LIST])

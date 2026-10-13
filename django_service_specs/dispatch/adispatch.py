@@ -48,7 +48,8 @@ async def adispatch(
 
     **Every concept is sync-only**, and so is every spec-carried callable but
     one. A permission check, a Validator, a selector nested in a service spec,
-    ``extend_queryset`` and a seed's resolver may each query, so each runs in
+    ``extend_queryset``, a seed's resolver, a spec's providers and its
+    preconditions may each query, so each runs in
     Django's thread-sensitive executor, never on the event loop. Only the run
     may be ``async def`` - the service, or a selector spec's own selector -
     because it is the one callable no phase shares: a spec is written once for
@@ -58,8 +59,10 @@ async def adispatch(
     So the phases run in **one** ``sync_to_async(thread_sensitive=True)`` hop,
     and the run's shape decides only what else joins it:
 
-    Every refusal before the run is made inside that hop, an affordance
-    included: a condition on the row is a query.
+    Every refusal before the run is made inside that hop, an affordance and
+    a service spec's precondition included: a condition on the row is a
+    query. A selector spec's preconditions run on what its selector found,
+    so after an ``async def`` one they join the hop that shapes its return.
 
     - A sync run joins the hop, so a sync spec costs exactly one.
     - An atomic ``async def`` service joins it too, through the bridge in
@@ -87,7 +90,9 @@ async def adispatch(
     ``progress`` reaches the run as it does under ``dispatch``, including an
     ``async def`` one awaited on the loop, so a reporter must be safe to call
     from either: the executor thread for a sync run, and an event loop for an
-    ``async def`` one, atomic or not.
+    ``async def`` one, atomic or not. A spec's ``progress_reporter`` is never
+    called on the loop: for an ``async def`` run it is resolved inside the
+    hop, once nothing before the run can refuse the call.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``.
@@ -223,7 +228,7 @@ def _settle_and_conclude(
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
-    return conclude_selector(spec, value, principal=who, grant=granted)
+    return conclude_selector(spec, value, principal=who, grant=granted, pool=pool)
 
 
 async def _await_selector(
@@ -257,7 +262,7 @@ async def _await_selector(
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
-        return conclude_selector(spec, None, principal=who, grant=granted)
+        return conclude_selector(spec, None, principal=who, grant=granted, pool=pool)
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
         spec, raw, pool, who, granted, pool_seeds.reserved
     )
