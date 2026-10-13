@@ -265,8 +265,9 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
             # Raised by nothing in this package: a refusal of the call a later
             # release may add, answered as ``error_response`` answers one.
             return self._render_refused(form, {NON_FIELD_ERRORS: [refused.message]}, status=400)
-        if result.kind == "not_found":
-            raise Http404
+        # Never ``not_found``: the target was found before dispatch, which
+        # looks nothing up when handed it, and where the route's value was
+        # refused the shape check refuses it again before any lookup.
         return HttpResponseRedirect(self.get_success_url(result))
 
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
