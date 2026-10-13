@@ -2070,11 +2070,6 @@ class _ServerTitle(TypedDict):
     title: str
 
 
-class _ServerProject(TypedDict):
-    project_pk: int
-    title: str
-
-
 def _title_provider(title: Any = "server's") -> tuple[Callable[[], _ServerTitle], list[None]]:
     """An ``input_data`` provider annotated to fill ``title``, and the list its calls append to.
 
@@ -2141,26 +2136,11 @@ def test_an_untyped_input_data_provider_relaxes_nothing(ada: Any) -> None:
     assert caught.value.detail == {"title": REQUIRED}
 
 
-def test_a_filled_key_naming_a_read_stays_required(ada: Any) -> None:
-    # ``input_data`` feeds the Validator alone, so a read it names is never
-    # filled by it: relaxed, the read would reach nothing at all.
-    def server() -> _ServerProject:
-        return {"project_pk": 1, "title": "server's"}
-
-    spec = ServiceSpec(
-        service=Record(),
-        permissions=[Refuse()],
-        reads=PROJECT,
-        validator=Titled(),
-        input_data=server,
-    )
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
-
-
 # A ``kwargs`` provider annotated to fill a read: the spec's own reaches the
 # service, and a selector's own reaches that selector, so a caller is not asked
 # for what the provider answers. Each provider relaxes only the parameters its
-# values reach.
+# values reach; one filling a parameter its values never reach is refused when
+# the spec is built (TestProviderReach in tests/specs/test_service_spec.py).
 
 
 class _ServerProjectPk(TypedDict):
@@ -2262,17 +2242,6 @@ def test_an_untyped_kwargs_provider_relaxes_no_read(ada: Any) -> None:
     assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
 
 
-def test_a_validator_field_the_spec_s_kwargs_provider_fills_stays_required(ada: Any) -> None:
-    # ``kwargs`` is merged into the service's pool after the Validator ran, so
-    # its value never reaches the Validator: relaxed, the field would pass the
-    # shape check and be refused by the Validator for every caller.
-    def server() -> _ServerTitle:
-        return {"title": "server's"}
-
-    spec = ServiceSpec(service=Record(), permissions=[Refuse()], validator=Titled(), kwargs=server)
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"title": REQUIRED}
-
-
 def test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded_of_the_caller(
     ada: Any,
 ) -> None:
@@ -2297,35 +2266,6 @@ def test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selec
     assert caught.value.detail == {"pk": REQUIRED}
     assert calls == [None]
     assert service.calls == []
-
-
-def test_a_target_read_the_spec_s_kwargs_provider_fills_stays_required(ada: Any) -> None:
-    # The spec's ``kwargs`` is called once the target is resolved, from the
-    # resolved row, so its value never reaches the lookup.
-    spec = ServiceSpec(
-        service=Record(),
-        permissions=[Refuse()],
-        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
-        kwargs=_pk_provider(1)[0],
-    )
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"pk": REQUIRED}
-
-
-def test_a_read_the_lookup_s_kwargs_provider_fills_stays_required_of_the_service(
-    ada: Any,
-) -> None:
-    # A selector's ``kwargs`` reaches that selector alone, never the service.
-    def server() -> _ServerProjectPk:
-        return {"project_pk": 7}
-
-    target = nested(LIST, selector=notes_of, kwargs=server)
-    spec = ServiceSpec(
-        service=Record(),
-        permissions=[Refuse()],
-        reads=PROJECT,
-        collection_selector_spec=target,
-    )
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
 
 
 def test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller(

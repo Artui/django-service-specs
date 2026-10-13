@@ -93,9 +93,12 @@ class SelectorSpec:
             author's value whatever the caller sent - a tenant, a project scope.
             A value of ``UNSET`` declines its key and leaves the caller's in
             place. Annotate its return as a ``TypedDict`` and ``provider_keys``
-            reads which keys it fills before it runs. On a target selector it
-            scopes the lookup; an output selector's is refused, since nothing
-            would run it.
+            reads which keys it fills before it runs, and a read it fills is
+            not demanded of the caller. On a target selector it scopes the
+            lookup, and a filled key that the service spec's ``reads`` or its
+            Validator declares is refused, since its values reach only the
+            lookup; an output selector's is refused, since nothing would run
+            it.
         preconditions: Raise-to-abort rules, a sequence of callables each called
             with the keywords it declares from the same pool once the selector
             has resolved, the row as ``instance`` or the rows as

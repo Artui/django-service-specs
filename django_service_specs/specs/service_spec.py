@@ -14,6 +14,7 @@ from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
@@ -71,7 +72,7 @@ class ServiceSpec:
             refuse an absent one, at any depth, and the Validator is told
             through ``ValidationContext.partial``. The spec's ``reads`` and its
             target selector's stay required as declared, so a partial update
-            still names its row. On a ``many`` spec it holds inside every row,
+            still names its row, unless a ``kwargs`` provider fills them. On a ``many`` spec it holds inside every row,
             and the list itself stays required.
         many: Whether the call carries a list of rows, each validated by the
             ``validator``, under the one argument ``many_argument`` names, for
@@ -151,12 +152,17 @@ class ServiceSpec:
             key it answers is the author's value whatever the caller sent. A
             value of ``UNSET`` declines its key. Annotate its return as a
             ``TypedDict`` and ``provider_keys`` reads which keys it fills
-            before it runs.
+            before it runs: a read it fills is not demanded of the caller,
+            and a filled key that a target selector's read or a Validator
+            field declares is refused, since its values never reach either.
         input_data: A provider of server-owned input: called with the keywords
             it declares from the call's pool, the resolved target among them,
             it returns a mapping merged onto the caller's arguments before the
             Validator sees them, after the caller's, so its keys are the
-            author's values. A value of ``UNSET`` declines its key.
+            author's values. A value of ``UNSET`` declines its key. Annotated to
+            return a ``TypedDict``, a Validator field it fills is not demanded
+            of the caller, and a filled key a read declares is refused, since
+            its values reach only the Validator.
         progress_reporter: A provider of a
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
             sink the service reports to beside the transport's - a task record,
@@ -265,6 +271,10 @@ class ServiceSpec:
         _check_reads(self)
         _check_nested(self)
         check_providers(self, ("kwargs", "input_data", "progress_reporter"), label=label)
+        # After the providers are known to be callables, and after the reads
+        # and the target are: the seats it compares need nothing else. The
+        # Validator's fields are compared in ``parameters()``.
+        _check_reach(self, _read_seats(self))
         object.__setattr__(
             self, "preconditions", check_preconditions(self.preconditions, label=label)
         )
@@ -291,6 +301,14 @@ class ServiceSpec:
         construction already.
         """
         own = self.validator.parameters() if self.validator is not None else Parameters()
+        # Where the Validator's fields are first known, beside the clash ``+``
+        # refuses below: a provider filling one its values never reach. The
+        # reads again too, for a provider whose annotation resolved only after
+        # the spec was built
+        # (test_a_provider_annotation_resolving_after_the_build_is_refused_here).
+        _check_reach(
+            self, [*_read_seats(self), ("ServiceSpec.validator", own, "ServiceSpec.input_data")]
+        )
         if self.many:
             own = Parameters.of(_the_list(self.many_argument, items=own))
         assembled = _beside_the_target(self) + own
@@ -380,6 +398,81 @@ def _check_reads(spec: ServiceSpec) -> None:
         raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
     check_reserved(spec.reads, label="ServiceSpec.reads")
     _beside_the_target(spec)
+
+
+_Seat = tuple[str, Parameters, str]
+"""Where parameters are declared, what declares them, and the one provider whose values reach them."""
+
+
+def _read_seats(spec: ServiceSpec) -> list[_Seat]:
+    """The spec's ``reads`` and its target selector's: the seats known at construction."""
+    seats: list[_Seat] = [("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs")]
+    target = spec.target_selector_spec()
+    if target is not None:
+        label = _target_label(spec)
+        seats.append((f"{label}.reads", target.reads, f"{label}.kwargs"))
+    return seats
+
+
+def _target_label(spec: ServiceSpec) -> str:
+    role = "instance" if spec.instance_selector_spec is not None else "collection"
+    return f"ServiceSpec.{role}_selector_spec"
+
+
+def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
+    """Refuse a typed provider annotated to fill a parameter its values never reach.
+
+    Each provider's values are merged into one place: a selector's ``kwargs``
+    into that selector's pool, so over its ``reads``; the spec's ``kwargs``
+    into the service's pool, after the target is resolved and the Validator
+    has run, so over the spec's ``reads``; ``input_data`` into the
+    Validator's arguments, so over its fields, in each row of a ``many``
+    spec. A ``filled`` key declared as a parameter in any other seat would
+    still be demanded of the caller, while ``server_owned_keys`` tells a
+    transport to hide it, so it is refused as the authoring error it is. That
+    is what makes ``server_owned_keys`` exact: none of its names is a
+    parameter dispatch demands.
+
+    The ``reads`` seats are compared when the spec is built, so the error
+    sits beside the declaration. Every seat, the Validator's fields with
+    them, is compared in ``parameters()``, where the fields are first
+    assembled and the clash between a read and a field is refused; that is
+    also where a provider whose return annotation named a type defined after
+    the spec, unreadable at the build, is read and refused.
+
+    Only a ``filled`` key of a provider whose return names its keys: a
+    ``declinable`` one stays the caller's
+    (test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted),
+    an untyped provider names none
+    (test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted),
+    and a key no parameter declares is the callable's to take by name
+    (test_a_key_no_parameter_declares_is_accepted). The provider that reaches
+    a seat is the one that relaxes it, never refused there
+    (test_a_provider_filling_the_parameters_its_values_reach_is_accepted).
+    """
+    target = spec.target_selector_spec()
+    providers: list[tuple[str, Callable[..., Any] | None]] = [
+        ("ServiceSpec.kwargs", spec.kwargs),
+        ("ServiceSpec.input_data", spec.input_data),
+    ]
+    if target is not None:
+        providers.append((f"{_target_label(spec)}.kwargs", target.kwargs))
+    for name, provider in providers:
+        keys = provider_keys(provider)
+        if keys is None:
+            continue
+        for where, declared, reaching in seats:
+            stray = sorted(keys.filled & declared.names())
+            # One arc to coverage: the second conjunct is held by every test
+            # of a provider filling what it reaches, such as
+            # test_a_provider_filling_the_parameters_its_values_reach_is_accepted.
+            if stray and name != reaching:
+                raise ImproperlyConfigured(
+                    f"{name} is annotated to fill {stray}, which {where} declares, and its "
+                    f"values never reach {where}, so dispatch would still demand {stray} of "
+                    f"the caller. Only {reaching} fills {where}; fill the key there, or "
+                    "rename it."
+                )
 
 
 def _check_nested(spec: ServiceSpec) -> None:

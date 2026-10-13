@@ -162,8 +162,9 @@ def shape_check(
     so a transport that binds for itself relaxes exactly what dispatch
     relaxes. Two things are relaxed:
 
-    - **A parameter a typed provider fills, where that provider's values
-      reach it** (see ``_server_filled``): not demanded of the caller, since
+    - **A parameter a typed provider is annotated to fill**, which is always
+      one that provider's values reach (see ``_server_filled``): not
+      demanded of the caller, since
       the provider's values are merged over the caller's before the callable
       reading it is called; ``server_owned_keys`` tells a transport to hide
       exactly such a key. It is still required of the merged result: a
@@ -222,7 +223,7 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
 
     **A provider relaxes only the parameters its values reach**, so a key it
     is annotated to fill is relaxed where the callable reading it is called
-    with the provider's value, and stays required everywhere else:
+    with the provider's value:
 
     - A selector's own ``kwargs`` is merged over its ``reads`` in
       ``selector_pool``, so it relaxes that selector's reads: a selector
@@ -230,19 +231,19 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
       (test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller),
       and a service spec's target selector's
       (test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded_of_the_caller).
-      It never reaches the service
-      (test_a_read_the_lookup_s_kwargs_provider_fills_stays_required_of_the_service).
     - A service spec's ``kwargs`` is merged into the service's pool after
       the caller's ``reads``, so it relaxes the spec's ``reads``
       (test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded_of_the_caller).
-      It is called once the target is resolved, and after the Validator ran,
-      so a target selector's read and a Validator field it names stay
-      required (test_a_target_read_the_spec_s_kwargs_provider_fills_stays_required,
-      test_a_validator_field_the_spec_s_kwargs_provider_fills_stays_required).
     - ``input_data`` is merged into the Validator's arguments alone, so it
-      relaxes the Validator's fields - in ``shape_check``, at the top level or
-      in each row of a ``many`` spec - and never a read
-      (test_a_filled_key_naming_a_read_stays_required).
+      relaxes the Validator's fields, in ``shape_check``.
+
+    A filled key naming a parameter in any other seat - a read named by
+    ``input_data``, a target read or a Validator field named by the spec's
+    ``kwargs``, a spec read or a Validator field named by the target
+    selector's ``kwargs`` - is refused by ``ServiceSpec`` before any call
+    reaches here, so every name ``server_owned_keys`` lists that a parameter
+    declares is one this relaxes. The rule is still read per provider rather
+    than as that union, so the relaxing never outruns the delivery.
 
     Only ``filled`` keys: a ``declinable`` one stays the caller's. And a
     provider whose return says nothing about its keys relaxes nothing

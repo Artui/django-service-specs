@@ -30,13 +30,15 @@ def server_owned_keys(
       are merged after the caller's, so a key it fills holds the author's
       value whatever the caller sent.
 
-    **Dispatch stops demanding a key only where the provider's values reach
-    it**: a selector's ``kwargs`` relaxes that selector's reads, a service
-    spec's ``kwargs`` its ``reads``, and ``input_data`` its Validator's
-    parameters. A key one provider fills that another parameter declares - a
-    read named by ``input_data``, a target selector's read or a Validator
-    field named by the spec's ``kwargs``, a spec read named by the target
-    selector's ``kwargs`` - is in this set and still required by dispatch.
+    **No name here is a parameter dispatch demands of the caller**, so a key
+    a provider fills is the server's for the whole call. Each provider's
+    values reach one seat - a selector's ``kwargs`` that selector's reads, a
+    service spec's ``kwargs`` its ``reads``, ``input_data`` its Validator's
+    fields - and dispatch does not demand a parameter there that the provider
+    fills. A filled key that a parameter in any other seat declares is
+    refused when the spec is built, or, for a Validator field, when
+    ``parameters()`` is assembled. A key no parameter declares is the server's
+    alone.
 
     A key a provider may decline with ``UNSET`` is not here: the caller's
     value is the one the callable receives when it does. Nor is any key of a

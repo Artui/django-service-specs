@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.parameters.parameter import Parameter
@@ -16,6 +17,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.unset import UnsetType
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -433,3 +435,180 @@ class TestAnAsyncValidatorIsRefused:
     def test_a_sync_validator_is_accepted(self) -> None:
         validator = Titled()
         assert ServiceSpec(service=print, validator=validator).validator is validator
+
+
+# --- a typed provider and the parameters its values reach -----------------------------
+
+
+class _FillsProject(TypedDict):
+    project: int
+
+
+class _FillsPk(TypedDict):
+    pk: int
+
+
+class _FillsTitle(TypedDict):
+    title: str
+
+
+class _MayFillProject(TypedDict):
+    project: int | UnsetType
+
+
+def _project() -> _FillsProject:
+    return {"project": 1}
+
+
+def _pk() -> _FillsPk:
+    return {"pk": 1}
+
+
+def _title() -> _FillsTitle:
+    return {"title": "t"}
+
+
+def _maybe_project() -> _MayFillProject:
+    return {"project": 1}
+
+
+PROJECT = Parameters.of(Parameter("project", "integer", required=True))
+TARGET = "ServiceSpec.instance_selector_spec"
+
+
+def _target(**kwargs: Any) -> SelectorSpec:
+    return SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, **kwargs)
+
+
+class TestProviderReach:
+    """A typed provider filling a parameter its values never reach is refused.
+
+    Every pair of a provider and a seat it does not reach, so each seat and
+    each provider is held by its own case: the ``reads`` seats when the spec
+    is built, the Validator's fields when ``parameters()`` assembles them.
+    """
+
+    @pytest.mark.parametrize(
+        ("declaration", "provider", "key", "where", "reaching"),
+        [
+            pytest.param(
+                {"reads": PROJECT, "input_data": _project},
+                "ServiceSpec.input_data",
+                "project",
+                "ServiceSpec.reads",
+                "ServiceSpec.kwargs",
+                id="input-data-on-a-read",
+            ),
+            pytest.param(
+                {"instance_selector_spec": _target(), "input_data": _pk},
+                "ServiceSpec.input_data",
+                "pk",
+                f"{TARGET}.reads",
+                f"{TARGET}.kwargs",
+                id="input-data-on-a-target-read",
+            ),
+            pytest.param(
+                {"instance_selector_spec": _target(), "kwargs": _pk},
+                "ServiceSpec.kwargs",
+                "pk",
+                f"{TARGET}.reads",
+                f"{TARGET}.kwargs",
+                id="kwargs-on-a-target-read",
+            ),
+            pytest.param(
+                {"reads": PROJECT, "instance_selector_spec": _target(kwargs=_project)},
+                f"{TARGET}.kwargs",
+                "project",
+                "ServiceSpec.reads",
+                "ServiceSpec.kwargs",
+                id="target-kwargs-on-a-read",
+            ),
+            pytest.param(
+                {
+                    "reads": PROJECT,
+                    "collection_selector_spec": SelectorSpec(
+                        kind=SelectorKind.LIST, selector=list, kwargs=_project
+                    ),
+                },
+                "ServiceSpec.collection_selector_spec.kwargs",
+                "project",
+                "ServiceSpec.reads",
+                "ServiceSpec.kwargs",
+                id="collection-kwargs-on-a-read",
+            ),
+        ],
+    )
+    def test_on_a_read_when_the_spec_is_built(
+        self, declaration: dict[str, Any], provider: str, key: str, where: str, reaching: str
+    ) -> None:
+        named = (
+            f"{provider} is annotated to fill {[key]!r}, which {where} declares, and its "
+            f"values never reach {where}"
+        )
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)) as refused:
+            ServiceSpec(service=print, **declaration)
+        assert f"Only {reaching} fills {where}" in str(refused.value)
+
+    @pytest.mark.parametrize(
+        ("declaration", "provider"),
+        [
+            pytest.param({"kwargs": _title}, "ServiceSpec.kwargs", id="kwargs"),
+            pytest.param(
+                {"instance_selector_spec": _target(kwargs=_title)},
+                f"{TARGET}.kwargs",
+                id="target-kwargs",
+            ),
+            pytest.param({"kwargs": _title, "many": True}, "ServiceSpec.kwargs", id="many-row"),
+        ],
+    )
+    def test_on_a_validator_field_when_parameters_are_assembled(
+        self, declaration: dict[str, Any], provider: str
+    ) -> None:
+        # Built, since the Validator's fields may need the app registry and
+        # are first read here.
+        spec = ServiceSpec(service=print, validator=Titled(), **declaration)
+        named = (
+            f"{provider} is annotated to fill ['title'], which ServiceSpec.validator "
+            "declares, and its values never reach ServiceSpec.validator"
+        )
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)) as refused:
+            spec.parameters()
+        assert "Only ServiceSpec.input_data fills ServiceSpec.validator" in str(refused.value)
+
+    def test_a_provider_filling_the_parameters_its_values_reach_is_accepted(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            reads=PROJECT,
+            kwargs=_project,
+            instance_selector_spec=_target(kwargs=_pk),
+            validator=Titled(),
+            input_data=_title,
+        )
+        assert spec.parameters().names() == {"pk", "project", "title"}
+
+    def test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
+        spec = ServiceSpec(service=print, reads=PROJECT, input_data=_maybe_project)
+        assert spec.parameters().names() == {"project"}
+
+    def test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
+        spec = ServiceSpec(service=print, reads=PROJECT, input_data=lambda: {"project": 1})
+        assert spec.parameters().names() == {"project"}
+
+    def test_a_key_no_parameter_declares_is_accepted(self) -> None:
+        spec = ServiceSpec(service=print, validator=Titled(), kwargs=_project, input_data=_pk)
+        assert spec.parameters().names() == {"title"}
+
+    def test_a_provider_annotation_resolving_after_the_build_is_refused_here(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A return annotation naming a type defined after the spec reads as
+        # untyped when the spec is built, and as typed once it resolves.
+        def late() -> Any:
+            return {"project": 1}
+
+        late.__annotations__["return"] = "_DefinedLater"
+        spec = ServiceSpec(service=print, reads=PROJECT, input_data=late)
+        monkeypatch.setitem(globals(), "_DefinedLater", _FillsProject)
+        named = "ServiceSpec.input_data is annotated to fill ['project'], which ServiceSpec.reads"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            spec.parameters()

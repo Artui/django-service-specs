@@ -37,7 +37,8 @@ def resolve_target(
        only the arguments they name. A Validator field is neither required
        nor an unknown key here, so a GET carrying the route's arguments and a
        POST carrying the whole form both resolve; the target's own reads are
-       required as declared.
+       required as declared, except one its ``kwargs`` provider is annotated
+       to fill.
     3. Class-level authorization, honouring ``grant`` as dispatch does. Like
        the two steps before it, before any query.
     4. The lookup, and the checks on what it finds: ``has_object_permission``
