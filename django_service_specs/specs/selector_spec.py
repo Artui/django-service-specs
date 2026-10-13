@@ -91,8 +91,7 @@ class SelectorSpec:
             that pool after the caller's arguments, so a key it answers is the
             author's value whatever the caller sent - a tenant, a project scope.
             A value of ``UNSET`` declines its key and leaves the caller's in
-            place. Annotate its return as a ``TypedDict`` and
-            [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
+            place. Annotate its return as a ``TypedDict`` and ``provider_keys``
             reads which keys it fills before it runs. On a target selector it
             scopes the lookup; an output selector's is refused, since nothing
             would run it.

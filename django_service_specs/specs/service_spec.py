@@ -118,9 +118,8 @@ class ServiceSpec:
             pool the service is called from after the caller's arguments, so a
             key it answers is the author's value whatever the caller sent. A
             value of ``UNSET`` declines its key. Annotate its return as a
-            ``TypedDict`` and
-            [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
-            reads which keys it fills before it runs.
+            ``TypedDict`` and ``provider_keys`` reads which keys it fills
+            before it runs.
         input_data: A provider of server-owned input: called with the keywords
             it declares from the call's pool, the resolved target among them,
             it returns a mapping merged onto the caller's arguments before the
