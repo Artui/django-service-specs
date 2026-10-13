@@ -38,6 +38,7 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
@@ -318,14 +319,29 @@ def _check_bulk(
     A list is checked at the top level as an empty one, so the list itself
     and every argument beside it are checked as declared while no row is: a
     row checked there would raise with the others, before the Validator could
-    add its own refusals of the rest. Anything that is not a list is checked
-    as it was sent, and refused.
+    add its own refusals of the rest. Its length is read on the list as sent,
+    and the empty stand-in is held to no minimum, or ``many_min_length=1``
+    would refuse every call
+    (test_many_min_length_is_the_rule_an_empty_list_is_refused_by). Anything
+    that is not a list, or a list of a length it does not take, is checked as
+    it was sent, and refused: the length at the list itself, before any row is
+    read, beside the top level's other refusals
+    (test_a_list_past_its_maximum_is_refused_beside_the_top_level_s_own_refusals).
     """
     value = arguments.get(name) if isinstance(arguments, Mapping) else None
-    if not isinstance(value, (list, tuple)):
+    the_list = next(param for param in parameters if param.name == name)
+    # One branch to coverage, each condition held by its own test:
+    # test_the_list_s_own_refusal_is_a_list_under_its_name (the type: without
+    # it, a value that is no list is measured and read as rows) and
+    # test_a_list_of_rows_past_the_default_maximum_is_refused_at_the_list (the
+    # length: without it, every row is checked and validated first).
+    if not isinstance(value, (list, tuple)) or length_problem(the_list, len(value)) is not None:
         return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    stand_in = Parameters.of(
+        *(replace(param, min_length=None) if param is the_list else param for param in parameters)
+    )
     checked = _without(
-        check_arguments(parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments),
+        check_arguments(stand_in, {**arguments, name: []}, unknown_arguments=unknown_arguments),
         owned,
     )
     cleaned: dict[int, dict[str, Any]] = {}

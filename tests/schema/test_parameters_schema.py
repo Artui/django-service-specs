@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
@@ -122,7 +123,7 @@ class TestTheClosedArgumentSet:
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
-                "books": {"type": "array", "items": closed_book},
+                "books": {"type": "array", "items": closed_book, "maxItems": 1000},
                 "flags": {"type": "object", "properties": {}, "additionalProperties": False},
                 "meta": {"type": "object"},
             },
@@ -214,12 +215,14 @@ class TestTypes:
     def test_an_array_of_a_type_name_states_the_type_of_its_items(self) -> None:
         assert one(Parameter("ids", "array", items="integer")) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": "integer"},
         }
 
     def test_an_array_of_rows_describes_each_row_as_an_object(self) -> None:
         assert one(Parameter("books", "array", items=PUBLISHER)) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": "object",
                 "properties": {"name": {"type": "string"}},
@@ -229,7 +232,11 @@ class TestTypes:
         }
 
     def test_an_array_with_no_items_accepts_any_element(self) -> None:
-        assert one(Parameter("anything", "array")) == {"type": "array", "items": {}}
+        assert one(Parameter("anything", "array")) == {
+            "type": "array",
+            "items": {},
+            "maxItems": 1000,
+        }
 
 
 class TestNullable:
@@ -251,6 +258,7 @@ class TestNullable:
         assert one(Parameter("meta", "object", nullable=True)) == {"type": ["object", "null"]}
         assert one(Parameter("ids", "array", items="integer", nullable=True)) == {
             "type": ["array", "null"],
+            "maxItems": 1000,
             "items": {"type": "integer"},
         }
 
@@ -280,6 +288,7 @@ class TestChoices:
     def test_an_arrays_choices_constrain_each_item_and_not_the_array(self) -> None:
         assert one(Parameter("tags", "array", items="string", choices=["red", "blue"])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": "string", "enum": ["red", "blue"]},
         }
 
@@ -293,6 +302,7 @@ class TestChoices:
         }
         assert one(tags) == {
             "type": ["array", "null"],
+            "maxItems": 1000,
             "items": {"type": "string", "enum": ["red"]},
         }
 
@@ -304,6 +314,7 @@ class TestChoices:
         assert check_arguments(Parameters.of(ids), {"ids": [1, None]}) == {"ids": [1, None]}
         assert one(ids) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": ["integer", "null"], "enum": [1, 2, None]},
         }
 
@@ -317,6 +328,7 @@ class TestChoices:
 
         assert one(publishers) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": ["object", "null"],
                 "properties": {"name": {"type": "string"}},
@@ -328,6 +340,7 @@ class TestChoices:
     def test_an_untyped_arrays_choices_are_an_enum_with_no_type(self) -> None:
         assert one(Parameter("any", "array", choices=[1, "one"])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"enum": [1, "one"]},
         }
 
@@ -339,6 +352,7 @@ class TestChoices:
         assert one(rate) == {"type": "string", "format": "decimal"}
         assert one(Parameter("rates", "array", choices=[Decimal("1")])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {},
         }
 
@@ -425,6 +439,7 @@ class TestChoiceLabels:
 
         assert one(tags) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": ["string", "null"],
                 "anyOf": [{"const": "red", "title": "Red"}, {"type": "null"}],
@@ -468,7 +483,7 @@ class TestFiles:
     def test_an_array_of_files_has_untyped_items(self) -> None:
         notes = Parameter("notes", "array", items="file", items_nullable=True)
 
-        assert one(notes) == {"type": "array", "items": {}}
+        assert one(notes) == {"type": "array", "items": {}, "maxItems": 1000}
 
     def test_a_required_file_is_required(self) -> None:
         schema = parameters_schema(Parameters.of(Parameter("notes", "file", required=True)))
@@ -553,6 +568,43 @@ def test_a_bound_is_stated_beside_the_type() -> None:
     assert schema["properties"] == {
         "price": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
         "n": {"type": ["integer", "null"], "minimum": 0},
+    }
+
+
+# --- array length ------------------------------------------------------------------------------------
+
+
+def test_an_array_states_the_maximum_in_force_when_none_is_declared() -> None:
+    # The shape check refuses past it, so a client that does not learn it
+    # sends a call that cannot run.
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array", items="integer")))
+    assert schema["properties"]["ids"] == {
+        "type": "array",
+        "items": {"type": "integer"},
+        "maxItems": 1000,
+    }
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_stated_default_follows_the_setting() -> None:
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array")))
+    assert schema["properties"]["ids"] == {"type": "array", "items": {}, "maxItems": 3}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_setting_of_none_states_no_maximum() -> None:
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array")))
+    assert schema["properties"]["ids"] == {"type": "array", "items": {}}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_declared_lengths_are_stated_as_min_and_max_items() -> None:
+    both = Parameter("ids", "array", min_length=1, max_length=5, nullable=True)
+    floor = Parameter("tags", "array", min_length=0)
+    schema = parameters_schema(Parameters.of(both, floor))
+    assert schema["properties"] == {
+        "ids": {"type": ["array", "null"], "items": {}, "minItems": 1, "maxItems": 5},
+        "tags": {"type": "array", "items": {}, "minItems": 0},
     }
 
 

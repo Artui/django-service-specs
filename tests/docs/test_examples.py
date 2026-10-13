@@ -55,6 +55,7 @@ from django_service_specs import (
     error_response,
     present,
     server_owned_keys,
+    spec_input_schema,
     update_from_input,
 )
 from docs.examples import (
@@ -229,6 +230,31 @@ class TestDeclaringWrites:
             "Apples",
             "Pears",
         ]
+
+    def test_an_empty_list_is_refused_at_the_list(self, ada: Any) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(declaring_writes.add_notes_spec, principal=ada, arguments={"items": []})
+        assert refused.value.detail == {"items": ["Ensure this field has at least 1 elements."]}
+
+    def test_a_list_past_its_maximum_is_refused_before_any_row_is_read(self, ada: Any) -> None:
+        # Every row is malformed, and none is addressed: the list is refused whole.
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                declaring_writes.add_notes_spec,
+                principal=ada,
+                arguments={"items": [{"title": 3}] * 201},
+            )
+        assert refused.value.detail == {
+            "items": ["Ensure this field has no more than 200 elements."]
+        }
+        assert not Note.objects.exists()
+
+    def test_the_schema_states_both_lengths(self) -> None:
+        schema = spec_input_schema(declaring_writes.add_notes_spec)
+        assert (
+            schema["properties"]["items"]["minItems"],
+            schema["properties"]["items"]["maxItems"],
+        ) == (1, 200)
 
     def test_another_argument_beside_the_list_is_refused(self, ada: Any) -> None:
         with pytest.raises(InvalidArguments) as refused:

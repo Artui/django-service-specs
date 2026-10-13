@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `Parameter.min_length` and `Parameter.max_length`, how many elements an
+  `array` takes, inclusively. Each is a non-negative `int`, refused on any
+  other type, and a `min_length` past the `max_length` is refused where it is
+  written. The shape check and `coerce_flat` read the list's length before any
+  of its elements, so a list outside its bounds is refused whole, at its name,
+  in DRF's words (`"Ensure this field has no more than {max_length}
+  elements."`, `"Ensure this field has at least {min_length} elements."`),
+  which DRF's catalog translates wherever DRF is installed. The schema states
+  them as `"minItems"` and `"maxItems"`.
+- `ServiceSpec.many_min_length` and `ServiceSpec.many_max_length`, the same
+  two bounds on a `many` call's list of rows, read by the list's own
+  parameter. A list outside them is refused at `many_argument` before any row
+  is checked or validated, beside the top level's other refusals. Neither is
+  declared by default, so an empty list still runs the service on no rows;
+  `many_min_length=1` refuses one. Each is refused on a spec that is not
+  `many`, and a pair no list could meet when the spec is built.
+- The `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, the most elements an array
+  takes where its parameter declares no `max_length`, and the most rows a
+  `many` call carries where its spec declares no `many_max_length`. `1000`
+  when unset, Django's own `DATA_UPLOAD_MAX_NUMBER_FIELDS`; `None` bounds no
+  array. It is read at the call, so `override_settings` reaches a spec built
+  at import, and anything but a non-negative `int` or `None` is refused as
+  `ImproperlyConfigured` where it is read. A `min_length` past it on a
+  parameter with no `max_length` of its own, which no call could meet, is
+  refused the same way at the call.
+
+### Changed
+- **Breaking:** every array argument is bounded. One whose parameter declares
+  no `max_length` takes at most 1000 elements, and a `many` call at most 1000
+  rows, unless `SERVICE_SPECS_MAX_ARRAY_LENGTH` says otherwise; a call past it
+  is refused with `InvalidArguments` at the list's name where it used to run.
+  A comma-separated query value reached round Django's
+  `DATA_UPLOAD_MAX_NUMBER_FIELDS`, which counts keys, so `?ids=` with 40000
+  values into a django-filter `in` lookup passed the database's variable
+  limit and answered a 500; it is now a 400 at the filter's name, and the
+  value is split into no more than one element past the bound. A `many` call
+  carried no bound at all on the rows it validated inside one transaction.
+  The schema states the maximum in force as `"maxItems"` on every array input,
+  so a client learns the bound it meets, and under a setting of `None` an
+  array with no `max_length` states none.
+
 ## [0.5.0] — 2026-10-13
 
 ### Added

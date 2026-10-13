@@ -87,6 +87,7 @@ default, and `published_on` and `pk` may be null:
     "name": {"type": "string"},
     "books": {
       "type": "array",
+      "maxItems": 1000,
       "items": {
         "type": "object",
         "properties": {
@@ -201,7 +202,14 @@ contradict, and states everything the declaration knows.
 What stays incomplete is only what the declaration does not carry. A
 Parameter's `minimum` and `maximum` are stated as `"minimum"` and
 `"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
-`max_value`, is not. JSON Schema reads `minimum` and `maximum` on a number
+`max_value`, is not. An array's `min_length` is stated as `"minItems"`, and
+its `"maxItems"` is **the maximum in force**: the declared `max_length`, or
+where none is declared the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting's, 1000
+unless the project sets another. It is the one bound stated without being
+declared, because [the shape check refuses past
+it](arguments.md#how-long-a-list-may-be) and a client told nothing would send
+a call that cannot run. Under a setting of `None`, an array with no
+`max_length` states none. The setting is read each time a schema is built. JSON Schema reads `minimum` and `maximum` on a number
 instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.
 

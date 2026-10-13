@@ -229,6 +229,17 @@ call - a confirmation - is a read. The service receives the rows' `data` as a
 list under `data`, and their values as a list under `many_argument`; neither
 is spread by field.
 
+The list is an array parameter, so it is bounded as one:
+**`many_min_length`** and **`many_max_length`** are its `min_length` and
+`max_length`. Neither is declared by default, so an empty list runs the
+service on no rows, and `many_min_length=1` is how a spec refuses one. Where
+no `many_max_length` is declared, the `SERVICE_SPECS_MAX_ARRAY_LENGTH`
+setting bounds the list, 1000 rows by default, since every row is a Validator
+run inside one transaction. A list outside either is refused at
+`many_argument` as a whole, `{"items": ["Ensure this field has no more than
+200 elements."]}`, before any row is checked, beside the top level's other
+refusals. Either is refused on a spec that is not `many`.
+
 A `many` spec must declare a Validator and no target selector, since a list of
 rows resolves no target, and a condition on the row among its `affordances` is
 refused. With no output selector its result is `kind="list"`, unless the
@@ -334,6 +345,12 @@ the same declaration.
   written. A decimal string is compared as the decimal it spells, by its
   exponent, so `"1E+999999999"` is refused without building the integer it
   names. The schema states both as `"minimum"` and `"maximum"`.
+- **`min_length`** and **`max_length`** bound how many elements an `array`
+  takes, inclusively, each a non-negative `int`, and are refused on any other
+  type. An array that declares no `max_length` is still bounded, by the
+  `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, 1000 by default; see
+  [how long a list may be](arguments.md#how-long-a-list-may-be). The schema
+  states them as `"minItems"` and `"maxItems"`.
 - **`choice_labels`** names the choices for a reader, as a mapping of a choice
   to its label or as Django's pairs. The labels constrain nothing; the schema
   states each as a choice's `title`. A label may be a lazy translation.

@@ -6,6 +6,7 @@ from typing import Any
 
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import max_length_in_force
 from django_service_specs.schema.utils import allow_null, is_json_native
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
@@ -51,6 +52,12 @@ def parameters_schema(
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
       The shape check also accepts a JSON number, which this does not advertise.
+    - **An array's length** is ``"minItems"`` as declared, and ``"maxItems"``
+      as in force: the declared ``max_length``, or where none is declared the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's, 1000 unless the project
+      sets another. The shape check refuses past it either way, so a client
+      told nothing would send a call that cannot run; under a setting of
+      ``None`` an array that declares no maximum states none.
     - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared.
       JSON Schema applies them to a number instance only, so on a decimal
       string a validating client enforces neither; the shape check does, and
@@ -92,8 +99,10 @@ def parameters_schema(
     No ``$defs`` or ``$ref`` ever: most MCP clients refuse a schema with a
     reference in it, so every schema is flat and self-contained, however deep
     the declaration nests. No ``$schema`` key, which a transport adds if its
-    wire wants one. And no bound a Parameter does not declare (``maxLength``,
-    a Validator's ``max_value``): the Validator enforces those.
+    wire wants one. And no bound the shape check does not enforce
+    (``maxLength``, a Validator's ``max_value``): the Validator enforces those.
+    The one stated without being declared is an array's default maximum,
+    because the shape check enforces it.
 
     Every call builds a new schema, so a transport may add its own keys to the
     result without reaching the declaration or another transport's copy.
@@ -128,7 +137,7 @@ def _object_schema(parameters: Parameters, policy: UnknownArguments) -> dict[str
 def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
     schema: dict[str, Any]
     if param.type == "array":
-        schema = {"type": "array", "items": _items_schema(param, policy)}
+        schema = {"type": "array", "items": _items_schema(param, policy), **_lengths(param)}
     elif param.fields is not None:
         # Only an object carries ``fields``; ``Parameter`` refuses them elsewhere.
         schema = _object_schema(param.fields, policy)
@@ -168,6 +177,19 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         # is not a JSON value: it is rendered in the language active now.
         schema["description"] = str(param.help)
     return schema
+
+
+def _lengths(param: Parameter) -> dict[str, Any]:
+    """An array's ``minItems`` as declared, and its ``maxItems`` as in force: declared or the default."""
+    lengths: dict[str, Any] = {}
+    # Two arcs, held by test_declared_lengths_are_stated_as_min_and_max_items
+    # and test_a_setting_of_none_states_no_maximum.
+    if param.min_length is not None:
+        lengths["minItems"] = param.min_length
+    most = max_length_in_force(param)
+    if most is not None:
+        lengths["maxItems"] = most
+    return lengths
 
 
 def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:

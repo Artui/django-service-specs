@@ -7,9 +7,10 @@ from typing import Any
 
 import pytest
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
@@ -843,6 +844,89 @@ def test_a_bound_message_is_translated_through_djangos_own_catalog() -> None:
     assert detail == {"n": [expected % {"limit_value": 10}]}
 
 
+# --- array length ------------------------------------------------------------------------------------
+
+TOO_MANY = "Ensure this field has no more than %s elements."
+TOO_FEW = "Ensure this field has at least %s elements."
+IDS = one(Parameter("ids", "array", items="integer"))
+
+
+def test_an_array_takes_a_thousand_elements_and_no_more_by_default() -> None:
+    # The boundary pair, so the default itself is held: 1000 is Django's own
+    # DATA_UPLOAD_MAX_NUMBER_FIELDS, the line a form body already stops at.
+    assert check_arguments(IDS, {"ids": list(range(1000))}) == {"ids": list(range(1000))}
+    assert refusal(IDS, {"ids": list(range(1001))}) == {"ids": [TOO_MANY % 1000]}
+
+
+def test_an_array_past_its_maximum_is_refused_before_any_element_is_read() -> None:
+    # Every element is malformed, and none is addressed: the list is refused
+    # whole, so a long list costs no per-element work.
+    detail = refusal(IDS, {"ids": ["x"] * 1001})
+    assert detail == {"ids": [TOO_MANY % 1000]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_setting_moves_the_default_maximum() -> None:
+    assert check_arguments(IDS, {"ids": [1, 2, 3]}) == {"ids": [1, 2, 3]}
+    assert refusal(IDS, {"ids": [1, 2, 3, 4]}) == {"ids": [TOO_MANY % 3]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_setting_of_none_bounds_no_array() -> None:
+    assert check_arguments(IDS, {"ids": list(range(1001))}) == {"ids": list(range(1001))}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_default_maximum_reaches_an_array_inside_a_row() -> None:
+    rows = one(Parameter("books", "array", items=Parameters.of(Parameter("tags", "array"))))
+    assert refusal(rows, {"books": [{"tags": [1, 2, 3, 4]}]}) == {
+        "books": {0: {"tags": [TOO_MANY % 3]}}
+    }
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_declared_maximum_outranks_the_default_both_ways() -> None:
+    wider = one(Parameter("ids", "array", max_length=5))
+    narrower = one(Parameter("ids", "array", max_length=2))
+    assert check_arguments(wider, {"ids": [1, 2, 3, 4, 5]}) == {"ids": [1, 2, 3, 4, 5]}
+    assert refusal(wider, {"ids": [1, 2, 3, 4, 5, 6]}) == {"ids": [TOO_MANY % 5]}
+    assert refusal(narrower, {"ids": [1, 2, 3]}) == {"ids": [TOO_MANY % 2]}
+
+
+def test_a_declared_minimum_is_inclusive() -> None:
+    params = one(Parameter("ids", "array", min_length=2))
+    assert check_arguments(params, {"ids": [1, 2]}) == {"ids": [1, 2]}
+    assert refusal(params, {"ids": [1]}) == {"ids": [TOO_FEW % 2]}
+    assert refusal(params, {"ids": []}) == {"ids": [TOO_FEW % 2]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_past_the_default_maximum_with_no_maximum_of_its_own_is_refused_loudly() -> None:
+    # No call could pass, and the setting is read only at the call, so this is
+    # where the declaration is found wrong rather than every call refused.
+    params = one(Parameter("ids", "array", min_length=4))
+    with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
+        check_arguments(params, {"ids": [1, 2, 3, 4]})
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_past_the_default_is_taken_beside_its_own_maximum() -> None:
+    params = one(Parameter("ids", "array", min_length=4, max_length=4))
+    assert check_arguments(params, {"ids": [1, 2, 3, 4]}) == {"ids": [1, 2, 3, 4]}
+
+
+def test_a_length_message_is_spelled_as_drf_spells_it() -> None:
+    # No Django catalog entry counts a list's elements (MaxLengthValidator
+    # counts characters), so the wording is DRF's ListField's, which its own
+    # catalog translates wherever DRF is installed and which a
+    # djangorestframework-services caller already reads.
+    params = one(Parameter("ids", "array", min_length=1, max_length=1))
+    assert refusal(params, {"ids": []}) == {"ids": ["Ensure this field has at least 1 elements."]}
+    assert refusal(params, {"ids": [1, 2]}) == {
+        "ids": ["Ensure this field has no more than 1 elements."]
+    }
+
+
 # --- messages ----------------------------------------------------------------------------------------
 
 
@@ -898,3 +982,10 @@ class TestAny:
         with pytest.raises(InvalidArguments) as refused:
             check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": float("nan")})
         assert refused.value.detail == {"pk": ["Enter a number."]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_minimum_is_compared_with_no_default_when_the_setting_is_none() -> None:
+    params = one(Parameter("ids", "array", min_length=2))
+    assert check_arguments(params, {"ids": [1, 2]}) == {"ids": [1, 2]}
+    assert refusal(params, {"ids": [1]}) == {"ids": [TOO_FEW % 2]}

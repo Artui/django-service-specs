@@ -431,6 +431,54 @@ class TestMany:
         # every spec, so the default alone refuses nothing.
         assert ServiceSpec(service=print, many_argument="items").many is False
 
+    def test_the_list_carries_its_declared_lengths(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            many=True,
+            validator=Titled("title"),
+            many_min_length=1,
+            many_max_length=50,
+        )
+        the_list = spec.parameters().get("items")
+        assert the_list is not None
+        assert (the_list.min_length, the_list.max_length) == (1, 50)
+
+    def test_no_length_is_declared_by_default(self) -> None:
+        # So an empty list runs, as it always has, and the setting's maximum
+        # bounds the list as it bounds every array.
+        spec = ServiceSpec(service=print, many=True, validator=Titled())
+        the_list = spec.parameters().get("items")
+        assert the_list is not None
+        assert (the_list.min_length, the_list.max_length) == (None, None)
+
+    @pytest.mark.parametrize("field", ["many_min_length", "many_max_length"])
+    def test_a_length_without_many_is_refused(self, field: str) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, **{field: 1})
+        assert str(refused.value).startswith(f"ServiceSpec declares {field}=1 without many=True.")
+
+    @pytest.mark.parametrize("field", ["many_min_length", "many_max_length"])
+    def test_a_length_of_none_written_out_without_many_is_not_a_declaration(
+        self, field: str
+    ) -> None:
+        assert ServiceSpec(service=print, **{field: None}).many is False
+
+    @pytest.mark.parametrize(
+        ("kwargs", "message"),
+        [
+            ({"many_min_length": -1}, "min_length -1 is not a non-negative int"),
+            ({"many_max_length": True}, "max_length True is not a non-negative int"),
+            ({"many_min_length": 3, "many_max_length": 2}, "min_length 3 is past max_length 2"),
+        ],
+    )
+    def test_a_length_no_list_could_meet_is_refused_at_construction(
+        self, kwargs: dict[str, Any], message: str
+    ) -> None:
+        # Read by the list's own Parameter, so the rules are one rule; refused
+        # when the spec is built, before any Validator is asked for its fields.
+        with pytest.raises(ImproperlyConfigured, match=f"ServiceSpec.many_argument.*{message}"):
+            ServiceSpec(service=print, many=True, validator=Titled(), **kwargs)
+
     def test_a_many_spec_needs_a_validator(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
             ServiceSpec(service=print, many=True)

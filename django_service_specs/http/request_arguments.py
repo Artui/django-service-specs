@@ -18,7 +18,11 @@ from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
+from django_service_specs.parameters.utils import (
+    NON_FIELD_ERRORS,
+    expected_type,
+    max_length_in_force,
+)
 
 _CSRF_FIELD = "csrfmiddlewaretoken"
 """The field ``{% csrf_token %}`` renders into a form: Django's, and never an argument."""
@@ -68,7 +72,12 @@ def request_arguments(
     refused at its index as any malformed element is. A string array is
     split only where its choices hold no comma, as an ordering's do, so
     ``?o=title,-pk`` is ``["title", "-pk"]``; otherwise it is never split,
-    since a comma is part of a string. **A blank value is
+    since a comma is part of a string. **An array is read no further than one
+    element past the most it takes** - its ``max_length``, or the
+    ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's default - so a list over it is
+    refused at its name as a whole, without a million commas becoming a
+    million elements first; Django's ``DATA_UPLOAD_MAX_NUMBER_FIELDS`` counts
+    keys, and a comma list is one. **A blank value is
     absent unless** ``""`` **is one the parameter can take**: a plain string
     can, and a number, a boolean, a date, a decimal, or a string whose
     choices leave the blank out cannot. A flat wire has no other spelling of
@@ -138,8 +147,21 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
             # dropped first, so an empty part left by a stray comma is the
             # reader's malformed element rather than a blank.
             split = _splits(param)
+            # Built no further than one element past the most the array takes,
+            # which is still past it, so ``coerce_flat`` refuses the list at its
+            # name as it would the whole: a value of a million commas is never
+            # split a million times. One past rather than at it, or a list over
+            # the bound would be cut to one that is accepted.
+            most = max_length_in_force(param)
             values: list[str] = []
             for value in source.getlist(key):
+                # One branch to coverage, each condition held by
+                # test_a_flat_array_is_split_no_further_than_one_past_its_maximum:
+                # [repeated-keys] the comparison, and the setting's ``None`` by
+                # test_a_setting_of_none_splits_every_comma, which compares
+                # nothing.
+                if most is not None and len(values) > most:
+                    break
                 # One branch to coverage, so each condition is held by its own
                 # test: test_blank_elements_of_a_non_string_array_are_dropped
                 # (the blank: without it every element is dropped) and
@@ -147,7 +169,11 @@ def _flat(parameters: Parameters, source: QueryDict) -> dict[str, Any]:
                 if value == "" and not keep:
                     continue
                 if split:
-                    values.extend(part.strip() for part in value.split(","))
+                    # Split no further than the room left: [one-value] and
+                    # [mixed] of the test above, and at the bound ``0``, which
+                    # leaves the value whole and one past.
+                    room = -1 if most is None else most - len(values)
+                    values.extend(part.strip() for part in value.split(",", room))
                 else:
                     values.append(value)
             if values:

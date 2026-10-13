@@ -190,3 +190,18 @@ def test_an_any_parameter_keeps_the_string_it_arrived_as() -> None:
     params = Parameters.of(Parameter("pk", "any"), Parameter("on", "any"))
 
     assert coerce_flat(params, {"pk": "3", "on": "true"}) == {"pk": "3", "on": "true"}
+
+
+def test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read() -> None:
+    # Every element is malformed and none is addressed: the length is read
+    # first, so a long flat list costs no per-element parse.
+    ids = Parameters.of(Parameter("ids", "array", items="integer"))
+    with pytest.raises(InvalidArguments) as refused:
+        coerce_flat(ids, {"ids": ["x"] * 1001})
+    assert refused.value.detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
+    assert "Enter a whole number." not in str(refused.value.detail)
+
+
+def test_an_array_at_its_maximum_is_read_element_by_element() -> None:
+    ids = Parameters.of(Parameter("ids", "array", items="integer"))
+    assert coerce_flat(ids, {"ids": ["1"] * 1000}) == {"ids": [1] * 1000}

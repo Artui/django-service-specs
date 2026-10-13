@@ -8,6 +8,8 @@ of it.
 
 from __future__ import annotations
 
+import contextlib
+import importlib
 import json
 from typing import Any
 
@@ -18,7 +20,7 @@ from django.core.exceptions import ImproperlyConfigured, RequestDataTooBig
 from django.core.files.uploadedfile import SimpleUploadedFile, UploadedFile
 from django.http import HttpRequest
 from django.http.request import RawPostDataException
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.test.client import encode_multipart
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
@@ -35,6 +37,9 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.http.utils import DEEP_JSON
+
+# The module, which ``http``'s own ``request_arguments`` re-export shadows as an attribute.
+request_arguments_module = importlib.import_module("django_service_specs.http.request_arguments")
 
 FACTORY = RequestFactory()
 FORM = "application/x-www-form-urlencoded"
@@ -683,3 +688,60 @@ class TestUrlKwargs:
         # the route by its own branch.
         with pytest.raises(ImproperlyConfigured, match="The route captures org, slug,"):
             read(request_, url_kwargs={"slug": "x", "org": "acme", "pk": "4"})
+
+
+class TestArrayLength:
+    """A flat array is bounded as a JSON one is, and its commas never build past the bound."""
+
+    TOO_MANY = "Ensure this field has no more than %s elements."
+
+    def test_a_comma_list_past_the_default_maximum_is_refused_at_its_name(self) -> None:
+        # The spelling that reaches round Django's DATA_UPLOAD_MAX_NUMBER_FIELDS:
+        # one key, any number of values.
+        query = ",".join(map(str, range(1001)))
+        assert refusal(FACTORY.get(f"/?ids={query}"), CSV) == {"ids": [self.TOO_MANY % 1000]}
+
+    def test_a_comma_list_at_the_default_maximum_is_read(self) -> None:
+        query = ",".join(map(str, range(1000)))
+        assert read(FACTORY.get(f"/?ids={query}"), CSV) == {"ids": list(range(1000))}
+
+    @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+    @pytest.mark.parametrize(
+        ("query", "handed_on"),
+        [
+            ("ids=1,2,3,4,5,6", ["1", "2", "3", "4,5,6"]),
+            ("ids=1&ids=2&ids=3&ids=4&ids=5", ["1", "2", "3", "4"]),
+            ("ids=1,2&ids=3,4,5&ids=6", ["1", "2", "3", "4,5"]),
+            ("ids=1,2,3", ["1", "2", "3"]),
+        ],
+        ids=["one-value", "repeated-keys", "mixed", "at-the-bound"],
+    )
+    def test_a_flat_array_is_split_no_further_than_one_past_its_maximum(
+        self, monkeypatch: pytest.MonkeyPatch, query: str, handed_on: list[str]
+    ) -> None:
+        # Invisible to every message, which is the length's either way: what is
+        # held is the list built on the way, one element past the bound and no
+        # more, so a value of a million commas is never split a million times.
+        # One past rather than at it, or a list over the bound would be cut to
+        # one that is accepted.
+        seen: list[Any] = []
+        real = request_arguments_module.coerce_flat
+
+        def spy(parameters: Parameters, raw: Any) -> dict[str, Any]:
+            seen.append(raw["ids"])
+            return real(parameters, raw)
+
+        monkeypatch.setattr(request_arguments_module, "coerce_flat", spy)
+        with contextlib.suppress(InvalidArguments):
+            read(FACTORY.get(f"/?{query}"), CSV)
+        assert seen == [handed_on]
+
+    @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+    def test_a_setting_of_none_splits_every_comma(self) -> None:
+        assert read(FACTORY.get("/?ids=1,2,3,4"), CSV) == {"ids": [1, 2, 3, 4]}
+
+    @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+    def test_a_declared_maximum_bounds_the_split_rather_than_the_default(self) -> None:
+        wide = Parameters.of(Parameter("ids", "array", items="integer", max_length=5))
+        assert read(FACTORY.get("/?ids=1,2,3,4,5"), wide) == {"ids": [1, 2, 3, 4, 5]}
+        assert refusal(FACTORY.get("/?ids=1,2,3,4,5,6"), wide) == {"ids": [self.TOO_MANY % 5]}

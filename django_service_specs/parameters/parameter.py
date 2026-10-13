@@ -99,8 +99,21 @@ class Parameter:
     ``float``, a JSON number the schema can state. They exist for the bound a
     reader needs before any Validator runs: a filter whose form field has none
     hands the value to the database's integer conversion, which builds every
-    digit. Any other bound - a length, a Validator's ``max_value`` - is still
-    the Validator's alone.
+    digit. Any other bound - a string's length, a Validator's ``max_value`` -
+    is still the Validator's alone.
+
+    ``min_length`` and ``max_length`` bound how many elements an ``array``
+    takes, inclusively, and are refused on anything else: each a
+    non-negative ``int``. They are checked on the list whole, before any
+    element is read, so a list past its maximum costs no per-element work.
+    **An array that declares no** ``max_length`` **is still bounded**, by the
+    ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the project sets
+    another count or ``None``: a list a caller controls the length of is a
+    cost the caller controls, and the setting is read at the call, so it
+    applies to a declaration built before settings were configured. A
+    declared ``max_length`` outranks it either way, wider or narrower.
+    ``min_length`` has no default: an empty list is taken unless one says
+    otherwise.
     """
 
     name: str
@@ -115,6 +128,11 @@ class Parameter:
     choice_labels: tuple[tuple[Any, str], ...] | None = None
     minimum: int | float | None = None
     maximum: int | float | None = None
+    # A list's own count, under the names Django's and DRF's length validators
+    # use, rather than JSON Schema's ``minItems``: the declaration is read by
+    # Python authors, and the schema states the JSON spelling.
+    min_length: int | None = None
+    max_length: int | None = None
     # Out of the hash and still in equality, so a list or dict default - which
     # the pydantic adapter reports as given - leaves the declaration hashable.
     # Equal Parameters still hash equal, which is all a hash promises; two that
@@ -189,6 +207,10 @@ class Parameter:
         # test_a_bound_must_be_a_finite_number: [minimum-...] and [maximum-...].
         if self.minimum is not None or self.maximum is not None:
             self._check_bounds(where)
+        # One branch to coverage, each side held by its own half of
+        # test_a_length_describes_an_array: [min_length] and [max_length].
+        if self.min_length is not None or self.max_length is not None:
+            self._check_lengths(where)
 
     def _check_bounds(self, where: str) -> None:
         """Refuse a bound no reader can act on: a non-number, or one on a value that is no number."""
@@ -222,6 +244,35 @@ class Parameter:
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise ImproperlyConfigured(
                 f"{where}: minimum {self.minimum!r} is past maximum {self.maximum!r}."
+            )
+
+    def _check_lengths(self, where: str) -> None:
+        """Refuse a length no reader can act on: no count, or one on a value that is no array."""
+        for label, length in (("min_length", self.min_length), ("max_length", self.max_length)):
+            # A count: ``bool`` is an ``int`` to Python and no count, which
+            # ``type() is`` keeps out. One branch to coverage, each condition
+            # held by its own test: test_a_length_may_stand_alone_and_be_zero
+            # (``None``: without it, the side left open is refused), and
+            # test_a_length_must_be_a_non_negative_int's [bool] and [string]
+            # (the type) and [negative] (the sign).
+            if length is not None and not (type(length) is int and length >= 0):
+                raise ImproperlyConfigured(
+                    f"{where}: {label} {length!r} is not a non-negative int."
+                )
+        if self.type != "array":
+            raise ImproperlyConfigured(
+                f"{where}: a length describes an array; this parameter is {self.type!r}."
+            )
+        # One branch to coverage: test_one_length_may_equal_the_other_and_not_pass_it
+        # holds the comparison, and test_a_length_may_stand_alone_and_be_zero
+        # each ``is not None``, without which an absent length is compared and raises.
+        if (
+            self.min_length is not None
+            and self.max_length is not None
+            and self.min_length > self.max_length
+        ):
+            raise ImproperlyConfigured(
+                f"{where}: min_length {self.min_length!r} is past max_length {self.max_length!r}."
             )
 
     def _normalize_choice_labels(

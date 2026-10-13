@@ -176,6 +176,41 @@ def test_one_bound_may_equal_the_other() -> None:
     assert Parameter("n", "integer", minimum=1, maximum=1.0).maximum == 1.0
 
 
+# --- array lengths -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "length",
+    [True, 1.0, "1", -1],
+    ids=["bool", "float", "string", "negative"],
+)
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_must_be_a_non_negative_int(side: str, length: Any) -> None:
+    # A count of elements: ``bool`` is an ``int`` to Python and no count.
+    with pytest.raises(ImproperlyConfigured, match=f"{side} .* is not a non-negative int"):
+        Parameter("ids", "array", **{side: length})
+
+
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_describes_an_array(side: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="a length describes an array; this parameter"):
+        Parameter("title", "string", **{side: 1})
+
+
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_may_stand_alone_and_be_zero(side: str) -> None:
+    # Zero is a count, so a falsy check in place of ``is not None`` would
+    # refuse it as no length or take it as none.
+    param = Parameter("ids", "array", **{side: 0})
+    assert getattr(param, side) == 0
+
+
+def test_one_length_may_equal_the_other_and_not_pass_it() -> None:
+    assert Parameter("ids", "array", min_length=2, max_length=2).max_length == 2
+    with pytest.raises(ImproperlyConfigured, match="min_length 3 is past max_length 2"):
+        Parameter("ids", "array", min_length=3, max_length=2)
+
+
 # --- choice labels ----------------------------------------------------------------------------
 
 
