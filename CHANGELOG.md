@@ -173,6 +173,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the call fails closed instead of running. A pool seed's resolver declared
   `async def` is refused when it is declared, and one handing back an
   awaitable from a plain `def` where it is resolved.
+- A dataclass field declared `init=False` was written to the row by the
+  mutation helpers, although the dataclass computes it and no caller sends
+  it: `create_from_input`, `update_from_input`, their async twins and
+  `apply_input` read every field of a dataclass row, the rows of a relation a
+  `DataclassValidator` hands over as instances included. Only its `__init__`
+  fields are written now, at every depth.
 
 ## [0.4.2] — 2026-10-06
 

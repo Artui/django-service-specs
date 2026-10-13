@@ -30,7 +30,9 @@ runs, and the helpers own persistence only.
   are the async forms, for an `async def` service.
 
 `data` is a dataclass, a mapping, or an object with a `__dict__` - usually the
-validated values dispatch passes the service as `data`. A field holding
+validated values dispatch passes the service as `data`. A dataclass gives its
+`__init__` fields only, at every depth: one declared `init=False` is computed
+by the dataclass rather than sent, and is never written. A field holding
 [`UNSET`][django_service_specs.types.unset.UNSET] is left alone, which is what
 makes a partial update's omitted fields omitted. `field_map` renames input keys
 onto model fields and `exclude_fields` drops keys. `m2m={name: rows}` assigns

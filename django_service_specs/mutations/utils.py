@@ -54,13 +54,21 @@ _RowSpec = (
 
 
 def coerce_to_dict(data: Any) -> dict[str, Any]:
-    """Normalize input ``data`` to a dict mapping field name to value."""
+    """Normalize input ``data`` to a dict mapping field name to value.
+
+    A dataclass gives its ``__init__`` fields only. A field declared
+    ``init=False`` is the dataclass's to compute, never the caller's to send,
+    so it is no input and writing it would put a value nobody sent in a
+    column. Every row is read here, the top-level one, each row of a
+    collection and each nested one alike, so the rule holds at every depth:
+    test_a_field_declared_init_false_is_left_out fails without the filter.
+    """
     if data is None:
         return {}
     if isinstance(data, dict):
         return dict(data)
     if is_dataclass(data) and not isinstance(data, type):
-        return {f.name: getattr(data, f.name) for f in fields(data)}
+        return {f.name: getattr(data, f.name) for f in fields(data) if f.init}
     if hasattr(data, "__dict__"):
         return dict(vars(data))
     raise TypeError(

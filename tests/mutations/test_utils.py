@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -34,6 +35,19 @@ class TestCoerceToDict:
 
     def test_dict(self) -> None:
         assert coerce_to_dict({"a": 1}) == {"a": 1}
+
+    def test_a_field_declared_init_false_is_left_out(self) -> None:
+        # The dataclass computes it rather than taking it, so it is no input:
+        # written to the row, a value nobody sent would land in a column.
+        @dataclass
+        class _Computed:
+            title: str
+            views: int = field(init=False)
+
+            def __post_init__(self) -> None:
+                self.views = 99
+
+        assert coerce_to_dict(_Computed(title="hi")) == {"title": "hi"}
 
     def test_object_with_dict(self) -> None:
         class _Obj:
