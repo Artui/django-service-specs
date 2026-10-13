@@ -36,12 +36,16 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    # Django is the base, and the only one: no DRF, here or in any group below,
+    # Django is the base, and the only framework: no DRF, here or in any group below,
     # because dispatch without DRF is the reason the package exists and a test
     # environment with DRF installed could not notice the kernel reaching for
     # it. The floor matches djangorestframework-services', which will depend on
     # this package, so it cannot be raised past what that package supports.
     "django>=4.2",
+    # ``provider_keys`` reads its declarations through ``typing_extensions``,
+    # and the floor is djangorestframework-services', which will depend on this
+    # package and cannot be asked to raise it.
+    "typing_extensions>=4.14",
 ]
 
 [project.optional-dependencies]
