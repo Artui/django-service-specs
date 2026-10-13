@@ -67,9 +67,10 @@ def request_arguments(
     **An upload is an argument**, under the name its part carries, as each
     field is: the upload itself, Django's ``UploadedFile``, for a parameter of
     type ``file``, every upload under the name for an array, and the last
-    of repeated ones for anything else. It wins over a field of the same name,
-    as DRF's multipart parser has it, since a browser sends a file input only
-    as a file. A POST's uploads are Django's own ``request.FILES``; those in a
+    of repeated ones for anything else. It replaces a field of the same name,
+    since a browser sends a file input only as a file: a single value reads as
+    the upload in DRF's merged data too, where an array there would hold the
+    field and the uploads together. A POST's uploads are Django's own ``request.FILES``; those in a
     PUT, PATCH or DELETE body are parsed here with its fields. An upload under
     a name ``parameters`` do not declare passes through like an undeclared
     field, for the closed argument set to refuse, and a file input left empty
