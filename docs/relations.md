@@ -34,7 +34,11 @@ validated values dispatch passes the service as `data`. A dataclass gives its
 `__init__` fields only, at every depth: one declared `init=False` is computed
 by the dataclass rather than sent, and is never written. A field holding
 [`UNSET`][django_service_specs.types.unset.UNSET] is left alone, which is what
-makes a partial update's omitted fields omitted. `field_map` renames input keys
+makes a partial update's omitted fields omitted. A file field's value is
+written as a `ModelForm` writes it, through the model field's
+`save_form_data`: a file replaces the one the row holds, `None` keeps it, and
+`False`, a form's value for a [cleared file](forms.md#clearing-a-file),
+leaves no file, reported as a change to `""`. `field_map` renames input keys
 onto model fields and `exclude_fields` drops keys. `m2m={name: rows}` assigns
 many-to-many rows **that already exist**; writing the target rows from the
 payload is a `ManyToManySpec`, and naming one relation in both is refused.

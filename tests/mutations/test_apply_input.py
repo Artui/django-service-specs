@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
 
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.types.unset import UNSET
+from tests.adapter_app.models import Document
+from tests.mutations.utils import STORED, stored_document
 from tests.relations_app.models import Author, Post
 
 
@@ -101,3 +104,31 @@ class TestApplyInput:
         # Reload from DB; persisted value is unchanged.
         author.refresh_from_db()
         assert author.name == "orig"
+
+
+@pytest.mark.django_db
+class TestFileFields:
+    """As ``update_from_input``, in memory: ``None`` keeps a file, ``False`` clears it."""
+
+    def test_false_clears_the_file_in_memory(self, media: str) -> None:
+        row = stored_document()
+        result = apply_input(row, {"attachment": False})
+        assert row.attachment.name == ""
+        change = result.get_field_change("attachment")
+        assert change is not None
+        assert (change.old, change.new) == (STORED, "")
+
+    def test_none_keeps_the_file(self, media: str) -> None:
+        row = stored_document()
+        result = apply_input(row, {"attachment": None})
+        assert result.changes == ()
+        assert row.attachment.name == STORED
+
+    def test_a_file_is_set_through_its_field_s_save_form_data(self, media: str) -> None:
+        # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
+        row = stored_document()
+        attachment = Document._meta.get_field("attachment")
+        with patch.object(attachment, "save_form_data") as save_form_data:
+            apply_input(row, {"attachment": False, "title": "New"})
+        save_form_data.assert_called_once_with(row, "")
+        assert row.title == "New"

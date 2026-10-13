@@ -6,10 +6,13 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from asgiref.sync import sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.types.unset import UNSET
+from tests.mutations.utils import STORED, stored_document, stored_name
 from tests.relations_app.models import Author, Post, Tag, Timestamped
 
 
@@ -127,3 +130,26 @@ class TestAUpdateFromInput:
         await aupdate_from_input(obj, {"title": "new"})
         await obj.arefresh_from_db()
         assert obj.updated_at > old_ts
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFileFields:
+    """As ``update_from_input``: ``None`` keeps a file, ``False`` clears it."""
+
+    async def test_false_clears_the_file_and_reports_the_name_it_held(self, media: str) -> None:
+        row = await sync_to_async(stored_document)()
+        result = await aupdate_from_input(row, {"attachment": False})
+        assert await sync_to_async(stored_name)(row) == ""
+        change = result.get_field_change("attachment")
+        assert change is not None
+        assert (change.old, change.new) == (STORED, "")
+
+    async def test_none_keeps_the_file_and_an_upload_replaces_it(self, media: str) -> None:
+        row = await sync_to_async(stored_document)()
+        kept = await aupdate_from_input(row, {"attachment": None})
+        assert kept.changes == ()
+        assert await sync_to_async(stored_name)(row) == STORED
+        upload = SimpleUploadedFile("new.txt", b"new")
+        replaced = await aupdate_from_input(row, {"attachment": upload})
+        assert replaced.changed_fields == ("attachment",)
+        assert await sync_to_async(stored_name)(row) == "documents/new.txt"

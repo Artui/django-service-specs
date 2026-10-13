@@ -292,6 +292,11 @@ the form's own widgets**, which is how Django reads a form:
   the shape check never refuses what the form accepts. A value the field
   refuses is sent on as it came, and refused in the kernel's words, which are
   the field's own.
+- **A ticked [clear checkbox](forms.md#clearing-a-file)** is read by its
+  file's widget, which answers `False`, and is sent on as the argument the
+  Validator declares for it, `attachment-clear`, so the file is cleared.
+  Ticked beside an upload, both are sent, and the form refuses the pair in
+  its own words.
 - The URL kwargs are merged last, so the route wins a clash, and typed with
   [`coerce_flat`](arguments.md#flat-transports) in the same call as
   everything else: one refusal carries every problem. Each is an argument,

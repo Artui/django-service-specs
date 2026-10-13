@@ -5,9 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import pytest
+from asgiref.sync import sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.types.unset import UNSET, UnsetType
+from tests.adapter_app.models import Document
+from tests.mutations.utils import stored_name
 from tests.relations_app.models import Author, Post, Tag
 
 
@@ -83,3 +87,23 @@ class TestACreateFromInput:
         )
         pks = [pk async for pk in result.instance.tags.values_list("pk", flat=True)]
         assert pks == []
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFileFields:
+    """As ``create_from_input``: ``None`` leaves a file to the model, ``False`` clears it."""
+
+    async def test_false_stores_no_file_and_none_is_left_to_the_model(self, media: str) -> None:
+        cleared = await acreate_from_input(
+            Document,
+            {"title": "T", "attachment": False, "scan": SimpleUploadedFile("scan.txt", b"s")},
+        )
+        assert await sync_to_async(stored_name)(cleared.instance) == ""
+        change = cleared.get_field_change("attachment")
+        assert change is not None
+        assert change.new == ""
+        left = await acreate_from_input(
+            Document,
+            {"title": "T", "attachment": None, "scan": SimpleUploadedFile("scan.txt", b"s")},
+        )
+        assert left.changed_fields == ("title", "scan")

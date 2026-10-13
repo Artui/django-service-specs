@@ -11,6 +11,8 @@ from django_service_specs.mutations.utils import (
     coerce_to_dict,
     diff_attrs,
     filter_input,
+    form_values,
+    write_values,
 )
 
 
@@ -25,14 +27,17 @@ def apply_input(
 
     Returns a [`ChangeResult`][django_service_specs.mutations.change_result.ChangeResult]
     describing fields whose value actually changed. Useful when a service wants to
-    inspect what the input would change before deciding whether to persist."""
+    inspect what the input would change before deciding whether to persist.
+
+    A file field is set as ``update_from_input`` writes it: ``None`` keeps the
+    file, and ``False`` leaves none."""
     raw: dict[str, Any] = coerce_to_dict(data)
     new_values: dict[str, Any] = filter_input(
         raw,
         field_map=field_map,
         exclude_fields=exclude_fields,
     )
+    new_values = form_values(type(instance), new_values)
     changes = diff_attrs(instance, new_values)
-    for change in changes:
-        setattr(instance, change.field, change.new)
+    write_values(instance, {change.field: change.new for change in changes})
     return ChangeResult(instance=instance, created=False, changes=changes)
