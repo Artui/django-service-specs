@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import inspect
 from typing import Any
+
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -33,6 +36,13 @@ def base_pool(
     is no request to seed. An HTTP adapter that wants one registers it as its
     own seed through ``PoolSeeds``, the same way any other ambient value is
     added.
+
+    A seed resolving to an awaitable is refused with ``ImproperlyConfigured``
+    and never enters the pool. ``PoolSeeds`` refuses an ``async def``
+    resolver when it is registered, but a plain ``def`` handing back a
+    coroutine - a decorated ``async def``, a partial over one - looks sync
+    until it answers. Nothing awaits a pool entry, and a coroutine is truthy,
+    so a condition reading it would read an unmet condition as met.
 
     ``progress`` is the caller's reporter, and defaults to ``null_progress``
     rather than to ``None``, so a declared reporter is always callable - see
@@ -75,5 +85,26 @@ def base_pool(
                 f"base_pool() got a registered pool seed {name!r} that an entry already "
                 f"occupies. A seed cannot silently outrank what the caller spread in."
             )
-        pool[name] = resolver(**resolve_callable_kwargs(resolver, bound))
+        pool[name] = _settled(name, resolver(**resolve_callable_kwargs(resolver, bound)))
     return pool
+
+
+def _settled(name: str, value: Any) -> Any:
+    """Return a seed's resolved ``value``, refusing one that is still to be awaited.
+
+    A coroutine is closed first, so it is not left behind to warn that it was
+    never awaited. Two disjuncts, each held in ``tests/pool/test_base_pool.py``'s
+    ``TestAResolverAnsweringWithAnAwaitable``:
+    ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
+    first and ``test_an_async_generator_is_refused`` without the second, since
+    an async generator is not awaitable and is truthy too.
+    """
+    if inspect.isawaitable(value) or inspect.isasyncgen(value):
+        if inspect.iscoroutine(value):
+            value.close()
+        raise ImproperlyConfigured(
+            f"The pool seed {name!r} resolved to an awaitable ({type(value).__name__}). A "
+            "resolver is called from sync code and never awaited, so the value is refused "
+            "rather than seeded, where it would read as true; declare the resolver with def."
+        )
+    return value

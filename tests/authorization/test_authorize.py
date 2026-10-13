@@ -10,6 +10,7 @@ from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -137,3 +138,24 @@ def test_dispatch_does_not_run_a_service_its_check_answered_with_a_coroutine() -
     with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
         dispatch(spec, principal=object(), arguments={})
     assert ran == []
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize("atomic", [True, False], ids=["atomic", "non-atomic"])
+async def test_adispatch_does_not_run_a_service_its_check_answered_with_a_coroutine(
+    atomic: bool,
+) -> None:
+    # An ``async def`` service, so both of adispatch's paths are walked: run
+    # inside the hop when atomic, awaited after it when not. The check is
+    # answered inside the hop either way, and the refusal must land first.
+    ran: list[Any] = []
+
+    async def service() -> None:
+        ran.append(True)
+
+    answer = refuses()
+    spec = ServiceSpec(service=service, permissions=[AnswersWith(answer)], atomic=atomic)
+    with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+        await adispatch(spec, principal=object(), arguments={})
+    assert ran == []
+    assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
