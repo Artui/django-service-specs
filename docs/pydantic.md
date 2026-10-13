@@ -55,12 +55,25 @@ same parameter:
 | `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum` and a `Literal` label nothing. |
-| `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. |
+| `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, as `list[Decimal]` on a dataclass does. The list's length is declared: see below. |
 | a model | An object, with its fields as nested Parameters. |
 | `dict[str, X]` | An object with no declared fields. Its values are the model's to validate. |
 
 `Annotated` is looked through, so `Annotated[str, Field(max_length=100)]`
-declares a string. Anything else - `Any`, a union of two types, `UnsetType`, a
+declares a string.
+
+**A list's length is declared** as the model states it: `Field(min_length=,
+max_length=)`, `conlist(...)`, `annotated_types`' `Len`, `MinLen` and
+`MaxLen`, whether on the field or inside an `Annotated` in its annotation,
+become the parameter's `min_length` and `max_length`, and a schema's
+`"minItems"` and `"maxItems"`. So `tags: list[str] = Field(max_length=5000)`
+takes 5000 tags where an undeclared list is held to the
+`SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, 1000 by default, and a list the
+model allows 5 of is refused at 6 by the shape check before the model runs.
+Where a field states a length twice, the declaration takes the one pydantic
+enforces: the last it applies, the annotation's innermost first and the
+field's own last. A length on a string or a `dict` is the model's alone,
+since a parameter's length counts an array's elements. Anything else - `Any`, a union of two types, `UnsetType`, a
 `RootModel`, `set`, `tuple`, a `dict` not keyed by `str` - is refused with
 `ImproperlyConfigured` naming the model and the field, when the validator or
 presenter is constructed.
@@ -131,9 +144,12 @@ A refusal keeps pydantic's words, addressed into the kernel's refusal tree, as
   validated: `{"books": {1: {"non_field_errors": ["Value error, A published
   book has a publication date."]}}}`.
 
-The kernel's shape check runs first, so a wrong JSON type is refused in the
-kernel's words and never reaches the model. pydantic's words are what a caller
-reads for the model's own rules: bounds, patterns, validators.
+The kernel's shape check runs first, so a wrong JSON type, and a list past
+the length it declares, is refused in the kernel's words and never reaches the
+model: `Ensure this field has no more than 5 elements.` where the model would
+say `List should have at most 5 items after validation, not 6`, under the same
+`max_length` code. pydantic's words are what a caller reads for the model's
+own rules: bounds, patterns, validators.
 
 The context reaches pydantic's validators as `info.context`, a dict with
 `"principal"` and `"target"`, so a `field_validator` can check a value against
@@ -182,5 +198,13 @@ adapter declared it, and the model's own JSON Schema is not consulted. There is
 one dialect: a `Decimal` is a `string` in the `decimal` format for a model as
 for a dataclass, where pydantic's schema describes it as a number or a
 patterned string. The price of that is that what `Parameters` cannot carry -
-`max_length`, `gt`, a pattern - is not described. It is still enforced, by the
-model, in `validate()`.
+a string's `max_length`, `gt`, a pattern - is not described. It is still
+enforced, by the model, in `validate()`. A list's length is the exception, as
+`Parameters` carries one and the kernel bounds every list without it.
+
+A number's bounds are not declared either, although a parameter takes an
+inclusive `minimum` and `maximum`. pydantic's `gt` and `lt` are exclusive,
+which a parameter cannot state, and its bounds may be a `Decimal` or a date,
+which a parameter does not take; declaring only `ge` and `le` would answer
+one model's bounds in two dialects, the kernel's words for some and
+pydantic's for the rest. So every bound stays the model's, in its words.

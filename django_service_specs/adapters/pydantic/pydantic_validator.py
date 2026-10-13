@@ -18,7 +18,7 @@ from django_service_specs.adapters.pydantic.utils import (
     inputs,
     read_fields,
 )
-from django_service_specs.adapters.utils import choice_labels
+from django_service_specs.adapters.utils import choice_labels, element_format
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -43,8 +43,19 @@ class PydanticValidator(Validator):
     ``bool``; ``Decimal``, ``datetime`` and ``date`` as strings with their
     format; ``X | None`` as nullable; ``Literal[...]`` and an ``Enum`` as
     choices; ``Annotated`` looked through; and ``list[X]`` of any of these,
-    where ``list[X | None]`` makes the element nullable and not the array.
-    On top of those:
+    where ``list[X | None]`` makes the element nullable and not the array
+    and ``list[Decimal]`` declares each element a ``decimal``. On top of
+    those:
+
+    - a list's length, however the model states it - ``Field(min_length=,
+      max_length=)``, ``conlist``, ``annotated_types``' ``Len``, ``MinLen``
+      and ``MaxLen`` - is the parameter's ``min_length`` and ``max_length``,
+      so a list the model allows more of than ``SERVICE_SPECS_MAX_ARRAY_LENGTH``
+      is not held to it. Where a field states one twice, the last pydantic
+      applies is the one declared, as it is the one pydantic enforces. A
+      number's bounds are not declared: ``gt`` and ``lt`` are exclusive,
+      which a parameter cannot state, and the model keeps every bound in
+      its own words rather than some in the kernel's;
 
     - a nested model is an object with its own fields as nested Parameters,
       and ``list[SomeModel]`` an array of rows;
@@ -79,8 +90,9 @@ class PydanticValidator(Validator):
     ``int``. A message about a model itself - its ``model_validator`` refusing
     - sits under ``non_field_errors`` inside that model, or at the top for the
     model being validated. The kernel's shape check runs first and refuses a
-    wrong JSON type in the kernel's words, so pydantic's are what a caller
-    reads for its own rules: bounds, patterns, validators.
+    wrong JSON type, and a list past its declared length, in the kernel's
+    words, under the code pydantic's would carry; pydantic's are what a
+    caller reads for the model's other rules: bounds, patterns, validators.
 
     **Each message carries a code**, the one a DRF field gives the same
     mistake where pydantic's error type has one: ``missing`` is
@@ -164,7 +176,8 @@ def _parameter(fs: FieldShape) -> Parameter:
         fs.input_name,
         shape.type,
         required=fs.required,
-        format=shape.format,
+        # An array's format is its element's, and only a decimal's is one.
+        format=shape.format if shape.items is None else element_format(shape.items.format),
         items=_items(shape.items),
         # ``list[X | None]``: the element's own nullability, which the array's
         # is not. Declared, or the shape check refuses the null the library takes.
@@ -174,6 +187,8 @@ def _parameter(fs: FieldShape) -> Parameter:
         # element, and ``items`` can hold only the element's JSON type.
         choices=shape.choices if shape.items is None else shape.items.choices,
         choice_labels=choice_labels((shape if shape.items is None else shape.items).enum),
+        min_length=fs.min_length,
+        max_length=fs.max_length,
         default=fs.default,
         nullable=shape.nullable,
         help=fs.help,

@@ -8,10 +8,11 @@ from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.test import override_settings
+from django.test import RequestFactory, override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -488,12 +489,27 @@ class _Typed:
     count: int
     price: Decimal
     status: Status
+    prices: list[Decimal]
 
 
 @pytest.mark.parametrize(
     "arguments",
-    [{"count": "three"}, {"price": True}, {"status": "archived"}],
-    ids=["type", "decimal", "choice"],
+    [
+        {"count": "three"},
+        {"price": True},
+        {"status": "archived"},
+        {"prices": ["1", "many"]},
+        {"prices": [True]},
+        {"prices": ["NaN"]},
+    ],
+    ids=[
+        "type",
+        "decimal",
+        "choice",
+        "decimal-element",
+        "decimal-element-type",
+        "decimal-element-not-finite",
+    ],
 )
 def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     arguments: dict[str, Any],
@@ -501,11 +517,64 @@ def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     # Dispatch puts the shape check in front of the Validator, so a caller of
     # dispatch only ever reads the first; a caller of ``validate()`` reads the
     # second. One fault should read the same to both.
-    valid = {"count": 1, "price": "1.5", "status": Status.values[0]}
+    valid = {"count": 1, "price": "1.5", "status": Status.values[0], "prices": []}
     validator = DataclassValidator(_Typed)
     with pytest.raises(InvalidArguments) as shape:
         check_arguments(validator.parameters(), {**valid, **arguments})
     assert shape.value.detail == _refusal(_Typed, {**valid, **arguments})
+
+
+@dataclass
+class _Dated:
+    prices: list[Decimal]
+    at: list[dt.datetime]
+    on: list[dt.date]
+
+
+def test_a_list_of_decimals_declares_each_element_a_decimal() -> None:
+    # A date or a date-time element takes no format on an array, so those
+    # lists stay arrays of strings: without the decimal condition in
+    # ``element_format`` this dataclass could not be declared at all.
+    params = DataclassValidator(_Dated).parameters()
+    assert [(p.name, p.items, p.format) for p in params] == [
+        ("prices", "string", "decimal"),
+        ("at", "string", None),
+        ("on", "string", None),
+    ]
+
+
+def test_the_shape_check_takes_each_decimal_element_as_the_validator_does() -> None:
+    # A scalar decimal takes a JSON number as well as a string, and so does
+    # each element of a list of them, at the shape check as in ``validate()``.
+    validator = DataclassValidator(_Dated)
+    arguments = {"prices": [1.5, "2.25", 3], "at": [], "on": []}
+    assert check_arguments(validator.parameters(), arguments) == arguments
+    assert validator.validate(arguments, CONTEXT)["prices"] == [
+        Decimal("1.5"),
+        Decimal("2.25"),
+        Decimal("3"),
+    ]
+
+
+def test_a_list_declares_no_length_and_the_setting_bounds_it() -> None:
+    parameters = DataclassValidator(_Dated).parameters()
+    assert {(p.min_length, p.max_length) for p in parameters} == {(None, None)}
+    with (
+        override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2),
+        pytest.raises(InvalidArguments) as caught,
+    ):
+        check_arguments(parameters, {"prices": ["1", "2", "3"], "at": [], "on": []})
+    assert coded(caught.value.detail) == {
+        "prices": [("Ensure this field has no more than 2 elements.", "max_length")]
+    }
+
+
+def test_a_query_string_splits_a_list_of_decimals_on_its_commas() -> None:
+    # No decimal holds a comma, so ``?prices=1.5,2.25`` is two elements, each
+    # the string it was sent as, for the Validator to read exactly.
+    request = RequestFactory().get("/", {"prices": "1.5,2.25"})
+    parameters = DataclassValidator(_Dated).parameters()
+    assert request_arguments(request, parameters) == {"prices": ["1.5", "2.25"]}
 
 
 @dataclass

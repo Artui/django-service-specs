@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
 from django.utils.datastructures import MultiValueDict
 
-from django_service_specs.adapters.utils import scalar_type
+from django_service_specs.adapters.utils import element_format, scalar_type
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -118,7 +118,16 @@ class FormValidator(Validator):
     - ``ModelChoiceField``: the JSON type of the model field it matches rows
       on - its ``to_field_name``, or the primary key - and no choices, since
       they are rows and reading them would query. ``ModelMultipleChoiceField``:
-      an array of that. They validate to the row, and to a queryset of rows.
+      an array of that, so one matching rows on a ``DecimalField`` takes an
+      array of ``decimal`` strings, and a query string's
+      ``?rows=12.50,9.99`` is two of them. Django matches each against the
+      column's own spelling, so ``"12.50"`` names a row a two-place column
+      holds and ``12.5`` names none. A date or a
+      date-time key is an array of strings, since an element takes no other
+      format. They validate to the row, and to a queryset of rows.
+    - No choice field declares a length, since Django's have none, so the
+      shape check in front of this Validator holds a list to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
     - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
       ``string``.
     - ``FileField`` and ``ImageField``: a ``file``, which no JSON caller can
@@ -494,12 +503,14 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
         return Parameter(name, "boolean", nullable=True)
     json_type, fmt, choices, labels = _shape(field, where=where)
     if isinstance(field, forms.MultipleChoiceField | forms.ModelMultipleChoiceField):
-        # ``items`` holds a JSON type and no format, as for any flat list, and
-        # an array's choices constrain each of its elements.
+        # ``items`` holds the element's JSON type, and an array's format and
+        # choices describe each of its elements: a list of rows keyed on a
+        # decimal column is a list of decimals, as one such key is a decimal.
         return Parameter(
             name,
             "array",
             items=json_type,
+            format=element_format(fmt),
             choices=choices,
             choice_labels=labels,
             required=field.required,

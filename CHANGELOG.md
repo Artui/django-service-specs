@@ -68,6 +68,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decimal holds a comma, and drops a blank element. Any other format on an
   array, and a format or a bound on an element that cannot carry it, is
   refused at construction.
+- `PydanticValidator` declares a list field's length as the model states
+  it: `Field(min_length=, max_length=)`, `conlist`, and `annotated_types`'
+  `Len`, `MinLen` and `MaxLen`, on the field or inside an `Annotated` in its
+  annotation, are the parameter's `min_length` and `max_length` and the
+  schema's `"minItems"` and `"maxItems"`. So a list the model allows 5000 of
+  is no longer held to the `SERVICE_SPECS_MAX_ARRAY_LENGTH` default of 1000,
+  and one past the model's own maximum is refused by the shape check, in the
+  kernel's words and under pydantic's `max_length` code, before the model
+  runs. A field stating a length twice declares the last pydantic applies,
+  which is the one it enforces. A length on a string or a `dict` stays the
+  model's, and so does every numeric bound: `gt` and `lt` are exclusive,
+  which a parameter cannot state.
+- `list[Decimal]`, on a dataclass or a pydantic model, and a
+  `ModelMultipleChoiceField` matching rows on a `DecimalField` declare the
+  `decimal` format for each element, as the scalar is declared. The shape
+  check now takes a JSON number for each element, as `DataclassValidator`
+  and pydantic do and as it did for one decimal, where it refused one as no
+  string; it refuses an element that is no decimal at its index, in the
+  words it uses for one decimal; and a query string's `?prices=1.5,2.25` is two
+  elements rather than one string. A list of dates or date-times is still an
+  array of strings, since an element takes no other format.
 
 ### Changed
 - **Breaking:** a django-filter CSV number filter (`BaseInFilter` or

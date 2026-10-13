@@ -62,8 +62,11 @@ class TestStrip:
     def test_annotated_and_none_nest_either_way_round(self, annotation: Any) -> None:
         assert strip(annotation) == (str, True, False, ("m",))
 
-    def test_extras_are_collected_from_every_level(self) -> None:
-        assert strip(Annotated[Annotated[int, "a"] | None, "b"]) == (int, True, False, ("b", "a"))
+    def test_extras_are_collected_from_every_level_innermost_first(self) -> None:
+        # The order a library building the type applies them in: each layer
+        # as written, the innermost first.
+        annotation = Annotated[Annotated[int, "a", "b"] | None, "c", "d"]
+        assert strip(annotation) == (int, True, False, ("a", "b", "c", "d"))
 
     def test_unset_type_is_omittable_and_adds_no_type(self) -> None:
         assert strip(str | None | UnsetType) == (str, True, True, ())

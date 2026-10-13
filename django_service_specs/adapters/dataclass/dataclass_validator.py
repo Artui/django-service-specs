@@ -23,7 +23,7 @@ from django_service_specs.adapters.dataclass.utils import (
     read_fields,
     scalar_type,
 )
-from django_service_specs.adapters.utils import choice_labels
+from django_service_specs.adapters.utils import choice_labels, element_format
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -60,9 +60,19 @@ class DataclassValidator(Validator):
       share. An ``Enum`` decodes to the member.
     - ``list[X]``: an array; ``list[SomeDataclass]`` is an array of rows, each
       declared as nested Parameters. For any other element, ``Parameter.items``
-      can hold only its JSON type, so a list of decimals is declared as an
-      array of strings and decoded here. A list of choices declares them on
-      the array, where they constrain each element.
+      holds its JSON type, and what else describes the element is declared on
+      the array, where it constrains each element: a list of choices declares
+      them there, and ``list[Decimal]`` the ``decimal`` format, so each
+      element is read as a scalar decimal is, a JSON number included, and a
+      query string's ``?prices=1.5,2.25`` is two of them. A list of dates or
+      date-times is an array of strings, since an element takes no other
+      format, and is decoded here.
+    - A list declares no length, since a dataclass has no way to state one,
+      so the shape check in front of this Validator holds it to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default. A list a
+      caller may send more of is declared with a Validator that states its
+      length, such as a pydantic model's ``Field(max_length=...)``, or under
+      a larger setting.
     - a dataclass: an object, with its own fields as nested Parameters.
     - ``X | UnsetType``: the argument may be left out, with or without a
       default, and the field then holds ``UNSET`` rather than a value a
@@ -189,7 +199,8 @@ def _parameter(fs: FieldShape) -> Parameter:
         fs.name,
         shape.type,
         required=fs.required,
-        format=shape.format,
+        # An array's format is its element's, and only a decimal's is one.
+        format=shape.format if shape.items is None else element_format(shape.items.format),
         items=_items(shape.items),
         # ``list[X | None]``: the element's own nullability, which the array's
         # is not. Declared, or the shape check refuses the null the library takes.

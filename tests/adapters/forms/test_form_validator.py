@@ -16,12 +16,14 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import QuerySet
+from django.test import RequestFactory, override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
@@ -370,6 +372,68 @@ class TestModelChoices:
         assert _declared(_form("Pick", row=field)) == [
             ("row", json_type, fmt, None, None, True, False)
         ]
+
+    @pytest.mark.parametrize(
+        ("to_field_name", "json_type", "fmt"),
+        [
+            (None, "integer", None),
+            ("price", "string", "decimal"),
+            # A date takes no format on an array, so a list of them stays an
+            # array of strings: without the decimal condition in
+            # ``element_format`` this field could not be declared.
+            ("published_on", "string", None),
+        ],
+    )
+    def test_a_list_of_keys_declares_each_element_a_decimal_as_one_key_does(
+        self, to_field_name: str | None, json_type: str, fmt: str | None
+    ) -> None:
+        field = forms.ModelMultipleChoiceField(
+            queryset=Book.objects.all(), to_field_name=to_field_name
+        )
+        (rows,) = FormValidator(_form("Pick", rows=field)).parameters()
+        assert (rows.type, rows.items, rows.format) == ("array", json_type, fmt)
+
+    def test_a_query_string_splits_a_list_of_decimal_keys_on_its_commas(self) -> None:
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
+        parameters = FormValidator(_form("Pick", rows=field)).parameters()
+        request = RequestFactory().get("/", {"rows": "12.50,9.99"})
+        assert request_arguments(request, parameters) == {"rows": ["12.50", "9.99"]}
+
+    @pytest.mark.django_db
+    def test_a_list_of_decimal_keys_is_matched_on_the_column_s_own_spelling(self) -> None:
+        # The shape check reads each element as a decimal, a JSON number
+        # included, and hands it on as sent. Django's field then matches each
+        # value against the ``str`` of the rows' column, so ``"12.50"`` names
+        # the row a two-place column holds and ``12.5`` names none: the form's
+        # refusal, in its words, where a list of strings was refused by type.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(author=author, title="Lathe", price=Decimal("12.50"))
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
+        validator = FormValidator(_form("Pick", rows=field))
+        arguments = check_arguments(validator.parameters(), {"rows": ["12.50"]})
+        assert list(validator.validate(arguments, CONTEXT)["rows"]) == [book]
+        arguments = check_arguments(validator.parameters(), {"rows": [12.5]})
+        assert coded(_refusal(validator.form_class, arguments)) == {
+            "rows": [
+                (
+                    "Select a valid choice. 12.5 is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
+        }
+
+    def test_a_list_of_rows_declares_no_length_and_the_setting_bounds_it(self) -> None:
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all())
+        (rows,) = FormValidator(_form("Pick", rows=field)).parameters()
+        assert (rows.min_length, rows.max_length) == (None, None)
+        with (
+            override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2),
+            pytest.raises(InvalidArguments) as caught,
+        ):
+            check_arguments(Parameters.of(rows), {"rows": [1, 2, 3]})
+        assert coded(caught.value.detail) == {
+            "rows": [("Ensure this field has no more than 2 elements.", "max_length")]
+        }
 
     def test_a_key_with_no_json_type_is_refused(self) -> None:
         field = forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published")
