@@ -33,7 +33,7 @@ from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
-from django_service_specs.relations.utils import pk_input_targets
+from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
@@ -1189,6 +1189,10 @@ def _match_scoped_target(
     if resolved is None:
         return None
     queryset, key = resolved
+    # A key no row's column can hold names none; the lookup would hand it to
+    # the driver (test_a_forward_key, test_a_many_to_many_key).
+    if key_past_its_column(queryset, spec.match_key, key):
+        raise _scoped_match_miss(path, spec, key)
     target = queryset.filter(**{spec.match_key: key}).first()
     if target is None:
         raise _scoped_match_miss(path, spec, key)
@@ -1207,6 +1211,9 @@ async def _amatch_scoped_target(
     if resolved is None:
         return None
     queryset, key = resolved
+    # test_an_async_forward_key and test_an_async_many_to_many_key.
+    if key_past_its_column(queryset, spec.match_key, key):
+        raise _scoped_match_miss(path, spec, key)
     target = await queryset.filter(**{spec.match_key: key}).afirst()
     if target is None:
         raise _scoped_match_miss(path, spec, key)

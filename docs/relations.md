@@ -142,7 +142,9 @@ resolved from `context` (`lambda user: Author.objects.filter(owner=user)`),
 of the rows this caller may write. Without a scope the spec is create-only,
 and a payload carrying a `match_key` raises `ImproperlyConfigured` rather than
 letting any caller write any row of that model by guessing a key. A key
-outside the scope is refused with `ServiceValidationError`, at the row.
+outside the scope is refused with `ServiceValidationError`, at the row, and so
+is one past the range of the integer column it is matched on, which no row
+holds, before the lookup hands it to the database.
 
 What removing a row *does* is the **`orphan`** setting of a child collection,
 a reverse one-to-one or a generic relation. `"auto"`, the default, reads the

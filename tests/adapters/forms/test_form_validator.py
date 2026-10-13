@@ -777,6 +777,152 @@ class TestTheWireFormIsNotLocalized:
         assert refused.value.detail == {"price": ["Enter a number."]}
 
 
+class _Viewed(forms.ModelForm):
+    class Meta:
+        model = Post
+        fields = ["title", "views"]
+
+
+def _form_over_views(views: forms.Field) -> type[forms.ModelForm]:
+    """A ``ModelForm`` over ``Post`` declaring its integer column ``views`` as ``views``."""
+    return type("Viewed", (_Viewed,), {"views": views})
+
+
+class TestANumberPastItsRange:
+    """An integer no float, no ``str`` or no column holds is refused, never raised."""
+
+    @pytest.mark.parametrize("value", [10**400, -(10**400)], ids=["above", "below"])
+    def test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number(
+        self, value: int
+    ) -> None:
+        # JSON's number has no range, so the shape check hands the integer on,
+        # and the field's ``float`` raised OverflowError. A string of the same
+        # digits reads as infinity, which the field refuses as no number.
+        form_class = _form("Measured", ratio=forms.FloatField())
+        assert coded(_refusal(form_class, {"ratio": value})) == {
+            "ratio": [("Enter a number.", "invalid")]
+        }
+
+    def test_an_integer_past_a_float_s_range_is_refused_in_the_field_s_own_words(self) -> None:
+        field = forms.FloatField(error_messages={"invalid": "Not a ratio."})
+        assert coded(_refusal(_form("Measured", ratio=field), {"ratio": 10**400})) == {
+            "ratio": [("Not a ratio.", "invalid")]
+        }
+
+    def test_a_float_field_still_reads_an_integer_as_its_float(self) -> None:
+        form_class = _form("Measured", ratio=forms.FloatField())
+        cleaned = FormValidator(form_class).validate({"ratio": 2**53 + 1}, CONTEXT)
+        assert cleaned == {"ratio": float(2**53 + 1)}
+
+    def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits(self) -> None:
+        # The field reads a value through ``str``, which refuses an int past
+        # 4300 digits from Python 3.10.7 on, with a ValueError the field does
+        # not catch. A Decimal's ``str`` has no such limit.
+        form_class = _form("Priced", price=forms.DecimalField())
+        cleaned = FormValidator(form_class).validate({"price": 10**5000}, CONTEXT)
+        assert cleaned == {"price": Decimal(10**5000)}
+
+    def test_true_is_still_no_decimal_to_the_field(self) -> None:
+        # Python makes a bool an int, and ``Decimal(True)`` is one; bound as it
+        # came, the field reads ``"True"`` and refuses it.
+        form_class = _form("Priced", price=forms.DecimalField())
+        assert _refusal(form_class, {"price": True}) == {"price": ["Enter a number."]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    @pytest.mark.parametrize(
+        ("views", "refusal"),
+        [
+            (2**63, ("less than or equal to", 2**63 - 1, "max_value")),
+            (-(2**63) - 1, ("greater than or equal to", -(2**63), "min_value")),
+            (str(2**63), ("less than or equal to", 2**63 - 1, "max_value")),
+        ],
+        ids=["above", "below", "digits"],
+    )
+    def test_a_value_past_an_integer_column_s_range_is_refused_in_django_s_words(
+        self, views: Any, refusal: tuple[str, int, str]
+    ) -> None:
+        # The words Django's model validators use from 5.0, where the backend
+        # states the range; where it states none, Django took the value and
+        # the column could not hold it. Digits are the integer the field
+        # cleans them to, as Django's validators read it.
+        words, limit, code = refusal
+        detail = _refusal(_Viewed, {"title": "Hi", "views": views})
+        assert coded(detail) == {"views": [(f"Ensure this value is {words} {limit}.", code)]}
+
+    @pytest.mark.django_db
+    def test_a_field_s_own_limit_answers_before_the_column_s(self) -> None:
+        # As where Django validates the model: the field refuses first, and
+        # the model is never asked about it.
+        form_class = _form_over_views(forms.IntegerField(max_value=100))
+        assert coded(_refusal(form_class, {"title": "Hi", "views": 2**63})) == {
+            "views": [("Ensure this value is less than or equal to 100.", "max_value")]
+        }
+
+    @pytest.mark.django_db
+    def test_an_optional_integer_left_out_is_the_field_s(self) -> None:
+        form_class = _form_over_views(forms.IntegerField(required=False))
+        assert FormValidator(form_class).validate({"title": "Hi"}, CONTEXT) == {
+            "title": "Hi",
+            "views": None,
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_a_value_past_a_unique_column_s_range_never_reaches_the_uniqueness_query(
+        self,
+    ) -> None:
+        # The constraint's check queries with the value, and SQLite's driver
+        # raised OverflowError for it.
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(_EditionForm, {"book": book.pk, "number": 2**63})
+        assert coded(detail) == {
+            "number": [
+                (
+                    "Ensure this value is less than or equal to %s." % (2**63 - 1),
+                    "max_value",
+                )
+            ]
+        }
+
+    @pytest.mark.django_db
+    def test_a_value_past_the_column_s_stated_range_is_refused_in_the_same_words(self) -> None:
+        # Where the backend states the range, the kernel reads that one.
+        assert coded(_refusal(_Viewed, {"title": "Hi", "views": 2**63})) == {
+            "views": [("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")]
+        }
+
+    @pytest.mark.django_db
+    def test_an_integer_on_a_column_that_is_no_integer_s_is_the_field_s(self) -> None:
+        # A text column holds any integer's digits, so it has no range.
+        cleaned = FormValidator(_Viewed).validate({"title": 2**63, "views": 1}, CONTEXT)
+        assert cleaned == {"title": str(2**63), "views": 1}
+
+    @pytest.mark.django_db
+    def test_an_integer_field_no_column_holds_is_the_field_s(self) -> None:
+        # A form field the model has no column for is no column's to range.
+        form_class = type("Paged", (_Viewed,), {"pages": forms.IntegerField()})
+        cleaned = FormValidator(form_class).validate(
+            {"title": "Hi", "views": 1, "pages": 2**63}, CONTEXT
+        )
+        assert cleaned == {"title": "Hi", "views": 1, "pages": 2**63}
+
+    @pytest.mark.django_db
+    def test_a_value_that_is_no_integer_is_left_to_the_field(self) -> None:
+        assert coded(_refusal(_Viewed, {"title": "Hi", "views": "many"})) == {
+            "views": [("Enter a whole number.", "invalid")]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_the_values_at_either_end_of_the_column_s_range_are_taken(self) -> None:
+        validator = FormValidator(_Viewed)
+        for views in (-(2**63), 2**63 - 1):
+            assert validator.validate({"title": "Hi", "views": views}, CONTEXT)["views"] == views
+
+
 @pytest.mark.django_db
 class TestModelForm:
     def test_an_update_excludes_the_target_from_the_uniqueness_check(self) -> None:

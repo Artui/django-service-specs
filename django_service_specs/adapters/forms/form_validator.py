@@ -11,7 +11,8 @@ from typing import Any
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.db import connections, models
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.db import models, router
 from django.utils.datastructures import MultiValueDict
 
 from django_service_specs.adapters.utils import element_format, scalar_type
@@ -20,6 +21,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
+from django_service_specs.relations.utils import integer_column_range
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -73,10 +75,6 @@ _KEYS: tuple[tuple[type[models.Field[Any, Any]], str, str | None], ...] = (
 """The model fields a ``ModelChoiceField`` can match rows on, and the JSON type
 a caller sends for one."""
 
-_WIDEST_INTEGER = (-(2**63), 2**63 - 1)
-"""A signed 64-bit integer's range: the widest integer column any backend has,
-and the most SQLite's driver hands on."""
-
 _EMPTY_CHOICES = ("", None)
 """The values Django reads as the blank choice, as a model field's
 ``get_choices`` does. A form never matches a value against one: it reads an
@@ -105,8 +103,17 @@ class FormValidator(Validator):
 
     - ``BooleanField`` and ``NullBooleanField``: a ``boolean``.
     - ``DecimalField``: a ``string`` in the ``decimal`` format, which takes a
-      JSON number as well. ``FloatField``: a ``number``. ``IntegerField``: an
-      ``integer``.
+      JSON number as well, and an integer whatever its digits. ``FloatField``:
+      a ``number``, and an integer past a float's range is refused as the
+      field refuses an infinity, ``invalid`` in its own words.
+      ``IntegerField``: an ``integer``. On a ``ModelForm``, a field that
+      cleans to an integer past the range of the model's integer column is
+      refused in the words and with the code of the validator Django's model
+      field carries from 5.0, ``max_value`` or ``min_value``, before a
+      uniqueness check or a constraint queries with it: Django 4.2 states no
+      range for SQLite, whose driver raises ``OverflowError`` for one. A
+      value the field refuses itself is the field's to refuse, its own
+      bounds included.
     - ``DateTimeField`` and ``DateField``: a ``string`` in the ``date-time`` or
       ``date`` format. ``TimeField`` and ``DurationField``: a ``string``.
     - ``ChoiceField``: choices, with the empty choice dropped and option
@@ -347,7 +354,7 @@ class FormValidator(Validator):
                 del form.fields[name]
         # Taken off the form and refused in its words, beside the rest: the
         # field itself would hand the key to the driver.
-        beyond = _keys_beyond_the_column(form)
+        beyond = {**_keys_beyond_the_column(form), **_values_beyond_the_column(form)}
         for name in beyond:
             del form.fields[name]
         # One branch to coverage, so each condition is held by its own test:
@@ -473,12 +480,28 @@ def _as_bound(field: forms.Field, value: Any) -> Any:
     is, localized or not, and it spells every value the shape check accepts
     exactly.
 
+    An ``int`` for a ``FloatField`` or a ``DecimalField`` is bound as the
+    ``Decimal`` it is, too. Each reads a value through a conversion an int
+    can break that a ``Decimal`` cannot: ``float`` raises ``OverflowError`` for
+    an int past a float's range, where a ``Decimal`` past it reads as an
+    infinity, which the field refuses as no number; and ``str`` refuses an
+    int past 4300 digits from Python 3.10.7 on, where a ``Decimal``'s has no
+    limit. One branch to coverage, so each field is held by its own test:
+    test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number (the
+    ``FloatField``) and
+    test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits (the
+    ``DecimalField``); ``type`` rather than ``isinstance`` is held by
+    test_true_is_still_no_decimal_to_the_field, since a ``bool`` is an int
+    and ``Decimal(True)`` a number.
+
     One branch to coverage, so each condition is held by its own test:
     test_a_field_that_is_not_a_number_is_bound_as_it_came (the field) and
     test_a_json_number_for_a_decimal_is_bound_as_it_came (the string, since a
     float made a ``Decimal`` carries its binary expansion into the field's
     decimal-places check).
     """
+    if isinstance(field, forms.FloatField | forms.DecimalField) and type(value) is int:
+        return Decimal(value)
     if not (isinstance(field, forms.IntegerField) and isinstance(value, str)):
         return value
     try:
@@ -669,16 +692,12 @@ def _keys_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationEr
         # when it was built.
         queryset: Any = field.queryset
         key = _key_field(queryset, field.to_field_name)
+        bounds = integer_column_range(key, queryset.db)
         # test_a_key_past_an_integer_range_on_a_text_column_is_matched fails
         # without this: a text column holds any integer's digits.
-        if not isinstance(key, models.IntegerField):
+        if bounds is None:
             continue
-        low, high = connections[queryset.db].ops.integer_field_range(key.get_internal_type())
-        # Django 4.2 states no range for SQLite, whose driver still refuses a
-        # key past 64 bits; from 5.0 it states exactly that one. No backend's
-        # integer column is wider, so it is the range where none is stated.
-        low = _WIDEST_INTEGER[0] if low is None else low
-        high = _WIDEST_INTEGER[1] if high is None else high
+        low, high = bounds
         sent = form.data[name]
         values = sent if isinstance(sent, list | tuple) else [sent]
         # One branch to coverage, so each condition is held by its own test:
@@ -695,4 +714,57 @@ def _keys_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationEr
                     params={"value": past[0]},
                 )
             ]
+    return beyond
+
+
+def _values_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationError]]:
+    """Each ``ModelForm`` field whose integer its model's integer column cannot hold, and its refusal.
+
+    In the words, and with the code, of the validator Django's model integer
+    field carries from 5.0, where the backend states the column's range:
+    ``max_value`` past its top, ``min_value`` past its bottom. Django 4.2
+    states none for SQLite, so the form took such a value, and a uniqueness
+    check or a constraint querying with it raised ``OverflowError`` from the
+    driver. The range is the one ``integer_column_range`` reads, from the
+    database the row is written to. The value is the one the field cleans
+    the argument to, so a string of digits is the integer it spells; one the
+    field refuses is left to it, so its own words, its own bounds included,
+    answer first, as they do where Django validates the model, and the model
+    is then never asked about that field. A ``clean_<field>()`` method is the
+    exception: it is not run on a value past the column's range, where
+    Django 5.0 or later, refusing the value itself, ran it first. A model choice field is ``_keys_beyond_the_column``'s, since its
+    column is a foreign key, which holds the key of another row.
+    """
+    beyond: dict[str, list[ValidationError]] = {}
+    # test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number fails
+    # without this: a plain form has no model to read a column from.
+    if not isinstance(form, forms.BaseModelForm):
+        return beyond
+    model = form._meta.model
+    columns = {column.name: column for column in model._meta.concrete_fields}
+    using = router.db_for_write(model, instance=form.instance)
+    for name, field in form.fields.items():
+        bounds = integer_column_range(columns.get(name), using)
+        # test_an_integer_field_no_column_holds_is_the_field_s fails without
+        # this: a field that is no model column has no range to unpack. It
+        # comes first so that a model choice field, which queries to clean,
+        # is never cleaned twice.
+        if bounds is None:
+            continue
+        try:
+            value = field.clean(form.data.get(name))
+        except ValidationError:
+            # test_a_field_s_own_limit_answers_before_the_column_s and
+            # test_a_value_that_is_no_integer_is_left_to_the_field.
+            continue
+        # test_an_optional_integer_left_out_is_the_field_s fails without
+        # this: an optional field sent nothing cleans to ``None``.
+        if type(value) is not int:
+            continue
+        low, high = bounds
+        try:
+            MinValueValidator(low)(value)
+            MaxValueValidator(high)(value)
+        except ValidationError as error:
+            beyond[name] = [error]
     return beyond

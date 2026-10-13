@@ -1,8 +1,14 @@
 """Internal helpers shared across the ``relations`` package.
 
-``pk_input_targets`` is the one exception to the package name: the write
-path in ``mutations`` shares it, so the three spellings of a primary key are
-written down once rather than agreed between two modules.
+``pk_input_targets``, ``integer_column_range`` and ``key_past_its_column``
+are the exceptions to the package name. The write path in ``mutations``
+shares the first, so the three spellings of a primary key are written down
+once rather than agreed between two modules. The other two are shared by
+the lookups the kernel makes itself with a key a caller sent - a relation
+write's scoped match, the forms adapter's model choice field and
+``ModelForm`` integer column, and ``resolve_principal`` - so each is held to
+one reading of the column's range. A FilterSet's lookups are django-filter's
+to build, and are not among them.
 """
 
 from __future__ import annotations
@@ -11,7 +17,8 @@ from collections.abc import Mapping
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models import Model
+from django.db import connections
+from django.db.models import ForeignKey, IntegerField, Model
 
 from django_service_specs.relations.relation_mode import RelationMode
 from django_service_specs.relations.relation_orphan import RelationOrphan
@@ -93,6 +100,76 @@ def pk_input_targets(model: type[Model]) -> frozenset[str]:
     implicit key, ``author``/``author_id`` where a one-to-one *is* the key).
     """
     return frozenset({"pk", model._meta.pk.name, model._meta.pk.attname})
+
+
+WIDEST_INTEGER = (-(2**63), 2**63 - 1)
+"""A signed 64-bit integer's range: the widest integer column any backend has,
+and the most SQLite's driver hands on."""
+
+
+def integer_column_range(field: Any, using: str) -> tuple[int, int] | None:
+    """The integers ``field``'s column holds on the database ``using``, or ``None``.
+
+    ``None`` for anything but an integer column, a key on which no integer
+    can be too large: a text column holds any integer's digits. The range is
+    the database's own, as Django reads it to answer an exact lookup past it
+    with no rows and, from 5.0, to validate a model's integer field. Django
+    4.2 states none for SQLite, whose driver still refuses a value past 64
+    bits, and raises ``OverflowError`` for one; from 5.0 it states exactly
+    that one. No backend's integer column is wider, so it is the range where
+    none is stated.
+    """
+    if not isinstance(field, IntegerField):
+        return None
+    low, high = connections[using].ops.integer_field_range(field.get_internal_type())
+    return (
+        WIDEST_INTEGER[0] if low is None else low,
+        WIDEST_INTEGER[1] if high is None else high,
+    )
+
+
+def key_past_its_column(queryset: Any, name: str, key: Any) -> bool:
+    """Whether ``key`` is past the range of the integer column ``name`` names on ``queryset``'s model.
+
+    Such a key names no row. Django answers an exact lookup with it with no
+    rows where the backend states the range, from 5.0; where it states none,
+    as Django 4.2's SQLite backend does, the lookup hands the key to the
+    driver, which raises ``OverflowError``. So a caller asks this first and
+    reads ``True`` as its own "no such row". ``name`` is a column's name or
+    attname, or ``pk``; a name that is no column of the model, such as a
+    lookup path, is ``False``, the lookup's alone. The key is read as the
+    column's own lookup reads it, so a string of digits is the integer it
+    spells, and a string that spells no number raises the ``ValueError`` the
+    lookup would, in Django's words
+    (test_a_key_that_spells_no_number_raises_as_the_lookup_did). A key of
+    a type the column cannot read as a number, such as a row, is ``False``,
+    the lookup's. A foreign key's column holds the key of the row it points
+    at, so its range is that key's
+    (test_a_key_on_a_foreign_key_is_held_to_the_column_it_points_at).
+    """
+    opts = queryset.model._meta
+    columns: dict[str, Any] = {
+        **{column.attname: column for column in opts.concrete_fields},
+        **{column.name: column for column in opts.concrete_fields},
+        "pk": opts.pk,
+    }
+    column: Any = columns.get(name)
+    while isinstance(column, ForeignKey):
+        column = column.target_field
+    bounds = integer_column_range(column, queryset.db)
+    # test_an_integer_on_a_text_column_is_matched_as_its_digits fails without
+    # this: a text column holds any integer's digits.
+    if bounds is None:
+        return False
+    try:
+        number = column.get_prep_value(key)
+    except TypeError:
+        # A key that is no number at all, such as the row a foreign key
+        # points at, which the lookup reads as the row's own key: the
+        # lookup's (test_a_row_sent_for_a_foreign_key_is_matched_as_its_key).
+        return False
+    low, high = bounds
+    return not low <= number <= high
 
 
 def validate_pk_field_map(

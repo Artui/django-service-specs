@@ -28,6 +28,17 @@ def test_malformed_identifier_raises() -> None:
 
 
 @pytest.mark.django_db
+@pytest.mark.usefixtures("unstated_ranges")
+@pytest.mark.parametrize("identifier", [2**63, -(2**63) - 1, str(2**63)])
+def test_an_identifier_past_the_key_s_column_raises(identifier: object) -> None:
+    # It names no row. Where the backend states no range for the column, as
+    # Django 4.2's SQLite backend does, the lookup handed it to the driver,
+    # which raised OverflowError.
+    with pytest.raises(PrincipalUnavailable, match="No principal"):
+        resolve_principal(identifier)
+
+
+@pytest.mark.django_db
 def test_an_identifier_of_the_wrong_kind_raises() -> None:
     # A list reaches the integer field's own coercion as ``int([])``, which is a
     # TypeError rather than a ValueError - a queue payload that decoded a
@@ -40,13 +51,14 @@ def test_an_identifier_of_the_wrong_kind_raises() -> None:
 def test_a_malformed_key_the_field_refuses_as_a_validation_error_raises() -> None:
     # A UUID primary key refuses a malformed string with Django's own
     # ValidationError, not ValueError. The suite's user model has an integer
-    # key, so the lookup is made to raise what a UUID key would.
+    # key, so the lookup is made to raise what a UUID key would, for a key
+    # that integer key reads: one it cannot read is refused before the lookup.
     refusal = ValidationError("not a valid UUID")
     with (
         mock.patch.object(User._default_manager, "get", side_effect=refusal),
         pytest.raises(PrincipalUnavailable, match="No principal"),
     ):
-        resolve_principal("not-a-uuid")
+        resolve_principal("1")
 
 
 def test_an_unrelated_failure_is_not_read_as_a_missing_principal() -> None:
