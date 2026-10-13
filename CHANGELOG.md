@@ -193,6 +193,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   upload was taken. It is parsed from the request's stream now, as Django
   parses a POST, so a file part streams to the upload handlers and the limit
   bounds the fields alone.
+- **Security: an empty `permissions` sequence allowed every call.** A spec
+  declaring `permissions=[]` or `()` had no check to fail, so anyone ran it.
+  Every published release is affected, 0.4.2 included. `ServiceSpec` and
+  `SelectorSpec` refuse it when built; declare `permissions=[Unrestricted()]`
+  to mean that.
+- **Security: a `Grant` that checked one row admitted another.** A grant with
+  `target_checked` covers a service spec's target only when that target is
+  handed to `dispatch` or `adispatch` as `target=`. Without it dispatch runs
+  the object-level or scope check on the row it looks up itself, so a grant
+  `resolve_target` returned for one row no longer admits a different row named
+  in the arguments, and a create, a collection or a `many` call is scope
+  checked again.
+- `dispatch` and `adispatch` refuse a precondition that answers with a
+  coroutine or an async generator, with `ImproperlyConfigured` naming it,
+  instead of reading the unawaited answer as a pass and running the service.
+  `present`, `apresent` and `present_for_audience` refuse a presenter
+  answering the same way instead of returning the coroutine as the payload.
+  A sync `extend_queryset` handing back an awaitable is refused likewise.
+- A key a typed `kwargs` or `input_data` provider is annotated to fill is the
+  server's: the caller's value for it is checked, then dropped, in `dispatch`,
+  `adispatch`, `resolve_target` and `bind_arguments`, and in each row of a
+  `many` call. A provider that leaves the key out or returns `UNSET` leaves it
+  absent, and the step reading it refuses the call, where before the caller's
+  value was used. A `declinable` key stays the caller's.
+- `resolve_target` refuses a spec any of whose parameters a registered pool
+  seed occupies, a Validator field included, as `dispatch` does.
 
 ## [0.4.2] — 2026-10-06
 
