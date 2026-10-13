@@ -243,6 +243,31 @@ def test_a_grant_that_checked_a_target_does_not_skip_the_checks_on_what_it_finds
     assert check.scopes == [scope]
 
 
+class _ServerPk(TypedDict, total=False):
+    pk: int
+
+
+def test_a_filled_target_read_the_caller_sends_never_reaches_the_lookup(ada: Any, bob: Any) -> None:
+    # The provider leaves the key out, as one that fills it for some users only
+    # would: the caller's pk is dropped rather than looked up, as in dispatch.
+    theirs = Note.objects.create(owner=bob, title="theirs")
+
+    def scoped() -> _ServerPk:
+        return {}
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK, kwargs=scoped
+        ),
+    )
+    for call in (resolve_target, dispatch):
+        with pytest.raises(InvalidArguments) as caught:
+            call(spec, principal=ada, arguments={"pk": theirs.pk})
+        assert caught.value.detail == {"pk": REQUIRED}
+
+
 # --- dispatch's order, before any lookup -----------------------------------------------
 
 

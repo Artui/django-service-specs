@@ -290,3 +290,23 @@ def test_a_read_an_untyped_kwargs_provider_returns_stays_required() -> None:
     with pytest.raises(InvalidArguments) as caught:
         bind_arguments(spec, {}, principal=PRINCIPAL)
     assert caught.value.detail == {"pk": ["This field is required."]}
+
+
+# --- the caller's value for a key a typed provider fills ---------------------------
+
+
+def test_a_selector_spec_s_filled_read_the_caller_sends_is_checked_and_dropped() -> None:
+    # What the selector is called with: the provider's value, never the caller's.
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk)
+    with pytest.raises(InvalidArguments):
+        bind_arguments(spec, {"pk": "x"}, principal=PRINCIPAL)
+    assert bind_arguments(spec, {"pk": 2}, principal=PRINCIPAL) == {}
+
+
+def test_a_filled_field_the_caller_sends_never_reaches_the_validator() -> None:
+    validator = _Merged()
+    spec = ServiceSpec(service=service, validator=validator, input_data=_server_title)
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "caller's"}, principal=PRINCIPAL)
+    assert caught.value.detail == {"title": ["The merged input has no title."]}
+    assert validator.calls == [{}]

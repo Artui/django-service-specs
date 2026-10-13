@@ -56,7 +56,8 @@ def dispatch(
        typed provider is annotated to fill - a read the ``kwargs`` of the
        spec declaring it fills, a Validator field ``input_data`` fills -
        which is still refused, where it is read, if the provider declines
-       it. A parameter a registered seed in
+       it. Such a parameter is the server's: a value the caller sends for it
+       is checked, then dropped, so it never stands in for the provider's. A parameter a registered seed in
        ``pool_seeds`` occupies is refused before that, as a configuration error.
     2. [`authorize`][django_service_specs.authorization.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything

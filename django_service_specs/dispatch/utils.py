@@ -165,17 +165,26 @@ def shape_check(
 
     - **A parameter a typed provider is annotated to fill**, which is always
       one that provider's values reach (see ``_server_filled``): not
-      demanded of the caller, since
-      the provider's values are merged over the caller's before the callable
-      reading it is called; ``server_owned_keys`` tells a transport to hide
-      exactly such a key. It is still required of the merged result: a
+      demanded of the caller, since it is the server's:
+      ``server_owned_keys`` tells a transport to hide exactly such a key.
+      **A value the caller sends for it anyway is checked as declared, then
+      dropped** from what this returns, so it reaches no merge and the
+      provider's answer is the only one
+      (test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s).
+      It is still required of the merged result: a
       provider that declines it after all, with ``UNSET`` or by leaving it
-      out, leaves the usual refusal to the step that reads it - the
+      out, leaves the key absent rather than the caller's, and the usual
+      refusal to the step that reads it - the
       Validator for one of its fields
       (test_a_filled_field_the_provider_declines_is_refused_by_the_validator),
       ``call_keywords`` for a read the service or a selector asks for
       (test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
-      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks).
+      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks),
+      whether or not the caller sent it
+      (test_a_filled_read_the_caller_sends_is_refused_where_the_service_asks_if_the_provider_declines).
+      djangorestframework-services drops the caller's value for a
+      server-owned key at every site that spreads caller input, and this is
+      that rule.
     - **Under** ``partial`` **an absent Validator field**, at any depth, as
       djangorestframework-services relaxes only its serializer. A ``reads``
       argument and a target selector's read, the ``pk`` among them, stay
@@ -212,11 +221,30 @@ def shape_check(
                 arguments,
                 name=spec.many_argument,
                 unknown_arguments=unknown_arguments,
+                owned=reads,
+                owned_in_rows=fields,
             )
-        parameters = _relaxed(parameters, everywhere, reads | fields)
+        reads |= fields
+        parameters = _relaxed(parameters, everywhere, reads)
     else:
         parameters = _relaxed(parameters, frozenset(), reads)
-    return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    return _without(
+        check_arguments(parameters, arguments, unknown_arguments=unknown_arguments), reads
+    )
+
+
+def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
+    """``checked`` less every key a typed provider fills: the caller's value for one is never used.
+
+    Checked first, so a value the caller sends is held to its declaration as
+    any other is. Then dropped, so it reaches no merge: a provider that
+    answers the key outranks nothing, and one that omits it or returns
+    ``UNSET`` leaves the key absent rather than the caller's, to be refused
+    where it is read. Otherwise a ``total=False`` provider - one that fills a
+    tenant for the users who have one - would hand the caller the choice for
+    everyone else.
+    """
+    return {name: value for name, value in checked.items() if name not in owned}
 
 
 def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
@@ -246,7 +274,10 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
     declares is one this relaxes. The rule is still read per provider rather
     than as that union, so the relaxing never outruns the delivery.
 
-    Only ``filled`` keys: a ``declinable`` one stays the caller's. And a
+    Only ``filled`` keys: a ``declinable`` one stays the caller's, required
+    of the caller as declared and kept when the provider declines it
+    (test_a_declinable_key_stays_required_of_the_caller,
+    test_a_declinable_key_stays_the_caller_s). And a
     provider whose return says nothing about its keys relaxes nothing
     (test_an_untyped_kwargs_provider_relaxes_no_read).
     """
@@ -270,8 +301,14 @@ def _check_bulk(
     *,
     name: str,
     unknown_arguments: UnknownArguments,
+    owned: frozenset[str],
+    owned_in_rows: frozenset[str],
 ) -> dict[str, Any]:
     """The top level of a ``many`` call checked here, and each row checked on its own.
+
+    ``owned`` is what a typed ``kwargs`` provider fills at the top level and
+    ``owned_in_rows`` what ``input_data`` fills in each row: dropped from
+    each once checked (see ``_without``).
 
     A list is checked at the top level as an empty one, so the list itself
     and every argument beside it are checked as declared while no row is: a
@@ -282,8 +319,9 @@ def _check_bulk(
     value = arguments.get(name) if isinstance(arguments, Mapping) else None
     if not isinstance(value, (list, tuple)):
         return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
-    checked = check_arguments(
-        parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments
+    checked = _without(
+        check_arguments(parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments),
+        owned,
     )
     cleaned: dict[int, dict[str, Any]] = {}
     errors: dict[int, Any] = {}
@@ -292,7 +330,9 @@ def _check_bulk(
         # row nested in a declared array too: the same unknown-key policy, and
         # a row that is no object refused under ``non_field_errors``.
         try:
-            cleaned[index] = check_arguments(rows, row, unknown_arguments=unknown_arguments)
+            cleaned[index] = _without(
+                check_arguments(rows, row, unknown_arguments=unknown_arguments), owned_in_rows
+            )
         except InvalidArguments as refused:
             errors[index] = refused.detail
     checked[name] = _CheckedRows(cleaned, errors)
@@ -351,6 +391,9 @@ def selector_pool(
     those reads, and what it returns is merged after them, so a key it answers
     is the author's whatever the caller sent: on a target selector it scopes
     the lookup (test_a_target_selector_s_kwargs_provider_scopes_the_lookup).
+    A read it is annotated to fill never carries the caller's value here at
+    all: ``shape_check`` dropped it, so a provider that leaves it out leaves
+    it absent.
 
     ``progress`` is passed only for a selector spec's own selector, which is
     that spec's run (see ``call_pool``), and only that run hears the spec's

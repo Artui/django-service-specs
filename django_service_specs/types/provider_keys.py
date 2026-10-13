@@ -23,7 +23,10 @@ class ProviderKeys(NamedTuple):
     Attributes:
         filled: The keys the provider always answers for, ``NotRequired`` ones
             included, since the provider owns them. A transport need not ask
-            its caller for any of them.
+            its caller for any of them, and dispatch drops a value the
+            caller sends for one once it has been checked, so the provider's
+            answer is the only one: a key it then leaves out, or returns as
+            ``UNSET``, is absent rather than the caller's.
         declinable: The keys whose value admits ``UnsetType``
             (``tenant: str | UnsetType``). The provider may return ``UNSET`` for
             one, which dispatch removes from the pool, so the caller's value is

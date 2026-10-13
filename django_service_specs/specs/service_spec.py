@@ -154,14 +154,18 @@ class ServiceSpec:
             value of ``UNSET`` declines its key. Annotate its return as a
             ``TypedDict`` and ``provider_keys`` reads which keys it fills
             before it runs: a read it fills is not demanded of the caller,
-            and a filled key that a target selector's read or a Validator
-            field declares is refused, since its values never reach either.
+            and is the server's even when the provider does not answer it,
+            since the caller's value for it is dropped once checked; and a
+            filled key that a target selector's read or a Validator field
+            declares is refused, since its values never reach either.
         input_data: A provider of server-owned input: called with the keywords
             it declares from the call's pool, the resolved target among them,
             it returns a mapping merged onto the caller's arguments before the
             Validator sees them, after the caller's, so its keys are the
             author's values. A value of ``UNSET`` declines its key. Annotated to
-            return a ``TypedDict``, a Validator field it fills is not demanded
+            return a ``TypedDict``, a field it fills is the server's: the
+            caller's value for it is dropped once checked, in each row of a
+            ``many`` call too. A Validator field it fills is not demanded
             of the caller, and a filled key a read declares is refused, since
             its values reach only the Validator.
         progress_reporter: A provider of a
