@@ -22,6 +22,7 @@ loading this phase.
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any, Final
 
@@ -85,9 +86,32 @@ def answer_operation_condition(
     whatever pool the caller holds, taken here rather than by each caller - nor
     about what counts as met: a callable that returns nothing is unmet in all
     three, not in two of them.
+
+    Nor about an answer that is not one. A condition is sync-only and is never
+    awaited, and an ``async def`` one answers with a coroutine, which is
+    truthy, so read for truth it would report every unmet condition as met and
+    let the call it exists to refuse go ahead. Answered here, so all three
+    readers refuse it, with ``ImproperlyConfigured``: the call fails closed and
+    the list does not advertise an operation as available. A coroutine is
+    closed first, so it does not linger to warn that it was never awaited. Two
+    disjuncts, each held in ``tests/affordances/test_utils.py``'s
+    ``TestAnAnswerThatIsNotAnAnswer``:
+    ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
+    first and ``test_an_async_generator_is_refused`` without the second.
     """
     ambient = ambient_pool(pool, reserved=reserved)
-    return bool(when(**resolve_callable_kwargs(when, ambient)))
+    answer = when(**resolve_callable_kwargs(when, ambient))
+    if inspect.isawaitable(answer) or inspect.isasyncgen(answer):
+        if inspect.iscoroutine(answer):
+            answer.close()
+        name = getattr(when, "__qualname__", None) or type(when).__name__
+        raise ImproperlyConfigured(
+            f"The affordance condition {name} answered with an awaitable "
+            f"({type(answer).__name__}) where a bool was asked for. A condition is sync-only "
+            "and is never awaited, so it is refused rather than read as met; declare it "
+            "with def."
+        )
+    return bool(answer)
 
 
 def affordance_expression(model: type[Model], when: Any) -> Exists:

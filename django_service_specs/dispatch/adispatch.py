@@ -19,6 +19,7 @@ from django_service_specs.dispatch.utils import (
     finish_service,
     open_call,
     prepare_service,
+    refuse_target,
     reraise_unless_retrieve,
     selector_pool,
     settle,
@@ -30,6 +31,7 @@ from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
@@ -43,12 +45,14 @@ async def adispatch(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
+    target: Any = UNSET,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
     **Every concept is sync-only**, and so is every spec-carried callable but
     one. A permission check, a Validator, a selector nested in a service spec,
-    ``extend_queryset`` and a seed's resolver may each query, so each runs in
+    ``extend_queryset``, a seed's resolver, a spec's providers and its
+    preconditions may each query, so each runs in
     Django's thread-sensitive executor, never on the event loop. Only the run
     may be ``async def`` - the service, or a selector spec's own selector -
     because it is the one callable no phase shares: a spec is written once for
@@ -58,8 +62,10 @@ async def adispatch(
     So the phases run in **one** ``sync_to_async(thread_sensitive=True)`` hop,
     and the run's shape decides only what else joins it:
 
-    Every refusal before the run is made inside that hop, an affordance
-    included: a condition on the row is a query.
+    Every refusal before the run is made inside that hop, an affordance and
+    a service spec's precondition included: a condition on the row is a
+    query. A selector spec's preconditions run on what its selector found,
+    so after an ``async def`` one they join the hop that shapes its return.
 
     - A sync run joins the hop, so a sync spec costs exactly one.
     - An atomic ``async def`` service joins it too, through the bridge in
@@ -87,7 +93,18 @@ async def adispatch(
     ``progress`` reaches the run as it does under ``dispatch``, including an
     ``async def`` one awaited on the loop, so a reporter must be safe to call
     from either: the executor thread for a sync run, and an event loop for an
-    ``async def`` one, atomic or not.
+    ``async def`` one, atomic or not. A spec's ``progress_reporter`` is never
+    called on the loop: for an ``async def`` run it is resolved inside the
+    hop, once nothing before the run can refuse the call.
+
+    ``target`` is ``dispatch``'s: a service spec's target the caller resolved,
+    standing in for the lookup inside the one hop, and checked there unless
+    ``grant`` says ``target_checked``; without ``target``, checked whatever
+    the grant says. A selector spec and a ``many`` spec
+    refuse it before any hop.
+
+    A ``many`` spec checks, validates and writes its rows as ``dispatch``
+    does, every row inside the one hop.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``.
@@ -102,6 +119,7 @@ async def adispatch(
     # by test_principal_id_is_resolved_inside_the_one_hop (``principal_id`` alone).
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
+    refuse_target(spec, target)
     rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
@@ -110,8 +128,8 @@ async def adispatch(
         # One branch to coverage, so each condition is held by its own test:
         # test_a_non_atomic_sync_service_costs_one_hop (the first) and
         # test_an_atomic_async_service_joins_the_hop_and_rolls_back (the second).
-        return await _await_service(spec, *rest)
-    return await sync_to_async(_dispatch, thread_sensitive=True)(spec, *rest)
+        return await _await_service(spec, *rest, target)
+    return await sync_to_async(_dispatch, thread_sensitive=True)(spec, *rest, target)
 
 
 def _principal(principal: Any, principal_id: Any) -> Any:
@@ -127,6 +145,7 @@ def _dispatch(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
     return dispatch(
@@ -137,6 +156,7 @@ def _dispatch(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        target=target,
     )
 
 
@@ -149,6 +169,7 @@ def _prepare(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> Prepared | DispatchResult:
     return prepare_service(
         spec,
@@ -158,6 +179,7 @@ def _prepare(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        target=target,
     )
 
 
@@ -170,10 +192,19 @@ async def _await_service(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    target: Any,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
     prepared = await sync_to_async(_prepare, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
+        spec,
+        principal,
+        principal_id,
+        arguments,
+        grant,
+        pool_seeds,
+        unknown_arguments,
+        progress,
+        target,
     )
     if isinstance(prepared, DispatchResult):
         return prepared
@@ -223,7 +254,7 @@ def _settle_and_conclude(
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
-    return conclude_selector(spec, value, principal=who, grant=granted)
+    return conclude_selector(spec, value, principal=who, grant=granted, pool=pool)
 
 
 async def _await_selector(
@@ -257,7 +288,7 @@ async def _await_selector(
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
-        return conclude_selector(spec, None, principal=who, grant=granted)
+        return conclude_selector(spec, None, principal=who, grant=granted, pool=pool)
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
         spec, raw, pool, who, granted, pool_seeds.reserved
     )

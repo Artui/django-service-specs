@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -11,19 +12,33 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
+    callable_name,
     check_callable,
     check_metadata,
     check_permissions,
+    check_preconditions,
     check_presenter,
+    check_providers,
     check_reserved,
 )
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.utils import is_row_condition
 from django_service_specs.validation.validator import Validator
+
+# The default ``many_argument``, djangorestframework-services' own, so a spec
+# moving between the two packages keeps the argument a caller sends.
+_DEFAULT_MANY_ARGUMENT = "items"
+# ASCII by the class rather than ``str.isidentifier``, which admits any
+# Unicode letter a header, a form field or a shell may not carry.
+_IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# The Validator methods dispatch calls: ``validated``, which calls ``validate``.
+_VALIDATOR_METHODS = ("validate", "validated")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -34,7 +49,7 @@ class ServiceSpec:
     refused: the shape check and the closed argument set, class-level
     authorization, target resolution, object-level authorization, validation
     with the target in the Validator's context, the ``affordances``, the
-    service, then the output selector.
+    ``preconditions``, the service, then the output selector.
 
     Attributes:
         service: The operation. Called with the keywords it declares: the
@@ -44,7 +59,45 @@ class ServiceSpec:
             ``async def``; the kernel bridges it into ``atomic`` either way.
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open
-            operation says ``[Unrestricted()]``.
+            operation says ``[Unrestricted()]``. An empty sequence is refused
+            when the spec is built, since no checks would pass everyone.
+        reads: The arguments the service, its providers and its preconditions
+            read with no Validator in front of them - the ``project_pk`` a
+            create's ``kwargs`` provider scopes by - as a selector spec's
+            ``reads`` are. Part of ``parameters()``, after the target selector's
+            and before the Validator's, so the schema, the closed argument set
+            and the shape check cover them; never handed to the Validator. A
+            name the target selector also reads is refused at construction,
+            and one the Validator declares when ``parameters()`` is assembled.
+        partial: Whether a call may leave out any of the Validator's
+            parameters, as an HTTP ``PATCH`` does: the shape check does not
+            refuse an absent one, at any depth, and the Validator is told
+            through ``ValidationContext.partial``. The spec's ``reads`` and its
+            target selector's stay required as declared, so a partial update
+            still names its row, unless a ``kwargs`` provider fills them. On a
+            ``many`` spec it holds inside every row, and the list itself stays
+            required. Declared with a ``validator`` whose ``supports_partial``
+            is true, such as a ``FormValidator``: with no Validator it would
+            relax nothing, and over a Validator that builds every field, as
+            ``DataclassValidator`` and ``PydanticValidator`` do, every call
+            would be refused, so both are refused when the spec is built.
+        many: Whether the call carries a list of rows, each validated by the
+            ``validator``, under the one argument ``many_argument`` names, for
+            one run of the service over all of them. The service receives the
+            validated rows as ``data``, a list, and the validated values as
+            ``many_argument``, a list of their mappings; neither is spread by
+            field. Every row is checked and validated before the service runs,
+            and every failing row is refused in one ``InvalidArguments``,
+            addressed by its ``int`` index under ``many_argument``. Declared
+            with a ``validator``, since the rows are the arguments it validates,
+            and with no target selector, since a list of rows resolves no
+            target.
+        many_argument: The argument a ``many`` spec's list travels under, an
+            ASCII identifier. ``"items"`` by default. Beside it a ``many``
+            spec takes its ``reads`` and nothing else, so an argument asked
+            once for the whole call - a confirmation - is a read. Naming
+            anything but the default on a spec that is not ``many`` is
+            refused, since nothing would read it.
         validator: Validates the arguments its own ``parameters()`` declare. A
             [`Validator`][django_service_specs.validation.validator.Validator]
             instance; ``None`` for an operation that takes no arguments beyond
@@ -96,11 +149,61 @@ class ServiceSpec:
             declared ``False``, or every spec ever written starts claiming it is
             not idempotent. ``atomic`` is a different question: it says a single
             call is all-or-nothing, not that a second call is a no-op.
+        preconditions: Raise-to-abort rules, a sequence of callables each called
+            with the keywords it declares from the service's pool, after the
+            ``affordances`` and before the service, outside its transaction. The
+            return value is ignored, unless it is still to be awaited - a
+            coroutine from a decorated ``async def`` - which refuses the call
+            with ``ImproperlyConfigured``. Kept as a tuple in declaration order.
+        kwargs: A provider of extra pool entries: called with the keywords it
+            declares from the call's pool, it returns a mapping merged into the
+            pool the service is called from after the caller's arguments, so a
+            key it answers is the author's value whatever the caller sent. A
+            value of ``UNSET`` declines its key. Annotate its return as a
+            ``TypedDict`` and ``provider_keys`` reads which keys it fills
+            before it runs: a read it fills is not demanded of the caller,
+            and is the server's even when the provider does not answer it,
+            since the caller's value for it is dropped once checked; and a
+            filled key that a target selector's read or a Validator field
+            declares is refused, since its values never reach either.
+        input_data: A provider of server-owned input: called with the keywords
+            it declares from the call's pool, the resolved target among them,
+            it returns a mapping merged onto the caller's arguments before the
+            Validator sees them, after the caller's, so its keys are the
+            author's values. A value of ``UNSET`` declines its key. Annotated to
+            return a ``TypedDict``, a field it fills is the server's: the
+            caller's value for it is dropped once checked, in each row of a
+            ``many`` call too. A Validator field it fills is not demanded
+            of the caller, and a filled key a read declares is refused, since
+            its values reach only the Validator. Declared with a ``validator``,
+            since the Validator is what consumes it and the service is handed
+            none of it directly; a spec with no Validator is refused when it
+            is built, and ``kwargs`` is the provider for a value the service
+            reads.
+        progress_reporter: A provider of a
+            [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
+            sink the service reports to beside the transport's - a task record,
+            an audit trail - called with the keywords it declares from the base
+            pool. Resolved on first use, so a call refused before its run never
+            calls it, and a provider returning ``None`` declines.
         metadata: A project's own per-operation facts, stored as given.
     """
 
     service: Callable[..., Any]
     permissions: Sequence[PermissionCheck] | None = None
+    # ``SelectorSpec``'s word for the arguments a callable reads with no
+    # Validator in front of it, so one word means one thing on both specs.
+    reads: Parameters = field(default_factory=Parameters)
+    # A bare bool rather than djangorestframework-services' ``bool | None``,
+    # where ``None`` reads the HTTP method: this package has no method to read,
+    # so the declaration is the answer.
+    partial: bool = False
+    # djangorestframework-services' names for the same declaration, so a spec
+    # moving between the two packages keeps its field names. A plain ``str``
+    # carrying its default rather than ``None`` meaning it, so every reader sees
+    # the name in force and no transport restates the default.
+    many: bool = False
+    many_argument: str = _DEFAULT_MANY_ARGUMENT
     validator: Validator | None = None
     instance_selector_spec: SelectorSpec | None = None
     collection_selector_spec: SelectorSpec | None = None
@@ -124,6 +227,15 @@ class ServiceSpec:
     # that for "no side effects at all", which a write never is. ``bool | None``
     # rather than ``bool``, because silence must not read as a claim.
     idempotent: bool | None = None
+    # djangorestframework-services' names for the same declarations, so a spec
+    # moving between the two packages keeps its field names. Not ``guards``
+    # for the first: the create and collection guard is a permission check's.
+    # Typed open (``...``) because each is bound from the keyword pool, so its
+    # signature is whichever subset of the pool it declares.
+    preconditions: Sequence[Callable[..., None]] | None = None
+    kwargs: Callable[..., Mapping[str, Any]] | None = None
+    input_data: Callable[..., Mapping[str, Any]] | None = None
+    progress_reporter: Callable[..., Any] | None = None
     metadata: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
@@ -140,6 +252,17 @@ class ServiceSpec:
                 f"{label}.validator is {what}, which is not a Validator instance. "
                 "Wrap the declaration in an adapter, such as DataclassValidator(...)."
             )
+        if self.validator is not None:
+            # Called from sync code on both entry points and never awaited, so
+            # an ``async def`` one hands dispatch a coroutine where its values
+            # should be. One case per method in
+            # ``TestAnAsyncValidatorIsRefused``, since coverage cannot see a
+            # name dropped from the tuple.
+            for method in _VALIDATOR_METHODS:
+                check_callable(
+                    getattr(self.validator, method), label=f"{label}.validator.{method}", sync=True
+                )
+        _check_partial(self)
         _check_selector(self.instance_selector_spec, SelectorKind.RETRIEVE, "instance")
         _check_selector(self.collection_selector_spec, SelectorKind.LIST, "collection")
         if self.instance_selector_spec is not None and self.collection_selector_spec is not None:
@@ -161,7 +284,31 @@ class ServiceSpec:
                 f"{label} declares a presenter and so does its output selector. One "
                 "value is presented once; keep the one that describes what is returned."
             )
+        _check_many(self)
         object.__setattr__(self, "affordances", _check_affordances(self))
+        _check_reads(self)
+        _check_nested(self)
+        check_providers(self, ("kwargs", "input_data", "progress_reporter"), label=label)
+        # After ``check_providers`` has proved it callable, so a value that is
+        # no callable is still refused as one (the ``{"input_data": 3}`` case of
+        # test_refuses_at_construction, which has no validator either). Two
+        # conjuncts, each held by its own test: TestInputDataNeedsAValidator.test_input_data_beside_a_validator_is_accepted
+        # fails without the second, and
+        # TestInputDataNeedsAValidator.test_a_spec_without_input_data_needs_no_validator
+        # without the first.
+        if self.input_data is not None and self.validator is None:
+            raise ImproperlyConfigured(
+                f"{label}.input_data merges over the Validator's arguments, and this {label} "
+                "has no validator, so it would reach nothing: the service is handed none of "
+                "it. Declare a validator, or use kwargs for a value the service reads."
+            )
+        # After the providers are known to be callables, and after the reads
+        # and the target are: the seats it compares need nothing else. The
+        # Validator's fields are compared in ``parameters()``.
+        _check_reach(self, _read_seats(self))
+        object.__setattr__(
+            self, "preconditions", check_preconditions(self.preconditions, label=label)
+        )
         check_metadata(self.metadata, label=label)
 
     def target_selector_spec(self) -> SelectorSpec | None:
@@ -169,16 +316,33 @@ class ServiceSpec:
         return self.instance_selector_spec or self.collection_selector_spec
 
     def parameters(self) -> Parameters:
-        """Everything this spec takes: its target selector's reads, then its Validator's.
+        """Everything this spec takes: its target selector's reads, its own, then its Validator's.
+
+        On a ``many`` spec the Validator's parameters are each row's, so the
+        top level is the spec's ``reads`` and then the list itself: a
+        required array under ``many_argument`` whose rows are the Validator's
+        parameters. A row's field is no top-level argument, so it may share a
+        read's name.
 
         Assembled on every call rather than at construction, because a
         Validator reading a model-backed declaration may need the app registry,
-        and specs are commonly built at import time. A name both sources declare
-        is refused here, as is one dispatch seeds itself.
+        and specs are commonly built at import time. A name two sources declare
+        is refused here, as is one dispatch seeds itself; the two that need no
+        Validator, the target's reads and the spec's, were refused at
+        construction already.
         """
-        target = self.target_selector_spec()
         own = self.validator.parameters() if self.validator is not None else Parameters()
-        assembled = (target.parameters() if target is not None else Parameters()) + own
+        # Where the Validator's fields are first known, beside the clash ``+``
+        # refuses below: a provider filling one its values never reach. The
+        # reads again too, for a provider whose annotation resolved only after
+        # the spec was built
+        # (test_a_provider_annotation_resolving_after_the_build_is_refused_here).
+        _check_reach(
+            self, [*_read_seats(self), ("ServiceSpec.validator", own, "ServiceSpec.input_data")]
+        )
+        if self.many:
+            own = Parameters.of(_the_list(self.many_argument, items=own))
+        assembled = _beside_the_target(self) + own
         return check_reserved(assembled, label="ServiceSpec.validator")
 
     def presenter_for_output(self) -> Presenter | None:
@@ -192,6 +356,233 @@ class ServiceSpec:
         """What this spec returns, as its presenter declares it, or ``None``."""
         presenter = self.presenter_for_output()
         return presenter.output() if presenter is not None else None
+
+
+def _beside_the_target(spec: ServiceSpec) -> Parameters:
+    """The target selector's reads, then the spec's own: the half known at construction."""
+    target = spec.target_selector_spec()
+    return (target.parameters() if target is not None else Parameters()) + spec.reads
+
+
+def _the_list(name: str, *, items: Parameters | None = None) -> Parameter:
+    """A ``many`` spec's list: required, each element a row of ``items``."""
+    return Parameter(name, "array", required=True, items=items)
+
+
+def _check_many(spec: ServiceSpec) -> None:
+    """Refuse a ``many_argument`` no caller could send, and a ``many`` spec nothing could run.
+
+    At construction, as every check here: a spec reaches transports that
+    dispatch it without ever asking. A ``many`` spec with no Validator would
+    hand the service rows nobody declared or checked; one with a target
+    selector would declare a lookup dispatch never runs, since a list of rows
+    resolves no target.
+    """
+    name: Any = spec.many_argument
+    # Two operands, each held by its own case of
+    # test_a_name_that_is_not_an_ascii_identifier_is_refused: ``3`` the first,
+    # since the pattern raises ``TypeError`` on a non-string, and ``"1st"`` the
+    # second. ``fullmatch``, or a valid prefix passes (``"rows!"``).
+    if not isinstance(name, str) or _IDENTIFIER.fullmatch(name) is None:
+        raise ImproperlyConfigured(
+            f"ServiceSpec.many_argument must be an ASCII identifier; got {name!r}. It is the "
+            "name a caller sends a many spec's list of rows under."
+        )
+    if not spec.many:
+        # Only a name other than the default: the field carries its default on
+        # every spec, so writing it out declares nothing
+        # (test_the_default_name_written_out_without_many_is_not_a_declaration).
+        if name != _DEFAULT_MANY_ARGUMENT:
+            raise ImproperlyConfigured(
+                f"ServiceSpec declares many_argument={name!r} without many=True. It names "
+                "the argument a list of rows travels under, and this spec takes no list; "
+                "set many=True or remove it."
+            )
+        return
+    if spec.validator is None:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares many=True with no validator. Each row is validated by "
+            "the spec's Validator, which also declares what a row is; declare one."
+        )
+    for role in ("instance", "collection"):
+        if getattr(spec, f"{role}_selector_spec") is not None:
+            raise ImproperlyConfigured(
+                f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
+                "resolves no target, so dispatch would never run the lookup; remove it, or "
+                "drop many=True."
+            )
+    # The list beside the reads is two sources of one argument if a read shares
+    # its name, which ``+`` refuses, and a seed's name is refused as any
+    # parameter's is. Neither needs the Validator, so both are refused here.
+    check_reserved(spec.reads + Parameters.of(_the_list(name)), label="ServiceSpec.many_argument")
+
+
+def _check_partial(spec: ServiceSpec) -> None:
+    """Refuse ``partial`` where no call could honour it: with no Validator, or one that builds every field.
+
+    After the Validator is known to be an instance, so a class given in its
+    place is refused as one (test_a_validator_class_is_refused_as_not_an_instance_first),
+    and before ``_check_many``, which refuses a spec with no Validator too and
+    would name the other declaration
+    (test_partial_with_no_validator_answers_before_many_does).
+
+    With no Validator, ``partial`` relaxes nothing: the spec's ``reads`` and
+    its target's stay required on a partial call, and only a Validator's
+    parameters are made optional, so the declaration is inert, as
+    ``many_argument`` without ``many`` is. A Validator whose
+    ``supports_partial`` is ``False`` refuses every partial call, so the
+    spec would build and every call raise; it is refused here instead, where
+    the error sits beside the declaration. That Validator's own refusal at
+    the call stays, for a caller that uses it directly.
+    """
+    if not spec.partial:
+        return
+    validator = spec.validator
+    service = callable_name(spec.service)
+    if validator is None:
+        raise ImproperlyConfigured(
+            f"ServiceSpec for {service} declares partial=True with no validator. partial "
+            "lets a call leave out the Validator's parameters, and with no Validator there "
+            "are none, so it would change nothing: declare a validator, or drop partial."
+        )
+    if not validator.supports_partial:
+        raise ImproperlyConfigured(
+            f"ServiceSpec for {service} declares partial=True with a "
+            f"{type(validator).__qualname__}, which cannot validate a partial call: it "
+            "builds every field, and a partial call may leave any out. A partial call needs "
+            "a Validator that can bind only what was sent, such as FormValidator, or a "
+            "custom one; drop partial, or change the validator."
+        )
+
+
+def _check_reads(spec: ServiceSpec) -> None:
+    """Refuse ``reads`` that are not Parameters, name a seed, or repeat the target's.
+
+    At construction, because none of it needs the Validator: a read the
+    target selector also declares is two sources of one argument, which ``+``
+    refuses, and refusing it here rather than on the first call keeps the
+    error beside the declaration.
+    """
+    if not isinstance(spec.reads, Parameters):
+        raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
+    check_reserved(spec.reads, label="ServiceSpec.reads")
+    _beside_the_target(spec)
+
+
+_Seat = tuple[str, Parameters, str]
+"""Where parameters are declared, what declares them, and the one provider whose values reach them."""
+
+
+def _read_seats(spec: ServiceSpec) -> list[_Seat]:
+    """The spec's ``reads`` and its target selector's: the seats known at construction."""
+    seats: list[_Seat] = [("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs")]
+    target = spec.target_selector_spec()
+    if target is not None:
+        label = _target_label(spec)
+        seats.append((f"{label}.reads", target.reads, f"{label}.kwargs"))
+    return seats
+
+
+def _target_label(spec: ServiceSpec) -> str:
+    role = "instance" if spec.instance_selector_spec is not None else "collection"
+    return f"ServiceSpec.{role}_selector_spec"
+
+
+def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
+    """Refuse a typed provider annotated to fill a parameter its values never reach.
+
+    Each provider's values are merged into one place: a selector's ``kwargs``
+    into that selector's pool, so over its ``reads``; the spec's ``kwargs``
+    into the service's pool, after the target is resolved and the Validator
+    has run, so over the spec's ``reads``; ``input_data`` into the
+    Validator's arguments, so over its fields, in each row of a ``many``
+    spec. A ``filled`` key declared as a parameter in any other seat would
+    still be demanded of the caller, while ``server_owned_keys`` tells a
+    transport to hide it, so it is refused as the authoring error it is. That
+    is what makes ``server_owned_keys`` exact: none of its names is a
+    parameter dispatch demands.
+
+    The ``reads`` seats are compared when the spec is built, so the error
+    sits beside the declaration. Every seat, the Validator's fields with
+    them, is compared in ``parameters()``, where the fields are first
+    assembled and the clash between a read and a field is refused; that is
+    also where a provider whose return annotation named a type defined after
+    the spec, unreadable at the build, is read and refused.
+
+    Only a ``filled`` key of a provider whose return names its keys: a
+    ``declinable`` one stays the caller's
+    (test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted),
+    an untyped provider names none
+    (test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted),
+    and a key no parameter declares is the callable's to take by name
+    (test_a_key_no_parameter_declares_is_accepted). The provider that reaches
+    a seat is the one that relaxes it, never refused there
+    (test_a_provider_filling_the_parameters_its_values_reach_is_accepted).
+    """
+    target = spec.target_selector_spec()
+    providers: list[tuple[str, Callable[..., Any] | None]] = [
+        ("ServiceSpec.kwargs", spec.kwargs),
+        ("ServiceSpec.input_data", spec.input_data),
+    ]
+    if target is not None:
+        providers.append((f"{_target_label(spec)}.kwargs", target.kwargs))
+    for name, provider in providers:
+        keys = provider_keys(provider)
+        if keys is None:
+            continue
+        for where, declared, reaching in seats:
+            stray = sorted(keys.filled & declared.names())
+            # One arc to coverage, so each conjunct is held by its own test:
+            # test_a_key_no_parameter_declares_is_accepted the first (a spec
+            # with no provider reads as one filling nothing, so every spec
+            # would be refused without it), and
+            # test_a_provider_filling_the_parameters_its_values_reach_is_accepted
+            # the second.
+            if stray and name != reaching:
+                raise ImproperlyConfigured(
+                    f"{name} is annotated to fill {stray}, which {where} declares, and its "
+                    f"values never reach {where}, so dispatch would still demand {stray} of "
+                    f"the caller. Only {reaching} fills {where}; fill the key there, or "
+                    "rename it."
+                )
+
+
+def _check_nested(spec: ServiceSpec) -> None:
+    """Refuse a nested selector declaring what dispatch never runs for it.
+
+    A nested selector is a step of this spec's run, not a run of its own, so
+    its ``preconditions`` and ``progress_reporter`` would be skipped in
+    silence, and a guard skipped in silence is the failure a construction
+    check exists to prevent. A target selector's ``kwargs`` scope its lookup
+    and run; an output selector re-reads what the service produced, with no
+    caller's arguments for a provider to stand beside, so its ``kwargs`` are
+    refused too.
+    """
+    for role in ("instance", "collection", "output"):
+        nested: SelectorSpec | None = getattr(spec, f"{role}_selector_spec")
+        if nested is None:
+            continue
+        label = f"ServiceSpec.{role}_selector_spec"
+        if nested.preconditions is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares preconditions, which are never run on a nested selector. "
+                "Declare them on this ServiceSpec, whose pool carries the resolved target."
+            )
+        if nested.progress_reporter is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares a progress_reporter, which is never run on a nested "
+                "selector. Declare it on this ServiceSpec, whose service is the run."
+            )
+        # Two conjuncts, each held by its own test in tests/specs/test_service_spec.py:
+        # TestEngineFields.test_a_target_selector_s_kwargs_provider_is_its_own_to_run
+        # fails without the first, and
+        # test_the_output_is_the_spec_presenters_or_else_the_output_selectors
+        # without the second.
+        if role == "output" and nested.kwargs is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares kwargs, which an output selector never runs: it re-reads "
+                "the service's result. Read what it needs from ``result`` or a pool seed."
+            )
 
 
 def _check_selector(spec: SelectorSpec | None, kind: SelectorKind, role: str) -> None:
@@ -238,16 +629,25 @@ def _check_affordances(spec: ServiceSpec) -> tuple[Affordance, ...] | None:
                 "unique within a spec."
             )
         codes.add(affordance.code)
-        # Two conjuncts, each held by its own test in tests/specs/test_service_spec.py:
+        # Three operands, each held by its own test in tests/specs/test_service_spec.py:
         # ``test_a_callable_condition_on_a_collection_operation_is_fine`` fails
-        # without the first, ``test_a_row_condition_on_a_one_row_operation_is_fine``
-        # without the second.
-        if is_row_condition(affordance.when) and spec.collection_selector_spec is not None:
+        # without the first,
+        # ``test_a_row_condition_on_a_collection_operation_is_refused`` without the
+        # second, ``test_a_row_condition_on_a_many_spec_is_refused`` without the
+        # third, and ``test_a_row_condition_on_a_one_row_operation_is_fine`` if the
+        # last two are dropped together.
+        if is_row_condition(affordance.when) and (
+            spec.collection_selector_spec is not None or spec.many
+        ):
+            what = (
+                "a list of rows (many=True)"
+                if spec.many
+                else "a collection (a collection_selector_spec)"
+            )
             raise ImproperlyConfigured(
                 f"ServiceSpec.affordances[{index}] ({affordance.code!r}) is a condition on "
-                "the row, and this spec operates on a collection (a "
-                "collection_selector_spec) with no single row to evaluate it against. "
-                "Declare it on the per-row operation, or express a rule about the "
-                "collection in the service."
+                f"the row, and this spec operates on {what} with no single row to evaluate "
+                "it against. Declare it on the per-row operation, or express a rule about "
+                "the rows in the service."
             )
     return declared

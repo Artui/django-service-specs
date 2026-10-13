@@ -9,6 +9,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.authorization.authorize import authorize
+from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -24,6 +25,8 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.adispatch_request import adispatch_request
 from django_service_specs.http.async_spec_view import AsyncSpecView
@@ -62,6 +65,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.registry.registered_spec import RegisteredSpec
@@ -79,6 +83,11 @@ from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
+from django_service_specs.selectors.amaterialize_retrieve import amaterialize_retrieve
+from django_service_specs.selectors.arun_selector import arun_selector
+from django_service_specs.selectors.is_queryset import is_queryset
+from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
+from django_service_specs.selectors.run_selector import run_selector
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
@@ -91,14 +100,17 @@ from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.provider_keys import ProviderKeys
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
@@ -138,6 +150,7 @@ __all__ = [
     "Presenter",
     "PrincipalUnavailable",
     "ProgressReporter",
+    "ProviderKeys",
     "RESERVED_POOL_SEEDS",
     "RegisteredSpec",
     "RelatedObjectChange",
@@ -163,6 +176,7 @@ __all__ = [
     "UnsetType",
     "UnsupportedMediaType",
     "ValidationContext",
+    "Validated",
     "Validator",
     "ValueFormatter",
     "__version__",
@@ -171,13 +185,16 @@ __all__ = [
     "adelete_relations",
     "adispatch",
     "adispatch_request",
+    "amaterialize_retrieve",
     "annotate_output_schema",
     "apply_input",
     "apresent",
+    "arun_selector",
     "arun_service",
     "audience_projection_for_spec",
     "aupdate_from_input",
     "authorize",
+    "authorize_scope",
     "authorize_target",
     "base_pool",
     "bind_arguments",
@@ -189,8 +206,12 @@ __all__ = [
     "dispatch_request",
     "enforce_affordances",
     "error_response",
+    "filter_set_parameters",
     "is_async",
+    "is_queryset",
+    "materialize_retrieve",
     "null_progress",
+    "provider_keys",
     "operation_affordances",
     "output_schema",
     "paginate_output",
@@ -200,7 +221,10 @@ __all__ = [
     "project_payload",
     "request_arguments",
     "resolve_callable_kwargs",
+    "server_owned_keys",
     "resolve_principal",
+    "resolve_target",
+    "run_selector",
     "run_service",
     "shape_queryset",
     "spec_input_schema",

@@ -8,11 +8,14 @@ from typing import Any
 import pytest
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
@@ -107,7 +110,7 @@ def test_a_default_of_none_is_a_real_default() -> None:
         ("integer", True, "Expected an integer."),
         ("number", False, "Expected a number."),
         ("integer", 1.5, "Expected an integer."),
-        ("integer", "3", "Expected an integer."),
+        ("integer", "three", "Expected an integer."),
         ("string", 3, "Expected a string."),
         ("boolean", "true", "Expected a boolean."),
         ("boolean", 1, "Expected a boolean."),
@@ -246,6 +249,132 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
     assert caught.value.detail == {"count": ["Ensure this value is less than or equal to 10."]}
 
 
+# --- a number sent as a string ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("json_type", "value", "number"),
+    [
+        ("integer", "3", 3),
+        ("integer", "3.0", 3),
+        ("integer", " 3 ", 3),
+        ("integer", "-4.", -4),
+        ("number", "3", 3.0),
+        ("number", "3.0", 3.0),
+        ("number", " 3 ", 3.0),
+        ("number", "1e3", 1000.0),
+        ("number", "2.5", 2.5),
+    ],
+)
+def test_a_numeric_string_is_read_and_the_number_handed_on(
+    json_type: str, value: str, number: float
+) -> None:
+    # Django's forms read every one of these strings as the number, and
+    # pydantic's lax mode all but the integer "-4.", so refusing them was
+    # stricter than every library behind the check. The parsed number is what goes on: a dataclass Validator refuses
+    # the string "3" for an ``int``.
+    cleaned = check_arguments(one(Parameter("x", json_type)), {"x": value})
+    assert cleaned == {"x": number}
+    assert type(cleaned["x"]) is type(number)
+
+
+@pytest.mark.parametrize(
+    ("json_type", "value", "message"),
+    [
+        ("integer", "1e3", "Expected an integer."),
+        ("integer", "3.5", "Expected an integer."),
+        ("integer", "", "Expected an integer."),
+        ("number", "nan", "Expected a number."),
+        ("number", "inf", "Expected a number."),
+        ("number", "three", "Expected a number."),
+    ],
+)
+def test_a_string_that_is_no_number_is_refused_as_its_type(
+    json_type: str, value: str, message: str
+) -> None:
+    # The refusal is the type's, as before: a string that does not read as the
+    # number is a string, which is not the declared type. "1e3" is no integer
+    # to Django's forms or pydantic, although both read it as a number.
+    assert refusal(one(Parameter("x", json_type)), {"x": value}) == {"x": [message]}
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["3", "3.0", " 3 ", "-4.", "1e3", "3.5", "", "abc", "nan", "inf", "1_000", "\u0665", "\u00a03"],
+)
+@pytest.mark.parametrize("json_type", ["integer", "number"])
+def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
+    json_type: str, value: str
+) -> None:
+    # One rule for both, input for input, so a query string and a JSON body
+    # carrying the same string reach the Validator as the same value.
+    params = one(Parameter("x", json_type))
+    try:
+        flat: Any = coerce_flat(params, {"x": value})
+    except InvalidArguments:
+        flat = None
+    try:
+        checked: Any = check_arguments(params, {"x": value})
+    except InvalidArguments:
+        checked = None
+    assert checked == flat
+
+
+@pytest.mark.parametrize("value", ["\u0665", "\uff15", "\u0665.0", "\u00a05"])
+def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: str) -> None:
+    # Python's ``int`` and ``float`` read Arabic-Indic and fullwidth digits, and
+    # a no-break space around them, and pydantic's lax mode reads none of them.
+    assert refusal(
+        Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number")),
+        {"count": value, "ratio": value},
+    ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
+
+
+def test_a_decimal_string_outside_ascii_is_read_as_decimal_reads_it() -> None:
+    # Not a number's reading: a decimal is checked as Python's ``Decimal``
+    # parses it, which takes an Arabic-Indic five, and is handed on unchanged.
+    params = one(Parameter("price", "string", format="decimal"))
+    assert check_arguments(params, {"price": "\u0665"}) == {"price": "\u0665"}
+
+
+def test_true_is_still_no_number_and_no_integer() -> None:
+    params = Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number"))
+    assert refusal(params, {"count": True, "ratio": True}) == {
+        "count": ["Expected an integer."],
+        "ratio": ["Expected a number."],
+    }
+
+
+def test_a_numeric_string_is_read_wherever_the_declaration_reaches() -> None:
+    params = Parameters.of(
+        Parameter("ids", "array", items="integer"),
+        Parameter("box", "object", fields=Parameters.of(Parameter("size", "number"))),
+        Parameter("lines", "array", items=Parameters.of(Parameter("qty", "integer"))),
+        Parameter("rank", "integer", choices=(1, 2)),
+    )
+    arguments = {"ids": ["1", 2], "box": {"size": "2.5"}, "lines": [{"qty": "4"}], "rank": "2"}
+    expected = {"ids": [1, 2], "box": {"size": 2.5}, "lines": [{"qty": 4}], "rank": 2}
+    assert repr(check_arguments(params, arguments)) == repr(expected)
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        Parameter("x", "string"),
+        Parameter("x", "string", format="decimal"),
+        Parameter("x", "array"),
+        Parameter("x", "object"),
+    ],
+    ids=["string", "decimal", "untyped-element", "free-form-object"],
+)
+def test_a_string_nothing_declares_a_number_stays_a_string(parameter: Parameter) -> None:
+    # Holds the type condition of the reading: a decimal is decoded by its
+    # Validator from the string, and what an undeclared element or a
+    # free-form object holds is the caller's.
+    value: Any = {"string": "3", "array": ["3"], "object": {"n": "3"}}[parameter.type]
+    assert repr(check_arguments(one(parameter), {"x": value})["x"]) == repr(value)
+
+
 def test_a_tuple_comes_back_as_a_list() -> None:
     assert check_arguments(one(Parameter("x", "array")), {"x": ("a", "b")}) == {"x": ["a", "b"]}
 
@@ -254,6 +383,45 @@ def test_a_free_form_object_is_passed_through_as_the_callers() -> None:
     # Nothing is declared inside it, so nothing inside it is checked or closed.
     value = {"anything": {"at": ["all"]}}
     assert check_arguments(one(Parameter("x", "object")), {"x": value})["x"] is value
+
+
+# --- a file -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "value",
+    [SimpleUploadedFile("notes.txt", b"A file."), ContentFile(b"A file.", name="notes.txt")],
+    ids=["uploaded", "content"],
+)
+def test_a_file_takes_a_django_file_and_hands_on_the_same_object(value: Any) -> None:
+    # An upload is a ``File``, and so is the ``ContentFile`` a command or a task
+    # builds, so a Python caller sends a file the way a request's body does.
+    cleaned = check_arguments(one(Parameter("notes", "file")), {"notes": value})
+    assert cleaned["notes"] is value
+
+
+@pytest.mark.parametrize("value", ["notes.txt", b"A file.", {"name": "notes.txt"}, 3])
+def test_a_file_refuses_anything_that_is_not_a_file(value: Any) -> None:
+    # No JSON value is a file: a path or the file's bytes sent as a string is
+    # the caller's mistake, refused at its name rather than handed to the
+    # Validator to fail on.
+    assert refusal(one(Parameter("notes", "file")), {"notes": value}) == {
+        "notes": ["Expected a file."]
+    }
+
+
+def test_an_array_of_files_checks_each_element() -> None:
+    attached = SimpleUploadedFile("a.txt", b"A.")
+    params = one(Parameter("notes", "array", items="file"))
+    assert check_arguments(params, {"notes": [attached]}) == {"notes": [attached]}
+    assert refusal(params, {"notes": [attached, "b.txt"]}) == {"notes": {1: ["Expected a file."]}}
+
+
+def test_a_file_is_absent_or_null_by_the_same_rules_as_any_parameter() -> None:
+    assert refusal(one(Parameter("notes", "file", required=True)), {}) == {"notes": [REQUIRED]}
+    assert check_arguments(one(Parameter("notes", "file", nullable=True)), {"notes": None}) == {
+        "notes": None
+    }
 
 
 # --- format -----------------------------------------------------------------------------
@@ -390,7 +558,7 @@ def test_a_flat_array_checks_each_element_and_addresses_only_the_failures() -> N
     # message stays a bare list at its index, where a row's own goes under
     # non_field_errors.
     params = one(Parameter("ids", "array", items="integer"))
-    assert refusal(params, {"ids": [1, "2", 3, True, None]}) == {
+    assert refusal(params, {"ids": [1, "two", 3, True, None]}) == {
         "ids": {
             1: ["Expected an integer."],
             3: ["Expected an integer."],
@@ -413,7 +581,7 @@ def test_a_null_element_is_kept_where_the_element_is_nullable() -> None:
     # other element still is.
     params = one(Parameter("ids", "array", items="integer", items_nullable=True, choices=(1, 2)))
     assert check_arguments(params, {"ids": [1, None, 2]}) == {"ids": [1, None, 2]}
-    assert refusal(params, {"ids": [None, "2", 3]}) == {
+    assert refusal(params, {"ids": [None, "two", 3]}) == {
         "ids": {
             1: ["Expected an integer."],
             2: ["Select a valid choice. 3 is not one of the available choices."],
@@ -487,6 +655,43 @@ def test_an_object_parameter_given_a_non_mapping_is_a_type_error_at_the_field() 
 
 def test_arguments_that_are_not_a_mapping_are_refused_at_the_root() -> None:
     assert refusal(AUTHOR, ["Le Guin"]) == {NON_FIELD_ERRORS: ["Expected an object."]}
+
+
+# --- a partial call ----------------------------------------------------------------------
+
+
+def test_a_partial_call_may_leave_out_a_required_parameter_at_every_depth() -> None:
+    # An update that sends only what changes, as DRF reads ``partial``: a
+    # field that is absent is skipped, whether at the top, inside a nested
+    # object or inside a row.
+    books = [{"isbn": "1", "publisher": {}}]
+    assert check_arguments(AUTHOR, {"books": books}, partial=True) == {"books": books}
+    assert check_arguments(AUTHOR, {}, partial=True) == {}
+
+
+def test_a_partial_call_still_checks_what_it_sends() -> None:
+    books = [{"title": 3, "publisher": {"name": None}}]
+    assert refusal(AUTHOR, {"name": 5, "books": books}, partial=True) == {
+        "name": ["Expected a string."],
+        "books": {0: {"title": ["Expected a string."], "publisher": {"name": [NULL]}}},
+    }
+
+
+def test_a_partial_call_still_refuses_an_unknown_key_at_every_level() -> None:
+    books = [{"subtitle": "x", "publisher": {"city": "NY"}}]
+    assert refusal(AUTHOR, {"colour": "red", "books": books}, partial=True) == {
+        "colour": [UNKNOWN],
+        "books": {0: {"subtitle": [UNKNOWN], "publisher": {"city": [UNKNOWN]}}},
+    }
+
+
+def test_a_call_is_not_partial_by_default() -> None:
+    # Holds ``not partial`` in the presence guard alongside
+    # test_a_required_parameter_is_refused_when_absent.
+    assert refusal(AUTHOR, {"books": [{}]}, partial=False) == {
+        "name": [REQUIRED],
+        "books": {0: {"title": [REQUIRED]}},
+    }
 
 
 # --- the closed argument set ---------------------------------------------------------------------
@@ -566,6 +771,78 @@ def test_every_problem_is_reported_in_one_tree() -> None:
     }
 
 
+# --- bounds ------------------------------------------------------------------------------------
+
+ABOVE = "Ensure this value is less than or equal to %s."
+BELOW = "Ensure this value is greater than or equal to %s."
+
+
+@pytest.mark.parametrize("value", [1, 10, "10", 5.0])
+def test_a_bound_on_an_integer_is_inclusive(value: Any) -> None:
+    params = one(Parameter("n", "integer", minimum=1, maximum=10))
+    assert check_arguments(params, {"n": value}) == {"n": int(value)}
+
+
+@pytest.mark.parametrize(
+    ("value", "message"), [(0, BELOW % 1), (11, ABOVE % 10), ("11", ABOVE % 10)]
+)
+def test_an_integer_past_a_bound_is_refused_in_django_s_words(value: Any, message: str) -> None:
+    params = one(Parameter("n", "integer", minimum=1, maximum=10))
+    assert refusal(params, {"n": value}) == {"n": [message]}
+
+
+def test_a_bound_may_stand_alone() -> None:
+    # Each value sits inside the one bound declared, so the side left open is
+    # compared too: read against ``None`` it would raise.
+    floor = one(Parameter("n", "number", minimum=0))
+    ceiling = one(Parameter("n", "number", maximum=0))
+    assert check_arguments(floor, {"n": 5.5}) == {"n": 5.5}
+    assert check_arguments(ceiling, {"n": -5.5}) == {"n": -5.5}
+    assert refusal(floor, {"n": -0.5}) == {"n": [BELOW % 0]}
+    assert refusal(ceiling, {"n": 0.5}) == {"n": [ABOVE % 0]}
+
+
+@pytest.mark.parametrize(
+    ("value", "detail"),
+    [
+        ("1e50", None),
+        ("-1e50", None),
+        (" 12.5 ", None),
+        (1e49, None),
+        # Read by exponent, never built as the integer it names. A cheap one
+        # all the same: a regression elsewhere must fail here, not hang.
+        ("1e400", [ABOVE % "1e+50"]),
+        ("-1e400", [BELOW % "-1e+50"]),
+        ("1.0000000000000001e50", [ABOVE % "1e+50"]),
+        (1e60, [ABOVE % "1e+50"]),
+        (-1e60, [BELOW % "-1e+50"]),
+    ],
+)
+def test_a_decimal_is_compared_as_the_decimal_it_spells(value: Any, detail: Any) -> None:
+    params = one(Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50))
+    if detail is None:
+        assert check_arguments(params, {"price": value}) == {"price": value}
+    else:
+        assert refusal(params, {"price": value}) == {"price": detail}
+
+
+def test_a_value_of_the_wrong_type_is_refused_as_that_not_as_out_of_bounds() -> None:
+    params = one(Parameter("price", "string", format="decimal", maximum=1))
+    assert refusal(params, {"price": "lots"}) == {"price": [NOT_A_NUMBER]}
+
+
+def test_a_bound_message_is_translated_through_djangos_own_catalog() -> None:
+    params = one(Parameter("n", "integer", maximum=10))
+    with translation.override("de"):
+        detail = refusal(params, {"n": 11})
+        expected = translation.gettext(
+            "Ensure this value is less than or equal to %(limit_value)s."
+        )
+    assert "%(limit_value)s" in expected
+    assert expected != ABOVE.replace("%s", "%(limit_value)s")
+    assert detail == {"n": [expected % {"limit_value": 10}]}
+
+
 # --- messages ----------------------------------------------------------------------------------------
 
 
@@ -577,3 +854,47 @@ def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> No
     assert expected != REQUIRED
     assert detail == {"pk": [expected]}
     assert all(type(message) is str for message in detail["pk"])
+
+
+class TestAny:
+    @pytest.mark.parametrize(
+        "value",
+        [3, "abc", "3", 2.5, True, [1, "a"], {"a": [1]}, ""],
+        ids=["int", "string", "numeric-string", "float", "bool", "list", "dict", "blank"],
+    )
+    def test_any_value_is_handed_on_unchanged(self, value: Any) -> None:
+        params = Parameters.of(Parameter("pk", "any", required=True))
+
+        cleaned = check_arguments(params, {"pk": value})
+
+        # No coercion: a numeric string stays the string, a float stays a float.
+        assert cleaned == {"pk": value}
+        assert type(cleaned["pk"]) is type(value)
+
+    def test_a_python_callers_value_of_no_json_type_is_handed_on_too(self) -> None:
+        # No type is declared, so nothing is checked against one: a Django
+        # ``File`` a multipart part carries under the name is handed on as well.
+        upload = ContentFile(b"x", name="x.txt")
+
+        assert check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": upload}) == {
+            "pk": upload
+        }
+
+    def test_null_is_refused_unless_nullable(self) -> None:
+        strict = Parameters.of(Parameter("pk", "any"))
+        loose = Parameters.of(Parameter("pk", "any", nullable=True))
+
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(strict, {"pk": None})
+        assert refused.value.detail == {"pk": ["This field cannot be null."]}
+        assert check_arguments(loose, {"pk": None}) == {"pk": None}
+
+    def test_a_required_any_is_refused_when_absent(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(Parameters.of(Parameter("pk", "any", required=True)), {})
+        assert refused.value.detail == {"pk": ["This field is required."]}
+
+    def test_nan_is_no_json_value_and_is_refused(self) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": float("nan")})
+        assert refused.value.detail == {"pk": ["Enter a number."]}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
@@ -29,6 +30,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.relations.child_spec import ChildSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.dataclass import utils as dataclass_models
@@ -523,3 +525,54 @@ def test_which_validators_take_the_non_finite_float_the_shape_check_refuses(
     with pytest.raises(InvalidArguments) as caught:
         FormValidator(_RatioForm).validate({"ratio": value}, CONTEXT)
     assert caught.value.detail == {"ratio": ["Enter a number."]}
+
+
+class _Labelled(BaseModel):
+    status: Status
+    priorities: list[Priority]
+    colour: Colour
+    mode: Literal["fast", "slow"]
+
+
+class TestChoiceLabels:
+    def test_a_django_choices_enum_labels_its_values_and_nothing_else_does(self) -> None:
+        labels = {p.name: p.choice_labels for p in PydanticValidator(_Labelled).parameters()}
+        assert labels == {
+            "status": (("draft", "Draft"), ("published", "Published")),
+            # A list's labels are its element's, beside its choices.
+            "priorities": ((1, "Low"), (2, "High")),
+            # A plain Enum and a Literal have no label of their own.
+            "colour": None,
+            "mode": None,
+        }
+
+
+class TestPartial:
+    @pytest.mark.parametrize("method", ["validate", "validated"])
+    def test_a_partial_call_is_refused_as_the_spec_s_error(self, method: str) -> None:
+        # A model validates whole: a field it requires and was not sent is
+        # missing, and its model validators assume every field is there.
+        with pytest.raises(
+            ImproperlyConfigured,
+            match=re.escape(
+                "PydanticValidator(Address) cannot validate a partial call: a pydantic "
+                "model validates every field."
+            ),
+        ):
+            getattr(PydanticValidator(Address), method)(
+                {"city": "Oslo"}, ValidationContext(None, partial=True)
+            )
+
+    def test_a_partial_spec_over_it_is_refused_when_declared(self) -> None:
+        # Not on the first call: a spec reaches transports that dispatch it
+        # without ever asking, and every call would raise.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, validator=PydanticValidator(Address), partial=True)
+        message = str(refused.value)
+        assert "declares partial=True with a PydanticValidator" in message
+        assert "which cannot validate a partial call" in message
+
+    def test_a_whole_call_is_the_mapping_as_its_data(self) -> None:
+        validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
+        assert validated.values == {"city": "Oslo", "postcode": None}
+        assert validated.data is validated.values

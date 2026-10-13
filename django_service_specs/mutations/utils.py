@@ -12,7 +12,7 @@ from typing import Any, cast
 from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
-from django.db.models import Model
+from django.db.models import FileField, ImageField, Model
 from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
@@ -54,13 +54,21 @@ _RowSpec = (
 
 
 def coerce_to_dict(data: Any) -> dict[str, Any]:
-    """Normalize input ``data`` to a dict mapping field name to value."""
+    """Normalize input ``data`` to a dict mapping field name to value.
+
+    A dataclass gives its ``__init__`` fields only. A field declared
+    ``init=False`` is the dataclass's to compute, never the caller's to send,
+    so it is no input and writing it would put a value nobody sent in a
+    column. Every row is read here, the top-level one, each row of a
+    collection and each nested one alike, so the rule holds at every depth:
+    test_a_field_declared_init_false_is_left_out fails without the filter.
+    """
     if data is None:
         return {}
     if isinstance(data, dict):
         return dict(data)
     if is_dataclass(data) and not isinstance(data, type):
-        return {f.name: getattr(data, f.name) for f in fields(data)}
+        return {f.name: getattr(data, f.name) for f in fields(data) if f.init}
     if hasattr(data, "__dict__"):
         return dict(vars(data))
     raise TypeError(
@@ -103,13 +111,76 @@ def diff_attrs(
     instance: Model,
     new_values: dict[str, Any],
 ) -> tuple[FieldChange, ...]:
-    """Return the subset of ``new_values`` whose value differs from current."""
+    """Return the subset of ``new_values`` whose value differs from current.
+
+    A file field's value has been through ``form_values`` by now, so it is a
+    file or ``""``, which compares with the file a row holds by name.
+    """
     changes: list[FieldChange] = []
     for attr, new_value in new_values.items():
         old_value: Any = safe_getattr(instance, attr)
         if old_value != new_value:
             changes.append(FieldChange(field=attr, old=old_value, new=new_value))
     return tuple(changes)
+
+
+def file_fields(model: type[Model]) -> dict[str, FileField]:
+    """``model``'s file fields, ``ImageField`` included, by name."""
+    return {
+        field.name: field for field in model._meta.concrete_fields if isinstance(field, FileField)
+    }
+
+
+def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
+    """``values`` with each file field's read as a ``ModelForm`` writes it.
+
+    A form cleans an optional file field to ``None`` for "keep the file the
+    row holds" and to ``False`` for "clear it", and the model field's
+    ``save_form_data`` writes them so: nothing for ``None``, and ``""``, no
+    file, for any other false value. Read as they came, ``None`` against a
+    held file differs by name and was written over it, and ``False``
+    reached the column, where ``pre_save`` raises on it. ``save_form_data``
+    returns nothing to diff or report, so its reading is restated here,
+    ahead of the diff, and ``write_values`` still writes through it. Any
+    other field's value passes as it came. Each step is held by its own
+    test: test_none_and_false_on_any_other_field_are_written_as_they_came
+    (the file field), test_none_keeps_the_file (``None``) and
+    test_false_clears_the_file_and_reports_the_name_it_held (``""``).
+    """
+    files = file_fields(model)
+    read: dict[str, Any] = {}
+    for attr, value in values.items():
+        if attr in files:
+            if value is None:
+                continue
+            value = value or ""
+        read[attr] = value
+    return read
+
+
+def split_file_values(
+    model: type[Model], values: dict[str, Any]
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """``values`` as two maps: the file fields' and every other one's."""
+    files = file_fields(model)
+    plain = {attr: value for attr, value in values.items() if attr not in files}
+    return plain, {attr: value for attr, value in values.items() if attr in files}
+
+
+def write_values(instance: Model, values: dict[str, Any]) -> None:
+    """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``.
+
+    As a ``ModelForm`` writes a file, so a field overriding how it stores
+    one is honoured; ``form_values`` has already read its value. Held by
+    test_a_file_is_set_through_its_field_s_save_form_data.
+    """
+    files = file_fields(type(instance))
+    for attr, value in values.items():
+        field = files.get(attr)
+        if field is None:
+            setattr(instance, attr, value)
+        else:
+            field.save_form_data(instance, value)
 
 
 def m2m_current_pks(instance: Model, attr: str) -> list[Any]:
@@ -220,21 +291,48 @@ def auto_now_field_names(instance: Model) -> tuple[str, ...]:
     )
 
 
+def dimension_field_names(instance: Model, changed: tuple[str, ...]) -> tuple[str, ...]:
+    """The ``width_field`` and ``height_field`` of each image field in ``changed``.
+
+    Setting an ``ImageField`` writes its dimension columns on the instance
+    too, ``None`` for no file, so a save narrowed to the changed columns has
+    to carry them, or the row keeps the old image's dimensions while the
+    instance holds the new one's. A ``ModelForm`` saves the whole row, and
+    so stores them. Each condition is held by its own test:
+    test_an_image_left_alone_saves_none_of_its_dimensions (only an image in
+    ``changed``) and test_an_image_with_no_dimension_columns_saves_only_itself
+    (only a dimension field the image declares); a file field that is not an
+    image has no dimension fields, and test_false_clears_the_file_and_reports_the_name_it_held
+    raises without the ``ImageField`` check.
+    """
+    files = file_fields(type(instance))
+    names: list[str] = []
+    for attr in changed:
+        field = files.get(attr)
+        if isinstance(field, ImageField):
+            # The type stubs leave out the two attributes ``ImageField`` sets
+            # in its ``__init__``.
+            image: Any = field
+            names.extend(name for name in (image.width_field, image.height_field) if name)
+    return tuple(names)
+
+
 def resolve_update_fields(
     update_fields: bool | list[str],
     changed: tuple[str, ...],
-    auto_now_fields: tuple[str, ...] = (),
+    derived_fields: tuple[str, ...] = (),
 ) -> list[str] | None:
     """Map the public ``update_fields`` argument to a ``save()``-compatible list.
 
-    ``True`` narrows the save to the changed columns, so the ``auto_now`` ones
-    have to be added back by hand: Django only refreshes them when they are in
-    ``update_fields``.
+    ``True`` narrows the save to the changed columns, so the columns Django
+    derives from them have to be added back by hand: the ``auto_now`` ones,
+    which Django only refreshes when they are in ``update_fields``, and an
+    image's dimension columns, which setting the image wrote on the instance.
     """
     if update_fields is True:
         fields = list(changed)
         if fields:
-            for f in auto_now_fields:
+            for f in derived_fields:
                 if f not in fields:
                     fields.append(f)
         return fields or None

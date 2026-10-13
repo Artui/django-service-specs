@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -11,12 +12,14 @@ from django_service_specs.mutations.utils import (
     auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
+    dimension_field_names,
     filter_input,
     m2m_target_pks,
     resolve_update_fields,
     safe_getattr,
 )
 from django_service_specs.types.unset import UNSET
+from tests.adapter_app.models import Document, Photo
 from tests.relations_app.models import Author, Timestamped
 
 
@@ -34,6 +37,19 @@ class TestCoerceToDict:
 
     def test_dict(self) -> None:
         assert coerce_to_dict({"a": 1}) == {"a": 1}
+
+    def test_a_field_declared_init_false_is_left_out(self) -> None:
+        # The dataclass computes it rather than taking it, so it is no input:
+        # written to the row, a value nobody sent would land in a column.
+        @dataclass
+        class _Computed:
+            title: str
+            views: int = field(init=False)
+
+            def __post_init__(self) -> None:
+                self.views = 99
+
+        assert coerce_to_dict(_Computed(title="hi")) == {"title": "hi"}
 
     def test_object_with_dict(self) -> None:
         class _Obj:
@@ -114,6 +130,17 @@ class TestAutoNowFieldNames:
 
     def test_model_without_auto_now(self) -> None:
         assert auto_now_field_names(Author()) == ()
+
+
+class TestDimensionFieldNames:
+    def test_a_changed_image_names_its_dimension_fields(self) -> None:
+        assert dimension_field_names(Photo(), ("book", "image")) == ("w", "h")
+
+    def test_an_image_declaring_none_names_nothing(self) -> None:
+        assert dimension_field_names(Photo(), ("thumbnail",)) == ()
+
+    def test_a_file_field_that_is_not_an_image_names_nothing(self) -> None:
+        assert dimension_field_names(Document(), ("attachment", "title")) == ()
 
 
 class TestResolveUpdateFields:

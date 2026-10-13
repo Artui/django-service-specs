@@ -13,13 +13,16 @@ from django_service_specs.mutations.utils import (
     auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
+    dimension_field_names,
     extract_relation_data,
     filter_input,
+    form_values,
     m2m_changes,
     reject_m2m_overlap,
     relation_map,
     resolve_update_fields,
     sync_relation_cache,
+    write_values,
 )
 from django_service_specs.relations.relation_spec import RelationSpec
 
@@ -40,9 +43,15 @@ def update_from_input(
     By default (``update_fields=True``), the save call uses
     ``update_fields=<changed>`` to write the minimal set of columns.
     ``auto_now=True`` fields (e.g. ``updated_at``) are automatically added to
-    that list so they are refreshed alongside the mutation. Pass ``False`` to
+    that list so they are refreshed alongside the mutation, and so are a
+    changed ``ImageField``'s ``width_field`` and ``height_field``, which
+    setting the image wrote on the instance. Pass ``False`` to
     perform a full save, or an explicit list to control exactly which columns
     are written (no auto-injection in that case).
+
+    A file field is written as a ``ModelForm`` writes it, through the model
+    field's ``save_form_data``: a file replaces the one the row holds, ``None`` keeps it, and ``False``,
+    a form's value for a cleared file, leaves no file, reported as a change to ``""``.
 
     ``m2m`` assigns many-to-many rows that already exist, and only where the set
     of primary keys differs from the current one;
@@ -82,15 +91,17 @@ def update_from_input(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
+    new_values = form_values(type(instance), new_values)
     field_changes = diff_attrs(instance, new_values)
-    for change in field_changes:
-        setattr(instance, change.field, change.new)
+    write_values(instance, {change.field: change.new for change in field_changes})
     for relation, target in forward_values.items():
         sync_relation_cache(instance, relation, target)
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=False)
     changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
     save_fields: list[str] | None = resolve_update_fields(
-        update_fields, changed_field_names, auto_now_field_names(instance)
+        update_fields,
+        changed_field_names,
+        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
     )
     if field_changes or update_fields is False:
         if save_fields is None:

@@ -16,8 +16,11 @@ from django_service_specs.mutations.utils import (
     coerce_to_dict,
     extract_relation_data,
     filter_input,
+    form_values,
     reject_m2m_overlap,
     relation_map,
+    split_file_values,
+    write_values,
 )
 from django_service_specs.relations.relation_spec import RelationSpec
 
@@ -48,7 +51,12 @@ async def acreate_from_input(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
-    instance: ModelT = model(**new_values)
+    new_values = form_values(model, new_values)
+    # Built as ``construct_instance`` builds a ModelForm's row: the file
+    # fields written last, through ``save_form_data``.
+    plain_values, file_values = split_file_values(model, new_values)
+    instance: ModelT = model(**plain_values)
+    write_values(instance, file_values)
     await instance.asave()
     field_changes = changes_for_create(new_values)
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=True)

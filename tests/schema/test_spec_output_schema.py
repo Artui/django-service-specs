@@ -13,6 +13,7 @@ from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
+from django_service_specs.schema.utils import allow_null
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -28,6 +29,7 @@ from tests.dispatch.utils import (
 )
 from tests.dispatch_app.models import Note
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA, InvoicePresenter
+from tests.specs.utils import Titled
 
 
 class NoteTitle(Presenter):
@@ -95,6 +97,25 @@ class TestServiceSpecs:
 
         assert spec.allow_none is False
         assert spec_output_schema(spec) == ITEM
+
+    def test_a_many_service_presents_an_array_of_its_item(self) -> None:
+        spec = ServiceSpec(
+            service=write, permissions=OPEN, presenter=NoteTitle(), many=True, validator=Titled()
+        )
+
+        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
+
+    def test_a_many_service_allowing_none_admits_null_for_the_whole_array(self) -> None:
+        spec = ServiceSpec(
+            service=write,
+            permissions=OPEN,
+            presenter=NoteTitle(),
+            many=True,
+            validator=Titled(),
+            allow_none=True,
+        )
+
+        assert spec_output_schema(spec) == allow_null({"type": "array", "items": ITEM})
 
     def test_a_service_allowing_none_admits_null(self) -> None:
         spec = ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle(), allow_none=True)

@@ -7,6 +7,317 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-10-13
+
+### Added
+- `ServiceSpec.reads`, the arguments a service, its providers and its
+  preconditions read with no Validator in front of them - the `project_pk` a
+  create is scoped by - named after `SelectorSpec.reads`. They are part of
+  `parameters()`, after the target selector's and before the Validator's, so
+  the schema, the closed argument set and the shape check cover them; they
+  reach the service and the providers by name and are never handed to the
+  Validator. A read the target selector also declares is refused when the
+  spec is built, and one the Validator declares when `parameters()` is
+  assembled.
+- `ServiceSpec.partial`, for an update that sends only what changes, as an
+  HTTP `PATCH` does. Dispatch and `bind_arguments` do not refuse an absent
+  Validator parameter of a partial call, at any depth, while the spec's
+  `reads` and the target selector's - the `pk` among them - stay required as
+  declared unless a `kwargs` provider fills them, and a present value is checked as on a whole call. The Validator
+  is told through `ValidationContext.partial`. `FormValidator` binds only the
+  fields the caller sent and returns no key for any other, so an absent
+  `BooleanField` does not come back `False` nor an absent `CharField` `''`,
+  while a `ModelForm`'s uniqueness checks and constraints still read the
+  whole row, so one field of a unique pair sent alone is refused as a whole
+  call refuses it rather than raising `IntegrityError` on save. A partial
+  spec is refused with `ImproperlyConfigured`, naming the service, when it is
+  built in two cases: with no `validator`, where it would relax nothing,
+  since only a Validator's parameters are made optional; and over a
+  Validator whose `supports_partial` is `False`, `DataclassValidator` and
+  `PydanticValidator` among them, because each validates every field, where
+  the message names the Validator's class and says a partial call needs one
+  that can bind only what was sent, such as a `FormValidator`. Each of those
+  adapters also refuses a partial call made to it directly. A service
+  parameter a partial call left out is not refused as missing.
+  `spec_input_schema` lists none of a partial spec's Validator parameters in
+  `required`, at any depth, a `many` spec's rows included, while its `reads`
+  and its target selector's stay required as declared, a read a provider
+  fills among them, which `server_owned_keys` names for a transport to take
+  out; `parameters()` still says what a whole update needs.
+- `ServiceSpec.many` and `many_argument`, for a call carrying a list of rows
+  under one argument, `"items"` by default, for one run of the service over
+  all of them inside one transaction. Each row is shape-checked and
+  validated by the spec's Validator before the service runs, and every
+  failing row is refused in one `InvalidArguments`, addressed by the row's
+  `int` index under `many_argument`: `{"items": {2: {"title": [...]}}}`, a
+  message about the row itself under `non_field_errors` inside the row, and
+  the list's own refusal as `{"items": [...]}`. Beside the list a `many` spec
+  takes its `reads` and nothing else. The service receives the rows' `data`
+  as a list under `data`, and their values as a list under `many_argument`.
+  A `many` spec must declare a Validator and no target selector; its scope
+  check is asked of `None`; a row condition among its affordances is
+  refused; a Validator binding a value for the call is refused on it.
+  `spec_input_schema` describes the list and the reads, and with no output
+  selector `spec_output_schema` describes an array of the item, and dispatch
+  answers `kind="list"` unless the service returned `None`.
+- `preconditions` on both specs: raise-to-abort callables, called with the
+  keywords they declare from the call's pool, in declaration order, after the
+  affordances and before the service, outside its transaction. A selector
+  spec's preconditions run on what its selector found, never on a missing row.
+- `kwargs` on both specs and `input_data` on `ServiceSpec`: providers called
+  with the keywords they declare from the base pool, the reads and, on a
+  service spec, the resolved target. `kwargs` returns pool entries merged after the caller's
+  arguments, so a key it answers is the author's value - on a target
+  selector it scopes the lookup. `input_data` returns values merged over the
+  caller's arguments before the Validator sees them, so a `ServiceSpec`
+  declaring `input_data` with no Validator is refused with
+  `ImproperlyConfigured` when it is built, since its values would reach
+  nothing. A parameter a provider is
+  annotated to fill is not demanded of the caller where the provider's values
+  reach it - a selector's `kwargs` that selector's `reads`, a service spec's
+  `kwargs` its `reads`, `input_data` the Validator's fields - and a
+  `ServiceSpec` whose typed provider fills a parameter declared anywhere else
+  is refused with `ImproperlyConfigured`, when the spec is built or, for a
+  Validator field, when `parameters()` is assembled. A value of `UNSET`
+  declines its key. A provider returning a key dispatch seeds itself is
+  refused.
+- `ProviderKeys` and `provider_keys(provider)`, which read the keys a provider
+  annotated to return a `TypedDict` fills, and those it may decline, before
+  it runs; and `server_owned_keys(spec)`, every name a spec's dispatch fills
+  from the server, for a transport building an input schema of its own. None
+  of them is a parameter dispatch demands of the caller, so a transport
+  subtracts the set from what `parameters()` lists.
+- `progress_reporter` on both specs: a provider of a `ProgressReporter` sink
+  the run reports to beside the transport's. On a service spec it is
+  resolved on the run's first report, so a call refused before its run never
+  calls it; a selector spec's selector is its run, so one refused after the
+  selector may already have.
+- `dispatch(..., target=)` and `adispatch(..., target=)`: a service spec's
+  target resolved by the caller, which stands in for the lookup. It is still
+  checked unless the grant says `target_checked`. A selector spec and a
+  `many` spec refuse it.
+- `resolve_target`, the lookup and the checks
+  dispatch runs on a service spec's target, run ahead of the call: it returns
+  the target and a grant with `target_checked` set, which
+  `dispatch(..., target=, grant=)` takes, or `DispatchResult(kind="not_found")`.
+  Only the target selector's reads are checked, so a page showing the row
+  before a form is posted resolves it from the route's arguments alone.
+- `PermissionCheck.has_scope_permission(principal, spec, scope)` and
+  `authorize_scope`: the object-level question for a call that resolves no
+  single row. Dispatch asks it of a collection target's set, empty or not,
+  of the set a `LIST` selector spec reads, and of `None` for a create, a
+  `many` spec and a missing row a service spec's `allow_none` lets through.
+  It allows by default, and `Grant.target_checked` skips it - on a service
+  spec only when the target is handed to dispatch as `target=`.
+- `Validator.validated(arguments, context)` and `Validated`: the values the
+  service is spread with, the call's `data`, and any value the Validator binds
+  for the call, which dispatch reads in place of `validate()`. The default
+  wraps `validate()`, so an existing Validator needs no change. A bound value
+  named after a seed, a validated value or a parameter is refused.
+- `ValidationContext.partial`.
+- A `file` Parameter type, a Django `File`: `request_arguments` reads a
+  multipart body's uploads as arguments, `FormValidator` declares a
+  `FileField` or `ImageField` as one and binds it as the form's `files`
+  rather than refusing it, and its schema is `{}`, since no JSON value is
+  one.
+- An `any` Parameter type, for a parameter that declares no type, as an
+  unannotated argument does: `3` and `"abc"` are both one. Its value is
+  handed on as it arrived, with no coercion, so a query string's `"3"` stays
+  the string `"3"`; `null` is accepted only where it is `nullable`. Its schema
+  is `{}` with its `description` and `default`. `choices` on one, and an
+  array declaring `items="any"`, are refused with `ImproperlyConfigured`, as
+  `format`, `fields`, `items` and a bound already are on anything they do not
+  describe.
+- `Parameter.minimum` and `Parameter.maximum`, an inclusive bound on an
+  `integer`, a `number` or a `decimal` string, which the shape check enforces
+  in the words of Django's `MinValueValidator` and `MaxValueValidator` and the
+  schema states as `"minimum"` and `"maximum"`. A decimal string is compared
+  by its exponent, so `"1E+999999999"` is refused without building the
+  integer it names. Each bound is an `int` or a finite `float`, and a bound on
+  any other type is refused with `ImproperlyConfigured`.
+- `Parameter.choice_labels`, a label for each choice, which the schema
+  carries as `"title"`. `FormValidator` labels every choice field's choices,
+  and the dataclass and pydantic adapters label a Django `Choices` enum's;
+  a plain `Enum` and a `Literal` stay unlabelled.
+- `check_arguments(..., partial=True)`, under which no absent parameter is
+  refused at any depth. Dispatch relaxes a `partial` spec's Validator
+  parameters and a parameter a provider is annotated to fill;
+  `bind_arguments` relaxes exactly what dispatch does.
+- `SelectorSpec.filter_set`, a django-filter `FilterSet` applied after
+  `extend_queryset`, whose filters are read as Parameters and join the
+  selector's `reads` after the author's own; and `filter_set_parameters`, that
+  reading. An object with no `base_filters` - a duck-typed stand-in taking
+  `(data, queryset)` - is refused with `ImproperlyConfigured` when the spec is
+  built, since it declares no Parameters and so would be handed none of the
+  caller's data and never filter. A number filter, and each bound of a numeric range, is read as a
+  `decimal` string, which its `DecimalField` reads exactly, so a key past
+  `2**53` matches its own row. Each is bounded at `minimum=-1e50` and
+  `maximum=1e50`, django-filter's number filter's limit drawn on both sides
+  and on a range's bounds, which django-filter leaves open: past it, a value
+  such as `"1E+999999999"` would reach an integer column's conversion, which
+  builds every digit and holds a worker for minutes. A real FilterSet needs
+  the new `filter` extra.
+- `run_selector`, `arun_selector`, `materialize_retrieve`,
+  `amaterialize_retrieve` and `is_queryset`, the selector steps dispatch runs,
+  exported for a transport that runs a selector itself.
+- Over HTTP, an array of numbers, integers or booleans reads a value holding
+  commas as its elements, so `?ids=1,2` is `[1, 2]`, as a django-filter CSV
+  filter is spelt. So does an array of strings whose choices hold no comma,
+  so a django-filter `OrderingFilter` takes `?o=title,-pk` as it does
+  `?o=title&o=-pk`; any other array of strings is never split.
+- `Validator.supports_partial`, a class attribute saying whether a
+  Validator can honour a `partial` call by returning only what was sent.
+  `True` by default; `DataclassValidator` and `PydanticValidator` set it
+  `False`.
+- An optional file field of a `FormValidator` can be cleared. Its widget's
+  clear checkbox, `<name>-clear`, is declared as a `boolean` parameter right
+  after the file, so the closed argument set, which refused it, takes it,
+  and the shape check and the schema describe it. Checked with no upload,
+  the form cleans the field to `False`, returned under the field's name,
+  which a `ModelForm` writes as no file through the model field's
+  `save_form_data`; on a partial call a checked checkbox alone sends its
+  field. Only an optional field whose widget is a `ClearableFileInput`
+  declares one, and a form field named as a checkbox is refused when the
+  Validator is built. Over HTTP it is a flat boolean, `true` or `1`. The
+  mutation helpers - `create_from_input`, `update_from_input`, `apply_input`
+  and the async forms, nested rows included - write a file field as a
+  `ModelForm` does, through the model field's `save_form_data`, so a service
+  handing them the validated values clears the file with no more code: the
+  `False` stores no file and is reported as a change to `""`, where it
+  reached the column, and on Django 6.1 raised `AttributeError`.
+
+### Changed
+- **Breaking:** a `DataclassValidator` call's `data` is the dataclass
+  instance it built, where it was a dict of its fields. A service declaring
+  `data` receives the instance, and so does `DispatchResult.data`; a service
+  declaring the fields by name receives them as before.
+- **Breaking:** a string spelling a number is accepted where an `integer` or a
+  `number` is declared, and the number is handed on: `"3"` is 3, and a
+  number's `"1e3"` is 1000.0. The shape check refused it, from a JSON body
+  too; it now reads it as Django's forms and pydantic's lax mode do, and as
+  Django's `IntegerField` where the two differ, so an integer's `"5."` is 5.
+  A string spelling no number is still refused, and so is `true`.
+- **Breaking:** only an ASCII string spells an `integer` or a `number`, in a
+  query string, an argv call and a JSON string alike. Arabic-Indic and fullwidth digits, and a
+  number padded with a Unicode space, were read as the number by a flat
+  transport, as Python's `int` and Django's fields read them; they are now
+  refused as the type they are not, as pydantic and JSON refuse them.
+- **Breaking:** a multipart upload is an argument, under the name its part
+  carries, in any method's body. An upload the spec declares no parameter for
+  was dropped; it now reaches the closed argument set, which refuses it under
+  `REJECT`. An upload replaces a form field of the same name.
+- **Breaking:** a parameter whose choices carry labels is described with an
+  `"anyOf"` of `{"const": value, "title": label}` in place of its `"enum"`,
+  with `{"type": "null"}` for a `null` among them. That is every choice field
+  of a form, and every Django `Choices` enum in a dataclass or a pydantic
+  model, where a label says more than its value. `anyOf` rather than `oneOf`,
+  over entries that are disjoint so the two admit the same values, because
+  an OpenAI strict schema and Gemini both refuse `oneOf`.
+- **Breaking:** an `async def` callable in a seat that is called from sync
+  code and never awaited is refused when it is declared, with
+  `ImproperlyConfigured` naming the seat: a permission check's methods, a
+  Validator's `validate` and `validated`, a Presenter's `present`, a
+  selector spec's `extend_queryset` and `filter_set`, an affordance's `when`,
+  a pool seed's resolver, and the new providers and preconditions. One
+  declared so at import time stops the project at import. A seed resolver
+  handing back an awaitable from a plain `def` is refused where it is
+  resolved, and an `extend_queryset` doing so where it is called, where its
+  coroutine stood in for the queryset and came back as a list's value.
+- **Breaking:** `None` for a file field keeps the file, in
+  `update_from_input`, `aupdate_from_input` and `apply_input`, where it was
+  written over it and the row stored no file; it is no change, as it is to a
+  `ModelForm`, whose cleaned value it is for a file left alone. In
+  `create_from_input` and `acreate_from_input` it leaves the field to the
+  model. `False` clears a file.
+- A selector nested in a service spec that declares `preconditions` or a
+  `progress_reporter` is refused when the service spec is built, as is an
+  output selector declaring `kwargs`: dispatch never runs them.
+- The package depends on `typing_extensions>=4.14`, to read a provider's
+  annotations, Python 3.14's lazily evaluated ones included.
+
+### Fixed
+- **Security: an `async def` permission check allowed every call.** A
+  permission check is read for truth from sync code and never awaited, and a
+  coroutine is truthy, so a check whose `has_permission` was declared
+  `async def` let the call run whatever it would have answered - one returning
+  `False` included - on `dispatch` and `adispatch` alike, and an `async def`
+  `has_object_permission` passed every row the same way. A callable
+  affordance condition declared `async def` was read the same way, and
+  reported every unmet condition as met. Every published release is
+  affected, 0.4.2 included. A spec now refuses a permission check declaring any of
+  its methods `async def` when the spec is built, `Affordance` refuses an
+  `async def` condition when it is declared, and an answer still to be
+  awaited - from a plain `def` handing back a coroutine, a decorated
+  `async def` - is refused where it is read, with `ImproperlyConfigured`, so
+  the call fails closed instead of running. A pool seed's resolver declared
+  `async def` is refused when it is declared, and one handing back an
+  awaitable from a plain `def` where it is resolved.
+- A dataclass field declared `init=False` was written to the row by the
+  mutation helpers, although the dataclass computes it and no caller sends
+  it: `create_from_input`, `update_from_input`, their async twins and
+  `apply_input` read every field of a dataclass row, the rows of a relation a
+  `DataclassValidator` hands over as instances included. Only its `__init__`
+  fields are written now, at every depth.
+- A multipart PUT, PATCH or DELETE body past `DATA_UPLOAD_MAX_MEMORY_SIZE`
+  (2.5 MB by default) was refused with `RequestDataTooBig`, because its body
+  was read whole into memory before it was parsed, where a POST of the same
+  upload was taken. It is parsed from the request's stream now, as Django
+  parses a POST, so a file part streams to the upload handlers and the limit
+  bounds the fields alone. As after a POST, the body is then gone: reading
+  `request.body` after the view, or calling `request_arguments` again, raises
+  `RawPostDataException`, where it returned the body and the same arguments.
+  Code that reads the body after the view - a middleware, an audit log, an
+  error reporter - reads it first instead, and the arguments are parsed from
+  that copy; being a whole-body read, that brings the size limit back on the
+  uploads.
+- `update_from_input` and `aupdate_from_input` save an `ImageField`'s
+  `width_field` and `height_field` with it. Setting the image writes them on
+  the instance, `None` for a cleared one, while the default
+  `update_fields=True` saved only the changed columns, so the row kept the
+  old image's dimensions beside the new image, or beside no image at all,
+  and a nested row written through a relation spec did the same. A
+  `ModelForm` saves the whole row, and the two now store the same values.
+  An explicit `update_fields` list is still saved as given.
+- **Security: an empty `permissions` sequence allowed every call.** A spec
+  declaring `permissions=[]` or `()` had no check to fail, so anyone ran it.
+  Every published release is affected, 0.4.2 included. `ServiceSpec` and
+  `SelectorSpec` refuse it when built; declare `permissions=[Unrestricted()]`
+  to mean that.
+- **Breaking, and a security fix: a `Grant` that checked one row admitted
+  another.** A grant with `target_checked` covers a service spec's target
+  only when that target is handed to `dispatch` or `adispatch` as `target=`.
+  Without it dispatch runs the object-level or scope check on the row it
+  looks up itself, so a grant `resolve_target` returned for one row no longer
+  admits a different row named in the arguments, and a create, a collection
+  or a `many` call is scope checked again. Every 0.4.2 caller passing
+  `Grant(..., target_checked=True)` is affected, because 0.4.2's dispatch
+  took no `target=`: such a grant could only skip the checks on the target
+  dispatch looked up itself, and now they run again - `has_object_permission`
+  on the row, and `has_scope_permission` on a create, a collection or a
+  `many` call. It fails closed: a call the
+  grant let through may now be refused with `NotPermitted`, never the other
+  way round.
+- `dispatch` and `adispatch` refuse a precondition that answers with a
+  coroutine or an async generator, with `ImproperlyConfigured` naming it,
+  instead of reading the unawaited answer as a pass and running the service.
+  `present`, `apresent` and `present_for_audience` refuse a presenter
+  answering the same way instead of returning the coroutine as the payload.
+  A sync `extend_queryset` handing back an awaitable is refused likewise.
+- A key a typed `kwargs` or `input_data` provider is annotated to fill is the
+  server's: the caller's value for it is checked, then dropped, in `dispatch`,
+  `adispatch`, `resolve_target` and `bind_arguments`, and in each row of a
+  `many` call. A provider that leaves the key out or returns `UNSET` leaves it
+  absent, and the step reading it refuses the call, where before the caller's
+  value was used. A `declinable` key stays the caller's.
+- `resolve_target` refuses a spec any of whose parameters a registered pool
+  seed occupies, a Validator field included, as `dispatch` does.
+- A `SpecFormView` page clears an optional file when its clear checkbox is
+  ticked. The widget reads a ticked box as `False`, which the view sent on as
+  the file and the shape check refused with `Expected a file.`; it now sends
+  the checkbox as the argument the `FormValidator` declares for it. Ticked
+  beside an upload, both are sent, and the form refuses the pair in its own
+  words rather than the shape check in its.
+
 ## [0.4.2] — 2026-10-06
 
 ### Added
@@ -436,7 +747,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.4.2...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/Artui/django-service-specs/compare/v0.3.0...v0.4.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
@@ -16,6 +17,17 @@ from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from tests.relations_app.models import Catalog, Item, Note, Section, Tag
 
 _SECTIONS = "sections"
+
+
+@dataclass
+class _ComputedSectionRow:
+    # Computed by the dataclass and never taken, so never written either.
+    title: str = field(init=False, default="computed")
+
+
+@dataclass
+class _ComputedItemRow:
+    label: str = field(init=False, default="computed")
 
 
 def _spec(**kw: Any) -> dict[str, ChildSpec]:
@@ -50,6 +62,30 @@ class TestCreateChildren:
         assert change is not None
         assert change.created == (section.pk,)
         assert bool(result) is True
+
+    def test_a_row_field_declared_init_false_is_not_written_in_any_row(self) -> None:
+        result = create_from_input(
+            Catalog,
+            {"name": "c", "sections": [_ComputedSectionRow(), _ComputedSectionRow()]},
+            relations=_spec(),
+        )
+        titles = list(result.instance.sections.values_list("title", flat=True))
+        assert titles == ["", ""]
+
+    def test_a_grandchild_field_declared_init_false_is_not_written(self) -> None:
+        result = create_from_input(
+            Catalog,
+            {"name": "c", "sections": [{"title": "s1", "items": [_ComputedItemRow()]}]},
+            relations={
+                _SECTIONS: ChildSpec(
+                    model=Section,
+                    fk="catalog",
+                    relations={"items": ChildSpec(model=Item, fk="section")},
+                ),
+            },
+        )
+        item = Item.objects.get(section__catalog=result.instance)
+        assert item.label == ""
 
     def test_child_m2m_via_callable(self) -> None:
         tag = Tag.objects.create(name="t")

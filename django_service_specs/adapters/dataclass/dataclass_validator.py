@@ -10,7 +10,7 @@ from functools import cached_property
 from typing import Any, TypeVar
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext
@@ -23,11 +23,13 @@ from django_service_specs.adapters.dataclass.utils import (
     read_fields,
     scalar_type,
 )
+from django_service_specs.adapters.utils import choice_labels
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
 from django_service_specs.types.unset import UNSET
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -102,6 +104,9 @@ class DataclassValidator(Validator):
     annotation may name a class its module cannot resolve yet.
     """
 
+    # A partial spec over it is refused when declared: see ``validate()``.
+    supports_partial = False
+
     def __init__(self, cls: type[Any]) -> None:
         check_dataclass(cls, label="DataclassValidator")
         self.cls = cls
@@ -118,10 +123,44 @@ class DataclassValidator(Validator):
         """The built instance's ``__init__`` fields, by name, or ``InvalidArguments``.
 
         Nested values stay dataclass instances, which is what the mutation
-        helpers read a row from.
+        helpers read a row from. A partial call is refused: see ``validated()``.
         """
+        return self._validated(arguments, context).values
+
+    def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
+        """The built instance as the call's ``data``, and its ``__init__`` fields as the values.
+
+        A service declaring ``data`` receives the instance, typed as the
+        dataclass, where 0.4 handed it the fields as a dict; one declaring the
+        fields by name receives them as before. The values are the instance's
+        own attributes, so ``data.title`` and ``title`` are one object.
+
+        **A partial call is refused** with ``ImproperlyConfigured``, because a
+        dataclass instance holds every field and a partial call may leave any
+        out. Building one anyway would mean a value the field's annotation does
+        not admit standing in for each field not sent, or no instance and no
+        ``__post_init__`` at all. A field an update may leave out is declared
+        ``X | UnsetType``, which every call honours; a spec whose calls are
+        partial uses a Validator that can return only what was sent.
+        ``supports_partial`` is ``False``, so a ``ServiceSpec`` declaring
+        ``partial=True`` over this Validator is refused when it is built, and
+        this refusal answers only a caller using it directly.
+        """
+        return self._validated(arguments, context)
+
+    def _validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
+        # Neither public method calls the other, so a subclass may extend
+        # either through the other, as one binding a value in ``pool`` on top
+        # of ``validate()`` does, without the two calling each other forever.
+        if context.partial:
+            raise ImproperlyConfigured(
+                f"DataclassValidator({self.cls.__qualname__}) cannot validate a partial call: "
+                "a dataclass instance holds every field. Drop partial and declare the fields "
+                "an update may leave out as X | UnsetType, or validate with a FormValidator."
+            )
         instance = _build(self.cls, self._fields, arguments)
-        return {fs.name: getattr(instance, fs.name) for fs in _inputs(self._fields)}
+        values = {fs.name: getattr(instance, fs.name) for fs in _inputs(self._fields)}
+        return Validated(values=values, data=instance)
 
 
 class _Refused(Exception):
@@ -158,6 +197,7 @@ def _parameter(fs: FieldShape) -> Parameter:
         # A list's choices are its element's: an array's choices constrain each
         # element, and ``items`` can hold only the element's JSON type.
         choices=shape.choices if shape.items is None else shape.items.choices,
+        choice_labels=choice_labels((shape if shape.items is None else shape.items).enum),
         # Encoded, so a Decimal or an Enum default is reported as the argument
         # that would be sent for it. ``UNSET`` stays ``UNSET``: no default.
         default=UNSET if default is dataclasses.MISSING else encode(shape, default),

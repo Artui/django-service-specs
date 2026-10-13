@@ -6,10 +6,20 @@ from datetime import timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from asgiref.sync import sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.types.unset import UNSET
+from tests.adapter_app.models import Document
+from tests.mutations.utils import (
+    STORED,
+    stored_document,
+    stored_name,
+    stored_photo,
+    stored_photo_columns,
+)
 from tests.relations_app.models import Author, Post, Tag, Timestamped
 
 
@@ -127,3 +137,50 @@ class TestAUpdateFromInput:
         await aupdate_from_input(obj, {"title": "new"})
         await obj.arefresh_from_db()
         assert obj.updated_at > old_ts
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFileFields:
+    """As ``update_from_input``: ``None`` keeps a file, ``False`` clears it."""
+
+    async def test_false_clears_the_file_and_reports_the_name_it_held(self, media: str) -> None:
+        row = await sync_to_async(stored_document)()
+        result = await aupdate_from_input(row, {"attachment": False})
+        assert await sync_to_async(stored_name)(row) == ""
+        change = result.get_field_change("attachment")
+        assert change is not None
+        assert (change.old, change.new) == (STORED, "")
+
+    async def test_none_keeps_the_file_and_an_upload_replaces_it(self, media: str) -> None:
+        row = await sync_to_async(stored_document)()
+        kept = await aupdate_from_input(row, {"attachment": None})
+        assert kept.changes == ()
+        assert await sync_to_async(stored_name)(row) == STORED
+        upload = SimpleUploadedFile("new.txt", b"new")
+        replaced = await aupdate_from_input(row, {"attachment": upload})
+        assert replaced.changed_fields == ("attachment",)
+        assert await sync_to_async(stored_name)(row) == "documents/new.txt"
+
+    async def test_a_file_is_written_through_its_field_s_save_form_data(self, media: str) -> None:
+        # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
+        row = await sync_to_async(stored_document)()
+        attachment = Document._meta.get_field("attachment")
+        with patch.object(attachment, "save_form_data") as save_form_data:
+            await aupdate_from_input(row, {"attachment": False, "title": "New"})
+        save_form_data.assert_called_once_with(row, "")
+        assert row.title == "New"
+
+
+@pytest.mark.django_db(transaction=True)
+class TestImageDimensions:
+    """As ``update_from_input``: an image's dimension columns are saved with it."""
+
+    async def test_clearing_an_image_clears_its_stored_dimensions(self) -> None:
+        row = await sync_to_async(stored_photo)()
+        await aupdate_from_input(row, {"image": False})
+        assert await sync_to_async(stored_photo_columns)(row) == {
+            "image": "",
+            "w": None,
+            "h": None,
+            "thumbnail": "thumbnails/x.png",
+        }

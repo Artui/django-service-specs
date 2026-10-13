@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import json
 from collections.abc import Callable
 from typing import Any
@@ -70,6 +71,42 @@ def test_a_list_is_presented_item_by_item() -> None:
 
     assert rendered == [{"title": "a"}, {"title": "b"}]
     assert presenter.seen == list(rows)
+
+
+class Awaiting(Presenter):
+    """A presenter whose plain ``def present`` hands back a coroutine, as a decorated async one does."""
+
+    def __init__(self) -> None:
+        self.answers: list[Any] = []
+
+    def output(self) -> Output:
+        return Output(())
+
+    def present(self, value: Any) -> Any:
+        async def presented() -> dict[str, Any]:
+            return {}
+
+        answer = presented()
+        self.answers.append(answer)
+        return answer
+
+
+@pytest.mark.parametrize(
+    ("kind", "value"), [(LIST, [Row("a")]), (RETRIEVE, Row("a"))], ids=["list", "instance"]
+)
+def test_a_presenter_answering_with_a_coroutine_is_refused(kind: SelectorKind, value: Any) -> None:
+    presenter = Awaiting()
+    result = DispatchResult("list" if kind is LIST else "instance", value)
+
+    with pytest.raises(ImproperlyConfigured) as caught:
+        present(selector_spec(kind, presenter), result)
+
+    assert str(caught.value).startswith(
+        "Awaiting.present answered with an awaitable (coroutine). A presenter is sync-only"
+    )
+    assert [inspect.getcoroutinestate(answer) for answer in presenter.answers] == [
+        inspect.CORO_CLOSED
+    ]
 
 
 def test_an_instance_with_no_presenter_is_returned_as_it_is() -> None:

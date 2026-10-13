@@ -22,7 +22,7 @@ class Unrestricted(PermissionCheck):
 
     A named class rather than an empty list, so every open operation in a
     project is one search away, and an empty list computed by accident is not
-    read as a decision.
+    read as a decision: a spec handed one is refused when it is built.
     """
 
     def has_permission(self, principal: Any, spec: ServiceSpec | SelectorSpec) -> bool:

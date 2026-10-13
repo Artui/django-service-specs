@@ -14,9 +14,12 @@ from django_service_specs.mutations.utils import (
     coerce_to_dict,
     extract_relation_data,
     filter_input,
+    form_values,
     m2m_changes,
     reject_m2m_overlap,
     relation_map,
+    split_file_values,
+    write_values,
 )
 from django_service_specs.relations.relation_spec import RelationSpec
 
@@ -34,6 +37,10 @@ def create_from_input(
     """Build, ``save()``, and return a fresh instance of ``model``.
 
     Regular fields come from ``data`` (a dataclass, dict, or object with ``__dict__``).
+
+    A file field is written as a ``ModelForm`` writes it, through the model
+    field's ``save_form_data``: a file is stored, ``None`` leaves the field to the model, and ``False``,
+    a form's value for a cleared file, stores no file.
 
     ``m2m`` maps a many-to-many attribute to the rows it should hold — instances or
     primary keys of rows that **already exist** — and ``set()``s them after the save;
@@ -69,7 +76,12 @@ def create_from_input(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
-    instance: ModelT = model(**new_values)
+    new_values = form_values(model, new_values)
+    # Built as ``construct_instance`` builds a ModelForm's row: the file
+    # fields written last, through ``save_form_data``.
+    plain_values, file_values = split_file_values(model, new_values)
+    instance: ModelT = model(**plain_values)
+    write_values(instance, file_values)
     instance.save()
     field_changes = changes_for_create(new_values)
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=True)

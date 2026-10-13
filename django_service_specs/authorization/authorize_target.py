@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.utils import sync_answer
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
@@ -23,10 +24,12 @@ def authorize_target(
 
     ``grant.target_checked`` lets a transport that resolved the row itself and
     already ran the object-level check claim it once, so dispatch does not pay
-    for it twice; otherwise every check's ``has_object_permission`` must pass,
+    for it twice; dispatch honours it on a service spec only for a target
+    handed in as ``target=`` (see ``Grant``); otherwise every check's ``has_object_permission`` must pass,
     in order, and the first refusal raises
     [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
-    with that check's own message.
+    with that check's own message. An answer still to be awaited raises
+    ``ImproperlyConfigured`` rather than being read as a pass.
 
     ``spec.permissions is None`` means nothing to check here rather than a
     configuration error: [`authorize`][django_service_specs.authorization.authorize.authorize]
@@ -37,5 +40,6 @@ def authorize_target(
     if grant.target_checked:
         return
     for check in spec.permissions or ():
-        if not check.has_object_permission(principal, spec, target):
+        answer = check.has_object_permission(principal, spec, target)
+        if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_object_permission"):
             raise NotPermitted(check.message)

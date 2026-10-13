@@ -29,6 +29,37 @@ keeps its float. DRF's `IntegerField`, like Django's form field, reads
 `str(value)`, so given `1e16` it reads `"1e+16"` and refuses it; the check
 follows JSON Schema and hands on `10000000000000000`.
 
+**A string spelling a number is that number** where an `integer` or a
+`number` is declared, wherever the declaration reaches, and the number is
+handed on: `"3"`, `"3.0"` and `" 3 "` are 3, and a number's `"1e3"` is
+1000.0. Django's forms and pydantic's lax mode both read these strings so,
+and the reading is the one [`coerce_flat`](#flat-transports) makes, which the
+check shares. Where the two differ it is Django's: an integer's `"5."` and
+`"5 .0"` are 5, which pydantic's `int` refuses. A string that spells no such
+number is refused as the type it is not, and `true` is still neither. The
+number goes on rather than the string because a Validator stricter than those
+two, the dataclass adapter's, refuses `"3"` for an `int`.
+
+**Only an ASCII string spells an `integer` or a `number`**, and this is the one
+place the check is stricter than Django's forms. Python's `int` and `float`,
+and so Django's number fields, read Arabic-Indic and fullwidth digits and
+strip any Unicode space; no JSON number is spelled so, and pydantic refuses
+them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
+type it is not, by the check and by `coerce_flat` alike. A `decimal` string is
+not read this way: it is checked as Python's `Decimal` reads it, which takes
+those digits too.
+
+A **`file`** is a Django `File`, an upload included, and nothing else is one:
+no JSON value can be, so a JSON caller's string for one is refused at its
+name.
+
+An **`any`** declares no type, so every value is one and is handed on exactly
+as it arrived: a `"3"` stays the string, never read as the number it spells.
+`null` is still refused unless the parameter is `nullable`, and NaN and the
+infinities are still no JSON value. Nothing is checked against a type, so a
+value of no JSON type is handed on too: a Python caller's, or a multipart
+upload sent under the parameter's name.
+
 NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the
 `number` type, and only a decoder reading an overflowing literal such as `1e400`,
@@ -39,6 +70,15 @@ refused with `"Enter a number."`; any other type refuses one as the wrong type.
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.
+
+Under `partial=True` no absent parameter is refused, at any depth: a partial
+update sends only what changes. A value that is present is checked as it would
+be otherwise, and an unknown key is still refused. Dispatch relaxes a
+[`partial`](declaring.md#partial-updates) write's Validator parameters, and a
+parameter a provider is annotated to fill, so a transport checking a call as
+dispatch will calls
+[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
+rather than `check_arguments(partial=True)`.
 
 It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument
@@ -96,6 +136,13 @@ docs/examples/arguments.py:tree
   DRF's spelling of the same idea, so a transport that renders either's errors
   reads these without a translation table.
 
+A [`many`](declaring.md#many-rows-in-one-call) write's rows are addressed the
+same way, under its `many_argument`: `{"items": {2: {"title": [...]}}}`, a
+message about a row itself under `non_field_errors` inside it, and the list's
+own refusal - absent, null, not a list - as `{"items": [...]}`. The shape
+check's refusals of some rows and the Validator's of others come back in the
+one tree.
+
 Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The
 messages are spelled as Django's own form fields spell them wherever one has
@@ -130,6 +177,8 @@ docs/examples/arguments.py:flat
   one answer that cannot set a flag the caller meant to clear.
 - A decimal, a date-time and a date **stay strings**, for the Validator to
   decode, exactly as they would arrive off a JSON wire.
+- **An `any` stays the string it arrived as**: it declares no type to read the
+  string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value
   becomes a one-element list, since a flat transport sends a one-element list
   as a bare value.

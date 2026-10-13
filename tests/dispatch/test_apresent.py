@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
@@ -73,6 +74,25 @@ async def test_a_list_is_presented_in_one_hop_and_comes_back_evaluated(
     assert type(rendered) is list
     assert rendered == ([{"owner": "ada"}] if presenter is not None else [note])
     assert hops == ["present"]
+
+
+async def test_a_presenter_answering_with_a_coroutine_is_refused_as_present_refuses_it() -> None:
+    class Awaiting(Presenter):
+        def output(self) -> Output:
+            return Output(())
+
+        def present(self, value: Any) -> Any:
+            async def presented() -> dict[str, Any]:
+                return {}
+
+            return presented()
+
+    spec = SelectorSpec(
+        kind=SelectorKind.RETRIEVE, selector=notes_of, permissions=OPEN, presenter=Awaiting()
+    )
+
+    with pytest.raises(ImproperlyConfigured, match="A presenter is sync-only"):
+        await apresent(spec, DispatchResult("instance", object()))
 
 
 async def test_not_found_is_refused_as_present_refuses_it() -> None:

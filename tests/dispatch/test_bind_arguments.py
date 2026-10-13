@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from typing_extensions import TypedDict
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.dispatch.bind_arguments import bind_arguments
@@ -171,3 +172,141 @@ def test_a_null_element_the_validator_takes_reaches_it() -> None:
     spec = ServiceSpec(service=service, validator=DataclassValidator(_Scores))
     bound = bind_arguments(spec, {"scores": [1, None]}, principal=PRINCIPAL)
     assert bound == {"scores": [1, None]}
+
+
+class _Both(Validator):
+    """Declares two required strings and returns only those it was handed; records the context."""
+
+    def __init__(self) -> None:
+        self.contexts: list[ValidationContext] = []
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(
+            Parameter("title", "string", required=True), Parameter("body", "string", required=True)
+        )
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.contexts.append(context)
+        return dict(arguments)
+
+
+def test_a_partial_spec_binds_a_call_leaving_out_a_required_argument() -> None:
+    validator = _Both()
+    spec = ServiceSpec(service=lambda: None, validator=validator, partial=True)
+    assert bind_arguments(spec, {"title": "T"}, principal=None) == {"title": "T"}
+    assert validator.contexts[0].partial is True
+
+
+def test_the_same_call_on_a_spec_that_is_not_partial_is_refused() -> None:
+    spec = ServiceSpec(service=lambda: None, validator=_Both())
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "T"}, principal=None)
+    assert caught.value.detail == {"body": ["This field is required."]}
+
+
+def test_a_partial_spec_still_requires_its_target_s_pk() -> None:
+    # ``partial`` relaxes the Validator's fields alone: a partial update still
+    # says which row it updates.
+    spec = ServiceSpec(
+        service=service, validator=Recording(), instance_selector_spec=retrieve(), partial=True
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "Kept"}, principal=PRINCIPAL)
+    assert caught.value.detail == {"pk": ["This field is required."]}
+
+
+class _ServerTitle(TypedDict):
+    title: str
+
+
+def _server_title() -> _ServerTitle:
+    return {"title": "server's"}
+
+
+class _Merged(Validator):
+    """Declares a required title, and refuses its absence in words no shape check uses."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string", required=True))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.calls.append(dict(arguments))
+        if "title" not in arguments:
+            raise InvalidArguments({"title": ["The merged input has no title."]})
+        return dict(arguments)
+
+
+def test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider() -> None:
+    # The shape check relaxes the field as dispatch's does, and this function
+    # calls no provider, so the Validator is handed the caller's arguments
+    # alone and is the one that refuses.
+    validator = _Merged()
+    spec = ServiceSpec(service=service, validator=validator, input_data=_server_title)
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {}, principal=PRINCIPAL)
+    assert caught.value.detail == {"title": ["The merged input has no title."]}
+    assert validator.calls == [{}]
+
+
+# --- a read a kwargs provider fills -------------------------------------------------
+
+
+class _ServerPk(TypedDict):
+    pk: int
+
+
+def _server_pk() -> _ServerPk:
+    return {"pk": 1}
+
+
+def test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded() -> None:
+    # The selector is called with the provider's value, which this function
+    # does not call, so the checked arguments carry only what was sent.
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk)
+    assert bind_arguments(spec, {}, principal=PRINCIPAL) == {}
+
+
+def test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded() -> None:
+    target = SelectorSpec(
+        kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk
+    )
+    spec = ServiceSpec(service=service, instance_selector_spec=target)
+    assert bind_arguments(spec, {}, principal=PRINCIPAL, target=ROW) == {}
+
+
+def test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded() -> None:
+    spec = ServiceSpec(service=service, reads=PK, kwargs=_server_pk, validator=Recording())
+    assert bind_arguments(spec, {"title": "Dune"}, principal=PRINCIPAL) == {
+        "title": "DUNE",
+        "validated": True,
+    }
+
+
+def test_a_read_an_untyped_kwargs_provider_returns_stays_required() -> None:
+    spec = ServiceSpec(service=service, reads=PK, kwargs=lambda: {"pk": 1})
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {}, principal=PRINCIPAL)
+    assert caught.value.detail == {"pk": ["This field is required."]}
+
+
+# --- the caller's value for a key a typed provider fills ---------------------------
+
+
+def test_a_selector_spec_s_filled_read_the_caller_sends_is_checked_and_dropped() -> None:
+    # What the selector is called with: the provider's value, never the caller's.
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk)
+    with pytest.raises(InvalidArguments):
+        bind_arguments(spec, {"pk": "x"}, principal=PRINCIPAL)
+    assert bind_arguments(spec, {"pk": 2}, principal=PRINCIPAL) == {}
+
+
+def test_a_filled_field_the_caller_sends_never_reaches_the_validator() -> None:
+    validator = _Merged()
+    spec = ServiceSpec(service=service, validator=validator, input_data=_server_title)
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"title": "caller's"}, principal=PRINCIPAL)
+    assert caught.value.detail == {"title": ["The merged input has no title."]}
+    assert validator.calls == [{}]

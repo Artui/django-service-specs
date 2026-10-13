@@ -21,25 +21,44 @@ the async entry point:
 
 1. **The shape check and the closed argument set**, over `spec.parameters()`:
    presence, JSON type, format, choices and nullability at every level of
-   nesting, with no query. An argument no parameter declares is refused.
+   nesting, with no query. An argument no parameter declares is refused. A
+   [`partial`](declaring.md#partial-updates) write's absent Validator
+   parameters are not refused, nor one its `input_data` provider is annotated
+   to fill.
 2. **Class-level authorization**: every permission check's `has_permission`,
    or the [grant](#grants) a transport passed instead.
 3. **Target resolution**: a read's own selector, or a write's instance or
-   collection selector, called with the arguments its `reads` declare, then
-   shaped. A retrieve that finds nothing is `kind="not_found"`, unless the
-   selector allows `None`.
-4. **Object-level authorization**: every check's `has_object_permission`, on a
-   retrieved row. Never on a list, which has no single object to check, and
-   never on a `None` that `allow_none` let through.
-5. **Validation**: a write's Validator, on only the arguments it declares, with
-   the resolved target in its context.
-6. **Affordances**: a write's `affordances`, in declaration order. The first
-   one not met refuses the call with `ActionUnavailable`, carrying its `code`.
+   collection selector, called with the arguments its `reads` declare and
+   what its `kwargs` provider returns, then shaped. A retrieve that finds
+   nothing is `kind="not_found"`, unless the selector allows `None`. A
+   [`target=`](#a-target-resolved-ahead-of-the-call) the caller passed stands
+   in for this step.
+4. **Object-level authorization**: every check's `has_object_permission` on a
+   retrieved row, and its [`has_scope_permission`](#permissions) where no
+   single row is: a list a read returns or a write's collection, empty or not,
+   and the `None` of a create, of a `many` write and of a missing row a
+   write's `allow_none` lets through. A read's own `None` under `allow_none`
+   is asked of neither.
+5. **Validation**: a write's `input_data` provider, then its Validator on only
+   the arguments it declares, with the provider's values merged over the
+   caller's, and the resolved target and `partial` in its context.
+6. **Affordances, then preconditions**: a write's `affordances`, in
+   declaration order - the first one not met refuses the call with
+   `ActionUnavailable`, carrying its `code` - then its `preconditions`, the
+   first to raise aborting the call with what it raised.
 7. **The run**: the service, inside `transaction.atomic()` unless the spec says
-   `atomic=False`, then the output selector if one is declared.
+   `atomic=False`, called with what its `kwargs` provider returns beside the
+   validated values, then the output selector if one is declared.
 
-A read stops after step four: its selector is its run. Its `affordances` are
-answers about each row, for a list to report, and refuse nothing.
+A read stops after step four and its `preconditions`, which run on what its
+selector found: its selector is its run. Its `affordances` are answers about
+each row, for a list to report, and refuse nothing.
+
+A [`many`](declaring.md#many-rows-in-one-call) write resolves nothing in steps
+three and four, where its scope check is asked of `None`, never of the
+caller's rows. Step one raises only the top level's refusal; a row's is raised
+in step five, beside the Validator's refusals of the other rows, so a
+principal refused in step two learns nothing about the rows it sent.
 
 The order is the design, and each place reads as if it could move:
 
@@ -58,6 +77,8 @@ The order is the design, and each place reads as if it could move:
 - **Affordances come after object-level authorization and validation**, so a
   principal who may not see the row is never told what state it is in. They
   come before the run's transaction opens, so a refusal never opens one.
+  Preconditions follow them, in the same place, as djangorestframework-services
+  orders the two.
 
 ## The result
 
@@ -65,13 +86,14 @@ A `DispatchResult` has a `kind` and a `value`:
 
 | `kind` | When | `value` |
 | --- | --- | --- |
-| `"list"` | A `LIST` read, or a write whose output selector is a `LIST` | The rows, a queryset when the selector returned one |
+| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one |
 | `"instance"` | Everything else that ran | The row, the service's return, or what the output selector re-read |
 | `"not_found"` | A required row does not exist | `None` |
 
 A write's result also carries `service_result` (the service's own return,
 before any output selector), `instance` (the resolved target) and `data` (the
-validated values the service received).
+Validator's `data` the service received: the validated values, or the
+instance a `DataclassValidator` built, or a `many` write's list of them).
 
 **Not-found is reported, not raised.** A transport decides what a missing row
 means on its own wire - a 404, an exit code, a tool error - and most transports
@@ -124,8 +146,21 @@ most transports have neither. Checks are **instances**, so a check can carry
 its own configuration - a codename, a group - and a spec reads as the list of
 checks it applies. `has_permission` is the class-level check;
 `has_object_permission` runs on a resolved row and allows unless overridden;
-`message` is what [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
-says when the check refuses. A check is sync-only: it may query.
+`has_scope_permission` is the same question for a call that resolves no
+single row - asked of the set a collection write acts on or a list read
+returns, and of `None` where the call acts on no existing row, a create - and
+allows unless overridden too. It is a method of its own rather than
+`has_object_permission` handed a set or `None`, because a check written for a
+row reads an attribute off it and would fail on either. `message` is what
+[`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
+says when the check refuses.
+
+**A check is sync-only**: it may query, so the async entry point runs it in
+the executor. An `async def` method would answer with a coroutine, which is
+truthy and would allow every call, so a spec refuses a check declaring one
+when it is built, with `ImproperlyConfigured` naming the method. A method that
+hands back a coroutine from a plain `def` - a decorated `async def` - is
+refused where its answer is read, so the call fails closed.
 
 **A spec with no permission check is refused**, with `ImproperlyConfigured`, at
 dispatch and at [registration](registry.md). Off HTTP there is no view whose
@@ -152,19 +187,64 @@ A grant is bound **by identity** to one spec object and one principal object.
 Carried to another operation or another user it covers nothing, and dispatch
 refuses it with `NotPermitted`. It covers the class-level check only, unless
 it says `target_checked=True`, which a transport can claim once it has resolved
-the row and run the object-level check itself; otherwise dispatch still runs
-`has_object_permission` on the row it resolves. A grant stands in for neither
+the row and run the object-level check itself, and which covers a service
+spec's target only when that target is handed to `dispatch` as `target=`;
+otherwise dispatch still runs `has_object_permission` on the row it resolves.
+A selector spec's claim covers whatever its selector returns. A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And **a grant cannot be
 serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.
 
-[`authorize`][django_service_specs.authorization.authorize.authorize] and
+[`authorize`][django_service_specs.authorization.authorize.authorize],
 [`authorize_target`][django_service_specs.authorization.authorize_target.authorize_target]
-are the two checks dispatch runs, exported for a transport that runs them
+and [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
+are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
-spec and principal.
+spec and principal, and the other two are skipped under `target_checked`
+where the target was handed in as `target=`.
+
+### A target resolved ahead of the call
+
+A page that shows the row before the call acts on it - the form in front of
+an update, the confirmation in front of a delete - must show the row dispatch
+would find, refused where dispatch would refuse it.
+[`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
+runs dispatch's own steps for a write's target and nothing else: the
+deactivated principal, the shape check over **the target selector's
+parameters alone**, class-level authorization, then the very lookup and checks
+dispatch runs. A Validator field is neither required nor unknown there, and a
+target read the selector's `kwargs` provider fills is not required, as in
+dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
+does.
+
+```python
+--8<--
+docs/examples/dispatching.py:resolve_target
+--8<--
+```
+
+It returns `(target, grant)`: the row, the set, or `None` for a create, and a
+grant covering the spec and the principal with `target_checked` set. Both go
+to `dispatch(..., target=, grant=)`, which then looks nothing up and asks no
+object-level or scope check again. The grant is honoured only with the
+target it was resolved for: handed on without `target=`, dispatch looks the
+row up itself and runs the checks on it. A missing row that `allow_none` does not
+let through comes back as `DispatchResult(kind="not_found")`, so it is never
+mistaken for the `None` it lets through. A read, whose selector is its run,
+raises `TypeError`, and a `many` write, which has no target,
+`ImproperlyConfigured`. It is sync; an async caller hops once with
+`sync_to_async`.
+
+`target=` on `dispatch` and `adispatch` takes any target the caller resolved -
+what an HTTP view's `get_object()` found, too - and stands in for step three.
+Step four still runs on it unless the grant says `target_checked`; without
+`target=` step four always runs. `None` is a
+missing row, not-found unless the instance selector says `allow_none`; a
+create takes `None` and refuses anything else. **Dispatch trusts it**: the
+target's `reads` are still checked as declared, and keeping them and the
+target in agreement is the caller's.
 
 ### Principals off HTTP
 
@@ -186,8 +266,12 @@ Some transports bind input themselves: an MCP server answering a malformed call
 before it opens a transaction, a queue validating a task in the worker.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs the same two steps dispatch does - the shape check over
-`spec.parameters()`, then the Validator on its own arguments - so a transport
-that binds for itself cannot drift from the gate dispatch applies.
+`spec.parameters()`, relaxing what dispatch relaxes for `partial` and for a provider's
+filled keys, then the Validator on its own arguments - so a
+transport that binds for itself cannot drift from the gate dispatch applies.
+It runs no provider: a field an `input_data` provider would fill passes the
+shape check and, left out, is the Validator's to refuse; a read a `kwargs`
+provider would fill passes too.
 
 ```python
 --8<--
@@ -212,9 +296,23 @@ steps in the same order, from async code, and
 **Only the run may be `async def`**: a write's service, or a read's own
 selector. Every other callable a spec carries is sync-only - a permission
 check, a Validator, a Presenter, a selector nested in a write,
-`extend_queryset`, a seed's resolver - because each may query, and because a
-spec is written once for both entry points: a check written `async def` could
-not be called from `dispatch`. The run is the one callable no step shares.
+`extend_queryset`, `filter_set`, an affordance's condition, the providers, the
+preconditions, a seed's resolver - each refused with `ImproperlyConfigured`
+naming its seat if declared `async def`, when the spec is built - because each may query, and because a spec
+is written once for both entry points: a check written `async def` could not
+be called from `dispatch`. The run is the one callable no step shares.
+
+Most of them are refused when they are declared `async def`, with
+`ImproperlyConfigured` naming the seat: a permission check's methods,
+`extend_queryset`, `filter_set`, the providers and the preconditions when the
+spec is built, an affordance's condition when it is declared, and a seed's
+resolver when `PoolSeeds` is built. Each is called from sync code and never
+awaited, and its unawaited answer is truthy, so a check would allow every
+call and a condition would read as met. An answer still to be awaited from a
+plain `def` is refused where it is read, for a permission check, a condition,
+a seed and `extend_queryset` alike, so the call fails closed: a lambda calling
+an `async def` from `extend_queryset` would otherwise hand dispatch a coroutine
+for the queryset, and a list's value would be that coroutine.
 
 So `adispatch` runs the steps in **one** thread-sensitive executor hop, and the
 run's shape decides only what joins it:
@@ -267,7 +365,10 @@ docs/examples/dispatching.py:seeds
 
 A resolver declares what it wants from the pool like any other callable, and
 sees the principal, never an argument: a seed is ambient, and a caller must not
-steer one by naming an argument after something its resolver reads.
+steer one by naming an argument after something its resolver reads. A resolver
+is sync-only: an `async def` one is refused with `ImproperlyConfigured` when
+it is registered, and a plain `def` handing back an awaitable is refused where
+it is resolved.
 
 A registered name is **reserved**, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
@@ -306,6 +407,11 @@ docs/examples/dispatching.py:progress
 With no reporter the pool carries
 [`null_progress`][django_service_specs.pool.null_progress.null_progress], so a
 service that declares `progress` runs unchanged on every transport and in
-tests. A target or output selector always gets `null_progress`: a lookup has
+tests. A spec's own `progress_reporter` provider adds a sink of the author's
+beside the transport's - a task record, an audit trail - for the run alone,
+called on its first report, or before an `async def` run once nothing can
+refuse the call. A service spec refused before its run never calls it; a
+selector spec's selector is its run, so one refused at its object check, its
+scope check or a precondition may already have. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.

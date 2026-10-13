@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.authorization.grant import Grant
@@ -42,6 +43,7 @@ from tests.dispatch.utils import (
     OwnerOnly,
     Record,
     Refuse,
+    Scoped,
     Titled,
     make_user,
     note_by_pk,
@@ -704,3 +706,235 @@ async def test_an_async_selector_s_extend_queryset_refuses_a_read_left_out(ada: 
         await adispatch(spec, principal=ada, arguments={})
 
     assert caught.value.detail == {"title": ["This field is required."]}
+
+
+# --- Preconditions and the spec's progress provider on the async paths ------------------
+
+
+class _QueryingSink:
+    """A progress provider that queries, as finding a task record does; records each report."""
+
+    def __init__(self) -> None:
+        self.counted: list[int] = []
+        self.reports: list[float] = []
+
+    def __call__(self, *, user: Any) -> Any:
+        # On the event loop this raises ``SynchronousOnlyOperation``.
+        self.counted.append(Note.objects.count())
+        return lambda progress, **_: self.reports.append(progress)
+
+
+async def test_a_non_atomic_async_service_s_progress_provider_is_resolved_in_the_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    sink = _QueryingSink()
+
+    async def reporting(*, progress: Any) -> None:
+        progress(1.0)
+
+    spec = ServiceSpec(service=reporting, permissions=OPEN, atomic=False, progress_reporter=sink)
+    await adispatch(spec, principal=ada, arguments={})
+    assert (sink.counted, sink.reports, hops) == ([0], [1.0], ["_prepare"])
+
+
+async def test_a_non_atomic_async_service_s_precondition_runs_in_the_hop(ada: Any) -> None:
+    def precondition(*, user: Any) -> None:
+        # A query: on the event loop it would raise ``SynchronousOnlyOperation``.
+        if not Note.objects.filter(owner=user).exists():
+            raise Boom()
+
+    async def service() -> str:
+        return "ran"
+
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, atomic=False, preconditions=[precondition]
+    )
+    with pytest.raises(Boom):
+        await adispatch(spec, principal=ada, arguments={})
+
+
+async def test_a_precondition_answering_with_a_coroutine_refuses_the_call(ada: Any) -> None:
+    async def refuse() -> None:
+        raise Boom()
+
+    ran: list[str] = []
+
+    async def service() -> None:
+        ran.append("service")
+
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, atomic=False, preconditions=[lambda: refuse()]
+    )
+    with pytest.raises(ImproperlyConfigured, match="A precondition is sync-only"):
+        await adispatch(spec, principal=ada, arguments={})
+    assert ran == []
+
+
+async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the_await(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def reporting(*, user: Any, progress: Any) -> Any:
+        progress(1.0)
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=reporting, permissions=OPEN, progress_reporter=sink
+    )
+    await adispatch(spec, principal=ada, arguments={})
+    assert (sink.counted, sink.reports) == ([0], [1.0])
+
+
+async def test_an_async_selector_spec_s_preconditions_see_its_row(ada: Any) -> None:
+    note = await _create(owner=ada, title="Row")
+    seen: list[Any] = []
+
+    async def by_pk(*, pk: int) -> Any:
+        return Note.objects.filter(pk=pk)
+
+    def precondition(*, instance: Note) -> None:
+        seen.append(instance)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.RETRIEVE,
+        selector=by_pk,
+        reads=PK,
+        permissions=OPEN,
+        preconditions=[precondition],
+    )
+    await adispatch(spec, principal=ada, arguments={"pk": note.pk})
+    assert seen == [note]
+
+
+async def test_an_async_selector_spec_raising_does_not_exist_runs_no_precondition(
+    ada: Any,
+) -> None:
+    seen: list[Any] = []
+
+    async def missing() -> Any:
+        raise Note.DoesNotExist
+
+    spec = SelectorSpec(
+        kind=SelectorKind.RETRIEVE,
+        selector=missing,
+        permissions=OPEN,
+        allow_none=True,
+        preconditions=[seen.append],
+    )
+    result = await adispatch(spec, principal=ada, arguments={})
+    assert (result.value, seen) == (None, [])
+
+
+# --- the scope check and target=, inside the one hop ------------------------------------
+
+
+async def test_an_async_list_selector_s_rows_are_scope_checked_in_the_second_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    mine = await _create(owner=ada, title="mine")
+
+    async def selector() -> Any:
+        return Note.objects.filter(owner=ada)
+
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=selector, permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(spec, principal=ada, arguments={})
+
+    # Listing the set is a query, so the check ran on the executor thread.
+    assert check.scopes == [[mine]]
+    assert len(hops) == 2
+
+
+async def test_a_create_is_scope_checked_inside_the_one_hop(ada: Any, hops: list[str]) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = ServiceSpec(service=Record(), permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert check.scopes == [None]
+    assert len(hops) == 1
+
+
+@pytest.mark.parametrize("atomic", [True, False])
+async def test_a_pre_resolved_target_stands_in_for_the_lookup(
+    ada: Any, hops: list[str], atomic: bool
+) -> None:
+    note = await _create(owner=ada, title="mine")
+    looked_up: list[int] = []
+
+    def selector(*, pk: int) -> Any:
+        looked_up.append(pk)
+        return Note.objects.filter(pk=pk)
+
+    async def service(*, instance: Note) -> Note:
+        return instance
+
+    check = OwnerOnly()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        atomic=atomic,
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=selector, reads=PK),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": note.pk}, target=note)
+
+    assert result.instance == note
+    assert looked_up == []
+    assert check.rows == [note]
+    assert len(hops) == 1
+
+
+async def test_an_async_selector_spec_refuses_a_target_before_any_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    async def selector() -> list[Any]:
+        return []
+
+    spec = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN)
+
+    with pytest.raises(TypeError, match="target= is a ServiceSpec's"):
+        await adispatch(spec, principal=ada, arguments={}, target=[])
+
+    assert hops == []
+
+
+# --- many: every row inside the one hop ---------------------------------------------------
+
+
+async def test_a_many_spec_validates_every_row_and_writes_them_in_one_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    async def write_then_fail(*, user: Any, data: list[dict[str, Any]]) -> None:
+        for row in data:
+            await Note.objects.acreate(owner=user, title=row["title"])
+        raise Boom
+
+    spec = ServiceSpec(service=write_then_fail, permissions=OPEN, many=True, validator=Titled())
+
+    with pytest.raises(Boom):
+        await adispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+
+    # One transaction for every row, and the rows validated in the same hop.
+    assert await Note.objects.aexists() is False
+    assert len(hops) == 1
+
+
+async def test_a_many_spec_refuses_its_rows_by_index(ada: Any, hops: list[str]) -> None:
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
+    with pytest.raises(InvalidArguments) as refused:
+        await adispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {}]})
+    assert refused.value.detail == {"items": {1: {"title": ["This field is required."]}}}
+
+
+async def test_a_many_spec_refuses_a_pre_resolved_target_before_any_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
+    with pytest.raises(TypeError, match="a many spec resolves no target"):
+        await adispatch(spec, principal=ada, arguments={"items": []}, target=None)
+    assert hops == []

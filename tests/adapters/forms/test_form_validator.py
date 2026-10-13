@@ -2,26 +2,38 @@ from __future__ import annotations
 
 import datetime as dt
 import re
-from collections.abc import Callable
+import tempfile
+from collections.abc import Callable, Iterator
 from decimal import Decimal
 from typing import Any
 
 import pytest
 from django import forms
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ImproperlyConfigured
+from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import QuerySet
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
-from tests.adapter_app.models import Author, Book
+from tests.adapter_app.models import Author, Book, Document, Edition
 from tests.relations_app.models import Post, Timestamped
 
 User = get_user_model()
@@ -120,16 +132,6 @@ class TestConstruction:
     @pytest.mark.parametrize(
         ("field", "message"),
         [
-            (
-                forms.FileField(),
-                "Upload.field: a FileField takes an uploaded file, which no JSON "
-                "transport carries.",
-            ),
-            (
-                forms.ImageField(),
-                "Upload.field: a ImageField takes an uploaded file, which no JSON "
-                "transport carries.",
-            ),
             (
                 forms.JSONField(),
                 "Upload.field: a JSONField takes any JSON value, and a parameter declares "
@@ -677,3 +679,457 @@ class TestModelForm:
             "price": Decimal("9.99"),
             "status": "published",
         }
+
+
+def _labels(form_class: type[forms.BaseForm]) -> dict[str, Any]:
+    return {p.name: p.choice_labels for p in FormValidator(form_class).parameters()}
+
+
+class TestChoiceLabels:
+    def test_every_choice_is_labelled_option_groups_flattened_and_the_empty_one_dropped(
+        self,
+    ) -> None:
+        labels = _labels(Everything)
+        assert labels["colour"] == (("red", "Red"), ("amber", "Amber"), ("blue", "Blue"))
+        assert labels["size"] == ((1, "Small"), (2, "Large"))
+        # An array's labels are its element's, beside its choices.
+        assert labels["tags"] == (("a", "A"), ("b", "B"))
+        assert labels["scores"] == ((1, "One"), (2, "Two"))
+        # No choices, no labels: rows, and fields with no choices at all.
+        assert labels["author"] is None
+        assert labels["name"] is None
+
+    def test_a_plain_choice_field_labels_the_strings_it_compares(self) -> None:
+        form_class = _form("Rating", stars=forms.ChoiceField(choices=[(1, "One"), (2, "Two")]))
+        assert _labels(form_class) == {"stars": (("1", "One"), ("2", "Two"))}
+
+    def test_an_option_group_given_as_a_tuple_is_labelled_too(self) -> None:
+        form_class = _form(
+            "Shade",
+            shade=forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
+        )
+        assert _labels(form_class) == {"shade": (("red", "Red"), ("amber", "Amber"))}
+
+    def test_a_callable_choice_set_has_no_labels_either(self) -> None:
+        form_class = _form("Paint", colour=forms.ChoiceField(choices=lambda: [("red", "Red")]))
+        assert _labels(form_class) == {"colour": None}
+
+    def test_a_label_stays_lazy_until_a_reader_renders_it(self) -> None:
+        form_class = _form(
+            "Poll",
+            answer=forms.ChoiceField(choices=[("y", gettext_lazy("Yes")), ("n", "No")]),
+        )
+        ((_, label), _) = _labels(form_class)["answer"]
+        with translation.override("fr"):
+            assert str(label) == "Oui"
+        assert str(label) == "Yes"
+
+    def test_a_model_form_labels_the_model_field_s_choices(self) -> None:
+        assert _labels(BookForm)["status"] == (("draft", "Draft"), ("published", "Published"))
+
+
+class _Upload(forms.Form):
+    title = forms.CharField()
+    attachment = forms.FileField()
+    cover = forms.ImageField(required=False)
+
+
+class TestFiles:
+    def test_a_file_field_declares_a_file(self) -> None:
+        assert list(FormValidator(_Upload).parameters()) == [
+            Parameter("title", "string", required=True),
+            Parameter("attachment", "file", required=True),
+            Parameter("cover", "file", nullable=True),
+            # Its clear checkbox, which only an optional file offers.
+            Parameter("cover-clear", "boolean"),
+        ]
+
+    def test_the_upload_is_read_from_the_call_s_arguments(self) -> None:
+        upload = SimpleUploadedFile("notes.txt", b"hello")
+        cleaned = FormValidator(_Upload).validate({"title": "Notes", "attachment": upload}, CONTEXT)
+        assert cleaned == {"title": "Notes", "attachment": upload, "cover": None}
+
+    def test_a_missing_required_upload_is_refused_in_the_form_s_words(self) -> None:
+        assert _refusal(_Upload, {"title": "Notes"}) == {"attachment": [REQUIRED]}
+
+    def test_a_file_with_no_name_is_the_form_s_to_refuse(self) -> None:
+        # A ContentFile a Python caller builds without a name: the shape check
+        # takes any Django File, and the form needs a name to read one.
+        detail = _refusal(_Upload, {"title": "Notes", "attachment": ContentFile(b"hello")})
+        assert detail == {"attachment": [forms.FileField.default_error_messages["invalid"]]}
+
+    def test_the_shape_check_passes_the_upload_the_form_takes(self) -> None:
+        upload = SimpleUploadedFile("notes.txt", b"hello")
+        validator = FormValidator(_Upload)
+        checked = check_arguments(validator.parameters(), {"title": "Notes", "attachment": upload})
+        assert validator.validate(checked, CONTEXT)["attachment"] is upload
+
+
+class _DocumentForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["title", "attachment", "scan"]
+
+
+class _BareUpload(forms.Form):
+    # An optional file whose widget offers no clear checkbox.
+    cover = forms.FileField(required=False, widget=forms.FileInput)
+
+
+def _clashing(*, disabled: bool) -> type[forms.BaseForm]:
+    """A form whose field is named as another field's clear checkbox.
+
+    Only reachable through ``base_fields`` set by hand, since a class
+    attribute cannot carry a hyphen.
+    """
+    return type(
+        "_Clashing",
+        (forms.BaseForm,),
+        {
+            "base_fields": {
+                "cover": forms.FileField(required=False),
+                "cover-clear": forms.BooleanField(required=False, disabled=disabled),
+            }
+        },
+    )
+
+
+@pytest.fixture
+def media(settings: Any) -> Iterator[str]:
+    """Default storage in a directory removed after the test, so no upload outlives it."""
+    with tempfile.TemporaryDirectory() as root:
+        settings.MEDIA_ROOT = root
+        yield root
+
+
+def _stored(title: str = "Notes") -> Document:
+    """A saved row holding both files, in the test's media directory."""
+    row = Document(title=title)
+    row.attachment.save("notes.txt", ContentFile(b"notes"), save=False)
+    row.scan.save("scan.txt", ContentFile(b"scan"), save=False)
+    row.save()
+    return row
+
+
+def _row(target: Document) -> ValidationContext:
+    return ValidationContext(None, target)
+
+
+class TestClearingAFile:
+    def test_a_custom_widget_with_no_clear_checkbox_offers_none(self) -> None:
+        assert list(FormValidator(_BareUpload).parameters()) == [
+            Parameter("cover", "file", nullable=True)
+        ]
+
+    def test_a_model_form_s_optional_file_offers_one_and_its_required_one_none(self) -> None:
+        names = [parameter.name for parameter in FormValidator(_DocumentForm).parameters()]
+        assert names == ["title", "attachment", "attachment-clear", "scan"]
+
+    @pytest.mark.parametrize("disabled", [False, True], ids=["a-field", "a-disabled-field"])
+    def test_a_field_named_as_a_clear_checkbox_is_refused(self, disabled: bool) -> None:
+        # A disabled field is no parameter, and still reads the same data key.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            FormValidator(_clashing(disabled=disabled))
+        message = str(refused.value)
+        assert "_Clashing.cover: its clear checkbox, 'cover-clear', is also the name" in message
+        assert "rename the field" in message
+
+    @pytest.mark.django_db
+    def test_without_it_null_keeps_the_file_and_false_is_no_file(self, media: str) -> None:
+        # Why the checkbox is declared: neither JSON value clears a file.
+        row = _stored()
+        validator = FormValidator(_DocumentForm)
+        cleaned = validator.validate({"title": "Notes", "attachment": None}, _row(row))
+        assert cleaned["attachment"] == row.attachment
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(validator.parameters(), {"title": "Notes", "attachment": False})
+        assert refused.value.detail["attachment"] == ["Expected a file."]
+
+    @pytest.mark.django_db
+    def test_the_checkbox_clears_the_file_as_the_form_cleans_it(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"title": "Notes", "attachment-clear": True}, _row(row)
+        )
+        # The form's own value for a cleared file: False, under the field's
+        # name, and nothing under the checkbox's.
+        assert cleaned["attachment"] is False
+        assert "attachment-clear" not in cleaned
+        assert cleaned["scan"] == row.scan
+
+    @pytest.mark.django_db
+    def test_an_unchecked_box_keeps_the_file(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"title": "Notes", "attachment-clear": False}, _row(row)
+        )
+        assert cleaned["attachment"] == row.attachment
+
+    @pytest.mark.django_db
+    def test_an_upload_and_a_checked_box_together_are_refused_in_the_form_s_words(
+        self, media: str
+    ) -> None:
+        upload = SimpleUploadedFile("new.txt", b"new")
+        with pytest.raises(InvalidArguments) as refused:
+            FormValidator(_DocumentForm).validate(
+                {"title": "Notes", "attachment": upload, "attachment-clear": True}, _row(_stored())
+            )
+        contradiction = forms.FileField.default_error_messages["contradiction"]
+        assert refused.value.detail == {"attachment": [contradiction]}
+
+    @pytest.mark.django_db
+    def test_a_partial_call_sending_only_the_checkbox_clears_the_file(self, media: str) -> None:
+        row = _stored()
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"attachment-clear": True}, ValidationContext(None, row, partial=True)
+        )
+        assert cleaned == {"attachment": False}
+
+    @pytest.mark.django_db
+    def test_a_partial_call_sending_the_box_unchecked_leaves_the_file_out(self, media: str) -> None:
+        # Unchecked is what absent is on a whole call, so it is on a partial
+        # one too: nothing about the file was sent.
+        cleaned = FormValidator(_DocumentForm).validate(
+            {"attachment-clear": False}, ValidationContext(None, _stored(), partial=True)
+        )
+        assert cleaned == {}
+
+    @pytest.mark.django_db
+    def test_dispatch_takes_the_checkbox_and_the_service_clears_the_row(self, media: str) -> None:
+        def clear(instance: Document, attachment: Any) -> Document:
+            # A ModelForm's own write: ``save_form_data`` stores a cleared
+            # file as the empty name.
+            Document._meta.get_field("attachment").save_form_data(instance, attachment)
+            instance.save()
+            return instance
+
+        spec = ServiceSpec(
+            service=clear,
+            permissions=[Unrestricted()],
+            validator=FormValidator(_DocumentForm),
+            instance_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE,
+                selector=lambda pk: Document.objects.get(pk=pk),
+                reads=Parameters.of(Parameter("pk", "integer", required=True)),
+            ),
+            partial=True,
+        )
+        row = _stored()
+        dispatch(spec, principal=None, arguments={"pk": row.pk, "attachment-clear": True})
+        row.refresh_from_db()
+        assert row.attachment.name == ""
+        assert row.scan.name.startswith("scans/")
+
+
+class _Profile(forms.Form):
+    title = forms.CharField()
+    subscribed = forms.BooleanField(required=False)
+    age = forms.IntegerField(required=False)
+    nickname = forms.CharField(required=False)
+
+    def clean_nickname(self) -> str:
+        nickname = self.cleaned_data["nickname"]
+        if nickname != nickname.lower():
+            raise ValidationError("Lower case only.")
+        return nickname
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean()
+        assert cleaned is not None
+        # ``get``, as Django advises: a field that failed, or was not sent on a
+        # partial call, has no cleaned value.
+        if cleaned.get("title") == "admin":
+            raise ValidationError("Reserved.")
+        return cleaned
+
+
+class _PermissionForm(forms.ModelForm):
+    class Meta:
+        model = Permission
+        fields = ["name", "content_type", "codename"]
+
+
+class _PermissionName(forms.ModelForm):
+    class Meta:
+        model = Permission
+        fields = ["name", "codename"]
+
+
+class _EditionForm(forms.ModelForm):
+    class Meta:
+        model = Edition
+        fields = ["book", "number"]
+
+
+def _a_pair_and_its_collision(pair: str) -> tuple[Any, Any, dict[str, Any]]:
+    """A row holding a value, another row beside it, and the whole call that collides.
+
+    ``(taken, target, whole)``: the value of the pair's second field the first
+    row holds, the row an update targets, which shares the first field, and
+    the whole call that would give the target the first row's pair.
+    """
+    if pair == "permission":
+        kind = ContentType.objects.get_for_model(Book)
+        Permission.objects.create(name="Taken", content_type=kind, codename="taken")
+        target = Permission.objects.create(name="Mine", content_type=kind, codename="mine")
+        whole = {"name": "Mine", "content_type": str(kind.pk), "codename": "taken"}
+        return "taken", target, whole
+    book = Book.objects.create(
+        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+    )
+    Edition.objects.create(book=book, number=1)
+    target = Edition.objects.create(book=book, number=2)
+    return 1, target, {"book": str(book.pk), "number": 1}
+
+
+def _partial(target: Any = None) -> ValidationContext:
+    """A partial call's context, built per test so the module imports on any version."""
+    return ValidationContext(None, target, partial=True)
+
+
+class TestPartial:
+    def test_a_partial_call_returns_only_the_fields_the_caller_sent(self) -> None:
+        validator = FormValidator(_Profile)
+        assert validator.validate({"age": 3}, _partial()) == {"age": 3}
+        # The same call made whole is refused, and an absent checkbox cleans
+        # to False there, which is exactly what a partial update must not write.
+        assert _refusal(_Profile, {"age": 3}) == {"title": [REQUIRED]}
+        assert validator.validate({"title": "Ada"}, CONTEXT) == {
+            "title": "Ada",
+            "subscribed": False,
+            "age": None,
+            "nickname": "",
+        }
+
+    def test_a_boolean_left_out_has_no_key_and_one_sent_false_keeps_it(self) -> None:
+        validator = FormValidator(_Profile)
+        assert validator.validate({"title": "Ada"}, _partial()) == {"title": "Ada"}
+        assert validator.validate({"subscribed": False}, _partial()) == {"subscribed": False}
+
+    def test_a_value_sent_is_checked_as_on_a_whole_call(self) -> None:
+        # Under partial a required field may be left out, never sent empty: a
+        # null for it is refused as before, rather than cleaned to a blank.
+        assert _refusal_partial(_Profile, {"title": None}) == {"title": [REQUIRED]}
+        assert _refusal_partial(_Profile, {"nickname": "Ada"}) == {"nickname": ["Lower case only."]}
+        assert _refusal_partial(_Profile, {"title": "admin"}) == {"non_field_errors": ["Reserved."]}
+
+    def test_a_field_left_out_is_not_cleaned_at_all(self) -> None:
+        # Bound with every field and only made optional, the empty nickname
+        # would pass through clean_nickname; one whose rule refuses a blank
+        # would refuse a call that never named the field.
+        class Strict(_Profile):
+            def clean_title(self) -> str:
+                title = self.cleaned_data["title"]
+                if not title:
+                    raise ValidationError("A title cannot be blank.")
+                return title
+
+        assert FormValidator(Strict).validate({"age": 1}, _partial()) == {"age": 1}
+
+    def test_parameters_still_say_what_a_whole_call_needs(self) -> None:
+        validator = FormValidator(_Profile)
+        validator.validate({"age": 3}, _partial())
+        required = {p.name: p.required for p in validator.parameters()}
+        assert required == {"title": True, "subscribed": False, "age": False, "nickname": False}
+        # And the next whole call still requires the title.
+        assert _refusal(_Profile, {"age": 3}) == {"title": [REQUIRED]}
+
+    @pytest.mark.django_db
+    def test_a_partial_model_form_update_keeps_what_the_caller_left_out(self) -> None:
+        author = Author.objects.create(name="Ada")
+        book = Book.objects.create(author=author, title="Notes", price=Decimal("9.99"))
+        validator = FormValidator(BookForm)
+
+        cleaned = validator.validate({"price": "5.00"}, ValidationContext(None, book, partial=True))
+
+        assert cleaned == {"price": Decimal("5.00")}
+        result = update_from_input(book, cleaned)
+        assert [change.field for change in result.changes] == ["price"]
+        book.refresh_from_db()
+        assert (book.title, book.price, book.author) == ("Notes", Decimal("5.00"), author)
+
+    @pytest.mark.django_db
+    def test_a_partial_model_form_update_checks_uniqueness_on_what_was_sent(self) -> None:
+        ada = User.objects.create_user(username="ada")
+        User.objects.create_user(username="bob")
+        validator = FormValidator(Username)
+        context = ValidationContext(ada, ada, partial=True)
+
+        assert validator.validate({}, context) == {}
+        with pytest.raises(InvalidArguments) as caught:
+            validator.validate({"username": "bob"}, context)
+        assert caught.value.detail == {"username": ["A user with that username already exists."]}
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize(
+        ("form_class", "pair"),
+        [
+            # ``unique_together``, which a ModelForm checks with validate_unique.
+            pytest.param(_PermissionForm, "permission", id="unique-together"),
+            # A ``UniqueConstraint``, which it checks with validate_constraints.
+            pytest.param(_EditionForm, "edition", id="unique-constraint"),
+        ],
+    )
+    def test_a_partial_update_colliding_with_a_unique_pair_is_refused_as_a_whole_one_is(
+        self, form_class: type[forms.ModelForm], pair: str
+    ) -> None:
+        # The update sends one field of the pair. Bound with only that field,
+        # the form excluded the other from its uniqueness check, and so skipped
+        # the pair: the collision surfaced as an IntegrityError on save.
+        taken, target, whole = _a_pair_and_its_collision(pair)
+        sent = {"codename": taken} if pair == "permission" else {"number": taken}
+        refused = _refusal(form_class, whole, target)
+        assert list(refused) == ["non_field_errors"]
+        with pytest.raises(InvalidArguments) as caught:
+            FormValidator(form_class).validate(sent, ValidationContext(None, target, partial=True))
+        assert caught.value.detail == refused
+
+    @pytest.mark.django_db
+    def test_a_whole_model_form_call_checks_uniqueness_once(
+        self, django_assert_num_queries: Any
+    ) -> None:
+        ada = User.objects.create_user(username="ada")
+        with django_assert_num_queries(1):
+            FormValidator(Username).validate({"username": "carol"}, ValidationContext(ada, ada))
+
+    @pytest.mark.django_db
+    def test_a_partial_call_with_no_target_row_checks_nothing_it_was_not_sent(self) -> None:
+        # Bound as a create, the form's instance holds the model's defaults for
+        # every field not sent, which nothing will write: checked, an empty
+        # username that a row already holds refused a call that never sent one.
+        User.objects.create(username="")
+        context = ValidationContext(None, None, partial=True)
+        assert FormValidator(Username).validate({}, context) == {}
+
+    @pytest.mark.django_db
+    def test_a_partial_update_checks_no_pair_the_form_does_not_declare(self) -> None:
+        # The whole call of a form without ``content_type`` excludes the pair,
+        # as Django excludes any model field a form does not have, and a
+        # partial one is no stricter.
+        taken, target, _ = _a_pair_and_its_collision("permission")
+        context = ValidationContext(None, target, partial=True)
+        assert FormValidator(_PermissionName).validate({"codename": taken}, context) == {
+            "codename": taken
+        }
+
+    @pytest.mark.django_db
+    def test_a_partial_update_that_collides_with_nothing_passes(self) -> None:
+        _, target, _ = _a_pair_and_its_collision("permission")
+        context = ValidationContext(None, target, partial=True)
+        assert FormValidator(_PermissionForm).validate({"codename": "free"}, context) == {
+            "codename": "free"
+        }
+
+    def test_the_whole_and_validated_paths_agree(self) -> None:
+        validated = FormValidator(_Profile).validated({"age": 3}, _partial())
+        assert (validated.values, validated.data, dict(validated.pool)) == (
+            {"age": 3},
+            {"age": 3},
+            {},
+        )
+
+
+def _refusal_partial(form_class: type[forms.BaseForm], arguments: dict[str, Any]) -> dict[Any, Any]:
+    with pytest.raises(InvalidArguments) as caught:
+        FormValidator(form_class).validate(arguments, _partial())
+    return caught.value.detail

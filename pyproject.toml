@@ -36,12 +36,16 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
-    # Django is the base, and the only one: no DRF, here or in any group below,
+    # Django is the base, and the only framework: no DRF, here or in any group below,
     # because dispatch without DRF is the reason the package exists and a test
     # environment with DRF installed could not notice the kernel reaching for
     # it. The floor matches djangorestframework-services', which will depend on
     # this package, so it cannot be raised past what that package supports.
     "django>=4.2",
+    # ``provider_keys`` reads its declarations through ``typing_extensions``,
+    # and the floor is djangorestframework-services', which will depend on this
+    # package and cannot be asked to raise it.
+    "typing_extensions>=4.14",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +56,13 @@ pydantic = [
     # for the key the model accepts. Below it the setting is silently ignored,
     # so the declared name would be one pydantic refuses.
     "pydantic>=2.11",
+]
+filter = [
+    # For ``SelectorSpec.filter_set``, whose filters are read as Parameters. The
+    # core never imports django-filter, so the extra is opt-in. The floor is
+    # djangorestframework-services', which this package's selector spec must
+    # accept filter sets from unchanged.
+    "django-filter>=23.1",
 ]
 
 [project.urls]
@@ -74,6 +85,7 @@ dev = [
     "django-stubs>=5.1.0",
     # The adapter's tests; the floor is the extra's, for the same reason.
     "pydantic>=2.11",
+    "django-filter>=23.1",
 ]
 docs = [
     "mkdocs>=1.6.0",
@@ -139,7 +151,7 @@ skip-magic-trailing-comma = false
 root = ["./django_service_specs"]
 
 [tool.bumpversion]
-current_version = "0.4.2"
+current_version = "0.5.0"
 allow_dirty = false
 commit = false
 tag = false

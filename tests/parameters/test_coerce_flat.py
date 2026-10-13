@@ -85,6 +85,22 @@ def test_an_arrays_integer_elements_read_an_integral_decimal_alike() -> None:
     assert refusal(FLAT, {"ids": ["5.0", "5.5"]}) == {"ids": {1: ["Enter a whole number."]}}
 
 
+# Arabic-Indic five, fullwidth five, an Arabic-Indic five point zero, and a
+# five behind a no-break space: Python's ``int`` and ``float`` read every one.
+_NON_ASCII_NUMBERS = ["\u0665", "\uff15", "\u0665.0", "\u00a05"]
+
+
+@pytest.mark.parametrize("value", _NON_ASCII_NUMBERS)
+def test_a_number_spelled_outside_ascii_is_refused(value: str) -> None:
+    # Django's form fields read each of these as 5, and pydantic and JSON read
+    # none of them; refused here, in each type's own words, so a query string
+    # never hands a Validator a number its caller did not spell in digits.
+    assert refusal(FLAT, {"count": value, "ratio": value}) == {
+        "count": ["Enter a whole number."],
+        "ratio": ["Enter a number."],
+    }
+
+
 @pytest.mark.parametrize("value", ["two", "nan", "inf", "-Infinity"])
 def test_a_number_must_parse_to_a_finite_number(value: str) -> None:
     # NaN and the infinities parse as floats, and no JSON caller can send one.
@@ -167,3 +183,10 @@ def test_argv_through_coerce_flat_reads_as_typed_json_to_the_shape_check() -> No
     raw = {"count": "3", "ratio": "0.5", "active": "false", "ids": "4", "price": "9.99"}
     typed = {"count": 3, "ratio": 0.5, "active": False, "ids": [4], "price": "9.99"}
     assert check_arguments(FLAT, coerce_flat(FLAT, raw)) == check_arguments(FLAT, typed)
+
+
+def test_an_any_parameter_keeps_the_string_it_arrived_as() -> None:
+    # A query string's "3" stays "3": ``any`` names no type to read it as.
+    params = Parameters.of(Parameter("pk", "any"), Parameter("on", "any"))
+
+    assert coerce_flat(params, {"pk": "3", "on": "true"}) == {"pk": "3", "on": "true"}

@@ -25,6 +25,8 @@ importing the package root never imports pydantic.
 ## Validation
 
 ::: django_service_specs.validation.validator.Validator
+::: django_service_specs.validation.validated.Validated
+
 ::: django_service_specs.validation.validation_context.ValidationContext
 ::: django_service_specs.validation.unknown_arguments.UnknownArguments
 
@@ -72,6 +74,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.present.present
 ::: django_service_specs.dispatch.apresent.apresent
 ::: django_service_specs.dispatch.present_for_audience.present_for_audience
+::: django_service_specs.dispatch.resolve_target.resolve_target
 ::: django_service_specs.dispatch.paginate_output.paginate_output
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
@@ -100,6 +103,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.authorization.unrestricted.Unrestricted
 ::: django_service_specs.authorization.grant.Grant
 ::: django_service_specs.authorization.authorize.authorize
+::: django_service_specs.authorization.authorize_scope.authorize_scope
 ::: django_service_specs.authorization.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.not_permitted.NotPermitted
@@ -124,6 +128,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
 ::: django_service_specs.pool.null_progress.null_progress
+::: django_service_specs.pool.provider_keys.provider_keys
+::: django_service_specs.specs.server_owned_keys.server_owned_keys
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
 
 ## Mutations
@@ -161,6 +167,15 @@ Installed with the `pydantic` extra and imported from
 ## Selectors
 
 ::: django_service_specs.selectors.shape_queryset.shape_queryset
+::: django_service_specs.selectors.run_selector.run_selector
+::: django_service_specs.selectors.arun_selector.arun_selector
+::: django_service_specs.selectors.materialize_retrieve.materialize_retrieve
+::: django_service_specs.selectors.amaterialize_retrieve.amaterialize_retrieve
+::: django_service_specs.selectors.is_queryset.is_queryset
+
+## Filters
+
+::: django_service_specs.filters.filter_set_parameters.filter_set_parameters
 
 ## Types
 
@@ -169,5 +184,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.unset.UnsetType
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
+::: django_service_specs.types.provider_keys.ProviderKeys
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.affordances.unmet_operation_affordance import (
@@ -101,3 +103,19 @@ class TestTheSeedsAConditionSees:
         pool = base_pool(user=ada, seeds=TENANT_SEEDS)
         assert unmet_operation_affordance(spec, pool) is None
         assert seen == {"user": ada, "progress": null_progress}
+
+
+async def _books_closed() -> bool:
+    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
+    return False
+
+
+def test_a_condition_answering_with_a_coroutine_is_refused_not_offered() -> None:
+    answer = _books_closed()
+    spec = ServiceSpec(
+        service=print,
+        affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
+    )
+    with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
+        unmet_operation_affordance(spec, {})
+    assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED

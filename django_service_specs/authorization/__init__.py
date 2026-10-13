@@ -1,6 +1,7 @@
 """Who is acting, and whether they may."""
 
 from django_service_specs.authorization.authorize import authorize
+from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -16,6 +17,7 @@ __all__ = [
     "PrincipalUnavailable",
     "Unrestricted",
     "authorize",
+    "authorize_scope",
     "authorize_target",
     "resolve_principal",
 ]

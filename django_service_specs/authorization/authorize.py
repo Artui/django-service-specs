@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.utils import sync_answer
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
@@ -36,6 +37,8 @@ def authorize(
     refusal raises
     [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     with that check's own message, or the generic one when it declares none.
+    An answer still to be awaited - a coroutine from a check that is not
+    sync - raises ``ImproperlyConfigured`` rather than being read as a pass.
 
     Returns:
         The grant that was honoured, or a freshly minted one covering this
@@ -55,6 +58,7 @@ def authorize(
             "no permissions. Pass permissions=[Unrestricted()] to mean that anyone may run it."
         )
     for check in spec.permissions:
-        if not check.has_permission(principal, spec):
+        answer = check.has_permission(principal, spec)
+        if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_permission"):
             raise NotPermitted(check.message)
     return Grant(spec, principal)

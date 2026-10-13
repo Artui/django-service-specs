@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
@@ -55,3 +56,47 @@ def test_resolvers_round_trips_the_registered_callable() -> None:
 
     extended = DEFAULT_POOL_SEEDS.extend(tenant=tenant_of)
     assert extended.resolvers() == {"tenant": tenant_of}
+
+
+async def _books_open() -> bool:
+    return False
+
+
+async def _books_open_lazily() -> Any:
+    yield False
+
+
+class _BooksOpen:
+    """A callable object whose ``__call__`` is ``async def``: the object itself is not."""
+
+    async def __call__(self) -> bool:
+        return False
+
+
+class TestAnAsyncResolverIsRefused:
+    """A resolver is called from sync code and never awaited: an async one is refused.
+
+    Its value would be a coroutine, which is truthy, so a condition or a
+    precondition reading the seed would see an answer nobody computed. One
+    shape per disjunct of the guard.
+    """
+
+    def test_an_async_def_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            DEFAULT_POOL_SEEDS.extend(books_open=_books_open)
+        message = str(refused.value)
+        assert message.startswith("The pool seed 'books_open' has an async resolver")
+        assert "_books_open" in message
+
+    def test_an_object_whose_call_is_async_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="has an async resolver"):
+            DEFAULT_POOL_SEEDS.extend(books_open=_BooksOpen())
+
+    def test_an_async_generator_function_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="has an async resolver"):
+            DEFAULT_POOL_SEEDS.extend(books_open=_books_open_lazily)
+
+    def test_constructing_the_registry_directly_is_refused_too(self) -> None:
+        # ``extend`` is not the only door: the dataclass is public.
+        with pytest.raises(ImproperlyConfigured, match="has an async resolver"):
+            PoolSeeds(seeds=(("books_open", _books_open),))

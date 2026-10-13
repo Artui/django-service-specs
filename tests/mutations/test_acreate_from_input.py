@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from unittest.mock import patch
 
 import pytest
+from asgiref.sync import sync_to_async
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.types.unset import UNSET, UnsetType
+from tests.adapter_app.models import Document
+from tests.mutations.utils import stored_name
 from tests.relations_app.models import Author, Post, Tag
 
 
@@ -83,3 +88,34 @@ class TestACreateFromInput:
         )
         pks = [pk async for pk in result.instance.tags.values_list("pk", flat=True)]
         assert pks == []
+
+
+@pytest.mark.django_db(transaction=True)
+class TestFileFields:
+    """As ``create_from_input``: ``None`` leaves a file to the model, ``False`` clears it."""
+
+    async def test_false_stores_no_file_and_none_is_left_to_the_model(self, media: str) -> None:
+        cleared = await acreate_from_input(
+            Document,
+            {"title": "T", "attachment": False, "scan": SimpleUploadedFile("scan.txt", b"s")},
+        )
+        assert await sync_to_async(stored_name)(cleared.instance) == ""
+        change = cleared.get_field_change("attachment")
+        assert change is not None
+        assert change.new == ""
+        left = await acreate_from_input(
+            Document,
+            {"title": "T", "attachment": None, "scan": SimpleUploadedFile("scan.txt", b"s")},
+        )
+        assert left.changed_fields == ("title", "scan")
+
+    async def test_a_file_is_written_through_its_field_s_save_form_data(self, media: str) -> None:
+        # Last, as ``construct_instance`` writes a ModelForm's files.
+        scan = SimpleUploadedFile("scan.txt", b"s")
+        scan_field = Document._meta.get_field("scan")
+        with patch.object(
+            scan_field, "save_form_data", wraps=scan_field.save_form_data
+        ) as save_form_data:
+            result = await acreate_from_input(Document, {"title": "T", "scan": scan})
+        save_form_data.assert_called_once_with(result.instance, scan)
+        assert await sync_to_async(stored_name)(result.instance, "scan") == "scans/scan.txt"

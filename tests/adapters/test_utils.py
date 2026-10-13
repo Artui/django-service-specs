@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import datetime as dt
 from decimal import Decimal
+from enum import Enum
 from typing import Annotated, Any, Optional
 
 import pytest
+from django.db import models
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy
 
-from django_service_specs.adapters.utils import SCALARS, scalar_type, strip
+from django_service_specs.adapters.utils import SCALARS, choice_labels, scalar_type, strip
 from django_service_specs.types.unset import UnsetType
 
 
@@ -70,3 +74,27 @@ class TestStrip:
 
     def test_a_plain_annotation_is_returned_unchanged(self) -> None:
         assert strip(int) == (int, False, False, ())
+
+
+class _Plain(Enum):
+    RED = "red"
+
+
+class _Shade(models.TextChoices):
+    LIGHT = "l", "Light"
+    DARK = "d", gettext_lazy("Dark")
+
+
+def test_a_literal_has_no_labels() -> None:
+    assert choice_labels(None) is None
+
+
+def test_a_plain_enum_has_no_labels() -> None:
+    assert choice_labels(_Plain) is None
+
+
+def test_a_django_choices_enum_labels_each_value_and_keeps_a_lazy_label_lazy() -> None:
+    labels = choice_labels(_Shade)
+    assert labels == (("l", "Light"), ("d", "Dark"))
+    assert labels is not None
+    assert isinstance(labels[1][1], Promise)

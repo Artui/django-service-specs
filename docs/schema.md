@@ -20,7 +20,8 @@ happened to install.
 
 - [`spec_input_schema(spec, *, unknown_arguments=REJECT)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
   describes everything `spec.parameters()` declares: the arguments dispatch
-  checks.
+  checks. A `many` service spec's is its `reads` and the one required list
+  `many_argument` names, each row an object of the Validator's parameters.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
@@ -91,7 +92,14 @@ default, and `published_on` and `pk` may be null:
         "properties": {
           "title": {"type": "string"},
           "price": {"type": "string", "format": "decimal"},
-          "status": {"type": "string", "enum": ["draft", "published"], "default": "draft"},
+          "status": {
+            "type": "string",
+            "anyOf": [
+              {"const": "draft", "title": "Draft"},
+              {"const": "published", "title": "Published"}
+            ],
+            "default": "draft"
+          },
           "published_on": {"type": ["string", "null"], "format": "date", "default": null},
           "pk": {"type": ["integer", "null"], "default": null}
         },
@@ -157,20 +165,63 @@ contradict, and states everything the declaration knows.
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on `items`, and gain `null` there by
   the element's nullability alone, never by the array's.
+- **Labelled choices are an `anyOf`** of `{"const": value, "title": label}`
+  in place of the `enum`, where some label says more than its value, as the
+  book's `status` above shows; labels that only repeat their values keep the
+  `enum`. A choice with no label is a bare `{"const": value}`, and a `null`
+  is `{"type": "null"}`, titled when it is labelled: the `null` a nullable
+  parameter gains among them. Each value is listed once, so the entries are
+  disjoint and `anyOf` admits exactly what `oneOf` would. It is `anyOf`
+  because a model provider's schema dialect is narrower than JSON Schema: an
+  OpenAI strict schema refuses `oneOf`, and so does Gemini, while Google's
+  transform empties a `{"const": null}` into `{}`, which matches every
+  value. A title is rendered when the schema is built, so a lazy label is in
+  the language active then, and it constrains nothing. What a spec returns
+  still states labelled choices as a `oneOf`.
+- **A file is `{}`.** No JSON value is one, so any type stated for it would be
+  false, and JSON Schema has no keyword for a multipart part. Whether it is
+  required, and its `description`, are still stated.
+- **An `any` is `{}` too**, since every JSON value is one; its `default` and
+  `description` are stated as on any other node. Like a file's, its node
+  admits `null` whether or not it is `nullable`, and the shape check is what
+  refuses a `null` it does not allow.
 - **`required` lists what the shape check refuses when absent**: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it
   is not listed.
+- **A partial update requires only its reads.** A `partial` spec's
+  Validator parameters are listed in no `required`, at any depth, because
+  dispatch refuses none of them absent; see [a partial update](#a-partial-update).
 - **A value JSON cannot carry is left out whole.** A default of
   `Decimal("9.99")` or `date.today`, or a choice set holding one, would break
   the encoding every transport performs on the schema, so it is not stated
   rather than restated in a form the declaration did not choose. Leaving out
   only the unencodable choices would claim the others are refused.
 
-What stays incomplete is only what the declaration does not carry. There are
-no bounds (`maxLength`, `minimum`) because Parameters has none yet; the
-Validator enforces them, and adding them to Parameters would reach the schema
-too.
+What stays incomplete is only what the declaration does not carry. A
+Parameter's `minimum` and `maximum` are stated as `"minimum"` and
+`"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
+`max_value`, is not. JSON Schema reads `minimum` and `maximum` on a number
+instance alone, so on a decimal string a validating client enforces neither:
+the shape check does, and the schema tells a reader where the line is.
+
+### A partial update
+
+A spec declaring `partial=True` takes any subset of its Validator's
+parameters, so its schema lists none of them in `required`: not at the top,
+not in an object's fields, not in an array's rows. A client reading
+`required` to decide what to send would otherwise never send the partial call
+the spec exists for. The spec's `reads` and its target selector's keep their
+`required`, as dispatch keeps them, so the schema still says which row the
+update names. An update whose target selector reads `pk` and whose Validator
+requires `title` and `body` has `"required": ["pk"]`.
+
+On a `many` spec the list stays required and each row requires nothing.
+`parameters()` is unchanged: it still says what a whole update needs, and
+the schema is where the relaxing happens. A read a `kwargs` provider fills
+is still listed as declared;
+[`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+is how a transport finds those.
 
 ### The decimal convention
 
@@ -224,6 +275,7 @@ on its presenter:
 | A service spec whose output selector is a `RETRIEVE` | the item, with `"null"` in its type |
 | A service spec with no output selector | the item |
 | A service spec with no output selector, with `allow_none=True` | the item, with `"null"` in its type |
+| A `many` service spec with no output selector | `{"type": "array", "items": <item>}`, with `"null"` in its type under `allow_none=True` |
 
 A `RETRIEVE` selector spec without `allow_none` answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
@@ -253,9 +305,10 @@ service's return.
 
 ## What is deliberately not emitted
 
-- **No `title` on input.** A Parameter has no label. On output, a field's
-  `label` becomes its `title`, and adapters set a label only where the author
-  wrote one, so a title is never the field's name restated.
+- **No `title` on an input property.** A Parameter has no label of its own;
+  on input a `title` is only ever a choice's. On output, a field's `label`
+  becomes its `title`, and adapters set a label only where the author wrote
+  one, so a title is never the field's name restated.
 - **No `additionalProperties` on output.** Output is not a set a caller can get
   wrong, and a transport may add keys of its own to what it sends.
 - **No `default` or `description` on output.** A default says what happens when
