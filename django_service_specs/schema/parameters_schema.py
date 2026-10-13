@@ -41,7 +41,10 @@ def parameters_schema(
       the node an adapter truncates a recursive declaration to.
     - **An array** is ``{"type": "array", "items": ...}``: a type name's
       ``{"type": t}``, the object schema of its rows, or ``{}`` for an array
-      that declares no ``items`` and accepts any element.
+      that declares no ``items`` and accepts any element. The array's
+      ``format`` and bounds describe each element, so they go on ``items``,
+      as its choices do: a CSV number filter's are ``{"type": "string",
+      "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}``.
     - **A file** is ``{}``. No JSON value is one, so any JSON type stated here
       would be false, and JSON Schema has no keyword for a multipart part.
       What is still known is the rest: whether it is required, its
@@ -147,22 +150,16 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         schema = {}
     else:
         schema = {"type": param.type}
-    if param.format is not None:
-        schema["format"] = param.format
-    # Stated on a decimal string too, where a validating client passes them by:
-    # JSON Schema reads ``minimum`` and ``maximum`` on a number instance only.
-    # The shape check is what enforces them there, and a reader still learns
-    # the bound. Two arcs, each held by test_a_bound_is_stated_beside_the_type.
-    if param.minimum is not None:
-        schema["minimum"] = param.minimum
-    if param.maximum is not None:
-        schema["maximum"] = param.maximum
-    # An array's choices describe its elements, and ``_items_schema`` states them.
-    # One branch to coverage, so each condition is held by its own test:
-    # test_a_scalar_states_its_type (the first: a parameter with no choices) and
-    # test_an_arrays_choices_constrain_each_item_and_not_the_array (the second).
-    if param.choices is not None and param.type != "array":
-        schema.update(_choices(param, nullable=param.nullable))
+    # An array's format, bounds and choices describe its elements, and
+    # ``_items_schema`` states them. Held by
+    # test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself
+    # and test_an_arrays_choices_constrain_each_item_and_not_the_array, which
+    # fail without it, for the array node would carry them as well.
+    if param.type != "array":
+        schema.update(_reading(param))
+        # Held by test_a_scalar_states_its_type, a parameter with no choices.
+        if param.choices is not None:
+            schema.update(_choices(param, nullable=param.nullable))
     if param.nullable:
         schema = allow_null(schema)
     # ``UNSET``, the declaration of no default, is not a JSON value either, so
@@ -177,6 +174,25 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         # is not a JSON value: it is rendered in the language active now.
         schema["description"] = str(param.help)
     return schema
+
+
+def _reading(param: Parameter) -> dict[str, Any]:
+    """The value's ``format`` and bounds: a scalar's own, or an array's element's.
+
+    Bounds are stated on a decimal string too, where a validating client
+    passes them by: JSON Schema reads ``minimum`` and ``maximum`` on a number
+    instance only. The shape check is what enforces them there, and a reader
+    still learns the bound. Three arcs, each held by
+    test_a_bound_is_stated_beside_the_type.
+    """
+    reading: dict[str, Any] = {}
+    if param.format is not None:
+        reading["format"] = param.format
+    if param.minimum is not None:
+        reading["minimum"] = param.minimum
+    if param.maximum is not None:
+        reading["maximum"] = param.maximum
+    return reading
 
 
 def _lengths(param: Parameter) -> dict[str, Any]:
@@ -204,7 +220,10 @@ def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
         # test_an_array_of_files_has_untyped_items.
         schema = {}
     else:
-        schema = {"type": items}
+        # ``Parameter`` takes a format or a bound on an array only for a
+        # typed element that can carry it, so a row, a file and an undeclared
+        # element carry neither and need no reading.
+        schema = {"type": items, **_reading(param)}
     if param.choices is not None:
         # Widened with null by the element's nullability and never the array's:
         # the shape check keeps a null element only where ``items_nullable``

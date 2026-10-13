@@ -152,9 +152,10 @@ def dispatch(
     ``instance`` or ``collection`` is ``target``. Step four still runs on it,
     unless ``grant`` says ``target_checked``, so with that grant
     ``has_object_permission`` is asked once across both. Without ``target``
-    a service spec's step four runs whatever the grant says: the grant
-    vouches for the target the caller found, not for what the arguments make
-    the lookup find. ``None`` is a missing
+    step four runs whatever the grant says: the grant vouches for the target
+    the caller found, not for what the arguments make the lookup find. So a
+    selector spec, which takes no ``target``, runs it on the row or the list
+    its selector found, whatever the grant says. ``None`` is a missing
     row, not-found unless the instance selector says ``allow_none``; a create
     takes ``None`` and refuses anything else. **Dispatch trusts it**: the
     target's ``reads`` are still checked as declared, and keeping them and

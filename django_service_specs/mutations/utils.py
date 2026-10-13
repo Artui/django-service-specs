@@ -23,7 +23,7 @@ from django_service_specs.mutations.related_object_change import RelatedObjectCh
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -776,7 +776,10 @@ def _namespaced_row_error(
     Django's codes are DRF's for the same mistakes, and a message raised with
     none is ``invalid``, as DRF's is. So is the message of a ``TypeError`` or
     ``ValueError``, which has no code to keep. A refusal that already has a
-    tree is re-rooted with its messages as they were, codes and all.
+    tree is re-rooted with its messages as they were, codes and all. The
+    messages are rendered by ``coded_messages``, the reading every step that
+    hands on Django's ``ValidationError`` shares; a field-keyed one is read
+    a field at a time here, so its field names stay the row's addresses.
     """
     if isinstance(exc, ServiceValidationError):
         return ServiceValidationError(path.namespace(exc.detail))
@@ -784,25 +787,12 @@ def _namespaced_row_error(
         return InvalidArguments(path.namespace(exc.detail))
     if isinstance(exc, ValidationError):
         detail: Any = (
-            {field: _coded(errors) for field, errors in exc.error_dict.items()}
+            {field: coded_messages(errors) for field, errors in exc.error_dict.items()}
             if hasattr(exc, "error_dict")
-            else _coded(exc.error_list)
+            else coded_messages(exc.error_list)
         )
         return InvalidArguments(path.namespace(detail))
     return InvalidArguments(path.namespace([CodedMessage(str(exc), "invalid")]))
-
-
-def _coded(errors: list[ValidationError]) -> list[CodedMessage]:
-    """Each of ``errors``' messages, rendered as ``messages`` renders it, with its own code.
-
-    Each of ``error_list`` holds one message, which ``messages`` renders
-    with its ``params``.
-    """
-    return [
-        CodedMessage(message, error.code or "invalid")
-        for error in errors
-        for message in error.messages
-    ]
 
 
 def _resolve_m2m(

@@ -216,16 +216,35 @@ def test_a_grant_for_another_principal_is_refused(ada: Any, bob: Any) -> None:
     assert caught.value.message == "The grant does not cover this spec and principal."
 
 
-def test_a_grant_that_checked_the_target_skips_the_object_level_check(ada: Any, bob: Any) -> None:
+def test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds(
+    ada: Any, bob: Any
+) -> None:
+    # A selector spec takes no ``target=``, so a grant has no row to be bound
+    # to: whatever its transport checked, the row the arguments make the
+    # selector find is checked here, as a service spec's lookup is.
     theirs = Note.objects.create(owner=bob, title="theirs")
     check = OwnerOnly()
     spec = retrieve(permissions=[check])
     grant = Grant(spec, ada, target_checked=True)
 
-    result = dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, grant=grant)
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, grant=grant)
 
-    assert result.value == theirs
-    assert check.rows == []
+    assert check.rows == [theirs]
+
+
+def test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads(
+    ada: Any,
+) -> None:
+    Note.objects.create(owner=ada, title="mine")
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[check])
+    grant = Grant(spec, ada, target_checked=True)
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={}, grant=grant)
+
+    assert len(check.scopes) == 1
 
 
 def test_a_selector_spec_s_object_level_check_sees_the_row_the_call_returns(ada: Any) -> None:
@@ -2077,6 +2096,60 @@ def test_a_selector_spec_s_precondition_reports_to_the_transport_and_not_the_spe
     )
     dispatch(spec, principal=ada, arguments={}, progress=lambda p, **_: transport.append(p))
     assert (sink.reports, transport) == ([1.0], [1.0, 0.5])
+
+
+def test_a_selector_spec_s_queryset_step_and_row_conditions_read_the_transport_s_reporter(
+    ada: Any,
+) -> None:
+    # Only the selector, the run, reports to the spec's sink: what shapes its
+    # rows and what answers each row's affordances are handed the reporter
+    # the transport passed, as a service spec's conditions are.
+    Note.objects.create(owner=ada, title="Row")
+    sink = _Sink()
+    reporter = _Reporter()
+    handed: dict[str, Any] = {}
+
+    def narrowing(*, queryset: Any, progress: Any) -> Any:
+        handed["extend_queryset"] = progress
+        return queryset
+
+    def condition(*, progress: Any) -> bool:
+        handed["condition"] = progress
+        return True
+
+    renaming = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[Affordance(code="open", reason="Closed.", when=condition)],
+    )
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=notes_of,
+        permissions=OPEN,
+        extend_queryset=narrowing,
+        affordances={"rename": renaming},
+        progress_reporter=sink,
+    )
+    rows = list(dispatch(spec, principal=ada, arguments={}, progress=reporter).value)
+
+    assert rows[0].affordance__rename__open is True
+    assert handed == {"extend_queryset": reporter, "condition": reporter}
+    assert sink.resolved == []
+
+
+def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
+    ada: Any,
+) -> None:
+    # Bound and handed a reporter, a selector that never reports never calls
+    # the provider: a sync run resolves it on the first report.
+    sink = _Sink()
+
+    def quiet(*, user: Any, progress: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(kind=LIST, selector=quiet, permissions=OPEN, progress_reporter=sink)
+    dispatch(spec, principal=ada, arguments={})
+    assert sink.resolved == []
 
 
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(

@@ -577,6 +577,39 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             }
         }
 
+    def test_a_validation_error_with_no_field_keeps_each_message_s_own_code(self) -> None:
+        # Built from a list, as ``Model.clean()`` raises one: the row's own
+        # complaint, each message rendered with its params and its code kept.
+        refusal = ValidationError(
+            [
+                ValidationError("Too long.", code="max_length"),
+                ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
+                "No code.",
+            ]
+        )
+
+        with (
+            patch.object(Section, "save", side_effect=refusal),
+            pytest.raises(InvalidArguments) as excinfo,
+        ):
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        assert coded(excinfo.value.detail) == {
+            "sections": {
+                0: {
+                    "non_field_errors": [
+                        ("Too long.", "max_length"),
+                        ("Not this.", "blocked"),
+                        ("No code.", "invalid"),
+                    ]
+                }
+            }
+        }
+
     def test_a_coerced_value_s_refusal_keeps_django_s_code(self) -> None:
         # A ``ValidationError`` with no field, from the field's ``to_python``.
         with pytest.raises(InvalidArguments) as excinfo:

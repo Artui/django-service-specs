@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Any
+from decimal import Decimal
+from typing import Any, ClassVar
 
 import django_filters
 import pytest
@@ -27,6 +28,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.dispatch.utils import Refuse, make_user
 from tests.dispatch_app.models import Note
 from tests.filters.utils import NoteFilters, NumberInFilter, UserFilters, notes
+from tests.parameters.utils import coded
 
 CSV_HELP = "Multiple values may be separated by commas."
 FACTORY = RequestFactory()
@@ -56,8 +58,11 @@ def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
         ),
         # django-filter gives every CSV filter this ``help_text`` of its own, and
         # it holds for the query string, where ``?pks=1,2`` is the spelling.
-        Parameter("pks", "array", items="number", help=CSV_HELP),
-        Parameter("pk_between", "array", items="number", help=CSV_HELP),
+        # Each element is a number filter's decimal, bounded as one is.
+        Parameter("pks", "array", items="string", format="decimal", help=CSV_HELP, **BOUNDED),
+        Parameter(
+            "pk_between", "array", items="string", format="decimal", help=CSV_HELP, **BOUNDED
+        ),
         # Two arguments, because django-filter reads ``pk_range_min`` and
         # ``pk_range_max`` off the data and never a ``pk_range`` of its own.
         Parameter(
@@ -217,6 +222,19 @@ def test_a_csv_filter_of_text_reads_strings() -> None:
             items="string",
             help=CSV_HELP,
         ),
+    )
+
+
+def test_a_csv_filter_of_dates_reads_strings_with_no_format() -> None:
+    # An element takes no format but a decimal, so a date's is left to the
+    # FilterSet's own field, as a text element's whole reading is.
+    class DateInFilter(django_filters.BaseInFilter, django_filters.DateFilter): ...
+
+    class Dated(django_filters.FilterSet):
+        days = DateInFilter(field_name="date_joined__date", lookup_expr="in")
+
+    assert filter_set_parameters(Dated) == Parameters.of(
+        Parameter("days", "array", items="string", help=CSV_HELP)
     )
 
 
@@ -384,9 +402,14 @@ class _Bounded(django_filters.FilterSet):
     pks = NumberInFilter(field_name="pk", lookup_expr="in")
 
 
-_BOUNDED_NAMES = ["pk", "pk_lt", "pk_gt", "pk_range_min", "pk_range_max"]
+_BOUNDED_NAMES = ["pk", "pk_lt", "pk_gt", "pk_range_min", "pk_range_max", "pks"]
 _ABOVE = "Ensure this value is less than or equal to 1e+50."
 _BELOW = "Ensure this value is greater than or equal to -1e+50."
+
+
+def _at(name: str, messages: list[str]) -> dict[str, Any]:
+    """Where a refusal of ``name``'s one value sits: at the name, or a CSV filter's at index 0."""
+    return {name: {0: messages}} if name == "pks" else {name: messages}
 
 
 def _dispatch_refused(request: HttpRequest) -> None:
@@ -412,6 +435,11 @@ def _dispatch_refused(request: HttpRequest) -> None:
         # has a million digits would hang the suite rather than fail it.
         ("1e400", _ABOVE),
         ("-1e400", _BELOW),
+        # The spelling that held a worker for minutes. Safe here whatever
+        # regresses: the permission check refuses every call, so a value the
+        # shape check let through ends at NotPermitted, never at ``int()``.
+        ("1E+999999999", _ABOVE),
+        ("-1E+999999999", _BELOW),
         # Just past the float django-filter's validator compares against,
         # which is 1.00000000000000007...e50 rather than 10**50.
         ("1.0000000000000001e50", _ABOVE),
@@ -427,7 +455,7 @@ def test_a_number_past_django_filter_s_bound_is_refused_by_the_shape_check(
     # billion-digit integer and held a worker for minutes.
     with pytest.raises(InvalidArguments) as caught:
         _dispatch_refused(FACTORY.get("/", {name: value}))
-    assert caught.value.detail == {name: [message]}
+    assert caught.value.detail == _at(name, [message])
 
 
 @pytest.mark.django_db
@@ -450,10 +478,81 @@ def test_a_json_number_past_the_bound_is_refused_too() -> None:
 
 
 @pytest.mark.django_db
-def test_a_csv_number_filter_past_a_float_s_range_is_no_number() -> None:
-    # A CSV filter's numbers are read as floats on the way, so the largest one
-    # it can hand on is a float's, whose integer is cheap; one past that is no
-    # number at all.
+@pytest.mark.parametrize(
+    "request_",
+    [
+        pytest.param(FACTORY.get("/", {"pks": "1,1E+999999999,-1E+999999999"}), id="comma-list"),
+        pytest.param(
+            FACTORY.get("/", {"pks": ["1", "1E+999999999", "-1E+999999999"]}), id="repeated"
+        ),
+        pytest.param(_json({"pks": ["1", "1E+999999999", "-1E+999999999"]}), id="json-strings"),
+        pytest.param(_json({"pks": [1, 1e60, -1e60]}), id="json-numbers"),
+    ],
+)
+def test_a_csv_number_filter_s_element_past_the_bound_is_refused_at_its_index(
+    request_: HttpRequest,
+) -> None:
+    # Each element is bounded as a number filter's value is, in the words and
+    # with the codes a DRF field gives, before anything converts it.
     with pytest.raises(InvalidArguments) as caught:
-        _dispatch_refused(FACTORY.get("/", {"pks": "1,1e400"}))
-    assert caught.value.detail == {"pks": {1: ["Enter a number."]}}
+        _dispatch_refused(request_)
+    assert coded(caught.value.detail) == {
+        "pks": {1: [(_ABOVE, "max_value")], 2: [(_BELOW, "min_value")]}
+    }
+
+
+class _ByIds(django_filters.FilterSet):
+    pks = NumberInFilter(field_name="pk", lookup_expr="in")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "request_for",
+    [
+        pytest.param(lambda pk: FACTORY.get(f"/?pks=1,{pk}"), id="comma-list"),
+        pytest.param(lambda pk: FACTORY.get(f"/?pks=1&pks={pk}"), id="repeated"),
+        pytest.param(lambda pk: _json({"pks": [1, pk]}), id="json-numbers"),
+        pytest.param(lambda pk: _json({"pks": ["1", str(pk)]}), id="json-strings"),
+    ],
+)
+def test_a_csv_number_filter_matches_a_key_past_a_float_s_precision_exactly(
+    big_ids: list[int], request_for: Any
+) -> None:
+    params = filter_set_parameters(_ByIds)
+    checked = check_arguments(params, request_arguments(request_for(big_ids[1]), params))
+    rows = shape_queryset(Note.objects.all(), _spec(_ByIds), checked, source_label="x")
+    assert list(rows.values_list("pk", flat=True)) == [big_ids[1]]
+
+
+_FORTY_DIGITS = "0.1234567890123456789012345678901234567891"
+"""A fraction no float holds: read through one, it comes back as 0.12345678901234568."""
+
+
+class _Recorded(django_filters.FilterSet):
+    """Records the values its CSV number filter hands on, as django-filter cleaned them."""
+
+    amounts = NumberInFilter(method="record")
+    seen: ClassVar[list[Any]] = []
+
+    def record(self, queryset: Any, name: str, value: Any) -> Any:
+        self.seen.append(value)
+        return queryset
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "request_",
+    [
+        pytest.param(FACTORY.get(f"/?amounts={_FORTY_DIGITS},2"), id="comma-list"),
+        pytest.param(FACTORY.get(f"/?amounts={_FORTY_DIGITS}&amounts=2"), id="repeated"),
+        pytest.param(_json({"amounts": [_FORTY_DIGITS, 2]}), id="json-strings"),
+    ],
+)
+def test_a_csv_number_filter_s_fraction_reaches_the_filter_exactly(request_: HttpRequest) -> None:
+    # Read as a float on the way, the fraction reached the filter rounded to
+    # seventeen digits; a decimal element stays the string it spells.
+    _Recorded.seen.clear()
+    params = filter_set_parameters(_Recorded)
+    checked = check_arguments(params, request_arguments(request_, params))
+    shape_queryset(Note.objects.all(), _spec(_Recorded), checked, source_label="x")
+    assert _Recorded.seen == [[Decimal(_FORTY_DIGITS), Decimal(2)]]

@@ -165,7 +165,11 @@ contradict, and states everything the declaration knows.
   parameter with choices therefore lists `null` among them, because the shape
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on `items`, and gain `null` there by
-  the element's nullability alone, never by the array's.
+  the element's nullability alone, never by the array's. So do an array's
+  `format`, `minimum` and `maximum`, which describe each element: a CSV
+  number filter's `items` are `{"type": "string", "format": "decimal",
+  "minimum": -1e+50, "maximum": 1e+50}`, and the array node states only its
+  own `"minItems"` and `"maxItems"`.
 - **Labelled choices are an `anyOf`** of `{"const": value, "title": label}`
   in place of the `enum`, where some label says more than its value, as the
   book's `status` above shows; labels that only repeat their values keep the

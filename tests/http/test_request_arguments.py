@@ -154,6 +154,11 @@ CSV = Parameters.of(
 )
 
 
+def _decimal_pks() -> Parameters:
+    """A CSV number filter's declaration, built in the test so a tree refusing it fails there."""
+    return Parameters.of(Parameter("pks", "array", items="string", format="decimal"))
+
+
 class _Ordered(django_filters.FilterSet):
     o = django_filters.OrderingFilter(fields=["title", "pk"])
 
@@ -191,6 +196,18 @@ class TestCommaSeparatedArrays:
     def test_a_form_body_splits_too(self) -> None:
         request = FACTORY.post("/", data="ids=1,2&pks=3", content_type=FORM)
         assert read(request, CSV) == {"ids": [1, 2], "pks": [3.0]}
+
+    def test_a_decimal_array_reads_a_comma_separated_value_as_its_elements_exactly(self) -> None:
+        # A decimal never holds a comma, so ``?pks=1,2`` splits as a number's
+        # does, and each part stays the string it spells, digits and all.
+        fraction = "0.1234567890123456789012345678901234567891"
+        query = f"/?pks=1,{fraction}, 3 &pks=4"
+        assert read(FACTORY.get(query), _decimal_pks()) == {"pks": ["1", fraction, "3", "4"]}
+
+    def test_blank_elements_of_a_decimal_array_are_dropped(self) -> None:
+        # No decimal is blank, so a blank element is absent, as a number's is.
+        assert read(FACTORY.get("/?pks=&pks=1"), _decimal_pks()) == {"pks": ["1"]}
+        assert read(FACTORY.get("/?pks="), _decimal_pks()) == {}
 
     def test_a_string_array_is_not_split(self) -> None:
         # A comma is part of a string; the whole value is the element.

@@ -102,7 +102,8 @@ async def adispatch(
     standing in for the lookup inside the one hop, and checked there unless
     ``grant`` says ``target_checked``; without ``target``, checked whatever
     the grant says. A selector spec and a ``many`` spec
-    refuse it before any hop.
+    refuse it before any hop, and a selector spec's row or list is checked
+    whatever the grant says, as ``dispatch``'s is.
 
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.

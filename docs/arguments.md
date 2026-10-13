@@ -45,7 +45,10 @@ alone are the exact integer they spell, and a point or an exponent makes a
 float. So `"9007199254740993"` goes on as that integer, as the JSON literal
 does, where a float would round it to its neighbour, and `"3"` goes on as the
 3 a JSON body's `3` is. A fraction finer than a float holds is rounded, as the
-JSON literal is; a value that must be exact is declared a `decimal`.
+JSON literal is; a value that must be exact is declared a `decimal`, and so is
+each element of an array that must be: `items="string"` with
+`format="decimal"`, as a django-filter CSV number filter declares, keeps every
+digit of each element and still splits `?pks=1,2`.
 
 **Only an ASCII string spells an `integer` or a `number`**, and this is one of
 two places the check is stricter than Django's forms, the other being
@@ -227,7 +230,7 @@ docs/examples/arguments.py:codes
 | A key nobody declared, under `REJECT` | `unknown` | the shape check |
 | A value of the wrong type, a malformed date or date-time, a decimal or number that is not finite, a row that is not an object | `invalid` | the shape check |
 | A value that is not an array where one is declared | `not_a_list` | the shape check |
-| A number past its `maximum`, or short of its `minimum` | `max_value`, `min_value` | the shape check |
+| A number past its `maximum`, or short of its `minimum`, an array's element at its index | `max_value`, `min_value` | the shape check |
 | A value outside its `choices` | `invalid_choice` | the shape check |
 | An array longer than it takes, or shorter | `max_length`, `min_length` | the shape check, `coerce_flat` |
 | A flat string that spells no integer, number or boolean, or one sent for a parameter with nested parameters | `invalid` | `coerce_flat` |
@@ -307,7 +310,9 @@ docs/examples/arguments.py:flat
   spelling (a Django `BooleanField` reads `"no"` as true), so refusing is the
   one answer that cannot set a flag the caller meant to clear.
 - A decimal, a date-time and a date **stay strings**, for the Validator to
-  decode, exactly as they would arrive off a JSON wire.
+  decode, exactly as they would arrive off a JSON wire. So does each element
+  of an array of decimal strings, which the shape check then reads and
+  bounds as a decimal, at its index.
 - **An `any` stays the string it arrived as**: it declares no type to read the
   string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value

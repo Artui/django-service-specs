@@ -133,9 +133,10 @@ def check_arguments(
       than the library behind it. ``filter_set_parameters`` draws
       django-filter's ``1e50`` below zero and on a range's bounds too, where
       django-filter draws none, because past it an integer column's
-      conversion builds every digit of the value. A decimal string is compared as the decimal it
-      spells, which reads its exponent and builds none of its digits, so
-      ``"1E+999999999"`` is refused as fast as ``"2"`` is taken.
+      conversion builds every digit of the value. A decimal string is
+      compared as the decimal it spells, which reads its exponent and builds
+      none of its digits, so ``"1E+999999999"`` is refused as fast as ``"2"``
+      is taken. An array's bounds bound each element, refused at its index.
     - **An array's length** is read before any of its elements: within its
       ``min_length`` and ``max_length``, and where it declares no maximum,
       within the ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the
@@ -145,7 +146,9 @@ def check_arguments(
       ``many`` call and one query variable per value of an ``in`` filter.
       The refusal is the list's own, at its name, in DRF's words.
     - ``choices`` constrain the value, and an array's choices constrain each of
-      its elements, since an array is never one of a list of scalars.
+      its elements, since an array is never one of a list of scalars. So do
+      an array's ``format`` and bounds: a ``decimal`` array's elements are
+      each read as a decimal is, and handed on as they were sent.
     - An ``object`` with no ``fields`` is free-form: its type is checked and
       its contents are not, because nothing is declared inside it to check
       against. An array with no ``items`` takes any element, and each is
@@ -270,11 +273,17 @@ def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
         if element is None and param.items_nullable:
             cleaned.append(None)
             continue
+        # An array's format, choices and bounds describe each element, never
+        # the list, whose own count is ``length_problem``'s. ``Parameter``
+        # takes a format or a bound only on an element that can carry it.
         checked, detail = _check_one(
             element_type,
             element,
+            fmt=param.format,
             fields=rows,
             choices=param.choices,
+            minimum=param.minimum,
+            maximum=param.maximum,
             walk=walk,
         )
         if detail is None:

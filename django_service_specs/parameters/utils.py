@@ -198,10 +198,8 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     only where a point or an exponent is spelled: what a JSON decoder makes
     of the same literal, so ``"3"`` reaches the Validator as the JSON ``3``
     does. Through ``float`` alone, every integer past 2**53 was rounded to a
-    neighbour, and a CSV filter's key, which is declared a ``number``, matched
-    the neighbour's row
-    (test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http).
-    The ``float`` reading still decides what is a number, so the accepted
+    neighbour, and a key sent for a ``number`` named the neighbour's row
+    (test_a_number_spelling_an_integer_is_that_exact_int). The ``float`` reading still decides what is a number, so the accepted
     strings are unchanged, and a literal long enough to reach ``int``'s digit
     limit is already infinite to ``float`` and refused. A fraction past a
     ``float``'s precision is rounded, as a JSON decoder rounds it: a value

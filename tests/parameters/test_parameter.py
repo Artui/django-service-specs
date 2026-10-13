@@ -149,11 +149,10 @@ def test_a_large_int_bound_is_taken_without_reading_it_as_a_float() -> None:
         {"type": "string"},
         {"type": "string", "format": "date"},
         {"type": "boolean"},
-        {"type": "array", "items": "number"},
         {"type": "object"},
         {"type": "file"},
     ],
-    ids=["string", "date", "boolean", "array", "object", "file"],
+    ids=["string", "date", "boolean", "object", "file"],
 )
 def test_a_bound_describes_a_number(kwargs: dict[str, Any]) -> None:
     with pytest.raises(
@@ -165,6 +164,61 @@ def test_a_bound_describes_a_number(kwargs: dict[str, Any]) -> None:
 def test_a_decimal_string_takes_a_bound() -> None:
     p = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
     assert (p.minimum, p.maximum) == (-1e50, 1e50)
+
+
+# --- an array's element: its format and its bounds ------------------------------------------
+
+
+def test_a_decimal_array_reads_each_element_as_a_bounded_decimal() -> None:
+    # A django-filter CSV number filter: each element is the decimal its
+    # string spells, bounded as a scalar number filter is.
+    p = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    assert (p.items, p.format, p.minimum, p.maximum) == ("string", "decimal", -1e50, 1e50)
+
+
+@pytest.mark.parametrize("items", ["integer", "number"])
+def test_a_bound_on_an_array_of_numbers_bounds_each_element(items: str) -> None:
+    # Beside a length, which counts the list: the two pairs say different things.
+    p = Parameter("ids", "array", items=items, minimum=1, maximum=10, max_length=3)
+    assert (p.minimum, p.maximum, p.max_length) == (1, 10, 3)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({}, "a format on an array describes each element, which must be a string"),
+        (
+            {"items": "number"},
+            "a format on an array describes each element, which must be a string",
+        ),
+        ({"items": ROW}, "a format on an array describes each element, which must be a string"),
+        (
+            {"items": "string", "format": "date"},
+            "an array's element takes no format but 'decimal'",
+        ),
+        (
+            {"items": "string", "format": "date-time"},
+            "an array's element takes no format but 'decimal'",
+        ),
+    ],
+    ids=["no-items", "number", "rows", "date", "date-time"],
+)
+def test_an_array_s_format_is_a_decimal_string_element_s_alone(
+    kwargs: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ImproperlyConfigured, match=message):
+        Parameter("pks", "array", **{"format": "decimal", **kwargs})
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, {"items": "string"}, {"items": "boolean"}, {"items": ROW}, {"items": "file"}],
+    ids=["no-items", "string", "boolean", "rows", "file"],
+)
+@pytest.mark.parametrize("side", ["minimum", "maximum"])
+def test_a_bound_on_an_array_describes_a_numeric_element(kwargs: dict[str, Any], side: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="a bound on an array describes each element"):
+        Parameter("pks", "array", **{side: 1, **kwargs})
 
 
 def test_a_minimum_past_the_maximum_is_refused() -> None:

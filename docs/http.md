@@ -91,10 +91,11 @@ reads them, by method and body:
 
 **A flat source is read by the declaration.** An `array` parameter takes every
 value its key was sent with (`?ids=1&ids=2`), and anything else takes the last.
-An array of numbers, integers or booleans also reads a value holding commas as
-its elements, `?ids=1,2` as `[1, 2]` with the space around each part trimmed:
-a comma cannot be part of such a value, and it is the spelling a django-filter
-CSV filter advertises. Repeated keys and commas may mix, and an empty part
+An array of numbers, integers, booleans or decimal strings also reads a value
+holding commas as its elements, `?ids=1,2` as `[1, 2]` with the space around
+each part trimmed: a comma cannot be part of such a value, and it is the
+spelling a django-filter CSV filter advertises. A decimal element stays the
+string it spells, so `?pks=1,2` is `["1", "2"]`, every digit kept. Repeated keys and commas may mix, and an empty part
 (`?ids=1,,2`) is refused at its index as any malformed element is. A list
 longer than the array takes - its `max_length`, or 1000 by the
 `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting - is refused whole at its name, a 400
@@ -104,8 +105,9 @@ split further than one element past it: see
 of strings is split the same way when it declares choices and none of them
 holds a comma, as a django-filter `OrderingFilter`'s do: every element must be
 a choice, so `?o=title,-pk` can only be `["title", "-pk"]`. An array of
-strings with no choices, or with a choice holding a comma, and an array of
-decimals or dates, is never split, since a comma can be part of a string.
+strings with no choices, or with a choice holding a comma, is never split,
+since a comma can be part of a string, and an array declaring no `items` is
+not either.
 A blank value is absent unless `""` is one the parameter can take: a plain
 string can, and a number, a boolean, a date, a decimal, or a string whose
 `choices` leave the blank out cannot. A flat wire has no other spelling of
