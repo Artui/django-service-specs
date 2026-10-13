@@ -31,10 +31,12 @@ class ProviderKeys(NamedTuple):
             transport keeps asking for it, and dispatch holds it to its
             declaration, so a required one is required of the caller even
             though the provider may fill it. What dispatch relaxes is narrower
-            still: a ``filled`` key of the spec's ``input_data`` provider that
-            names one of the Validator's parameters, at the top level or, on a
-            ``many`` spec, inside each row. A filled key naming a read stays
-            required.
+            still: a ``filled`` key where the provider's values reach it - a
+            selector's ``kwargs`` that selector's reads, a service spec's
+            ``kwargs`` the spec's ``reads``, and ``input_data`` the
+            Validator's parameters, at the top level or, on a ``many`` spec,
+            inside each row. A filled key any other parameter declares stays
+            required of the caller.
     """
 
     filled: frozenset[str]

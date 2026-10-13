@@ -2157,6 +2157,207 @@ def test_a_filled_key_naming_a_read_stays_required(ada: Any) -> None:
     assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
 
 
+# A ``kwargs`` provider annotated to fill a read: the spec's own reaches the
+# service, and a selector's own reaches that selector, so a caller is not asked
+# for what the provider answers. Each provider relaxes only the parameters its
+# values reach.
+
+
+class _ServerProjectPk(TypedDict):
+    project_pk: int
+
+
+class _ServerPk(TypedDict):
+    pk: int
+
+
+class _ServerTenant(TypedDict):
+    tenant: str
+
+
+_OMITTED = object()
+"""Handed to a provider factory to make the provider leave its key out altogether."""
+
+
+def _project_provider(project_pk: Any = 7) -> tuple[Callable[[], _ServerProjectPk], list[None]]:
+    """A ``kwargs`` provider annotated to fill ``project_pk``, and the list its calls append to."""
+    calls: list[None] = []
+
+    def server() -> _ServerProjectPk:
+        calls.append(None)
+        return {} if project_pk is _OMITTED else {"project_pk": project_pk}
+
+    return server, calls
+
+
+def _pk_provider(pk: Any) -> tuple[Callable[[], _ServerPk], list[None]]:
+    """A selector's ``kwargs`` provider annotated to fill ``pk``, and the list its calls append to."""
+    calls: list[None] = []
+
+    def server() -> _ServerPk:
+        calls.append(None)
+        return {} if pk is _OMITTED else {"pk": pk}
+
+    return server, calls
+
+
+def test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded_of_the_caller(ada: Any) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, reads=PROJECT, kwargs=_project_provider()[0]
+    )
+    dispatch(spec, principal=ada, arguments={})
+    assert service.calls[0]["project_pk"] == 7
+
+
+def test_a_relaxed_read_the_caller_sends_is_still_checked_and_the_provider_outranks_it(
+    ada: Any,
+) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, reads=PROJECT, kwargs=_project_provider()[0]
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"project_pk": "x"})
+    assert caught.value.detail == {"project_pk": ["Expected an integer."]}
+    dispatch(spec, principal=ada, arguments={"project_pk": 1})
+    assert service.calls[0]["project_pk"] == 7
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it(
+    ada: Any, declined: Any
+) -> None:
+    # Required of what the service is called with, not of the caller: the
+    # refusal is the usual one, from ``call_keywords``, after the provider ran.
+    provider, calls = _project_provider(project_pk=declined)
+    ran: list[int] = []
+
+    def create(*, project_pk: int) -> None:
+        ran.append(project_pk)
+
+    spec = ServiceSpec(service=create, permissions=OPEN, reads=PROJECT, kwargs=provider)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"project_pk": REQUIRED}
+    assert calls == [None]
+    assert ran == []
+
+
+def test_a_read_the_provider_does_not_name_stays_required(ada: Any) -> None:
+    def server() -> _ServerTenant:
+        return {"tenant": "t"}
+
+    spec = ServiceSpec(service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=server)
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+
+
+def test_an_untyped_kwargs_provider_relaxes_no_read(ada: Any) -> None:
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=PROJECT,
+        kwargs=lambda: {"project_pk": 7},
+    )
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+
+
+def test_a_validator_field_the_spec_s_kwargs_provider_fills_stays_required(ada: Any) -> None:
+    # ``kwargs`` is merged into the service's pool after the Validator ran, so
+    # its value never reaches the Validator: relaxed, the field would pass the
+    # shape check and be refused by the Validator for every caller.
+    def server() -> _ServerTitle:
+        return {"title": "server's"}
+
+    spec = ServiceSpec(service=Record(), permissions=[Refuse()], validator=Titled(), kwargs=server)
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"title": REQUIRED}
+
+
+def test_a_target_read_the_lookup_s_kwargs_provider_fills_is_not_demanded_of_the_caller(
+    ada: Any,
+) -> None:
+    note = Note.objects.create(owner=ada, title="Row")
+    service = Record()
+    target = nested(RETRIEVE, selector=note_by_pk, reads=PK, kwargs=_pk_provider(note.pk)[0])
+    spec = ServiceSpec(service=service, permissions=OPEN, instance_selector_spec=target)
+    dispatch(spec, principal=ada, arguments={})
+    assert service.calls[0]["instance"] == note
+
+
+@pytest.mark.parametrize("declined", [UNSET, _OMITTED], ids=["unset", "omitted"])
+def test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks(
+    ada: Any, declined: Any
+) -> None:
+    provider, calls = _pk_provider(declined)
+    service = Record()
+    target = nested(RETRIEVE, selector=note_by_pk, reads=PK, kwargs=provider)
+    spec = ServiceSpec(service=service, permissions=OPEN, instance_selector_spec=target)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"pk": REQUIRED}
+    assert calls == [None]
+    assert service.calls == []
+
+
+def test_a_target_read_the_spec_s_kwargs_provider_fills_stays_required(ada: Any) -> None:
+    # The spec's ``kwargs`` is called once the target is resolved, from the
+    # resolved row, so its value never reaches the lookup.
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        kwargs=_pk_provider(1)[0],
+    )
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"pk": REQUIRED}
+
+
+def test_a_read_the_lookup_s_kwargs_provider_fills_stays_required_of_the_service(
+    ada: Any,
+) -> None:
+    # A selector's ``kwargs`` reaches that selector alone, never the service.
+    def server() -> _ServerProjectPk:
+        return {"project_pk": 7}
+
+    target = nested(LIST, selector=notes_of, kwargs=server)
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=PROJECT,
+        collection_selector_spec=target,
+    )
+    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+
+
+def test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller(
+    ada: Any,
+) -> None:
+    note = Note.objects.create(owner=ada, title="Row")
+    spec = SelectorSpec(
+        kind=RETRIEVE,
+        selector=note_by_pk,
+        permissions=OPEN,
+        reads=PK,
+        kwargs=_pk_provider(note.pk)[0],
+    )
+    assert dispatch(spec, principal=ada, arguments={}).value == note
+
+
+def test_a_many_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller(
+    ada: Any,
+) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        many=True,
+        validator=Titled(),
+        reads=PROJECT,
+        kwargs=_project_provider()[0],
+    )
+    dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+    assert service.calls[0]["project_pk"] == 7
+
+
 # --- the scope check: a set, or nothing, asked where no row is resolved.
 
 

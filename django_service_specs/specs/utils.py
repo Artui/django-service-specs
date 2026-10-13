@@ -23,7 +23,8 @@ def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
 
     ``sync`` is for every seat dispatch calls from sync code and never awaits:
     the providers, the preconditions, a selector spec's ``extend_queryset`` and
-    ``filter_set``, and each method of a permission check. Called there, an
+    ``filter_set``, each method of a permission check, a Validator's
+    ``validate`` and ``validated``, and a Presenter's ``present``. Called there, an
     ``async def`` callable returns a coroutine nobody awaits, so a precondition
     that would have refused the call raises nothing and the call goes ahead, a
     permission check's answer is truthy and allows it, and a provider or a
@@ -124,10 +125,20 @@ def check_permissions(
 
 
 def check_presenter(presenter: Presenter | None, *, label: str) -> None:
-    if presenter is not None and not isinstance(presenter, Presenter):
+    """Refuse a presenter that is not a ``Presenter`` instance, or whose ``present`` is async.
+
+    ``present`` is called from sync code on both entry points and never
+    awaited, so an ``async def`` one would hand a transport a coroutine where
+    the payload should be
+    (``TestAnAsyncPresenterIsRefused`` in ``tests/specs/test_utils.py``).
+    """
+    if presenter is None:
+        return
+    if not isinstance(presenter, Presenter):
         raise ImproperlyConfigured(
             f"{label}.presenter is {_describe(presenter)}, which is not a Presenter instance."
         )
+    check_callable(presenter.present, label=f"{label}.presenter.present", sync=True)
 
 
 def check_metadata(metadata: Mapping[str, Any] | None, *, label: str) -> None:

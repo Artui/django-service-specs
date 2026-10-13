@@ -12,6 +12,7 @@ from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from tests.specs.utils import Named
 
 OPEN = (Unrestricted(),)
 
@@ -175,3 +176,26 @@ class TestAnAsyncPermissionCheckIsRefused:
             SelectorSpec(
                 kind=SelectorKind.RETRIEVE, selector=_selector, permissions=[_AsyncObjectLevel()]
             )
+
+
+class _AsyncPresent(Named):
+    async def present(self, value: Any) -> Any:  # A coroutine where the payload should be.
+        return {"name": str(value)}
+
+
+class TestAnAsyncPresenterIsRefused:
+    """``present`` is called from sync code on both entry points and never awaited."""
+
+    def test_on_a_service_spec(self) -> None:
+        named = "ServiceSpec.presenter.present is _AsyncPresent.present, an async callable"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            ServiceSpec(service=_service, presenter=_AsyncPresent())
+
+    def test_on_a_selector_spec(self) -> None:
+        named = "SelectorSpec.presenter.present is _AsyncPresent.present, an async callable"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            SelectorSpec(kind=SelectorKind.LIST, selector=_selector, presenter=_AsyncPresent())
+
+    def test_a_sync_presenter_is_accepted(self) -> None:
+        presenter = Named()
+        assert ServiceSpec(service=_service, presenter=presenter).presenter is presenter

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
+from typing import Any
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
@@ -12,6 +16,9 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.validation.validated import Validated
+from django_service_specs.validation.validation_context import ValidationContext
+from django_service_specs.validation.validator import Validator
 from tests.filters.utils import TitleFilter
 from tests.specs.utils import PK, Named, Titled
 
@@ -391,3 +398,38 @@ class TestMany:
     def test_a_callable_condition_on_a_many_spec_is_fine(self) -> None:
         spec = ServiceSpec(service=print, many=True, validator=Titled(), affordances=[ON_NOTHING])
         assert spec.affordances == (ON_NOTHING,)
+
+
+class _AsyncValidate(Titled):
+    async def validate(  # A coroutine nobody awaits, where the values should be.
+        self, arguments: Mapping[str, Any], context: ValidationContext
+    ) -> dict[str, Any]:
+        return dict(arguments)
+
+
+class _AsyncValidated(Titled):
+    async def validated(  # What dispatch calls, overridden as a coroutine.
+        self, arguments: Mapping[str, Any], context: ValidationContext
+    ) -> Validated:
+        return Validated(values=dict(arguments), data=dict(arguments))
+
+
+class TestAnAsyncValidatorIsRefused:
+    """Dispatch calls the Validator from sync code on both entry points and never awaits it.
+
+    One case per method, because the methods are named in one tuple and
+    coverage cannot see a name dropped from it.
+    """
+
+    @pytest.mark.parametrize(
+        ("validator", "method"),
+        [(_AsyncValidate(), "validate"), (_AsyncValidated(), "validated")],
+    )
+    def test_at_construction(self, validator: Validator, method: str) -> None:
+        named = f"ServiceSpec.validator.{method} is {type(validator).__name__}.{method}"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named + ", an async callable")):
+            ServiceSpec(service=print, validator=validator)
+
+    def test_a_sync_validator_is_accepted(self) -> None:
+        validator = Titled()
+        assert ServiceSpec(service=print, validator=validator).validator is validator

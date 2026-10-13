@@ -35,6 +35,8 @@ _DEFAULT_MANY_ARGUMENT = "items"
 # ASCII by the class rather than ``str.isidentifier``, which admits any
 # Unicode letter a header, a form field or a shell may not carry.
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+# The Validator methods dispatch calls: ``validated``, which calls ``validate``.
+_VALIDATOR_METHODS = ("validate", "validated")
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -227,6 +229,16 @@ class ServiceSpec:
                 f"{label}.validator is {what}, which is not a Validator instance. "
                 "Wrap the declaration in an adapter, such as DataclassValidator(...)."
             )
+        if self.validator is not None:
+            # Called from sync code on both entry points and never awaited, so
+            # an ``async def`` one hands dispatch a coroutine where its values
+            # should be. One case per method in
+            # ``TestAnAsyncValidatorIsRefused``, since coverage cannot see a
+            # name dropped from the tuple.
+            for method in _VALIDATOR_METHODS:
+                check_callable(
+                    getattr(self.validator, method), label=f"{label}.validator.{method}", sync=True
+                )
         _check_selector(self.instance_selector_spec, SelectorKind.RETRIEVE, "instance")
         _check_selector(self.collection_selector_spec, SelectorKind.LIST, "collection")
         if self.instance_selector_spec is not None and self.collection_selector_spec is not None:
