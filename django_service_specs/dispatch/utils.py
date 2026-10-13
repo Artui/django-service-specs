@@ -141,9 +141,10 @@ def open_call(
     # shape check to: the declaration is wrong for every caller, so
     # ``resolve_target`` refuses it as dispatch does
     # (test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
-    taken = sorted(spec.parameters().names() & pool_seeds.reserved)
+    declared = spec.parameters()
+    taken = sorted(declared.names() & pool_seeds.reserved)
     if parameters is None:
-        parameters = spec.parameters()
+        parameters = declared
     if taken:
         raise ImproperlyConfigured(
             f"{type(spec).__name__} declares the parameter(s) {taken}, which a registered "

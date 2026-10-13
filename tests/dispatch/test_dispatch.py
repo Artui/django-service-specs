@@ -843,11 +843,14 @@ def test_an_unmet_affordance_refuses_the_call_and_the_service_never_runs(
     note = Note.objects.create(owner=ada, title="old", archived=True)
     service = Record()
     spec = _renaming(service, NOT_ARCHIVED)
-    # A grant that claims both checks ran still leaves the row's state to ask.
-    grant = Grant(spec, ada, target_checked=True) if granted else None
+    # A grant that claims both checks ran, on the row handed over with it,
+    # still leaves the row's state to ask.
+    extra: dict[str, Any] = (
+        {"grant": Grant(spec, ada, target_checked=True), "target": note} if granted else {}
+    )
 
     with pytest.raises(ActionUnavailable) as caught:
-        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}, grant=grant)
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"}, **extra)
 
     assert (caught.value.code, caught.value.message) == (
         "note_archived",

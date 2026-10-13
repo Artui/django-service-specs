@@ -69,6 +69,10 @@ def check_preconditions(
     to coverage: the ``"print"`` case of each spec's
     ``test_refuses_at_construction`` holds the first disjunct, its ``print``
     case the second.
+
+    An ``async def`` one is refused here. What construction cannot see, a
+    plain ``def`` handing back a coroutine, is refused where the answer is
+    read, by ``dispatch/utils.py``'s ``sync_result``.
     """
     if preconditions is None:
         return None
@@ -142,6 +146,8 @@ def check_presenter(presenter: Presenter | None, *, label: str) -> None:
     awaited, so an ``async def`` one would hand a transport a coroutine where
     the payload should be
     (``TestAnAsyncPresenterIsRefused`` in ``tests/specs/test_utils.py``).
+    A plain ``def present`` handing back a coroutine is refused where its
+    answer is read, by ``present``.
     """
     if presenter is None:
         return

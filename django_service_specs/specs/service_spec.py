@@ -146,7 +146,9 @@ class ServiceSpec:
         preconditions: Raise-to-abort rules, a sequence of callables each called
             with the keywords it declares from the service's pool, after the
             ``affordances`` and before the service, outside its transaction. The
-            return value is ignored. Kept as a tuple in declaration order.
+            return value is ignored, unless it is still to be awaited - a
+            coroutine from a decorated ``async def`` - which refuses the call
+            with ``ImproperlyConfigured``. Kept as a tuple in declaration order.
         kwargs: A provider of extra pool entries: called with the keywords it
             declares from the call's pool, it returns a mapping merged into the
             pool the service is called from after the caller's arguments, so a

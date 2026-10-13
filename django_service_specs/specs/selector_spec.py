@@ -105,8 +105,9 @@ class SelectorSpec:
         preconditions: Raise-to-abort rules, a sequence of callables each called
             with the keywords it declares from the same pool once the selector
             has resolved, the row as ``instance`` or the rows as
-            ``collection``. The return value is ignored. Kept as a tuple in
-            declaration order. Refused on a nested selector, whose run is the
+            ``collection``. The return value is ignored, unless it is still to
+            be awaited, which refuses the call with ``ImproperlyConfigured``.
+            Kept as a tuple in declaration order. Refused on a nested selector, whose run is the
             enclosing service spec's.
         progress_reporter: A provider of a
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]

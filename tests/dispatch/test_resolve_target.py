@@ -244,6 +244,25 @@ def test_a_grant_that_checked_a_target_does_not_skip_the_checks_on_what_it_finds
     assert check.scopes == [scope]
 
 
+@pytest.mark.parametrize(
+    ("make", "arguments", "target"),
+    [
+        (_bulk, {}, []),
+        (_create, {"title": "T"}, None),
+        (lambda check: _update(check, allow_none=True), {"pk": 404, "title": "T"}, None),
+    ],
+    ids=["a-set", "a-create", "an-allow-none-miss"],
+)
+def test_dispatch_handed_the_target_with_a_grant_that_checked_it_skips_the_scope_check(
+    ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any], target: Any
+) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = make(check)
+    grant = Grant(spec, ada, target_checked=True)
+    dispatch(spec, principal=ada, arguments=arguments, grant=grant, target=target)
+    assert check.scopes == []
+
+
 class _ServerPk(TypedDict, total=False):
     pk: int
 

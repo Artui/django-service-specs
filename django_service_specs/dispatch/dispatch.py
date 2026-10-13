@@ -187,8 +187,9 @@ def dispatch(
             a validated, bound or provided value named after a seed, a bound
             value named after a validated one, any value bound for a row of a
             ``many`` call, shaping declared on a
-            selector that returned something other than a queryset, or a
-            condition on the row with no row to answer it for.
+            selector that returned something other than a queryset, a
+            condition on the row with no row to answer it for, or a
+            precondition answering with a coroutine or an async generator.
     """
     refuse_target(spec, target)
     if isinstance(spec, SelectorSpec):
