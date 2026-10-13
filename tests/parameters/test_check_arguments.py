@@ -269,9 +269,9 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
 def test_a_numeric_string_is_read_and_the_number_handed_on(
     json_type: str, value: str, number: float
 ) -> None:
-    # Django's forms, DRF and pydantic's lax mode all read these strings as the
-    # number, so refusing them was stricter than every library behind the
-    # check. The parsed number is what goes on: a dataclass Validator refuses
+    # Django's forms read every one of these strings as the number, and
+    # pydantic's lax mode all but the integer "-4.", so refusing them was
+    # stricter than every library behind the check. The parsed number is what goes on: a dataclass Validator refuses
     # the string "3" for an ``int``.
     cleaned = check_arguments(one(Parameter("x", json_type)), {"x": value})
     assert cleaned == {"x": number}
@@ -294,7 +294,7 @@ def test_a_string_that_is_no_number_is_refused_as_its_type(
 ) -> None:
     # The refusal is the type's, as before: a string that does not read as the
     # number is a string, which is not the declared type. "1e3" is no integer
-    # to any of the three libraries, although each reads it as a number.
+    # to Django's forms or pydantic, although both read it as a number.
     assert refusal(one(Parameter("x", json_type)), {"x": value}) == {"x": [message]}
 
 
