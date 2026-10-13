@@ -115,6 +115,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   django-filter only if it is already loaded, so a duck is refused in the same
   words with or without the `filter` extra. A step narrowing the queryset by
   no argument belongs in `extend_queryset`.
+- `spec_input_schema` and dispatch's shape check read what a `partial` call
+  may leave out through one function, where each kept its own copy of the
+  rule. Nothing either answers changes; the schema's `required` less
+  `server_owned_keys` is exactly what dispatch refuses when it is absent,
+  and a test now holds the two to that.
 
 ### Fixed
 - **A nested write's own refusals carry codes.** A null row in a relation
@@ -135,12 +140,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   value. The held file handed back as itself, which is what a form's file
   field cleans to when nothing is uploaded, is still no change; `None` still
   keeps the file and `False` still clears it.
-- `spec_input_schema` and dispatch's shape check read what a `partial` call
-  may leave out through one function, where each kept its own copy of the
-  rule. Nothing either answers changes; the schema's `required` less
-  `server_owned_keys` is exactly what dispatch refuses when it is absent,
-  and a test now holds the two to that.
-
 - A string sent for a `number`, by a flat transport or in a JSON body, is read
   as a JSON decoder reads the same literal: digits alone are the exact `int`
   they spell, and a point or an exponent makes a `float`. Read through `float`
