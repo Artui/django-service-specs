@@ -99,7 +99,9 @@ def check_arguments(
       nothing is read as a number, and ``"3"`` stays the string ``"3"``. A
       ``null`` is still refused unless it is ``nullable``, and NaN and the
       infinities are still no JSON value. A container is not walked, as an
-      undeclared array element's is not.
+      undeclared array element's is not, and a value of no JSON type - a
+      Python caller's, or a multipart upload sent under its name - is handed
+      on too.
     - **An integral float is an** ``integer``, and is handed on as an ``int``
       wherever the declaration reaches. JSON Schema counts ``5.0`` as an
       integer, so the ``{"type": "integer"}`` this kernel advertises admits

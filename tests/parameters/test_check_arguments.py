@@ -871,6 +871,15 @@ class TestAny:
         assert cleaned == {"pk": value}
         assert type(cleaned["pk"]) is type(value)
 
+    def test_a_python_callers_value_of_no_json_type_is_handed_on_too(self) -> None:
+        # No type is declared, so nothing is checked against one: a Django
+        # ``File`` a multipart part carries under the name is handed on as well.
+        upload = ContentFile(b"x", name="x.txt")
+
+        assert check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": upload}) == {
+            "pk": upload
+        }
+
     def test_null_is_refused_unless_nullable(self) -> None:
         strict = Parameters.of(Parameter("pk", "any"))
         loose = Parameters.of(Parameter("pk", "any", nullable=True))

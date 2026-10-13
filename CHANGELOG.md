@@ -33,8 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter a partial call left out is not refused as missing.
   `spec_input_schema` lists none of a partial spec's Validator parameters in
   `required`, at any depth, a `many` spec's rows included, while its `reads`
-  and its target selector's stay required as declared; `parameters()` still
-  says what a whole update needs.
+  and its target selector's stay required as declared, a read a provider
+  fills among them, which `server_owned_keys` names for a transport to take
+  out; `parameters()` still says what a whole update needs.
 - `ServiceSpec.many` and `many_argument`, for a call carrying a list of rows
   under one argument, `"items"` by default, for one run of the service over
   all of them inside one transaction. Each row is shape-checked and

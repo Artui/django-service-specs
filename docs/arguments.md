@@ -56,7 +56,9 @@ name.
 An **`any`** declares no type, so every value is one and is handed on exactly
 as it arrived: a `"3"` stays the string, never read as the number it spells.
 `null` is still refused unless the parameter is `nullable`, and NaN and the
-infinities are still no JSON value.
+infinities are still no JSON value. Nothing is checked against a type, so a
+value of no JSON type is handed on too: a Python caller's, or a multipart
+upload sent under the parameter's name.
 
 NaN and the infinities are refused, and that is a type rule rather than a
 stricter check: JSON has no spelling for either, so they are outside the

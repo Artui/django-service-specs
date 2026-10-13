@@ -65,6 +65,9 @@ def _partial(spec: ServiceSpec, parameters: Parameters) -> Parameters:
             *(_below(param) if param.name == spec.many_argument else param for param in parameters)
         )
     target = spec.target_selector_spec()
+    # The spec's reads are held by
+    # test_a_partial_spec_with_no_target_keeps_its_reads_required, the
+    # target's by test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth.
     kept = spec.reads.names() | (target.parameters().names() if target is not None else frozenset())
     return Parameters.of(
         *(param if param.name in kept else _optional(param) for param in parameters)

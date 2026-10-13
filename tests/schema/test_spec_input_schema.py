@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import pytest
+from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.utils import shape_check
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -12,6 +13,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
@@ -137,6 +139,15 @@ def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
 TAG = Parameters.of(Parameter("label", "string", required=True))
 
 
+class _Project(TypedDict):
+    project: int
+
+
+def the_project() -> _Project:
+    """A typed ``kwargs`` provider: it fills ``project``, so dispatch demands it of nobody."""
+    return {"project": 1}
+
+
 class Article(Validator):
     """Required fields at every depth: the top, an object's fields, an array's rows."""
 
@@ -194,6 +205,51 @@ class TestPartial:
         )
 
         assert spec_input_schema(spec)["required"] == ["project"]
+
+    def test_an_update_naming_its_row_by_pk_requires_the_pk_alone(self) -> None:
+        # The case docs/schema.md states: a target read ``pk``, and a Validator
+        # requiring ``title`` and ``body``.
+        class TitleAndBody(Validator):
+            def parameters(self) -> Parameters:
+                return Parameters.of(
+                    Parameter("title", "string", required=True),
+                    Parameter("body", "string", required=True),
+                )
+
+            def validate(
+                self, arguments: Mapping[str, Any], context: ValidationContext
+            ) -> dict[str, Any]:
+                return dict(arguments)
+
+        spec = ServiceSpec(
+            service=edit,
+            permissions=OPEN,
+            validator=TitleAndBody(),
+            partial=True,
+            instance_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK
+            ),
+        )
+
+        assert spec_input_schema(spec)["required"] == ["pk"]
+
+    def test_a_read_a_provider_fills_is_listed_as_declared_and_owned_by_the_server(
+        self,
+    ) -> None:
+        # The schema relaxes only what ``partial`` relaxes. A read a typed
+        # provider fills stays required here, and ``server_owned_keys`` is how
+        # a transport learns to take it out.
+        spec = ServiceSpec(
+            service=edit,
+            permissions=OPEN,
+            validator=Article(),
+            partial=True,
+            reads=Parameters.of(Parameter("project", "integer", required=True)),
+            kwargs=the_project,
+        )
+
+        assert spec_input_schema(spec)["required"] == ["project"]
+        assert "project" in server_owned_keys(spec)
 
     def test_a_partial_spec_leaves_its_parameters_declaration_as_it_was(self) -> None:
         spec = article_spec(partial=True)
