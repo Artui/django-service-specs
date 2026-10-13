@@ -9,6 +9,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.authorization.authorize import authorize
+from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.authorize_target import authorize_target
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -191,6 +192,7 @@ __all__ = [
     "audience_projection_for_spec",
     "aupdate_from_input",
     "authorize",
+    "authorize_scope",
     "authorize_target",
     "base_pool",
     "bind_arguments",

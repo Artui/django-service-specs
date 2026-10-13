@@ -25,6 +25,13 @@ class PermissionCheck(abc.ABC):
     ``has_object_permission`` runs against the resolved target of a retrieve or
     an update; it allows by default, because most checks are class-level only.
 
+    ``has_scope_permission`` is the same question for a call that resolves no
+    single row: it is asked of the set a bulk call acts on or a collection
+    reads, and of ``None`` where the call acts on no existing row (a create).
+    It is a separate method rather than ``has_object_permission`` handed a set
+    or ``None``, because a check written for a row would read an attribute off
+    it and fail on neither; it allows by default for the same reason.
+
     ``message`` is what [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     says when this check refuses; ``None`` keeps the generic wording.
 
@@ -42,4 +49,14 @@ class PermissionCheck(abc.ABC):
         self, principal: Any, spec: ServiceSpec | SelectorSpec, target: Any
     ) -> bool:
         """Whether ``principal`` may act on ``target``. Allows unless overridden."""
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: ServiceSpec | SelectorSpec, scope: Any
+    ) -> bool:
+        """Whether ``principal`` may act on ``scope``. Allows unless overridden.
+
+        ``scope`` is the resolved set of a bulk or collection call, or ``None``
+        for a call that acts on no existing row.
+        """
         return True

@@ -21,3 +21,8 @@ def test_object_level_allows_unless_overridden() -> None:
 def test_class_level_is_abstract() -> None:
     with pytest.raises(TypeError, match="abstract"):
         PermissionCheck()
+
+
+def test_scope_level_allows_unless_overridden() -> None:
+    assert _StaffOnly().has_scope_permission(None, None, None) is True
+    assert _StaffOnly().has_scope_permission(None, None, [object()]) is True
