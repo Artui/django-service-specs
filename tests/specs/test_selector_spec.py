@@ -246,6 +246,37 @@ class TestFilterSet:
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):
             listing(filter_set=3)
 
+    def test_one_with_no_base_filters_is_refused_naming_it(self) -> None:
+        # A duck-typed object takes ``(data, queryset)`` and declares no
+        # filters, so it would be handed no data and never filter: the
+        # caller's argument was dropped under IGNORE and refused as unknown
+        # under REJECT. Refused where it is declared instead.
+        class Duck:
+            def __init__(self, data: object = None, queryset: object = None) -> None:
+                self.qs = queryset
+
+        with pytest.raises(ImproperlyConfigured) as refused:
+            listing(filter_set=Duck)
+        message = str(refused.value)
+        assert "SelectorSpec.filter_set is Duck" in message
+        assert "must be a django-filter FilterSet" in message
+        assert "base_filters" in message
+        # Not the callable check's wording: this one is callable.
+        assert "must be callable" not in message
+
+    def test_a_filterset_declaring_no_filters_is_accepted(self) -> None:
+        # Holds the guard to the attribute's absence rather than its
+        # emptiness: a real FilterSet with no filters narrows nothing and
+        # declares nothing, which is a spec worth nothing but not a broken
+        # one. A guard reading ``getattr(..., "base_filters", None) or ...``
+        # refuses this.
+        class Empty(django_filters.FilterSet):
+            pass
+
+        spec = listing(filter_set=Empty)
+        assert spec.filter_set is Empty
+        assert spec.reads == Parameters()
+
 
 async def _extend(queryset: object) -> object:
     return queryset

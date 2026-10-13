@@ -107,8 +107,10 @@ them on a selector that returns something other than a queryset is refused at
 dispatch.
 
 `filter_set` is a django-filter `FilterSet` class, installed with the
-`filter` extra, or anything called as `filter_set(data=..., queryset=...)`
-that answers `.qs`. Its filters are reads: each is read as a Parameter by
+`filter` extra. An object with no `base_filters` - a duck-typed stand-in
+taking `(data, queryset)` - is refused with `ImproperlyConfigured` when the
+spec is built: it declares no Parameters, so it would be handed none of the
+caller's data and never filter. Its filters are reads: each is read as a Parameter by
 [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument
@@ -230,7 +232,11 @@ sync-only: an `async def` one is refused when the spec is built.
   owner, a status - is the author's. A Validator field it is annotated to fill
   is not demanded of the caller, and the Validator still refuses it if the
   provider declines it. A value the caller sends for a field the provider is
-  annotated to fill is dropped, not used in its place.
+  annotated to fill is dropped, not used in its place. The Validator is what
+  consumes it, and the service is handed none of it directly, so a spec that
+  declares `input_data` with no Validator is refused with
+  `ImproperlyConfigured` when it is built: declare a Validator, or use
+  `kwargs` for a value the service reads.
 - **`preconditions`** are raise-to-abort rules, in declaration order, after
   the affordances and before the service, outside its transaction. What the
   first to raise raises reaches the caller as it is. One answering with a

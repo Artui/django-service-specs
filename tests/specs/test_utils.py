@@ -12,7 +12,7 @@ from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from tests.specs.utils import Named
+from tests.specs.utils import Bare, Named
 
 OPEN = (Unrestricted(),)
 
@@ -96,6 +96,7 @@ def test_a_sync_provider_and_precondition_are_accepted() -> None:
         permissions=OPEN,
         preconditions=[_service],
         kwargs=dict,
+        validator=Bare(),
         input_data=dict,
         progress_reporter=_service,
     )

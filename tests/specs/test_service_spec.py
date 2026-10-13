@@ -22,7 +22,7 @@ from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.filters.utils import TitleFilter
-from tests.specs.utils import PK, Named, Titled
+from tests.specs.utils import PK, Bare, Named, Titled
 
 RETRIEVE = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK)
 LIST = SelectorSpec(kind=SelectorKind.LIST, selector=list)
@@ -128,6 +128,29 @@ def test_refuses_at_construction(kwargs: dict, message: str) -> None:
         ServiceSpec(**{"service": print, **kwargs})
 
 
+class TestInputDataNeedsAValidator:
+    """``input_data`` merges over the Validator's arguments, so with none it reaches nothing."""
+
+    def test_input_data_with_no_validator_is_refused_at_construction(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, permissions=[Unrestricted()], input_data=_title)
+        message = str(refused.value)
+        assert "ServiceSpec.input_data merges over the Validator's arguments" in message
+        assert "has no validator, so it would reach nothing" in message
+        assert "Declare a validator, or use kwargs" in message
+
+    def test_input_data_beside_a_validator_is_accepted(self) -> None:
+        # Holds the ``validator is None`` conjunct of the refusal: without it
+        # this is refused.
+        spec = ServiceSpec(service=print, validator=Titled(), input_data=_title)
+        assert spec.input_data is _title
+
+    def test_a_spec_without_input_data_needs_no_validator(self) -> None:
+        # Holds the ``input_data is not None`` conjunct: without it every
+        # spec with no Validator, this one included, is refused.
+        assert ServiceSpec(service=print).input_data is None
+
+
 class TestEngineFields:
     """The fields a dispatch reads beyond the declaration: partial, preconditions, providers."""
 
@@ -142,6 +165,7 @@ class TestEngineFields:
         spec = ServiceSpec(
             service=print,
             kwargs=scope,
+            validator=Bare(),
             input_data=dict,
             progress_reporter=print,
             preconditions=[print, len],
@@ -492,7 +516,7 @@ class TestProviderReach:
         ("declaration", "provider", "key", "where", "reaching"),
         [
             pytest.param(
-                {"reads": PROJECT, "input_data": _project},
+                {"reads": PROJECT, "validator": Bare(), "input_data": _project},
                 "ServiceSpec.input_data",
                 "project",
                 "ServiceSpec.reads",
@@ -500,7 +524,7 @@ class TestProviderReach:
                 id="input-data-on-a-read",
             ),
             pytest.param(
-                {"instance_selector_spec": _target(), "input_data": _pk},
+                {"instance_selector_spec": _target(), "validator": Bare(), "input_data": _pk},
                 "ServiceSpec.input_data",
                 "pk",
                 f"{TARGET}.reads",
@@ -587,11 +611,15 @@ class TestProviderReach:
         assert spec.parameters().names() == {"pk", "project", "title"}
 
     def test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
-        spec = ServiceSpec(service=print, reads=PROJECT, input_data=_maybe_project)
+        spec = ServiceSpec(
+            service=print, reads=PROJECT, validator=Bare(), input_data=_maybe_project
+        )
         assert spec.parameters().names() == {"project"}
 
     def test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
-        spec = ServiceSpec(service=print, reads=PROJECT, input_data=lambda: {"project": 1})
+        spec = ServiceSpec(
+            service=print, reads=PROJECT, validator=Bare(), input_data=lambda: {"project": 1}
+        )
         assert spec.parameters().names() == {"project"}
 
     def test_a_key_no_parameter_declares_is_accepted(self) -> None:
@@ -607,7 +635,7 @@ class TestProviderReach:
             return {"project": 1}
 
         late.__annotations__["return"] = "_DefinedLater"
-        spec = ServiceSpec(service=print, reads=PROJECT, input_data=late)
+        spec = ServiceSpec(service=print, reads=PROJECT, validator=Bare(), input_data=late)
         monkeypatch.setitem(globals(), "_DefinedLater", _FillsProject)
         named = "ServiceSpec.input_data is annotated to fill ['project'], which ServiceSpec.reads"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):

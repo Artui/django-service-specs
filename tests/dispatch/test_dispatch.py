@@ -60,6 +60,7 @@ from tests.dispatch.utils import (
     shaping_refused,
 )
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Bare
 
 LIST = SelectorKind.LIST
 RETRIEVE = SelectorKind.RETRIEVE
@@ -2541,7 +2542,7 @@ def _guarded(check: Scoped, **kwargs: Any) -> tuple[ServiceSpec, Record]:
 def test_a_create_asks_the_scope_check_of_nothing(ada: Any) -> None:
     check = Scoped(refuse_scope=True)
     calls: list[None] = []
-    spec, service = _guarded(check, input_data=lambda: calls.append(None) or {})
+    spec, service = _guarded(check, validator=Bare(), input_data=lambda: calls.append(None) or {})
     with pytest.raises(NotPermitted) as caught:
         dispatch(spec, principal=ada, arguments={})
     assert caught.value.message == "Not within your scope."

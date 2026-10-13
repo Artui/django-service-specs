@@ -225,16 +225,6 @@ def _notes() -> QuerySet[Note]:
     return Note.objects.all()
 
 
-class _BareFilter:
-    """The duck type at its smallest: ``(data, queryset)`` in, ``.qs`` out, no ``is_valid``."""
-
-    seen: ClassVar[list[dict[str, Any]]] = []
-
-    def __init__(self, data: Any, queryset: Any) -> None:
-        type(self).seen.append({"data": data})
-        self.qs = queryset.filter(archived=True)
-
-
 @pytest.mark.django_db
 class TestFilterSet:
     def test_the_filters_read_their_arguments_from_the_pool(self) -> None:
@@ -281,14 +271,6 @@ class TestFilterSet:
             )
         assert list(caught.value.detail) == ["pk_range"]
 
-    def test_a_stand_in_with_no_is_valid_is_read_as_it_answers(self) -> None:
-        _BareFilter.seen.clear()
-        _three_notes()
-        rows = shape_queryset(Note.objects.all(), _filtered(_BareFilter), {}, source_label="x")
-        assert _titles(rows) == ["final"]
-        # It declares no filters, so nothing in the pool is its argument.
-        assert _BareFilter.seen == [{"data": {}}]
-
     def test_the_request_reaches_a_filterset_that_takes_one(self) -> None:
         ada = _three_notes()
         Note.objects.create(owner=make_user("bob"), title="bob's")
@@ -299,11 +281,16 @@ class TestFilterSet:
         assert _titles(rows) == ["draft", "final", "other"]
 
     def test_a_filter_that_takes_no_request_is_not_handed_one(self) -> None:
-        _BareFilter.seen.clear()
+        # Its constructor takes no ``request``, so handing it one would be a
+        # ``TypeError``: it is handed only what it declares.
+        class NoRequest(TitleFilter):
+            def __init__(self, data: Any = None, queryset: Any = None) -> None:
+                super().__init__(data=data, queryset=queryset)
+
         _three_notes()
-        pool = {"request": SimpleNamespace(user=None)}
-        rows = shape_queryset(Note.objects.all(), _filtered(_BareFilter), pool, source_label="x")
-        assert _titles(rows) == ["final"]
+        pool = {"title": "draft", "request": SimpleNamespace(user=None)}
+        rows = shape_queryset(Note.objects.all(), _filtered(NoRequest), pool, source_label="x")
+        assert _titles(rows) == ["draft"]
 
     def test_it_runs_after_extend_queryset(self) -> None:
         # ``extend_queryset`` sees the declaratively shaped rows and no filter,

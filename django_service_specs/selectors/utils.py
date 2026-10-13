@@ -196,19 +196,16 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     adapter registers - and the constructor declares it, by the
     declare-to-receive rule of every pool-resolved callable, so a
     request-scoped FilterSet sees the ``self.request`` it would behind
-    django-filter's own backend, and a stand-in taking ``(data, queryset)`` is
-    called as it always was.
+    django-filter's own backend.
 
     A FilterSet that refuses its data is refused here, as ``InvalidArguments``
     keyed as the FilterSet keys its errors. Reading ``.qs`` without
     ``is_valid()`` would answer the **unfiltered** rows in django-filter's
     default non-strict mode, so a bad value would read as a filter that matched
     everything (test_a_value_the_filterset_refuses_is_refused_rather_than_ignored).
-    A stand-in with no ``is_valid`` is read as it answers
-    (test_a_stand_in_with_no_is_valid_is_read_as_it_answers). A range filter's
-    error is keyed by the filter's name, ``price``, where its arguments are
-    ``price_min`` and ``price_max``: django-filter validates the two as one
-    form field.
+    A range filter's error is keyed by the filter's name, ``price``, where its
+    arguments are ``price_min`` and ``price_max``: django-filter validates the
+    two as one form field.
     """
     seen = {"request": pool["request"]} if "request" in pool else {}
     bound = filter_set(
@@ -216,8 +213,7 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
         data=_filter_data(filter_set, pool),
         queryset=queryset,
     )
-    is_valid = getattr(bound, "is_valid", None)
-    if is_valid is not None and not is_valid():
+    if not bound.is_valid():
         raise InvalidArguments(
             {
                 name: [str(message) for message in messages]
@@ -240,7 +236,7 @@ def _filter_data(filter_set: Any, pool: Mapping[str, Any]) -> dict[str, Any]:
     names = filter_set_parameters(filter_set).names()
     data = {name: value for name, value in pool.items() if name in names}
     if not data:
-        # Nothing sent, or a stand-in declaring no filters: no filter to ask
+        # Nothing sent, or a FilterSet declaring no filters: no filter to ask
         # about, and so no need for django-filter.
         return data
     module = import_django_filters()

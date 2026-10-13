@@ -56,7 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service spec, the resolved target. `kwargs` returns pool entries merged after the caller's
   arguments, so a key it answers is the author's value - on a target
   selector it scopes the lookup. `input_data` returns values merged over the
-  caller's arguments before the Validator sees them. A parameter a provider is
+  caller's arguments before the Validator sees them, so a `ServiceSpec`
+  declaring `input_data` with no Validator is refused with
+  `ImproperlyConfigured` when it is built, since its values would reach
+  nothing. A parameter a provider is
   annotated to fill is not demanded of the caller where the provider's values
   reach it - a selector's `kwargs` that selector's `reads`, a service spec's
   `kwargs` its `reads`, `input_data` the Validator's fields - and a
@@ -112,7 +115,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SelectorSpec.filter_set`, a django-filter `FilterSet` applied after
   `extend_queryset`, whose filters are read as Parameters and join the
   selector's `reads` after the author's own; and `filter_set_parameters`, that
-  reading. A number filter, and each bound of a numeric range, is read as a
+  reading. An object with no `base_filters` - a duck-typed stand-in taking
+  `(data, queryset)` - is refused with `ImproperlyConfigured` when the spec is
+  built, since it declares no Parameters and so would be handed none of the
+  caller's data and never filter. A number filter, and each bound of a numeric range, is read as a
   `decimal` string, which its `DecimalField` reads exactly, so a key past
   `2**53` matches its own row. A real FilterSet needs the new `filter` extra.
 - `run_selector`, `arun_selector`, `materialize_retrieve`,

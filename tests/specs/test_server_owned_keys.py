@@ -10,7 +10,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UnsetType
-from tests.specs.utils import PK
+from tests.specs.utils import PK, Bare
 
 
 class _Scope(TypedDict):
@@ -76,6 +76,7 @@ def test_a_service_spec_owns_its_providers_and_its_target_lookup_s() -> None:
     spec = ServiceSpec(
         service=print,
         kwargs=scope,
+        validator=Bare(),
         input_data=project,
         instance_selector_spec=target,
     )
