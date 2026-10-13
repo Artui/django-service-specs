@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import math
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
@@ -523,3 +524,45 @@ def test_which_validators_take_the_non_finite_float_the_shape_check_refuses(
     with pytest.raises(InvalidArguments) as caught:
         FormValidator(_RatioForm).validate({"ratio": value}, CONTEXT)
     assert caught.value.detail == {"ratio": ["Enter a number."]}
+
+
+class _Labelled(BaseModel):
+    status: Status
+    priorities: list[Priority]
+    colour: Colour
+    mode: Literal["fast", "slow"]
+
+
+class TestChoiceLabels:
+    def test_a_django_choices_enum_labels_its_values_and_nothing_else_does(self) -> None:
+        labels = {p.name: p.choice_labels for p in PydanticValidator(_Labelled).parameters()}
+        assert labels == {
+            "status": (("draft", "Draft"), ("published", "Published")),
+            # A list's labels are its element's, beside its choices.
+            "priorities": ((1, "Low"), (2, "High")),
+            # A plain Enum and a Literal have no label of their own.
+            "colour": None,
+            "mode": None,
+        }
+
+
+class TestPartial:
+    @pytest.mark.parametrize("method", ["validate", "validated"])
+    def test_a_partial_call_is_refused_as_the_spec_s_error(self, method: str) -> None:
+        # A model validates whole: a field it requires and was not sent is
+        # missing, and its model validators assume every field is there.
+        with pytest.raises(
+            ImproperlyConfigured,
+            match=re.escape(
+                "PydanticValidator(Address) cannot validate a partial call: a pydantic "
+                "model validates every field."
+            ),
+        ):
+            getattr(PydanticValidator(Address), method)(
+                {"city": "Oslo"}, ValidationContext(None, partial=True)
+            )
+
+    def test_a_whole_call_is_the_mapping_as_its_data(self) -> None:
+        validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
+        assert validated.values == {"city": "Oslo", "postcode": None}
+        assert validated.data is validated.values

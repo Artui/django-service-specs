@@ -15,6 +15,10 @@ pydantic.
 The forms adapter reads field instances rather than annotations and shares
 only ``scalar_type``: a typed choice field's values take their JSON type from
 it, exactly as a ``Literal``'s do.
+
+``choice_labels`` reads Django's own vocabulary rather than an annotation's,
+and both annotation adapters label an enum's choices through it, so a
+``TextChoices`` field is labelled alike whichever library declared it.
 """
 
 from __future__ import annotations
@@ -23,7 +27,10 @@ import datetime as dt
 import types
 import typing
 from decimal import Decimal
+from enum import Enum
 from typing import Any
+
+from django.db.models import Choices
 
 from django_service_specs.types.unset import UnsetType
 
@@ -58,6 +65,23 @@ def scalar_type(value: Any) -> str | None:
     if isinstance(value, str):
         return "string"
     return None
+
+
+def choice_labels(enum_cls: type[Enum] | None) -> tuple[tuple[Any, str], ...] | None:
+    """Each value of a Django ``Choices`` enum with its label, or ``None``.
+
+    Only a ``Choices`` enum has a label for a reader. A plain ``Enum``'s member
+    names are identifiers, and a ``Literal`` has nothing but its values, so
+    neither is labelled, as neither has a display in the presenters. The label
+    is handed on unrendered: a lazy translation stays lazy until a schema
+    renders it, in the language active then, since an adapter may build its
+    Parameters once.
+    """
+    # One branch to coverage, so each operand is held by its own test:
+    # test_a_literal_has_no_labels (no enum) and test_a_plain_enum_has_no_labels.
+    if enum_cls is None or not issubclass(enum_cls, Choices):
+        return None
+    return tuple((member.value, member.label) for member in enum_cls)
 
 
 def strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:
