@@ -12,7 +12,7 @@ from typing import Any, cast
 from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
-from django.db.models import FileField, Model
+from django.db.models import FileField, ImageField, Model
 from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
@@ -291,21 +291,48 @@ def auto_now_field_names(instance: Model) -> tuple[str, ...]:
     )
 
 
+def dimension_field_names(instance: Model, changed: tuple[str, ...]) -> tuple[str, ...]:
+    """The ``width_field`` and ``height_field`` of each image field in ``changed``.
+
+    Setting an ``ImageField`` writes its dimension columns on the instance
+    too, ``None`` for no file, so a save narrowed to the changed columns has
+    to carry them, or the row keeps the old image's dimensions while the
+    instance holds the new one's. A ``ModelForm`` saves the whole row, and
+    so stores them. Each condition is held by its own test:
+    test_an_image_left_alone_saves_none_of_its_dimensions (only an image in
+    ``changed``) and test_an_image_with_no_dimension_columns_saves_only_itself
+    (only a dimension field the image declares); a file field that is not an
+    image has no dimension fields, and test_false_clears_the_file_and_reports_the_name_it_held
+    raises without the ``ImageField`` check.
+    """
+    files = file_fields(type(instance))
+    names: list[str] = []
+    for attr in changed:
+        field = files.get(attr)
+        if isinstance(field, ImageField):
+            # The type stubs leave out the two attributes ``ImageField`` sets
+            # in its ``__init__``.
+            image: Any = field
+            names.extend(name for name in (image.width_field, image.height_field) if name)
+    return tuple(names)
+
+
 def resolve_update_fields(
     update_fields: bool | list[str],
     changed: tuple[str, ...],
-    auto_now_fields: tuple[str, ...] = (),
+    derived_fields: tuple[str, ...] = (),
 ) -> list[str] | None:
     """Map the public ``update_fields`` argument to a ``save()``-compatible list.
 
-    ``True`` narrows the save to the changed columns, so the ``auto_now`` ones
-    have to be added back by hand: Django only refreshes them when they are in
-    ``update_fields``.
+    ``True`` narrows the save to the changed columns, so the columns Django
+    derives from them have to be added back by hand: the ``auto_now`` ones,
+    which Django only refreshes when they are in ``update_fields``, and an
+    image's dimension columns, which setting the image wrote on the instance.
     """
     if update_fields is True:
         fields = list(changed)
         if fields:
-            for f in auto_now_fields:
+            for f in derived_fields:
                 if f not in fields:
                     fields.append(f)
         return fields or None

@@ -27,9 +27,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `BooleanField` does not come back `False` nor an absent `CharField` `''`,
   while a `ModelForm`'s uniqueness checks and constraints still read the
   whole row, so one field of a unique pair sent alone is refused as a whole
-  call refuses it rather than raising `IntegrityError` on save;
-  `PydanticValidator` and `DataclassValidator` refuse a partial call with
-  `ImproperlyConfigured`, because each validates every field. A service
+  call refuses it rather than raising `IntegrityError` on save. A partial
+  spec is refused with `ImproperlyConfigured`, naming the service, when it is
+  built in two cases: with no `validator`, where it would relax nothing,
+  since only a Validator's parameters are made optional; and over a
+  Validator whose `supports_partial` is `False`, `DataclassValidator` and
+  `PydanticValidator` among them, because each validates every field, where
+  the message names the Validator's class and says a partial call needs one
+  that can bind only what was sent, such as a `FormValidator`. Each of those
+  adapters also refuses a partial call made to it directly. A service
   parameter a partial call left out is not refused as missing.
   `spec_input_schema` lists none of a partial spec's Validator parameters in
   `required`, at any depth, a `many` spec's rows included, while its `reads`
@@ -215,15 +221,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handing back an awaitable from a plain `def` is refused where it is
   resolved, and an `extend_queryset` doing so where it is called, where its
   coroutine stood in for the queryset and came back as a list's value.
-- **Breaking:** a `ServiceSpec` declaring `partial=True` is refused when it
-  is built, with `ImproperlyConfigured` naming the service, in two cases that
-  were accepted. With no `validator`, where it relaxed nothing, since only a
-  Validator's parameters are made optional. And over a Validator whose
-  `supports_partial` is `False`, `DataclassValidator` and `PydanticValidator`
-  among them, where the spec built and every call raised; the message names
-  the Validator's class and says a partial call needs one that can bind only
-  what was sent, such as a `FormValidator`. Each adapter still refuses a
-  partial call made to it directly.
 - **Breaking:** `None` for a file field keeps the file, in
   `update_from_input`, `aupdate_from_input` and `apply_input`, where it was
   written over it and the row stored no file; it is no change, as it is to a
@@ -271,6 +268,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   error reporter - reads it first instead, and the arguments are parsed from
   that copy; being a whole-body read, that brings the size limit back on the
   uploads.
+- `update_from_input` and `aupdate_from_input` save an `ImageField`'s
+  `width_field` and `height_field` with it. Setting the image writes them on
+  the instance, `None` for a cleared one, while the default
+  `update_fields=True` saved only the changed columns, so the row kept the
+  old image's dimensions beside the new image, or beside no image at all,
+  and a nested row written through a relation spec did the same. A
+  `ModelForm` saves the whole row, and the two now store the same values.
+  An explicit `update_fields` list is still saved as given.
 - **Security: an empty `permissions` sequence allowed every call.** A spec
   declaring `permissions=[]` or `()` had no check to fail, so anyone ran it.
   Every published release is affected, 0.4.2 included. `ServiceSpec` and

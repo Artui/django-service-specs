@@ -13,6 +13,7 @@ from django_service_specs.mutations.utils import (
     auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
+    dimension_field_names,
     extract_relation_data,
     filter_input,
     form_values,
@@ -42,7 +43,9 @@ def update_from_input(
     By default (``update_fields=True``), the save call uses
     ``update_fields=<changed>`` to write the minimal set of columns.
     ``auto_now=True`` fields (e.g. ``updated_at``) are automatically added to
-    that list so they are refreshed alongside the mutation. Pass ``False`` to
+    that list so they are refreshed alongside the mutation, and so are a
+    changed ``ImageField``'s ``width_field`` and ``height_field``, which
+    setting the image wrote on the instance. Pass ``False`` to
     perform a full save, or an explicit list to control exactly which columns
     are written (no auto-injection in that case).
 
@@ -96,7 +99,9 @@ def update_from_input(
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=False)
     changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
     save_fields: list[str] | None = resolve_update_fields(
-        update_fields, changed_field_names, auto_now_field_names(instance)
+        update_fields,
+        changed_field_names,
+        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
     )
     if field_changes or update_fields is False:
         if save_fields is None:

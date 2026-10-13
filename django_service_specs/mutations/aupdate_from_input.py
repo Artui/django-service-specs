@@ -15,6 +15,7 @@ from django_service_specs.mutations.utils import (
     auto_now_field_names,
     coerce_to_dict,
     diff_attrs,
+    dimension_field_names,
     extract_relation_data,
     filter_input,
     form_values,
@@ -62,7 +63,9 @@ async def aupdate_from_input(
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=False)
     changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
     save_fields: list[str] | None = resolve_update_fields(
-        update_fields, changed_field_names, auto_now_field_names(instance)
+        update_fields,
+        changed_field_names,
+        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
     )
     if field_changes or update_fields is False:
         if save_fields is None:
