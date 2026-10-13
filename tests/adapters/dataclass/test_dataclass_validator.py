@@ -453,7 +453,7 @@ class _Typed:
 
 @pytest.mark.parametrize(
     "arguments",
-    [{"count": "3"}, {"price": True}, {"status": "archived"}],
+    [{"count": "three"}, {"price": True}, {"status": "archived"}],
     ids=["type", "decimal", "choice"],
 )
 def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
