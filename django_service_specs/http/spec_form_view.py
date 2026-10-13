@@ -498,4 +498,13 @@ def _wire(field: forms.Field, value: Any) -> Any:
         # A datetime is a date too, and each writes its own ISO form: the
         # date-time with its offset, since the field made it aware.
         return typed.isoformat()
-    return typed if math.isfinite(typed) else value
+    # Only a float can be no finite number, and asking an int, which an
+    # ``IntegerField`` reads any number of digits as, converts it to one,
+    # raising OverflowError past a float's range. One branch to coverage, so
+    # each condition is held by its own test:
+    # test_an_integer_past_a_float_s_range_reaches_the_validator (the float)
+    # and test_localized_numbers_are_read_as_the_form_reads_them (its
+    # finiteness: without it, every float is sent on as it was typed).
+    if isinstance(typed, float) and not math.isfinite(typed):
+        return value
+    return typed

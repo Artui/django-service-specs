@@ -49,9 +49,12 @@ class DataclassValidator(Validator):
 
     - ``str``, ``int``, ``float``, ``bool``: their JSON types. ``float`` takes an
       integer as well, since JSON writes ``2.0`` as ``2``; nothing else crosses
-      types, so ``true`` is not an ``int``.
+      types, so ``true`` is not an ``int``. An integer past a float's range
+      is refused as no number, in the words the shape check refuses a
+      non-finite one in, since no finite float stands for it.
     - ``Decimal``, ``datetime``, ``date``: a string, with the format it decodes
-      from. A decimal takes a JSON number too, as every decimal validator does.
+      from. A decimal takes a JSON number too, as every decimal validator does,
+      and an integer exactly, whatever its digits.
     - ``X | None``: nullable. Inside a list, ``list[X | None]``, it is the
       element that is, declared as ``items_nullable`` and not as the array's
       own nullability.
@@ -337,16 +340,29 @@ def _decode_scalar(shape: Shape, value: Any) -> Any:
         return _decode_date(value)
     if not _fits(shape.type, value):
         raise _Refused(expected_type(shape.type))
-    return float(value) if python is float else value
+    if python is not float:
+        return value
+    try:
+        return float(value)
+    except OverflowError:
+        # An integer past a float's range: JSON's number has none, so the
+        # shape check hands it on, and ``float`` raises rather than refusing.
+        # No finite float stands for it, which is the shape check's own
+        # refusal of a non-finite number, in the same words
+        # (test_an_integer_past_a_float_s_range_is_no_number).
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
 
 
 def _decode_decimal(value: Any) -> Decimal:
     if scalar_type(value) not in ("string", "integer", "number"):
         raise _Refused(expected_type("decimal"))
     try:
-        # Through ``str`` so a float gives the digits JSON carried, not its
-        # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``.
-        decoded = Decimal(str(value))
+        # A float through ``str`` so it gives the digits JSON carried, not its
+        # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``. Anything
+        # else as it is, since an int is a Decimal exactly, and ``str`` refuses
+        # one past 4300 digits from Python 3.10.7 on
+        # (test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits).
+        decoded = Decimal(str(value) if isinstance(value, float) else value)
     except InvalidOperation:
         raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
     if not decoded.is_finite():

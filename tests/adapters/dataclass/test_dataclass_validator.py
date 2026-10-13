@@ -395,6 +395,24 @@ def test_a_decimal_that_is_not_a_finite_number_is_refused(argument: Any) -> None
     assert _refusal(_Price, {"price": argument}) == {"price": ["Enter a number."]}
 
 
+@pytest.mark.parametrize("argument", [10**400, -(10**400)], ids=["above", "below"])
+def test_an_integer_past_a_float_s_range_is_no_number(argument: int) -> None:
+    # JSON's number has no range, so the shape check passes the integer on,
+    # and ``float`` raises OverflowError for it rather than refusing it.
+    detail = _refusal(Everything, _arguments(ratio=argument))
+    assert coded(detail) == {"ratio": [("Enter a number.", "invalid")]}
+
+
+def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits() -> None:
+    # Past the 4300 digits ``str`` writes an int in from Python 3.10.7 on, a
+    # decimal read through its string raised ValueError. An int is a Decimal
+    # exactly as it is, so no digit is lost reading it whole.
+    argument = 10**5000
+    assert DataclassValidator(_Price).validate({"price": argument}, CONTEXT) == {
+        "price": Decimal(argument)
+    }
+
+
 @pytest.mark.parametrize(
     "argument",
     [

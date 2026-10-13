@@ -58,8 +58,8 @@ extends.
 | Field | Declares |
 | --- | --- |
 | `BooleanField`, `NullBooleanField` | A `boolean`. |
-| `DecimalField` | A `string` in the `decimal` format. It takes a JSON number too. |
-| `FloatField` | A `number`. |
+| `DecimalField` | A `string` in the `decimal` format. It takes a JSON number too, and an integer whatever its digits. |
+| `FloatField` | A `number`. An integer past a float's range is refused as the field refuses an infinity: `invalid`, in its own words. |
 | `IntegerField` | An `integer`. |
 | `DateTimeField`, `DateField` | A `string` in the `date-time` or `date` format. |
 | `TimeField`, `DurationField` | A `string`. |
@@ -79,6 +79,17 @@ keys to the database driver in an `__in` lookup, and SQLite's raises
 `OverflowError` for one past 64 bits on every Django version, as it does for a
 `ModelChoiceField`'s on Django 4.2. The range is the database's own for the
 column, as Django reads it to answer an exact lookup past it with no rows.
+
+A `ModelForm`'s field that cleans to an integer past the range of its
+model's integer column is refused in the words, and with the code, of the
+validator Django's model field carries from 5.0: `max_value` past its top,
+`min_value` past its bottom. Django 4.2 states no range for SQLite, so there
+the form took such a value, and a uniqueness check or a constraint querying
+with it raised the driver's `OverflowError`. A value the field refuses itself
+is refused in the field's words, its own bounds included, as where Django
+validates the model. A `clean_<field>()` method is not run on a value past
+the column's range: where Django 5.0 or later refuses one itself, the method
+ran first, and a refusal of its own was the one reported.
 
 Every choice field's choices carry their labels as `choice_labels`, the label
 Django displays keyed by the value as the caller sends it, so a schema states

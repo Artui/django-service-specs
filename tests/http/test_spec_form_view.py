@@ -704,6 +704,13 @@ class TestReadingThroughTheWidgets:
         assert spec.validator.calls[0]["count"] == 5
         assert received(spec)["count"] == 5
 
+    def test_an_integer_past_a_float_s_range_reaches_the_validator(self, ada: Any) -> None:
+        # The field reads the digits as the int they spell, which no float
+        # holds: asking whether it was finite raised OverflowError.
+        spec = entry_spec()
+        post(form_view(spec), ada, {"title": "Hi", "count": "1" + "0" * 400})
+        assert spec.validator.calls[0]["count"] == 10**400
+
     def test_a_malformed_date_is_refused_once_in_the_kernels_words(self, ada: Any) -> None:
         spec = entry_spec()
         response = post(form_view(spec), ada, {"title": "Hi", "due": "someday"})

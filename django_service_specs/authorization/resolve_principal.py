@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.utils import is_deactivated
+from django_service_specs.relations.utils import key_past_its_column
 
 
 def resolve_principal(identifier: Any) -> Any:
@@ -23,7 +24,8 @@ def resolve_principal(identifier: Any) -> Any:
     [`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable],
     terminal and never a fallback:
 
-    - no row with that primary key (``DoesNotExist``);
+    - no row with that primary key (``DoesNotExist``), including a key past
+      the range of an integer key's column, which no row can hold;
     - a malformed primary key (``ValueError``, ``TypeError``, or Django's own
       ``ValidationError`` - a non-UUID string against a UUID primary key raises
       that one instead of ``ValueError``);
@@ -36,8 +38,14 @@ def resolve_principal(identifier: Any) -> Any:
     principal has no principal, not an anonymous one.
     """
     user_model = get_user_model()
+    manager = user_model._default_manager
     try:
-        user = user_model._default_manager.get(pk=identifier)
+        # A key past the range of an integer key's column names no row, and
+        # the lookup would hand it to the driver
+        # (test_an_identifier_past_the_key_s_column_raises).
+        if key_past_its_column(manager.all(), "pk", identifier):
+            raise user_model.DoesNotExist
+        user = manager.get(pk=identifier)
     except (user_model.DoesNotExist, ValueError, TypeError, ValidationError):
         raise PrincipalUnavailable(f"No principal with identifier {identifier!r}.") from None
     if is_deactivated(user):

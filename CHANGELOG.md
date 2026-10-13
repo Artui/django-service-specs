@@ -210,6 +210,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the column. An integer argument a project's selector or service hands the
   database is still the database's to range; declare a `minimum` and
   `maximum` on one that reaches a column unchecked.
+- **An integer past a float's range is refused, never raised.** JSON's
+  number has no range, so the shape check hands such an integer on, and
+  `DataclassValidator`'s `float` field and `FormValidator`'s `FloatField`
+  each read it through `float`, which raised `OverflowError`, answered as a
+  500. Each refuses it as no number now, as the shape check refuses a
+  non-finite one: `"Enter a number."`, code `invalid`, and the form field's
+  own `invalid` message where it has one. `SpecFormView` reading a posted
+  `IntegerField` past a float's range raised the same way asking whether it
+  was finite, and hands the integer on.
+- **A decimal sent as an integer is read whatever its digits.**
+  `DataclassValidator`'s `Decimal` field and `FormValidator`'s
+  `DecimalField` read an integer through `str`, which raises `ValueError`
+  past 4300 digits from Python 3.10.7 on. Each reads it as the exact
+  `Decimal` it is.
+- **`FormValidator` refuses a `ModelForm` value past its integer column's
+  range.** Django 4.2 states no range for SQLite, so a `ModelForm` took an
+  integer past 64 bits, and a uniqueness check or a constraint querying with
+  it raised the driver's `OverflowError`. A field that cleans to one is
+  refused before the form queries, in the words and with the code of the
+  validator Django's model field carries from 5.0: `max_value` past the
+  column's top, `min_value` past its bottom. A value the field refuses
+  itself is still refused in the field's words, its own bounds included. A
+  `clean_<field>()` method is not run on a value past the range, where
+  Django 5.0 or later, refusing it itself, ran the method first.
+- **A relation write's key past its column's range names no row.** A
+  forward relation's or a many-to-many's `match_key` past the range of the
+  integer column it is matched on reached the database driver through the
+  scoped lookup, and SQLite's raised `OverflowError` on Django 4.2. It is
+  refused as any key matching nothing in scope is, at the row, on
+  `create_from_input`, `update_from_input` and their async twins; a string
+  of digits is read as the integer it spells, as the lookup reads it, and a
+  key the column reads as no number, such as a row, is left to the lookup.
+  A foreign key's column is held to the range of the key it points at. And
+  `resolve_principal` refuses an identifier past its integer key's range with
+  `PrincipalUnavailable`, as a key no row holds, where it raised the same
+  way.
 - **A re-upload under the held file's name is written.** `update_from_input`,
   `aupdate_from_input` and `apply_input` compared a file field's new value
   with the held file by name, so an upload named as the file the row held -

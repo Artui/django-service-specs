@@ -378,8 +378,14 @@ the same declaration.
   does any lookup on Django 4.2; from 5.0 an exact or a comparison lookup is
   answered without the query, as no rows or every row. Bound an
   integer that reaches a column unchecked, as a key a selector looks rows up
-  by does. The forms adapter refuses such a key to a model choice field
-  itself ([the forms adapter](forms.md#what-each-field-declares)).
+  by does. Four lookups the kernel makes itself with a key a caller sent
+  answer such a key as one no row holds, on every version: the forms
+  adapter's model choice field and a `ModelForm`'s integer column
+  ([the forms adapter](forms.md#what-each-field-declares)), a relation
+  write's scoped match ([relations](relations.md#matching-scope-and-orphans))
+  and `resolve_principal`. A FilterSet's lookups are django-filter's, so a
+  number filter's value past the range is still the database's to answer,
+  as above.
 - **`min_length`** and **`max_length`** bound how many elements an `array`
   takes, inclusively, each a non-negative `int`, and are refused on any other
   type. An array that declares no `max_length` is still bounded, by the
@@ -469,8 +475,8 @@ docs/examples/declaring.py:validator
 
 | Annotation | Declares |
 | --- | --- |
-| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. Through dispatch, the shape check hands an `int` field a whole float such as `2.0` as `2`. |
-| `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number. |
+| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. Through dispatch, the shape check hands an `int` field a whole float such as `2.0` as `2`. An integer past a float's range is refused as no number, `"Enter a number."`, since no finite float stands for it. |
+| `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number, and an integer exactly, whatever its digits. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum`'s member names and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, so each is read as a decimal is, a JSON number included, and `?prices=1.5,2.25` is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds it. |
