@@ -391,9 +391,11 @@ the same declaration.
   before the query, as `max_value` or `min_value` at the argument that
   carried it, on every version
   ([the codes a refusal carries](arguments.md#the-codes-a-refusal-carries)).
-  Django 5.0 and later would answer the exact and comparison lookups with no
-  rows or every row; they are refused all the same, so a call has one answer
-  on every version. A filter with a `method`, a lookup that reads its value
+  Django 5.0 and later would answer an exact or a comparison lookup on the
+  integer column itself, its own or one reached through a relation, with no
+  rows or every row, where on a foreign key's own column the driver raised;
+  they are refused all the same, so a call has one answer on every version.
+  A filter with a `method`, a lookup that reads its value
   as text, such as `contains`, a path through a transform or to an
   annotation, and an object that is not a django-filter `FilterSet` are left
   to the database, as above.

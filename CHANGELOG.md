@@ -256,8 +256,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   foreign key, or either reached through a relation - reached the database
   driver past the column's range, and SQLite's raised `OverflowError`,
   answered as a 500: for an `in` or a `range` lookup, a CSV filter's and a
-  `RangeFilter`'s, on every Django version, and for any lookup on Django
-  4.2. It is refused before the query, in the words and with the code of
+  `RangeFilter`'s, and for any lookup on a foreign key's own column, on
+  every Django version, and for any lookup on Django 4.2. It is refused before the query, in the words and with the code of
   Django's range validators, `max_value` past the column's top and
   `min_value` past its bottom, at the argument that carried it: a range
   filter's bound at its own `_min` or `_max` argument, and a CSV filter's
@@ -265,9 +265,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   range is the database's own for the column, so a decimal or float column
   still takes any number inside 1e50. **Breaking** only where Django 5.0 and
   later answered without the query: an `exact`, `gt`, `gte`, `lt` or `lte`
-  lookup past the range, a `RangeFilter` given one bound included, answered
-  no rows or every row, and is refused now, so a call has one answer on
-  every version. A filter with a `method`, a lookup that reads its value as
+  lookup past the range on the integer column itself, its own or one reached
+  through a relation, a `RangeFilter` given one bound included, answered no
+  rows or every row, and is refused now, so a call has one answer on every
+  version. A filter with a `method`, a lookup that reads its value as
   text such as `contains`, a path through a transform or to an annotation,
   and a `filter_set` that is not a django-filter `FilterSet` are left to the
   database.

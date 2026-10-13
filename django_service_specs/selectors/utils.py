@@ -243,11 +243,13 @@ def _past_their_columns(bound: Any, queryset: Any) -> dict[str, Any]:
     """Each argument carrying a number its filter's integer column cannot hold, and its refusal.
 
     The driver refuses such a number with ``OverflowError`` as the query
-    runs: for an ``in`` or a ``range`` lookup on every Django, and for any
-    lookup on Django 4.2's SQLite, which states no range. Django 5.0 and later
-    answer the rest themselves - an exact match or a lower bound past the top
-    with no rows, an upper bound past it with every row - and they are refused
-    here all the same, so a call has one answer on every Django and backend.
+    runs: for an ``in`` or a ``range`` lookup and for any lookup on a foreign
+    key's own column (``owner_key``) on every Django, and for any lookup on
+    Django 4.2's SQLite, which states no range. Django 5.0 and later answer
+    the rest, the exact and comparison lookups on an integer column itself,
+    without the query - an exact match or a lower bound past the top with no
+    rows, an upper bound past it with every row - and they are refused here
+    all the same, so a call has one answer on every Django and backend.
     The 1e50 bound every number filter is held to is not this one, because it
     must hold for a decimal or float column too.
 

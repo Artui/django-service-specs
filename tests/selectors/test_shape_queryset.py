@@ -628,14 +628,21 @@ class TestAFilterValuePastItsColumn:
 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize(
-    ("arguments", "detail"),
+    ("filter_set", "arguments", "detail"),
     [
-        pytest.param({"pks": [_PAST_TOP]}, {"pks": {0: [_ABOVE]}}, id="in"),
-        pytest.param({"min_pk": _PAST_BOTTOM}, {"min_pk": [_BELOW]}, id="gte"),
+        pytest.param(NoteKeyFilters, {"pk": _PAST_TOP}, {"pk": [_ABOVE]}, id="exact"),
+        pytest.param(NoteFilters, {"pks": [_PAST_TOP]}, {"pks": {0: [_ABOVE]}}, id="in"),
+        pytest.param(
+            NoteFilters,
+            {"pk_range_min": "1", "pk_range_max": _PAST_TOP},
+            {"pk_range_max": [_ABOVE]},
+            id="range",
+        ),
+        pytest.param(NoteFilters, {"min_pk": _PAST_BOTTOM}, {"min_pk": [_BELOW]}, id="gte"),
     ],
 )
 async def test_adispatch_refuses_a_filter_value_past_its_column(
-    arguments: dict[str, Any], detail: dict[str, Any]
+    filter_set: Any, arguments: dict[str, Any], detail: dict[str, Any]
 ) -> None:
     async def notes() -> QuerySet[Note]:
         return Note.objects.all()
@@ -645,7 +652,7 @@ async def test_adispatch_refuses_a_filter_value_past_its_column(
         kind=SelectorKind.LIST,
         selector=notes,
         permissions=[Unrestricted()],
-        filter_set=NoteFilters,
+        filter_set=filter_set,
     )
     with pytest.raises(InvalidArguments) as caught:
         result = await adispatch(spec, principal=ada, arguments=arguments)
