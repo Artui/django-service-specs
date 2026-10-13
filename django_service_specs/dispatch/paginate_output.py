@@ -6,7 +6,7 @@ from typing import Any, Final
 
 from django.db.models.manager import BaseManager
 
-from django_service_specs.selectors.utils import is_queryset
+from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.types.output_page import OutputPage
 
 DEFAULT_PAGE_SIZE: Final[int] = 100

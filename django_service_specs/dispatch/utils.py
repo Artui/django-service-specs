@@ -35,13 +35,10 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
-from django_service_specs.selectors.utils import (
-    apply_shaping,
-    call_keywords,
-    call_selector,
-    is_queryset,
-    materialize_retrieve,
-)
+from django_service_specs.selectors.is_queryset import is_queryset
+from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
+from django_service_specs.selectors.run_selector import run_selector
+from django_service_specs.selectors.utils import apply_shaping, call_keywords
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -288,7 +285,7 @@ def lookup(
 ) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
-    An ``async def`` selector is bridged by ``call_selector``, driven from this
+    An ``async def`` selector is bridged by ``run_selector``, driven from this
     thread rather than awaited. That covers a selector spec's own selector when
     sync ``dispatch`` runs it, and a nested one on either entry point: a nested
     selector is never the run, so ``adispatch`` never awaits it on the loop.
@@ -308,7 +305,7 @@ def lookup(
     fillable: frozenset[str] = frozenset() if after_the_run else selector_spec.reads.names()
     kwargs = call_keywords(fn, pool, fillable=fillable)
     try:
-        raw = call_selector(fn, kwargs)
+        raw = run_selector(fn, kwargs)
     except ObjectDoesNotExist as error:
         reraise_unless_retrieve(selector_spec, error)
         return None

@@ -161,6 +161,15 @@ Installed with the `pydantic` extra and imported from
 ## Selectors
 
 ::: django_service_specs.selectors.shape_queryset.shape_queryset
+::: django_service_specs.selectors.run_selector.run_selector
+::: django_service_specs.selectors.arun_selector.arun_selector
+::: django_service_specs.selectors.materialize_retrieve.materialize_retrieve
+::: django_service_specs.selectors.amaterialize_retrieve.amaterialize_retrieve
+::: django_service_specs.selectors.is_queryset.is_queryset
+
+## Filters
+
+::: django_service_specs.filters.filter_set_parameters.filter_set_parameters
 
 ## Types
 

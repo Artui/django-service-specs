@@ -123,9 +123,9 @@ class Record:
 def shaping_refused(source: str, returned: str) -> str:
     """``shape_queryset``'s refusal, as it names the selector that returned a non-queryset."""
     return (
-        "select_related / prefetch_related / annotations / extend_queryset are set on the "
-        f"spec but {source} returned {returned}, which is not a Django QuerySet. Drop the "
-        "shaping fields or have the callable return a QuerySet."
+        "select_related / prefetch_related / annotations / extend_queryset / filter_set are "
+        f"set on the spec but {source} returned {returned}, which is not a Django QuerySet. "
+        "Drop the shaping fields or have the callable return a QuerySet."
     )
 
 
