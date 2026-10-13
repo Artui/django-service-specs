@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.pool.utils import deferred_progress, resolve_provider
+from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
 from django_service_specs.types.unset import UNSET
 
 
@@ -110,3 +110,31 @@ class TestDeferredProgress:
         assert report is not None
         report(5, message="alone")
         assert own.reports == [(5, None, "alone", None)]
+
+
+class TestResolveProgress:
+    def test_no_provider_leaves_the_transport_s_reporter_as_it_is(self) -> None:
+        transport = Recorder()
+        assert resolve_progress(None, {}, transport=transport) is transport
+        assert resolve_progress(None, {}, transport=None) is None
+
+    def test_the_provider_is_called_at_once_from_the_pool_and_both_sinks_hear(self) -> None:
+        transport, own = Recorder(), Recorder()
+        calls: list[Any] = []
+
+        def provider(user: Any) -> Recorder:
+            calls.append(user)
+            return own
+
+        report = resolve_progress(provider, {"user": "ada"}, transport=transport)
+        assert calls == ["ada"]
+        assert report is not None
+        report(1, total=3)
+        assert transport.reports == own.reports == [(1, 3, None, None)]
+
+    def test_a_provider_returning_none_declines_and_the_transport_still_hears(self) -> None:
+        transport = Recorder()
+        report = resolve_progress(lambda: None, {}, transport=transport)
+        assert report is not None
+        report(1, message="only the transport")
+        assert transport.reports == [(1, None, "only the transport", None)]

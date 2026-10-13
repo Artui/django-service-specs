@@ -65,6 +65,11 @@ def deferred_progress(
     ``transport`` is the reporter the caller handed dispatch, or ``None``.
     With no provider this is ``transport`` itself, so a spec declaring none
     costs nothing and a pool still falls back to ``null_progress`` on ``None``.
+
+    Not for an ``async def`` service: its first report runs on the event
+    loop, and a provider that queries - finding or creating a task record is
+    the common one - raises ``SynchronousOnlyOperation`` there and nowhere
+    else. ``resolve_progress`` resolves it at once, from sync code, for that.
     """
     if provider is None:
         return transport
@@ -79,7 +84,41 @@ def deferred_progress(
     ) -> None:
         if not resolved:
             resolved.append(provider(**resolve_callable_kwargs(provider, dict(pool))))
-        for sink in (transport, resolved[0]):
+        _fan(transport, resolved[0])(progress, total=total, message=message, meta=meta)
+
+    return report
+
+
+def resolve_progress(
+    provider: Callable[..., Any] | None,
+    pool: Mapping[str, Any],
+    *,
+    transport: ProgressReporter | None,
+) -> ProgressReporter | None:
+    """``deferred_progress``, with the provider called now rather than on the first report.
+
+    For a dispatch path that must call the provider from sync code before the
+    run - an ``async def`` service reports from the event loop, where a
+    provider that queries cannot run. Called after every check that can
+    refuse the call, it keeps the same promise: a refused call never calls the
+    provider. A provider returning ``None`` declines, as there.
+    """
+    if provider is None:
+        return transport
+    return _fan(transport, provider(**resolve_callable_kwargs(provider, dict(pool))))
+
+
+def _fan(transport: ProgressReporter | None, own: ProgressReporter | None) -> ProgressReporter:
+    """One reporter handing each report to ``transport``, then to ``own``, skipping a ``None``."""
+
+    def report(
+        progress: float,
+        *,
+        total: float | None = None,
+        message: str | None = None,
+        meta: Mapping[str, Any] | None = None,
+    ) -> None:
+        for sink in (transport, own):
             if sink is not None:
                 sink(progress, total=total, message=message, meta=meta)
 

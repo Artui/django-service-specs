@@ -56,8 +56,7 @@ class ServiceSpec:
             name the target selector also reads is refused at construction,
             and one the Validator declares when ``parameters()`` is assembled.
         partial: Whether a call may leave out a required argument, as an HTTP
-            ``PATCH`` does: the shape check and the Validator are both told, and
-            only what the caller sent is validated.
+            ``PATCH`` does: the shape check and the Validator are both told.
         validator: Validates the arguments its own ``parameters()`` declare. A
             [`Validator`][django_service_specs.validation.validator.Validator]
             instance; ``None`` for an operation that takes no arguments beyond

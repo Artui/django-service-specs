@@ -7,6 +7,7 @@ from django.db.models import Q
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -167,6 +168,16 @@ class TestReads:
         )
         assert [p.name for p in spec.parameters()] == ["pk", "project_pk", "title"]
         assert ServiceSpec(service=print).reads == Parameters()
+
+    def test_the_input_schema_describes_each_read(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            reads=Parameters.of(Parameter("project_pk", "integer", required=True)),
+            validator=Titled(),
+        )
+        schema = spec_input_schema(spec)
+        assert schema["properties"]["project_pk"] == {"type": "integer"}
+        assert schema["required"] == ["project_pk"]
 
     def test_a_read_the_validator_also_declares_is_refused_when_read(self) -> None:
         # The Validator's names are read lazily, as everywhere in parameters().
