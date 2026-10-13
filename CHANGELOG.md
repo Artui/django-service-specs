@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- An output selector is handed the service's return as `instance` as well as
+  `result`, as djangorestframework-services binds it, so a re-read written
+  `def reread(*, instance)` runs rather than raising a `TypeError` for a
+  missing keyword. The two names are one value, whatever the service returned,
+  `None` included, and `instance` there is the return, never the target the
+  service acted on.
+
+### Changed
+- `SelectorSpec.allow_none` is accepted on a `LIST`, where it was refused at
+  construction since 0.1.0. A list selector declaring it may return `None` for
+  "no rows", and the result is the empty list wherever the selector runs: a
+  selector spec's own, on `dispatch` and `adispatch`, a collection target,
+  including through `resolve_target`, and a `LIST` output selector. Its
+  shaping is skipped, its scope check and `preconditions` are asked of the
+  empty set, and its output schema stays an array. Without `allow_none`, a
+  list selector's `None` is passed on as before.
+
 ## [0.5.0] — 2026-10-13
 
 ### Added

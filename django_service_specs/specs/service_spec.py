@@ -108,8 +108,9 @@ class ServiceSpec:
         collection_selector_spec: A ``LIST`` resolving the rows a bulk operation
             acts on. At most one of the two target selectors.
         output_selector_spec: Re-reads what the service produced, with its
-            return value as ``result`` in the pool - the way to return a row
-            with fresh annotations, or a list after a bulk write.
+            return value in the pool as both ``result`` and ``instance`` - the
+            way to return a row with fresh annotations, or a list after a bulk
+            write. ``instance`` there is the return, never the resolved target.
         presenter: Renders the dispatch value. When ``None``, the output
             selector's presenter is used; declaring both is refused.
         allow_none: Declares that a service with no output selector may

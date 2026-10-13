@@ -11,7 +11,8 @@ RESERVED_POOL_SEEDS: Final[frozenset[str]] = frozenset(
 
 ``user`` is the principal, ``progress`` the caller's progress reporter,
 ``data`` the validated values, ``instance`` and ``collection`` the resolved
-target, ``result`` the service's return (in an output selector's pool) and
+target, ``result`` the service's return (in an output selector's pool, where
+``instance`` is that return too, as djangorestframework-services binds it) and
 ``queryset`` what ``extend_queryset`` shapes. They are the names
 ``djangorestframework-services`` seeds for the same values, so a callable
 written for it runs under this kernel unchanged.

@@ -38,6 +38,13 @@ def test_defaults_and_normalization() -> None:
     assert SelectorSpec(kind=SelectorKind.LIST, selector=list).affordances is None
 
 
+@pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
+def test_allow_none_is_accepted_on_either_kind(kind: SelectorKind) -> None:
+    # On a RETRIEVE a missing row is None; on a LIST a selector's None is the
+    # empty list. Neither is refused.
+    assert SelectorSpec(kind=kind, selector=list, allow_none=True).allow_none is True
+
+
 def test_output_is_the_presenters() -> None:
     spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, presenter=Named(), reads=PK)
     assert spec.output() == Named().output()
@@ -60,7 +67,6 @@ def test_output_is_the_presenters() -> None:
         ),
         ({"presenter": Named}, "the class Named, which is not a Presenter"),
         ({"presenter": object()}, "is object, which is not a Presenter"),
-        ({"allow_none": True}, "only a RETRIEVE has"),
         (
             {"select_related": "author"},
             r"select_related is a string; pass a sequence, \['author'\]",

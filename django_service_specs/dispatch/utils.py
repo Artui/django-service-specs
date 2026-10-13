@@ -606,7 +606,20 @@ def settle(
 
     ``fillable`` is what the selector was bound with, and ``extend_queryset``
     is bound with the same: see ``call_keywords``.
+
+    **A LIST selector's ``None`` under ``allow_none`` is the empty list**, at
+    once and before any shaping, since there is no set for ``select_related``
+    or an ``annotate`` to apply to. Here rather than in the step that checks
+    the rows, because every selector settles through this: a selector spec's
+    own on either entry point, a collection target, and a LIST re-read.
     """
+    # One arc to coverage, so each conjunct is held by its own test:
+    # test_a_list_selector_s_rows_under_allow_none_are_its_rows (the first),
+    # test_a_retrieve_selector_s_own_none_under_allow_none_stays_none (the
+    # second: a RETRIEVE's ``None`` is a missing row, never an empty list) and
+    # test_a_list_selector_s_none_without_allow_none_is_left_as_it_was (the third).
+    if raw is None and selector_spec.kind is SelectorKind.LIST and selector_spec.allow_none:
+        return []
     if isinstance(raw, BaseManager):
         # ``Note.objects`` is a selector's shortest spelling of every row, and a
         # Manager is neither iterable nor sliceable, so a list declaring no
@@ -1102,9 +1115,13 @@ def finish_service(
 ) -> DispatchResult:
     """The output selector, if declared, and the service spec's result.
 
-    The output selector's pool is the base pool plus ``result``, the service's
-    return; the arguments are not in it, because it re-reads what the service
-    produced rather than what the caller asked for.
+    The output selector's pool is the base pool plus the service's return,
+    as both ``result`` and ``instance``: one value under two names, so a
+    re-read written for djangorestframework-services, which binds both, runs
+    unchanged. ``instance`` there is never the resolved target, which the
+    re-read has no use for: it re-reads what the service produced
+    (test_an_output_selector_reads_the_service_s_return_as_instance_not_the_target).
+    The arguments are not in it either, for the same reason.
 
     **A RETRIEVE output selector that finds nothing is ``None``, not
     not-found.** The service has already run, and under ``atomic`` its write
@@ -1132,7 +1149,11 @@ def finish_service(
     # second.
     kind: Literal["instance", "list"] = "list" if spec.many and result is not None else "instance"
     if output_spec is not None:
-        pool = call_pool(prepared.principal, pool_seeds, {"result": result})
+        # The service's return under both names djangorestframework-services
+        # binds it by, so a re-read declares whichever its author wrote:
+        # ``instance`` here is what the service returned, not the target it
+        # resolved, and it is bound whatever the return is, ``None`` included.
+        pool = call_pool(prepared.principal, pool_seeds, {"instance": result, "result": result})
         value = lookup(
             output_spec,
             pool,
