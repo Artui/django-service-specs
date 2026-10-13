@@ -264,6 +264,14 @@ class TestBlanks:
         # value, the empty string, and dropping it would make it unsendable.
         assert read(FACTORY.get("/?title=")) == {"title": ""}
 
+    def test_a_blank_untyped_read_is_kept(self) -> None:
+        # Holds ``"any"`` in the blank guard: an untyped read is handed what
+        # was sent, so ``?pk=`` reaches it as the empty string, as a string's
+        # does, rather than being dropped. Built in the body, so the module
+        # imports on a release whose Parameter has no such type.
+        untyped = Parameters.of(Parameter("pk", "any"))
+        assert read(FACTORY.get("/?pk="), untyped) == {"pk": ""}
+
     def test_blank_elements_of_a_non_string_array_are_dropped(self) -> None:
         assert read(FACTORY.get("/?ids=1&ids=&ids=3")) == {"ids": [1, 3]}
 

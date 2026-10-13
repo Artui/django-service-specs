@@ -205,6 +205,8 @@ def _takes_blank(json_type: object, param: Parameter, *, fmt: str | None = None)
     ``json_type`` is the parameter's own type, or an array's element type:
     ``None`` for an undeclared element, which ``coerce_flat`` leaves as the
     string it arrived as, and a ``Parameters`` for a row, which is no string.
+    An ``"any"`` parameter is untyped, and an untyped read is handed what was
+    sent, so its blank is kept as ``""`` as a string's is.
     A format names what a string decodes into, and no date or decimal is
     blank. ``choices`` constrain a scalar and each element of an array alike,
     so a blank they leave out is refused by the shape check rather than read
@@ -213,13 +215,14 @@ def _takes_blank(json_type: object, param: Parameter, *, fmt: str | None = None)
     One branch to coverage, so each condition is held by its own test:
     test_blank_elements_of_an_undeclared_element_type_are_kept (``None``),
     test_blank_elements_of_a_string_array_are_kept (``"string"``),
+    test_a_blank_untyped_read_is_kept (``"any"``),
     test_a_blank_date_is_absent (the format),
     test_a_blank_the_choices_leave_out_is_absent (the choices, whole),
     test_a_blank_string_is_kept (``choices is None``), and
     test_a_blank_the_choices_name_is_kept (``"" in choices``).
     """
     return (
-        (json_type is None or json_type == "string")
+        (json_type is None or json_type in ("string", "any"))
         and fmt is None
         and (param.choices is None or "" in param.choices)
     )
