@@ -417,9 +417,11 @@ def selector_pool(
     it absent.
 
     ``progress`` is passed only for a selector spec's own selector, which is
-    that spec's run (see ``call_pool``), and only that run hears the spec's
-    ``progress_reporter``: a nested selector declaring one is refused when the
-    service spec is built.
+    that spec's run (see ``call_pool``), and is the pool's ``progress``, as
+    it is a service's. The spec's ``progress_reporter`` is not joined here:
+    only the run hears it, joined to its keywords by ``with_run_progress``
+    once they are bound, as a service's run is. A nested selector declaring
+    one is refused when the service spec is built.
     """
     reads = selector_spec.reads.names()
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
@@ -429,10 +431,40 @@ def selector_pool(
             selector_spec.kwargs, pool, label="SelectorSpec.kwargs", reserved=pool_seeds.reserved
         )
     )
-    pool["progress"] = run_progress(
-        selector_spec.progress_reporter, selector_spec.selector, base, transport=progress
-    )
     return pool
+
+
+def with_run_progress(
+    selector_spec: SelectorSpec,
+    kwargs: dict[str, Any],
+    pool: Mapping[str, Any],
+    *,
+    reserved: frozenset[str],
+    transport: ProgressReporter | None,
+) -> dict[str, Any]:
+    """A selector spec's run keywords, with the run's reporter under ``progress`` where it takes one.
+
+    Called once ``kwargs`` are bound, which is the last step before a
+    selector spec's run that can refuse the call: ``call_keywords`` refusing
+    a read the caller left out. So an ``async def`` selector, whose provider
+    is resolved before the run rather than on its first report, never calls
+    it for a call refused there
+    (test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider).
+    And only where the selector takes ``progress``, as ``prepare_service``
+    does for a service, so one that could never report never calls it
+    (test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provider).
+
+    The provider is called from the base pool, as a service spec's is: the
+    entries of ``pool`` under a seeded name, which are exactly
+    ``base_pool``'s, since no read and no provided key may take one.
+    """
+    if "progress" not in kwargs:
+        return kwargs
+    base = {name: value for name, value in pool.items() if name in reserved}
+    reporter = run_progress(
+        selector_spec.progress_reporter, selector_spec.selector, base, transport=transport
+    )
+    return {**kwargs, "progress": reporter}
 
 
 def provide(
@@ -480,8 +512,9 @@ def run_progress(
     A selector spec's selector is its run, and the checks on what it
     returned - the object-level and scope checks, its ``preconditions`` -
     answer after it, so a selector spec those refuse may already have called
-    the provider, on either path. With neither, ``null_progress``, as
-    ``base_pool`` seeds it.
+    the provider, on either path; everything that can refuse it before the
+    run has answered by then (see ``with_run_progress``). With neither,
+    ``null_progress``, as ``base_pool`` seeds it.
     """
     resolve = resolve_progress if is_async(run) else deferred_progress
     reporter = resolve(provider, base, transport=transport)
@@ -702,6 +735,8 @@ def lookup(
     source: str,
     reserved: frozenset[str],
     after_the_run: bool = False,
+    run: bool = False,
+    transport: ProgressReporter | None = None,
 ) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
@@ -720,10 +755,18 @@ def lookup(
     test_an_output_selector_is_never_refused_after_the_run (the selector) and
     test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run
     (its ``extend_queryset``) fail without it.
+
+    ``run`` says the selector is a selector spec's own, its run, which alone
+    reports to the spec's ``progress_reporter`` beside ``transport``, the
+    caller's reporter (see ``with_run_progress``).
     """
     fn = selector_spec.selector
     fillable: frozenset[str] = frozenset() if after_the_run else selector_spec.reads.names()
     kwargs = call_keywords(fn, pool, fillable=fillable)
+    if run:
+        kwargs = with_run_progress(
+            selector_spec, kwargs, pool, reserved=reserved, transport=transport
+        )
     try:
         raw = run_selector(fn, kwargs)
     except ObjectDoesNotExist as error:

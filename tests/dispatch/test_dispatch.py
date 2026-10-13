@@ -228,6 +228,20 @@ def test_a_grant_that_checked_the_target_skips_the_object_level_check(ada: Any, 
     assert check.rows == []
 
 
+def test_a_selector_spec_s_object_level_check_sees_the_row_the_call_returns(ada: Any) -> None:
+    # The row after shaping and the collapse to one row: the very object the
+    # result carries, annotations included, never the queryset it came from.
+    mine = Note.objects.create(owner=ada, title="mine")
+    check = OwnerOnly()
+    spec = retrieve(permissions=[check], annotations={"shaped": Value(1)})
+
+    result = dispatch(spec, principal=ada, arguments={"pk": mine.pk})
+
+    assert check.rows == [result.value]
+    assert check.rows[0] is result.value
+    assert check.rows[0].shaped == 1
+
+
 def test_a_selector_receives_the_pool_and_only_its_declared_reads(ada: Any) -> None:
     selector = Record(returns=[])
     reads = Parameters.of(Parameter("q", "string"), Parameter("limit", "integer"))
@@ -2028,6 +2042,43 @@ def test_a_selector_spec_s_progress_provider_hears_its_selector(ada: Any) -> Non
     spec = SelectorSpec(kind=LIST, selector=reporting, permissions=OPEN, progress_reporter=sink)
     dispatch(spec, principal=ada, arguments={})
     assert sink.reports == [1.0]
+
+
+def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    # An ``async def`` selector's provider is resolved before the run, so it
+    # must be resolved after the binding that refuses a read left out, as a
+    # service's is: a call refused before its run never calls it.
+    sink = _Sink()
+
+    async def by_title(*, user: Any, title: str, progress: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=by_title,
+        reads=Parameters.of(Parameter("title", "string")),
+        permissions=OPEN,
+        progress_reporter=sink,
+    )
+    with pytest.raises(InvalidArguments):
+        dispatch(spec, principal=ada, arguments={})
+    assert sink.resolved == []
+
+
+def test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    # As for a service: a run that could never report never calls it.
+    sink = _Sink()
+
+    async def silent(*, user: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(kind=LIST, selector=silent, permissions=OPEN, progress_reporter=sink)
+    dispatch(spec, principal=ada, arguments={})
+    assert sink.resolved == []
 
 
 def test_a_read_outranks_a_validated_value_of_its_name(ada: Any) -> None:

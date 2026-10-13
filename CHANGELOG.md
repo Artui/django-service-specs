@@ -84,6 +84,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   neighbour's row; `?pks=9007199254740993` now matches its own. The strings
   accepted are unchanged, and `"3"` reaches the Validator as `3` rather than
   `3.0`, as the JSON `3` always did.
+- An `async def` selector spec's `progress_reporter` provider is called only
+  once the selector's keywords are bound, and only for a selector that takes
+  `progress`, as a service spec's is. It was resolved before the binding, so
+  a call refused for a read the caller left out had already called it, and a
+  selector that could never report called it on every call. The selector
+  spec's affordance conditions, `extend_queryset` and preconditions now read
+  the transport's reporter, as a service spec's do; the spec's own sink is
+  the run's alone.
 
 ## [0.5.0] — 2026-10-13
 
