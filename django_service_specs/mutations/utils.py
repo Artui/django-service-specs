@@ -12,7 +12,9 @@ from typing import Any, cast
 from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
+from django.core.files.base import File
 from django.db.models import FileField, ImageField, Model
+from django.db.models.fields.files import FieldFile
 from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
@@ -114,12 +116,27 @@ def diff_attrs(
     """Return the subset of ``new_values`` whose value differs from current.
 
     A file field's value has been through ``form_values`` by now, so it is a
-    file or ``""``, which compares with the file a row holds by name.
+    file or ``""``. A file that is not one a row holds - an upload, a
+    ``ContentFile`` - is content to write, and so always a change, as a
+    ``ModelForm`` always writes one: compared by name, a re-upload of the
+    file a row holds under its own name, at the storage root, was taken for
+    no change and never written. A file a row holds, ``""`` and a stored
+    name compare by name, so the held file handed back as itself is no
+    change. One branch to coverage, so each condition is held by its own
+    test: test_no_changes_returns_empty_result (a ``File``: without it every
+    value that is not a held file is a change) and
+    test_the_held_file_handed_back_is_no_change (not a ``FieldFile``: a
+    ModelForm's file field cleans to the held file when nothing is uploaded,
+    which test_anything_else_keeps_it reaches through dispatch).
+    test_an_upload_named_as_the_held_file_replaces_it_as_a_model_form_does
+    fails without the whole first operand.
     """
     changes: list[FieldChange] = []
     for attr, new_value in new_values.items():
         old_value: Any = safe_getattr(instance, attr)
-        if old_value != new_value:
+        if (isinstance(new_value, File) and not isinstance(new_value, FieldFile)) or (
+            old_value != new_value
+        ):
             changes.append(FieldChange(field=attr, old=old_value, new=new_value))
     return tuple(changes)
 

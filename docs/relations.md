@@ -39,7 +39,10 @@ makes a partial update's omitted fields omitted. A file field's value is
 written as a `ModelForm` writes it, through the model field's
 `save_form_data`: a file replaces the one the row holds, `None` keeps it, and
 `False`, a form's value for a [cleared file](forms.md#clearing-a-file),
-leaves no file, reported as a change to `""`. `field_map` renames input keys
+leaves no file, reported as a change to `""`. An upload, or any `File` a row
+does not already hold, is always written and reported, even under the name of
+the file it replaces; the file the row holds, handed back as itself, is no
+change. `field_map` renames input keys
 onto model fields and `exclude_fields` drops keys. `m2m={name: rows}` assigns
 many-to-many rows **that already exist**; writing the target rows from the
 payload is a `ManyToManySpec`, and naming one relation in both is refused.

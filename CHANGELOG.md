@@ -63,6 +63,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a client learns the bound it meets, and under a setting of `None` an
   array with no `max_length` states none.
 
+### Fixed
+- **A re-upload under the held file's name is written.** `update_from_input`,
+  `aupdate_from_input` and `apply_input` compared a file field's new value
+  with the held file by name, so an upload named as the file the row held -
+  any re-upload to a field whose `upload_to` is empty - was taken for no
+  change: nothing was written and nothing reported, where a `ModelForm` writes
+  every upload. An upload, or any `File` that is not one a row holds, is now
+  always a change, written and reported with the replaced file as its old
+  value. The held file handed back as itself, which is what a form's file
+  field cleans to when nothing is uploaded, is still no change; `None` still
+  keeps the file and `False` still clears it.
+
 ## [0.5.0] — 2026-10-13
 
 ### Added

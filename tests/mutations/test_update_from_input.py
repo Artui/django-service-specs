@@ -29,6 +29,7 @@ from tests.dispatch.utils import OPEN, PK, make_user
 from tests.mutations.utils import (
     PHOTO,
     STORED,
+    attachment_at_the_root,
     stored_document,
     stored_name,
     stored_photo,
@@ -246,6 +247,39 @@ class TestFileFields:
         assert result.changed_fields == ("attachment",)
         with row.attachment.open("rb") as written:
             assert written.read() == b"new"
+
+    def test_an_upload_named_as_the_held_file_replaces_it_as_a_model_form_does(
+        self, media: str
+    ) -> None:
+        # The name says nothing about the content: an upload is a file to
+        # write, whatever it is called, and a ModelForm writes it.
+        with attachment_at_the_root():
+            row = stored_document()
+            twin = stored_document()
+            assert row.attachment.name == "notes.txt"
+            result = update_from_input(row, {"attachment": SimpleUploadedFile("notes.txt", b"new")})
+            form = modelform_factory(Document, fields=["attachment"])(
+                data={},
+                files={"attachment": SimpleUploadedFile("notes.txt", b"new")},
+                instance=twin,
+            )
+            form.save()
+        for written in (row, twin):
+            with Document.objects.get(pk=written.pk).attachment.open("rb") as stored:
+                assert stored.read() == b"new"
+        assert result.changed_fields == ("attachment",)
+        # The name the row held, as a clear reports it.
+        assert result.get_field_change("attachment").old == "notes.txt"
+
+    def test_the_held_file_handed_back_is_no_change(self, media: str) -> None:
+        # A file the row already holds is no upload, so it compares by name and
+        # is not written again; a ModelForm's field cleans to it when nothing
+        # is uploaded.
+        row = stored_document()
+        with patch.object(Document, "save") as save:
+            result = update_from_input(row, {"attachment": row.attachment, "scan": row.scan})
+        assert result.changes == ()
+        save.assert_not_called()
 
     def test_an_upload_fills_a_field_holding_no_file(self, media: str) -> None:
         row = stored_document(attachment=False)

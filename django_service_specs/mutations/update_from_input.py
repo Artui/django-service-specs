@@ -52,6 +52,9 @@ def update_from_input(
     A file field is written as a ``ModelForm`` writes it, through the model
     field's ``save_form_data``: a file replaces the one the row holds, ``None`` keeps it, and ``False``,
     a form's value for a cleared file, leaves no file, reported as a change to ``""``.
+    An upload, or any ``File`` that is not one a row holds, is always written and reported,
+    even under the name of the file it replaces, since a name says nothing of the content;
+    the held file handed back as itself is no change.
 
     ``m2m`` assigns many-to-many rows that already exist, and only where the set
     of primary keys differs from the current one;
