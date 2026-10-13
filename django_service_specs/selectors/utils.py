@@ -198,9 +198,9 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     Its ``data`` is the pool's value for each name its filters read, which
     ``SelectorSpec`` made reads, so the shape check has already judged them
     and the pool carries exactly the ones the caller sent. Never the whole
-    pool, and never a pool entry called ``data``: an output selector's pool
-    carries the service's, which is not a filter's argument
-    (test_a_pool_s_data_is_not_the_filters_data).
+    pool, and never a pool entry called ``data``: a transport shaping rows
+    itself may hand over a pool with one, and it is a filter's argument only
+    under a filter's own name (test_a_pool_s_data_is_not_the_filters_data).
 
     ``request`` is handed over when the pool carries one - a seed an HTTP
     adapter registers - and the constructor declares it, by the

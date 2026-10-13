@@ -249,8 +249,8 @@ class TestFilterSet:
         assert _titles(rows) == ["draft", "final", "other"]
 
     def test_a_pool_s_data_is_not_the_filters_data(self) -> None:
-        # An output selector's pool carries the service's ``data``; the filters
-        # read only the names they declare, never a mapping under that key.
+        # The filters read only the names they declare, never a mapping a
+        # pool happens to carry under ``data``.
         _three_notes()
         pool = {"data": {"title": "draft"}}
         rows = shape_queryset(Note.objects.all(), _filtered(TitleFilter), pool, source_label="x")
@@ -267,6 +267,19 @@ class TestFilterSet:
         assert caught.value.detail == {
             "owner": ["Select a valid choice. That choice is not one of the available choices."]
         }
+
+    def test_a_range_filter_s_refusal_is_keyed_by_the_filter_s_name(self) -> None:
+        # Its arguments are ``pk_range_min`` and ``pk_range_max``, and
+        # django-filter validates the two as one form field, called ``pk_range``.
+        # Called directly, so the shape check is not there to answer first.
+        with pytest.raises(InvalidArguments) as caught:
+            shape_queryset(
+                Note.objects.all(),
+                _filtered(NoteFilters),
+                {"pk_range_min": "x"},
+                source_label="x",
+            )
+        assert list(caught.value.detail) == ["pk_range"]
 
     def test_a_stand_in_with_no_is_valid_is_read_as_it_answers(self) -> None:
         _BareFilter.seen.clear()
