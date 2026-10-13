@@ -133,8 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `2**53` matches its own row. Each is bounded at `minimum=-1e50` and
   `maximum=1e50`, django-filter's number filter's limit drawn on both sides
   and on a range's bounds, which django-filter leaves open: past it, a value
-  such as `"1E+999999999"` reached an integer column's conversion, which
-  builds every digit and held a worker for minutes. A real FilterSet needs
+  such as `"1E+999999999"` would reach an integer column's conversion, which
+  builds every digit and holds a worker for minutes. A real FilterSet needs
   the new `filter` extra.
 - `run_selector`, `arun_selector`, `materialize_retrieve`,
   `amaterialize_retrieve` and `is_queryset`, the selector steps dispatch runs,
@@ -218,13 +218,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RawPostDataException`, where it returned the body and the same arguments.
   Code that reads the body after the view - a middleware, an audit log, an
   error reporter - reads it first instead, and the arguments are parsed from
-  that copy.
+  that copy; being a whole-body read, that brings the size limit back on the
+  uploads.
 - **Security: an empty `permissions` sequence allowed every call.** A spec
   declaring `permissions=[]` or `()` had no check to fail, so anyone ran it.
   Every published release is affected, 0.4.2 included. `ServiceSpec` and
   `SelectorSpec` refuse it when built; declare `permissions=[Unrestricted()]`
   to mean that.
-- **Security, and breaking: a `Grant` that checked one row admitted
+- **Breaking, and a security fix: a `Grant` that checked one row admitted
   another.** A grant with `target_checked` covers a service spec's target
   only when that target is handed to `dispatch` or `adispatch` as `target=`.
   Without it dispatch runs the object-level or scope check on the row it
@@ -232,9 +233,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admits a different row named in the arguments, and a create, a collection
   or a `many` call is scope checked again. Every 0.4.2 caller passing
   `Grant(..., target_checked=True)` is affected, because 0.4.2's dispatch
-  took no `target=`: such a grant could only skip the check on the row
-  dispatch looked up itself, and now `has_object_permission` and
-  `has_scope_permission` run on that row again. It fails closed: a call the
+  took no `target=`: such a grant could only skip the checks on the target
+  dispatch looked up itself, and now they run again - `has_object_permission`
+  on the row, and `has_scope_permission` on a create, a collection or a
+  `many` call. It fails closed: a call the
   grant let through may now be refused with `NotPermitted`, never the other
   way round.
 - `dispatch` and `adispatch` refuse a precondition that answers with a

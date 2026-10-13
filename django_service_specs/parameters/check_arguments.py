@@ -62,9 +62,10 @@ def check_arguments(
     level of nesting, with no query. It is what runs at enqueue time and in front of an
     untrusted caller's Validator, so a malformed call is refused before it costs
     a row lookup, and **it is no stricter than the libraries behind it**, with
-    one exception named below: a decimal accepts a JSON number as well as a
-    string, because every decimal validator does, and a check stricter than
-    the worker refuses what would have run.
+    two exceptions named below, ASCII digits and a declared bound. So a
+    decimal accepts a JSON number as well as a string, because every decimal
+    validator does, and a check stricter than the worker refuses what would
+    have run.
 
     - A required parameter with a declared default is not refused when absent,
       because the Validator will supply the default. The default is not
@@ -110,9 +111,12 @@ def check_arguments(
       type, and this is a type rule rather than a stricter check - although
       pydantic's ``float`` and the dataclass adapter's both take one.
     - ``minimum`` and ``maximum`` bound a number inclusively, in the words
-      Django's ``MinValueValidator`` and ``MaxValueValidator`` use. They are
-      declared rather than inferred, so they are the declaration's and no
-      stricter than it. A decimal string is compared as the decimal it
+      Django's ``MinValueValidator`` and ``MaxValueValidator`` use. **The
+      second exception**: a bound is the declaration's, and may be stricter
+      than the library behind it. ``filter_set_parameters`` draws
+      django-filter's ``1e50`` below zero and on a range's bounds too, where
+      django-filter draws none, because past it an integer column's
+      conversion builds every digit of the value. A decimal string is compared as the decimal it
       spells, which reads its exponent and builds none of its digits, so
       ``"1E+999999999"`` is refused as fast as ``"2"`` is taken.
     - ``choices`` constrain the value, and an array's choices constrain each of

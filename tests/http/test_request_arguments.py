@@ -486,6 +486,18 @@ class TestUploads:
         assert read(request) == {"count": 2}
         assert request.body == body
 
+    def test_reading_the_body_first_brings_the_size_limit_back_on_an_upload(self) -> None:
+        # The way round the spent stream is a whole-body read, which
+        # DATA_UPLOAD_MAX_MEMORY_SIZE bounds, file parts and all; the parse
+        # itself takes the same upload, as the test above it shows.
+        request = FACTORY.patch(
+            "/",
+            data=encode_multipart(BOUNDARY, {"notes": SimpleUploadedFile("a", b"x" * 3 * 1024**2)}),
+            content_type=f"multipart/form-data; boundary={BOUNDARY}",
+        )
+        with pytest.raises(RequestDataTooBig):
+            request.body  # noqa: B018
+
     def test_a_multipart_stream_read_without_a_buffer_is_refused(self) -> None:
         # Something read the stream and kept nothing, so the body is gone:
         # parsed anyway, it would be a call with no arguments.
