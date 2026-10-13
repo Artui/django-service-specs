@@ -56,9 +56,10 @@ contents are the Validator's.
 
 Under `partial=True` no absent parameter is refused, at any depth: a partial
 update sends only what changes. A value that is present is checked as it would
-be otherwise, and an unknown key is still refused. Dispatch relaxes only a
-[`partial`](declaring.md#partial-updates) write's Validator parameters, so a
-transport checking a call as dispatch will calls
+be otherwise, and an unknown key is still refused. Dispatch relaxes a
+[`partial`](declaring.md#partial-updates) write's Validator parameters, and a
+parameter a provider is annotated to fill, so a transport checking a call as
+dispatch will calls
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 rather than `check_arguments(partial=True)`.
 

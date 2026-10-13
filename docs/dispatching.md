@@ -211,8 +211,9 @@ would find, refused where dispatch would refuse it.
 runs dispatch's own steps for a write's target and nothing else: the
 deactivated principal, the shape check over **the target selector's
 parameters alone**, class-level authorization, then the very lookup and checks
-dispatch runs. A Validator field is neither required nor unknown there, so a
-GET carrying the route's arguments resolves as a POST carrying the whole form
+dispatch runs. A Validator field is neither required nor unknown there, and a
+target read the selector's `kwargs` provider fills is not required, as in
+dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
 does.
 
 ```python
@@ -259,11 +260,12 @@ Some transports bind input themselves: an MCP server answering a malformed call
 before it opens a transaction, a queue validating a task in the worker.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs the same two steps dispatch does - the shape check over
-`spec.parameters()`, relaxing what dispatch relaxes for `partial` and for an
-`input_data` provider, then the Validator on its own arguments - so a
+`spec.parameters()`, relaxing what dispatch relaxes for `partial` and for a provider's
+filled keys, then the Validator on its own arguments - so a
 transport that binds for itself cannot drift from the gate dispatch applies.
 It runs no provider: a field an `input_data` provider would fill passes the
-shape check and, left out, is the Validator's to refuse.
+shape check and, left out, is the Validator's to refuse; a read a `kwargs`
+provider would fill passes too.
 
 ```python
 --8<--
@@ -289,7 +291,8 @@ steps in the same order, from async code, and
 selector. Every other callable a spec carries is sync-only - a permission
 check, a Validator, a Presenter, a selector nested in a write,
 `extend_queryset`, `filter_set`, an affordance's condition, the providers, the
-preconditions, a seed's resolver - because each may query, and because a spec
+preconditions, a seed's resolver - each refused with `ImproperlyConfigured`
+naming its seat if declared `async def`, when the spec is built - because each may query, and because a spec
 is written once for both entry points: a check written `async def` could not
 be called from `dispatch`. The run is the one callable no step shares.
 
@@ -354,7 +357,10 @@ docs/examples/dispatching.py:seeds
 
 A resolver declares what it wants from the pool like any other callable, and
 sees the principal, never an argument: a seed is ambient, and a caller must not
-steer one by naming an argument after something its resolver reads.
+steer one by naming an argument after something its resolver reads. A resolver
+is sync-only: an `async def` one is refused with `ImproperlyConfigured` when
+it is registered, and a plain `def` handing back an awaitable is refused where
+it is resolved.
 
 A registered name is **reserved**, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with

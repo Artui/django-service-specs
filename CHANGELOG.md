@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   HTTP `PATCH` does. Dispatch and `bind_arguments` do not refuse an absent
   Validator parameter of a partial call, at any depth, while the spec's
   `reads` and the target selector's - the `pk` among them - stay required as
-  declared, and a present value is checked as on a whole call. The Validator
+  declared unless a `kwargs` provider fills them, and a present value is checked as on a whole call. The Validator
   is told through `ValidationContext.partial`. `FormValidator` binds only the
   fields the caller sent and returns no key for any other, so an absent
   `BooleanField` does not come back `False` nor an absent `CharField` `''`;
@@ -53,14 +53,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   service spec, the resolved target. `kwargs` returns pool entries merged after the caller's
   arguments, so a key it answers is the author's value - on a target
   selector it scopes the lookup. `input_data` returns values merged over the
-  caller's arguments before the Validator sees them, and a Validator field it
-  is annotated to fill is not demanded of the caller. A value of `UNSET`
+  caller's arguments before the Validator sees them. A parameter a provider is
+  annotated to fill is not demanded of the caller where the provider's values
+  reach it - a selector's `kwargs` that selector's `reads`, a service spec's
+  `kwargs` its `reads`, `input_data` the Validator's fields - and a
+  `ServiceSpec` whose typed provider fills a parameter declared anywhere else
+  is refused with `ImproperlyConfigured`, when the spec is built or, for a
+  Validator field, when `parameters()` is assembled. A value of `UNSET`
   declines its key. A provider returning a key dispatch seeds itself is
   refused.
 - `ProviderKeys` and `provider_keys(provider)`, which read the keys a provider
   annotated to return a `TypedDict` fills, and those it may decline, before
   it runs; and `server_owned_keys(spec)`, every name a spec's dispatch fills
-  from the server, for a transport building an input schema of its own.
+  from the server, for a transport building an input schema of its own. None
+  of them is a parameter dispatch demands of the caller, so a transport
+  subtracts the set from what `parameters()` lists.
 - `progress_reporter` on both specs: a provider of a `ProgressReporter` sink
   the run reports to beside the transport's, resolved on the run's first
   report, so a refused call never calls it.
@@ -96,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the dataclass and pydantic adapters label a Django `Choices` enum's;
   a plain `Enum` and a `Literal` stay unlabelled.
 - `check_arguments(..., partial=True)`, under which no absent parameter is
-  refused at any depth. Dispatch relaxes only the Validator's parameters;
+  refused at any depth. Dispatch relaxes a `partial` spec's Validator
+  parameters and a parameter a provider is annotated to fill;
   `bind_arguments` relaxes exactly what dispatch does.
 - `SelectorSpec.filter_set`, a django-filter `FilterSet` applied after
   `extend_queryset`, whose filters are read as Parameters and join the
@@ -130,6 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking:** an `async def` callable in a seat that is called from sync
   code and never awaited is refused when it is declared, with
   `ImproperlyConfigured` naming the seat: a permission check's methods, a
+  Validator's `validate` and `validated`, a Presenter's `present`, a
   selector spec's `extend_queryset` and `filter_set`, an affordance's `when`,
   a pool seed's resolver, and the new providers and preconditions. One
   declared so at import time stops the project at import. A seed resolver
@@ -155,7 +164,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `async def` condition when it is declared, and an answer still to be
   awaited - from a plain `def` handing back a coroutine, a decorated
   `async def` - is refused where it is read, with `ImproperlyConfigured`, so
-  the call fails closed instead of running.
+  the call fails closed instead of running. A pool seed's resolver declared
+  `async def` is refused when it is declared, and one handing back an
+  awaitable from a plain `def` where it is resolved.
 
 ## [0.4.2] — 2026-10-06
 
