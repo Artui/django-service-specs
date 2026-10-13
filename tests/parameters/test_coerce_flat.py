@@ -41,10 +41,19 @@ def test_parses_integers_numbers_and_booleans() -> None:
     assert coerce_flat(FLAT, raw) == {"count": 3, "ratio": 2.5, "active": True, "title": "Lathe"}
 
 
-def test_a_json_number_is_a_float_even_when_it_is_whole() -> None:
-    # What a JSON number decodes to is a float for a "number"; the shape check
-    # accepts either, and this one keeps the reading to one spelling.
-    assert coerce_flat(FLAT, {"ratio": "3"}) == {"ratio": 3.0}
+@pytest.mark.parametrize(
+    ("value", "number"),
+    [("3", 3), (str(2**53 + 1), 2**53 + 1), ("-12", -12), ("3.0", 3.0), ("1e3", 1000.0)],
+)
+def test_a_number_is_what_a_json_decoder_makes_of_the_same_digits(
+    value: str, number: float
+) -> None:
+    # An integer literal decodes to an exact ``int`` and anything with a point
+    # or an exponent to a ``float``, so the flat ``"3"`` reaches the Validator
+    # as the JSON ``3`` does. Read through ``float``, 2**53 + 1 was 2**53.
+    coerced = coerce_flat(FLAT, {"ratio": value})["ratio"]
+    assert coerced == number
+    assert type(coerced) is type(number)
 
 
 @pytest.mark.parametrize(

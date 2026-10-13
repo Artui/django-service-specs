@@ -75,6 +75,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   so a client learns the bound it meets, and under a setting of `None` an
   array with no `max_length` states none.
 
+### Fixed
+- A string sent for a `number`, by a flat transport or in a JSON body, is read
+  as a JSON decoder reads the same literal: digits alone are the exact `int`
+  they spell, and a point or an exponent makes a `float`. Read through `float`
+  alone, every integer past `2**53` was rounded to a neighbour, so a
+  django-filter CSV filter's key, declared a `number`, matched the
+  neighbour's row; `?pks=9007199254740993` now matches its own. The strings
+  accepted are unchanged, and `"3"` reaches the Validator as `3` rather than
+  `3.0`, as the JSON `3` always did.
+
 ## [0.5.0] — 2026-10-13
 
 ### Added

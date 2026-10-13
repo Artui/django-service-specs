@@ -40,6 +40,13 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
+**A `number`'s string is read as a JSON decoder reads its literal**: digits
+alone are the exact integer they spell, and a point or an exponent makes a
+float. So `"9007199254740993"` goes on as that integer, as the JSON literal
+does, where a float would round it to its neighbour, and `"3"` goes on as the
+3 a JSON body's `3` is. A fraction finer than a float holds is rounded, as the
+JSON literal is; a value that must be exact is declared a `decimal`.
+
 **Only an ASCII string spells an `integer` or a `number`**, and this is one of
 two places the check is stricter than Django's forms, the other being
 [the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
@@ -270,8 +277,11 @@ docs/examples/arguments.py:flat
 
 - An `integer` or a `number` is parsed. An integer is read as Django's
   `IntegerField` reads one: `"5.0"` and `"5."` are 5, and `"5.5"` is refused
-  with `"Enter a whole number."`. Each integer element of an array, a
-  repeated query-string key's included, is read the same way.
+  with `"Enter a whole number."`. A number is read as a JSON decoder reads
+  the same literal: `"3"` is the integer 3, exactly, and `"2.5"` and `"1e3"`
+  are floats, so `?pks=9007199254740993` is that key and not its neighbour.
+  Each element of an array, a repeated query-string key's included, is read
+  the same way.
 - A `boolean` is parsed from exactly four spellings - `true`, `false`, `1`, `0`,
   in any case - and anything else is refused with
   `"Enter true, false, 1 or 0."`. Libraries disagree about every other

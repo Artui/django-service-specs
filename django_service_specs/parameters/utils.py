@@ -148,10 +148,23 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     An integer is read as Django's ``IntegerField`` reads one: ``"5.0"``,
     ``"5."``, ``"5 .0"`` and ``" 5 "`` are 5, and ``"5.5"`` and ``"1e3"`` are
     no integer. That is looser than pydantic's lax ``int``, which refuses
-    ``"5."`` and ``"5 .0"``. A number is Python's ``float``, as Django's
-    ``FloatField`` reads it, so ``"1e3"`` is 1000.0 and ``"5."`` is 5.0, as
-    pydantic reads them too, and ``"5 .0"`` is none. NaN and the infinities
+    ``"5."`` and ``"5 .0"``. A number is any string Python's ``float`` reads,
+    as Django's ``FloatField`` reads it, so ``"1e3"`` and ``"5."`` are numbers,
+    as pydantic reads them too, and ``"5 .0"`` is none. NaN and the infinities
     parse and are no number, since no JSON caller can send one.
+
+    **A number spelling an integer is that exact** ``int``, and a ``float``
+    only where a point or an exponent is spelled: what a JSON decoder makes
+    of the same literal, so ``"3"`` reaches the Validator as the JSON ``3``
+    does. Through ``float`` alone, every integer past 2**53 was rounded to a
+    neighbour, and a CSV filter's key, which is declared a ``number``, matched
+    the neighbour's row
+    (test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http).
+    The ``float`` reading still decides what is a number, so the accepted
+    strings are unchanged, and a literal long enough to reach ``int``'s digit
+    limit is already infinite to ``float`` and refused. A fraction past a
+    ``float``'s precision is rounded, as a JSON decoder rounds it: a value
+    that must be exact is a ``decimal``.
 
     **Only an ASCII string spells one.** Python's ``int`` and ``float``,
     and so Django's fields, read Arabic-Indic and fullwidth digits and strip
@@ -176,4 +189,10 @@ def parse_number(json_type: str, text: str) -> int | float | None:
         number = float(text)
     except ValueError:
         return None
-    return number if math.isfinite(number) else None
+    if not math.isfinite(number):
+        return None
+    try:
+        # test_a_number_spelling_an_integer_is_that_exact_int fails without this.
+        return int(text)
+    except ValueError:
+        return number
