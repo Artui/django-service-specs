@@ -99,6 +99,7 @@ from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
@@ -219,6 +220,7 @@ __all__ = [
     "project_payload",
     "request_arguments",
     "resolve_callable_kwargs",
+    "server_owned_keys",
     "resolve_principal",
     "run_selector",
     "run_service",
