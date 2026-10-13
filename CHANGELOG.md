@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CodedMessage`, a `str` carrying a `code`, and every refusal the kernel and
   its shipped adapters make is one: the shape check's, `coerce_flat`'s,
   `request_arguments`', dispatch refusing a read a selector asks for and
-  nothing filled, a FilterSet's, and `DataclassValidator`'s, `FormValidator`'s
-  and `PydanticValidator`'s. The code is the one a DRF field gives the same
+  nothing filled, a FilterSet's, a relation write's, and
+  `DataclassValidator`'s, `FormValidator`'s and `PydanticValidator`'s. The
+  code is the one a DRF field gives the same
   mistake - `required`, `null`, `invalid`, `not_a_list`, `max_value`,
   `min_value`, `invalid_choice`, `max_length`, `min_length` - plus `unknown`
   for a key refused under `REJECT` and `parse_error` for a body that is not

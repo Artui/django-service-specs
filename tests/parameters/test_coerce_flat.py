@@ -60,7 +60,7 @@ def test_a_number_is_what_a_json_decoder_makes_of_the_same_digits(
 # Digits past ``int``'s limit of 4300, which Python enforces from 3.10.7 on.
 # Padded with zeros, ``float`` still reads the value as a finite number.
 PADDED = "0" * 4300 + str(2**53 + 1)
-LIMITED = hasattr(sys, "get_int_max_str_digits")
+LIMITED = getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0
 
 
 def test_an_integer_literal_past_int_s_digit_limit_is_refused_never_rounded() -> None:

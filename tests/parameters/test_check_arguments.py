@@ -356,7 +356,7 @@ def test_a_number_s_string_past_int_s_digit_limit_is_refused_never_rounded() -> 
     # rather than handed on as that neighbour. With no limit they are exact.
     padded = "0" * 4300 + str(2**53 + 1)
     params = one(Parameter("x", "number"))
-    if hasattr(sys, "get_int_max_str_digits"):
+    if getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0:
         assert refusal(params, {"x": padded}) == {"x": ["Expected a number."]}
     else:
         assert check_arguments(params, {"x": padded}) == {"x": 2**53 + 1}
