@@ -14,6 +14,7 @@ from django_service_specs.mutations.child_collection_change import ChildCollecti
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.delete_relations import delete_relations
 from django_service_specs.mutations.field_change import FieldChange
+from django_service_specs.mutations.register_row_error import register_row_error
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
@@ -30,5 +31,6 @@ __all__ = [
     "aupdate_from_input",
     "create_from_input",
     "delete_relations",
+    "register_row_error",
     "update_from_input",
 ]

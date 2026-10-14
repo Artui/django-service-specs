@@ -17,6 +17,7 @@ import importlib
 import json
 import pickle
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -59,6 +60,7 @@ from django_service_specs import (
     spec_input_schema,
     update_from_input,
 )
+from django_service_specs.mutations.utils import ROW_ERROR_READERS
 from docs.examples import (
     arguments,
     async_dispatch,
@@ -69,6 +71,7 @@ from docs.examples import (
     quickstart,
     registry,
     relations,
+    row_errors,
     transport,
 )
 from tests.adapter_app.models import Author, Book
@@ -726,6 +729,40 @@ class TestRelations:
         assert tuple(sorted(result.value)) == books
         assert not Author.objects.filter(pk=author.pk).exists()
         assert not Book.objects.filter(pk__in=books).exists()
+
+    def test_delete_model_takes_the_books_first_and_returns_nothing(self, ada: Any) -> None:
+        author = self._create(ada).value
+        books = list(author.books.values_list("pk", flat=True))
+        assert books
+        result = dispatch(deleting.retire_author_spec, principal=ada, arguments={"pk": author.pk})
+        assert result.value is None
+        assert not Author.objects.filter(pk=author.pk).exists()
+        assert not Book.objects.filter(pk__in=books).exists()
+
+
+@pytest.fixture
+def row_error_registered() -> Iterator[None]:
+    """The example's registration, undone after the test so it reaches no other."""
+    before = dict(ROW_ERROR_READERS)
+    row_errors.ready()
+    yield
+    ROW_ERROR_READERS.clear()
+    ROW_ERROR_READERS.update(before)
+
+
+@pytest.mark.django_db
+class TestRowErrors:
+    def test_a_registered_refusal_lands_at_its_row_and_keeps_its_class(
+        self, row_error_registered: None
+    ) -> None:
+        books = [{"title": "Fine", "price": "1"}, {"title": "LOUD", "price": "1"}]
+        with pytest.raises(row_errors.CatalogueRefusal) as refused:
+            row_errors.create_author(data={"name": "Ada", "books": books})
+        assert refused.value.detail == {"books": {1: {"title": ["No titles in capitals."]}}}
+
+    def test_registering_it_again_changes_nothing(self, row_error_registered: None) -> None:
+        row_errors.ready()
+        assert ROW_ERROR_READERS[row_errors.CatalogueRefusal] is row_errors.read_refusal
 
 
 class TestRegistry:

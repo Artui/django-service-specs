@@ -45,6 +45,7 @@ from django_service_specs.mutations.child_collection_change import ChildCollecti
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.delete_relations import delete_relations
 from django_service_specs.mutations.field_change import FieldChange
+from django_service_specs.mutations.register_row_error import register_row_error
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
@@ -90,15 +91,23 @@ from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
 from django_service_specs.selectors.run_selector import run_selector
 from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.services.acreate_model import acreate_model
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
+from django_service_specs.services.adelete_collection import adelete_collection
+from django_service_specs.services.adelete_model import adelete_model
 from django_service_specs.services.arun_service import arun_service
+from django_service_specs.services.aupdate_model import aupdate_model
+from django_service_specs.services.create_model import create_model
+from django_service_specs.services.delete_collection import delete_collection
+from django_service_specs.services.delete_model import delete_model
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.services.update_model import update_model
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
@@ -183,7 +192,10 @@ __all__ = [
     "ValueFormatter",
     "__version__",
     "acreate_from_input",
+    "acreate_model",
     "add_argument_errors",
+    "adelete_collection",
+    "adelete_model",
     "adelete_relations",
     "adispatch",
     "adispatch_request",
@@ -195,6 +207,7 @@ __all__ = [
     "arun_service",
     "audience_projection_for_spec",
     "aupdate_from_input",
+    "aupdate_model",
     "authorize",
     "authorize_scope",
     "authorize_target",
@@ -203,6 +216,9 @@ __all__ = [
     "check_arguments",
     "coerce_flat",
     "create_from_input",
+    "create_model",
+    "delete_collection",
+    "delete_model",
     "delete_relations",
     "dispatch",
     "dispatch_request",
@@ -221,6 +237,7 @@ __all__ = [
     "present",
     "present_for_audience",
     "project_payload",
+    "register_row_error",
     "request_arguments",
     "resolve_callable_kwargs",
     "server_owned_keys",
@@ -233,4 +250,5 @@ __all__ = [
     "spec_output_schema",
     "unmet_operation_affordance",
     "update_from_input",
+    "update_model",
 ]

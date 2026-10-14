@@ -133,6 +133,14 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.service_not_found.ServiceNotFound
 ::: django_service_specs.services.action_unavailable.ActionUnavailable
 ::: django_service_specs.services.additional_input_required.AdditionalInputRequired
+::: django_service_specs.services.create_model.create_model
+::: django_service_specs.services.acreate_model.acreate_model
+::: django_service_specs.services.update_model.update_model
+::: django_service_specs.services.aupdate_model.aupdate_model
+::: django_service_specs.services.delete_model.delete_model
+::: django_service_specs.services.adelete_model.adelete_model
+::: django_service_specs.services.delete_collection.delete_collection
+::: django_service_specs.services.adelete_collection.adelete_collection
 
 ## Pool
 
@@ -154,6 +162,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.mutations.apply_input.apply_input
 ::: django_service_specs.mutations.delete_relations.delete_relations
 ::: django_service_specs.mutations.adelete_relations.adelete_relations
+::: django_service_specs.mutations.register_row_error.register_row_error
 ::: django_service_specs.mutations.change_result.ChangeResult
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
