@@ -10,7 +10,7 @@ importing the package root never imports pydantic.
 
 ## Settings
 
-One Django setting, read at the call rather than at import, so
+Two Django settings, each read at the call rather than at import, so
 `override_settings` reaches a spec built before it.
 
 - **`SERVICE_SPECS_MAX_ARRAY_LENGTH`**: the most elements an array argument
@@ -19,6 +19,12 @@ One Django setting, read at the call rather than at import, so
   when unset; `None` bounds no array. Anything but a non-negative `int` or
   `None` is refused as `ImproperlyConfigured` where it is read. See
   [how long a list may be](arguments.md#how-long-a-list-may-be).
+- **`SERVICE_SPECS_COMMAND_OUTPUT`**: the format a `SpecCommand` writes its
+  result in. `"auto"` when unset, a table on a terminal and JSON Lines on
+  anything else; `"table"` or `"json"` pins one project-wide, and a
+  command's own `--table` or `--json` still wins. Anything else, a
+  different case included, is refused as `ImproperlyConfigured` where it is
+  read.
 
 ## Specs
 
