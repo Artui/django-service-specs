@@ -107,6 +107,12 @@ flips is refused when it is called, with the code this would answer if asked
 again then. A condition driven by a clock has no event, so nothing announces
 the moment it flips.
 
+On an event loop, await
+[`aunmet_operation_affordance`][django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance]
+instead. It gives the same answer, with every condition asked in one
+`sync_to_async` hop, since a condition may query; a spec with nothing to ask at
+list time costs no hop at all, and most declare nothing.
+
 ## Enforcing at the call
 
 [`dispatch`][django_service_specs.dispatch.dispatch.dispatch] and
@@ -137,6 +143,11 @@ that one:
 docs/examples/affordances.py:enforce
 --8<--
 ```
+
+A transport running a service from an event loop awaits
+[`aenforce_affordances`][django_service_specs.affordances.aenforce_affordances.aenforce_affordances],
+which refuses and lets through as `enforce_affordances` does, answering every
+condition in one `sync_to_async` hop, and none for a spec declaring none.
 
 Declaration order decides which refusal a caller sees, and nothing after the
 first unmet condition runs. A condition on the row is read from the table, not

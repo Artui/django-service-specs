@@ -61,6 +61,7 @@ One Django setting, read at the call rather than at import, so
 ::: django_service_specs.schema.spec_output_schema.spec_output_schema
 ::: django_service_specs.schema.parameters_schema.parameters_schema
 ::: django_service_specs.schema.output_schema.output_schema
+::: django_service_specs.schema.can_present_nothing.can_present_nothing
 
 ## Dataclass adapters
 
@@ -97,6 +98,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.affordances.enforce_affordances.enforce_affordances
 ::: django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance
 ::: django_service_specs.affordances.operation_affordances.operation_affordances
+::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
+::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
 
 ## HTTP
 
@@ -133,6 +136,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.service_not_found.ServiceNotFound
 ::: django_service_specs.services.action_unavailable.ActionUnavailable
 ::: django_service_specs.services.additional_input_required.AdditionalInputRequired
+::: django_service_specs.services.create_service.CreateService
+::: django_service_specs.services.update_service.UpdateService
+::: django_service_specs.services.delete_service.DeleteService
+::: django_service_specs.services.implements.implements
 
 ## Pool
 
@@ -141,6 +148,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
 ::: django_service_specs.pool.null_progress.null_progress
+::: django_service_specs.pool.combine_progress.combine_progress
 ::: django_service_specs.pool.provider_keys.provider_keys
 ::: django_service_specs.specs.server_owned_keys.server_owned_keys
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
@@ -185,6 +193,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.selectors.materialize_retrieve.materialize_retrieve
 ::: django_service_specs.selectors.amaterialize_retrieve.amaterialize_retrieve
 ::: django_service_specs.selectors.is_queryset.is_queryset
+::: django_service_specs.selectors.selector.Selector
+::: django_service_specs.selectors.async_selector.AsyncSelector
+::: django_service_specs.selectors.list_selector.ListSelector
+::: django_service_specs.selectors.retrieve_selector.RetrieveSelector
 
 ## Filters
 
@@ -200,3 +212,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.provider_keys.ProviderKeys
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
+::: django_service_specs.types.no_input.NoInput

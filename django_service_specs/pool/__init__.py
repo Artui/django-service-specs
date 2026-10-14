@@ -1,6 +1,7 @@
 """The keyword pool every dispatched callable is bound from."""
 
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.combine_progress import combine_progress
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
@@ -12,6 +13,7 @@ __all__ = [
     "RESERVED_POOL_SEEDS",
     "PoolSeeds",
     "base_pool",
+    "combine_progress",
     "null_progress",
     "provider_keys",
     "resolve_callable_kwargs",
