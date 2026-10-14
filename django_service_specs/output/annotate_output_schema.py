@@ -9,8 +9,28 @@ from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
 
-_VALUE_KEYWORDS: Final = frozenset({"type", "enum", "const", "anyOf", "oneOf"})
-"""The keywords ``_admits_null`` reads a null from; a schema with none of them admits anything."""
+_ANNOTATIONS: Final = frozenset(
+    {
+        "title",
+        "description",
+        "examples",
+        "default",
+        "$comment",
+        "deprecated",
+        "readOnly",
+        "writeOnly",
+    }
+)
+"""The keywords that describe a field rather than its value.
+
+A schema carrying these alone - an ``any`` field is described so - states
+nothing about its value and admits every value, the null with it. Anything
+else, a ``$ref``, an ``allOf``, a ``not``, a ``format`` or a shape, says
+something about the value, and only ``_admits_null``'s other spellings decide
+whether a null is among it. Each keyword is held by a case of
+test_an_annotation_alone_states_nothing_about_the_value, and the boundary by
+test_a_schema_stating_its_value_another_way_admits_no_null.
+"""
 
 _CARRIED: Final = ("title", "description")
 """Keywords that survive a formatter replacing a property's schema.
@@ -211,9 +231,10 @@ def _admits_null(schema: dict[str, Any]) -> bool:
       nullable choice is, a member that is itself nullable, or one that admits
       anything (``true`` or ``{}``).
 
-    - a schema stating nothing about its value, such as ``{}`` or one carrying
-      only a ``title``: an ``any`` field is described so, and it admits
-      every value, the null with it.
+    - a schema stating nothing about its value: ``{}``, or one whose every
+      keyword is an annotation in ``_ANNOTATIONS``, such as a lone ``title``.
+      An ``any`` field is described so, and it admits every value, the null
+      with it. A ``$ref``, a composition or a shape is not nothing.
 
     One boolean, so one branch to coverage; each spelling has a test that
     fails without it:
@@ -228,7 +249,7 @@ def _admits_null(schema: dict[str, Any]) -> bool:
     """
     stated = schema.get("type")
     return (
-        not schema.keys() & _VALUE_KEYWORDS
+        schema.keys() <= _ANNOTATIONS
         or "null" in (stated if isinstance(stated, list) else [stated])
         or None in schema.get("enum", ())
         or schema.get("const", ...) is None

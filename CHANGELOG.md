@@ -14,7 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   string it may not be. As on `Parameter`, an `any` field lists no choices, and
   an array of any element declares no `items` rather than `items="any"`, which
   is refused. A formatter over a property that states nothing about its value
-  keeps admitting the null it passes through unformatted.
+  - `{}`, or annotations such as a `title` alone - keeps admitting the null
+  it passes through unformatted; one carrying a `$ref`, a composition or a
+  shape is read as before.
 - **`Validator.supports_partial` may be set per instance.** It is declared
   as an ordinary `bool` attribute rather than a `ClassVar`, so an adapter
   whose answer depends on what it was built over sets it in `__init__`, and
