@@ -12,6 +12,7 @@ from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses
+from tests.specs.utils import Foreign
 
 
 def _spec(permissions: list | None) -> SelectorSpec:
@@ -91,3 +92,21 @@ def test_a_check_answering_with_a_coroutine_is_refused_rather_than_read_as_a_pas
         authorize_target(spec, principal, object(), grant=Grant(spec, principal))
     assert "AnswersWith.has_object_permission" in str(caught.value)
     assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+
+def test_a_source_s_object_checks_are_the_spec_it_compiles_to_s() -> None:
+    source, principal = Foreign(_spec([RefuseWithMessage()])), object()
+
+    with pytest.raises(NotPermitted, match="Staff only."):
+        authorize_target(source, principal, object(), grant=Grant(source, principal))
+
+
+def test_a_source_s_grant_that_checked_the_target_skips_the_checks() -> None:
+    check = Allow()
+    source, principal = Foreign(_spec([check])), object()
+
+    authorize_target(
+        source, principal, object(), grant=Grant(source, principal, target_checked=True)
+    )
+
+    assert check.object_level_calls == 0

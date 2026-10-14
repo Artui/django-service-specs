@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import gc
+import inspect
 from typing import Any
 
 import pytest
 
+import django_service_specs
+from django_service_specs.authorization.grant import Grant
 from django_service_specs.specs import spec_source
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -130,3 +133,45 @@ def test_a_compile_answering_something_else_is_refused_and_nothing_is_cached() -
     with pytest.raises(TypeError, match=r"Wrong.as_kernel_spec\(\) must return .*; got Foreign"):
         kernel_spec(source)
     assert id(source) not in spec_source._COMPILED
+
+
+ENTRY_POINTS = [
+    "adispatch",
+    "aenforce_affordances",
+    "apresent",
+    "audience_projection_for_spec",
+    "aunmet_operation_affordance",
+    "authorize",
+    "authorize_scope",
+    "authorize_target",
+    "bind_arguments",
+    "can_present_nothing",
+    "check_call",
+    "dispatch",
+    "enforce_affordances",
+    "kernel_spec",
+    "operation_affordances",
+    "present",
+    "present_for_audience",
+    "resolve_target",
+    "server_owned_keys",
+    "spec_input_schema",
+    "spec_output_schema",
+    "unmet_operation_affordance",
+]
+
+
+@pytest.mark.parametrize("name", ENTRY_POINTS)
+def test_every_entry_point_is_annotated_to_take_a_source(name: str) -> None:
+    # What a type checker reads: a function that compiles a source but is
+    # annotated for a spec alone makes every caller holding a declaration
+    # write a cast, or call kernel_spec itself and lose nothing it could see.
+    annotation = (
+        inspect.signature(getattr(django_service_specs, name)).parameters["spec"].annotation
+    )
+
+    assert "SpecSource" in str(annotation)
+
+
+def test_a_grant_is_annotated_to_hold_a_source() -> None:
+    assert "SpecSource" in str(Grant.__dataclass_fields__["spec"].type)
