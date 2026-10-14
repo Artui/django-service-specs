@@ -24,6 +24,7 @@ from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import OPEN as OPEN_PERMISSIONS
 from tests.dispatch.utils import make_user, notes_of
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 # The submodule rather than the function the package re-exports under the same
 # name: the hop is looked up in this module's namespace, so it is counted there.
@@ -129,3 +130,9 @@ async def test_a_condition_that_queries_runs_off_the_loop() -> None:
     answer = await aunmet_operation_affordance(spec, _pool())
     assert answer is not None
     assert answer.code == "archive_pending"
+
+
+async def test_a_source_answers_as_the_spec_it_compiles_to() -> None:
+    source = Foreign(ServiceSpec(service=print, affordances=[OPEN, BOOKS_CLOSED]))
+
+    assert await aunmet_operation_affordance(source, _pool()) is BOOKS_CLOSED

@@ -9,10 +9,11 @@ from asgiref.sync import sync_to_async
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 
 async def aenforce_affordances(
-    spec: ServiceSpec,
+    spec: ServiceSpec | SpecSource,
     pool: dict[str, Any],
     *,
     instance: Any,
@@ -30,16 +31,32 @@ async def aenforce_affordances(
     is answered in **one** ``sync_to_async(thread_sensitive=True)`` hop, as
     dispatch's async path runs every sync concept: not one hop per condition.
     A spec declaring none returns before the hop, so declaring nothing costs
-    the async path nothing.
+    the async path nothing. ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource], read as
+    the spec it compiles to, and a ``SelectorSpec`` is refused with the sync
+    function's ``TypeError`` whatever it declares.
 
     Raises:
         ActionUnavailable: An affordance is not met.
+        TypeError: ``spec`` is, or compiles to, a ``SelectorSpec``.
         ServiceNotFound: A condition on the row was reached and the row is gone.
         ImproperlyConfigured: A condition on the row was reached and
             ``instance`` is not a model instance.
     """
-    if not spec.affordances:
+    compiled = kernel_spec(spec)
+    # Only a ServiceSpec declaring nothing returns here: a SelectorSpec goes on
+    # to the sync function, which refuses it, so the two refuse alike whatever
+    # the selector declares. One arc to coverage, so each operand is named:
+    # test_a_selector_spec_is_refused_as_the_sync_function_refuses_it holds the
+    # kind, and test_an_unmet_condition_refuses_with_its_code_and_reason what is
+    # declared.
+    if isinstance(compiled, ServiceSpec) and not compiled.affordances:
         return
     await sync_to_async(enforce_affordances, thread_sensitive=True)(
-        spec, pool, instance=instance, reserved=reserved
+        # ``spec`` rather than ``compiled``: the sync function compiles it again,
+        # from the cache, to the same spec, and it is what its annotation takes.
+        spec,
+        pool,
+        instance=instance,
+        reserved=reserved,
     )

@@ -14,10 +14,13 @@ from django_service_specs.affordances.aenforce_affordances import aenforce_affor
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.services.action_unavailable import ActionUnavailable
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 # The submodule rather than the function the package re-exports under the same
 # name: the hop is looked up in this module's namespace, so it is counted there.
@@ -115,3 +118,33 @@ async def test_a_condition_that_queries_runs_off_the_loop() -> None:
     with pytest.raises(ActionUnavailable) as caught:
         await aenforce_affordances(spec, _pool(), instance=None)
     assert caught.value.code == "archive_pending"
+
+
+async def test_a_source_refuses_as_the_spec_it_compiles_to() -> None:
+    source = Foreign(ServiceSpec(service=print, affordances=[OPEN, BOOKS_CLOSED]))
+
+    with pytest.raises(ActionUnavailable) as caught:
+        await aenforce_affordances(source, _pool(), instance=None)
+
+    assert caught.value.code == "books_closed"
+
+
+async def test_a_source_declaring_nothing_costs_no_executor_hop(hops: list[str]) -> None:
+    await aenforce_affordances(Foreign(ServiceSpec(service=print)), {}, instance=None)
+
+    assert hops == []
+
+
+@pytest.mark.parametrize("wrapped", [False, True], ids=["spec", "source"])
+async def test_a_selector_spec_is_refused_as_the_sync_function_refuses_it(wrapped: bool) -> None:
+    # Declaring no affordances, so a check that answered "nothing declared"
+    # before asking what kind of spec it holds would let it through.
+    selector = SelectorSpec(kind=SelectorKind.LIST, selector=list)
+    spec: Any = Foreign(selector) if wrapped else selector
+    with pytest.raises(TypeError) as sync:
+        enforce_affordances(spec, _pool(), instance=None)
+
+    with pytest.raises(TypeError) as awaited:
+        await aenforce_affordances(spec, _pool(), instance=None)
+
+    assert str(awaited.value) == str(sync.value)
