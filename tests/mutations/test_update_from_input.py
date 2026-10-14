@@ -19,9 +19,9 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.mutations.change_result import ChangeResult
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UNSET
 from tests.adapter_app.models import Author as BookAuthor
 from tests.adapter_app.models import Book, Document, Photo

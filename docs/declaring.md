@@ -120,7 +120,7 @@ docs/examples/declaring.py:selector
 --8<--
 ```
 
-`kind` is [`SelectorKind.LIST`][django_service_specs.specs.selector_kind.SelectorKind]
+`kind` is [`SelectorKind.LIST`][django_service_specs.types.selector_kind.SelectorKind]
 or `RETRIEVE`. A retrieve returns one row: a queryset is read with `.first()`,
 a `DoesNotExist` raised by a selector written with `.get()` means the same
 missing row, and a missing row is reported as not-found unless the spec sets

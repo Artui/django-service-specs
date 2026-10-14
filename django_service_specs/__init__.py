@@ -140,7 +140,6 @@ from django_service_specs.services.service_validation_error import ServiceValida
 from django_service_specs.services.update_model import update_model
 from django_service_specs.services.update_service import UpdateService
 from django_service_specs.specs.kernel_spec import kernel_spec
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -152,6 +151,7 @@ from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter

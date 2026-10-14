@@ -451,7 +451,7 @@ SURFACE: dict[str, Pin] = {
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "()", "output": "()"},
     ),
-    "SelectorKind": _enum("specs.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
+    "SelectorKind": _enum("types.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
     # The compile seam: every entry point takes an object answering as_kernel_spec().
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),

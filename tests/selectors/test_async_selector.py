@@ -11,8 +11,8 @@ from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.selectors.async_selector import AsyncSelector
 from django_service_specs.selectors.selector import Selector
 from django_service_specs.services.is_async import is_async
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch.utils import OPEN, make_user
 from tests.dispatch_app.models import Note
 

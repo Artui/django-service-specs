@@ -30,7 +30,6 @@ Two Django settings, each read at the call rather than at import, so
 
 ::: django_service_specs.specs.service_spec.ServiceSpec
 ::: django_service_specs.specs.selector_spec.SelectorSpec
-::: django_service_specs.specs.selector_kind.SelectorKind
 ::: django_service_specs.specs.spec_source.SpecSource
 ::: django_service_specs.specs.kernel_spec.kernel_spec
 
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.no_input.NoInput
 ::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
+::: django_service_specs.types.selector_kind.SelectorKind

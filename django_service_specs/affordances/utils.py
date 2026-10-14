@@ -30,9 +30,9 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, Model, OuterRef
 
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import (
     PER_CALL_POOL_NAMES,
     affordance_alias,
