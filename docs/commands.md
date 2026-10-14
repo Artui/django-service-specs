@@ -47,6 +47,12 @@ The registry is read when the command's parser is built, on every run; a
 command naming none is refused then with `ImproperlyConfigured`, as is a
 registry where two names would be one subcommand (`a_b` and `a-b`).
 
+A registry whose callables read a seed of their own - an affordance's `when`,
+a selector - names the seeds on the class, as
+[`SpecView`][django_service_specs.http.spec_view.SpecView] does:
+`pool_seeds = DEFAULT_POOL_SEEDS.extend(tenant=current_tenant)`. Without it a
+callable asking for a seed nobody registered fails as it would in `dispatch`.
+
 The command does not need `django_service_specs` in `INSTALLED_APPS`. Listing
 it adds the [system check](#open-specs-explain).
 

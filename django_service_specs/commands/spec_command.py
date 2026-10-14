@@ -30,6 +30,7 @@ from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -62,6 +63,8 @@ class SpecCommand(BaseCommand):
     The registry is the subclass's to name, so one project can expose two
     registries under two command names. It is read when the parser is built,
     and a command naming none is refused then, as ``ImproperlyConfigured``.
+    ``pool_seeds`` names the seeds the specs' callables are resolved with, as
+    ``SpecView.pool_seeds`` does, for a registry whose callables read one.
 
     It is run as ``manage.py <command> <spec> --as-user USER [--json|--table]
     [--option value ...]``, or ``manage.py <command> --explain``:
@@ -97,6 +100,7 @@ class SpecCommand(BaseCommand):
     """
 
     registry: SpecRegistry
+    pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
     help = "Run one operation of a registry of specs, as the user --as-user names."
 
     _command_label: str
@@ -233,7 +237,10 @@ class SpecCommand(BaseCommand):
         try:
             principal = self.resolve_as_user(options["as_user"])
             result = dispatch(
-                entry.spec, principal=principal, arguments=coerce_flat(parameters, raw)
+                entry.spec,
+                principal=principal,
+                arguments=coerce_flat(parameters, raw),
+                pool_seeds=self.pool_seeds,
             )
         except (DispatchError, ServiceError) as error:
             raise CommandError(_message(error), returncode=int(exit_code_for(error))) from error

@@ -32,6 +32,7 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.service_spec import ServiceSpec
 from tests.commands_app.management.commands import notes
@@ -277,6 +278,31 @@ class TestRunning:
         registry.register("broken", ServiceSpec(service=broken, permissions=[Unrestricted()]))
         with pytest.raises(RuntimeError, match="a bug"):
             run("broken", "--as-user", str(owner.pk), command=command_over(registry))
+
+
+class TestSeeds:
+    def _registry(self) -> SpecRegistry:
+        def greet(*, tenant: str) -> str:
+            return f"hello {tenant}"
+
+        registry = SpecRegistry()
+        registry.register("greet", ServiceSpec(service=greet, permissions=[Unrestricted()]))
+        return registry
+
+    def test_the_seeds_a_command_names_resolve_the_services_callables(self, owner: Any) -> None:
+        # The HTTP entry points take ``pool_seeds``; a command over the same
+        # registry has to be able to answer a callable that reads one.
+        seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "acme")
+        command = command_over(self._registry(), pool_seeds=seeds)
+        assert run("greet", "--as-user", str(owner.pk), command=command) == '"hello acme"\n'
+
+    def test_with_no_seeds_named_a_callable_reading_one_fails_as_dispatch_does(
+        self, owner: Any
+    ) -> None:
+        # The default is the stock seeds, as ``dispatch``'s: a seed nobody
+        # registered is the callable's own ``TypeError``, not a quiet default.
+        with pytest.raises(TypeError, match="tenant"):
+            run("greet", "--as-user", str(owner.pk), command=command_over(self._registry()))
 
 
 class TestAbbreviation:
