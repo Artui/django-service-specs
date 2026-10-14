@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.present import present
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -38,7 +38,7 @@ def present_for_audience(
     ``projection`` is the output's resolved markings. Omit it and one is read
     off the spec; a transport that registers its tools up front builds it
     once with
-    [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec],
+    [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec],
     a mount's overrides included, and passes it in. ``None`` is therefore not
     a way out of projecting: a caller naming no audience calls ``present``,
     which is what every HTTP response is.

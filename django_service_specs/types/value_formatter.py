@@ -169,7 +169,7 @@ class ValueFormatter:
 
         **A callable zone is not merely unsupported, it is impossible.** A
         projection is built once, where a transport registers the spec, by
-        [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec],
+        [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec],
         and the schema it advertises is described then, before any request
         exists to describe. A per-request callable would therefore resolve
         differently on the two sides, which is the divergence between schema

@@ -7,13 +7,13 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters

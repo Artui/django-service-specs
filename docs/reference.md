@@ -57,7 +57,7 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.output.output_field.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking
 ::: django_service_specs.output.audience_projection.AudienceProjection
-::: django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec
+::: django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec
 ::: django_service_specs.output.project_payload.project_payload
 ::: django_service_specs.output.annotate_output_schema.annotate_output_schema
 
@@ -130,10 +130,10 @@ Installed with the `pydantic` extra and imported from
 
 ::: django_service_specs.authorization.permission_check.PermissionCheck
 ::: django_service_specs.authorization.unrestricted.Unrestricted
-::: django_service_specs.authorization.grant.Grant
-::: django_service_specs.authorization.authorize.authorize
-::: django_service_specs.authorization.authorize_scope.authorize_scope
-::: django_service_specs.authorization.authorize_target.authorize_target
+::: django_service_specs.dispatch.grant.Grant
+::: django_service_specs.dispatch.authorize.authorize
+::: django_service_specs.dispatch.authorize_scope.authorize_scope
+::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.not_permitted.NotPermitted
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable

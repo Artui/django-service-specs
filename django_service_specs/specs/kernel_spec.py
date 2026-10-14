@@ -6,10 +6,9 @@ import weakref
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    # Annotation-only, and nothing of the package at run time: the
-    # authorization modules import this one at their top, and the spec
-    # modules import those for their ``permissions`` field, so a class import
-    # here would close that loop. A spec is told apart by compiling to itself.
+    # Annotation-only, and nothing of the package at run time: kept a leaf,
+    # so any module, the parts a spec imports included, can read it without
+    # closing a loop. A spec is told apart by compiling to itself.
     from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
     from django_service_specs.specs.spec_source import SpecSource

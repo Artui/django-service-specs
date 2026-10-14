@@ -6,12 +6,12 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.authorize import authorize
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec

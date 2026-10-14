@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
-
-if TYPE_CHECKING:
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
-    from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize_target(
@@ -37,7 +35,7 @@ def authorize_target(
     checked as the spec it compiles to.
 
     ``spec.permissions is None`` means nothing to check here rather than a
-    configuration error: [`authorize`][django_service_specs.authorization.authorize.authorize]
+    configuration error: [`authorize`][django_service_specs.dispatch.authorize.authorize]
     already refused an undeclared spec before any target could be resolved, so
     this function is never reached with one - iterating an empty tuple in its
     place is simpler than asserting an invariant this module cannot enforce.

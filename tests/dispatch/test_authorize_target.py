@@ -5,10 +5,10 @@ import inspect
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.authorize_target import authorize_target
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses

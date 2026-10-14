@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django_service_specs.authorization.grant import Grant
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import open_call
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -44,7 +44,7 @@ def check_call(
        under ``unknown_arguments``, relaxed exactly as dispatch relaxes it: a
        parameter a typed provider fills, and a Validator field under
        ``partial``.
-    4. [`authorize`][django_service_specs.authorization.authorize.authorize],
+    4. [`authorize`][django_service_specs.dispatch.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal.
 
     The keywords are ``dispatch``'s, less what only a run reads. The kernel's

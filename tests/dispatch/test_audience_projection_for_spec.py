@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField

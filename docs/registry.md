@@ -48,7 +48,7 @@ transport reads the spec it compiles to anywhere else. It is compiled the
 first time anything reads it, and that compiled spec answers every later call
 for the same object.
 
-A [`Grant`][django_service_specs.authorization.grant.Grant] compares specs as
+A [`Grant`][django_service_specs.dispatch.grant.Grant] compares specs as
 compiled, so a transport that authorizes the object it holds and mints a grant
 from it can dispatch that object or the spec it compiles to under the same
 grant. Each permission check is asked about the compiled spec, the same object

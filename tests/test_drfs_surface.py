@@ -108,15 +108,7 @@ SURFACE: dict[str, Pin] = {
         "affordances.aunmet_operation_affordance", "spec, pool, *, reserved="
     ),
     # --- authorization ------------------------------------------------------------------------
-    "authorize": _fn("authorization.authorize", "spec, principal, *, grant="),
-    "authorize_scope": _fn("authorization.authorize_scope", "spec, principal, scope, *, grant"),
-    "authorize_target": _fn("authorization.authorize_target", "spec, principal, target, *, grant"),
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
-    "Grant": Pin(
-        "authorization.grant",
-        signature="spec, principal, target_checked=",
-        methods={"covers": "(spec, principal)"},
-    ),
     # Subclassed by the adapter's permission check over DRF permission classes.
     "PermissionCheck": Pin(
         "authorization.permission_check",
@@ -161,11 +153,22 @@ SURFACE: dict[str, Pin] = {
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
+    "audience_projection_for_spec": _fn(
+        "dispatch.audience_projection_for_spec", "spec, *, overrides=, name="
+    ),
     "present_for_audience": _fn("dispatch.present_for_audience", "spec, result, *, projection="),
     "paginate_output": _fn("dispatch.paginate_output", "rows, *, page=, limit=, max_page_size="),
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
     "DispatchResult": Pin(
         "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
+    ),
+    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant="),
+    "authorize_scope": _fn("dispatch.authorize_scope", "spec, principal, scope, *, grant"),
+    "authorize_target": _fn("dispatch.authorize_target", "spec, principal, target, *, grant"),
+    "Grant": Pin(
+        "dispatch.grant",
+        signature="spec, principal, target_checked=",
+        methods={"covers": "(spec, principal)"},
     ),
     # --- adapters -----------------------------------------------------------------------------
     "filter_set_parameters": _fn("adapters.filters.filter_set_parameters", "filter_set"),
@@ -260,9 +263,6 @@ SURFACE: dict[str, Pin] = {
     ),
     "annotate_output_schema": _fn(
         "output.annotate_output_schema", "schema, projection, *, handle_description="
-    ),
-    "audience_projection_for_spec": _fn(
-        "output.audience_projection_for_spec", "spec, *, overrides=, name="
     ),
     "project_payload": _fn("output.project_payload", "payload, projection"),
     # --- parameters ---------------------------------------------------------------------------

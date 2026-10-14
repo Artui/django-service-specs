@@ -21,10 +21,10 @@ from django_service_specs.parameters.utils import (
     expected_type,
     length_problem,
     parse_number,
+    unknown_arguments_policy,
 )
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.validation.utils import unknown_arguments_policy
 
 # Messages are translated where they are raised, never at import: every
 # ``django.utils.translation`` function reads settings, and a module that did

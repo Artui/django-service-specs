@@ -15,11 +15,11 @@ from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import TypedDict
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter

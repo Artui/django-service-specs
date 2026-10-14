@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
     conclude_selector,
@@ -61,7 +61,7 @@ def dispatch(
        it. Such a parameter is the server's: a value the caller sends for it
        is checked, then dropped, so it never stands in for the provider's. A parameter a registered seed in
        ``pool_seeds`` occupies is refused before that, as a configuration error.
-    2. [`authorize`][django_service_specs.authorization.authorize.authorize],
+    2. [`authorize`][django_service_specs.dispatch.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything
        is resolved, so a refused principal learns nothing about which rows exist.
     3. Resolution: a selector spec's own selector, or a service spec's instance
@@ -70,9 +70,9 @@ def dispatch(
        and a RETRIEVE collapsed to its row. A
        missing row is ``DispatchResult(kind="not_found")``, returned rather than
        raised, unless the selector says ``allow_none``.
-    4. [`authorize_target`][django_service_specs.authorization.authorize_target.authorize_target]
+    4. [`authorize_target`][django_service_specs.dispatch.authorize_target.authorize_target]
        on a retrieved row, and
-       [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
+       [`authorize_scope`][django_service_specs.dispatch.authorize_scope.authorize_scope]
        where no row is: on a list, a collection target's set, empty or not,
        a create's ``None``, and the ``None`` a service spec's instance
        selector lets through under its ``allow_none``. A selector spec's own ``None`` under ``allow_none`` is

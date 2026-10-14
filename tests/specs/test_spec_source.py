@@ -7,7 +7,7 @@ import inspect
 import pytest
 
 import django_service_specs
-from django_service_specs.authorization.grant import Grant
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.http.utils import SpecViewBase
 
 # The entry points docs/registry.md names as taking a source.

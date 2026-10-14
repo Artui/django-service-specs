@@ -27,13 +27,13 @@ from django_service_specs.affordances.utils import (
     rows_with_affordances,
     split_affordances,
 )
-from django_service_specs.authorization.authorize import authorize
-from django_service_specs.authorization.authorize_scope import authorize_scope
-from django_service_specs.authorization.authorize_target import authorize_target
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.utils import is_deactivated
+from django_service_specs.dispatch.authorize import authorize
+from django_service_specs.dispatch.authorize_scope import authorize_scope
+from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
