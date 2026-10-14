@@ -8,6 +8,8 @@ from django.core.exceptions import ImproperlyConfigured
 import django_service_specs
 import django_service_specs.http
 from django_service_specs.http.route_arguments import route_arguments
+from django_service_specs.parameters.coerce_flat import coerce_flat
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 
@@ -30,6 +32,17 @@ def test_every_undeclared_kwarg_is_named_in_order() -> None:
     assert str(refused.value).startswith(
         "The route captures org, team, which the spec does not declare."
     )
+
+
+def test_merged_last_and_typed_with_the_rest_one_refusal_carries_every_problem() -> None:
+    # The recipe the docstring and the HTTP page give a host's own view. The
+    # route comes back uncoerced, so a malformed route value is refused in the
+    # same call as a malformed value the view read, rather than on its own.
+    parameters = Parameters.of(Parameter("pk", "integer"), Parameter("count", "integer"))
+    read = {"count": "many"}
+    with pytest.raises(InvalidArguments) as refused:
+        coerce_flat(parameters, {**read, **route_arguments(parameters, {"pk": "four"})})
+    assert set(refused.value.detail) == {"pk", "count"}
 
 
 def test_it_is_public_from_the_subpackage_and_the_root() -> None:
