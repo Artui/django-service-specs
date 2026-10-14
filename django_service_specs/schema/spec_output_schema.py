@@ -17,10 +17,11 @@ from django_service_specs.schema.utils import allow_null
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 
 def spec_output_schema(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     *,
     paginate: bool = False,
     projection: AudienceProjection | None = None,
@@ -30,7 +31,9 @@ def spec_output_schema(
 
     ``None`` when ``spec.output()`` is ``None``: a spec with no presenter
     declares nothing about what it returns, and a shape invented for it would
-    be a guess every client then trusts.
+    be a guess every client then trusts. A
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    described as the spec it compiles to.
 
     Otherwise the item's [`output_schema`][django_service_specs.schema.output_schema.output_schema],
     shaped by what dispatch returns for this kind of spec:
@@ -78,7 +81,10 @@ def spec_output_schema(
     marking declares none, and defaults to none: what a reader should do with
     an identifier depends on the reader, and the transport is what knows.
     """
-    output = spec.output()
+    # Compiled once here, so every read below - and can_present_nothing's -
+    # reads the one compiled spec rather than the source's own attributes.
+    compiled = kernel_spec(spec)
+    output = compiled.output()
     if output is None:
         return None
     item: dict[str, Any] = output_schema(output)
@@ -88,7 +94,7 @@ def spec_output_schema(
         item = (
             annotate_output_schema(item, projection, handle_description=handle_description) or item
         )
-    affordances = rendered_affordances(spec)
+    affordances = rendered_affordances(compiled)
     if affordances is not None:
         # After the projection, which walks declared fields and has nothing to
         # say about a key no ``Output`` declares, and before the array, the
@@ -104,22 +110,22 @@ def spec_output_schema(
     # Whether ``"null"`` is admitted is ``can_present_nothing``'s answer, asked
     # in one place so a transport writing its own schema gives the same one;
     # what remains here is the shape around the item.
-    if isinstance(spec, SelectorSpec):
-        kind = spec.kind
-    elif spec.output_selector_spec is not None:
-        kind = spec.output_selector_spec.kind
+    if isinstance(compiled, SelectorSpec):
+        kind = compiled.kind
+    elif compiled.output_selector_spec is not None:
+        kind = compiled.output_selector_spec.kind
     else:
         # One value, the service's return. A ``many`` service returns the rows
         # it wrote, which dispatch presents as a list
         # (test_a_many_service_presents_an_array_of_its_item), never paged; a
         # ``None`` return is still presented as ``None``, so a ``"null"`` wraps
         # the array (test_a_many_service_allowing_none_admits_null_for_the_whole_array).
-        whole: dict[str, Any] = {"type": "array", "items": item} if spec.many else item
-        return allow_null(whole) if can_present_nothing(spec) else whole
+        whole: dict[str, Any] = {"type": "array", "items": item} if compiled.many else item
+        return allow_null(whole) if can_present_nothing(compiled) else whole
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}
         return _paged(array) if paginate else array
-    return allow_null(item) if can_present_nothing(spec) else item
+    return allow_null(item) if can_present_nothing(compiled) else item
 
 
 def _paged(array: dict[str, Any]) -> dict[str, Any]:

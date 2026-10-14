@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import enum
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -16,9 +18,10 @@ from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import kernel_spec
 from tests.dispatch.utils import OPEN, PK, make_user, note_by_pk
 from tests.dispatch_app.models import Note
-from tests.specs.utils import Titled
+from tests.specs.utils import Foreign, Titled
 
 LIST, RETRIEVE = SelectorKind.LIST, SelectorKind.RETRIEVE
 
@@ -146,3 +149,45 @@ def test_every_true_row_really_presents_none(spec: Any) -> None:
     result = dispatch(spec, principal=make_user("ada"), arguments=_call(spec))
 
     assert present(spec, result) is None
+
+
+class _ForeignKind(enum.Enum):
+    """A selector kind of another library's own, as djangorestframework-services declares."""
+
+    RETRIEVE = "retrieve"
+    LIST = "list"
+
+
+@dataclass(frozen=True)
+class _ForeignReRead:
+    kind: _ForeignKind
+
+
+@dataclass(frozen=True)
+class _ForeignService(Foreign):
+    """A foreign service spec carrying the attributes this function reads, under its own kinds.
+
+    Shaped as djangorestframework-services' spec is: an ``output_selector_spec``
+    whose ``kind`` is that library's enum and an ``allow_none`` of its own, so
+    reading it uncompiled answers without raising, and answers wrong.
+    """
+
+    output_selector_spec: _ForeignReRead | None = None
+    allow_none: bool = False
+
+
+def test_a_source_answers_as_the_spec_it_compiles_to() -> None:
+    # Uncompiled, the foreign RETRIEVE is not the kernel's RETRIEVE, so the
+    # re-read reads as a LIST and the answer is a silent False.
+    source = _ForeignService(
+        _service(_re_read(RETRIEVE)), output_selector_spec=_ForeignReRead(_ForeignKind.RETRIEVE)
+    )
+
+    assert can_present_nothing(source) is True
+    assert can_present_nothing(source) is can_present_nothing(kernel_spec(source))
+
+
+def test_a_selector_source_answers_as_the_spec_it_compiles_to() -> None:
+    source = Foreign(_selector(RETRIEVE, allow_none=True))
+
+    assert can_present_nothing(source) is True
