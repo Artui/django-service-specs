@@ -8,6 +8,7 @@ from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
+from django_service_specs.types.relation_mode import RelationMode
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
@@ -24,6 +25,7 @@ __all__ = [
     "OutputPage",
     "ProgressReporter",
     "ProviderKeys",
+    "RelationMode",
     "SelectorKind",
     "UnguardedReason",
     "UnknownArguments",

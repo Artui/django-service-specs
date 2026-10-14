@@ -24,9 +24,9 @@ from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
-from django_service_specs.relations.relation_mode import RelationMode
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.types.relation_mode import RelationMode
 from tests.relations_app.models import Author, Catalog, Cover, Note, Post, Profile, Section, Tag
 
 

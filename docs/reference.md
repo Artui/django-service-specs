@@ -194,7 +194,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.relations.reverse_one_to_one_spec.ReverseOneToOneSpec
 ::: django_service_specs.relations.many_to_many_spec.ManyToManySpec
 ::: django_service_specs.relations.generic_relation_spec.GenericRelationSpec
-::: django_service_specs.relations.relation_mode.RelationMode
 ::: django_service_specs.relations.relation_orphan.RelationOrphan
 ::: django_service_specs.relations.relation_phase.RelationPhase
 
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.selector_kind.SelectorKind
 ::: django_service_specs.types.field_audience.FieldAudience
 ::: django_service_specs.types.unknown_arguments.UnknownArguments
+::: django_service_specs.types.relation_mode.RelationMode

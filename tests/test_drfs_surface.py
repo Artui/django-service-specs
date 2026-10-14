@@ -366,7 +366,7 @@ SURFACE: dict[str, Pin] = {
         "create_service=, update_service=, delete_service=",
         bases=("RelationSpec",),
     ),
-    "RelationMode": _enum("relations.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
+    "RelationMode": _enum("types.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
     "RelationOrphan": _enum(
         "relations.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
     ),
