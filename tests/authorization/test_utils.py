@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import functools
 import gc
+import types
 import weakref
+from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -226,4 +228,20 @@ def test_a_wrapped_layer_that_is_not_callable_is_handed_nothing() -> None:
     cast(Any, forwarded).__wrapped__ = 5
     check = _Shapes()
     cast(Any, check).undeclared = forwarded
+    assert asked_with(check, "undeclared", {"pk": 1}) == {}
+
+
+@dataclass
+class _UnhashableRule:
+    """A callable object with ``eq`` and so no hash."""
+
+    def __call__(self, principal: Any, spec: Any) -> bool:
+        return True
+
+
+def test_a_method_binding_a_callable_object_is_read_uncached() -> None:
+    """``MethodType`` binds any callable, and its ``__func__`` here has no
+    hash: only a plain function is a cache key, so it is read uncached."""
+    check = _Shapes()
+    cast(Any, check).undeclared = types.MethodType(_UnhashableRule(), check)
     assert asked_with(check, "undeclared", {"pk": 1}) == {}

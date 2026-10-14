@@ -115,6 +115,10 @@ def _declares_arguments(asked: Callable[..., Any]) -> bool:
     (test_a_callable_set_on_the_instance_is_not_kept_once_asked), and a
     callable object with ``eq`` and no hash could not be a key at all
     (test_a_callable_the_class_holds_unhashed_is_read_by_its_own_signature).
+    So the test is that ``__func__`` is a plain function, not merely present:
+    ``MethodType`` binds any callable, and one binding such an object would
+    reach the cache with no hash
+    (test_a_method_binding_a_callable_object_is_read_uncached).
     """
     function = getattr(asked, "__func__", None)
     if isinstance(function, FunctionType):
