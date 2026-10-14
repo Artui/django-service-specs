@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import ast
 import gc
 import importlib
+import inspect
 from typing import Any
 
 import pytest
@@ -127,12 +129,49 @@ def test_a_compile_attribute_that_is_not_callable_is_refused() -> None:
         kernel_spec(Attribute())
 
 
-def test_a_compile_answering_something_else_is_refused_and_nothing_is_cached() -> None:
+@pytest.mark.parametrize(
+    ("answer", "named"),
+    [
+        # Each held by name, as the two halves of the fixed-point check: an
+        # answer with no compile of its own, and one whose compile answers
+        # something other than itself.
+        pytest.param("a spec", "str", id="no-compile"),
+        pytest.param(Foreign(LISTING), "Foreign", id="not-a-fixed-point"),
+    ],
+)
+def test_a_compile_answering_something_else_is_refused_and_nothing_is_cached(
+    answer: Any, named: str
+) -> None:
     class Wrong:
         def as_kernel_spec(self) -> Any:
-            return Foreign(LISTING)
+            return answer
 
     source = Wrong()
-    with pytest.raises(TypeError, match=r"Wrong.as_kernel_spec\(\) must return .*; got Foreign"):
+    with pytest.raises(TypeError, match=rf"Wrong.as_kernel_spec\(\) must return .*; got {named}"):
         kernel_spec(source)
     assert id(source) not in kernel_spec_module._COMPILED
+
+
+def test_the_module_imports_nothing_from_the_package_at_run_time() -> None:
+    # The authorization modules import it at their top, and the spec modules
+    # import them: a class import here would close that loop. A spec is told
+    # apart by compiling to itself instead.
+    tree = ast.parse(inspect.getsource(kernel_spec_module))
+    annotation_only = {
+        id(node)
+        for block in ast.walk(tree)
+        if isinstance(block, ast.If) and ast.unparse(block.test) == "TYPE_CHECKING"
+        for node in ast.walk(block)
+    }
+    imported = [
+        node.module or ""
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and id(node) not in annotation_only
+    ] + [
+        alias.name
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import) and id(node) not in annotation_only
+        for alias in node.names
+    ]
+
+    assert [name for name in imported if name.startswith("django_service_specs")] == []

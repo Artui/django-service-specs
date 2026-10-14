@@ -9,10 +9,12 @@ object reads the same compiled spec.
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from django_service_specs.specs.selector_spec import SelectorSpec
-from django_service_specs.specs.service_spec import ServiceSpec
+if TYPE_CHECKING:
+    # Annotation-only, as in kernel_spec.py: nothing of the package at run time.
+    from django_service_specs.specs.selector_spec import SelectorSpec
+    from django_service_specs.specs.service_spec import ServiceSpec
 
 
 class SpecSource(Protocol):
@@ -23,6 +25,11 @@ class SpecSource(Protocol):
     permission classes - so its declaration is handed to ``dispatch``, the
     registry, the schemas and the rest as it is, with no wrapper of this
     package's around it.
+
+    ``ServiceSpec`` and ``SelectorSpec`` satisfy it too: each compiles to
+    itself, which is how
+    [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] tells a
+    spec from a declaration without importing either class.
 
     ``as_kernel_spec()`` is called the first time any entry point reads the
     object, and the compiled spec it answers is the one every later call
