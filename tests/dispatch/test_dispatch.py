@@ -48,6 +48,7 @@ from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
+    EDIT,
     OPEN,
     PK,
     TENANT_SEEDS,
@@ -3885,7 +3886,7 @@ _READ_Q = Parameters.of(Parameter("q", "string"))
 
 
 class TestOverlays:
-    """``extra_kwargs`` and ``extra_input_data``: per-call values beneath the spec's providers."""
+    """``extra_kwargs``: a call's own service keywords beneath the spec's provider."""
 
     def test_the_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
         service = Record()
@@ -3986,55 +3987,6 @@ class TestOverlays:
             "extra_kwargs returned the key(s) ['user'], which dispatch seeds itself."
         )
 
-    def test_input_data_overlays_the_caller_and_the_spec_s_provider_overlays_it(
-        self, ada: Any
-    ) -> None:
-        validator = Titled()
-        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
-        dispatch(
-            spec,
-            principal=ada,
-            arguments={"title": "caller"},
-            extra_input_data={"title": " view ", "undeclared": 1},
-        )
-        provided = ServiceSpec(
-            service=Record(),
-            permissions=OPEN,
-            validator=validator,
-            input_data=lambda: {"title": "spec"},
-        )
-        dispatch(
-            provided,
-            principal=ada,
-            arguments={"title": "caller"},
-            extra_input_data={"title": "view"},
-        )
-        # Only what the Validator declares reaches it, as from the provider.
-        assert [args for args, _ in validator.calls] == [{"title": " view "}, {"title": "spec"}]
-
-    def test_input_data_overlays_every_row_of_a_many_call(self, ada: Any) -> None:
-        validator = Titled()
-        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
-        dispatch(
-            spec,
-            principal=ada,
-            arguments={"items": [{"title": "a"}, {"title": "b"}]},
-            extra_input_data={"title": "view"},
-        )
-        assert [args for args, _ in validator.calls] == [{"title": "view"}, {"title": "view"}]
-
-    def test_an_overlay_relaxes_no_parameter_the_caller_owes(self, ada: Any) -> None:
-        """The shape check reads the caller's arguments before any provider
-        runs, and only a typed provider's annotation says which keys the server
-        fills, so a required field only the overlay supplies is still the
-        caller's to send."""
-        validator = Titled()
-        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
-        with pytest.raises(InvalidArguments) as refused:
-            dispatch(spec, principal=ada, arguments={}, extra_input_data={"title": "view"})
-        assert refused.value.detail == {"title": ["This field is required."]}
-        assert validator.calls == []
-
     def test_a_selector_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
         seen: list[dict[str, Any]] = []
 
@@ -4048,10 +4000,12 @@ class TestOverlays:
         dispatch(spec, principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1})
         assert seen == [{"tag": "spec", "extra": 1}]
 
-    def test_input_data_on_a_selector_spec_is_refused_before_anything_runs(self, ada: Any) -> None:
-        spec = retrieve()
-        with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
-            dispatch(spec, principal=ada, arguments={"pk": 1}, extra_input_data={"x": 1})
+    @pytest.mark.parametrize("spec", [EDIT, retrieve()], ids=["service", "selector"])
+    def test_there_is_no_input_data_overlay(self, spec: Any, ada: Any) -> None:
+        """A transport merges what it would overlay into the arguments it
+        hands dispatch, so the checks and the Validator see one value."""
+        with pytest.raises(TypeError, match="unexpected keyword argument 'extra_input_data'"):
+            dispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
 
 
 class TestArgumentsChannel:

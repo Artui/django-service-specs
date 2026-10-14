@@ -66,47 +66,25 @@ NOT_FOUND = DispatchResult(kind="not_found")
 
 @dataclass(frozen=True)
 class Overlay:
-    """A call's own values beneath a spec's providers: ``extra_kwargs`` and ``extra_input_data``.
+    """A call's own keywords beneath the spec's ``kwargs`` provider: ``extra_kwargs``.
 
     What a transport resolves per call and the spec cannot carry - a view's
     hook returning service keywords, say - handed to ``dispatch`` rather than
-    folded into a spec rebuilt for the call, which would lose its providers'
-    annotations and its identity. Copied on entry, so the caller's mappings
-    are never read again.
+    folded into a spec rebuilt for the call, which would lose its provider's
+    annotations and its identity. Copied on entry, so the caller's mapping is
+    never read again.
+
+    There is no overlay for ``input_data``: every key one could carry to the
+    Validator names a parameter the caller sends, so it would stand in for a
+    value the permission checks saw. A transport merges such values into the
+    arguments it hands dispatch instead, where the checks and the Validator
+    read one value (test_there_is_no_input_data_overlay).
     """
 
     kwargs: Mapping[str, Any] = field(default_factory=dict)
-    input_data: Mapping[str, Any] = field(default_factory=dict)
 
 
 NO_OVERLAY = Overlay()
-
-
-def overlay_for(
-    spec: ServiceSpec | SelectorSpec,
-    extra_kwargs: Mapping[str, Any] | None,
-    extra_input_data: Mapping[str, Any] | None,
-) -> Overlay:
-    """The call's ``Overlay``, refusing ``extra_input_data`` where no Validator could receive it.
-
-    A selector spec validates nothing, so input data handed to one stands in
-    for nothing, and is refused before anything runs rather than ignored
-    (test_input_data_on_a_selector_spec_is_refused_before_anything_runs).
-    The guard is one branch to coverage, so each conjunct is held by its own
-    test: without the first, a selector spec called with no input data is
-    refused (test_a_selector_spec_s_kwargs_provider_outranks_the_overlay);
-    without the second, a service spec's is
-    (test_input_data_overlays_the_caller_and_the_spec_s_provider_overlays_it).
-
-    A key naming a declared parameter is refused in ``open_call``, inside
-    the hop, since reading the declaration may query.
-    """
-    if extra_input_data and isinstance(spec, SelectorSpec):
-        raise TypeError(
-            "extra_input_data= is a ServiceSpec's, merged beneath its input_data before its "
-            "Validator; a SelectorSpec validates nothing."
-        )
-    return Overlay(dict(extra_kwargs or {}), dict(extra_input_data or {}))
 
 
 def refuse_overlaid_parameters(
@@ -1349,13 +1327,7 @@ def prepare_service(
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**base, **reads, **resolved}
-    server_input = overlaid(
-        overlay.input_data,
-        resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data"),
-        spec.input_data,
-        label="extra_input_data",
-        reserved=frozenset(),
-    )
+    server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
     validated = validate_arguments(
         spec,
         checked,

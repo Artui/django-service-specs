@@ -1156,27 +1156,9 @@ async def test_extra_kwargs_reach_the_run_beneath_the_provider_on_every_path(
     assert result.value == ["spec", 1]
 
 
-async def test_extra_input_data_reaches_an_awaited_service_s_validator(ada: Any) -> None:
-    async def service(*, title: str) -> str:
-        return title
-
-    validator = Titled()
-    spec = ServiceSpec(service=service, atomic=False, permissions=OPEN, validator=validator)
-
-    await adispatch(
-        spec, principal=ada, arguments={"title": "caller"}, extra_input_data={"title": "view"}
-    )
-
-    assert [args for args, _ in validator.calls] == [{"title": "view"}]
-
-
-async def test_extra_input_data_on_a_selector_spec_is_refused_before_any_hop(
-    ada: Any, hops: list[str]
-) -> None:
-    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN)
-
-    with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
-        await adispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
+async def test_there_is_no_input_data_overlay(ada: Any, hops: list[str]) -> None:
+    with pytest.raises(TypeError, match="unexpected keyword argument 'extra_input_data'"):
+        await adispatch(EDIT, principal=ada, arguments={}, extra_input_data={"x": 1})
     assert hops == []
 
 

@@ -9,11 +9,11 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
+    Overlay,
     conclude_selector,
     finish_service,
     lookup,
     open_call,
-    overlay_for,
     prepare_service,
     refuse_target,
     selector_pool,
@@ -40,7 +40,6 @@ def dispatch(
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
     extra_kwargs: Mapping[str, Any] | None = None,
-    extra_input_data: Mapping[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` for ``principal`` with ``arguments``, in a fixed order.
 
@@ -166,25 +165,22 @@ def dispatch(
     target's ``reads`` are still checked as declared, and keeping them and
     ``target`` in agreement is the caller's. A selector spec refuses it.
 
-    ``extra_kwargs`` and ``extra_input_data`` are the transport's per-call
-    overlays for the spec's ``kwargs`` and ``input_data`` providers - what an
-    HTTP view's per-request hooks add - merged **beneath** them, so the spec's
-    own provider wins on a clash, and ``extra_input_data`` wins over the
-    caller's arguments. Each is treated as its provider's own return is: an ``UNSET``
-    entry is dropped, a key the spec's provider is annotated to fill is the
-    server's and the overlay's value for it is dropped too, so an overlay
-    never fills a key its provider declined to. ``extra_kwargs`` naming a
-    registered seed is refused, as a provider's is, and so, before step one,
-    is one naming a parameter the spec declares - a read, a Validator field,
-    a target read, a ``many`` spec's list - unless its value is ``UNSET`` or
-    the spec's typed ``kwargs`` provider fills it: the caller's value for a
-    parameter is what step two and three read, so an overlay standing in for
-    it would run the call on a value they never saw. ``extra_kwargs`` reaches
-    a selector spec's own selector and a service spec's service, never a
-    target or output selector; ``extra_input_data`` reaches the Validator,
-    under every row of a ``many`` call, and a selector spec refuses it. An
-    overlay relaxes nothing in step one: a parameter only it supplies is
-    still the caller's to send.
+    ``extra_kwargs`` is the transport's per-call overlay for the spec's
+    ``kwargs`` provider - what an HTTP view's per-request hook adds - merged
+    **beneath** it, so the spec's own provider wins on a clash. It is treated
+    as the provider's own return is: an ``UNSET`` entry is dropped, a key the
+    provider is annotated to fill is the server's and the overlay's value for
+    it is dropped too, so an overlay never fills a key the provider declined
+    to, and a key naming a registered seed is refused. So, before step one,
+    is a key naming a parameter the spec declares - a read, a Validator
+    field, a target read, a ``many`` spec's list - unless its value is
+    ``UNSET`` or the spec's typed ``kwargs`` provider fills it: the caller's
+    value for a parameter is what steps two and three read, so an overlay
+    standing in for it would run the call on a value they never saw. It
+    reaches a selector spec's own selector and a service spec's service,
+    never a target or output selector. There is no overlay for the
+    Validator's input: a transport merges such values into ``arguments``,
+    where the checks and the Validator read one value.
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
     selector is a LIST, or a ``many`` service with no output selector that
@@ -205,7 +201,7 @@ def dispatch(
         NotPermitted: step two or step four.
         TypeError: ``target`` on a selector spec or a ``many`` spec, or
             anything but ``None`` on a service spec that declares no target
-            selector; ``extra_input_data`` on a selector spec.
+            selector.
         ActionUnavailable: step six, an affordance not met.
         ServiceNotFound: step six, a condition on the row reached after the row
             was deleted.
@@ -219,7 +215,7 @@ def dispatch(
     """
     spec = kernel_spec(spec)
     refuse_target(spec, target)
-    overlay = overlay_for(spec, extra_kwargs, extra_input_data)
+    overlay = Overlay(dict(extra_kwargs or {}))
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
             spec,

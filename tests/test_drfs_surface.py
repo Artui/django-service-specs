@@ -143,12 +143,12 @@ SURFACE: dict[str, Pin] = {
     "dispatch": _fn(
         "dispatch.dispatch",
         "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, progress=, "
-        "target=, extra_kwargs=, extra_input_data=",
+        "target=, extra_kwargs=",
     ),
     "adispatch": _fn(
         "dispatch.adispatch",
         "spec, *, principal=, principal_id=, arguments, grant=, pool_seeds=, "
-        "unknown_arguments=, progress=, target=, extra_kwargs=, extra_input_data=",
+        "unknown_arguments=, progress=, target=, extra_kwargs=",
     ),
     "check_call": _fn(
         "dispatch.check_call",

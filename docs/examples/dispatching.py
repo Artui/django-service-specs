@@ -110,15 +110,15 @@ stamp_spec = ServiceSpec(
 
 
 def stamp_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
-    # What the view's per-request hooks resolved, beneath the spec's providers:
-    # the provider's ``channel`` wins, the hook's ``source`` fills the gap, and
-    # the hook's ``title`` stands over the caller's before the Validator runs.
+    # What the view's per-request hook resolved, beneath the spec's provider:
+    # the provider's ``channel`` wins, and the hook's ``source`` fills the gap.
+    # A value for the Validator goes into ``arguments``, where the permission
+    # checks read it too.
     return dispatch(
         stamp_spec,
         principal=user,
         arguments=arguments,
         extra_kwargs={"source": "web", "channel": "web"},
-        extra_input_data={"title": "From the hook"},
     )
 
 

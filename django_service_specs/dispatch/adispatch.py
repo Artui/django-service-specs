@@ -19,7 +19,6 @@ from django_service_specs.dispatch.utils import (
     conclude_selector,
     finish_service,
     open_call,
-    overlay_for,
     prepare_service,
     refuse_target,
     reraise_unless_retrieve,
@@ -52,7 +51,6 @@ async def adispatch(
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
     extra_kwargs: Mapping[str, Any] | None = None,
-    extra_input_data: Mapping[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
@@ -111,16 +109,16 @@ async def adispatch(
     refuse it before any hop, and a selector spec's row or list is checked
     whatever the grant says, as ``dispatch``'s is.
 
-    ``extra_kwargs`` and ``extra_input_data`` are ``dispatch``'s overlays,
-    merged beneath the spec's providers inside the hop, on every path; an
-    ``extra_input_data`` a selector spec refuses is refused before any hop.
+    ``extra_kwargs`` is ``dispatch``'s overlay, merged beneath the spec's
+    ``kwargs`` provider inside the hop, on every path, and refused there
+    where it names a declared parameter.
 
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``;
-            ``target`` or ``extra_input_data`` where ``dispatch`` refuses it.
+            ``target`` where ``dispatch`` refuses it.
         PrincipalUnavailable: ``principal_id`` names no principal who may act,
             or ``principal`` is deactivated.
         InvalidArguments, NotPermitted, ImproperlyConfigured: as ``dispatch``.
@@ -135,8 +133,7 @@ async def adispatch(
     # Compiled on the loop, before the branch that reads which kind of spec it is.
     spec = kernel_spec(spec)
     refuse_target(spec, target)
-    # Built on the loop, before any hop, so a refused overlay costs none.
-    overlay = overlay_for(spec, extra_kwargs, extra_input_data)
+    overlay = Overlay(dict(extra_kwargs or {}))
     rest = (
         principal,
         principal_id,
@@ -185,7 +182,6 @@ def _dispatch(
         progress=progress,
         target=target,
         extra_kwargs=overlay.kwargs,
-        extra_input_data=overlay.input_data,
     )
 
 

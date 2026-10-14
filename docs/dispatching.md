@@ -80,12 +80,11 @@ The order is the design, and each place reads as if it could move:
   Preconditions follow them, in the same place, as djangorestframework-services
   orders the two.
 
-## Per-call values beneath the providers
+## Per-call values beneath the provider
 
-A transport sometimes knows a value per call that the spec cannot carry: an
-HTTP view's hook returning extra service keywords, or extra data for the
-Validator. `dispatch` and `adispatch` take them as two overlays, so the spec
-need not be rebuilt for the call:
+A transport sometimes knows a service keyword per call that the spec cannot
+carry: what an HTTP view's per-request hook returns. `dispatch` and `adispatch`
+take it as `extra_kwargs`, so the spec need not be rebuilt for the call:
 
 ```python
 --8<--
@@ -93,20 +92,17 @@ docs/examples/dispatching.py:overlays
 --8<--
 ```
 
-`extra_kwargs` sits beneath the spec's `kwargs` provider and `extra_input_data`
-beneath its `input_data` provider: **the spec's own provider wins on a clash**.
-`extra_input_data` wins over the caller's arguments; `extra_kwargs` never meets
-one, by the rule below. Each is read as its provider's return is:
+`extra_kwargs` sits beneath the spec's `kwargs` provider: **the spec's own
+provider wins on a clash**. It is read as the provider's return is:
 
-- an entry whose value is `UNSET` is dropped, so the caller's value stands;
+- an entry whose value is `UNSET` is dropped;
 - a key the spec's provider is annotated to fill is the provider's alone, and
   the overlay's value for it is dropped, so a provider that leaves the key out
   leaves it absent; one annotated `UNSET`-able lets the overlay's value through
   when it declines;
-- an `extra_kwargs` key naming a seed, such as `user`, is refused as
-  `ImproperlyConfigured`.
+- a key naming a seed, such as `user`, is refused as `ImproperlyConfigured`.
 
-**An `extra_kwargs` key naming a parameter the spec declares is refused**, as
+**A key naming a parameter the spec declares is refused**, as
 `ImproperlyConfigured`, before the shape check, the way a seed's name is. A
 declared parameter is anything `spec.parameters()` lists: the spec's `reads`,
 its Validator's fields, its target selector's `reads`, and a `many` spec's
@@ -120,14 +116,13 @@ overlay value is dropped beneath the provider. To set such a value per call,
 fill it from that provider.
 
 `extra_kwargs` reaches a read's own selector and a write's service, never a
-target or output selector. `extra_input_data` reaches the Validator, under
-every row of a [`many`](declaring.md#many-rows-in-one-call) call, and a read
-refuses it with a `TypeError` before anything runs.
+target or output selector.
 
-An overlay relaxes nothing in step one. The shape check reads the caller's
-arguments before any provider runs, so a required Validator field that only
-`extra_input_data` supplies is still refused as missing: declare it optional,
-or have the spec's `input_data` provider fill it under an annotation.
+**There is no overlay for the Validator's input.** Every value one could carry
+to the Validator is a field the caller sends, so an overlay would stand in for
+a value the permission checks saw. A transport with per-request values for the
+Validator merges them into the `arguments` it hands `dispatch`, where the
+checks and the Validator read the same value.
 
 ## The result
 

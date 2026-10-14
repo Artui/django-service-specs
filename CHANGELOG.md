@@ -60,23 +60,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is `None` on a result built by hand and takes no part in equality. An
   `async def` `presented` is refused when the spec is built, as an
   `async def` `present` is.
-- **`extra_kwargs=` and `extra_input_data=` on `dispatch` and `adispatch`**:
-  a transport's per-call values, merged beneath the spec's `kwargs` and
-  `input_data` providers, so a view's per-request hooks need no spec rebuilt
-  for the call. The spec's provider wins on a clash, and `extra_input_data`
-  wins over the caller's arguments. Each is read as its provider's return
-  is: an `UNSET` entry is dropped, a key the provider is annotated to fill is
-  the provider's alone, and an `extra_kwargs` key naming a seed is refused.
-  So is an `extra_kwargs` key naming a parameter the spec declares - a read,
-  a Validator field, a target selector's read, a `many` spec's list - unless
-  its value is `UNSET` or the spec's typed `kwargs` provider fills it: the
-  caller's value for a parameter is what the permission checks and the
-  target selector see, so the value authorized is the value run.
-  `extra_kwargs` reaches a selector spec's selector and a service spec's
-  service, never a target or output selector; `extra_input_data` reaches the
-  Validator, on every row of a `many` call, and a selector spec refuses it
-  with a `TypeError`. Neither relaxes the shape check: a required parameter
-  only an overlay supplies is still the caller's to send.
+- **`extra_kwargs=` on `dispatch` and `adispatch`**: a transport's per-call
+  service keywords, merged beneath the spec's `kwargs` provider, so a view's
+  per-request hook needs no spec rebuilt for the call. The spec's provider
+  wins on a clash. It is read as the provider's return is: an `UNSET` entry
+  is dropped, a key the provider is annotated to fill is the provider's
+  alone, and a key naming a seed is refused. So is a key naming a parameter
+  the spec declares - a read, a Validator field, a target selector's read, a
+  `many` spec's list - unless its value is `UNSET` or the spec's typed
+  `kwargs` provider fills it: the caller's value for a parameter is what the
+  permission checks and the target selector see, so the value authorized is
+  the value run. It reaches a selector spec's selector and a service spec's
+  service, never a target or output selector. There is no overlay for the
+  Validator's input; a transport merges such values into `arguments`.
 - **A permission check can read the call's arguments.** A
   `PermissionCheck` method that declares a keyword `arguments` - on
   `has_permission`, `has_object_permission` or `has_scope_permission` - is
