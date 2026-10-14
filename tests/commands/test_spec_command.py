@@ -16,6 +16,7 @@ from typing import Any, TypedDict
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -367,6 +368,16 @@ class TestThePrincipal:
 
 
 class TestHelp:
+    def test_a_percent_sign_in_a_docstring_is_help_text_and_not_a_format(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        def discount() -> None:
+            """Take 10% off."""
+
+        registry = SpecRegistry()
+        registry.register("discount", ServiceSpec(service=discount, permissions=[Unrestricted()]))
+        assert "Take 10% off. (write)" in help_of(capsys, command=command_over(registry))
+
     def test_each_subcommand_says_what_its_spec_s_callable_says_and_its_kind(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -487,6 +498,36 @@ class TestRefusals:
         error = refused("ping", "--as-user", "999")
         assert (error.returncode, str(error)) == (5, "No principal with identifier '999'.")
 
+    def test_a_lookup_answering_none_is_refused(self, owner: Any) -> None:
+        # ``Unrestricted`` is the spec an unattributed run would succeed on.
+        command = command_over(notes.registry, resolve_as_user=lambda self, value: None)
+        error = refused("ping", "--as-user", "typo", command=command)
+        assert error.returncode == 5
+        assert "'typo'" in str(error)
+
+    def test_a_lookup_answering_an_anonymous_user_is_refused(self) -> None:
+        command = command_over(notes.registry, resolve_as_user=lambda self, value: AnonymousUser())
+        assert refused("ping", "--as-user", "x", command=command).returncode == 5
+
+    def test_a_setting_naming_no_format_is_refused_before_the_write(self, owner: Any) -> None:
+        # Read after the run, it failed a rename that had already committed.
+        note = Note.objects.create(owner=owner, title="draft")
+        with (
+            override_settings(SERVICE_SPECS_COMMAND_OUTPUT="TABLE"),
+            pytest.raises(ImproperlyConfigured),
+        ):
+            run(
+                "rename-note",
+                "--as-user",
+                str(owner.pk),
+                "--pk",
+                str(note.pk),
+                "--title",
+                "renamed",
+            )
+        note.refresh_from_db()
+        assert note.title == "draft"
+
     def test_a_missing_row_is_not_found(self, owner: Any) -> None:
         error = refused("rename-note", "--as-user", str(owner.pk), "--pk", "999", "--title", "x")
         assert (error.returncode, str(error)) == (6, "Not found.")
@@ -501,6 +542,7 @@ class TestRefusals:
                 "Service validation error.\nCheck the shelf.\ntitle: Too long.\n"
                 "books.1: Missing.\nbooks.1.isbn: Malformed.",
             ),
+            ("validation_list", 3, "Service validation error.\nFirst.\nSecond."),
             ("not_found", 6, "No such shelf."),
             ("conflict", 7, "Already archived."),
             ("unavailable", 7, "The note is archived. (code: archived)"),

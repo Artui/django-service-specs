@@ -130,6 +130,7 @@ class Refusal:
     kind: Literal[
         "validation",
         "validation_map",
+        "validation_list",
         "not_found",
         "conflict",
         "unavailable",
@@ -150,6 +151,8 @@ def refuse(*, kind: str) -> None:
                 "books": {"1": {"__all__": ["Missing."], "isbn": ["Malformed."]}},
             }
         )
+    if kind == "validation_list":
+        raise ServiceValidationError(["First.", "Second."])
     if kind == "not_found":
         raise ServiceNotFound("No such shelf.")
     if kind == "conflict":

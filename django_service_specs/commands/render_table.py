@@ -175,7 +175,12 @@ def _display(value: Any, choices: tuple[tuple[Any, Any], ...]) -> Any:
     """
     if isinstance(value, list | tuple):
         return [_display(member, choices) for member in value]
-    return next((display for choice, display in choices if choice == value), value)
+    # Matched by type as well as value, as the declaration keeps them apart:
+    # ``1`` and ``True`` are equal to Python and two choices to a caller.
+    return next(
+        (display for choice, display in choices if type(choice) is type(value) and choice == value),
+        value,
+    )
 
 
 def _text(value: str) -> str:

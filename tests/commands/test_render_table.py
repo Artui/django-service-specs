@@ -330,3 +330,28 @@ def test_a_dataclass_presenter_s_rows_render_under_its_own_output() -> None:
         " 1  Dune   Published  9.99   1965-08-01\n"
         "22  Emma   Draft      12.50              A Novel\n"
     )
+
+
+def test_a_line_or_paragraph_separator_in_a_cell_is_escaped() -> None:
+    # JSON leaves both raw and ``str.splitlines`` breaks a line at either, so a
+    # raw one would split a row for any reader that splits that way.
+    output = Output((OutputField("note", "string"),))
+    assert _table([{"note": "a\u2028b\u2029c"}], output) == "note\na\\u2028b\\u2029c\n"
+
+
+def test_an_enclosing_mark_takes_no_column() -> None:
+    output = Output((OutputField("name", "string"), OutputField("n", "string")))
+    rows: list[dict[str, object]] = [{"name": "a\u20ddb", "n": "1"}, {"name": "ab", "n": "2"}]
+    assert _table(rows, output) == "name  n\na\u20ddb    1\nab    2\n"
+
+
+def test_a_full_width_character_takes_two_columns() -> None:
+    output = Output((OutputField("name", "string"), OutputField("n", "string")))
+    rows: list[dict[str, object]] = [{"name": "\uff21", "n": "1"}, {"name": "ab", "n": "2"}]
+    assert _table(rows, output) == "name  n\n\uff21    1\nab    2\n"
+
+
+def test_a_choice_is_matched_by_type_as_well_as_value() -> None:
+    # ``True == 1`` in Python; the choice ``1`` is not the value ``True``.
+    output = Output((OutputField("flag", "integer", choices=((1, "one"),)),))
+    assert _table([{"flag": True}], output) == "flag\ntrue\n"

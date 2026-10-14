@@ -108,7 +108,7 @@ only that app's commands.
 | Id | Level | For |
 | --- | --- | --- |
 | `django_service_specs.W001` | Warning | One spec that authorizes nothing, with the command class as `obj` |
-| `django_service_specs.W003` | Warning | A command that could not be imported or constructed, or names no registry: its specs were not checked |
+| `django_service_specs.W003` | Warning | A command that could not be imported or constructed, names no registry, or whose parser could not be built: its specs were not checked |
 
 Both are warnings, never errors: an open spec is a decision or an accident
 the check cannot tell apart, and an error would stop `migrate` on a project

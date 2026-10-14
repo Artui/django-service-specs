@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.utils.translation import gettext
 
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.commands.add_spec_arguments import add_spec_arguments
 from django_service_specs.commands.describe_parameters import describe_parameters
@@ -207,13 +208,14 @@ class SpecCommand(BaseCommand):
         account. A project whose runbooks name people by username or email
         overrides this method with that lookup.
 
-        The contract is: return a user, or raise
+        The contract is: return an authenticated user, or raise
         [`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable],
         which ends the run with ``ExitCode.PRINCIPAL_UNAVAILABLE``. Anything
         else an override raises is a bug in the lookup, and propagates. An
         override need not refuse a deactivated user itself: ``dispatch``
-        refuses one whatever the lookup returns. There is no fallback to an
-        anonymous user and no user of the command's own.
+        refuses one whatever the lookup returns. A lookup answering ``None``
+        or an anonymous user is refused the same way, by the command. There is
+        no fallback to an anonymous user and no user of the command's own.
         """
         return resolve_principal(value)
 
@@ -234,8 +236,25 @@ class SpecCommand(BaseCommand):
         spec = kernel_spec(entry.spec)
         parameters = spec.parameters()
         raw = parsed_arguments(argparse.Namespace(**options), parameters)
+        # Read before the run, not after it: a setting that names no format
+        # raises, and raising once a write has committed reports a failure for
+        # an operation that happened, which a script retries.
+        # Django's ``OutputWrapper`` is an ``io.TextIOBase`` rather than a
+        # ``typing.TextIO``, and answers the ``write`` and ``isatty`` both
+        # functions read for the stream it wraps.
+        stdout = cast("TextIO", self.stdout)
+        table = wants_table(stdout, requested=options["output_format"])
         try:
             principal = self.resolve_as_user(options["as_user"])
+            # A lookup is the project's, and ``filter(...).first()`` is the
+            # obvious one: a typo then answers ``None``, which an open spec
+            # would run for. Each condition is held by its own test:
+            # test_a_lookup_answering_none_is_refused and
+            # test_a_lookup_answering_an_anonymous_user_is_refused.
+            if principal is None or not getattr(principal, "is_authenticated", False):
+                raise PrincipalUnavailable(
+                    f"The user {options['as_user']!r} resolved to nobody who can sign in."
+                )
             result = dispatch(
                 entry.spec,
                 principal=principal,
@@ -246,11 +265,6 @@ class SpecCommand(BaseCommand):
             raise CommandError(_message(error), returncode=int(exit_code_for(error))) from error
         if result.kind == "not_found":
             raise CommandError(gettext("Not found."), returncode=int(ExitCode.NOT_FOUND))
-        # Django's ``OutputWrapper`` is an ``io.TextIOBase`` rather than a
-        # ``typing.TextIO``, and answers the ``write`` and ``isatty`` both
-        # functions read for the stream it wraps.
-        stdout = cast("TextIO", self.stdout)
-        table = wants_table(stdout, requested=options["output_format"])
         render_result(present(entry.spec, result), spec.output(), stdout, table=table)
 
     def _explain(self) -> None:

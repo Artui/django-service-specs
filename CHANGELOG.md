@@ -44,9 +44,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parameter whose option another already claims or the command owns.
 - **`unguarded_specs`, `UnguardedSpec`, `UnguardedReason`,
   `unguarded_message`**: the specs of a registry that authorize nothing,
-  either because `Unrestricted` is the only check or because every check is a
-  subclass of it. `manage.py <command> --explain` prints them and runs no
-  spec.
+  because every check it declares is `Unrestricted` or a subclass of it.
+  `manage.py <command> --explain` prints them and runs no spec.
 - **The `django_service_specs` app**: listing it in `INSTALLED_APPS` registers
   a system check over every `SpecCommand` of the installed apps.
   `django_service_specs.W001` names each spec a command serves that authorizes

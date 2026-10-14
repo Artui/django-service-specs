@@ -7,7 +7,7 @@ arguments as options, and gets its presented result as a table or as JSON
 Lines:
 
 ```console
-$ python manage.py notes rename-note --as-user 1 --pk 1 --title Final
+$ python manage.py notes rename-note --as-user 1 --pk 1 --title Final --json
 {"id":1,"title":"Final"}
 ```
 
@@ -65,7 +65,9 @@ Each registry entry is a subcommand named after it, with each `_` shown as
 `--due-at` for `due_at`, a `--flag`/`--no-flag` pair for a boolean, and an
 array as a repeated option, `--tag a --tag b`. Every value reaches
 [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat] as
-the string typed, and is refused as a query string's would be.
+the string typed, and is refused as a query string's would be. A value that
+starts with `-` is read by argparse as an option, so it is attached with an
+equals sign: `--tag=-x`.
 
 `manage.py notes --help` lists the subcommands, each with the first paragraph
 of its service's or selector's docstring and whether it reads or writes, or
@@ -212,7 +214,7 @@ printed, with the code as its `returncode`. A malformed command line is a
 `whoami` is open to every active user, which is what it is for:
 
 ```console
-$ python manage.py notes whoami --as-user 2
+$ python manage.py notes whoami --as-user 2 --json
 "grace"
 ```
 
