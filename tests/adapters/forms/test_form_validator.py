@@ -905,6 +905,18 @@ class TestANumberPastItsRange:
         }
 
     @pytest.mark.django_db
+    def test_a_clean_method_handing_back_nothing_is_the_model_s(self) -> None:
+        # Required, so Django validates the column with what the method hands
+        # back, and ``None`` is no number to range: the model refuses it.
+        class Emptied(_Viewed):
+            def clean_views(self) -> None:
+                return None
+
+        assert coded(_refusal(Emptied, {"title": "Hi", "views": 5})) == {
+            "views": [("This field cannot be null.", "null")]
+        }
+
+    @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
     def test_a_value_past_a_unique_column_s_range_never_reaches_the_uniqueness_query(
         self,
@@ -945,6 +957,56 @@ class TestANumberPastItsRange:
             {"title": "Hi", "views": 1, "pages": 2**63}, CONTEXT
         )
         assert cleaned == {"title": "Hi", "views": 1, "pages": 2**63}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_value_clean_sets_for_a_column_the_form_does_not_edit_is_never_judged(
+        self,
+    ) -> None:
+        # Django writes onto the instance only the columns the form edits, and
+        # validates only those, so a value ``clean()`` sets for another is the
+        # form's to use: Django's own validation takes it, and so does this.
+        class Doubled(forms.ModelForm):
+            factor = forms.IntegerField()
+
+            class Meta:
+                model = Post
+                fields = ["title"]
+
+            def clean(self) -> dict[str, Any]:
+                cleaned = super().clean()
+                cleaned["views"] = cleaned["factor"] * 2**62
+                return cleaned
+
+        data = {"title": "Hi", "factor": 4}
+        own = Doubled(data=data)
+        assert own.is_valid()
+        assert FormValidator(Doubled).validate(data, CONTEXT) == own.cleaned_data
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    @pytest.mark.parametrize(
+        "meta",
+        [
+            {"fields": ["title"]},
+            {"exclude": ["body", "published", "views", "author", "tags"]},
+        ],
+        ids=["fields", "exclude"],
+    )
+    def test_a_field_declared_over_a_column_meta_leaves_out_is_never_judged(
+        self, meta: dict[str, Any]
+    ) -> None:
+        # Declared on the form but left out by ``Meta``, the value is never
+        # written onto the instance, and Django validates no column for it.
+        form_class = type(
+            "Undeclared",
+            (forms.ModelForm,),
+            {"views": forms.IntegerField(), "Meta": type("Meta", (), {"model": Post, **meta})},
+        )
+        data = {"title": "Hi", "views": 2**63}
+        own = form_class(data=data)
+        assert own.is_valid()
+        assert FormValidator(form_class).validate(data, CONTEXT) == own.cleaned_data
 
     @pytest.mark.django_db
     def test_a_value_that_is_no_integer_is_left_to_the_field(self) -> None:

@@ -19,6 +19,7 @@ from django.core.exceptions import (
 )
 from django.db import models
 from django.forms.models import model_to_dict
+from django.forms.utils import ErrorDict
 from django.forms.widgets import FILE_INPUT_CONTRADICTION
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBase, HttpResponseRedirect
 from django.shortcuts import resolve_url
@@ -158,9 +159,11 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
       raises ``Http404``, for the host's own 403 and 404 pages.
 
     **A re-rendered form carries the refusal and nothing else**: the page says
-    what dispatch decided. The page's own form's errors are cleared before
-    the refusal is placed, so nothing the Validator did not decide reaches
-    the page. After a shape-check refusal, then,
+    what dispatch decided. The page's own form is never validated: its
+    errors start empty and the refusal is placed on them, so nothing the
+    Validator did not decide reaches the page, and a value the Validator
+    refused because no column holds it never reaches the database through
+    the page's own checks. After a shape-check refusal, then,
     the form's further checks - a length, ``clean()``, uniqueness - answer the
     next post rather than this one.
 
@@ -289,11 +292,20 @@ class SpecFormView(TemplateResponseMixin, ContextMixin, View):
 
         The page says what dispatch decided, and nothing the page's own form
         would add: its own errors are not shown, whatever its own checks
-        found, since the Validator's form is the one that decided. Django's ``add_error`` needs the form cleaned first, so its
-        validation runs, and its errors are cleared before the refusal is
-        placed.
+        would find, since the Validator's form is the one that decided. So
+        the page's form is never validated: its error state is set to none
+        directly, which is what Django's ``add_error`` needs, and the refusal
+        is placed on it. Validated, it would hand a number no integer column
+        holds to the database driver, with none of the Validator's guards,
+        and SQLite's raises ``OverflowError``
+        (test_a_list_s_key_past_its_column_is_refused_on_the_page).
         """
-        form.errors.clear()
+        # Django's own two attributes, as ``full_clean()`` starts them, with
+        # the form's renderer as Django 5.0 and later pass it; ``Any``, as the
+        # stubs declare neither as assignable.
+        bound: Any = form
+        bound._errors = ErrorDict(renderer=form.renderer)
+        bound.cleaned_data = {}
         add_argument_errors(form, detail)
         return self.render_to_response(self.get_context_data(form=form), status=status)
 

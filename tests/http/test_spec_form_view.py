@@ -39,7 +39,8 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
-from tests.adapter_app.models import Document
+from tests.adapter_app.models import Author as BookAuthor
+from tests.adapter_app.models import Book, Document, Edition
 from tests.dispatch.utils import (
     OPEN,
     PK,
@@ -202,6 +203,21 @@ class Listed(forms.Form):
         self.fields["owner"].choices = [
             (user.pk, user.username) for user in get_user_model().objects.all()
         ]
+
+
+class EditionForm(forms.ModelForm):
+    """A row whose integer column a constraint holds unique, so validating it queries."""
+
+    class Meta:
+        model = Edition
+        fields = ["book", "number"]
+
+
+class AssigneesForm(forms.Form):
+    """A form choosing several rows, which Django matches with one ``in`` lookup."""
+
+    title = forms.CharField()
+    assignees = forms.ModelMultipleChoiceField(queryset=get_user_model().objects.all())
 
 
 class Counted(PermissionCheck):
@@ -780,6 +796,15 @@ class TestRefusals:
         assert (response.status_code, refused(response)) == (400, {"__all__": [CLOSED]})
         assert validated(spec) == 1
 
+    def test_the_page_form_s_own_checks_add_nothing_to_dispatch_s_refusal(self, ada: Any) -> None:
+        # The shape check refuses the count before the Validator runs, so the
+        # form's ``clean()`` never decided anything: the page shows what
+        # dispatch did, and not what the page's form would have said.
+        spec = entry_spec()
+        response = post(form_view(spec), ada, {"title": "shut", "count": "x"})
+        assert (response.status_code, refused(response)) == (400, {"count": [WHOLE]})
+        assert validated(spec) == 0
+
     def test_a_validator_refusal_appears_once(self, ada: Any) -> None:
         spec = entry_spec()
         response = post(form_view(spec), ada, {"title": "Longer"})
@@ -903,6 +928,63 @@ class TestRefusals:
     def test_the_refused_page_shows_each_message_once(self, ada: Any) -> None:
         response = post(form_view(entry_spec()), ada, {"title": "shut"}).render()
         assert response.content.count(CLOSED.encode()) == 1
+
+
+@pytest.fixture(params=["stated", "unstated"])
+def ranges(request: pytest.FixtureRequest) -> None:
+    """The range the backend states, and none, as Django 4.2's SQLite states."""
+    if request.param == "unstated":
+        request.getfixturevalue("unstated_ranges")
+
+
+@pytest.mark.usefixtures("ranges")
+class TestAValuePastItsColumn:
+    """A post the Validator refuses for a value no column holds re-renders the page.
+
+    The page's own form is never validated again to show the refusal: it has
+    none of the Validator's guards, and its own validation would hand the
+    value to the database driver, which raises ``OverflowError``.
+    """
+
+    def test_a_model_form_s_integer_past_its_column_is_refused_on_the_page(self, ada: Any) -> None:
+        book = Book.objects.create(
+            author=BookAuthor.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=FormValidator(EditionForm))
+        response = post(form_view(spec), ada, {"book": book.pk, "number": 2**63})
+        assert response.status_code == 400
+        assert refused(response) == {
+            "number": ["Ensure this value is less than or equal to %s." % (2**63 - 1)]
+        }
+
+    def test_a_choice_s_key_past_its_column_is_refused_on_the_page(self, ada: Any) -> None:
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=FormValidator(AssignForm))
+        response = post(form_view(spec), ada, {"title": "Hi", "assignee": 2**63})
+        assert response.status_code == 400
+        assert refused(response) == {
+            "assignee": ["Select a valid choice. That choice is not one of the available choices."]
+        }
+
+    def test_a_key_past_its_column_beside_a_shape_refusal_never_reaches_the_driver(
+        self, ada: Any
+    ) -> None:
+        # The shape check refuses the missing title before the Validator runs,
+        # so nothing has judged the key: the page shows the refusal alone.
+        spec = ServiceSpec(
+            service=Record(), permissions=OPEN, validator=FormValidator(AssigneesForm)
+        )
+        response = post(form_view(spec), ada, {"assignees": [2**63]})
+        assert (response.status_code, refused(response)) == (400, {"title": [REQUIRED]})
+
+    def test_a_list_s_key_past_its_column_is_refused_on_the_page(self, ada: Any) -> None:
+        spec = ServiceSpec(
+            service=Record(), permissions=OPEN, validator=FormValidator(AssigneesForm)
+        )
+        response = post(form_view(spec), ada, {"title": "Hi", "assignees": [2**63]})
+        assert response.status_code == 400
+        assert refused(response) == {
+            "assignees": [f"Select a valid choice. {2**63} is not one of the available choices."]
+        }
 
 
 class TestDeniedAndMissing:

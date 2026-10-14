@@ -374,8 +374,10 @@ The first two rows place the refusal on the form, and a service's string or
 list detail is about the whole form. Every other re-rendered refusal is its
 message, among the form's non-field errors. **The re-rendered form carries
 the refusal and nothing else**, so the page says what dispatch decided. The
-page's own errors are cleared before the refusal is placed, so nothing the
-Validator did not decide reaches it. So after a shape-check
+page's own form is never validated: its errors start empty and the refusal is
+placed on it, so nothing the Validator did not decide reaches it, and a value
+the Validator refused because no column holds it - a key past 64 bits - never
+reaches the database through the page's own checks. So after a shape-check
 refusal - a required field left blank, a date that does not parse - the
 form's further checks, such as a length, `clean()` or uniqueness, answer the
 next post rather than this one. The statuses are
@@ -392,7 +394,7 @@ only** in this release.
 ### A refusal, placed on the form
 
 [`add_argument_errors`][django_service_specs.http.add_argument_errors.add_argument_errors]
-is how the view places a refusal, on a form whose own errors it has cleared,
+is how the view places a refusal, on a form whose errors it has started empty,
 and a hand-written view with its own bound form can call it the same way. It
 uses Django's public `form.add_error`, beside whatever errors the form carries:
 
@@ -410,3 +412,12 @@ uses Django's public `form.add_error`, beside whatever errors the form carries:
   says - a `FormValidator`'s refusal is the form's own errors, and the shape
   check spells its messages as Django's fields do - so without this most
   refusals would show twice.
+- **A form not yet validated is validated first**, as reading `form.errors`
+  would, so its own errors are the ones compared against, but with the guards
+  a `FormValidator`'s form is validated with. Its own validation would hand
+  the database driver a number no integer column holds - a model choice
+  field's key, a `ModelForm`'s integer - which SQLite's refuses with
+  `OverflowError`. Such a key is refused as `invalid_choice` and such an
+  integer as `max_value` or `min_value`, in the words a `FormValidator`
+  refuses them with, so the refusal of one is placed once. A form already
+  validated is compared as it stands.
