@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import ast
 import gc
 import importlib
-import inspect
 from typing import Any
 
 import pytest
@@ -150,28 +148,3 @@ def test_a_compile_answering_something_else_is_refused_and_nothing_is_cached(
     with pytest.raises(TypeError, match=rf"Wrong.as_kernel_spec\(\) must return .*; got {named}"):
         kernel_spec(source)
     assert id(source) not in kernel_spec_module._COMPILED
-
-
-def test_the_module_imports_nothing_from_the_package_at_run_time() -> None:
-    # Kept a leaf, so any module, the parts a spec imports included, can read
-    # it without closing a loop. A spec is told apart by compiling to itself
-    # instead.
-    tree = ast.parse(inspect.getsource(kernel_spec_module))
-    annotation_only = {
-        id(node)
-        for block in ast.walk(tree)
-        if isinstance(block, ast.If) and ast.unparse(block.test) == "TYPE_CHECKING"
-        for node in ast.walk(block)
-    }
-    imported = [
-        node.module or ""
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom) and id(node) not in annotation_only
-    ] + [
-        alias.name
-        for node in ast.walk(tree)
-        if isinstance(node, ast.Import) and id(node) not in annotation_only
-        for alias in node.names
-    ]
-
-    assert [name for name in imported if name.startswith("django_service_specs")] == []

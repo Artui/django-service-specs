@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django_service_specs.dispatch.utils import shape_check, validate_arguments
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.unknown_arguments import UnknownArguments
-
-if TYPE_CHECKING:
-    from django_service_specs.specs.service_spec import ServiceSpec
 
 
 def bind_arguments(
