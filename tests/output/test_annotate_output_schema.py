@@ -683,6 +683,41 @@ class TestFormatters:
             "type": "string",
         }
 
+    def test_a_formatters_own_const_admits_the_null_its_field_does(self) -> None:
+        """A ``const`` is a one-value ``enum``: restated as the ``enum`` of that
+        value and a null, the smallest statement that still admits both."""
+        produced = ValueFormatter(str, produces="string", schema={"const": "n/a"})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "enum": ["n/a", None],
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_and_enum_together_are_one_value_and_a_null(self) -> None:
+        """Both must hold, so the values left are the constant alone."""
+        produced = ValueFormatter(str, produces="string", schema={"const": "a", "enum": ["a", "b"]})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "enum": ["a", None],
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_none_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"const": None})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "const": None,
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_on_a_field_admitting_no_null_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"const": "a"})
+
+        assert self.formatted({"type": "string"}, FieldMarking.formatted(produced)) == {
+            "const": "a",
+            "type": "string",
+        }
+
     def test_a_type_admitting_no_null_admits_none_after_formatting(self) -> None:
         """The condition of the null kept: only a stated ``"null"`` is."""
         assert self.formatted({"type": ["string", "integer"]}) == LOCAL_TIME
