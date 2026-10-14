@@ -10,6 +10,7 @@ from django_service_specs.parameters.utils import max_length_in_force
 from django_service_specs.schema.utils import allow_null, is_json_native
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.utils import unknown_arguments_policy
 
 
 def parameters_schema(
@@ -112,10 +113,10 @@ def parameters_schema(
     Defaults and choice values are placed in it as declared, not copied.
 
     ``unknown_arguments`` accepts the policy's plain value as well, and a value
-    that is neither raises ``ValueError`` here rather than quietly describing
-    one policy or the other.
+    that is neither, or the kept ``PASSTHROUGH`` member, raises ``ValueError``
+    here rather than quietly describing one policy or the other.
     """
-    return _object_schema(parameters, UnknownArguments(unknown_arguments))
+    return _object_schema(parameters, unknown_arguments_policy(unknown_arguments))
 
 
 def _object_schema(parameters: Parameters, policy: UnknownArguments) -> dict[str, Any]:

@@ -165,7 +165,10 @@ docs/examples/arguments.py:ignore
 There is no third policy that passes an undeclared argument through. Reaching a
 callable is exactly what the closed set prevents: on a read, with no Validator
 in front of it, it would let a caller supply a keyword the operation's author
-never offered.
+never offered. The enum does carry a third member, `PASSTHROUGH`, kept as a
+name for the transports of the current djangorestframework-services release,
+which compare a policy against it. It is not a policy: every function that
+takes one raises `ValueError` for it rather than running it as `IGNORE`.
 
 `dispatch`, `adispatch` and `bind_arguments` each take `unknown_arguments=`.
 

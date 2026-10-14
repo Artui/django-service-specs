@@ -3640,3 +3640,16 @@ class TestRefusalCodes:
         with pytest.raises(InvalidArguments) as refused:
             dispatch(one, principal=ada, arguments=rows[0])
         assert coded(refused.value.detail) == {"colour": [("Unknown argument.", "unknown")]}
+
+
+def test_passthrough_is_refused_rather_than_run_as_ignore(ada: Any) -> None:
+    # Sized so the policy is what answers: an active principal, an open spec
+    # and an undeclared key the IGNORE branch would drop and run.
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN)
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"tenant": "acme"},
+            unknown_arguments=UnknownArguments.PASSTHROUGH,
+        )

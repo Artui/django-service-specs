@@ -394,3 +394,9 @@ class TestPartialMany:
         assert "required" not in row
         assert "required" not in row["properties"]["meta"]
         assert not _refused(spec, {"title": "t", "items": [{}, {"meta": {}}]})
+
+
+def test_passthrough_is_refused() -> None:
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK)
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        spec_input_schema(spec, unknown_arguments=UnknownArguments.PASSTHROUGH)

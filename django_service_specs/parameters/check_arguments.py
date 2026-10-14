@@ -24,6 +24,7 @@ from django_service_specs.parameters.utils import (
 )
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.validation.utils import unknown_arguments_policy
 
 # Messages are translated where they are raised, never at import: every
 # ``django.utils.translation`` function reads settings, and a module that did
@@ -174,9 +175,11 @@ def check_arguments(
             addressed by path, rather than the first; the tree's shape is
             documented on ``InvalidArguments``.
     """
-    # Normalized, so the policy's plain value works and a misspelt one raises
-    # here rather than quietly falling through to one policy or the other.
-    policy = UnknownArguments(unknown_arguments)
+    # Normalized, so the policy's plain value works and a misspelt one, or the
+    # kept PASSTHROUGH member, raises here rather than quietly falling through
+    # to one policy or the other
+    # (test_passthrough_is_refused_where_the_policy_is_normalized).
+    policy = unknown_arguments_policy(unknown_arguments)
     if not isinstance(arguments, Mapping):
         # A JSON-RPC caller controls the whole ``arguments`` value, so a list
         # there is a caller's mistake to refuse, not a crash to raise.
