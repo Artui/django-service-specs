@@ -9,9 +9,11 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 _SCALAR_TYPES = frozenset({"string", "number", "integer", "boolean"})
 """The scalar types a question may ask for: the narrowest renderer's. An MCP
@@ -34,7 +36,7 @@ list, which is read on its own."""
 
 
 def check_requested_input(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     schema: Mapping[str, Any] | None,
     *,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
@@ -81,10 +83,14 @@ def check_requested_input(
       is compared and nothing finer: a ``format``, ``choices`` or a bound the
       parameter declares still checks the answer when it arrives.
 
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    read as the spec it compiles to.
+
     Raises:
         ImproperlyConfigured: naming the first key refused, or for a
             ``schema`` that is no mapping at all.
     """
+    spec = kernel_spec(spec)
     if schema is None:
         return
     if not isinstance(schema, Mapping):

@@ -27,8 +27,10 @@ from django.views import View
 from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 ANSWERABLE: Final = ("get", "head", "post", "put", "patch", "delete")
@@ -39,7 +41,7 @@ spec has nothing to add to that answer. TRACE is not one either, since
 nothing about an operation is a loop-back of the request."""
 
 
-def check_asked_input(spec: ServiceSpec | SelectorSpec, refused: Exception) -> None:
+def check_asked_input(spec: ServiceSpec | SelectorSpec | SpecSource, refused: Exception) -> None:
     """Refuse, as the service's own error, a request for input no route could hear answered.
 
     A 422 body carries the schema a service asked under, and a client builds
@@ -115,21 +117,26 @@ def answered_methods(spec: Any, methods: Sequence[str] | None, *, label: str) ->
     an HTTP client. A view that names ``methods`` answers exactly those,
     spelled in either case and returned in ``ANSWERABLE``'s order.
 
-    Checked when the view is built, so a view with no spec, or one naming a
-    method it could never answer, fails when the URLconf is imported rather
+    ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource], and its
+    default is that of the spec it compiles to. Checked when the view is
+    built, so a view with no spec, one whose declaration does not compile, or
+    one naming a method it could never answer, fails when the URLconf is imported rather
     than on the first request to reach it.
 
     Raises:
-        ImproperlyConfigured: ``spec`` is not a spec, or ``methods`` names one
+        ImproperlyConfigured: ``spec`` is not a spec and does not compile to
+            one, or ``methods`` names one
             outside ``ANSWERABLE``.
     """
-    if not isinstance(spec, ServiceSpec | SelectorSpec):
-        raise ImproperlyConfigured(
-            f"{label}.as_view() needs a spec: a ServiceSpec or a SelectorSpec, got "
-            f"{type(spec).__name__}."
-        )
+    try:
+        # Compiled here, when the URLconf is imported, so a declaration that
+        # does not compile fails there too, and the cache answers every request.
+        compiled = kernel_spec(spec)
+    except TypeError as error:
+        raise ImproperlyConfigured(f"{label}.as_view() needs a spec: {error}") from error
     if methods is None:
-        return ("get", "head") if isinstance(spec, SelectorSpec) else ("post",)
+        return ("get", "head") if isinstance(compiled, SelectorSpec) else ("post",)
     named = {method.lower() for method in methods}
     unknown = sorted(named - set(ANSWERABLE))
     if unknown:
@@ -148,7 +155,7 @@ class SpecViewBase(View):
     sync one: Django serves a class async only when all of its handlers are.
     """
 
-    spec: ServiceSpec | SelectorSpec | None = None
+    spec: ServiceSpec | SelectorSpec | SpecSource | None = None
     success_status: int | None = None
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
@@ -179,6 +186,6 @@ class SpecViewBase(View):
         methods = answered_methods(self.spec, self.methods, label=type(self).__name__)
         self.http_method_names = [*methods, "options"]
 
-    def served_spec(self) -> ServiceSpec | SelectorSpec:
+    def served_spec(self) -> ServiceSpec | SelectorSpec | SpecSource:
         """``spec``, which ``as_view`` refused to build a view without."""
-        return cast("ServiceSpec | SelectorSpec", self.spec)
+        return cast("ServiceSpec | SelectorSpec | SpecSource", self.spec)

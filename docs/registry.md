@@ -32,14 +32,17 @@ stored label can never disagree with the object it describes.
 
 The `spec` may also be any object with an `as_kernel_spec()` method, a
 [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]:
-djangorestframework-services' spec is one. It is registered as it is, with no
+djangorestframework-services' spec is one, and so is every `ServiceSpec` and
+`SelectorSpec`, each compiling to itself. It is registered as it is, with no
 wrapper, and kept as registered, so `entry.spec` and `specs()` hand back the
 object itself. `dispatch`, `adispatch`, `check_call`, `bind_arguments`,
 `present`, `apresent`, `present_for_audience`, `resolve_target`, the three
 `authorize` functions, the affordance functions and their async twins,
-`server_owned_keys`, `spec_input_schema`, `spec_output_schema`,
-`can_present_nothing` and `audience_projection_for_spec` take it as they take a
-spec, and
+`server_owned_keys`, `check_requested_input`, `shape_queryset`,
+`spec_input_schema`, `spec_output_schema`, `can_present_nothing`,
+`audience_projection_for_spec`, `dispatch_request` and `adispatch_request` take
+it as they take a spec, `SpecView` and `AsyncSpecView` serve it as their
+`spec`, and
 [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] is how a
 transport reads the spec it compiles to anywhere else. It is compiled the
 first time anything reads it, and that compiled spec answers every later call

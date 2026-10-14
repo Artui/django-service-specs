@@ -20,14 +20,16 @@ from django_service_specs.http.utils import (
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
 def dispatch_request(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     request: HttpRequest,
     *,
     url_kwargs: Mapping[str, Any] | None = None,
@@ -62,9 +64,16 @@ def dispatch_request(
     as ``ImproperlyConfigured``: every URL kwarg is an argument, and the route
     is the host's.
 
+    ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]: it is
+    compiled once, first, and every step reads the spec it compiles to.
+
     **CSRF is the host's middleware**, as for any Django view: nothing here
     exempts a view, and ``csrf_exempt`` is one line for a host that wants it.
     """
+    # Compiled once, before anything is read, so the arguments, the answer's
+    # status and the asked-input check all read the one compiled spec.
+    spec = kernel_spec(spec)
     try:
         # The principal first, as ``adispatch`` resolves a ``principal_id``
         # and ``dispatch`` refuses a deactivated principal before its shape
