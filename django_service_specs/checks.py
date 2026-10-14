@@ -41,8 +41,8 @@ def check_unguarded_specs(
       spec is a decision or an accident the check cannot tell apart, and an
       ``Error`` would stop ``migrate`` on a project working as intended.
       ``SILENCED_SYSTEM_CHECKS`` silences it by id, so for every spec at once.
-    - ``django_service_specs.W003``, one per command that could not be loaded,
-      naming it and the error. Without this app nothing loads that command
+    - ``django_service_specs.W003``, one per command that could not be loaded or
+      whose parser could not be built, naming it and the error. Without this app nothing loads that command
       until somebody runs it, so failing the check on it would make a broken
       command nobody runs stop ``migrate``; and dropping it silently would
       leave its specs unchecked with nothing saying so.
@@ -60,7 +60,7 @@ def check_unguarded_specs(
         if isinstance(loaded, Exception):
             messages.append(
                 Warning(
-                    f"The command {name!r} from {app_name} could not be loaded, so its specs "
+                    f"The command {name!r} from {app_name} could not be set up, so its specs "
                     f"were not checked: {type(loaded).__name__}: {loaded}",
                     hint=(
                         f"Run manage.py {name} to see the traceback. Until it loads, the specs "
@@ -114,11 +114,16 @@ def _spec_commands(
             command = load_command_class(app_name, name)
             if not isinstance(command, SpecCommand):
                 continue
+            # Built as ``manage.py`` builds it, so a command whose parser
+            # cannot be built (a parameter taking an option the command owns,
+            # two specs sharing a subcommand name) is reported here and not
+            # first found by the operator running it.
+            command.create_parser("manage.py", name)
             loaded: tuple[SpecCommand, tuple[UnguardedSpec, ...]] | Exception = (
                 command,
                 unguarded_specs(command.registry),
             )
-        # Anything a module or a constructor raises: an ``ImportError`` from a
+        # Anything a module, a constructor or the parser's construction raises: an ``ImportError`` from a
         # missing dependency, an ``ImproperlyConfigured`` from a registry
         # refusing a spec at import, or the command's own bug. Not
         # ``BaseException``, so an interrupt still stops the check.

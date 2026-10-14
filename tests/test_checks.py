@@ -99,15 +99,25 @@ class TestACommandThatDoesNotLoad:
 
     def test_an_import_error_is_reported_with_its_cause(self) -> None:
         assert self._w003("unguarded_broken_import") == [
-            "The command 'unguarded_broken_import' from tests.commands_app could not be loaded, "
+            "The command 'unguarded_broken_import' from tests.commands_app could not be set up, "
             "so its specs were not checked: RuntimeError: this command module cannot be imported"
         ]
 
     def test_a_constructor_error_is_reported_with_its_cause(self) -> None:
         assert self._w003("unguarded_broken_init") == [
-            "The command 'unguarded_broken_init' from tests.commands_app could not be loaded, "
+            "The command 'unguarded_broken_init' from tests.commands_app could not be set up, "
             "so its specs were not checked: ValueError: this command cannot be constructed"
         ]
+
+    def test_a_parser_that_cannot_be_built_is_reported_with_its_cause(self) -> None:
+        # The command constructs, so only building its parser finds the clash
+        # between a parameter and the option the command owns.
+        [message] = self._w003("unguarded_bad_parser")
+        assert message.startswith(
+            "The command 'unguarded_bad_parser' from tests.commands_app could not be set up, "
+            "so its specs were not checked: ImproperlyConfigured: "
+        )
+        assert "--as-user" in message
 
     def test_a_spec_command_naming_no_registry_is_reported(self) -> None:
         # Only that it is reported: how a ``SpecCommand`` with no registry
@@ -115,7 +125,7 @@ class TestACommandThatDoesNotLoad:
         # to decide, and each is caught by the same walk.
         [message] = self._w003("unguarded_no_registry")
         assert message.startswith(
-            "The command 'unguarded_no_registry' from tests.commands_app could not be loaded, "
+            "The command 'unguarded_no_registry' from tests.commands_app could not be set up, "
             "so its specs were not checked: "
         )
 
