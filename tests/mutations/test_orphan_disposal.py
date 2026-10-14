@@ -19,8 +19,8 @@ from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
-from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
+from django_service_specs.types.relation_orphan import RelationOrphan
 from tests.relations_app.models import (
     Annotation,
     Attachment,

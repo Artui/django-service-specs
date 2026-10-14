@@ -8,7 +8,6 @@ from typing import Any, ClassVar
 
 from django.db.models import Model
 
-from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.utils import (
@@ -18,6 +17,7 @@ from django_service_specs.relations.utils import (
     validate_relation_services,
 )
 from django_service_specs.types.relation_mode import RelationMode
+from django_service_specs.types.relation_orphan import RelationOrphan
 
 
 @dataclass(frozen=True)

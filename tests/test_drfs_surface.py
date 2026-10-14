@@ -368,7 +368,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "RelationMode": _enum("types.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
     "RelationOrphan": _enum(
-        "relations.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
+        "types.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
     ),
     "RelationPhase": _enum(
         "relations.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int

@@ -35,7 +35,7 @@ class ChildCollectionChange:
       left the relation and a service decided the rest.
 
     Whether a row let go is ``deleted`` or ``unlinked`` is the spec's ``orphan``
-    ([`RelationOrphan`][django_service_specs.relations.relation_orphan.RelationOrphan]),
+    ([`RelationOrphan`][django_service_specs.types.relation_orphan.RelationOrphan]),
     not the column alone: ``"delete"`` always deletes; ``"unlink"`` always unlinks,
     and is refused where the link cannot hold ``NULL``; ``"auto"``, the default,
     unlinks when it can — both columns, for a generic relation — and deletes when
