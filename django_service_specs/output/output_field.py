@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.parameters.parameter import FORMATS, JSON_TYPES
+from django_service_specs.parameters.parameters import FORMATS, JSON_TYPES
 
 if TYPE_CHECKING:
     # Annotation-only: ``Output`` imports this module.
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class OutputField:
     """One field of an operation's output, declared without rendering anything.
 
-    The output-side counterpart of [`Parameter`][django_service_specs.parameters.parameter.Parameter],
+    The output-side counterpart of [`Parameter`][django_service_specs.parameters.parameters.Parameter],
     carrying what a reader needs that names and types alone do not give:
 
     - ``label``: a readable header. Libraries disagree here (one invents ``Id``

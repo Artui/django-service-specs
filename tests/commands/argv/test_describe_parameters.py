@@ -11,8 +11,7 @@ import pytest
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.commands.argv.describe_parameters import describe_parameters
 from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.unset import UNSET
 from tests.commands.argv.utils import FLAT, UNSENDABLE
 

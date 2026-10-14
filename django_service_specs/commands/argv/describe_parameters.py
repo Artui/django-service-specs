@@ -6,8 +6,7 @@ import json
 from typing import Any
 
 from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.unset import UNSET
 
 _FLAT_TYPES = ("string", "integer", "number", "boolean", "any")

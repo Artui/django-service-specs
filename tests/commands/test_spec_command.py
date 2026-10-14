@@ -30,8 +30,7 @@ from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.service_spec import ServiceSpec

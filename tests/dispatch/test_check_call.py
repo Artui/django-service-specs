@@ -15,8 +15,7 @@ from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind

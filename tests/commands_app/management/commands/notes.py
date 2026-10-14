@@ -22,8 +22,7 @@ from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.commands.spec_command import SpecCommand
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired

@@ -10,8 +10,7 @@ from typing_extensions import TypedDict
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from django.utils.translation import gettext_lazy
 
-from django_service_specs.parameters.parameter import JSON_TYPES
+from django_service_specs.parameters.parameters import JSON_TYPES
 from django_service_specs.parameters.utils import (
     expected_type,
     parse_number,

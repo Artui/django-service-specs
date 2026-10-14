@@ -35,7 +35,7 @@ Two Django settings, each read at the call rather than at import, so
 
 ## Parameters
 
-::: django_service_specs.parameters.parameter.Parameter
+::: django_service_specs.parameters.parameters.Parameter
 ::: django_service_specs.parameters.parameters.Parameters
 ::: django_service_specs.parameters.check_arguments.check_arguments
 ::: django_service_specs.parameters.non_field_errors.NON_FIELD_ERRORS
