@@ -15,7 +15,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
@@ -38,6 +38,7 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
@@ -211,18 +212,18 @@ def shape_check(
     ``_CheckedRows``, to be reported with the Validator's.
     """
     reads = _server_filled(spec)
+    # The schema relaxes ``partial`` through the same function, so the two
+    # cannot disagree about which fields a partial call may leave out.
+    parameters = relax_partial(spec, parameters)
     # One arc to coverage, each conjunct held by bind_arguments' tests:
     # test_a_selector_spec_returns_its_checked_arguments (the first: a selector
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        declared = spec.validator.parameters()
-        fields = _filled(spec.input_data, declared)
-        everywhere = declared.names() if spec.partial else frozenset()
+        fields = _filled(spec.input_data, spec.validator.parameters())
         if spec.many:
             return _check_bulk(
-                _relaxed(parameters, frozenset(), reads),
-                _relaxed(declared, everywhere, fields),
+                _relaxed(parameters, reads),
                 arguments,
                 name=spec.many_argument,
                 unknown_arguments=unknown_arguments,
@@ -230,11 +231,57 @@ def shape_check(
                 owned_in_rows=fields,
             )
         reads |= fields
-        parameters = _relaxed(parameters, everywhere, reads)
-    else:
-        parameters = _relaxed(parameters, frozenset(), reads)
     return _without(
-        check_arguments(parameters, arguments, unknown_arguments=unknown_arguments), reads
+        check_arguments(
+            _relaxed(parameters, reads), arguments, unknown_arguments=unknown_arguments
+        ),
+        reads,
+    )
+
+
+def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> Parameters:
+    """``parameters`` as a call of ``spec`` is checked under ``partial``: every Validator parameter optional.
+
+    The one reading of what a partial call may leave out, for the shape check
+    and for ``spec_input_schema``'s ``required``, so the schema never asks for
+    a field dispatch would not refuse absent, nor leaves one out that it
+    would. Made optional at every depth - an object's fields and an array's
+    rows included - as djangorestframework-services relaxes only its
+    serializer. The spec's ``reads`` and its target selector's keep their
+    ``required``: a partial update still names the row it updates
+    (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
+    On a ``many`` spec the Validator's parameters are each row's, so the list
+    stays required and only its rows are walked, since a read may share a
+    row field's name
+    (test_a_partial_many_spec_requires_the_list_and_its_reads_and_nothing_in_a_row).
+
+    ``parameters`` as they are for a selector spec, which has no ``partial``,
+    and for a service spec that is not partial. One branch to coverage, so
+    each condition is held by its own test:
+    test_a_selector_specs_schema_is_its_reads (the type: without it, a
+    selector spec's missing attribute raises) and
+    test_a_spec_that_is_not_partial_requires_every_required_parameter (the
+    flag). The Validator's are told apart by what they are not, the spec's
+    reads and its target's, so the Validator is not asked for its parameters
+    again; a read and a Validator parameter of one name are refused when
+    ``parameters()`` is assembled. Of the names kept, the spec's reads are
+    held by test_a_partial_spec_with_no_target_keeps_its_reads_required and
+    the target's by
+    test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth.
+
+    A copy, so the declaration every other reader sees - ``parameters()``
+    itself, which still says what a whole call needs - is untouched.
+    """
+    if not (isinstance(spec, ServiceSpec) and spec.partial):
+        return parameters
+    if spec.many:
+        return Parameters.of(
+            *(_below(param) if param.name == spec.many_argument else param for param in parameters)
+        )
+    target = spec.target_selector_spec()
+    kept = spec.reads.names() | (target.parameters().names() if target is not None else frozenset())
+    return Parameters.of(
+        *(param if param.name in kept else _optional(param) for param in parameters)
     )
 
 
@@ -301,7 +348,6 @@ def _filled(provider: Callable[..., Any] | None, parameters: Parameters) -> froz
 
 def _check_bulk(
     parameters: Parameters,
-    rows: Parameters,
     arguments: Mapping[str, Any],
     *,
     name: str,
@@ -311,21 +357,41 @@ def _check_bulk(
 ) -> dict[str, Any]:
     """The top level of a ``many`` call checked here, and each row checked on its own.
 
-    ``owned`` is what a typed ``kwargs`` provider fills at the top level and
-    ``owned_in_rows`` what ``input_data`` fills in each row: dropped from
-    each once checked (see ``_without``).
+    Each row is the list's own ``items``, as ``relax_partial`` left them,
+    with what ``input_data`` fills relaxed on top. ``owned`` is what a typed
+    ``kwargs`` provider fills at the top level and ``owned_in_rows`` what
+    ``input_data`` fills in each row: dropped from each once checked (see
+    ``_without``).
 
     A list is checked at the top level as an empty one, so the list itself
     and every argument beside it are checked as declared while no row is: a
     row checked there would raise with the others, before the Validator could
-    add its own refusals of the rest. Anything that is not a list is checked
-    as it was sent, and refused.
+    add its own refusals of the rest. Its length is read on the list as sent,
+    and the empty stand-in is held to no minimum, or ``many_min_length=1``
+    would refuse every call
+    (test_many_min_length_is_the_rule_an_empty_list_is_refused_by). Anything
+    that is not a list, or a list of a length it does not take, is checked as
+    it was sent, and refused: the length at the list itself, before any row is
+    read, beside the top level's other refusals
+    (test_a_list_past_its_maximum_is_refused_beside_the_top_level_s_own_refusals).
     """
     value = arguments.get(name) if isinstance(arguments, Mapping) else None
-    if not isinstance(value, (list, tuple)):
+    the_list = next(param for param in parameters if param.name == name)
+    # A ``many`` spec's list is built with the Validator's parameters as its
+    # rows (``ServiceSpec.parameters``), never a JSON type or nothing.
+    rows = _relaxed(cast(Parameters, the_list.items), owned_in_rows)
+    # One branch to coverage, each condition held by its own test:
+    # test_the_list_s_own_refusal_is_a_list_under_its_name (the type: without
+    # it, a value that is no list is measured and read as rows) and
+    # test_a_list_of_rows_past_the_default_maximum_is_refused_at_the_list (the
+    # length: without it, every row is checked and validated first).
+    if not isinstance(value, (list, tuple)) or length_problem(the_list, len(value)) is not None:
         return check_arguments(parameters, arguments, unknown_arguments=unknown_arguments)
+    stand_in = Parameters.of(
+        *(replace(param, min_length=None) if param is the_list else param for param in parameters)
+    )
     checked = _without(
-        check_arguments(parameters, {**arguments, name: []}, unknown_arguments=unknown_arguments),
+        check_arguments(stand_in, {**arguments, name: []}, unknown_arguments=unknown_arguments),
         owned,
     )
     cleaned: dict[int, dict[str, Any]] = {}
@@ -344,37 +410,28 @@ def _check_bulk(
     return checked
 
 
-def _relaxed(parameters: Parameters, everywhere: frozenset[str], top: frozenset[str]) -> Parameters:
-    """``parameters`` with the named ones optional: ``everywhere`` at every depth, ``top`` at the top.
+def _relaxed(parameters: Parameters, filled: frozenset[str]) -> Parameters:
+    """``parameters`` with the ones a typed provider fills optional, at the top level only.
 
     A copy, made for the shape check alone, so the declaration every other
-    reader sees - the schema, ``required`` - is untouched.
+    reader sees - the schema, ``required`` - is untouched. Only the top
+    level, because a provider fills a whole argument, never a field inside one.
     """
-    # One arc to coverage, so each conjunct is held by its own test:
-    # test_a_partial_spec_dispatched_with_one_field_reaches_the_service_with_that_field_alone
-    # the first, and
-    # test_an_input_data_provider_fills_a_required_validator_field_the_caller_left_out
-    # the second.
-    if not everywhere and not top:
-        return parameters
     return Parameters.of(
-        *(
-            _optional(param)
-            if param.name in everywhere
-            else replace(param, required=False)
-            if param.name in top
-            else param
-            for param in parameters
-        )
+        *(replace(param, required=False) if param.name in filled else param for param in parameters)
     )
 
 
 def _optional(param: Parameter) -> Parameter:
     """``param`` and everything declared below it made optional, as a partial serializer reads it."""
+    return replace(_below(param), required=False)
+
+
+def _below(param: Parameter) -> Parameter:
+    """``param`` with everything declared below it optional: an object's fields, an array's rows."""
     items = param.items
     return replace(
         param,
-        required=False,
         fields=None if param.fields is None else Parameters.of(*map(_optional, param.fields)),
         items=Parameters.of(*map(_optional, items)) if isinstance(items, Parameters) else items,
     )
@@ -401,9 +458,11 @@ def selector_pool(
     it absent.
 
     ``progress`` is passed only for a selector spec's own selector, which is
-    that spec's run (see ``call_pool``), and only that run hears the spec's
-    ``progress_reporter``: a nested selector declaring one is refused when the
-    service spec is built.
+    that spec's run (see ``call_pool``), and is the pool's ``progress``, as
+    it is a service's. The spec's ``progress_reporter`` is not joined here:
+    only the run hears it, joined to its keywords by ``with_run_progress``
+    once they are bound, as a service's run is. A nested selector declaring
+    one is refused when the service spec is built.
     """
     reads = selector_spec.reads.names()
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
@@ -413,10 +472,41 @@ def selector_pool(
             selector_spec.kwargs, pool, label="SelectorSpec.kwargs", reserved=pool_seeds.reserved
         )
     )
-    pool["progress"] = run_progress(
-        selector_spec.progress_reporter, selector_spec.selector, base, transport=progress
-    )
     return pool
+
+
+def with_run_progress(
+    selector_spec: SelectorSpec,
+    kwargs: dict[str, Any],
+    pool: Mapping[str, Any],
+    *,
+    reserved: frozenset[str],
+    transport: ProgressReporter | None,
+) -> dict[str, Any]:
+    """A selector spec's run keywords, with the run's reporter under ``progress`` where it takes one.
+
+    Called once ``kwargs`` are bound, which is the last step before a
+    selector spec's run that can refuse the call: ``call_keywords`` refusing
+    a read the caller left out. So an ``async def`` selector, whose provider
+    is resolved before the run rather than on its first report, never calls
+    it for a call refused there
+    (test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider).
+    And only where the selector takes ``progress``, as ``prepare_service``
+    does for a service, so one that could never report never calls it
+    (test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provider).
+
+    The provider is called from the base pool, as a service spec's is: the
+    entries of ``pool`` under a seeded name, which are exactly
+    ``base_pool``'s, since no read and no provided key may take one
+    (test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool).
+    """
+    if "progress" not in kwargs:
+        return kwargs
+    base = {name: value for name, value in pool.items() if name in reserved}
+    reporter = run_progress(
+        selector_spec.progress_reporter, selector_spec.selector, base, transport=transport
+    )
+    return {**kwargs, "progress": reporter}
 
 
 def provide(
@@ -464,8 +554,9 @@ def run_progress(
     A selector spec's selector is its run, and the checks on what it
     returned - the object-level and scope checks, its ``preconditions`` -
     answer after it, so a selector spec those refuse may already have called
-    the provider, on either path. With neither, ``null_progress``, as
-    ``base_pool`` seeds it.
+    the provider, on either path; everything that can refuse it before the
+    run has answered by then (see ``with_run_progress``). With neither,
+    ``null_progress``, as ``base_pool`` seeds it.
     """
     resolve = resolve_progress if is_async(run) else deferred_progress
     reporter = resolve(provider, base, transport=transport)
@@ -606,7 +697,20 @@ def settle(
 
     ``fillable`` is what the selector was bound with, and ``extend_queryset``
     is bound with the same: see ``call_keywords``.
+
+    **A LIST selector's ``None`` under ``allow_none`` is the empty list**, at
+    once and before any shaping, since there is no set for ``select_related``
+    or an ``annotate`` to apply to. Here rather than in the step that checks
+    the rows, because every selector settles through this: a selector spec's
+    own on either entry point, a collection target, and a LIST re-read.
     """
+    # One arc to coverage, so each conjunct is held by its own test:
+    # test_a_list_selector_s_rows_under_allow_none_are_its_rows (the first),
+    # test_a_retrieve_selector_s_own_none_under_allow_none_stays_none (the
+    # second: a RETRIEVE's ``None`` is a missing row, never an empty list) and
+    # test_a_list_selector_s_none_without_allow_none_is_left_as_it_was (the third).
+    if raw is None and selector_spec.kind is SelectorKind.LIST and selector_spec.allow_none:
+        return []
     if isinstance(raw, BaseManager):
         # ``Note.objects`` is a selector's shortest spelling of every row, and a
         # Manager is neither iterable nor sliceable, so a list declaring no
@@ -673,6 +777,8 @@ def lookup(
     source: str,
     reserved: frozenset[str],
     after_the_run: bool = False,
+    run: bool = False,
+    transport: ProgressReporter | None = None,
 ) -> Any:
     """Call a selector from sync code and settle its return: the rows, the row, or ``None``.
 
@@ -691,10 +797,18 @@ def lookup(
     test_an_output_selector_is_never_refused_after_the_run (the selector) and
     test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run
     (its ``extend_queryset``) fail without it.
+
+    ``run`` says the selector is a selector spec's own, its run, which alone
+    reports to the spec's ``progress_reporter`` beside ``transport``, the
+    caller's reporter (see ``with_run_progress``).
     """
     fn = selector_spec.selector
     fillable: frozenset[str] = frozenset() if after_the_run else selector_spec.reads.names()
     kwargs = call_keywords(fn, pool, fillable=fillable)
+    if run:
+        kwargs = with_run_progress(
+            selector_spec, kwargs, pool, reserved=reserved, transport=transport
+        )
     try:
         raw = run_selector(fn, kwargs)
     except ObjectDoesNotExist as error:
@@ -724,7 +838,18 @@ def conclude_selector(
     Never without a row, missing or
     ``None`` under ``allow_none``
     (test_a_selector_spec_s_preconditions_never_run_without_a_row).
+
+    **A** ``target_checked`` **grant covers nothing here**, as it covers
+    nothing on a service spec's lookup. It says the checks ran on the target
+    its transport found, and a selector spec takes no ``target=`` to hand
+    that target over, so the row or set its selector finds from the
+    arguments may be one the grant never saw; the checks run on what was
+    found, whatever the grant says. The grant still stands for the
+    class-level check it was minted for
+    (test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds,
+    test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads).
     """
+    grant = replace(grant, target_checked=False)
     fillable = spec.reads.names()
     if spec.kind is SelectorKind.LIST:
         authorize_scope(spec, principal, value, grant=grant)
@@ -1102,9 +1227,13 @@ def finish_service(
 ) -> DispatchResult:
     """The output selector, if declared, and the service spec's result.
 
-    The output selector's pool is the base pool plus ``result``, the service's
-    return; the arguments are not in it, because it re-reads what the service
-    produced rather than what the caller asked for.
+    The output selector's pool is the base pool plus the service's return,
+    as both ``result`` and ``instance``: one value under two names, so a
+    re-read written for djangorestframework-services, which binds both, runs
+    unchanged. ``instance`` there is never the resolved target, which the
+    re-read has no use for: it re-reads what the service produced
+    (test_an_output_selector_reads_the_service_s_return_as_instance_not_the_target).
+    The arguments are not in it either, for the same reason.
 
     **A RETRIEVE output selector that finds nothing is ``None``, not
     not-found.** The service has already run, and under ``atomic`` its write
@@ -1132,7 +1261,11 @@ def finish_service(
     # second.
     kind: Literal["instance", "list"] = "list" if spec.many and result is not None else "instance"
     if output_spec is not None:
-        pool = call_pool(prepared.principal, pool_seeds, {"result": result})
+        # The service's return under both names djangorestframework-services
+        # binds it by, so a re-read declares whichever its author wrote:
+        # ``instance`` here is what the service returned, not the target it
+        # resolved, and it is bound whatever the return is, ``None`` included.
+        pool = call_pool(prepared.principal, pool_seeds, {"instance": result, "result": result})
         value = lookup(
             output_spec,
             pool,

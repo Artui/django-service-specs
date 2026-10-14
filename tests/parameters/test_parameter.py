@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import inspect
 from decimal import Decimal
 from typing import Any
 
@@ -12,6 +13,19 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET
 
 ROW = Parameters.of(Parameter("title", "string", required=True))
+
+
+def test_only_the_name_and_the_type_are_positional() -> None:
+    # Every other field is keyword-only, so a field added among them shifts no
+    # call written positionally, and their order is not part of the contract.
+    kinds = {name: param.kind for name, param in inspect.signature(Parameter).parameters.items()}
+    positional = [
+        name for name, kind in kinds.items() if kind is not inspect.Parameter.KEYWORD_ONLY
+    ]
+    assert positional == ["name", "type"]
+    assert Parameter.__match_args__ == ("name", "type")
+    with pytest.raises(TypeError):
+        Parameter("pk", "integer", True)
 
 
 def test_defaults() -> None:
@@ -149,11 +163,10 @@ def test_a_large_int_bound_is_taken_without_reading_it_as_a_float() -> None:
         {"type": "string"},
         {"type": "string", "format": "date"},
         {"type": "boolean"},
-        {"type": "array", "items": "number"},
         {"type": "object"},
         {"type": "file"},
     ],
-    ids=["string", "date", "boolean", "array", "object", "file"],
+    ids=["string", "date", "boolean", "object", "file"],
 )
 def test_a_bound_describes_a_number(kwargs: dict[str, Any]) -> None:
     with pytest.raises(
@@ -167,6 +180,61 @@ def test_a_decimal_string_takes_a_bound() -> None:
     assert (p.minimum, p.maximum) == (-1e50, 1e50)
 
 
+# --- an array's element: its format and its bounds ------------------------------------------
+
+
+def test_a_decimal_array_reads_each_element_as_a_bounded_decimal() -> None:
+    # A django-filter CSV number filter: each element is the decimal its
+    # string spells, bounded as a scalar number filter is.
+    p = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    assert (p.items, p.format, p.minimum, p.maximum) == ("string", "decimal", -1e50, 1e50)
+
+
+@pytest.mark.parametrize("items", ["integer", "number"])
+def test_a_bound_on_an_array_of_numbers_bounds_each_element(items: str) -> None:
+    # Beside a length, which counts the list: the two pairs say different things.
+    p = Parameter("ids", "array", items=items, minimum=1, maximum=10, max_length=3)
+    assert (p.minimum, p.maximum, p.max_length) == (1, 10, 3)
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({}, "a format on an array describes each element, which must be a string"),
+        (
+            {"items": "number"},
+            "a format on an array describes each element, which must be a string",
+        ),
+        ({"items": ROW}, "a format on an array describes each element, which must be a string"),
+        (
+            {"items": "string", "format": "date"},
+            "an array's element takes no format but 'decimal'",
+        ),
+        (
+            {"items": "string", "format": "date-time"},
+            "an array's element takes no format but 'decimal'",
+        ),
+    ],
+    ids=["no-items", "number", "rows", "date", "date-time"],
+)
+def test_an_array_s_format_is_a_decimal_string_element_s_alone(
+    kwargs: dict[str, Any], message: str
+) -> None:
+    with pytest.raises(ImproperlyConfigured, match=message):
+        Parameter("pks", "array", **{"format": "decimal", **kwargs})
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{}, {"items": "string"}, {"items": "boolean"}, {"items": ROW}, {"items": "file"}],
+    ids=["no-items", "string", "boolean", "rows", "file"],
+)
+@pytest.mark.parametrize("side", ["minimum", "maximum"])
+def test_a_bound_on_an_array_describes_a_numeric_element(kwargs: dict[str, Any], side: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="a bound on an array describes each element"):
+        Parameter("pks", "array", **{side: 1, **kwargs})
+
+
 def test_a_minimum_past_the_maximum_is_refused() -> None:
     with pytest.raises(ImproperlyConfigured, match="minimum 2 is past maximum 1"):
         Parameter("n", "integer", minimum=2, maximum=1)
@@ -174,6 +242,41 @@ def test_a_minimum_past_the_maximum_is_refused() -> None:
 
 def test_one_bound_may_equal_the_other() -> None:
     assert Parameter("n", "integer", minimum=1, maximum=1.0).maximum == 1.0
+
+
+# --- array lengths -------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "length",
+    [True, 1.0, "1", -1],
+    ids=["bool", "float", "string", "negative"],
+)
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_must_be_a_non_negative_int(side: str, length: Any) -> None:
+    # A count of elements: ``bool`` is an ``int`` to Python and no count.
+    with pytest.raises(ImproperlyConfigured, match=f"{side} .* is not a non-negative int"):
+        Parameter("ids", "array", **{side: length})
+
+
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_describes_an_array(side: str) -> None:
+    with pytest.raises(ImproperlyConfigured, match="a length describes an array; this parameter"):
+        Parameter("title", "string", **{side: 1})
+
+
+@pytest.mark.parametrize("side", ["min_length", "max_length"])
+def test_a_length_may_stand_alone_and_be_zero(side: str) -> None:
+    # Zero is a count, so a falsy check in place of ``is not None`` would
+    # refuse it as no length or take it as none.
+    param = Parameter("ids", "array", **{side: 0})
+    assert getattr(param, side) == 0
+
+
+def test_one_length_may_equal_the_other_and_not_pass_it() -> None:
+    assert Parameter("ids", "array", min_length=2, max_length=2).max_length == 2
+    with pytest.raises(ImproperlyConfigured, match="min_length 3 is past max_length 2"):
+        Parameter("ids", "array", min_length=3, max_length=2)
 
 
 # --- choice labels ----------------------------------------------------------------------------

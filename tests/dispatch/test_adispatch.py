@@ -261,7 +261,7 @@ async def test_its_output_selector_takes_a_second_hop(ada: Any, hops: list[str])
 
     assert result.value.title == "made"
     assert result.value == result.service_result
-    assert set(reread.calls[0]) == {"user", "progress", "result"}
+    assert set(reread.calls[0]) == {"user", "progress", "instance", "result"}
     assert len(hops) == 2
 
 
@@ -339,6 +339,54 @@ async def test_an_async_retrieve_raising_does_not_exist_is_decided_without_a_sec
     assert result == expected
     assert check.rows == []
     assert len(hops) == 1
+
+
+async def test_an_async_list_s_none_under_allow_none_is_the_empty_list(ada: Any) -> None:
+    async def nothing(*, user: Any) -> None:
+        return None
+
+    check = Scoped()
+    spec = SelectorSpec(kind=LIST, selector=nothing, permissions=[check], allow_none=True)
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="list", value=[])
+    assert check.scopes == [[]]
+
+
+async def test_an_async_list_s_none_under_allow_none_is_refused_as_an_empty_set(ada: Any) -> None:
+    async def nothing(*, user: Any) -> None:
+        return None
+
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=nothing, permissions=[check], allow_none=True)
+
+    with pytest.raises(NotPermitted) as caught:
+        await adispatch(spec, principal=ada, arguments={})
+
+    assert caught.value.message == "Not within your scope."
+    assert check.scopes == [[]]
+
+
+async def test_an_async_service_s_output_selector_reads_its_return_as_instance(ada: Any) -> None:
+    written = await sync_to_async(Note.objects.create)(owner=ada, title="written")
+
+    async def write(*, user: Any) -> Note:
+        return written
+
+    def reread(*, instance: Any) -> Any:
+        return Note.objects.filter(pk=instance.pk)
+
+    spec = ServiceSpec(
+        service=write,
+        permissions=OPEN,
+        atomic=False,
+        output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=reread),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert (result.kind, result.value) == ("instance", written)
 
 
 async def test_an_async_list_raising_does_not_exist_passes_through(ada: Any) -> None:
@@ -770,6 +818,38 @@ async def test_a_precondition_answering_with_a_coroutine_refuses_the_call(ada: A
     assert ran == []
 
 
+async def test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds(
+    ada: Any, bob: Any
+) -> None:
+    theirs = await _create(owner=bob, title="theirs")
+    check = OwnerOnly()
+    spec = SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK, permissions=[check])
+
+    with pytest.raises(NotPermitted):
+        await adispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": theirs.pk},
+            grant=Grant(spec, ada, target_checked=True),
+        )
+
+    assert check.rows == [theirs]
+
+
+async def test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads(
+    ada: Any,
+) -> None:
+    check = Scoped(refuse_scope=True)
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[check])
+
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        await adispatch(
+            spec, principal=ada, arguments={}, grant=Grant(spec, ada, target_checked=True)
+        )
+
+    assert len(check.scopes) == 1
+
+
 async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the_await(
     ada: Any,
 ) -> None:
@@ -784,6 +864,41 @@ async def test_an_async_selector_spec_s_progress_provider_is_resolved_before_the
     )
     await adispatch(spec, principal=ada, arguments={})
     assert (sink.counted, sink.reports) == ([0], [1.0])
+
+
+async def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def by_title(*, user: Any, title: str, progress: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=by_title,
+        reads=Parameters.of(Parameter("title", "string")),
+        permissions=OPEN,
+        progress_reporter=sink,
+    )
+    with pytest.raises(InvalidArguments):
+        await adispatch(spec, principal=ada, arguments={})
+    assert sink.counted == []
+
+
+async def test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provider(
+    ada: Any,
+) -> None:
+    sink = _QueryingSink()
+
+    async def silent(*, user: Any) -> Any:
+        return notes_of(user=user)
+
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=silent, permissions=OPEN, progress_reporter=sink
+    )
+    await adispatch(spec, principal=ada, arguments={})
+    assert sink.counted == []
 
 
 async def test_an_async_selector_spec_s_preconditions_see_its_row(ada: Any) -> None:

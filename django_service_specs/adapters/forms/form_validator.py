@@ -14,11 +14,13 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
 from django.utils.datastructures import MultiValueDict
 
-from django_service_specs.adapters.utils import scalar_type
+from django_service_specs.adapters.utils import element_format, scalar_type
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
+from django_service_specs.relations.utils import clean_held_to_their_columns
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -100,8 +102,22 @@ class FormValidator(Validator):
 
     - ``BooleanField`` and ``NullBooleanField``: a ``boolean``.
     - ``DecimalField``: a ``string`` in the ``decimal`` format, which takes a
-      JSON number as well. ``FloatField``: a ``number``. ``IntegerField``: an
-      ``integer``.
+      JSON number as well, and an integer whatever its digits. ``FloatField``:
+      a ``number``, and an integer past a float's range is refused as the
+      field refuses an infinity, ``invalid`` in its own words.
+      ``IntegerField``: an ``integer``. On a ``ModelForm``, a value the form
+      cleans to an integer past the range of the model's integer column is
+      refused in the words and with the code of the validator Django's model
+      field carries from 5.0, ``max_value`` or ``min_value``, before a
+      uniqueness check or a constraint queries with it: Django 4.2 states no
+      range for SQLite, whose driver raises ``OverflowError`` for one. It is
+      judged where Django 5.0 and later judge it, after the field, its
+      ``clean_<field>()`` and the form's ``clean()``, so each of those answers
+      first, and a value a ``clean_<field>()`` brings inside the range is
+      taken. Only a column Django validates is judged: a value ``clean()``
+      sets for a column the form has no field for, and a field declared over
+      a column ``Meta.fields`` leaves out or ``Meta.exclude`` names, are the
+      form's, as Django never writes them onto the row.
     - ``DateTimeField`` and ``DateField``: a ``string`` in the ``date-time`` or
       ``date`` format. ``TimeField`` and ``DurationField``: a ``string``.
     - ``ChoiceField``: choices, with the empty choice dropped and option
@@ -117,7 +133,22 @@ class FormValidator(Validator):
     - ``ModelChoiceField``: the JSON type of the model field it matches rows
       on - its ``to_field_name``, or the primary key - and no choices, since
       they are rows and reading them would query. ``ModelMultipleChoiceField``:
-      an array of that. They validate to the row, and to a queryset of rows.
+      an array of that, so one matching rows on a ``DecimalField`` takes an
+      array of ``decimal`` strings, and a query string's
+      ``?rows=12.50,9.99`` is two of them. Django matches each against the
+      column's own spelling, so ``"12.50"`` names a row a two-place column
+      holds and ``12.5`` names none. A date or a
+      date-time key is an array of strings, since an element takes no other
+      format. They validate to the row, and to a queryset of rows. A key
+      past the range of the integer column rows are matched on names no row,
+      and is refused as the field refuses a key no row holds,
+      ``invalid_choice`` in its own words, before the form queries: Django
+      hands a ``ModelMultipleChoiceField``'s keys to the database driver,
+      which raises ``OverflowError`` for one, and so does a
+      ``ModelChoiceField``'s on Django 4.2.
+    - No choice field declares a length, since Django's have none, so the
+      shape check in front of this Validator holds a list to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
     - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
       ``string``.
     - ``FileField`` and ``ImageField``: a ``file``, which no JSON caller can
@@ -325,8 +356,11 @@ class FormValidator(Validator):
             }
             for name in form.fields.keys() - sent:
                 del form.fields[name]
+        # A number no integer column holds is refused in the words of the
+        # check that would have handed it to the driver, beside the rest.
+        clean_held_to_their_columns(form)
         if not form.is_valid():
-            raise InvalidArguments(_detail(form.errors))
+            raise InvalidArguments(_detail(form.errors.as_data()))
         # One branch to coverage, so each condition is held by its own test:
         # test_a_whole_model_form_call_checks_uniqueness_once (the partial
         # call: a whole one has already checked every pair, and would query
@@ -391,11 +425,15 @@ def _checked(arguments: Mapping[str, Any], clear: str) -> bool:
     return bool(forms.CheckboxInput().value_from_datadict(arguments, MultiValueDict(), clear))
 
 
-def _detail(errors: Mapping[str, Any]) -> dict[str, list[Any]]:
-    """Django's errors as a refusal's detail, the form-wide ones under ``non_field_errors``."""
+def _detail(errors: Mapping[str, list[ValidationError]]) -> dict[str, list[CodedMessage]]:
+    """Django's errors as a refusal's detail, the form-wide ones under ``non_field_errors``.
+
+    Each message keeps Django's own code (see ``coded_messages``), which the
+    strings ``form.errors`` reads them as would drop.
+    """
     return {
-        NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: list(messages)
-        for key, messages in errors.items()
+        NON_FIELD_ERRORS if key == FORM_NON_FIELD_ERRORS else key: coded_messages(found)
+        for key, found in errors.items()
     }
 
 
@@ -414,13 +452,15 @@ def _check_unique_as_whole(instance: models.Model, names: frozenset[str]) -> Non
     all sent is checked again, and passes again.
     """
     exclude = {field.name for field in instance._meta.fields if field.name not in names}
-    errors: dict[str, list[Any]] = {}
+    errors: dict[str, list[ValidationError]] = {}
     for check in (instance.validate_unique, instance.validate_constraints):
         try:
             check(exclude=exclude)
         except ValidationError as error:
-            for key, messages in error.message_dict.items():
-                errors.setdefault(key, []).extend(messages)
+            # Both raise a dict-built error, read by field so each message
+            # keeps its code, as ``message_dict`` would not.
+            for key, found in error.error_dict.items():
+                errors.setdefault(key, []).extend(found)
     if errors:
         raise InvalidArguments(_detail(errors))
 
@@ -437,12 +477,28 @@ def _as_bound(field: forms.Field, value: Any) -> Any:
     is, localized or not, and it spells every value the shape check accepts
     exactly.
 
+    An ``int`` for a ``FloatField`` or a ``DecimalField`` is bound as the
+    ``Decimal`` it is, too. Each reads a value through a conversion an int
+    can break that a ``Decimal`` cannot: ``float`` raises ``OverflowError`` for
+    an int past a float's range, where a ``Decimal`` past it reads as an
+    infinity, which the field refuses as no number; and ``str`` refuses an
+    int past 4300 digits from Python 3.10.7 on, where a ``Decimal``'s has no
+    limit. One branch to coverage, so each field is held by its own test:
+    test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number (the
+    ``FloatField``) and
+    test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits (the
+    ``DecimalField``); ``type`` rather than ``isinstance`` is held by
+    test_true_is_still_no_decimal_to_the_field, since a ``bool`` is an int
+    and ``Decimal(True)`` a number.
+
     One branch to coverage, so each condition is held by its own test:
     test_a_field_that_is_not_a_number_is_bound_as_it_came (the field) and
     test_a_json_number_for_a_decimal_is_bound_as_it_came (the string, since a
     float made a ``Decimal`` carries its binary expansion into the field's
     decimal-places check).
     """
+    if isinstance(field, forms.FloatField | forms.DecimalField) and type(value) is int:
+        return Decimal(value)
     if not (isinstance(field, forms.IntegerField) and isinstance(value, str)):
         return value
     try:
@@ -487,12 +543,14 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
         return Parameter(name, "boolean", nullable=True)
     json_type, fmt, choices, labels = _shape(field, where=where)
     if isinstance(field, forms.MultipleChoiceField | forms.ModelMultipleChoiceField):
-        # ``items`` holds a JSON type and no format, as for any flat list, and
-        # an array's choices constrain each of its elements.
+        # ``items`` holds the element's JSON type, and an array's format and
+        # choices describe each of its elements: a list of rows keyed on a
+        # decimal column is a list of decimals, as one such key is a decimal.
         return Parameter(
             name,
             "array",
             items=json_type,
+            format=element_format(fmt),
             choices=choices,
             choice_labels=labels,
             required=field.required,
@@ -586,12 +644,8 @@ def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | 
             f"{where}: a {type(field).__name__} with no queryset has no model to read "
             "its key from; declare the queryset on the field."
         )
+    key = _key_field(queryset, field.to_field_name)
     opts = queryset.model._meta
-    key: Any = opts.get_field(field.to_field_name) if field.to_field_name else opts.pk
-    while isinstance(key, models.ForeignKey):
-        # A multi-table child's primary key is the link to its parent, and a
-        # caller sends what that link holds.
-        key = key.target_field
     for cls, json_type, fmt in _KEYS:
         if isinstance(key, cls):
             return json_type, fmt
@@ -599,3 +653,14 @@ def _key_type(field: forms.ModelChoiceField, *, where: str) -> tuple[str, str | 
         f"{where}: matches rows on {opts.label}.{key.name}, a {type(key).__name__}, "
         "which has no JSON type this adapter can declare."
     )
+
+
+def _key_field(queryset: models.QuerySet[Any], to_field_name: str | None) -> Any:
+    """The model field a choice field matches rows on: its ``to_field_name``, or the key."""
+    opts = queryset.model._meta
+    key: Any = opts.get_field(to_field_name) if to_field_name else opts.pk
+    while isinstance(key, models.ForeignKey):
+        # A multi-table child's primary key is the link to its parent, and a
+        # caller sends what that link holds.
+        key = key.target_field
+    return key

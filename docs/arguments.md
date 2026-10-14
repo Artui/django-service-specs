@@ -40,14 +40,31 @@ number is refused as the type it is not, and `true` is still neither. The
 number goes on rather than the string because a Validator stricter than those
 two, the dataclass adapter's, refuses `"3"` for an `int`.
 
-**Only an ASCII string spells an `integer` or a `number`**, and this is the one
-place the check is stricter than Django's forms. Python's `int` and `float`,
+**A `number`'s string is read as a JSON decoder reads its literal**: digits
+alone are the exact integer they spell, and a point or an exponent makes a
+float. So `"9007199254740993"` goes on as that integer, as the JSON literal
+does, where a float would round it to its neighbour, and `"3"` goes on as the
+3 a JSON body's `3` is. Digits alone that Python's `int` refuses, past the
+4300 it reads from Python 3.10.7 on, spell no number either, even where zeros
+in front leave a float able to read them. A fraction finer than a float holds is rounded, as the
+JSON literal is; a value that must be exact is declared a `decimal`, and so is
+each element of an array that must be: `items="string"` with
+`format="decimal"`, as a django-filter CSV number filter declares, keeps every
+digit of each element and still splits `?pks=1,2`.
+
+**Only an ASCII string spells an `integer` or a `number`**, and this is one of
+three places the check is stricter than the libraries behind it, the others
+being a declared `minimum` or `maximum` and
+[the length of a list](#how-long-a-list-may-be). Python's `int` and `float`,
 and so Django's number fields, read Arabic-Indic and fullwidth digits and
 strip any Unicode space; no JSON number is spelled so, and pydantic refuses
 them. `"\u0665"`, the JSON spelling of an Arabic-Indic five, is refused as the
 type it is not, by the check and by `coerce_flat` alike. A `decimal` string is
-not read this way: it is checked as Python's `Decimal` reads it, which takes
-those digits too.
+not read this way, and on purpose: it is checked as Python's `Decimal` reads
+it, which takes those digits too, because every decimal field behind the check
+reads it so - Django's `DecimalField`, DRF's and pydantic's `Decimal` each hand
+the string to `Decimal` - and the string is handed on unchanged. `"\u0665"`
+sent for a decimal is 5 to all of them, as `"5"` is.
 
 A **`file`** is a Django `File`, an upload included, and nothing else is one:
 no JSON value can be, so a JSON caller's string for one is refused at its
@@ -70,6 +87,46 @@ refused with `"Enter a number."`; any other type refuses one as the wrong type.
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.
+
+### How long a list may be
+
+**An array's length is read before any of its elements**, so a list longer
+than it takes is refused whole, at its name, and costs no per-element work.
+A parameter's `min_length` and `max_length` bound it inclusively. One that
+declares no `max_length` is still bounded, by the
+**`SERVICE_SPECS_MAX_ARRAY_LENGTH`** setting: 1000 unless the project sets
+another count, the line Django's `DATA_UPLOAD_MAX_NUMBER_FIELDS` draws for a
+form body, or `None`, which bounds no array. A declared `max_length` outranks
+the setting either way, wider or narrower. The setting is read at the call,
+so `override_settings` reaches a spec built at import, and so checking an
+array with no `max_length`, by the shape check or `coerce_flat`, needs
+Django's settings configured.
+
+```python
+--8<--
+docs/examples/arguments.py:length
+--8<--
+```
+
+Like the ASCII rule and a declared `minimum` or `maximum`, this is a place
+the check can be stricter than the library behind it, on purpose: a list is a
+cost its caller controls the size of. Each row of
+a [`many`](declaring.md#many-rows-in-one-call) call is a Validator run inside
+one transaction, and each value of a django-filter `in` lookup is one query
+variable, past whose limit the database refuses the query and the caller
+gets a 500 rather than a refusal. The default reaches every array the
+declaration reaches - a row's own array included, a CSV filter's, a `many`
+call's list of rows - and a project whose Validator takes longer lists
+raises the setting or declares the `max_length`. A `min_length` past the
+setting on a parameter with no `max_length` of its own is a declaration no
+call could meet, refused as `ImproperlyConfigured` at the call and when its
+schema is built, since the setting cannot be read where the parameter is
+written.
+
+The messages are DRF's, `"Ensure this field has no more than {max_length}
+elements."` and `"Ensure this field has at least {min_length} elements."`: no
+Django catalog entry counts a list's elements, and DRF's catalog translates
+these wherever DRF is installed.
 
 Under `partial=True` no absent parameter is refused, at any depth: a partial
 update sends only what changes. A value that is present is checked as it would
@@ -147,10 +204,91 @@ Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The
 messages are spelled as Django's own form fields spell them wherever one has
 the message, so Django's catalogue translates them and a project adds nothing.
+Each also carries a code, which the next section reads.
 
 [`DataclassValidator`][django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator]
 answers in the same tree, and so does a relation write that refuses a row, so
 a transport reads one shape whichever of them refused.
+
+## The codes a refusal carries
+
+A message is for a person, and is translated. A program reading the tree needs
+something that is not, so every refusal the kernel and its shipped adapters
+make is a
+[`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]: a
+`str` carrying a `code`. The code is the one a DRF field gives the same mistake,
+so an adapter building DRF's `ErrorDetail` from the tree maps each one across
+unchanged, and a client of both reads one `get_codes()`.
+
+```python
+--8<--
+docs/examples/arguments.py:codes
+--8<--
+```
+
+| Refusal | Code | Raised by |
+| --- | --- | --- |
+| A required argument is absent | `required` | the shape check |
+| A null where none is allowed | `null` | the shape check |
+| A key nobody declared, under `REJECT` | `unknown` | the shape check |
+| A value of the wrong type, a malformed date or date-time, a decimal or number that is not finite, a row that is not an object | `invalid` | the shape check |
+| A value that is not an array where one is declared | `not_a_list` | the shape check |
+| A number past its `maximum`, or short of its `minimum`, an array's element at its index | `max_value`, `min_value` | the shape check |
+| A value outside its `choices` | `invalid_choice` | the shape check |
+| An array longer than it takes, or shorter | `max_length`, `min_length` | the shape check, `coerce_flat` |
+| A flat string that spells no integer, number or boolean, or one sent for a parameter with nested parameters | `invalid` | `coerce_flat` |
+| A request body that is not JSON | `parse_error` | `request_arguments` |
+| A request body that is not a JSON object | `invalid` | `request_arguments` |
+| A read a selector, its `extend_queryset` or a precondition asks for that nothing filled | `required` | dispatch, as the shape check would |
+| A value a FilterSet refuses | its form field's own code, `invalid` where it has none | the FilterSet, through dispatch |
+| A number past a signed 64-bit integer sent to a filter on an integer column, a range filter's bound at its own argument and a CSV filter's element at its index | `max_value`, `min_value` | dispatch, applying the FilterSet |
+| A model choice filter's key past the range of the column its rows are matched on | `invalid_choice` | dispatch, applying the FilterSet |
+| A `null` row in a relation's list | `null` | a [relation write](relations.md) |
+| A row's data Django fails to write | the `ValidationError`'s own code, `invalid` where it has none and for a `TypeError` or `ValueError` | a [relation write](relations.md) |
+
+The shipped Validators code theirs the same way:
+
+| Validator | Its refusals |
+| --- | --- |
+| `DataclassValidator` | `required`, `null`, `unknown`, `invalid_choice`, and `invalid` for a wrong type, a decimal or date that does not parse, and a `ValueError` from `__post_init__`; a Django `ValidationError` from `__post_init__` keeps its own code, `invalid` where it has none |
+| `FormValidator` | Django's own code on each message, the field's and the form's: `required`, `max_length`, `invalid_choice`, `unique_together` and the rest; `invalid` for a message raised with none |
+| `PydanticValidator` | pydantic's error type mapped to DRF's code: `missing` is `required`, a `None` a type refuses `null`, a length `max_length` or `min_length`, a bound (an exclusive one too) `max_value` or `min_value`, a `Literal` or `Enum` `invalid_choice`, a list's type `not_a_list`, a decimal's digits `max_digits`, `max_decimal_places` or `max_whole_digits`, a forbidden extra key `unknown`; any other of pydantic's own types, and a `ValueError` in a validator, `invalid`; a `PydanticCustomError` keeps its type as its code |
+
+**Django's codes are Django's**, and not always DRF's: a pair a model holds
+unique together says `unique_together` from a form, where DRF's serializer
+validator says `unique`. They come through as Django raised them rather than
+translated to a guess.
+
+Two have no DRF field to follow. DRF ignores a key a serializer does not
+declare, so it has no code for refusing one, and `unknown` names the
+[policy](#the-closed-argument-set) that refused it. And a body DRF cannot parse
+is its `ParseError`, which is not a validation error there and is here, so
+`parse_error` is that exception's own code. A free-form `object` is `invalid`,
+as a nested serializer's refusal is, where DRF's `DictField` would say
+`not_a_dict`. An empty `many` list refused by `many_min_length=1` is
+`min_length`, as its message says, where a `ListSerializer` with
+`allow_empty=False` says `empty`.
+
+**A `CodedMessage` is its message to everything else.** It equals and hashes as
+its `str`, and `json.dumps` writes the plain message, so the codes never reach a
+body a transport writes and a test comparing a tree with plain strings is
+unchanged by them. A copy and a pickle keep the code.
+
+**A Validator's messages reach the tree as it raised them**, on one call and
+row by row on a `many` call. Dispatch does not rewrap them: a library's own
+coded message, DRF's `ErrorDetail` among them, keeps its code, and a plain
+`str` stays one, with no code. So does a project's own Validator raising
+plain strings, so read a code with
+`getattr(message, "code", ...)` and choose the default, as the example's
+`"invalid"` is DRF's own for a message raised with none.
+
+**One check answers a field.** The shape check runs before the Validator, so a
+call it refuses is never validated, and only its codes come back: a title that
+is blank and sent beside an unknown key reads `unknown` alone, not `blank`
+too. A [`many`](declaring.md#many-rows-in-one-call) call reads the same way
+row by row: a row the shape check refuses is never handed to the Validator,
+while every row it lets through is, so the two checks' refusals of different
+rows come back in one tree.
 
 ## Flat transports
 
@@ -168,20 +306,30 @@ docs/examples/arguments.py:flat
 
 - An `integer` or a `number` is parsed. An integer is read as Django's
   `IntegerField` reads one: `"5.0"` and `"5."` are 5, and `"5.5"` is refused
-  with `"Enter a whole number."`. Each integer element of an array, a
-  repeated query-string key's included, is read the same way.
+  with `"Enter a whole number."`. A number is read as a JSON decoder reads
+  the same literal: `"3"` is the integer 3, exactly, and `"2.5"` and `"1e3"`
+  are floats, so `?pks=9007199254740993` is that key and not its neighbour.
+  Each element of an array, a repeated query-string key's included, is read
+  the same way.
 - A `boolean` is parsed from exactly four spellings - `true`, `false`, `1`, `0`,
   in any case - and anything else is refused with
   `"Enter true, false, 1 or 0."`. Libraries disagree about every other
   spelling (a Django `BooleanField` reads `"no"` as true), so refusing is the
   one answer that cannot set a flag the caller meant to clear.
 - A decimal, a date-time and a date **stay strings**, for the Validator to
-  decode, exactly as they would arrive off a JSON wire.
+  decode, exactly as they would arrive off a JSON wire. So does each element
+  of an array of decimal strings, which the shape check then reads and
+  bounds as a decimal, at its index.
 - **An `any` stays the string it arrived as**: it declares no type to read the
   string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value
   becomes a one-element list, since a flat transport sends a one-element list
-  as a bare value.
+  as a bare value. **An array longer than it takes is refused whole**, before
+  any element is parsed, by [the same length rule](#how-long-a-list-may-be) as
+  the shape check's. A query string's `?ids=1,2,3` is split into no more
+  than one element past the most the array takes, so a value of a million
+  commas is refused without becoming a million elements first: Django's
+  `DATA_UPLOAD_MAX_NUMBER_FIELDS` counts keys, and a comma list is one.
 - **A parameter with nested Parameters is refused by name** - an object, or an
   array of rows, has no flat spelling - with `"This argument has nested
   parameters, which a flat transport cannot send."`, rather than passing the

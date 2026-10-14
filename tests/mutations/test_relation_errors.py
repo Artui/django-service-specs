@@ -23,6 +23,7 @@ from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.update_from_input import update_from_input
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -30,6 +31,7 @@ from django_service_specs.relations.generic_relation_spec import GenericRelation
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from tests.parameters.utils import coded
 from tests.relations_app.models import (
     Attachment,
     Author,
@@ -363,6 +365,164 @@ class TestAnUnmatchedReferenceSaysWhichRow:
         assert message.startswith("No Tag with pk=4242 is available to write")
 
 
+_PAST = pytest.mark.parametrize(
+    "key", [2**63, -(2**63) - 1, str(2**63)], ids=["above", "below", "digits"]
+)
+"""Keys past a 64-bit column at either end, and one spelled as the digits the
+lookup reads as that integer."""
+
+
+def _missed(detail: Any, relation: str, model: str, key: Any, index: int | None = None) -> bool:
+    row = detail[relation] if index is None else detail[relation][index]
+    [message] = row["non_field_errors"]
+    return message.startswith(f"No {model} with {key} is available to write")
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.usefixtures("unstated_ranges")
+class TestAKeyPastItsColumnNamesNoRow:
+    """A scoped kind's key past its integer column's range is a key no row holds.
+
+    Django answers an exact lookup past the range with no rows where the
+    backend states it, from 5.0; where it states none, as Django 4.2's SQLite
+    backend does, the lookup handed the key to the driver, which raised
+    ``OverflowError``. Refused as any key matching nothing in scope is.
+    """
+
+    @_PAST
+    def test_a_forward_key(self, key: Any) -> None:
+        with pytest.raises(ServiceValidationError) as excinfo:
+            create_from_input(
+                Post,
+                {"title": "t", "author": {"pk": key}},
+                relations={"author": ForwardRelationSpec(model=Author, scope=Author.objects.all())},
+            )
+        assert _missed(excinfo.value.detail, "author", "Author", f"pk={key!r}")
+
+    @_PAST
+    def test_a_many_to_many_key(self, key: Any) -> None:
+        section = Section.objects.create(catalog=Catalog.objects.create(name="c"), title="s")
+        with pytest.raises(ServiceValidationError) as excinfo:
+            update_from_input(
+                section,
+                {"tags": [{"name": "new"}, {"pk": key}]},
+                relations={"tags": ManyToManySpec(model=Tag, scope=Tag.objects.all())},
+            )
+        assert _missed(excinfo.value.detail, "tags", "Tag", f"pk={key!r}", index=1)
+
+    @_PAST
+    async def test_an_async_forward_key(self, key: Any) -> None:
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await acreate_from_input(
+                Post,
+                {"title": "t", "author": {"pk": key}},
+                relations={"author": ForwardRelationSpec(model=Author, scope=Author.objects.all())},
+            )
+        assert _missed(excinfo.value.detail, "author", "Author", f"pk={key!r}")
+
+    @_PAST
+    async def test_an_async_many_to_many_key(self, key: Any) -> None:
+        catalog = await Catalog.objects.acreate(name="c")
+        section = await Section.objects.acreate(catalog=catalog, title="s")
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await aupdate_from_input(
+                section,
+                {"tags": [{"name": "new"}, {"pk": key}]},
+                relations={"tags": ManyToManySpec(model=Tag, scope=Tag.objects.all())},
+            )
+        assert _missed(excinfo.value.detail, "tags", "Tag", f"pk={key!r}", index=1)
+
+    @pytest.mark.parametrize("match_key", ["catalog", "catalog_id"])
+    def test_a_key_on_a_foreign_key_is_held_to_the_column_it_points_at(
+        self, match_key: str
+    ) -> None:
+        # The foreign key's column holds the other row's key, so its range is
+        # that key's, by the field's name or by its column's.
+        catalog = Catalog.objects.create(name="c")
+        with pytest.raises(ServiceValidationError) as excinfo:
+            create_from_input(
+                Item,
+                {"label": "i", "section": {match_key: 2**63}},
+                relations={
+                    "section": ForwardRelationSpec(
+                        model=Section, match_key=match_key, scope=Section.objects.all()
+                    )
+                },
+            )
+        assert _missed(excinfo.value.detail, "section", "Section", f"{match_key}={2**63!r}")
+        assert catalog.sections.count() == 0
+
+    @pytest.mark.parametrize("key", [2**63, -(2**63) - 1], ids=["above", "below"])
+    def test_a_path_is_held_to_the_column_it_ends_on(self, key: int) -> None:
+        # ``catalog__pk`` ends on the catalog's key, a column like any other.
+        Catalog.objects.create(name="c")
+        with pytest.raises(ServiceValidationError) as excinfo:
+            create_from_input(
+                Item,
+                {"label": "i", "section": {"catalog__pk": key}},
+                relations={
+                    "section": ForwardRelationSpec(
+                        model=Section, match_key="catalog__pk", scope=Section.objects.all()
+                    )
+                },
+            )
+        assert _missed(excinfo.value.detail, "section", "Section", f"catalog__pk={key!r}")
+
+    def test_a_row_sent_for_a_foreign_key_is_matched_as_its_key(self) -> None:
+        # The lookup reads a row as its key; the range has no number to read.
+        catalog = Catalog.objects.create(name="c")
+        section = Section.objects.create(catalog=catalog, title="s")
+        item = create_from_input(
+            Item,
+            {"label": "i", "section": {"catalog": catalog}},
+            relations={
+                "section": ForwardRelationSpec(
+                    model=Section, match_key="catalog", scope=Section.objects.all()
+                )
+            },
+        )
+        assert item.instance.section == section
+
+    def test_a_key_that_spells_no_number_raises_as_the_lookup_did(self) -> None:
+        # Django's own refusal, in its words, as the lookup raised it.
+        with pytest.raises(ValueError, match="expected a number but got 'abc'"):
+            create_from_input(
+                Post,
+                {"title": "t", "author": {"pk": "abc"}},
+                relations={"author": ForwardRelationSpec(model=Author, scope=Author.objects.all())},
+            )
+
+    def test_an_integer_on_a_text_column_is_matched_as_its_digits(self) -> None:
+        # A text column holds any integer's digits, so it has no range.
+        mine = Author.objects.create(name=str(2**63))
+        post = create_from_input(
+            Post,
+            {"title": "t", "author": {"name": 2**63}},
+            relations={
+                "author": ForwardRelationSpec(
+                    model=Author, match_key="name", scope=Author.objects.all()
+                )
+            },
+        )
+        assert post.instance.author == mine
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unstated_ranges")
+class TestAKeyAtItsColumnsEndsNamesItsRow:
+    # Not in a transactional test: SQLite's key sequence would keep the
+    # largest key past the flush, and no later row could be given one.
+    def test_the_keys_at_either_end_of_the_column_s_range_are_matched(self) -> None:
+        ends = [Author.objects.create(pk=pk, name="end") for pk in (-(2**63), 2**63 - 1)]
+        for end in ends:
+            post = create_from_input(
+                Post,
+                {"title": "t", "author": {"pk": end.pk}},
+                relations={"author": ForwardRelationSpec(model=Author, scope=Author.objects.all())},
+            )
+            assert post.instance.author == end
+
+
 @pytest.mark.django_db
 class TestWhatTheServiceSaidSurvives:
     def test_a_string_detail_is_the_rows_own_message(self) -> None:
@@ -539,6 +699,117 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
             )
 
         assert excinfo.value.detail == {"sections": {0: {"title": ["Not this one."]}}}
+
+    def test_a_validation_error_keeps_each_message_s_own_code(self) -> None:
+        # Django's code, which is DRF's for the same mistake; a message
+        # raised with none is ``invalid``, as DRF's ValidationError's is.
+        refusal = ValidationError(
+            {
+                "title": [
+                    ValidationError("Too long.", code="max_length"),
+                    ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
+                    "No code.",
+                ]
+            }
+        )
+
+        with (
+            patch.object(Section, "save", side_effect=refusal),
+            pytest.raises(InvalidArguments) as excinfo,
+        ):
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        assert coded(excinfo.value.detail) == {
+            "sections": {
+                0: {
+                    "title": [
+                        ("Too long.", "max_length"),
+                        ("Not this.", "blocked"),
+                        ("No code.", "invalid"),
+                    ]
+                }
+            }
+        }
+
+    def test_a_validation_error_with_no_field_keeps_each_message_s_own_code(self) -> None:
+        # Built from a list, as ``Model.clean()`` raises one: the row's own
+        # complaint, each message rendered with its params and its code kept.
+        refusal = ValidationError(
+            [
+                ValidationError("Too long.", code="max_length"),
+                ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
+                "No code.",
+            ]
+        )
+
+        with (
+            patch.object(Section, "save", side_effect=refusal),
+            pytest.raises(InvalidArguments) as excinfo,
+        ):
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        assert coded(excinfo.value.detail) == {
+            "sections": {
+                0: {
+                    "non_field_errors": [
+                        ("Too long.", "max_length"),
+                        ("Not this.", "blocked"),
+                        ("No code.", "invalid"),
+                    ]
+                }
+            }
+        }
+
+    def test_a_coerced_value_s_refusal_keeps_django_s_code(self) -> None:
+        # A ``ValidationError`` with no field, from the field's ``to_python``.
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Author,
+                {"name": "a", "posts": [{"title": "t", "published": "maybe"}]},
+                relations={"posts": ChildSpec(model=Post, fk="author")},
+            )
+
+        [(_, code)] = coded(excinfo.value.detail)["posts"][0]["non_field_errors"]
+        assert code == "invalid"
+
+    def test_a_key_the_model_has_no_field_for_is_invalid(self) -> None:
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t", "bogus": 1}]},
+                relations={"sections": ChildSpec(model=Section, fk="catalog")},
+            )
+
+        [(_, code)] = coded(excinfo.value.detail)["sections"][0]["non_field_errors"]
+        assert code == "invalid"
+
+    def test_a_row_service_s_coded_refusal_keeps_its_codes_under_the_relation(self) -> None:
+        # Re-rooted under the relation and row, with its messages as they were.
+        refused = InvalidArguments({"title": [CodedMessage("Taken.", "unique")]})
+
+        def section_service(**pool: Any) -> Any:
+            raise refused
+
+        with pytest.raises(InvalidArguments) as excinfo:
+            create_from_input(
+                Catalog,
+                {"name": "c", "sections": [{"title": "t"}]},
+                relations={
+                    "sections": ChildSpec(
+                        model=Section, fk="catalog", create_service=section_service
+                    )
+                },
+            )
+
+        assert coded(excinfo.value.detail) == {"sections": {0: {"title": [("Taken.", "unique")]}}}
 
     def test_an_integrity_error_is_left_alone(self) -> None:
         # A constraint is a conflict with rows that exist rather than a shape,

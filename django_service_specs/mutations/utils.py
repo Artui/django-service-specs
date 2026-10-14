@@ -12,15 +12,18 @@ from typing import Any, cast
 from asgiref.sync import sync_to_async
 from django.apps import apps
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist, ValidationError
+from django.core.files.base import File
 from django.db.models import FileField, ImageField, Model
+from django.db.models.fields.files import FieldFile
 from django.utils.translation import gettext
 
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -30,7 +33,7 @@ from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
-from django_service_specs.relations.utils import pk_input_targets
+from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
@@ -114,12 +117,27 @@ def diff_attrs(
     """Return the subset of ``new_values`` whose value differs from current.
 
     A file field's value has been through ``form_values`` by now, so it is a
-    file or ``""``, which compares with the file a row holds by name.
+    file or ``""``. A file that is not one a row holds - an upload, a
+    ``ContentFile`` - is content to write, and so always a change, as a
+    ``ModelForm`` always writes one: compared by name, a re-upload of the
+    file a row holds under its own name, at the storage root, was taken for
+    no change and never written. A file a row holds, ``""`` and a stored
+    name compare by name, so the held file handed back as itself is no
+    change. One branch to coverage, so each condition is held by its own
+    test: test_no_changes_returns_empty_result (a ``File``: without it every
+    value that is not a held file is a change) and
+    test_the_held_file_handed_back_is_no_change (not a ``FieldFile``: a
+    ModelForm's file field cleans to the held file when nothing is uploaded,
+    which test_anything_else_keeps_it reaches through dispatch).
+    test_an_upload_named_as_the_held_file_replaces_it_as_a_model_form_does
+    fails without the whole first operand.
     """
     changes: list[FieldChange] = []
     for attr, new_value in new_values.items():
         old_value: Any = safe_getattr(instance, attr)
-        if old_value != new_value:
+        if (isinstance(new_value, File) and not isinstance(new_value, FieldFile)) or (
+            old_value != new_value
+        ):
             changes.append(FieldChange(field=attr, old=old_value, new=new_value))
     return tuple(changes)
 
@@ -752,15 +770,29 @@ def _namespaced_row_error(
     ``str()`` would render as the repr of a list, and a field-keyed one (a
     model whose ``save()`` runs ``full_clean()``) keeps its field names, so the
     row's fields are addressed the way a validator would address them.
+
+    Each message Django raised keeps its own code, as a
+    [`CodedMessage`][django_service_specs.parameters.coded_message.CodedMessage]:
+    Django's codes are DRF's for the same mistakes, and a message raised with
+    none is ``invalid``, as DRF's is. So is the message of a ``TypeError`` or
+    ``ValueError``, which has no code to keep. A refusal that already has a
+    tree is re-rooted with its messages as they were, codes and all. The
+    messages are rendered by ``coded_messages``, the reading every step that
+    hands on Django's ``ValidationError`` shares; a field-keyed one is read
+    a field at a time here, so its field names stay the row's addresses.
     """
     if isinstance(exc, ServiceValidationError):
         return ServiceValidationError(path.namespace(exc.detail))
     if isinstance(exc, InvalidArguments):
         return InvalidArguments(path.namespace(exc.detail))
     if isinstance(exc, ValidationError):
-        detail: Any = exc.message_dict if hasattr(exc, "error_dict") else exc.messages
+        detail: Any = (
+            {field: coded_messages(errors) for field, errors in exc.error_dict.items()}
+            if hasattr(exc, "error_dict")
+            else coded_messages(exc.error_list)
+        )
         return InvalidArguments(path.namespace(detail))
-    return InvalidArguments(path.namespace([str(exc)]))
+    return InvalidArguments(path.namespace([CodedMessage(str(exc), "invalid")]))
 
 
 def _resolve_m2m(
@@ -1157,6 +1189,10 @@ def _match_scoped_target(
     if resolved is None:
         return None
     queryset, key = resolved
+    # A key no row's column can hold names none; the lookup would hand it to
+    # the driver (test_a_forward_key, test_a_many_to_many_key).
+    if key_past_its_column(queryset, spec.match_key, key):
+        raise _scoped_match_miss(path, spec, key)
     target = queryset.filter(**{spec.match_key: key}).first()
     if target is None:
         raise _scoped_match_miss(path, spec, key)
@@ -1175,6 +1211,9 @@ async def _amatch_scoped_target(
     if resolved is None:
         return None
     queryset, key = resolved
+    # test_an_async_forward_key and test_an_async_many_to_many_key.
+    if key_past_its_column(queryset, spec.match_key, key):
+        raise _scoped_match_miss(path, spec, key)
     target = await queryset.filter(**{spec.match_key: key}).afirst()
     if target is None:
         raise _scoped_match_miss(path, spec, key)
@@ -1350,12 +1389,12 @@ def _collection_rows(items: Any, *, relation: str) -> list[dict[str, Any]]:
     or matched on nothing. A declaration may allow the gap (``list[Row | None]``
     passes the shape check), and nothing in a relation spec says what one
     stands for, so it is refused rather than guessed at. The message is Django's
-    own, which its catalog translates.
+    own, which its catalog translates, and its code is ``null``, DRF's.
     """
     rows = list(items or [])
     nulls = [index for index, row in enumerate(rows) if row is None]
     if nulls:
-        message = gettext("This field cannot be null.")
+        message = CodedMessage(gettext("This field cannot be null."), "null")
         raise InvalidArguments({relation: {i: {NON_FIELD_ERRORS: [message]} for i in nulls}})
     return [coerce_to_dict(row) for row in rows]
 

@@ -144,6 +144,12 @@ class TestServiceSpecs:
 
         assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
 
+    def test_a_list_selector_allowing_none_is_an_array_never_null(self) -> None:
+        """Its selector's ``None`` is presented as the empty list, so ``"null"`` is never stated."""
+        spec = listing(selector=nothing, presenter=NoteTitle(), allow_none=True)
+
+        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
+
     def test_a_service_whose_output_selector_is_a_list_presents_an_array(self) -> None:
         reread = listing(selector=nothing, presenter=NoteTitle())
         spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)

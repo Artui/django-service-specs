@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from django_service_specs.filters.utils import import_django_filters
+from django_service_specs.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 
@@ -46,15 +46,17 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     ``date-time`` string, and ``string`` for the rest. **A number filter, and
     each bound of a numeric range, is a** ``decimal`` **string**, because its
     form field is a ``DecimalField`` and reads one exactly, where a float read
-    on the way loses a key past ``2**53``; a JSON number is still taken. A CSV
-    filter's numbers stay ``number``, which over HTTP is what splits
-    ``?pks=1,2``, and keep that float reading. **Each decimal is bounded**,
-    ``minimum=-1e50`` and ``maximum=1e50``: the line django-filter's number
-    filter draws above, drawn below too and on a range's bounds, which it
-    leaves open. A value past it is refused by the shape check before it
-    reaches the database's integer conversion, which builds every digit of
-    ``"1E+999999999"``. A float reading cannot reach that far, so a CSV
-    filter's numbers carry no bound.
+    on the way loses a key past ``2**53``; a JSON number is still taken. **So
+    is each value of a CSV number filter**: an array whose ``format`` and
+    bounds describe each element, as its choices would, so a fraction keeps
+    every digit it was sent with and ``?pks=1,2`` still splits over HTTP,
+    since no decimal holds a comma. **Each decimal is bounded**,
+    ``minimum=-1e50`` and ``maximum=1e50``, a CSV filter's values each: the
+    line django-filter's number filter draws above, drawn below too and on a
+    range's bounds, which it leaves open. A value past it is refused by the
+    shape check, at its index in a CSV filter's list, before it reaches the
+    database's integer conversion, which builds every digit of
+    ``"1E+999999999"``.
 
     **Every one is optional**, because a filter narrows a read and never
     stands between a caller and it. ``help`` is the author's ``help_text`` when
@@ -66,11 +68,12 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     ``joined_after`` - are refused, as any two Parameters of one name are,
     because django-filter would hand one value to both.
 
-    An object with no ``base_filters`` declares nothing, and is read without
-    django-filter. A
+    An object whose ``base_filters`` is missing, empty or ``None`` declares
+    nothing, and is read without django-filter. A
     [`SelectorSpec`][django_service_specs.specs.selector_spec.SelectorSpec]
-    refuses one as its ``filter_set``, since nothing it declares would be
-    handed to it. Reading any filter needs the ``[filter]`` extra.
+    refuses one as its ``filter_set`` unless it is a django-filter
+    ``FilterSet`` class, since none of the caller's data would be handed to
+    it. Reading any filter needs the ``[filter]`` extra.
     """
     base_filters: dict[str, Any] = dict(getattr(filter_set, "base_filters", None) or {})
     if not base_filters:
@@ -90,11 +93,7 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     field_name: str = getattr(filter_obj, "field_name", None) or name
     extra: dict[str, Any] = getattr(filter_obj, "extra", None) or {}
     help_text: Any = extra.get("help_text")
-    # A range's widget names the keys it reads; nothing else in django-filter
-    # carries ``suffixes``. Read off the field class rather than ``.field``,
-    # which would build the form field and, for a related-row filter, its
-    # queryset.
-    suffixes = getattr(getattr(filter_obj.field_class, "widget", None), "suffixes", None)
+    suffixes = range_suffixes(filter_obj)
     if suffixes:
         type_, format_ = _bound_type(module, filter_obj)
         minimum, maximum = _bounds(format_)
@@ -114,8 +113,23 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     # ``kinds`` (a multiple choice) in
     # test_each_note_filter_reads_as_the_argument_django_filter_reads.
     if isinstance(filter_obj, (module.BaseCSVFilter, module.MultipleChoiceFilter)):
-        items, choices = offered or (_element(module, filter_obj), None)
-        yield Parameter(name, "array", items=items, choices=choices, help=help_)
+        if offered is not None:
+            yield Parameter(name, "array", items=offered[0], choices=offered[1], help=help_)
+            return
+        # Each element read as the filter's scalar would be: a number filter's
+        # as a bounded decimal, the format and the bounds describing the
+        # element, as an array's choices do.
+        items, format_ = _element(module, filter_obj)
+        minimum, maximum = _bounds(format_)
+        yield Parameter(
+            name,
+            "array",
+            items=items,
+            format=format_,
+            help=help_,
+            minimum=minimum,
+            maximum=maximum,
+        )
     elif offered is not None:
         yield Parameter(name, offered[0], choices=offered[1], help=help_)
     else:
@@ -161,21 +175,21 @@ def _scalar(module: Any, filter_obj: Any) -> tuple[str, str | None]:
     return "string", None
 
 
-def _element(module: Any, filter_obj: Any) -> str:
-    """The JSON type of each value a CSV filter reads.
+def _element(module: Any, filter_obj: Any) -> tuple[str, str | None]:
+    """The JSON type and format of each value a CSV filter reads.
 
-    ``items`` holds a JSON type and no format, so a CSV filter's numbers are
-    the ``number`` a decimal cannot be there: declared ``string``, ``?pks=1,2``
-    would no longer split over HTTP, which splits only an element no comma can
-    be part of. So a number in a CSV filter is still read as a float on the
-    way, unlike a scalar number filter's, and a key past ``2**53`` in one may match
-    its neighbour's row. Held both ways by
-    test_each_note_filter_reads_as_the_argument_django_filter_reads (``pks``)
-    and test_a_csv_filter_of_text_reads_strings.
+    A number filter's element is its scalar's ``decimal`` string, which over
+    HTTP splits ``?pks=1,2`` as a number's would, since no decimal holds a
+    comma, and is handed on exactly: a key past ``2**53`` matches its own
+    row, and a fraction keeps every digit it was sent with. Any other element
+    keeps its scalar's type and no format: an element takes none but a
+    decimal's, so a date's is left to the FilterSet's own field. Held by
+    test_each_note_filter_reads_as_the_argument_django_filter_reads (``pks``,
+    the decimal kept) and test_a_csv_filter_of_dates_reads_strings_with_no_format
+    (a date's dropped, which ``Parameter`` would refuse on an array).
     """
-    if isinstance(filter_obj, module.NumberFilter):
-        return "number"
-    return _scalar(module, filter_obj)[0]
+    type_, format_ = _scalar(module, filter_obj)
+    return type_, (format_ if format_ == "decimal" else None)
 
 
 def _bound_type(module: Any, filter_obj: Any) -> tuple[str, str | None]:

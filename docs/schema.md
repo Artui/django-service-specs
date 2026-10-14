@@ -87,6 +87,7 @@ default, and `published_on` and `pk` may be null:
     "name": {"type": "string"},
     "books": {
       "type": "array",
+      "maxItems": 1000,
       "items": {
         "type": "object",
         "properties": {
@@ -164,7 +165,11 @@ contradict, and states everything the declaration knows.
   parameter with choices therefore lists `null` among them, because the shape
   check accepts a null before it reads the choices. An array's choices
   constrain each element, so they sit on `items`, and gain `null` there by
-  the element's nullability alone, never by the array's.
+  the element's nullability alone, never by the array's. So do an array's
+  `format`, `minimum` and `maximum`, which describe each element: a CSV
+  number filter's `items` are `{"type": "string", "format": "decimal",
+  "minimum": -1e+50, "maximum": 1e+50}`, and the array node states only its
+  own `"minItems"` and `"maxItems"`.
 - **Labelled choices are an `anyOf`** of `{"const": value, "title": label}`
   in place of the `enum`, where some label says more than its value, as the
   book's `status` above shows; labels that only repeat their values keep the
@@ -201,8 +206,19 @@ contradict, and states everything the declaration knows.
 What stays incomplete is only what the declaration does not carry. A
 Parameter's `minimum` and `maximum` are stated as `"minimum"` and
 `"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
-`max_value`, is not. JSON Schema reads `minimum` and `maximum` on a number
-instance alone, so on a decimal string a validating client enforces neither:
+`max_value`, is not. An array's `min_length` is stated as `"minItems"`, and
+its `"maxItems"` is **the maximum in force**: the declared `max_length`, or
+where none is declared the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting's, 1000
+unless the project sets another. It is the one bound stated without being
+declared, because [the shape check refuses past
+it](arguments.md#how-long-a-list-may-be) and a client told nothing would send
+a call that cannot run. Under a setting of `None`, an array with no
+`max_length` states none. The setting is read each time a schema is built,
+so building one for an array with no `max_length` reads Django's settings and
+needs them configured: outside a configured Django it raises
+`ImproperlyConfigured`, as the shape check does, rather than state the default
+when a project configured later may set another. JSON Schema reads `minimum`
+and `maximum` on a number instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.
 
 ### A partial update
@@ -218,10 +234,12 @@ requires `title` and `body` has `"required": ["pk"]`.
 
 On a `many` spec the list stays required and each row requires nothing.
 `parameters()` is unchanged: it still says what a whole update needs, and
-the schema is where the relaxing happens. A read a `kwargs` provider fills
-is still listed as declared;
+the schema is where the relaxing happens, through the one function the shape
+check relaxes a partial call with, so the two cannot drift. A read a `kwargs`
+provider fills is still listed as declared;
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-is how a transport finds those.
+is how a transport finds those, and the schema's `required` less that set is
+exactly what dispatch refuses when it is absent.
 
 ### The decimal convention
 
@@ -269,6 +287,7 @@ on its presenter:
 | --- | --- |
 | No presenter, on the spec or its output selector | `None` |
 | A `LIST` selector spec | `{"type": "array", "items": <item>}` |
+| A `LIST` selector spec with `allow_none=True` | `{"type": "array", "items": <item>}`: its selector's `None` is presented as `[]` |
 | A `RETRIEVE` selector spec | the item |
 | A `RETRIEVE` selector spec with `allow_none=True` | the item, with `"null"` in its type |
 | A service spec whose output selector is a `LIST` | `{"type": "array", "items": <item>}` |

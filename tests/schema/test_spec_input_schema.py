@@ -82,6 +82,7 @@ class TestSpecInputSchema:
             "properties": {
                 "rows": {
                     "type": "array",
+                    "maxItems": 1000,
                     "items": {
                         "type": "object",
                         "properties": {"title": {"type": "string"}},
@@ -123,6 +124,7 @@ def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
             "confirmed": {"type": "boolean"},
             "items": {
                 "type": "array",
+                "maxItems": 1000,
                 "items": {
                     "type": "object",
                     "properties": {"title": {"type": "string"}},
@@ -281,6 +283,78 @@ class TestPartial:
             empty: Any = {} if name == "meta" else [{}]
             call = {**whole, name: empty}
             assert ("label" in node.get("required", ())) == _refused(spec, call)
+
+
+class _Title(TypedDict):
+    title: str
+
+
+def the_title() -> _Title:
+    """A typed ``input_data`` provider: it fills the Validator's ``title``."""
+    return {"title": "server"}
+
+
+class _Pk(TypedDict):
+    pk: int
+
+
+def the_pk() -> _Pk:
+    """A typed ``kwargs`` provider on the target selector: it fills the lookup's ``pk``."""
+    return {"pk": 1}
+
+
+def _filled_spec(*, partial: bool, filled: str) -> ServiceSpec:
+    providers: dict[str, Any] = {
+        "nothing": {},
+        "a-read": {"kwargs": the_project},
+        "a-validator-field": {"input_data": the_title},
+    }
+    target = SelectorSpec(
+        kind=SelectorKind.RETRIEVE,
+        selector=note_by_pk,
+        reads=PK,
+        **({"kwargs": the_pk} if filled == "a-target-read" else {}),
+    )
+    return ServiceSpec(
+        service=edit,
+        permissions=OPEN,
+        validator=Article(),
+        partial=partial,
+        reads=Parameters.of(Parameter("project", "integer", required=True)),
+        instance_selector_spec=target,
+        **providers.get(filled, {}),
+    )
+
+
+@pytest.mark.parametrize("filled", ["nothing", "a-read", "a-validator-field", "a-target-read"])
+@pytest.mark.parametrize("partial", [True, False])
+def test_the_schema_less_server_owned_keys_requires_what_the_shape_check_demands(
+    partial: bool, filled: str
+) -> None:
+    # The two read ``partial`` through one function, and a key a typed
+    # provider fills is the one place they part: the schema lists it as
+    # declared and ``server_owned_keys`` names it for a transport to take out,
+    # where the shape check never demands it. Less that set, they agree.
+    spec = _filled_spec(partial=partial, filled=filled)
+    whole = {
+        "pk": 1,
+        "project": 2,
+        "title": "t",
+        "body": "b",
+        "meta": {"label": "m"},
+        "tags": [{"label": "x"}],
+    }
+    schema = spec_input_schema(spec)
+    required = set(schema.get("required", ())) - server_owned_keys(spec)
+    assert required == {name for name in whole if _refused(spec, _without(whole, name))}
+    for name, empty in (("meta", {}), ("tags", [{}])):
+        node = schema["properties"][name]
+        node = node if name == "meta" else node["items"]
+        assert ("label" in node.get("required", ())) == _refused(spec, {**whole, name: empty})
+
+
+def _without(call: Mapping[str, Any], name: str) -> dict[str, Any]:
+    return {key: value for key, value in call.items() if key != name}
 
 
 def _refused(spec: ServiceSpec, call: Mapping[str, Any]) -> bool:

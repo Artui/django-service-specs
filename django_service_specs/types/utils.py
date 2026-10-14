@@ -13,9 +13,9 @@ from typing import Any, Final
 
 # The pool names dispatch seeds per call rather than per process: the validated
 # input (``data``), the resolved target (``instance``, ``collection``), and the
-# values only a later step has - the service's return, as ``result`` in an output
-# selector's pool, and the queryset being shaped, as ``queryset`` in
-# ``extend_queryset``'s. An affordance condition reading one of them is a rule
+# values only a later step has - the service's return, as ``result`` and
+# ``instance`` in an output selector's pool, and the queryset being shaped, as
+# ``queryset`` in ``extend_queryset``'s. An affordance condition reading one of them is a rule
 # about *this call*, and could never be answered without attempting the call,
 # which is the one thing an affordance exists to allow. The declaration refuses
 # a callable naming them, and ``ambient_pool`` withholds them from one that takes

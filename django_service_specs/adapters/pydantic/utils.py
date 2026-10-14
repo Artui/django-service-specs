@@ -18,10 +18,12 @@ of refused.
 from __future__ import annotations
 
 import typing
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from annotated_types import GroupedMetadata, MaxLen, MinLen
 from django.core.exceptions import ImproperlyConfigured
 from pydantic import BaseModel, RootModel
 from pydantic.errors import PydanticUndefinedAnnotation
@@ -127,6 +129,10 @@ class FieldShape:
     label: str | None
     always_present: bool
     marking: FieldMarking | None
+    min_length: int | None = None
+    max_length: int | None = None
+    """How many elements a list field takes, as the model declares it; ``None``
+    for a bound it leaves open, and for every field that is not a list."""
 
 
 def check_model(model: Any, *, label: str) -> None:
@@ -160,6 +166,12 @@ def read_fields(
     for name, info in model.model_fields.items():
         where = f"{model.__qualname__}.{name}"
         shape, extras = _read(info.annotation, where=where, stack=below)
+        # pydantic lifts the metadata of an outer ``Annotated`` onto the
+        # FieldInfo and leaves an inner one in the annotation, so a marking
+        # and a length are each looked for in both. The annotation's go
+        # first, as pydantic applies them first.
+        metadata = (*extras, *info.metadata)
+        min_length, max_length = _lengths(shape, metadata)
         out.append(
             FieldShape(
                 name=name,
@@ -172,10 +184,9 @@ def read_fields(
                 help=info.description,
                 label=info.title,
                 always_present=_always_present(info),
-                # pydantic lifts the metadata of an outer ``Annotated`` onto the
-                # FieldInfo and leaves an inner one in the annotation, so a
-                # marking is looked for in both.
-                marking=_marking((*info.metadata, *extras), where=where),
+                marking=_marking(metadata, where=where),
+                min_length=min_length,
+                max_length=max_length,
             )
         )
     for name, computed in model.model_computed_fields.items():
@@ -300,6 +311,53 @@ def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
     # than the floor: a field has it from pydantic 2.12 and a computed field
     # from 2.13, and a model on an older release has no such key to drop.
     return getattr(info, "exclude_if", None) is None
+
+
+def _lengths(shape: Shape, metadata: tuple[Any, ...]) -> tuple[int | None, int | None]:
+    """(min_length, max_length) a list field declares, each ``None`` where it declares none.
+
+    Read from ``annotated_types``' ``MinLen`` and ``MaxLen``, which is what
+    every spelling comes to: ``Field(min_length=, max_length=)``, ``conlist``
+    and ``Len``, whose ``Len`` groups the two, and the markers written
+    directly. pydantic applies a field's metadata in order, the annotation's
+    from the innermost ``Annotated`` out and then the field's own, and a
+    later length replaces an earlier one, so the last of each is the one it
+    enforces: test_each_declared_length_is_the_one_pydantic_enforces holds
+    that against the model, and test_every_spelling_of_a_list_s_length_is_declared
+    each spelling, the order included.
+
+    Only a list's: a length on a string or a dict is the model's alone, as
+    ``Parameter`` takes a length on an array and nothing else.
+    test_pydantic_answers_for_what_the_declaration_does_not_carry holds the
+    type, and without it a string's ``max_length`` is refused when declared.
+    """
+    if shape.type != "array":
+        return None, None
+    min_length = max_length = None
+    for item in _flatten(metadata):
+        if isinstance(item, MinLen):
+            min_length = item.min_length
+        elif isinstance(item, MaxLen):
+            max_length = item.max_length
+    return min_length, max_length
+
+
+def _flatten(metadata: Iterable[Any]) -> Iterator[Any]:
+    """Each piece of metadata, with every group opened where it stands.
+
+    A ``Field()`` inside an ``Annotated`` the FieldInfo did not lift carries
+    its constraints as its own ``metadata``, and a ``GroupedMetadata`` such as
+    ``Len`` yields its parts when iterated: each read in its place, so the
+    order pydantic applies them in is kept. Held by the ``inner_field`` and
+    ``grouped`` rows of test_every_spelling_of_a_list_s_length_is_declared.
+    """
+    for item in metadata:
+        if isinstance(item, FieldInfo):
+            yield from _flatten(item.metadata)
+        elif isinstance(item, GroupedMetadata):
+            yield from _flatten(item)
+        else:
+            yield item
 
 
 def _marking(extras: tuple[Any, ...], *, where: str) -> FieldMarking | None:

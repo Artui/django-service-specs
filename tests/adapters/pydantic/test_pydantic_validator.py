@@ -1,35 +1,42 @@
 from __future__ import annotations
 
 import datetime as dt
+import enum
 import math
 import re
 from dataclasses import dataclass
 from decimal import Decimal
 from types import SimpleNamespace
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 import pytest
+from annotated_types import Len, MaxLen, MinLen
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.test import RequestFactory
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     ValidationInfo,
     computed_field,
+    conlist,
     field_validator,
     model_validator,
 )
+from pydantic_core import PydanticCustomError
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.relations.child_spec import ChildSpec
+from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
@@ -44,6 +51,7 @@ from tests.adapters.pydantic.utils import (
     Range,
     Schedule,
 )
+from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
 
@@ -576,3 +584,248 @@ class TestPartial:
         validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
         assert validated.values == {"city": "Oslo", "postcode": None}
         assert validated.data is validated.values
+
+
+class _Colour(enum.Enum):
+    RED = "red"
+
+
+class _Coded(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = Field(max_length=3)
+    short: str = Field(default="ok", min_length=2)
+    count: int = Field(default=1, ge=1, le=9, multiple_of=1)
+    ratio: float = Field(default=0.5, gt=0, lt=1)
+    few: list[int] = Field(default=[1], min_length=1, max_length=2)
+    colour: _Colour = _Colour.RED
+    price: Decimal = Field(default=Decimal(1), max_digits=4, decimal_places=2)
+    even: int = Field(default=2, multiple_of=2)
+    kind: Literal["draft", "final"] = "draft"
+    tags: list[str] = []
+    slug: str = "ok"
+    note: str | None = "fine"
+
+    @field_validator("note")
+    @classmethod
+    def _note(cls, value: str | None) -> str | None:
+        # A refusal of ``None`` that is no type's: its code is the validator's.
+        if value is None:
+            raise ValueError("Say something.")
+        return value
+
+    @field_validator("slug")
+    @classmethod
+    def _slug(cls, value: str) -> str:
+        if value == "raise":
+            raise ValueError("No.")
+        if value == "custom":
+            raise PydanticCustomError("not_a_slug", "Not a slug.")
+        return value
+
+
+class TestRefusalCodes:
+    """pydantic's error types mapped to the code a DRF field gives the same mistake."""
+
+    @pytest.mark.parametrize(
+        ("arguments", "field", "code"),
+        [
+            pytest.param({}, "title", "required", id="missing"),
+            pytest.param({"title": None}, "title", "null", id="none"),
+            pytest.param({"title": "long"}, "title", "max_length", id="string-too-long"),
+            pytest.param(
+                {"title": "t", "short": "s"}, "short", "min_length", id="string-too-short"
+            ),
+            pytest.param({"title": "t", "few": []}, "few", "min_length", id="list-too-short"),
+            pytest.param({"title": "t", "few": [1, 2, 3]}, "few", "max_length", id="list-too-long"),
+            pytest.param({"title": "t", "count": 0}, "count", "min_value", id="below"),
+            pytest.param({"title": "t", "count": 10}, "count", "max_value", id="above"),
+            pytest.param({"title": "t", "ratio": 0}, "ratio", "min_value", id="exclusive-below"),
+            pytest.param({"title": "t", "ratio": 1}, "ratio", "max_value", id="exclusive-above"),
+            pytest.param({"title": "t", "kind": "gone"}, "kind", "invalid_choice", id="literal"),
+            pytest.param({"title": "t", "colour": "blue"}, "colour", "invalid_choice", id="enum"),
+            pytest.param({"title": "t", "price": "12345"}, "price", "max_digits", id="digits"),
+            pytest.param(
+                {"title": "t", "price": "1.234"}, "price", "max_decimal_places", id="places"
+            ),
+            pytest.param(
+                {"title": "t", "price": "123.4"}, "price", "max_whole_digits", id="whole-digits"
+            ),
+            pytest.param({"title": "t", "tags": "a"}, "tags", "not_a_list", id="list-type"),
+            pytest.param({"title": "t", "nope": 1}, "nope", "unknown", id="extra"),
+            pytest.param({"title": 3}, "title", "invalid", id="type"),
+            pytest.param({"title": "t", "count": "x"}, "count", "invalid", id="parsing"),
+            pytest.param({"title": "t", "slug": "raise"}, "slug", "invalid", id="value-error"),
+            pytest.param({"title": "t", "note": None}, "note", "invalid", id="value-error-on-none"),
+            pytest.param({"title": "t", "even": 3}, "even", "invalid", id="no-drf-code"),
+            pytest.param({"title": "t", "slug": "custom"}, "slug", "not_a_slug", id="custom"),
+        ],
+    )
+    def test_each_error_type_carries_its_code(
+        self, arguments: dict[str, Any], field: str, code: str
+    ) -> None:
+        # On ``validate()`` itself: through dispatch, the shape check answers
+        # an absent, a null and a wrongly typed argument first.
+        refused = coded(_refusal(_Coded, arguments))
+        assert [found for _, found in refused[field]] == [code]
+
+    def test_a_missing_row_field_carries_required_at_its_address(self) -> None:
+        refused = coded(_refusal(_AuthorIn, {"name": "Ada", "books": [{}]}))
+        assert {code for _, code in refused["books"][0]["title"]} == {"required"}
+
+
+class _Dated(BaseModel):
+    prices: list[Decimal]
+    at: list[dt.datetime]
+    on: list[dt.date]
+
+
+class TestDecimalElements:
+    def test_a_list_of_decimals_declares_each_element_a_decimal(self) -> None:
+        # A date or a date-time element takes no format on an array, so those
+        # lists stay arrays of strings: without the decimal condition in
+        # ``element_format`` this model could not be declared at all.
+        params = PydanticValidator(_Dated).parameters()
+        assert [(p.name, p.items, p.format) for p in params] == [
+            ("prices", "string", "decimal"),
+            ("at", "string", None),
+            ("on", "string", None),
+        ]
+
+    def test_the_shape_check_takes_each_decimal_element_as_the_model_does(self) -> None:
+        validator = PydanticValidator(_Dated)
+        arguments = {"prices": [1.5, "2.25", 3], "at": [], "on": []}
+        assert check_arguments(validator.parameters(), arguments) == arguments
+        assert validator.validate(arguments, CONTEXT)["prices"] == [
+            Decimal("1.5"),
+            Decimal("2.25"),
+            Decimal("3"),
+        ]
+
+    def test_an_element_that_is_no_decimal_is_refused_at_its_index(self) -> None:
+        with pytest.raises(InvalidArguments) as caught:
+            check_arguments(
+                PydanticValidator(_Dated).parameters(),
+                {"prices": ["1", "many"], "at": [], "on": []},
+            )
+        assert coded(caught.value.detail) == {"prices": {1: [("Enter a number.", "invalid")]}}
+
+    def test_a_query_string_splits_a_list_of_decimals_on_its_commas(self) -> None:
+        request = RequestFactory().get("/", {"prices": "1.5,2.25"})
+        parameters = PydanticValidator(_Dated).parameters()
+        assert request_arguments(request, parameters) == {"prices": ["1.5", "2.25"]}
+
+
+class _Row(BaseModel):
+    tags: list[str] = Field(default=[], max_length=2)
+
+
+class _Lengths(BaseModel):
+    keyword: list[int] = Field(default=[], max_length=1500)
+    annotated: Annotated[list[int], Field(min_length=2, max_length=9)] = [1, 2]
+    constrained: conlist(int, min_length=1, max_length=7) = [1]
+    grouped: Annotated[list[int], Len(1, 3)] = [1]
+    inner_field: Annotated[list[int], Field(max_length=4)] | None = None
+    inner_raw: Annotated[list[int], MaxLen(3), MinLen(1)] | None = None
+    # pydantic applies a field's metadata in order, the annotation's first,
+    # and a later length replaces an earlier one, so each of these takes the
+    # last it declares: 8 over 6, 3 over 1, then 6 over the 8 of the
+    # annotation.
+    later: Annotated[list[int], MaxLen(6), MaxLen(8)] = []
+    fewest: Annotated[list[int], MinLen(1), MinLen(3)] = [1, 2, 3]
+    outer: Annotated[list[int], MaxLen(8)] | None = Field(default=None, max_length=6)
+    # Two layers inside the annotation, which pydantic leaves there: the
+    # inner 6 first, then the outer 8 over it.
+    deep: Annotated[Annotated[list[int], MaxLen(6)] | None, MaxLen(8)] | None = None
+    # Metadata that is no length is passed over.
+    noted: Annotated[list[int], "unrelated", MaxLen(2)] = []
+    open: list[int] = []
+    rows: list[_Row] = []
+    # A length on anything but an array is the model's alone.
+    name: str = Field(default="", max_length=3)
+    scores: dict[str, int] = Field(default={}, max_length=2)
+
+
+def _lengths(parameters: Parameters) -> list[tuple[str, int | None, int | None]]:
+    return [(p.name, p.min_length, p.max_length) for p in parameters]
+
+
+class TestDeclaredLengths:
+    def test_every_spelling_of_a_list_s_length_is_declared(self) -> None:
+        params = PydanticValidator(_Lengths).parameters()
+        assert _lengths(params) == [
+            ("keyword", None, 1500),
+            ("annotated", 2, 9),
+            ("constrained", 1, 7),
+            ("grouped", 1, 3),
+            ("inner_field", None, 4),
+            ("inner_raw", 1, 3),
+            ("later", None, 8),
+            ("fewest", 3, None),
+            ("outer", None, 6),
+            ("deep", None, 8),
+            ("noted", None, 2),
+            ("open", None, None),
+            ("rows", None, None),
+            ("name", None, None),
+            ("scores", None, None),
+        ]
+        rows = params.get("rows")
+        assert rows is not None
+        (tags,) = rows.nested or ()
+        assert (tags.name, tags.max_length) == ("tags", 2)
+
+    def test_each_declared_length_is_the_one_pydantic_enforces(self) -> None:
+        # Sized one past each declared maximum and one short of each minimum,
+        # so the model refuses exactly the arguments the declaration says it
+        # will: the order rule above is pydantic's, not a guess.
+        validator = PydanticValidator(_Lengths)
+        for param in validator.parameters():
+            if param.max_length is not None and param.nested is None:
+                refused = coded(_refusal(_Lengths, {param.name: [1] * (param.max_length + 1)}))
+                assert [code for _, code in refused[param.name]] == ["max_length"], param.name
+                validator.validate({param.name: [1] * param.max_length}, CONTEXT)
+            if param.min_length is not None:
+                refused = coded(_refusal(_Lengths, {param.name: [1] * (param.min_length - 1)}))
+                assert [code for _, code in refused[param.name]] == ["min_length"], param.name
+                validator.validate({param.name: [1] * param.min_length}, CONTEXT)
+
+    def test_a_list_the_model_allows_past_the_default_passes_the_shape_check(self) -> None:
+        # 1500 is past the 1000 every undeclared array is held to, so only the
+        # model's own maximum lets this through.
+        parameters = PydanticValidator(_Lengths).parameters()
+        arguments = {"keyword": list(range(1500))}
+        assert check_arguments(parameters, arguments) == arguments
+        schema = parameters_schema(parameters)["properties"]
+        assert (schema["keyword"]["maxItems"], schema["annotated"]["minItems"]) == (1500, 2)
+
+    def test_a_list_past_its_length_is_refused_by_the_shape_check_with_the_model_s_code(
+        self,
+    ) -> None:
+        # Through dispatch the shape check answers first, in the kernel's words;
+        # ``validate()`` alone answers in pydantic's. The code is the same.
+        parameters = PydanticValidator(_Lengths).parameters()
+        with pytest.raises(InvalidArguments) as caught:
+            check_arguments(parameters, {"keyword": [1] * 1501, "annotated": [1]})
+        assert coded(caught.value.detail) == {
+            "keyword": [("Ensure this field has no more than 1500 elements.", "max_length")],
+            "annotated": [("Ensure this field has at least 2 elements.", "min_length")],
+        }
+        refused = coded(_refusal(_Lengths, {"keyword": [1] * 1501}))
+        assert refused["keyword"] == [
+            ("List should have at most 1500 items after validation, not 1501", "max_length")
+        ]
+
+    def test_a_number_s_bounds_stay_the_model_s_in_its_words(self) -> None:
+        # ``ge`` and ``le`` could be stated as a parameter's inclusive bounds,
+        # ``gt`` and ``lt`` could not, so neither pair is, and one model's
+        # bounds are answered in one dialect.
+        parameters = PydanticValidator(_Coded).parameters()
+        bounds = {p.name: (p.minimum, p.maximum) for p in parameters}
+        assert (bounds["count"], bounds["ratio"]) == ((None, None), (None, None))
+        arguments = {"title": "t", "count": 10, "ratio": 1.0}
+        assert check_arguments(parameters, arguments) == arguments
+        assert coded(_refusal(_Coded, arguments)) == {
+            "count": [("Input should be less than or equal to 9", "max_value")],
+            "ratio": [("Input should be less than 1", "max_value")],
+        }

@@ -6,6 +6,7 @@ from typing import Any
 
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import max_length_in_force
 from django_service_specs.schema.utils import allow_null, is_json_native
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
@@ -40,7 +41,10 @@ def parameters_schema(
       the node an adapter truncates a recursive declaration to.
     - **An array** is ``{"type": "array", "items": ...}``: a type name's
       ``{"type": t}``, the object schema of its rows, or ``{}`` for an array
-      that declares no ``items`` and accepts any element.
+      that declares no ``items`` and accepts any element. The array's
+      ``format`` and bounds describe each element, so they go on ``items``,
+      as its choices do: a CSV number filter's are ``{"type": "string",
+      "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}``.
     - **A file** is ``{}``. No JSON value is one, so any JSON type stated here
       would be false, and JSON Schema has no keyword for a multipart part.
       What is still known is the rest: whether it is required, its
@@ -51,6 +55,12 @@ def parameters_schema(
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
       The shape check also accepts a JSON number, which this does not advertise.
+    - **An array's length** is ``"minItems"`` as declared, and ``"maxItems"``
+      as in force: the declared ``max_length``, or where none is declared the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's, 1000 unless the project
+      sets another. The shape check refuses past it either way, so a client
+      told nothing would send a call that cannot run; under a setting of
+      ``None`` an array that declares no maximum states none.
     - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared.
       JSON Schema applies them to a number instance only, so on a decimal
       string a validating client enforces neither; the shape check does, and
@@ -92,8 +102,10 @@ def parameters_schema(
     No ``$defs`` or ``$ref`` ever: most MCP clients refuse a schema with a
     reference in it, so every schema is flat and self-contained, however deep
     the declaration nests. No ``$schema`` key, which a transport adds if its
-    wire wants one. And no bound a Parameter does not declare (``maxLength``,
-    a Validator's ``max_value``): the Validator enforces those.
+    wire wants one. And no bound the shape check does not enforce
+    (``maxLength``, a Validator's ``max_value``): the Validator enforces those.
+    The one stated without being declared is an array's default maximum,
+    because the shape check enforces it.
 
     Every call builds a new schema, so a transport may add its own keys to the
     result without reaching the declaration or another transport's copy.
@@ -128,7 +140,7 @@ def _object_schema(parameters: Parameters, policy: UnknownArguments) -> dict[str
 def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
     schema: dict[str, Any]
     if param.type == "array":
-        schema = {"type": "array", "items": _items_schema(param, policy)}
+        schema = {"type": "array", "items": _items_schema(param, policy), **_lengths(param)}
     elif param.fields is not None:
         # Only an object carries ``fields``; ``Parameter`` refuses them elsewhere.
         schema = _object_schema(param.fields, policy)
@@ -138,22 +150,16 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         schema = {}
     else:
         schema = {"type": param.type}
-    if param.format is not None:
-        schema["format"] = param.format
-    # Stated on a decimal string too, where a validating client passes them by:
-    # JSON Schema reads ``minimum`` and ``maximum`` on a number instance only.
-    # The shape check is what enforces them there, and a reader still learns
-    # the bound. Two arcs, each held by test_a_bound_is_stated_beside_the_type.
-    if param.minimum is not None:
-        schema["minimum"] = param.minimum
-    if param.maximum is not None:
-        schema["maximum"] = param.maximum
-    # An array's choices describe its elements, and ``_items_schema`` states them.
-    # One branch to coverage, so each condition is held by its own test:
-    # test_a_scalar_states_its_type (the first: a parameter with no choices) and
-    # test_an_arrays_choices_constrain_each_item_and_not_the_array (the second).
-    if param.choices is not None and param.type != "array":
-        schema.update(_choices(param, nullable=param.nullable))
+    # An array's format, bounds and choices describe its elements, and
+    # ``_items_schema`` states them. Held by
+    # test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself
+    # and test_an_arrays_choices_constrain_each_item_and_not_the_array, which
+    # fail without it, for the array node would carry them as well.
+    if param.type != "array":
+        schema.update(_reading(param))
+        # Held by test_a_scalar_states_its_type, a parameter with no choices.
+        if param.choices is not None:
+            schema.update(_choices(param, nullable=param.nullable))
     if param.nullable:
         schema = allow_null(schema)
     # ``UNSET``, the declaration of no default, is not a JSON value either, so
@@ -170,6 +176,38 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
     return schema
 
 
+def _reading(param: Parameter) -> dict[str, Any]:
+    """The value's ``format`` and bounds: a scalar's own, or an array's element's.
+
+    Bounds are stated on a decimal string too, where a validating client
+    passes them by: JSON Schema reads ``minimum`` and ``maximum`` on a number
+    instance only. The shape check is what enforces them there, and a reader
+    still learns the bound. Three arcs, each held by
+    test_a_bound_is_stated_beside_the_type.
+    """
+    reading: dict[str, Any] = {}
+    if param.format is not None:
+        reading["format"] = param.format
+    if param.minimum is not None:
+        reading["minimum"] = param.minimum
+    if param.maximum is not None:
+        reading["maximum"] = param.maximum
+    return reading
+
+
+def _lengths(param: Parameter) -> dict[str, Any]:
+    """An array's ``minItems`` as declared, and its ``maxItems`` as in force: declared or the default."""
+    lengths: dict[str, Any] = {}
+    # Two arcs, held by test_declared_lengths_are_stated_as_min_and_max_items
+    # and test_a_setting_of_none_states_no_maximum.
+    if param.min_length is not None:
+        lengths["minItems"] = param.min_length
+    most = max_length_in_force(param)
+    if most is not None:
+        lengths["maxItems"] = most
+    return lengths
+
+
 def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
     """An array's element: its rows' object schema, its type, or ``{}`` for any value."""
     items = param.items
@@ -182,7 +220,10 @@ def _items_schema(param: Parameter, policy: UnknownArguments) -> dict[str, Any]:
         # test_an_array_of_files_has_untyped_items.
         schema = {}
     else:
-        schema = {"type": items}
+        # ``Parameter`` takes a format or a bound on an array only for a
+        # typed element that can carry it, so a row, a file and an undeclared
+        # element carry neither and need no reading.
+        schema = {"type": items, **_reading(param)}
     if param.choices is not None:
         # Widened with null by the element's nullability and never the array's:
         # the shape check keeps a null element only where ``items_nullable``

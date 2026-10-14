@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import sys
 
 import django_filters
 import pytest
@@ -38,6 +39,13 @@ def test_defaults_and_normalization() -> None:
     assert SelectorSpec(kind=SelectorKind.LIST, selector=list).affordances is None
 
 
+@pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
+def test_allow_none_is_accepted_on_either_kind(kind: SelectorKind) -> None:
+    # On a RETRIEVE a missing row is None; on a LIST a selector's None is the
+    # empty list. Neither is refused.
+    assert SelectorSpec(kind=kind, selector=list, allow_none=True).allow_none is True
+
+
 def test_output_is_the_presenters() -> None:
     spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, presenter=Named(), reads=PK)
     assert spec.output() == Named().output()
@@ -60,7 +68,6 @@ def test_output_is_the_presenters() -> None:
         ),
         ({"presenter": Named}, "the class Named, which is not a Presenter"),
         ({"presenter": object()}, "is object, which is not a Presenter"),
-        ({"allow_none": True}, "only a RETRIEVE has"),
         (
             {"select_related": "author"},
             r"select_related is a string; pass a sequence, \['author'\]",
@@ -266,12 +273,70 @@ class TestFilterSet:
         # Not the callable check's wording: this one is callable.
         assert "must be callable" not in message
 
+    @pytest.mark.parametrize("declared", [{}, None], ids=["empty", "none"])
+    def test_one_declaring_no_filters_is_refused_unless_it_is_a_filterset(
+        self, declared: object
+    ) -> None:
+        # The attribute is there and declares nothing, so the object is
+        # handed none of the caller's data exactly as one without it is. A
+        # real FilterSet declaring nothing is still accepted, below.
+        class Duck:
+            base_filters = declared
+
+            def __init__(self, data: object = None, queryset: object = None) -> None:
+                self.qs = queryset
+
+        with pytest.raises(ImproperlyConfigured) as refused:
+            listing(filter_set=Duck)
+        message = str(refused.value)
+        assert "SelectorSpec.filter_set is Duck" in message
+        assert "must be a django-filter FilterSet" in message
+        assert "extend_queryset" in message
+
+    def test_a_callable_object_declaring_no_filters_is_refused_as_one(self) -> None:
+        # Not a class, so it is asked no ``issubclass``, which would raise
+        # TypeError on it.
+        class Narrow:
+            base_filters: dict[str, object] = {}
+
+            def __call__(self, data: object = None, queryset: object = None) -> object:
+                return queryset
+
+        with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set is Narrow"):
+            listing(filter_set=Narrow())
+
+    def test_a_duck_declaring_filters_is_accepted(self) -> None:
+        # Its filters are declared, so the caller's data reaches it: only
+        # a filter_set declaring none is refused.
+        class Duck:
+            base_filters = {"title": django_filters.CharFilter(lookup_expr="icontains")}
+
+            def __init__(self, data: object = None, queryset: object = None) -> None:
+                self.qs = queryset
+
+        assert listing(filter_set=Duck).reads.names() == {"title"}
+
+    def test_without_django_filter_loaded_a_duck_declaring_nothing_is_refused(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A FilterSet cannot exist unless django-filter is loaded, so the
+        # check reads the loaded module rather than importing it: an
+        # environment without the extra refuses the duck in the same words,
+        # rather than raising for the missing package.
+        monkeypatch.delitem(sys.modules, "django_filters")
+
+        class Duck:
+            base_filters: dict[str, object] = {}
+
+        with pytest.raises(ImproperlyConfigured, match="must be a django-filter FilterSet"):
+            listing(filter_set=Duck)
+
     def test_a_filterset_declaring_no_filters_is_accepted(self) -> None:
-        # Holds the guard to the attribute's absence rather than its
-        # emptiness: a real FilterSet with no filters narrows nothing and
-        # declares nothing, which is a spec worth nothing but not a broken
-        # one. A guard reading ``getattr(..., "base_filters", None) or ...``
-        # refuses this.
+        # Holds the guard's FilterSet condition: a real FilterSet with no
+        # filters narrows nothing and declares nothing, which is a spec
+        # worth nothing but not a broken one, where any other object
+        # declaring no filters is refused. A guard reading the emptiness of
+        # ``base_filters`` alone refuses this.
         class Empty(django_filters.FilterSet):
             pass
 

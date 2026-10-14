@@ -7,13 +7,17 @@ from typing import Any
 
 from django.utils.translation import gettext
 
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import parse_number
+from django_service_specs.parameters.utils import length_problem, parse_number
 
 # Messages are translated where they are raised, never at import, and spelled as
 # a stock Django field spells them where one has the message, so Django's own
-# catalog translates them; see check_arguments.
+# catalog translates them; see check_arguments. Each carries the code a DRF
+# field gives the same mistake, held by
+# test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake: every
+# one here is ``"invalid"``, a nested serializer's code for a string included.
 
 _BOOLEANS = {"true": True, "1": True, "false": False, "0": False}
 """The only spellings a boolean has, matched case-insensitively.
@@ -45,6 +49,9 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
       are read the same way, a repeated query-string key's included. A string
       outside ASCII spells no integer or number, Arabic-Indic or fullwidth digits
       included, although Django's fields read them: see ``parse_number``.
+    - **An array longer than it takes is refused whole**, at its name, before
+      any element is read: the shape check's own length rule, which this
+      shares, so a flat list of a million malformed values costs one message.
     - An array's elements are each coerced by its ``items`` type, and a single
       value becomes a one-element list, since a flat transport sends a
       one-element list as a bare value. ``None`` is not wrapped: an option
@@ -70,9 +77,10 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
             coerced[key] = value
             continue
         if param.nested is not None:
-            errors[key] = [
-                gettext("This argument has nested parameters, which a flat transport cannot send.")
-            ]
+            message = gettext(
+                "This argument has nested parameters, which a flat transport cannot send."
+            )
+            errors[key] = [CodedMessage(message, "invalid")]
             continue
         # The second condition is held by test_none_is_not_wrapped_into_an_array.
         if param.type != "array" or value is None:
@@ -86,7 +94,13 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
         # undeclared element is left as the string it arrived as.
         item_type = param.items if isinstance(param.items, str) else "string"
         elements = list(value) if isinstance(value, list | tuple) else [value]
-        found: dict[int, list[str]] = {}
+        # Before any element is parsed, so a long list costs no per-element work:
+        # test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read.
+        problem = length_problem(param, len(elements))
+        if problem is not None:
+            errors[key] = [problem]
+            continue
+        found: dict[int, list[CodedMessage]] = {}
         for index, element in enumerate(elements):
             elements[index], problem = _coerce_one(item_type, element)
             if problem is not None:
@@ -100,7 +114,7 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
     return coerced
 
 
-def _coerce_one(json_type: str, value: Any) -> tuple[Any, str | None]:
+def _coerce_one(json_type: str, value: Any) -> tuple[Any, CodedMessage | None]:
     """``(value, None)``, or ``(None, message)`` for a string that does not parse."""
     if not isinstance(value, str):
         return value, None
@@ -108,14 +122,15 @@ def _coerce_one(json_type: str, value: Any) -> tuple[Any, str | None]:
         number = parse_number(json_type, value)
         if number is not None:
             return number, None
-        return None, (
+        return None, CodedMessage(
             gettext("Enter a whole number.")
             if json_type == "integer"
-            else gettext("Enter a number.")
+            else gettext("Enter a number."),
+            "invalid",
         )
     if json_type == "boolean":
         lowered = value.lower()
         if lowered in _BOOLEANS:
             return _BOOLEANS[lowered], None
-        return None, gettext("Enter true, false, 1 or 0.")
+        return None, CodedMessage(gettext("Enter true, false, 1 or 0."), "invalid")
     return value, None

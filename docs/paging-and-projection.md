@@ -158,7 +158,10 @@ Both are clamped at both ends - `limit` to between 1 and `max_page_size`,
 rather than silent: the envelope's `page` is the page actually served, and
 `totalPages` and `hasNext` are counted at the limit actually used. A queryset
 is counted with one `COUNT` before it is sliced, so a page past the end is
-never an unbounded `OFFSET`.
+never an unbounded `OFFSET`, and no page is longer than the rows counted, so
+a `limit` no `max_page_size` bounds, however large, still serves every row
+where a `LIMIT` past 64 bits would be refused by the database. The envelope
+reports the `limit` asked for.
 
 The names a caller pages by, and the ceiling, are the transport's. They are
 not arguments of the spec, whose argument set is closed, so the tool takes

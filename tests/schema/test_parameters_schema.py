@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
+import os
+import subprocess
+import sys
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
+from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
@@ -122,7 +129,7 @@ class TestTheClosedArgumentSet:
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
-                "books": {"type": "array", "items": closed_book},
+                "books": {"type": "array", "items": closed_book, "maxItems": 1000},
                 "flags": {"type": "object", "properties": {}, "additionalProperties": False},
                 "meta": {"type": "object"},
             },
@@ -214,12 +221,14 @@ class TestTypes:
     def test_an_array_of_a_type_name_states_the_type_of_its_items(self) -> None:
         assert one(Parameter("ids", "array", items="integer")) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": "integer"},
         }
 
     def test_an_array_of_rows_describes_each_row_as_an_object(self) -> None:
         assert one(Parameter("books", "array", items=PUBLISHER)) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": "object",
                 "properties": {"name": {"type": "string"}},
@@ -229,7 +238,11 @@ class TestTypes:
         }
 
     def test_an_array_with_no_items_accepts_any_element(self) -> None:
-        assert one(Parameter("anything", "array")) == {"type": "array", "items": {}}
+        assert one(Parameter("anything", "array")) == {
+            "type": "array",
+            "items": {},
+            "maxItems": 1000,
+        }
 
 
 class TestNullable:
@@ -251,6 +264,7 @@ class TestNullable:
         assert one(Parameter("meta", "object", nullable=True)) == {"type": ["object", "null"]}
         assert one(Parameter("ids", "array", items="integer", nullable=True)) == {
             "type": ["array", "null"],
+            "maxItems": 1000,
             "items": {"type": "integer"},
         }
 
@@ -280,6 +294,7 @@ class TestChoices:
     def test_an_arrays_choices_constrain_each_item_and_not_the_array(self) -> None:
         assert one(Parameter("tags", "array", items="string", choices=["red", "blue"])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": "string", "enum": ["red", "blue"]},
         }
 
@@ -293,6 +308,7 @@ class TestChoices:
         }
         assert one(tags) == {
             "type": ["array", "null"],
+            "maxItems": 1000,
             "items": {"type": "string", "enum": ["red"]},
         }
 
@@ -304,6 +320,7 @@ class TestChoices:
         assert check_arguments(Parameters.of(ids), {"ids": [1, None]}) == {"ids": [1, None]}
         assert one(ids) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"type": ["integer", "null"], "enum": [1, 2, None]},
         }
 
@@ -317,6 +334,7 @@ class TestChoices:
 
         assert one(publishers) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": ["object", "null"],
                 "properties": {"name": {"type": "string"}},
@@ -328,6 +346,7 @@ class TestChoices:
     def test_an_untyped_arrays_choices_are_an_enum_with_no_type(self) -> None:
         assert one(Parameter("any", "array", choices=[1, "one"])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {"enum": [1, "one"]},
         }
 
@@ -339,6 +358,7 @@ class TestChoices:
         assert one(rate) == {"type": "string", "format": "decimal"}
         assert one(Parameter("rates", "array", choices=[Decimal("1")])) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {},
         }
 
@@ -425,6 +445,7 @@ class TestChoiceLabels:
 
         assert one(tags) == {
             "type": "array",
+            "maxItems": 1000,
             "items": {
                 "type": ["string", "null"],
                 "anyOf": [{"const": "red", "title": "Red"}, {"type": "null"}],
@@ -468,7 +489,7 @@ class TestFiles:
     def test_an_array_of_files_has_untyped_items(self) -> None:
         notes = Parameter("notes", "array", items="file", items_nullable=True)
 
-        assert one(notes) == {"type": "array", "items": {}}
+        assert one(notes) == {"type": "array", "items": {}, "maxItems": 1000}
 
     def test_a_required_file_is_required(self) -> None:
         schema = parameters_schema(Parameters.of(Parameter("notes", "file", required=True)))
@@ -556,6 +577,60 @@ def test_a_bound_is_stated_beside_the_type() -> None:
     }
 
 
+def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself() -> None:
+    # The shape check reads them on each element, so the array node carries
+    # neither: stated there, a reader would take ``minimum`` for a count.
+    pks = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    ids = Parameter("ids", "array", items="integer", minimum=1, max_length=5, items_nullable=True)
+    assert one(pks) == {
+        "type": "array",
+        "items": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
+        "maxItems": 1000,
+    }
+    assert one(ids) == {
+        "type": "array",
+        "items": {"type": ["integer", "null"], "minimum": 1},
+        "maxItems": 5,
+    }
+
+
+# --- array length ------------------------------------------------------------------------------------
+
+
+def test_an_array_states_the_maximum_in_force_when_none_is_declared() -> None:
+    # The shape check refuses past it, so a client that does not learn it
+    # sends a call that cannot run.
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array", items="integer")))
+    assert schema["properties"]["ids"] == {
+        "type": "array",
+        "items": {"type": "integer"},
+        "maxItems": 1000,
+    }
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_stated_default_follows_the_setting() -> None:
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array")))
+    assert schema["properties"]["ids"] == {"type": "array", "items": {}, "maxItems": 3}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_setting_of_none_states_no_maximum() -> None:
+    schema = parameters_schema(Parameters.of(Parameter("ids", "array")))
+    assert schema["properties"]["ids"] == {"type": "array", "items": {}}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_declared_lengths_are_stated_as_min_and_max_items() -> None:
+    both = Parameter("ids", "array", min_length=1, max_length=5, nullable=True)
+    floor = Parameter("tags", "array", min_length=0)
+    schema = parameters_schema(Parameters.of(both, floor))
+    assert schema["properties"] == {
+        "ids": {"type": ["array", "null"], "items": {}, "minItems": 1, "maxItems": 5},
+        "tags": {"type": "array", "items": {}, "minItems": 0},
+    }
+
+
 class TestAny:
     def test_any_states_no_type(self) -> None:
         # Any JSON value is one, so any type stated here would be false.
@@ -573,3 +648,62 @@ class TestAny:
 
     def test_an_anys_default_is_stated(self) -> None:
         assert one(Parameter("pk", "any", default="abc")) == {"default": "abc"}
+
+
+_UNCONFIGURED_PROBE = """
+import json
+from django.core.exceptions import ImproperlyConfigured
+from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.coerce_flat import coerce_flat
+from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.schema.parameters_schema import parameters_schema
+
+answers = []
+for parameter in (
+    Parameter("ids", "array", items="integer"),
+    Parameter("ids", "array", items="integer", max_length=5),
+):
+    parameters = Parameters.of(parameter)
+    for read in (
+        lambda: parameters_schema(parameters)["properties"]["ids"],
+        lambda: check_arguments(parameters, {"ids": [1, 2]}),
+        lambda: coerce_flat(parameters, {"ids": ["1", "2"]}),
+    ):
+        try:
+            answers.append(read())
+        except ImproperlyConfigured:
+            answers.append("ImproperlyConfigured")
+print(json.dumps(answers))
+"""
+
+
+def test_an_undeclared_array_bound_needs_django_configured_to_describe_or_check() -> None:
+    # The setting is the bound in force, so it is read rather than guessed: a
+    # default stated before ``settings.configure()`` could describe a bound
+    # the calls after it never meet, and the shape check and ``coerce_flat``
+    # read it the same way. A declared maximum needs no setting.
+    env = {key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"}
+    completed = subprocess.run(
+        [sys.executable, "-c", _UNCONFIGURED_PROBE],
+        cwd=Path(__file__).resolve().parents[2],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(completed.stdout) == [
+        "ImproperlyConfigured",
+        "ImproperlyConfigured",
+        "ImproperlyConfigured",
+        {"type": "array", "items": {"type": "integer"}, "maxItems": 5},
+        {"ids": [1, 2]},
+        {"ids": [1, 2]},
+    ]
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_no_call_could_meet_is_refused_when_the_schema_is_built() -> None:
+    # The schema states the maximum in force, which this declaration has none of.
+    with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
+        parameters_schema(Parameters.of(Parameter("ids", "array", min_length=4)))

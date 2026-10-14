@@ -58,18 +58,45 @@ extends.
 | Field | Declares |
 | --- | --- |
 | `BooleanField`, `NullBooleanField` | A `boolean`. |
-| `DecimalField` | A `string` in the `decimal` format. It takes a JSON number too. |
-| `FloatField` | A `number`. |
+| `DecimalField` | A `string` in the `decimal` format. It takes a JSON number too, and an integer whatever its digits. |
+| `FloatField` | A `number`. An integer past a float's range is refused as the field refuses an infinity: `invalid`, in its own words. |
 | `IntegerField` | An `integer`. |
 | `DateTimeField`, `DateField` | A `string` in the `date-time` or `date` format. |
 | `TimeField`, `DurationField` | A `string`. |
 | `ChoiceField` | A `string` with the choices as strings, since a plain choice field cleans with `str` and compares against each choice's `str`. The empty choice is dropped and option groups are flattened. |
 | `TypedChoiceField` | Choices, of the JSON type every value shares. Values of mixed types, or of a type JSON does not have, are refused. |
-| `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. |
+| `MultipleChoiceField`, `TypedMultipleChoiceField` | An `array` of the same, whose choices constrain each element. No choice field declares a length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds every list one takes. |
 | `ModelChoiceField` | The JSON type of the model field rows are matched on - `to_field_name`, or the primary key - and no choices: they are rows, and listing them would query. It validates to the row. |
-| `ModelMultipleChoiceField` | An `array` of the same. It validates to a queryset. |
+| `ModelMultipleChoiceField` | An `array` of the same, so one matching rows on a `DecimalField` declares the `decimal` format for each element and `?rows=12.50,9.99` is two of them. Django matches each against the column's own spelling, `"12.50"` and not `12.5`. It validates to a queryset. |
 | `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. An optional one also declares its [clear checkbox](#clearing-a-file). |
 | any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
+
+A key past the range of the integer column rows are matched on names no row,
+so either field refuses it as it refuses a key no row holds: `invalid_choice`,
+in its own words, beside the form's other refusals. The adapter answers it
+before the form queries, because Django hands a `ModelMultipleChoiceField`'s
+keys to the database driver in an `__in` lookup, and SQLite's raises
+`OverflowError` for one past 64 bits on every Django version, as it does for a
+`ModelChoiceField`'s on Django 4.2. The range is the database's own for the
+column, as Django reads it to answer an exact lookup past it with no rows, and
+a key sent as a string of digits is the integer it spells.
+
+A `ModelForm` value past the range of its model's integer column is refused in
+the words, and with the code, of the validator Django's model field carries
+from 5.0: `max_value` past its top, `min_value` past its bottom. Django 4.2
+states no range for SQLite, so there the form took such a value, and a
+uniqueness check or a constraint querying with it raised the driver's
+`OverflowError`. The value is judged where Django 5.0 and later judge it: after
+the form field, its `clean_<field>()` and the form's `clean()`, on what they
+hand back, read as the model reads it, so digits a text field cleans to are
+the integer they spell. So a value the field refuses is refused in the field's
+words, its own bounds included, a `clean_<field>()` refusing it is reported in
+its own words, and one that brings the value inside the range has it taken.
+Only a column Django validates is judged, the ones it does not leave out of
+the model's checks: a value `clean()` sets in `cleaned_data` for a column the
+form has no field for, and a field the form declares over a column
+`Meta.fields` leaves out or `Meta.exclude` names, are never written onto the
+row by the form, and are the form's to use, whatever their size.
 
 Every choice field's choices carry their labels as `choice_labels`, the label
 Django displays keyed by the value as the caller sends it, so a schema states

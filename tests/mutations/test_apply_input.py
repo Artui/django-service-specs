@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from unittest.mock import patch
 
 import pytest
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 from django_service_specs.mutations.apply_input import apply_input
 from django_service_specs.types.unset import UNSET
 from tests.adapter_app.models import Document
-from tests.mutations.utils import STORED, stored_document
+from tests.mutations.utils import STORED, attachment_at_the_root, stored_document
 from tests.relations_app.models import Author, Post
 
 
@@ -123,6 +124,23 @@ class TestFileFields:
         result = apply_input(row, {"attachment": None})
         assert result.changes == ()
         assert row.attachment.name == STORED
+
+    def test_an_upload_named_as_the_held_file_is_set(self, media: str) -> None:
+        with attachment_at_the_root():
+            row = stored_document()
+        upload = SimpleUploadedFile("notes.txt", b"new")
+        result = apply_input(row, {"attachment": upload})
+        assert result.changed_fields == ("attachment",)
+        assert result.get_field_change("attachment").old == "notes.txt"
+        # Set and not yet stored: the save that follows writes it.
+        assert row.attachment.file is upload
+
+    def test_the_held_file_handed_back_is_no_change(self, media: str) -> None:
+        row = stored_document()
+        held = row.attachment
+        result = apply_input(row, {"attachment": held})
+        assert result.changes == ()
+        assert row.attachment is held
 
     def test_a_file_is_set_through_its_field_s_save_form_data(self, media: str) -> None:
         # As a ModelForm writes it, so a field overriding how it stores a file is honoured.

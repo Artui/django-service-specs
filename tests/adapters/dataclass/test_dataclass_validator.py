@@ -7,11 +7,12 @@ from decimal import Decimal
 from typing import Any, Literal
 
 import pytest
-from django.core.exceptions import ImproperlyConfigured
-from django.test import override_settings
+from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.test import RequestFactory, override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
@@ -33,6 +34,7 @@ from tests.adapters.dataclass.utils import (
     Range,
     Schedule,
 )
+from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
 
@@ -254,6 +256,24 @@ def test_a_decimal_takes_a_string_or_a_json_number(argument: Any, expected: Deci
     assert str(values["price"]) == str(expected)
 
 
+@pytest.mark.parametrize(
+    ("argument", "expected"),
+    [
+        ("12.50", Decimal("12.50")),
+        ("\u0661\u0662.\u0665", Decimal("12.5")),
+        ("\uff15", Decimal("5")),
+    ],
+)
+def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(
+    argument: str, expected: Decimal
+) -> None:
+    # Django's ``DecimalField``, DRF's and pydantic's ``Decimal`` all hand the
+    # string to ``Decimal``, which reads Arabic-Indic and fullwidth digits, so
+    # the adapter takes the digits each of them takes, the plain ones alike.
+    values = DataclassValidator(_Price).validate({"price": argument}, CONTEXT)
+    assert str(values["price"]) == str(expected)
+
+
 def test_unset_type_with_no_default_is_filled_with_unset() -> None:
     assert DataclassValidator(_Patch).validate({}, CONTEXT) == {"bio": UNSET}
     assert DataclassValidator(_Patch).validate({"bio": None}, CONTEXT) == {"bio": None}
@@ -375,6 +395,24 @@ def test_a_decimal_that_is_not_a_finite_number_is_refused(argument: Any) -> None
     assert _refusal(_Price, {"price": argument}) == {"price": ["Enter a number."]}
 
 
+@pytest.mark.parametrize("argument", [10**400, -(10**400)], ids=["above", "below"])
+def test_an_integer_past_a_float_s_range_is_no_number(argument: int) -> None:
+    # JSON's number has no range, so the shape check passes the integer on,
+    # and ``float`` raises OverflowError for it rather than refusing it.
+    detail = _refusal(Everything, _arguments(ratio=argument))
+    assert coded(detail) == {"ratio": [("Enter a number.", "invalid")]}
+
+
+def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits() -> None:
+    # Past the 4300 digits ``str`` writes an int in from Python 3.10.7 on, a
+    # decimal read through its string raised ValueError. An int is a Decimal
+    # exactly as it is, so no digit is lost reading it whole.
+    argument = 10**5000
+    assert DataclassValidator(_Price).validate({"price": argument}, CONTEXT) == {
+        "price": Decimal(argument)
+    }
+
+
 @pytest.mark.parametrize(
     "argument",
     [
@@ -424,7 +462,9 @@ def test_the_tree_holds_int_row_keys_and_str_messages() -> None:
     detail = _refusal(Everything, _arguments(name=None, lines=[_line(), _line(sku=1)]))
     (row,) = detail["lines"]
     assert type(row) is int
-    assert all(type(message) is str for message in detail["name"])
+    # A ``str`` each, carrying its code: never a lazy translation.
+    assert all(isinstance(message, str) for message in detail["name"])
+    assert coded(detail["name"]) == [("This field cannot be null.", "null")]
 
 
 def test_every_failure_is_collected_across_levels() -> None:
@@ -467,12 +507,27 @@ class _Typed:
     count: int
     price: Decimal
     status: Status
+    prices: list[Decimal]
 
 
 @pytest.mark.parametrize(
     "arguments",
-    [{"count": "three"}, {"price": True}, {"status": "archived"}],
-    ids=["type", "decimal", "choice"],
+    [
+        {"count": "three"},
+        {"price": True},
+        {"status": "archived"},
+        {"prices": ["1", "many"]},
+        {"prices": [True]},
+        {"prices": ["NaN"]},
+    ],
+    ids=[
+        "type",
+        "decimal",
+        "choice",
+        "decimal-element",
+        "decimal-element-type",
+        "decimal-element-not-finite",
+    ],
 )
 def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     arguments: dict[str, Any],
@@ -480,11 +535,64 @@ def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     # Dispatch puts the shape check in front of the Validator, so a caller of
     # dispatch only ever reads the first; a caller of ``validate()`` reads the
     # second. One fault should read the same to both.
-    valid = {"count": 1, "price": "1.5", "status": Status.values[0]}
+    valid = {"count": 1, "price": "1.5", "status": Status.values[0], "prices": []}
     validator = DataclassValidator(_Typed)
     with pytest.raises(InvalidArguments) as shape:
         check_arguments(validator.parameters(), {**valid, **arguments})
     assert shape.value.detail == _refusal(_Typed, {**valid, **arguments})
+
+
+@dataclass
+class _Dated:
+    prices: list[Decimal]
+    at: list[dt.datetime]
+    on: list[dt.date]
+
+
+def test_a_list_of_decimals_declares_each_element_a_decimal() -> None:
+    # A date or a date-time element takes no format on an array, so those
+    # lists stay arrays of strings: without the decimal condition in
+    # ``element_format`` this dataclass could not be declared at all.
+    params = DataclassValidator(_Dated).parameters()
+    assert [(p.name, p.items, p.format) for p in params] == [
+        ("prices", "string", "decimal"),
+        ("at", "string", None),
+        ("on", "string", None),
+    ]
+
+
+def test_the_shape_check_takes_each_decimal_element_as_the_validator_does() -> None:
+    # A scalar decimal takes a JSON number as well as a string, and so does
+    # each element of a list of them, at the shape check as in ``validate()``.
+    validator = DataclassValidator(_Dated)
+    arguments = {"prices": [1.5, "2.25", 3], "at": [], "on": []}
+    assert check_arguments(validator.parameters(), arguments) == arguments
+    assert validator.validate(arguments, CONTEXT)["prices"] == [
+        Decimal("1.5"),
+        Decimal("2.25"),
+        Decimal("3"),
+    ]
+
+
+def test_a_list_declares_no_length_and_the_setting_bounds_it() -> None:
+    parameters = DataclassValidator(_Dated).parameters()
+    assert {(p.min_length, p.max_length) for p in parameters} == {(None, None)}
+    with (
+        override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2),
+        pytest.raises(InvalidArguments) as caught,
+    ):
+        check_arguments(parameters, {"prices": ["1", "2", "3"], "at": [], "on": []})
+    assert coded(caught.value.detail) == {
+        "prices": [("Ensure this field has no more than 2 elements.", "max_length")]
+    }
+
+
+def test_a_query_string_splits_a_list_of_decimals_on_its_commas() -> None:
+    # No decimal holds a comma, so ``?prices=1.5,2.25`` is two elements, each
+    # the string it was sent as, for the Validator to read exactly.
+    request = RequestFactory().get("/", {"prices": "1.5,2.25"})
+    parameters = DataclassValidator(_Dated).parameters()
+    assert request_arguments(request, parameters) == {"prices": ["1.5", "2.25"]}
 
 
 @dataclass
@@ -641,3 +749,108 @@ def test_a_subclass_may_extend_validated_through_validate() -> None:
         {"price": Decimal("1.00")},
         {"bound": "yes"},
     )
+
+
+@dataclass
+class _Coded:
+    title: str
+    kind: Literal["draft", "final"] = "draft"
+    price: Decimal = Decimal("1")
+    at: dt.datetime | None = None
+    on: dt.date | None = None
+
+
+class TestRefusalCodes:
+    """Each refusal carries the code a DRF field gives the same mistake."""
+
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            pytest.param({}, {"title": [("This field is required.", "required")]}, id="required"),
+            pytest.param(
+                {"title": None}, {"title": [("This field cannot be null.", "null")]}, id="null"
+            ),
+            pytest.param(
+                {"title": "t", "extra": 1},
+                {"extra": [("Unknown argument.", "unknown")]},
+                id="unknown",
+            ),
+            pytest.param(
+                {"title": "t", "kind": "gone"},
+                {
+                    "kind": [
+                        (
+                            "Select a valid choice. gone is not one of the available choices.",
+                            "invalid_choice",
+                        )
+                    ]
+                },
+                id="choice",
+            ),
+            pytest.param(
+                {"title": "t", "price": "abc"},
+                {"price": [("Enter a number.", "invalid")]},
+                id="decimal",
+            ),
+            pytest.param(
+                {"title": "t", "price": "NaN"},
+                {"price": [("Enter a number.", "invalid")]},
+                id="decimal-not-finite",
+            ),
+            pytest.param(
+                {"title": "t", "at": "soon"},
+                {"at": [("Enter a valid date/time.", "invalid")]},
+                id="date-time",
+            ),
+            pytest.param(
+                {"title": "t", "on": "soon"},
+                {"on": [("Enter a valid date.", "invalid")]},
+                id="date",
+            ),
+            pytest.param({"title": 3}, {"title": [("Expected a string.", "invalid")]}, id="type"),
+        ],
+    )
+    def test_each_refusal_carries_its_code(
+        self, arguments: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        assert coded(_refusal(_Coded, arguments)) == expected
+
+    @pytest.mark.parametrize(
+        ("raised", "expected"),
+        [
+            pytest.param(
+                ValueError("Out of range."), [("Out of range.", "invalid")], id="value-error"
+            ),
+            pytest.param(
+                ValidationError("Taken.", code="taken"), [("Taken.", "taken")], id="its-own-code"
+            ),
+            pytest.param(ValidationError("Bad."), [("Bad.", "invalid")], id="no-code"),
+            pytest.param(
+                ValidationError("Over %(limit)s.", code="over", params={"limit": 3}),
+                [("Over 3.", "over")],
+                id="params",
+            ),
+            pytest.param(
+                ValidationError(
+                    {
+                        "title": [ValidationError("Short.", code="short")],
+                        "body": [ValidationError("Empty.")],
+                    }
+                ),
+                [("Short.", "short"), ("Empty.", "invalid")],
+                id="by-field",
+            ),
+        ],
+    )
+    def test_a_post_init_refusal_keeps_django_s_code_or_says_invalid(
+        self, raised: Exception, expected: list[tuple[str, str]]
+    ) -> None:
+        # DRF's own default for a message raised with no code is ``invalid``.
+        @dataclass
+        class Checked:
+            title: str
+
+            def __post_init__(self) -> None:
+                raise raised
+
+        assert coded(_refusal(Checked, {"title": "t"})) == {"non_field_errors": expected}

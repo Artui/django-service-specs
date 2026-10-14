@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -58,9 +59,16 @@ class SelectorSpec:
             the shape check both apply to them.
         presenter: Renders the rows. Not read on an instance or collection
             selector, whose rows the service consumes rather than returns.
-        allow_none: ``RETRIEVE`` only. A missing row is the value ``None``
+        allow_none: On a ``RETRIEVE``, a missing row is the value ``None``
             rather than not-found - the shape of an optional singleton, or of an
-            upsert's target.
+            upsert's target. On a ``LIST``, a selector returning ``None`` has
+            returned the empty list: the shaping is skipped, since there is
+            nothing to shape, and the result is ``[]`` wherever the selector
+            runs, so a selector spec's own scope check and ``preconditions``
+            see the empty set, as they see an empty queryset, and its output
+            schema stays an array. Without it, a ``LIST`` selector's ``None``
+            is passed on as it came, and presenting it fails as the author's
+            error.
         select_related, prefetch_related, annotations: Applied to the queryset
             the selector returns, in that order. Declaring any of them when the
             selector returns something else is refused at dispatch.
@@ -70,10 +78,15 @@ class SelectorSpec:
             one declared ``async def`` is refused at construction.
         filter_set: Applied after ``extend_queryset``: a django-filter
             ``FilterSet`` class, called as ``filter_set(data=..., queryset=...)``
-            and answering ``.qs``. An object with no ``base_filters`` - a
-            duck-typed stand-in - is refused at construction, because it
-            declares no Parameters and so would be handed none of the
-            caller's data. Its filters are reads: read as Parameters by
+            and answering ``.qs``. One that declares no filters - its
+            ``base_filters`` missing, empty or ``None`` - is refused at
+            construction unless it is a django-filter ``FilterSet`` class,
+            because it declares no Parameters and so would be handed none of
+            the caller's data: a duck-typed stand-in must declare its filters
+            in ``base_filters``, and a step narrowing the queryset by no
+            argument belongs in ``extend_queryset``. A real ``FilterSet``
+            declaring none is accepted and narrows nothing. Its filters are
+            reads: read as Parameters by
             [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
             and added to ``reads`` after the author's own, so the schema, the
             closed argument set and the shape check all cover them, and a
@@ -115,11 +128,18 @@ class SelectorSpec:
             [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
             sink the run reports to beside the transport's - a task record, an
             audit trail - called with the keywords it declares from the base
-            pool. Resolved on first use, so a call refused before its run never
-            calls it, and a provider returning ``None`` declines. The
-            object-level and scope checks and the ``preconditions`` answer
-            after the selector, which is the run, so a call they refuse may
-            already have called it. Refused on a nested selector.
+            pool. The run is the selector, and the provider is called only for
+            a selector that takes ``progress``, once its keywords are bound:
+            a sync selector calls it on its first report, and an ``async
+            def`` one before the await. So a call refused before the run,
+            a read the caller left out included, never calls it, and a
+            provider returning ``None`` declines. The object-level and scope
+            checks and the ``preconditions`` answer after the selector, so a
+            call they refuse may already have called it. Nothing but the
+            selector reports to it: ``extend_queryset``, the
+            ``preconditions`` and the affordance conditions answered for the
+            rows read ``progress`` from the pool, which is the transport's
+            reporter. Refused on a nested selector.
         metadata: A project's own per-operation facts, stored as given and read
             back by its own checks or audit hooks.
     """
@@ -176,21 +196,28 @@ class SelectorSpec:
             raise ImproperlyConfigured(f"{label}.reads must be Parameters.")
         if self.filter_set is not None:
             check_callable(self.filter_set, label=f"{label}.filter_set", sync=True)
-            # The attribute's absence, not its emptiness: a real FilterSet
-            # declaring no filters is legal and narrows nothing, where an
-            # object without ``base_filters`` declares no Parameters either
-            # and so is handed none of the caller's data
-            # (TestFilterSet.test_one_with_no_base_filters_is_refused_naming_it;
-            # test_a_filterset_declaring_no_filters_is_accepted holds the other
-            # side). After the callable check, so a value that is no callable
-            # is still refused as one.
-            if not hasattr(self.filter_set, "base_filters"):
+            # A filter_set declaring no filters is handed none of the caller's
+            # data and never filters, whether its ``base_filters`` is missing,
+            # empty or ``None``. A real FilterSet declaring none is still
+            # legal, and narrows nothing, since django-filter builds that
+            # class itself; anything else declaring none is refused. One
+            # branch to coverage, so each condition is held by its own test:
+            # TestFilterSet.test_a_duck_declaring_filters_is_accepted (the
+            # filters declared) and
+            # test_a_filterset_declaring_no_filters_is_accepted (a FilterSet,
+            # whose own conditions ``_is_filter_set`` names). After the
+            # callable check, so a value that is no callable is still refused
+            # as one.
+            if not getattr(self.filter_set, "base_filters", None) and not _is_filter_set(
+                self.filter_set
+            ):
                 named = getattr(self.filter_set, "__name__", type(self.filter_set).__name__)
                 raise ImproperlyConfigured(
-                    f"{label}.filter_set is {named}, which has no base_filters. A filter_set "
-                    "must be a django-filter FilterSet: its filters are declared as the "
-                    "selector's arguments, and an object that declares none is handed none "
-                    "of the caller's data and never filters."
+                    f"{label}.filter_set is {named}, which declares no filters in "
+                    "base_filters. A filter_set must be a django-filter FilterSet: its "
+                    "filters are declared as the selector's arguments, and an object that "
+                    "declares none is handed none of the caller's data and never filters. "
+                    "A step narrowing the queryset by no argument belongs in extend_queryset."
                 )
         _read_filters(self)
         # After the filters join, so a filter named ``user`` is refused as a
@@ -198,10 +225,6 @@ class SelectorSpec:
         # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
         check_reserved(self.reads, label=f"{label}.reads")
         check_presenter(self.presenter, label=label)
-        if self.allow_none and kind is not SelectorKind.RETRIEVE:
-            raise ImproperlyConfigured(
-                f"{label}.allow_none describes a missing row, which only a RETRIEVE has."
-            )
         for name in ("select_related", "prefetch_related"):
             value = getattr(self, name)
             if value is not None:
@@ -226,6 +249,30 @@ class SelectorSpec:
     def output(self) -> Output | None:
         """What this spec returns, as its presenter declares it, or ``None``."""
         return self.presenter.output() if self.presenter is not None else None
+
+
+def _is_filter_set(filter_set: Any) -> bool:
+    """Whether ``filter_set`` is a django-filter ``FilterSet`` class.
+
+    Read off the loaded module rather than by importing it: a ``FilterSet``
+    cannot exist unless django-filter has been imported, so a module not
+    loaded answers ``False`` without importing anything, and an environment
+    without the ``filter`` extra refuses a duck in the same words as one
+    with it. One branch to coverage, so each condition is held by its own
+    test, in ``TestFilterSet``:
+    test_a_callable_object_declaring_no_filters_is_refused_as_one (a class:
+    ``issubclass`` raises on anything else),
+    test_without_django_filter_loaded_a_duck_declaring_nothing_is_refused
+    (the module loaded) and
+    test_one_declaring_no_filters_is_refused_unless_it_is_a_filterset (the
+    subclass).
+    """
+    module = sys.modules.get("django_filters")
+    return (
+        isinstance(filter_set, type)
+        and module is not None
+        and issubclass(filter_set, module.FilterSet)
+    )
 
 
 def _read_filters(spec: SelectorSpec) -> None:

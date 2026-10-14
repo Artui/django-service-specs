@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import dataclasses
+import json
+import sys
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
 
 import pytest
 from django import forms
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
@@ -22,6 +25,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
+from tests.parameters.utils import coded
 
 REQUIRED = "This field is required."
 NULL = "This field cannot be null."
@@ -259,10 +263,12 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
         ("integer", "3.0", 3),
         ("integer", " 3 ", 3),
         ("integer", "-4.", -4),
-        ("number", "3", 3.0),
+        # A number's integer spelling is the exact int a JSON decoder makes of it.
+        ("number", "3", 3),
         ("number", "3.0", 3.0),
-        ("number", " 3 ", 3.0),
+        ("number", " 3 ", 3),
         ("number", "1e3", 1000.0),
+        ("number", "1E3", 1000.0),
         ("number", "2.5", 2.5),
     ],
 )
@@ -330,11 +336,46 @@ def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: st
     ) == {"count": ["Expected an integer."], "ratio": ["Expected a number."]}
 
 
-def test_a_decimal_string_outside_ascii_is_read_as_decimal_reads_it() -> None:
+@pytest.mark.parametrize(
+    ("value", "number"),
+    [(str(2**53 + 1), 2**53 + 1), ("-12", -12), ("12.5", 12.5), ("1e3", 1000.0)],
+)
+def test_a_number_s_string_is_handed_on_as_a_json_decoder_reads_its_digits(
+    value: str, number: float
+) -> None:
+    # A JSON body carrying the literal 9007199254740993 hands on that exact
+    # ``int``; the same digits sent as a string are read the same way, not
+    # rounded through ``float`` to their neighbour.
+    checked = check_arguments(one(Parameter("x", "number")), {"x": value})["x"]
+    assert checked == number
+    assert type(checked) is type(number)
+
+
+def test_a_number_s_string_past_int_s_digit_limit_is_refused_never_rounded() -> None:
+    # Zero-padded past the 4300 digits ``int`` reads from Python 3.10.7 on,
+    # these digits are still a finite ``float``, 2**53: refused as no number
+    # rather than handed on as that neighbour. With no limit they are exact.
+    padded = "0" * 4300 + str(2**53 + 1)
+    params = one(Parameter("x", "number"))
+    if getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0:
+        assert refusal(params, {"x": padded}) == {"x": ["Expected a number."]}
+    else:
+        assert check_arguments(params, {"x": padded}) == {"x": 2**53 + 1}
+    long = "9" * 4301
+    assert refusal(params, {"x": long}) == {"x": ["Expected a number."]}
+    integer = one(Parameter("x", "integer"))
+    assert refusal(integer, {"x": long}) == {"x": ["Expected an integer."]}
+
+
+@pytest.mark.parametrize("value", ["12.50", "\u0665", "\uff15", "\u0661\u0662.\u0665", " 5 "])
+def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(value: str) -> None:
     # Not a number's reading: a decimal is checked as Python's ``Decimal``
-    # parses it, which takes an Arabic-Indic five, and is handed on unchanged.
+    # parses it, which takes Arabic-Indic and fullwidth digits, and is handed
+    # on unchanged. Deliberately: Django's ``DecimalField``, DRF's and
+    # pydantic's ``Decimal`` each hand the string to ``Decimal`` and take them,
+    # so refusing them would be stricter than every Validator behind the check.
     params = one(Parameter("price", "string", format="decimal"))
-    assert check_arguments(params, {"price": "\u0665"}) == {"price": "\u0665"}
+    assert check_arguments(params, {"price": value}) == {"price": value}
 
 
 def test_true_is_still_no_number_and_no_integer() -> None:
@@ -826,6 +867,70 @@ def test_a_decimal_is_compared_as_the_decimal_it_spells(value: Any, detail: Any)
         assert refusal(params, {"price": value}) == {"price": detail}
 
 
+# --- an array's element: its format and its bounds ------------------------------------------
+
+FORTY_DIGITS = "0.1234567890123456789012345678901234567891"
+"""A fraction no float holds: read through one, it comes back as 0.12345678901234568."""
+
+
+def _decimals() -> Parameters:
+    """A django-filter CSV number filter's declaration, built in the test so a tree refusing it fails there."""
+    return one(
+        Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
+    )
+
+
+def test_each_element_of_a_decimal_array_is_handed_on_as_it_was_sent() -> None:
+    # Exact: a string stays the string it spells, never a float on the way, and
+    # a JSON number is taken as a scalar decimal takes one.
+    sent = ["1", 2, FORTY_DIGITS, " 12.5 ", 1.5, "1e50", "-1e50"]
+    assert check_arguments(_decimals(), {"pks": sent}) == {"pks": sent}
+
+
+def test_an_element_past_its_bound_is_refused_at_its_index_with_django_s_code() -> None:
+    # Compared by exponent, so a billion-digit integer is never built: a
+    # regression must fail here rather than hang the suite.
+    detail = refusal(_decimals(), {"pks": ["1", "1E+999999999", "-1E+999999999", 1e60]})
+    assert coded(detail) == {
+        "pks": {
+            1: [(ABOVE % "1e+50", "max_value")],
+            2: [(BELOW % "-1e+50", "min_value")],
+            3: [(ABOVE % "1e+50", "max_value")],
+        }
+    }
+
+
+def test_an_element_that_spells_no_decimal_is_refused_at_its_index() -> None:
+    detail = refusal(_decimals(), {"pks": ["1", "x", "", True, "NaN", None]})
+    assert coded(detail) == {
+        "pks": {
+            1: [(NOT_A_NUMBER, "invalid")],
+            2: [(NOT_A_NUMBER, "invalid")],
+            3: [("Expected a decimal string or a number.", "invalid")],
+            4: [(NOT_A_NUMBER, "invalid")],
+            # A gap the element does not allow is refused as the type it is not.
+            5: [("Expected a decimal string or a number.", "invalid")],
+        }
+    }
+
+
+def test_a_decimal_array_s_null_element_is_kept_where_its_element_is_nullable() -> None:
+    params = one(
+        Parameter("pks", "array", items="string", format="decimal", maximum=1, items_nullable=True)
+    )
+    assert check_arguments(params, {"pks": ["1", None]}) == {"pks": ["1", None]}
+    assert refusal(params, {"pks": [None, "2"]}) == {"pks": {1: [ABOVE % 1]}}
+
+
+@pytest.mark.parametrize("items", ["integer", "number"])
+def test_each_element_of_a_number_array_is_bounded(items: str) -> None:
+    params = one(Parameter("ids", "array", items=items, minimum=1, maximum=10))
+    assert check_arguments(params, {"ids": [1, "10", 5.0]}) == {"ids": [1, 10, 5]}
+    assert coded(refusal(params, {"ids": [1, 11, "0"]})) == {
+        "ids": {1: [(ABOVE % 10, "max_value")], 2: [(BELOW % 1, "min_value")]}
+    }
+
+
 def test_a_value_of_the_wrong_type_is_refused_as_that_not_as_out_of_bounds() -> None:
     params = one(Parameter("price", "string", format="decimal", maximum=1))
     assert refusal(params, {"price": "lots"}) == {"price": [NOT_A_NUMBER]}
@@ -843,6 +948,99 @@ def test_a_bound_message_is_translated_through_djangos_own_catalog() -> None:
     assert detail == {"n": [expected % {"limit_value": 10}]}
 
 
+# --- array length ------------------------------------------------------------------------------------
+
+TOO_MANY = "Ensure this field has no more than %s elements."
+TOO_FEW = "Ensure this field has at least %s elements."
+IDS = one(Parameter("ids", "array", items="integer"))
+
+
+def test_an_array_takes_a_thousand_elements_and_no_more_by_default() -> None:
+    # The boundary pair, so the default itself is held: 1000 is Django's own
+    # DATA_UPLOAD_MAX_NUMBER_FIELDS, the line a form body already stops at.
+    assert check_arguments(IDS, {"ids": list(range(1000))}) == {"ids": list(range(1000))}
+    assert refusal(IDS, {"ids": list(range(1001))}) == {"ids": [TOO_MANY % 1000]}
+
+
+def test_an_array_past_its_maximum_is_refused_before_any_element_is_read() -> None:
+    # Every element is malformed, and none is addressed: the list is refused
+    # whole, so a long list costs no per-element work.
+    detail = refusal(IDS, {"ids": ["x"] * 1001})
+    assert detail == {"ids": [TOO_MANY % 1000]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_setting_moves_the_default_maximum() -> None:
+    assert check_arguments(IDS, {"ids": [1, 2, 3]}) == {"ids": [1, 2, 3]}
+    assert refusal(IDS, {"ids": [1, 2, 3, 4]}) == {"ids": [TOO_MANY % 3]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_setting_of_none_bounds_no_array() -> None:
+    assert check_arguments(IDS, {"ids": list(range(1001))}) == {"ids": list(range(1001))}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_the_default_maximum_reaches_an_array_inside_a_row() -> None:
+    rows = one(Parameter("books", "array", items=Parameters.of(Parameter("tags", "array"))))
+    assert refusal(rows, {"books": [{"tags": [1, 2, 3, 4]}]}) == {
+        "books": {0: {"tags": [TOO_MANY % 3]}}
+    }
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_declared_maximum_outranks_the_default_both_ways() -> None:
+    wider = one(Parameter("ids", "array", max_length=5))
+    narrower = one(Parameter("ids", "array", max_length=2))
+    assert check_arguments(wider, {"ids": [1, 2, 3, 4, 5]}) == {"ids": [1, 2, 3, 4, 5]}
+    assert refusal(wider, {"ids": [1, 2, 3, 4, 5, 6]}) == {"ids": [TOO_MANY % 5]}
+    assert refusal(narrower, {"ids": [1, 2, 3]}) == {"ids": [TOO_MANY % 2]}
+
+
+def test_a_declared_minimum_is_inclusive() -> None:
+    params = one(Parameter("ids", "array", min_length=2))
+    assert check_arguments(params, {"ids": [1, 2]}) == {"ids": [1, 2]}
+    assert refusal(params, {"ids": [1]}) == {"ids": [TOO_FEW % 2]}
+    assert refusal(params, {"ids": []}) == {"ids": [TOO_FEW % 2]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_past_the_default_maximum_with_no_maximum_of_its_own_is_refused_loudly() -> None:
+    # No call could pass, and the setting is read only at the call, so this is
+    # where the declaration is found wrong rather than every call refused.
+    params = one(Parameter("ids", "array", min_length=4))
+    with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
+        check_arguments(params, {"ids": [1, 2, 3, 4]})
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_at_the_default_maximum_is_met_by_a_list_of_exactly_that_many() -> None:
+    # The default bounds inclusively, so a minimum equal to it is meetable:
+    # only one past it is refused as a declaration no call could pass.
+    params = one(Parameter("ids", "array", min_length=3))
+    assert check_arguments(params, {"ids": [1, 2, 3]}) == {"ids": [1, 2, 3]}
+    assert refusal(params, {"ids": [1, 2]}) == {"ids": [TOO_FEW % 3]}
+    assert refusal(params, {"ids": [1, 2, 3, 4]}) == {"ids": [TOO_MANY % 3]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
+def test_a_minimum_past_the_default_is_taken_beside_its_own_maximum() -> None:
+    params = one(Parameter("ids", "array", min_length=4, max_length=4))
+    assert check_arguments(params, {"ids": [1, 2, 3, 4]}) == {"ids": [1, 2, 3, 4]}
+
+
+def test_a_length_message_is_spelled_as_drf_spells_it() -> None:
+    # No Django catalog entry counts a list's elements (MaxLengthValidator
+    # counts characters), so the wording is DRF's ListField's, which its own
+    # catalog translates wherever DRF is installed and which a
+    # djangorestframework-services caller already reads.
+    params = one(Parameter("ids", "array", min_length=1, max_length=1))
+    assert refusal(params, {"ids": []}) == {"ids": ["Ensure this field has at least 1 elements."]}
+    assert refusal(params, {"ids": [1, 2]}) == {
+        "ids": ["Ensure this field has no more than 1 elements."]
+    }
+
+
 # --- messages ----------------------------------------------------------------------------------------
 
 
@@ -853,7 +1051,9 @@ def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> No
         expected = translation.gettext(REQUIRED)
     assert expected != REQUIRED
     assert detail == {"pk": [expected]}
-    assert all(type(message) is str for message in detail["pk"])
+    # Translated now, not a lazy proxy, which is no ``str``: the message is a
+    # ``CodedMessage``, so a ``str`` holding the translated words.
+    assert all(isinstance(message, str) for message in detail["pk"])
 
 
 class TestAny:
@@ -898,3 +1098,156 @@ class TestAny:
         with pytest.raises(InvalidArguments) as refused:
             check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": float("nan")})
         assert refused.value.detail == {"pk": ["Enter a number."]}
+
+
+@override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)
+def test_a_minimum_is_compared_with_no_default_when_the_setting_is_none() -> None:
+    params = one(Parameter("ids", "array", min_length=2))
+    assert check_arguments(params, {"ids": [1, 2]}) == {"ids": [1, 2]}
+    assert refusal(params, {"ids": [1]}) == {"ids": [TOO_FEW % 2]}
+
+
+# --- the code each refusal carries -------------------------------------------------
+
+PRICE = Parameter("price", "string", format="decimal")
+
+
+@pytest.mark.parametrize(
+    ("parameter", "arguments", "expected"),
+    [
+        pytest.param(
+            Parameter("title", "string", required=True),
+            {},
+            {"title": [(REQUIRED, "required")]},
+            id="required",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"title": None},
+            {"title": [(NULL, "null")]},
+            id="null",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"colour": "red"},
+            {"colour": [(UNKNOWN, "unknown")]},
+            id="unknown",
+        ),
+        pytest.param(
+            Parameter("title", "string"),
+            {"title": 3},
+            {"title": [("Expected a string.", "invalid")]},
+            id="type",
+        ),
+        pytest.param(
+            Parameter("ids", "array"),
+            {"ids": "1"},
+            {"ids": [("Expected an array.", "not_a_list")]},
+            id="not-a-list",
+        ),
+        pytest.param(
+            Parameter("author", "object"),
+            {"author": 3},
+            {"author": [("Expected an object.", "invalid")]},
+            id="not-an-object",
+        ),
+        pytest.param(
+            Parameter("books", "array", items=BOOK),
+            {"books": ["Dune"]},
+            {"books": {0: {NON_FIELD_ERRORS: [("Expected an object.", "invalid")]}}},
+            id="row-not-an-object",
+        ),
+        pytest.param(
+            PRICE,
+            {"price": True},
+            {"price": [("Expected a decimal string or a number.", "invalid")]},
+            id="decimal-type",
+        ),
+        pytest.param(
+            PRICE,
+            {"price": "NaN"},
+            {"price": [(NOT_A_NUMBER, "invalid")]},
+            id="decimal-not-finite",
+        ),
+        pytest.param(
+            Parameter("n", "number"),
+            {"n": float("inf")},
+            {"n": [(NOT_A_NUMBER, "invalid")]},
+            id="number-not-finite",
+        ),
+        pytest.param(
+            Parameter("at", "string", format="date-time"),
+            {"at": "soon"},
+            {"at": [("Enter a valid date/time.", "invalid")]},
+            id="date-time",
+        ),
+        pytest.param(
+            Parameter("on", "string", format="date"),
+            {"on": "soon"},
+            {"on": [("Enter a valid date.", "invalid")]},
+            id="date",
+        ),
+        pytest.param(
+            Parameter("n", "integer", maximum=5),
+            {"n": 6},
+            {"n": [("Ensure this value is less than or equal to 5.", "max_value")]},
+            id="max-value",
+        ),
+        pytest.param(
+            Parameter("n", "integer", minimum=1),
+            {"n": 0},
+            {"n": [("Ensure this value is greater than or equal to 1.", "min_value")]},
+            id="min-value",
+        ),
+        pytest.param(
+            Parameter("c", "string", choices=("a", "b")),
+            {"c": "z"},
+            {
+                "c": [
+                    (
+                        "Select a valid choice. z is not one of the available choices.",
+                        "invalid_choice",
+                    )
+                ]
+            },
+            id="choice",
+        ),
+        pytest.param(
+            Parameter("ids", "array", max_length=1),
+            {"ids": [1, 2]},
+            {"ids": [("Ensure this field has no more than 1 elements.", "max_length")]},
+            id="max-length",
+        ),
+        pytest.param(
+            Parameter("ids", "array", min_length=2),
+            {"ids": [1]},
+            {"ids": [("Ensure this field has at least 2 elements.", "min_length")]},
+            id="min-length",
+        ),
+        pytest.param(
+            Parameter("scan", "file"),
+            {"scan": "scan.pdf"},
+            {"scan": [("Expected a file.", "invalid")]},
+            id="file",
+        ),
+    ],
+)
+def test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake(
+    parameter: Parameter, arguments: dict[str, Any], expected: dict[Any, Any]
+) -> None:
+    assert coded(refusal(one(parameter), arguments)) == expected
+
+
+def test_arguments_that_are_no_mapping_are_refused_as_a_serializer_refuses_them() -> None:
+    assert coded(refusal(AUTHOR, ["Ursula"])) == {
+        NON_FIELD_ERRORS: [("Expected an object.", "invalid")]
+    }
+
+
+def test_a_coded_refusal_is_its_plain_message_to_everything_but_its_code() -> None:
+    detail = refusal(AUTHOR, {"name": "Ursula", "books": [{"title": None}]})
+    # Equal to, and serialized as, the plain strings a tree without codes holds,
+    # so the wire a transport writes is unchanged by them.
+    assert detail == {"books": {0: {"title": [NULL]}}}
+    assert json.dumps(detail) == json.dumps({"books": {0: {"title": [NULL]}}})
+    assert NULL in {detail["books"][0]["title"][0]}

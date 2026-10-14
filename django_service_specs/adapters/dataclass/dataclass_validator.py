@@ -23,11 +23,12 @@ from django_service_specs.adapters.dataclass.utils import (
     read_fields,
     scalar_type,
 )
-from django_service_specs.adapters.utils import choice_labels
+from django_service_specs.adapters.utils import choice_labels, element_format
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type
+from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages, expected_type
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
@@ -48,9 +49,12 @@ class DataclassValidator(Validator):
 
     - ``str``, ``int``, ``float``, ``bool``: their JSON types. ``float`` takes an
       integer as well, since JSON writes ``2.0`` as ``2``; nothing else crosses
-      types, so ``true`` is not an ``int``.
+      types, so ``true`` is not an ``int``. An integer past a float's range
+      is refused as no number, in the words the shape check refuses a
+      non-finite one in, since no finite float stands for it.
     - ``Decimal``, ``datetime``, ``date``: a string, with the format it decodes
-      from. A decimal takes a JSON number too, as every decimal validator does.
+      from. A decimal takes a JSON number too, as every decimal validator does,
+      and an integer exactly, whatever its digits.
     - ``X | None``: nullable. Inside a list, ``list[X | None]``, it is the
       element that is, declared as ``items_nullable`` and not as the array's
       own nullability.
@@ -59,9 +63,19 @@ class DataclassValidator(Validator):
       share. An ``Enum`` decodes to the member.
     - ``list[X]``: an array; ``list[SomeDataclass]`` is an array of rows, each
       declared as nested Parameters. For any other element, ``Parameter.items``
-      can hold only its JSON type, so a list of decimals is declared as an
-      array of strings and decoded here. A list of choices declares them on
-      the array, where they constrain each element.
+      holds its JSON type, and what else describes the element is declared on
+      the array, where it constrains each element: a list of choices declares
+      them there, and ``list[Decimal]`` the ``decimal`` format, so each
+      element is read as a scalar decimal is, a JSON number included, and a
+      query string's ``?prices=1.5,2.25`` is two of them. A list of dates or
+      date-times is an array of strings, since an element takes no other
+      format, and is decoded here.
+    - A list declares no length, since a dataclass has no way to state one,
+      so the shape check in front of this Validator holds it to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default. A list a
+      caller may send more of is declared with a Validator that states its
+      length, such as a pydantic model's ``Field(max_length=...)``, or under
+      a larger setting.
     - a dataclass: an object, with its own fields as nested Parameters.
     - ``X | UnsetType``: the argument may be left out, with or without a
       default, and the field then holds ``UNSET`` rather than a value a
@@ -166,7 +180,7 @@ class DataclassValidator(Validator):
 class _Refused(Exception):
     """One value refused: a leaf of the detail tree, carried to the key it belongs under."""
 
-    def __init__(self, message: str) -> None:
+    def __init__(self, message: CodedMessage) -> None:
         super().__init__(message)
         self.message = message
 
@@ -188,7 +202,8 @@ def _parameter(fs: FieldShape) -> Parameter:
         fs.name,
         shape.type,
         required=fs.required,
-        format=shape.format,
+        # An array's format is its element's, and only a decimal's is one.
+        format=shape.format if shape.items is None else element_format(shape.items.format),
         items=_items(shape.items),
         # ``list[X | None]``: the element's own nullability, which the array's
         # is not. Declared, or the shape check refuses the null the library takes.
@@ -218,7 +233,9 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
     inputs = _inputs(fields)
     declared = {fs.name for fs in inputs}
     errors: dict[Any, Any] = {
-        key: [gettext("Unknown argument.")] for key in arguments if key not in declared
+        key: [CodedMessage(gettext("Unknown argument."), "unknown")]
+        for key in arguments
+        if key not in declared
     }
     values: dict[str, Any] = {}
     for fs in inputs:
@@ -230,7 +247,7 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
             if fs.omittable:
                 values[fs.name] = UNSET
             else:
-                errors[fs.name] = [gettext("This field is required.")]
+                errors[fs.name] = [CodedMessage(gettext("This field is required."), "required")]
             continue
         try:
             values[fs.name] = _decode(fs.shape, arguments[fs.name])
@@ -245,9 +262,11 @@ def _build(cls: type[Any], fields: tuple[FieldShape, ...], arguments: Mapping[st
     except ValueError as exc:
         # ``__post_init__`` is the only place a dataclass can state a rule
         # across its fields, and raising is how it states one.
-        raise InvalidArguments({NON_FIELD_ERRORS: [str(exc)]}) from exc
+        # A ``ValueError`` carries no code, so it says ``"invalid"``, DRF's
+        # default for a message raised with none.
+        raise InvalidArguments({NON_FIELD_ERRORS: [CodedMessage(str(exc), "invalid")]}) from exc
     except ValidationError as exc:
-        raise InvalidArguments({NON_FIELD_ERRORS: exc.messages}) from exc
+        raise InvalidArguments({NON_FIELD_ERRORS: coded_messages([exc])}) from exc
 
 
 def _decode(shape: Shape, value: Any) -> Any:
@@ -259,7 +278,7 @@ def _decode(shape: Shape, value: Any) -> Any:
     if value is None:
         if shape.nullable:
             return None
-        raise _Refused(gettext("This field cannot be null."))
+        raise _Refused(CodedMessage(gettext("This field cannot be null."), "null"))
     if shape.fields is not None:
         if not isinstance(value, Mapping):
             raise _Refused(expected_type("object"))
@@ -301,8 +320,11 @@ def _decode_choice(shape: Shape, choices: tuple[Any, ...], value: Any) -> Any:
         raise _Refused(expected_type(shape.type))
     if value not in choices:
         raise _Refused(
-            gettext("Select a valid choice. %(value)s is not one of the available choices.")
-            % {"value": value}
+            CodedMessage(
+                gettext("Select a valid choice. %(value)s is not one of the available choices.")
+                % {"value": value},
+                "invalid_choice",
+            )
         )
     enum_cls = shape.enum
     return value if enum_cls is None else enum_cls(value)
@@ -318,29 +340,42 @@ def _decode_scalar(shape: Shape, value: Any) -> Any:
         return _decode_date(value)
     if not _fits(shape.type, value):
         raise _Refused(expected_type(shape.type))
-    return float(value) if python is float else value
+    if python is not float:
+        return value
+    try:
+        return float(value)
+    except OverflowError:
+        # An integer past a float's range: JSON's number has none, so the
+        # shape check hands it on, and ``float`` raises rather than refusing.
+        # No finite float stands for it, which is the shape check's own
+        # refusal of a non-finite number, in the same words
+        # (test_an_integer_past_a_float_s_range_is_no_number).
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
 
 
 def _decode_decimal(value: Any) -> Decimal:
     if scalar_type(value) not in ("string", "integer", "number"):
         raise _Refused(expected_type("decimal"))
     try:
-        # Through ``str`` so a float gives the digits JSON carried, not its
-        # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``.
-        decoded = Decimal(str(value))
+        # A float through ``str`` so it gives the digits JSON carried, not its
+        # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``. Anything
+        # else as it is, since an int is a Decimal exactly, and ``str`` refuses
+        # one past 4300 digits from Python 3.10.7 on
+        # (test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits).
+        decoded = Decimal(str(value) if isinstance(value, float) else value)
     except InvalidOperation:
-        raise _Refused(gettext("Enter a number.")) from None
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid")) from None
     if not decoded.is_finite():
         # Django's DecimalField refuses NaN and infinity too; neither is an
         # amount, and neither can be stored.
-        raise _Refused(gettext("Enter a number."))
+        raise _Refused(CodedMessage(gettext("Enter a number."), "invalid"))
     return decoded
 
 
 def _decode_datetime(value: Any) -> dt.datetime:
     parsed = _parse(parse_datetime, value)
     if parsed is None:
-        raise _Refused(gettext("Enter a valid date/time."))
+        raise _Refused(CodedMessage(gettext("Enter a valid date/time."), "invalid"))
     if settings.USE_TZ and timezone.is_naive(parsed):
         # What forms.DateTimeField does, and what pydantic does not: the
         # kernel sides with forms, so an offset-less value means the same
@@ -352,7 +387,7 @@ def _decode_datetime(value: Any) -> dt.datetime:
 def _decode_date(value: Any) -> dt.date:
     parsed = _parse(parse_date, value)
     if parsed is None:
-        raise _Refused(gettext("Enter a valid date."))
+        raise _Refused(CodedMessage(gettext("Enter a valid date."), "invalid"))
     return parsed
 
 

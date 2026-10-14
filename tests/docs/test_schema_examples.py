@@ -64,7 +64,7 @@ AUTHOR_INPUT = {
     "type": "object",
     "properties": {
         "name": {"type": "string"},
-        "books": {"type": "array", "items": BOOK_IN},
+        "books": {"type": "array", "items": BOOK_IN, "maxItems": 1000},
     },
     "required": ["name"],
     "additionalProperties": False,

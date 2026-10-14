@@ -7,6 +7,346 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-14
+
+### Added
+- `CodedMessage`, a `str` carrying a `code`, and every refusal the kernel and
+  its shipped adapters make is one: the shape check's, `coerce_flat`'s,
+  `request_arguments`', dispatch refusing a read a selector asks for and
+  nothing filled, a FilterSet's, a relation write's, and
+  `DataclassValidator`'s, `FormValidator`'s and `PydanticValidator`'s. The
+  code is the one a DRF field gives the same
+  mistake - `required`, `null`, `invalid`, `not_a_list`, `max_value`,
+  `min_value`, `invalid_choice`, `max_length`, `min_length` - plus `unknown`
+  for a key refused under `REJECT` and `parse_error` for a body that is not
+  JSON. A message Django raised keeps Django's code (`unique_together` from a
+  form, where DRF says `unique`), pydantic's error types map to DRF's codes,
+  and a `PydanticCustomError` keeps its own type. So an adapter building
+  DRF's error details reads each code off `InvalidArguments.detail` rather
+  than every one of those refusals reading as `invalid`. A `CodedMessage`
+  equals, hashes, serializes and `repr`s as its message, so the JSON body a
+  transport writes and the text of a tree printed with `str` are unchanged; a
+  copy and a pickle keep the code. Dispatch still hands on a
+  Validator's own messages as it raised them, a library's coded message
+  keeping its code and a plain `str` staying plain.
+- An output selector is handed the service's return as `instance` as well as
+  `result`, as djangorestframework-services binds it, so a re-read written
+  `def reread(*, instance)` runs rather than raising a `TypeError` for a
+  missing keyword. The two names are one value, whatever the service returned,
+  `None` included, and `instance` there is the return, never the target the
+  service acted on.
+- `Parameter.min_length` and `Parameter.max_length`, how many elements an
+  `array` takes, inclusively. Each is a non-negative `int`, refused on any
+  other type, and a `min_length` past the `max_length` is refused where it is
+  written. The shape check and `coerce_flat` read the list's length before any
+  of its elements, so a list outside its bounds is refused whole, at its name,
+  in DRF's words (`"Ensure this field has no more than {max_length}
+  elements."`, `"Ensure this field has at least {min_length} elements."`),
+  which DRF's catalog translates wherever DRF is installed. The schema states
+  them as `"minItems"` and `"maxItems"`.
+- `ServiceSpec.many_min_length` and `ServiceSpec.many_max_length`, the same
+  two bounds on a `many` call's list of rows, read by the list's own
+  parameter. A list outside them is refused at `many_argument` before any row
+  is checked or validated, beside the top level's other refusals. Neither is
+  declared by default, so an empty list still runs the service on no rows;
+  `many_min_length=1` refuses one. Each is refused on a spec that is not
+  `many`, and a pair no list could meet when the spec is built.
+- The `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, the most elements an array
+  takes where its parameter declares no `max_length`, and the most rows a
+  `many` call carries where its spec declares no `many_max_length`. `1000`
+  when unset, Django's own `DATA_UPLOAD_MAX_NUMBER_FIELDS`; `None` bounds no
+  array. It is read at the call, so `override_settings` reaches a spec built
+  at import, and anything but a non-negative `int` or `None` is refused as
+  `ImproperlyConfigured` where it is read. A `min_length` past it on a
+  parameter with no `max_length` of its own, which no call could meet, is
+  refused the same way at the call and when its schema is built.
+- `Parameter`'s `format`, `minimum` and `maximum` on an array describe each
+  element, as its `choices` do. An array of `integer` or `number` takes a
+  bound, and an array of `string` takes `format="decimal"` and then a bound
+  too; the shape check reads each element as a scalar of that declaration
+  and refuses one past a bound at its index, with the code `max_value` or
+  `min_value`. The schema states them on `"items"`, never on the array. Over
+  HTTP a decimal array splits `?pks=1,2` as a number array does, since no
+  decimal holds a comma, and drops a blank element. Any other format on an
+  array, and a format or a bound on an element that cannot carry it, is
+  refused at construction.
+- `PydanticValidator` declares a list field's length as the model states
+  it: `Field(min_length=, max_length=)`, `conlist`, and `annotated_types`'
+  `Len`, `MinLen` and `MaxLen`, on the field or inside an `Annotated` in its
+  annotation, are the parameter's `min_length` and `max_length` and the
+  schema's `"minItems"` and `"maxItems"`. So a list the model allows 5000 of
+  is no longer held to the `SERVICE_SPECS_MAX_ARRAY_LENGTH` default of 1000,
+  and one past the model's own maximum is refused by the shape check, in the
+  kernel's words and under pydantic's `max_length` code, before the model
+  runs. A field stating a length twice declares the last pydantic applies,
+  which is the one it enforces. A length on a string or a `dict` stays the
+  model's, and so does every numeric bound: `gt` and `lt` are exclusive,
+  which a parameter cannot state.
+- `list[Decimal]`, on a dataclass or a pydantic model, and a
+  `ModelMultipleChoiceField` matching rows on a `DecimalField` declare the
+  `decimal` format for each element, as the scalar is declared. The shape
+  check now takes a JSON number for each element, as `DataclassValidator`
+  and pydantic do and as it did for one decimal, where it refused one as no
+  string; it refuses an element that is no decimal at its index, in the
+  words it uses for one decimal; and a query string's `?prices=1.5,2.25` is two
+  elements rather than one string. Django matches a
+  `ModelMultipleChoiceField`'s keys against the column's own spelling, so
+  `"12.50"` names a row a two-place column holds and `12.5`, which the shape
+  check now passes, is refused by the form as no choice. A list of dates or
+  date-times is still an array of strings, since an element takes no other
+  format.
+
+### Changed
+- **Breaking:** a django-filter CSV number filter (`BaseInFilter` or
+  `BaseRangeFilter` over a `NumberFilter`) is declared an array of bounded
+  decimal strings, `items="string", format="decimal", minimum=-1e50,
+  maximum=1e50`, as a scalar number filter is, where it was an array of
+  `number`. Each element reaches the FilterSet as the string it was sent, so
+  a fraction keeps every digit where a float rounded it, and one past
+  `1e50` either way is refused at its index before the FilterSet runs, where
+  the CSV filter carried no bound. `filter_set_parameters` and the schema a
+  selector spec states change accordingly: its `items` are `{"type":
+  "string", "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}`
+  rather than `{"type": "number"}`. A malformed element is refused with
+  `"Enter a number."` by the shape check, where a JSON caller's was
+  `"Expected a number."`.
+- `SelectorSpec.allow_none` is accepted on a `LIST`, where it was refused at
+  construction since 0.1.0. A list selector declaring it may return `None` for
+  "no rows", and the result is the empty list wherever the selector runs: a
+  selector spec's own, on `dispatch` and `adispatch`, a collection target,
+  including through `resolve_target`, and a `LIST` output selector. Its
+  shaping is skipped, its scope check and `preconditions` are asked of the
+  empty set, and its output schema stays an array. Without `allow_none`, a
+  list selector's `None` is passed on as before.
+- **Breaking:** every array argument is bounded. One whose parameter declares
+  no `max_length` takes at most 1000 elements, and a `many` call at most 1000
+  rows, unless `SERVICE_SPECS_MAX_ARRAY_LENGTH` says otherwise; a call past it
+  is refused with `InvalidArguments` at the list's name where it used to run.
+  A comma-separated query value reached round Django's
+  `DATA_UPLOAD_MAX_NUMBER_FIELDS`, which counts keys, so `?ids=` with 40000
+  values into a django-filter `in` lookup passed the database's variable
+  limit and answered a 500; it is now a 400 at the filter's name, and the
+  value is split into no more than one element past the bound. A `many` call
+  carried no bound at all on the rows it validated inside one transaction.
+  The schema states the maximum in force as `"maxItems"` on every array input,
+  so a client learns the bound it meets, and under a setting of `None` an
+  array with no `max_length` states none. Since the setting is read whenever
+  such an array is checked or described, `parameters_schema`,
+  `spec_input_schema`, `check_arguments` and `coerce_flat` raise
+  `ImproperlyConfigured` outside a configured Django for an array with no
+  `max_length`, where each returned a schema or the checked arguments. A
+  default stated before `settings.configure()` would describe a bound the
+  calls after it need not meet, so there is no fallback; configure settings,
+  or declare the `max_length`, before building such a schema.
+- **Breaking:** `SpecFormView`'s GET shows the row an update's post would
+  act on. Every GET finds its target as dispatch would, through
+  `resolve_target` on the route's kwargs - the row or set a target selector
+  resolves, or `None` for a create - and the unbound form shows a row's values
+  for its own fields: a `ModelForm` of the row's model is built on a copy of
+  the row, as `FormValidator` binds it, and any other form takes those values
+  for its enabled fields as its `initial`. So a held file is shown with the
+  clear checkbox an optional file's `ClearableFileInput` offers, where it
+  appeared only when the form class declared an initial file. The page is
+  refused where the post would be: an object-level or scope check refusing
+  the target, a create's `None` included, raises `PermissionDenied`, a missing
+  row or a selector's `ServiceNotFound` raises `Http404`, and a route value
+  the spec's parameters refuse raises Django's `BadRequest`; each of these
+  rendered the page before. A create, a collection target and a missing row
+  `allow_none` lets through still show an empty form.
+- **Breaking:** `SpecFormView`'s POST finds its target as its GET does,
+  before the form is built or read, and hands dispatch that target with the
+  grant `resolve_target` returns, so nothing is looked up or checked twice.
+  The form a refused post re-renders is built on the row, so it shows the held
+  file and its clear checkbox, which it lost on every refusal. The target now
+  answers before the shape check: a principal the object-level or scope check
+  refuses gets `PermissionDenied`, and a missing row `Http404`, for a
+  malformed post too, where the page was re-rendered at 400 with the post's
+  errors. A route value the target's reads refuse is still refused in
+  dispatch's one tree beside the form's errors. `as_view()` refuses a `many`
+  spec, whose list of rows no form posts.
+- **Breaking:** a `SelectorSpec.filter_set` that declares no filters is
+  refused at construction unless it is a django-filter `FilterSet` class. Only
+  one with no `base_filters` attribute at all was refused, so a duck-typed
+  stand-in whose `base_filters` was empty or `None` was accepted, declared no
+  arguments, and was handed none of the caller's data. A real `FilterSet`
+  declaring no filters is still accepted and narrows nothing. The check reads
+  django-filter only if it is already loaded, so a duck is refused in the same
+  words with or without the `filter` extra. A step narrowing the queryset by
+  no argument belongs in `extend_queryset`.
+- `spec_input_schema` and dispatch's shape check read what a `partial` call
+  may leave out through one function, where each kept its own copy of the
+  rule. Nothing either answers changes; the schema's `required` less
+  `server_owned_keys` is exactly what dispatch refuses when it is absent,
+  and a test now holds the two to that.
+
+### Fixed
+- **Breaking, and a security fix: a `Grant` with `target_checked` skipped a
+  selector spec's checks on any row.** On a selector spec it skipped
+  `has_object_permission` on whatever row the selector found and
+  `has_scope_permission` on whatever list it read, although a selector spec
+  takes no `target=` to bind the claim to a row: a grant minted after
+  checking one row admitted another principal's, named in the arguments.
+  The flag now covers a selector spec's row and list never, as it covers a
+  service spec's lookup never, on `dispatch` and `adispatch` alike; the
+  grant still stands for the class-level check. Every caller handing a
+  selector spec `Grant(..., target_checked=True)` is affected: the checks
+  run again, so a call the grant let through may now be refused with
+  `NotPermitted`, never the other way round. `resolve_target` never minted
+  such a grant, since it refuses a read.
+- **A nested write's own refusals carry codes.** A null row in a relation
+  write is refused with the code `null`, and Django's failures to write a
+  row's data keep theirs: each message of a `ValidationError` carries its own
+  `code`, or `invalid` where it was raised with none, and the message of a
+  `TypeError` or `ValueError` is `invalid`. They were plain strings, so a
+  client reading codes found none where the shape check's refusals had one. A
+  row service's refusal, re-rooted under its relation, keeps its messages as
+  they were, codes included.
+- **`FormValidator` refuses a model choice key past its column's range.**
+  An integer key past the range of the column a `ModelMultipleChoiceField`
+  matches rows on reached the database driver through Django's `__in`
+  lookup, and SQLite's raised `OverflowError`, answered as a 500, on every
+  Django version; a `ModelChoiceField`'s did the same on Django 4.2. Such a
+  key names no row, so it is refused as the field refuses a key no row
+  holds, `invalid_choice` in its own words, beside the form's other
+  refusals and before the form queries. The range is the database's own for
+  the column, and a key handed to `validate` as a string of digits is the
+  integer it spells. An integer argument a project's selector or service hands the
+  database is still the database's to range; declare a `minimum` and
+  `maximum` on one that reaches a column unchecked.
+- **An integer past a float's range is refused, never raised.** JSON's
+  number has no range, so the shape check hands such an integer on, and
+  `DataclassValidator`'s `float` field and `FormValidator`'s `FloatField`
+  each read it through `float`, which raised `OverflowError`, answered as a
+  500. Each refuses it as no number now, as the shape check refuses a
+  non-finite one: `"Enter a number."`, code `invalid`, and the form field's
+  own `invalid` message where it has one. `SpecFormView` reading a posted
+  `IntegerField` past a float's range raised the same way asking whether it
+  was finite, and hands the integer on.
+- **A decimal sent as an integer is read whatever its digits.**
+  `DataclassValidator`'s `Decimal` field and `FormValidator`'s
+  `DecimalField` read an integer through `str`, which raises `ValueError`
+  past 4300 digits from Python 3.10.7 on. Each reads it as the exact
+  `Decimal` it is.
+- **`FormValidator` refuses a `ModelForm` value past its integer column's
+  range.** Django 4.2 states no range for SQLite, so a `ModelForm` took an
+  integer past 64 bits, and a uniqueness check or a constraint querying with
+  it raised the driver's `OverflowError`. Such a value is refused before
+  either queries, in the words and with the code of the validator Django's
+  model field carries from 5.0: `max_value` past the column's top,
+  `min_value` past its bottom. It is judged where Django 5.0 and later judge
+  it, after the form field, its `clean_<field>()` and the form's `clean()`,
+  on the value they hand back, read as the model reads it, so digits a text
+  field cleans to are the integer they spell. A value the field or a
+  `clean_<field>()` refuses is still refused in their words, and one a
+  `clean_<field>()` brings inside the range is taken, on every version. Only
+  a column Django validates is judged, as Django leaves the others out of
+  the model's checks: a value `clean()` sets in `cleaned_data` for a column
+  the form has no field for, and a field the form declares over a column
+  `Meta.fields` leaves out or `Meta.exclude` names, are the form's, whatever
+  their size.
+- **A relation write's key past its column's range names no row.** A
+  forward relation's or a many-to-many's `match_key` past the range of the
+  integer column it is matched on reached the database driver through the
+  scoped lookup, and SQLite's raised `OverflowError` on Django 4.2. It is
+  refused as any key matching nothing in scope is, at the row, on
+  `create_from_input`, `update_from_input` and their async twins; a string
+  of digits is read as the integer it spells, as the lookup reads it, and a
+  key the column reads as no number, such as a row, is left to the lookup.
+  A foreign key's column is held to the range of the key it points at, a
+  `match_key` written as a path, `catalog__pk`, to the column it ends on, and
+  one naming a many-to-many or a reverse relation to the related row's key.
+  And `resolve_principal` refuses an identifier past its integer key's range,
+  an infinity included, with `PrincipalUnavailable`, as a key no row holds,
+  where it raised the same way.
+- **Breaking on Django 5.0 and later, and otherwise a fix: a FilterSet's
+  number past 64 bits is refused.** A number a selector spec's FilterSet
+  accepted, for a filter on an integer column - a key, a foreign key's own
+  column, or the key of the row a foreign key, a many-to-many or a reverse
+  foreign key reaches, at the end of a path or alone - reached the database
+  driver past a signed 64-bit integer, and SQLite's raised `OverflowError`,
+  answered as a 500: for an `in` or a `range` lookup, a CSV filter's and a
+  `RangeFilter`'s, and for any lookup on a relation, on every Django
+  version, and for any lookup on Django 4.2. It is refused before the
+  query, in the words and with the code of Django's range validators,
+  `max_value` past 64 bits' top and `min_value` past their bottom, at the
+  argument that carried it: a range filter's bound at its own `_min` or
+  `_max` argument, and a CSV filter's value at its index, as the shape check
+  refuses a number past 1e50. A number inside 64 bits is answered whatever
+  range the column states, so `gte=-1` on a `PositiveIntegerField` is every
+  row on every version, and a decimal or float column still takes any
+  number inside 1e50; on Django 4.2.0 and 4.2.1 a decimal past the column's
+  `max_digits` raises in Django's own decimal handling, fixed in Django
+  4.2.2, which this does not change. **Breaking** only where Django 5.0 and later answered
+  a number past 64 bits without the query: an `exact`, `gt`, `gte`, `lt` or
+  `lte` lookup on an integer column itself, its own or one reached through a
+  relation, a `RangeFilter` given one bound included, answered no rows or
+  every row, and is refused now, so a call has one answer on every version.
+  A model choice filter's key past the range of the column its rows are
+  matched on raised the same `OverflowError` as the FilterSet validated, for
+  a `ModelMultipleChoiceFilter` on every version and for a
+  `ModelChoiceFilter` on Django 4.2; it is no choice now, `invalid_choice`
+  in its form field's words, beside the FilterSet's other refusals. A
+  filter with a `method`, a lookup that reads its value as text such as
+  `contains`, a path through a transform or to an annotation, a relation
+  over more than one column, and a `filter_set` that is not a django-filter
+  `FilterSet` are left to the database.
+- **`paginate_output` serves a `limit` past 64 bits.** With no
+  `max_page_size`, a `limit` past a signed 64-bit integer reached the
+  queryset's slice whole, and SQLite refused the `LIMIT` with
+  `IntegrityError: datatype mismatch`, answered as a 500, on every Django
+  version. No page is longer than the rows counted now, so such a limit
+  serves every row, and the page reports the `limit` asked for. A `limit`
+  past the rows asks for a `LIMIT` of the rows counted rather than of the
+  limit; the rows served are the same. A page past the end already clamped
+  to the last one before its offset was computed, so no offset reaches past
+  the rows.
+- **A re-upload under the held file's name is written.** `update_from_input`,
+  `aupdate_from_input` and `apply_input` compared a file field's new value
+  with the held file by name, so an upload named as the file the row held -
+  any re-upload to a field whose `upload_to` is empty - was taken for no
+  change: nothing was written and nothing reported, where a `ModelForm` writes
+  every upload. An upload, or any `File` that is not one a row holds, is now
+  always a change, written and reported with the replaced file as its old
+  value. The held file handed back as itself, which is what a form's file
+  field cleans to when nothing is uploaded, is still no change; `None` still
+  keeps the file and `False` still clears it.
+- A string sent for a `number`, by a flat transport or in a JSON body, is read
+  as a JSON decoder reads the same literal: digits alone are the exact `int`
+  they spell, and a point or an exponent makes a `float`. Read through `float`
+  alone, every integer past `2**53` was rounded to a neighbour, so a key
+  sent for a `number` matched the neighbour's row. The strings accepted are
+  unchanged but one kind: digits alone that `int` refuses, past the 4300 it
+  reads from Python 3.10.7 on, which zeros in front can reach while `float`
+  still reads them as finite, are refused as no number, as they are no
+  integer, rather than rounded to a neighbour; that refusal is **Breaking**
+  for a call that sent such digits and was answered with the neighbour. And
+  `"3"` reaches the Validator as `3` rather than `3.0`, as the JSON `3`
+  always did.
+- An `async def` selector spec's `progress_reporter` provider is called only
+  once the selector's keywords are bound, and only for a selector that takes
+  `progress`, as a service spec's is. It was resolved before the binding, so
+  a call refused for a read the caller left out had already called it, and a
+  selector that could never report called it on every call. The selector
+  spec's affordance conditions, `extend_queryset` and preconditions now read
+  the transport's reporter, as a service spec's do; the spec's own sink is
+  the run's alone.
+- **`SpecFormView` re-renders a refused post carrying a number no column
+  holds.** To place a refusal, the view validated the page's own form and
+  then cleared its errors, and that validation has none of the Validator's
+  guards: a refused post carrying a key past its column's range, or a
+  `ModelForm` integer past its column's, re-rendered by handing the value to
+  the database driver, which raised `OverflowError`, answered as a 500 - for
+  a `ModelMultipleChoiceField` on every Django version, and for a
+  `ModelChoiceField` and a `ModelForm` integer on Django 4.2. The page's form
+  is never validated now: its errors start empty, and the refusal is placed
+  on them, so the page still carries the refusal and nothing else.
+  `add_argument_errors`, handed a form not yet validated, validates it with
+  the guards a `FormValidator`'s form is validated with, reading a model
+  choice field's keys as the field reads them, every value a `QueryDict`
+  carries and the form's prefix included: the key is refused as
+  `invalid_choice` and the integer as `max_value` or `min_value`, the words
+  the kernel's refusal uses, so it is placed once.
+
 ## [0.5.0] — 2026-10-13
 
 ### Added
@@ -747,7 +1087,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1

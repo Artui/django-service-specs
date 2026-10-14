@@ -86,7 +86,7 @@ A `DispatchResult` has a `kind` and a `value`:
 
 | `kind` | When | `value` |
 | --- | --- | --- |
-| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one |
+| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
 | `"instance"` | Everything else that ran | The row, the service's return, or what the output selector re-read |
 | `"not_found"` | A required row does not exist | `None` |
 
@@ -118,6 +118,13 @@ One case is not reported as not-found: **a retrieve output selector that finds
 nothing**. The service has already run and, under `atomic`, committed, so
 reporting not-found would tell the caller the write did not happen. The value
 is `None` under `kind="instance"` instead.
+
+The output selector is called from the base pool plus the service's return,
+under two names: `result`, and `instance`, as djangorestframework-services
+binds it. They are one value, whatever the service returned, `None` included,
+so a re-read declares whichever its author wrote. `instance` there is what the
+service returned, not the target it acted on, which the result carries as
+`result.instance`.
 
 ## Presenting
 
@@ -190,7 +197,13 @@ it says `target_checked=True`, which a transport can claim once it has resolved
 the row and run the object-level check itself, and which covers a service
 spec's target only when that target is handed to `dispatch` as `target=`;
 otherwise dispatch still runs `has_object_permission` on the row it resolves.
-A selector spec's claim covers whatever its selector returns. A grant stands in for neither
+**On a selector spec the claim covers nothing**: a selector spec takes no
+`target=`, so there is no row handed in to bind the claim to, and the row
+the arguments make the selector find may be one the transport never
+checked. Dispatch runs the check on the row the call returns, shaped and
+annotated, and the scope check on the list it returns, whatever the grant
+says, as djangorestframework-services checks the row its selector returned.
+A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And **a grant cannot be
 serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
@@ -202,8 +215,8 @@ re-authorizes by construction.
 and [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
 are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
-spec and principal, and the other two are skipped under `target_checked`
-where the target was handed in as `target=`.
+spec and principal, and dispatch skips the other two under `target_checked`
+only where a service spec's target was handed in as `target=`.
 
 ### A target resolved ahead of the call
 
@@ -252,7 +265,8 @@ HTTP has a session to resolve a user from; a queue payload, a command argument
 or an agent's notion of who is asking carries an identifier.
 [`resolve_principal`][django_service_specs.authorization.resolve_principal.resolve_principal]
 is the one place that becomes a user row, and it refuses a missing, malformed
-or deactivated one with
+or deactivated one, or a key past its integer column's range, an infinite
+one included, with
 [`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable].
 It never falls back to an anonymous user: an operation dispatched with no
 resolvable principal has no principal, not an anonymous one. The stock
@@ -409,9 +423,13 @@ With no reporter the pool carries
 service that declares `progress` runs unchanged on every transport and in
 tests. A spec's own `progress_reporter` provider adds a sink of the author's
 beside the transport's - a task record, an audit trail - for the run alone,
-called on its first report, or before an `async def` run once nothing can
-refuse the call. A service spec refused before its run never calls it; a
-selector spec's selector is its run, so one refused at its object check, its
-scope check or a precondition may already have. A target or output selector always gets `null_progress`: a lookup has
+and only for a run that takes `progress`: called on its first report, or
+before an `async def` run once nothing before the run can refuse the call. A
+call refused before its run never calls it, a selector spec's whose selector
+is refused a read the caller left out included. A selector spec's selector is
+its run, though, and its object check, scope check and preconditions answer
+what the run returned, so a selector spec refused at one of those may already
+have called it. The selector spec's affordance conditions, `extend_queryset`
+and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.

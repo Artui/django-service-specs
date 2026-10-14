@@ -36,7 +36,7 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | each of a selector's `reads`, by name | The checked argument | That selector, its `kwargs` provider |
 | each of a service spec's `reads`, by name | The checked argument | The service, its providers |
 | each key a `kwargs` provider returns | The author's value, outranking the caller's | The selector or service it is declared on |
-| `result` | The service's return | The output selector |
+| `result` | The service's return | The output selector, which is handed it as `instance` too |
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
 
@@ -93,7 +93,12 @@ or `RETRIEVE`. A retrieve returns one row: a queryset is read with `.first()`,
 a `DoesNotExist` raised by a selector written with `.get()` means the same
 missing row, and a missing row is reported as not-found unless the spec sets
 `allow_none=True`, which makes it the value `None` - the shape of an optional
-singleton, or of an upsert's target.
+singleton, or of an upsert's target. On a list, `allow_none=True` says the
+selector may return `None` for "no rows": the result is the empty list, its
+scope check and `preconditions` are asked of that empty set as they are of an
+empty queryset, and the shaping is skipped, since there is nothing to shape.
+Without it, a list selector's `None` is passed on as it came, and presenting it
+fails as the author's error.
 
 `reads` is the selector's whole input. There is no Validator in front of a
 read, so these Parameters are what the closed argument set and the shape check
@@ -107,10 +112,14 @@ them on a selector that returns something other than a queryset is refused at
 dispatch.
 
 `filter_set` is a django-filter `FilterSet` class, installed with the
-`filter` extra. An object with no `base_filters` - a duck-typed stand-in
-taking `(data, queryset)` - is refused with `ImproperlyConfigured` when the
-spec is built: it declares no Parameters, so it would be handed none of the
-caller's data and never filter. Its filters are reads: each is read as a Parameter by
+`filter` extra. One that declares no filters - its `base_filters` missing,
+empty or `None` - is refused with `ImproperlyConfigured` when the spec is
+built, unless it is a django-filter `FilterSet` class: it declares no
+Parameters, so it would be handed none of the caller's data and never
+filter. A duck-typed stand-in taking `(data, queryset)` declares its filters
+in `base_filters`, and a step narrowing the queryset by no argument belongs
+in `extend_queryset`. A real `FilterSet` declaring no filters is accepted,
+and narrows nothing. Its filters are reads: each is read as a Parameter by
 [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument
@@ -124,8 +133,12 @@ number filter refuses a value past `1e50` and leaves a range's bounds and
 every negative value open, while an integer column's conversion builds every
 digit of a value such as `"1E+999999999"`, which holds a worker for minutes.
 So the shape check refuses either side of the line before the FilterSet is
-reached. A CSV filter's numbers stay `number`, so `?pks=1,2` splits, and keep
-the float reading, which cannot reach that far.
+reached. A CSV number filter is an array of the same bounded decimals:
+`Parameter("pks", "array", items="string", format="decimal",
+minimum=-1e50, maximum=1e50)`, whose format and bounds describe each
+element. `?pks=1,2` still splits, since no decimal holds a comma, each value
+reaches the filter with every digit it was sent with, a fraction included,
+and one past the line is refused at its index in the list.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its
@@ -229,6 +242,17 @@ call - a confirmation - is a read. The service receives the rows' `data` as a
 list under `data`, and their values as a list under `many_argument`; neither
 is spread by field.
 
+The list is an array parameter, so it is bounded as one:
+**`many_min_length`** and **`many_max_length`** are its `min_length` and
+`max_length`. Neither is declared by default, so an empty list runs the
+service on no rows, and `many_min_length=1` is how a spec refuses one. Where
+no `many_max_length` is declared, the `SERVICE_SPECS_MAX_ARRAY_LENGTH`
+setting bounds the list, 1000 rows by default, since every row is a Validator
+run inside one transaction. A list outside either is refused at
+`many_argument` as a whole, `{"items": ["Ensure this field has no more than
+200 elements."]}`, before any row is checked, beside the top level's other
+refusals. Either is refused on a spec that is not `many`.
+
 A `many` spec must declare a Validator and no target selector, since a list of
 rows resolves no target, and a condition on the row among its `affordances` is
 refused. With no output selector its result is `kind="list"`, unless the
@@ -264,9 +288,14 @@ sync-only: an `async def` one is refused when the spec is built.
 - **`progress_reporter`** returns a
   [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
   the run reports to beside the transport's - a task record, an audit trail -
-  called on the run's first report. A service spec refused before its run
-  never calls it; a selector spec's selector is its run, so one refused at
-  its object check, its scope check or a precondition may already have.
+  called only for a run that takes `progress`, once its keywords are bound:
+  on the run's first report, or before the await of an `async def` run. A
+  call refused before its run never calls it; a selector spec's selector is
+  its run, so one refused at its object check, its scope check or a
+  precondition may already have. Nothing but the run reports to it: a
+  selector spec's `extend_queryset`, its preconditions and the affordance
+  conditions answered for its rows read `progress` from the pool, the
+  transport's reporter, as a service spec's conditions do.
 
 Both providers are called from the base pool, the `reads` and the resolved
 target, and never see the Validator's values. A provider returning a name
@@ -320,7 +349,11 @@ the same declaration.
   bound, and an array's `items` never name it: an array with no `items` takes
   any element already.
 - **`format`** is `decimal`, `date-time` or `date`, on a `string`: a value JSON
-  cannot carry, which travels as a string for the Validator to decode.
+  cannot carry, which travels as a string for the Validator to decode. On an
+  array it describes each element, as `choices` do, and is `decimal` on
+  `items="string"` alone: a number element is read as a float on the way and
+  loses a fraction's digits past a float's precision, where a decimal string
+  is handed on as it was sent.
 - **`items`** is an array's element: a JSON type name for a flat list, or the
   `Parameters` of the object each row is. **`fields`** is the same for an
   `object`. Nesting is what lets a write declare its rows, so a malformed row
@@ -333,7 +366,50 @@ the same declaration.
   finite `float`, and a bound on any other type is refused where it is
   written. A decimal string is compared as the decimal it spells, by its
   exponent, so `"1E+999999999"` is refused without building the integer it
-  names. The schema states both as `"minimum"` and `"maximum"`.
+  names. The schema states both as `"minimum"` and `"maximum"`. On an array
+  they bound each element, as its `format` describes each: an array of
+  `integer` or `number`, or of `decimal` strings, takes them, and an element
+  past one is refused at its index. The list's own count is `min_length` and
+  `max_length`'s, so an array may carry both pairs, and the schema states
+  the element's on `"items"`. **No `integer` is bounded unless it says so**,
+  and one a selector or a service hands the database past its column's range
+  is the database's to answer. On SQLite, past 64 bits, an `__in` lookup and
+  a write raise the driver's `OverflowError` on every Django version, and so
+  does any lookup on Django 4.2; from 5.0 an exact or a comparison lookup is
+  answered without the query, as no rows or every row. Bound an
+  integer that reaches a column unchecked, as a key a selector looks rows up
+  by does. Four lookups the kernel makes itself with a key a caller sent
+  answer such a key as one no row holds, on every version: the forms
+  adapter's model choice field and a `ModelForm`'s integer column
+  ([the forms adapter](forms.md#what-each-field-declares)), a relation
+  write's scoped match ([relations](relations.md#matching-scope-and-orphans))
+  and `resolve_principal`. A FilterSet's filters are held to what any
+  driver binds: where a filter's path ends on an integer column - its own, a
+  foreign key's, or the key of the row a many-to-many or a reverse foreign
+  key reaches - and its lookup reads the value as the column's - `exact`,
+  `gt`, `gte`, `lt`, `lte`, `in` and `range`, a `RangeFilter`'s bounds and a
+  CSV filter's elements included - a number past a signed 64-bit integer is
+  refused before the query, as `max_value` or `min_value` at the argument
+  that carried it, on every version
+  ([the codes a refusal carries](arguments.md#the-codes-a-refusal-carries)).
+  A number inside 64 bits is answered whatever range the column states, so
+  `gte=-1` on a `PositiveIntegerField` is every row on every version, as an
+  exact `-1` is none. A model choice filter's key past the range of the
+  column its rows are matched on is no choice, refused as `invalid_choice`
+  in its form field's words. A filter with a `method`, a lookup that reads
+  its value as text, such as `contains`, a path through a transform or to an
+  annotation, a relation over more than one column, and an object that is
+  not a django-filter `FilterSet` are left to the database, as above. A
+  number filter on a decimal or float column takes any number inside 1e50,
+  except on Django 4.2.0 and 4.2.1, where a decimal past the column's
+  `max_digits` raises in Django's own decimal handling, which this does not
+  change.
+- **`min_length`** and **`max_length`** bound how many elements an `array`
+  takes, inclusively, each a non-negative `int`, and are refused on any other
+  type. An array that declares no `max_length` is still bounded, by the
+  `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting, 1000 by default; see
+  [how long a list may be](arguments.md#how-long-a-list-may-be). The schema
+  states them as `"minItems"` and `"maxItems"`.
 - **`choice_labels`** names the choices for a reader, as a mapping of a choice
   to its label or as Django's pairs. The labels constrain nothing; the schema
   states each as a choice's `title`. A label may be a lazy translation.
@@ -417,11 +493,11 @@ docs/examples/declaring.py:validator
 
 | Annotation | Declares |
 | --- | --- |
-| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. Through dispatch, the shape check hands an `int` field a whole float such as `2.0` as `2`. |
-| `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number. |
+| `str`, `int`, `float`, `bool` | Their JSON types. `float` also takes an integer; nothing else crosses types, so `true` is not an `int`. Through dispatch, the shape check hands an `int` field a whole float such as `2.0` as `2`. An integer past a float's range is refused as no number, `"Enter a number."`, since no finite float stands for it. |
+| `Decimal`, `datetime`, `date` | A `string` with the format it decodes from. A decimal also takes a JSON number, and an integer exactly, whatever its digits. |
 | `X \| None` | Nullable. Inside a list, `list[X \| None]`, the element is: `items_nullable`. |
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum`'s member names and a `Literal` label nothing. |
-| `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. |
+| `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, so each is read as a decimal is, a JSON number included, and `?prices=1.5,2.25` is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds it. |
 | a dataclass | An object, with its fields as nested Parameters. |
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 

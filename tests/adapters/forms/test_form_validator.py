@@ -16,12 +16,14 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import QuerySet
+from django.test import RequestFactory, override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
@@ -34,6 +36,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Document, Edition
+from tests.parameters.utils import coded
 from tests.relations_app.models import Post, Timestamped
 
 User = get_user_model()
@@ -88,6 +91,14 @@ class BookForm(forms.ModelForm):
 
 class _NoModel(forms.ModelForm):
     """A ModelForm Django accepts as a class and refuses only when one is built."""
+
+
+_BEYOND_THE_COLUMN = 2**63
+"""One past the largest key SQLite's integer column holds, and so past every backend's."""
+
+
+def _many_books() -> forms.ModelMultipleChoiceField:
+    return forms.ModelMultipleChoiceField(queryset=Book.objects.all())
 
 
 def _form(form_name: str, /, **fields: forms.Field) -> type[forms.Form]:
@@ -370,6 +381,193 @@ class TestModelChoices:
             ("row", json_type, fmt, None, None, True, False)
         ]
 
+    @pytest.mark.parametrize(
+        ("to_field_name", "json_type", "fmt"),
+        [
+            (None, "integer", None),
+            ("price", "string", "decimal"),
+            # A date takes no format on an array, so a list of them stays an
+            # array of strings: without the decimal condition in
+            # ``element_format`` this field could not be declared.
+            ("published_on", "string", None),
+        ],
+    )
+    def test_a_list_of_keys_declares_each_element_a_decimal_as_one_key_does(
+        self, to_field_name: str | None, json_type: str, fmt: str | None
+    ) -> None:
+        field = forms.ModelMultipleChoiceField(
+            queryset=Book.objects.all(), to_field_name=to_field_name
+        )
+        (rows,) = FormValidator(_form("Pick", rows=field)).parameters()
+        assert (rows.type, rows.items, rows.format) == ("array", json_type, fmt)
+
+    def test_a_query_string_splits_a_list_of_decimal_keys_on_its_commas(self) -> None:
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
+        parameters = FormValidator(_form("Pick", rows=field)).parameters()
+        request = RequestFactory().get("/", {"rows": "12.50,9.99"})
+        assert request_arguments(request, parameters) == {"rows": ["12.50", "9.99"]}
+
+    @pytest.mark.django_db
+    def test_a_list_of_decimal_keys_is_matched_on_the_column_s_own_spelling(self) -> None:
+        # The shape check reads each element as a decimal, a JSON number
+        # included, and hands it on as sent. Django's field then matches each
+        # value against the ``str`` of the rows' column, so ``"12.50"`` names
+        # the row a two-place column holds and ``12.5`` names none: the form's
+        # refusal, in its words, where a list of strings was refused by type.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(author=author, title="Lathe", price=Decimal("12.50"))
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
+        validator = FormValidator(_form("Pick", rows=field))
+        arguments = check_arguments(validator.parameters(), {"rows": ["12.50"]})
+        assert list(validator.validate(arguments, CONTEXT)["rows"]) == [book]
+        arguments = check_arguments(validator.parameters(), {"rows": [12.5]})
+        assert coded(_refusal(validator.form_class, arguments)) == {
+            "rows": [
+                (
+                    "Select a valid choice. 12.5 is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
+    def test_a_list_naming_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
+        # Django's ``ModelMultipleChoiceField`` matches the list with an
+        # ``__in`` lookup, which hands a key past the integer column's range
+        # to the database driver and raises ``OverflowError`` on every Django
+        # version. No row can hold that key, so the list is no choice: refused
+        # in the field's own words, beside the form's other refusals.
+        validator = FormValidator(_form("Pick", rows=_many_books(), title=forms.CharField()))
+        arguments = check_arguments(validator.parameters(), {"rows": [key], "title": "Lathe"})
+        assert coded(_refusal(validator.form_class, {**arguments, "title": ""})) == {
+            "title": [("This field is required.", "required")],
+            "rows": [
+                (
+                    f"Select a valid choice. {key} is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ],
+        }
+
+    @pytest.mark.django_db
+    def test_django_s_own_list_field_hands_such_a_key_to_the_driver(self) -> None:
+        # Why the adapter answers first: the field alone raises, on every
+        # Django version the package supports. Fails, and says the adapter's
+        # check can go, once Django answers it.
+        with pytest.raises(OverflowError):
+            _many_books().clean([_BEYOND_THE_COLUMN])
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
+    def test_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
+        # Django 5.0 answers an exact lookup past the range with no rows, so
+        # ``ModelChoiceField`` refuses it there; Django 4.2 raises
+        # ``OverflowError`` from its ``get``. Refused before the query, the
+        # answer is the field's own on both.
+        field = forms.ModelChoiceField(queryset=Book.objects.all())
+        validator = FormValidator(_form("Pick", row=field))
+        arguments = check_arguments(validator.parameters(), {"row": key})
+        assert coded(_refusal(validator.form_class, arguments)) == {
+            "row": [
+                (
+                    "Select a valid choice. That choice is not one of the available choices.",
+                    "invalid_choice",
+                )
+            ]
+        }
+
+    @pytest.mark.django_db
+    def test_the_keys_at_either_end_of_the_column_s_range_are_matched(self) -> None:
+        author = Author.objects.create(name="Ursula")
+        ends = [
+            Book.objects.create(pk=key, author=author, title="End", price=Decimal("1.00"))
+            for key in (-_BEYOND_THE_COLUMN, _BEYOND_THE_COLUMN - 1)
+        ]
+        validator = FormValidator(
+            _form(
+                "Pick", rows=_many_books(), row=forms.ModelChoiceField(queryset=Book.objects.all())
+            )
+        )
+        cleaned = validator.validate(
+            {"rows": [book.pk for book in ends], "row": ends[1].pk}, CONTEXT
+        )
+        assert (sorted(book.pk for book in cleaned["rows"]), cleaned["row"]) == (
+            [book.pk for book in ends],
+            ends[1],
+        )
+
+    @pytest.mark.django_db
+    def test_a_key_past_an_integer_range_on_a_text_column_is_matched(self) -> None:
+        # Only an integer column has a range: a title is matched as the text
+        # the integer spells, as Django matches it.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(
+            author=author, title=str(_BEYOND_THE_COLUMN), price=Decimal("1.00")
+        )
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="title")
+        validator = FormValidator(_form("Pick", rows=field))
+        assert list(validator.validate({"rows": [_BEYOND_THE_COLUMN]}, CONTEXT)["rows"]) == [book]
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    @pytest.mark.parametrize("many", [False, True], ids=["one", "a-list"])
+    def test_a_key_spelled_as_digits_past_the_column_s_range_is_no_choice(self, many: bool) -> None:
+        # A caller handing ``validate`` the string, where dispatch's shape
+        # check hands on an ``int``: the field's lookup reads the digits as
+        # the integer they spell, and handed that to the driver.
+        key = str(_BEYOND_THE_COLUMN)
+        if many:
+            form_class = _form("Pick", rows=_many_books())
+            arguments: dict[str, Any] = {"rows": [key]}
+            message = f"Select a valid choice. {key} is not one of the available choices."
+        else:
+            form_class = _form("Pick", rows=forms.ModelChoiceField(queryset=Book.objects.all()))
+            arguments = {"rows": key}
+            message = "Select a valid choice. That choice is not one of the available choices."
+        assert coded(_refusal(form_class, arguments)) == {"rows": [(message, "invalid_choice")]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_a_key_that_spells_no_number_is_the_field_s(self) -> None:
+        # The column's lookup refuses ``"abc"`` with a ValueError, which the
+        # field catches and answers in its words.
+        form_class = _form("Pick", rows=_many_books())
+        assert coded(_refusal(form_class, {"rows": ["abc"]})) == {
+            "rows": [("\u201cabc\u201d is not a valid value.", "invalid_pk_value")]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_an_optional_key_sent_as_null_is_the_field_s(self) -> None:
+        # ``None`` names no number, so no range is compared with it.
+        field = forms.ModelChoiceField(queryset=Book.objects.all(), required=False)
+        assert FormValidator(_form("Pick", row=field)).validate({"row": None}, CONTEXT) == {
+            "row": None
+        }
+
+    @pytest.mark.django_db
+    def test_a_key_sent_as_a_string_is_left_to_the_field(self) -> None:
+        # Dispatch's shape check hands an integer key on as an ``int``; a
+        # caller handing ``validate`` the string is answered by the field.
+        author = Author.objects.create(name="Ursula")
+        book = Book.objects.create(author=author, title="Lathe", price=Decimal("1.00"))
+        validator = FormValidator(_form("Pick", rows=_many_books()))
+        assert list(validator.validate({"rows": [str(book.pk)]}, CONTEXT)["rows"]) == [book]
+
+    def test_a_list_of_rows_declares_no_length_and_the_setting_bounds_it(self) -> None:
+        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all())
+        (rows,) = FormValidator(_form("Pick", rows=field)).parameters()
+        assert (rows.min_length, rows.max_length) == (None, None)
+        with (
+            override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=2),
+            pytest.raises(InvalidArguments) as caught,
+        ):
+            check_arguments(Parameters.of(rows), {"rows": [1, 2, 3]})
+        assert coded(caught.value.detail) == {
+            "rows": [("Ensure this field has no more than 2 elements.", "max_length")]
+        }
+
     def test_a_key_with_no_json_type_is_refused(self) -> None:
         field = forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published")
         with pytest.raises(
@@ -556,7 +754,12 @@ class TestValidate:
     def test_every_leaf_is_a_list_of_str(self) -> None:
         detail = _refusal(_form("Pair", a=forms.IntegerField(max_value=1)), {"a": 2})
         assert detail == {"a": ["Ensure this value is less than or equal to 1."]}
-        assert all(type(m) is str for messages in detail.values() for m in messages)
+        # A ``str`` each, never a lazy translation or Django's error object,
+        # carrying the field's own code beside its words.
+        assert all(isinstance(m, str) for messages in detail.values() for m in messages)
+        assert coded(detail) == {
+            "a": [("Ensure this value is less than or equal to 1.", "max_value")]
+        }
 
     def test_the_form_is_built_from_the_arguments_alone(self) -> None:
         class ForUser(forms.Form):
@@ -609,6 +812,273 @@ class TestTheWireFormIsNotLocalized:
         with pytest.raises(InvalidArguments) as refused:
             FormValidator(form_class).validate({"price": "cheap"}, CONTEXT)
         assert refused.value.detail == {"price": ["Enter a number."]}
+
+
+class _Viewed(forms.ModelForm):
+    class Meta:
+        model = Post
+        fields = ["title", "views"]
+
+
+def _form_over_views(views: forms.Field) -> type[forms.ModelForm]:
+    """A ``ModelForm`` over ``Post`` declaring its integer column ``views`` as ``views``."""
+    return type("Viewed", (_Viewed,), {"views": views})
+
+
+class TestANumberPastItsRange:
+    """An integer no float, no ``str`` or no column holds is refused, never raised."""
+
+    @pytest.mark.parametrize("value", [10**400, -(10**400)], ids=["above", "below"])
+    def test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number(
+        self, value: int
+    ) -> None:
+        # JSON's number has no range, so the shape check hands the integer on,
+        # and the field's ``float`` raised OverflowError. A string of the same
+        # digits reads as infinity, which the field refuses as no number.
+        form_class = _form("Measured", ratio=forms.FloatField())
+        assert coded(_refusal(form_class, {"ratio": value})) == {
+            "ratio": [("Enter a number.", "invalid")]
+        }
+
+    def test_an_integer_past_a_float_s_range_is_refused_in_the_field_s_own_words(self) -> None:
+        field = forms.FloatField(error_messages={"invalid": "Not a ratio."})
+        assert coded(_refusal(_form("Measured", ratio=field), {"ratio": 10**400})) == {
+            "ratio": [("Not a ratio.", "invalid")]
+        }
+
+    def test_a_float_field_still_reads_an_integer_as_its_float(self) -> None:
+        form_class = _form("Measured", ratio=forms.FloatField())
+        cleaned = FormValidator(form_class).validate({"ratio": 2**53 + 1}, CONTEXT)
+        assert cleaned == {"ratio": float(2**53 + 1)}
+
+    def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits(self) -> None:
+        # The field reads a value through ``str``, which refuses an int past
+        # 4300 digits from Python 3.10.7 on, with a ValueError the field does
+        # not catch. A Decimal's ``str`` has no such limit.
+        form_class = _form("Priced", price=forms.DecimalField())
+        cleaned = FormValidator(form_class).validate({"price": 10**5000}, CONTEXT)
+        assert cleaned == {"price": Decimal(10**5000)}
+
+    def test_true_is_still_no_decimal_to_the_field(self) -> None:
+        # Python makes a bool an int, and ``Decimal(True)`` is one; bound as it
+        # came, the field reads ``"True"`` and refuses it.
+        form_class = _form("Priced", price=forms.DecimalField())
+        assert _refusal(form_class, {"price": True}) == {"price": ["Enter a number."]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    @pytest.mark.parametrize(
+        ("views", "refusal"),
+        [
+            (2**63, ("less than or equal to", 2**63 - 1, "max_value")),
+            (-(2**63) - 1, ("greater than or equal to", -(2**63), "min_value")),
+            (str(2**63), ("less than or equal to", 2**63 - 1, "max_value")),
+        ],
+        ids=["above", "below", "digits"],
+    )
+    def test_a_value_past_an_integer_column_s_range_is_refused_in_django_s_words(
+        self, views: Any, refusal: tuple[str, int, str]
+    ) -> None:
+        # The words Django's model validators use from 5.0, where the backend
+        # states the range; where it states none, Django took the value and
+        # the column could not hold it. Digits are the integer the field
+        # cleans them to, as Django's validators read it.
+        words, limit, code = refusal
+        detail = _refusal(_Viewed, {"title": "Hi", "views": views})
+        assert coded(detail) == {"views": [(f"Ensure this value is {words} {limit}.", code)]}
+
+    @pytest.mark.django_db
+    def test_a_field_s_own_limit_answers_before_the_column_s(self) -> None:
+        # As where Django validates the model: the field refuses first, and
+        # the model is never asked about it.
+        form_class = _form_over_views(forms.IntegerField(max_value=100))
+        assert coded(_refusal(form_class, {"title": "Hi", "views": 2**63})) == {
+            "views": [("Ensure this value is less than or equal to 100.", "max_value")]
+        }
+
+    @pytest.mark.django_db
+    def test_an_optional_integer_left_out_is_the_field_s(self) -> None:
+        form_class = _form_over_views(forms.IntegerField(required=False))
+        assert FormValidator(form_class).validate({"title": "Hi"}, CONTEXT) == {
+            "title": "Hi",
+            "views": None,
+        }
+
+    @pytest.mark.django_db
+    def test_a_clean_method_handing_back_nothing_is_the_model_s(self) -> None:
+        # Required, so Django validates the column with what the method hands
+        # back, and ``None`` is no number to range: the model refuses it.
+        class Emptied(_Viewed):
+            def clean_views(self) -> None:
+                return None
+
+        assert coded(_refusal(Emptied, {"title": "Hi", "views": 5})) == {
+            "views": [("This field cannot be null.", "null")]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_a_value_past_a_unique_column_s_range_never_reaches_the_uniqueness_query(
+        self,
+    ) -> None:
+        # The constraint's check queries with the value, and SQLite's driver
+        # raised OverflowError for it.
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(_EditionForm, {"book": book.pk, "number": 2**63})
+        assert coded(detail) == {
+            "number": [
+                (
+                    "Ensure this value is less than or equal to %s." % (2**63 - 1),
+                    "max_value",
+                )
+            ]
+        }
+
+    @pytest.mark.django_db
+    def test_a_value_past_the_column_s_stated_range_is_refused_in_the_same_words(self) -> None:
+        # Where the backend states the range, the kernel reads that one.
+        assert coded(_refusal(_Viewed, {"title": "Hi", "views": 2**63})) == {
+            "views": [("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")]
+        }
+
+    @pytest.mark.django_db
+    def test_an_integer_on_a_column_that_is_no_integer_s_is_the_field_s(self) -> None:
+        # A text column holds any integer's digits, so it has no range.
+        cleaned = FormValidator(_Viewed).validate({"title": 2**63, "views": 1}, CONTEXT)
+        assert cleaned == {"title": str(2**63), "views": 1}
+
+    @pytest.mark.django_db
+    def test_an_integer_field_no_column_holds_is_the_field_s(self) -> None:
+        # A form field the model has no column for is no column's to range.
+        form_class = type("Paged", (_Viewed,), {"pages": forms.IntegerField()})
+        cleaned = FormValidator(form_class).validate(
+            {"title": "Hi", "views": 1, "pages": 2**63}, CONTEXT
+        )
+        assert cleaned == {"title": "Hi", "views": 1, "pages": 2**63}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_value_clean_sets_for_a_column_the_form_does_not_edit_is_never_judged(
+        self,
+    ) -> None:
+        # Django writes onto the instance only the columns the form edits, and
+        # validates only those, so a value ``clean()`` sets for another is the
+        # form's to use: Django's own validation takes it, and so does this.
+        class Doubled(forms.ModelForm):
+            factor = forms.IntegerField()
+
+            class Meta:
+                model = Post
+                fields = ["title"]
+
+            def clean(self) -> dict[str, Any]:
+                cleaned = super().clean()
+                cleaned["views"] = cleaned["factor"] * 2**62
+                return cleaned
+
+        data = {"title": "Hi", "factor": 4}
+        own = Doubled(data=data)
+        assert own.is_valid()
+        assert FormValidator(Doubled).validate(data, CONTEXT) == own.cleaned_data
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    @pytest.mark.parametrize(
+        "meta",
+        [
+            {"fields": ["title"]},
+            {"exclude": ["body", "published", "views", "author", "tags"]},
+        ],
+        ids=["fields", "exclude"],
+    )
+    def test_a_field_declared_over_a_column_meta_leaves_out_is_never_judged(
+        self, meta: dict[str, Any]
+    ) -> None:
+        # Declared on the form but left out by ``Meta``, the value is never
+        # written onto the instance, and Django validates no column for it.
+        form_class = type(
+            "Undeclared",
+            (forms.ModelForm,),
+            {"views": forms.IntegerField(), "Meta": type("Meta", (), {"model": Post, **meta})},
+        )
+        data = {"title": "Hi", "views": 2**63}
+        own = form_class(data=data)
+        assert own.is_valid()
+        assert FormValidator(form_class).validate(data, CONTEXT) == own.cleaned_data
+
+    @pytest.mark.django_db
+    def test_a_value_that_is_no_integer_is_left_to_the_field(self) -> None:
+        assert coded(_refusal(_Viewed, {"title": "Hi", "views": "many"})) == {
+            "views": [("Enter a whole number.", "invalid")]
+        }
+
+    @pytest.fixture(params=["stated", "unstated"])
+    def ranges(self, request: pytest.FixtureRequest) -> None:
+        """The range the backend states, and none, as Django 4.2's SQLite states."""
+        if request.param == "unstated":
+            request.getfixturevalue("unstated_ranges")
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_clean_method_bringing_a_value_inside_the_range_is_taken(self) -> None:
+        # The method runs on the value the field cleaned, as Django runs it,
+        # and the column holds what it hands back.
+        class Clamped(_EditionForm):
+            def clean_number(self) -> int:
+                return min(self.cleaned_data["number"], 10)
+
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        cleaned = FormValidator(Clamped).validate({"book": book.pk, "number": 2**63}, CONTEXT)
+        assert cleaned["number"] == 10
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_clean_method_s_own_refusal_answers_for_a_value_past_the_range(self) -> None:
+        class Capped(_EditionForm):
+            def clean_number(self) -> int:
+                raise forms.ValidationError("Too many editions.", code="too_many")
+
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(Capped, {"book": book.pk, "number": 2**63})
+        assert coded(detail) == {"number": [("Too many editions.", "too_many")]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_digits_a_text_field_cleans_to_are_held_to_the_column(self) -> None:
+        # The model reads the digits as the integer they spell, and the
+        # constraint's check queried with it.
+        form_class = type("Spelled", (_EditionForm,), {"number": forms.CharField()})
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(form_class, {"book": book.pk, "number": str(2**63)})
+        assert coded(detail) == {
+            "number": [
+                ("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")
+            ]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_text_the_column_reads_as_no_number_is_the_model_s(self) -> None:
+        # Never compared with the range: the model refuses it in its words.
+        form_class = _form_over_views(forms.CharField())
+        assert coded(_refusal(form_class, {"title": "Hi", "views": "abc"})) == {
+            "views": [("\u201cabc\u201d value must be an integer.", "invalid")]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_the_values_at_either_end_of_the_column_s_range_are_taken(self) -> None:
+        validator = FormValidator(_Viewed)
+        for views in (-(2**63), 2**63 - 1):
+            assert validator.validate({"title": "Hi", "views": views}, CONTEXT)["views"] == views
 
 
 @pytest.mark.django_db
@@ -1133,3 +1603,50 @@ def _refusal_partial(form_class: type[forms.BaseForm], arguments: dict[str, Any]
     with pytest.raises(InvalidArguments) as caught:
         FormValidator(form_class).validate(arguments, _partial())
     return caught.value.detail
+
+
+class _CodedForm(forms.Form):
+    title = forms.CharField(max_length=3)
+    count = forms.IntegerField(required=False)
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean()
+        # One message with a code of its own and one with none, which DRF
+        # reports as ``invalid``.
+        if cleaned.get("count") == 13:
+            raise ValidationError(["Unlucky.", ValidationError("Taken.", code="taken")])
+        return cleaned
+
+
+class TestRefusalCodes:
+    """Django's own code on each message, which ``form.errors`` read as strings drops."""
+
+    def test_a_field_s_refusal_keeps_its_code(self) -> None:
+        assert coded(_refusal(_CodedForm, {"count": "x"})) == {
+            "title": [("This field is required.", "required")],
+            "count": [("Enter a whole number.", "invalid")],
+        }
+
+    def test_a_rendered_message_keeps_its_code(self) -> None:
+        # ``max_length``'s message is rendered from its params, as Django renders it.
+        assert coded(_refusal(_CodedForm, {"title": "long"})) == {
+            "title": [
+                ("Ensure this value has at most 3 characters (it has 4).", "max_length"),
+            ]
+        }
+
+    def test_a_form_wide_refusal_keeps_its_code_or_says_invalid(self) -> None:
+        assert coded(_refusal(_CodedForm, {"title": "ok", "count": 13})) == {
+            "non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]
+        }
+
+    @pytest.mark.django_db
+    def test_a_unique_pair_s_refusal_keeps_django_s_code_whole_and_partial(self) -> None:
+        taken, target, whole = _a_pair_and_its_collision("edition")
+        refused = coded(_refusal(_EditionForm, whole, target))
+        with pytest.raises(InvalidArguments) as caught:
+            FormValidator(_EditionForm).validate(
+                {"number": taken}, ValidationContext(None, target, partial=True)
+            )
+        assert coded(caught.value.detail) == refused
+        assert [code for _, code in refused["non_field_errors"]] == ["unique_together"]

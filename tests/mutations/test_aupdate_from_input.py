@@ -15,6 +15,7 @@ from django_service_specs.types.unset import UNSET
 from tests.adapter_app.models import Document
 from tests.mutations.utils import (
     STORED,
+    attachment_at_the_root,
     stored_document,
     stored_name,
     stored_photo,
@@ -160,6 +161,25 @@ class TestFileFields:
         replaced = await aupdate_from_input(row, {"attachment": upload})
         assert replaced.changed_fields == ("attachment",)
         assert await sync_to_async(stored_name)(row) == "documents/new.txt"
+
+    async def test_an_upload_named_as_the_held_file_replaces_it(self, media: str) -> None:
+        with attachment_at_the_root():
+            row = await sync_to_async(stored_document)()
+            assert row.attachment.name == "notes.txt"
+            upload = SimpleUploadedFile("notes.txt", b"new")
+            result = await aupdate_from_input(row, {"attachment": upload})
+        assert result.changed_fields == ("attachment",)
+        assert result.get_field_change("attachment").old == "notes.txt"
+        stored = await Document.objects.aget(pk=row.pk)
+        with stored.attachment.open("rb") as written:
+            assert written.read() == b"new"
+
+    async def test_the_held_file_handed_back_is_no_change(self, media: str) -> None:
+        row = await sync_to_async(stored_document)()
+        with patch.object(Document, "asave") as asave:
+            result = await aupdate_from_input(row, {"attachment": row.attachment})
+        assert result.changes == ()
+        asave.assert_not_called()
 
     async def test_a_file_is_written_through_its_field_s_save_form_data(self, media: str) -> None:
         # As a ModelForm writes it, so a field overriding how it stores a file is honoured.
