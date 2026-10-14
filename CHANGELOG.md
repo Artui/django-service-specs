@@ -69,10 +69,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `types/`. The eight model write helpers (`create_model`, `update_model`,
   `delete_model`, `delete_collection` and their `a` forms) moved from
   `services/` to `mutations/`, which ends the import cycle between those two
-  packages. `filters/` moved to `adapters/filters/`, beside the other adapters
-  over an optional library. A project importing by a deep path
-  (`django_service_specs.specs.selector_kind`) updates the path; one importing
-  from the package root changes nothing.
+  packages. `filters/` moved to `adapters/filters/`, beside the other adapters.
+  A project importing by a deep path (`django_service_specs.specs.selector_kind`)
+  or from a subpackage (`django_service_specs.services` for `is_async` or
+  `create_model`, `django_service_specs.filters`) updates the path; one
+  importing from the package root changes nothing.
 
 ## [0.6.0] — 2026-10-14
 
