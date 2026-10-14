@@ -452,6 +452,22 @@ class TestAKeyPastItsColumnNamesNoRow:
         assert _missed(excinfo.value.detail, "section", "Section", f"{match_key}={2**63!r}")
         assert catalog.sections.count() == 0
 
+    @pytest.mark.parametrize("key", [2**63, -(2**63) - 1], ids=["above", "below"])
+    def test_a_path_is_held_to_the_column_it_ends_on(self, key: int) -> None:
+        # ``catalog__pk`` ends on the catalog's key, a column like any other.
+        Catalog.objects.create(name="c")
+        with pytest.raises(ServiceValidationError) as excinfo:
+            create_from_input(
+                Item,
+                {"label": "i", "section": {"catalog__pk": key}},
+                relations={
+                    "section": ForwardRelationSpec(
+                        model=Section, match_key="catalog__pk", scope=Section.objects.all()
+                    )
+                },
+            )
+        assert _missed(excinfo.value.detail, "section", "Section", f"catalog__pk={key!r}")
+
     def test_a_row_sent_for_a_foreign_key_is_matched_as_its_key(self) -> None:
         # The lookup reads a row as its key; the range has no number to read.
         catalog = Catalog.objects.create(name="c")

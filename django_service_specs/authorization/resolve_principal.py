@@ -25,7 +25,8 @@ def resolve_principal(identifier: Any) -> Any:
     terminal and never a fallback:
 
     - no row with that primary key (``DoesNotExist``), including a key past
-      the range of an integer key's column, which no row can hold;
+      the range of an integer key's column, an infinite one among them, which
+      no row can hold;
     - a malformed primary key (``ValueError``, ``TypeError``, or Django's own
       ``ValidationError`` - a non-UUID string against a UUID primary key raises
       that one instead of ``ValueError``);

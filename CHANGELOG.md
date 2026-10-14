@@ -207,7 +207,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key names no row, so it is refused as the field refuses a key no row
   holds, `invalid_choice` in its own words, beside the form's other
   refusals and before the form queries. The range is the database's own for
-  the column. An integer argument a project's selector or service hands the
+  the column, and a key handed to `validate` as a string of digits is the
+  integer it spells. An integer argument a project's selector or service hands the
   database is still the database's to range; declare a `minimum` and
   `maximum` on one that reaches a column unchecked.
 - **An integer past a float's range is refused, never raised.** JSON's
@@ -227,17 +228,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`FormValidator` refuses a `ModelForm` value past its integer column's
   range.** Django 4.2 states no range for SQLite, so a `ModelForm` took an
   integer past 64 bits, and a uniqueness check or a constraint querying with
-  it raised the driver's `OverflowError`. A field that cleans to one is
-  refused before the form queries, in the words and with the code of the
-  validator Django's model field carries from 5.0: `max_value` past the
-  column's top, `min_value` past its bottom. A value the field refuses
-  itself is still refused in the field's words, its own bounds included. A
-  `clean_<field>()` method is not run on a value past the range, where
-  Django 5.0 or later, refusing it itself, ran the method first. That order
-  is the one change on Django 5.0 and later, and it is **Breaking** for a
-  `clean_<field>()` that turned a value past the range into one inside it.
-  On Django 4.2 it is a fix: such a value raised the driver's
-  `OverflowError` once a check queried with it or the row was written.
+  it raised the driver's `OverflowError`. Such a value is refused before
+  either queries, in the words and with the code of the validator Django's
+  model field carries from 5.0: `max_value` past the column's top,
+  `min_value` past its bottom. It is judged where Django 5.0 and later judge
+  it, after the form field, its `clean_<field>()` and the form's `clean()`,
+  on the value they hand back, read as the model reads it, so digits a text
+  field cleans to are the integer they spell. A value the field or a
+  `clean_<field>()` refuses is still refused in their words, and one a
+  `clean_<field>()` brings inside the range is taken, on every version.
 - **A relation write's key past its column's range names no row.** A
   forward relation's or a many-to-many's `match_key` past the range of the
   integer column it is matched on reached the database driver through the
@@ -246,31 +245,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `create_from_input`, `update_from_input` and their async twins; a string
   of digits is read as the integer it spells, as the lookup reads it, and a
   key the column reads as no number, such as a row, is left to the lookup.
-  A foreign key's column is held to the range of the key it points at. And
-  `resolve_principal` refuses an identifier past its integer key's range with
-  `PrincipalUnavailable`, as a key no row holds, where it raised the same
-  way.
+  A foreign key's column is held to the range of the key it points at, a
+  `match_key` written as a path, `catalog__pk`, to the column it ends on, and
+  one naming a many-to-many or a reverse relation to the related row's key.
+  And `resolve_principal` refuses an identifier past its integer key's range,
+  an infinity included, with `PrincipalUnavailable`, as a key no row holds,
+  where it raised the same way.
 - **Breaking on Django 5.0 and later, and otherwise a fix: a FilterSet's
-  number past its integer column's range is refused.** A number a selector
-  spec's FilterSet accepted, for a filter on an integer column - a key, a
-  foreign key, or either reached through a relation - reached the database
-  driver past the column's range, and SQLite's raised `OverflowError`,
+  number past 64 bits is refused.** A number a selector spec's FilterSet
+  accepted, for a filter on an integer column - a key, a foreign key's own
+  column, or the key of the row a foreign key, a many-to-many or a reverse
+  foreign key reaches, at the end of a path or alone - reached the database
+  driver past a signed 64-bit integer, and SQLite's raised `OverflowError`,
   answered as a 500: for an `in` or a `range` lookup, a CSV filter's and a
-  `RangeFilter`'s, and for any lookup on a foreign key's own column, on
-  every Django version, and for any lookup on Django 4.2. It is refused before the query, in the words and with the code of
-  Django's range validators, `max_value` past the column's top and
-  `min_value` past its bottom, at the argument that carried it: a range
-  filter's bound at its own `_min` or `_max` argument, and a CSV filter's
-  value at its index, as the shape check refuses a number past 1e50. The
-  range is the database's own for the column, so a decimal or float column
-  still takes any number inside 1e50. **Breaking** only where Django 5.0 and
-  later answered without the query: an `exact`, `gt`, `gte`, `lt` or `lte`
-  lookup past the range on the integer column itself, its own or one reached
-  through a relation, a `RangeFilter` given one bound included, answered no
-  rows or every row, and is refused now, so a call has one answer on every
-  version. A filter with a `method`, a lookup that reads its value as
-  text such as `contains`, a path through a transform or to an annotation,
-  and a `filter_set` that is not a django-filter `FilterSet` are left to the
+  `RangeFilter`'s, and for any lookup on a relation, on every Django
+  version, and for any lookup on Django 4.2. It is refused before the
+  query, in the words and with the code of Django's range validators,
+  `max_value` past 64 bits' top and `min_value` past their bottom, at the
+  argument that carried it: a range filter's bound at its own `_min` or
+  `_max` argument, and a CSV filter's value at its index, as the shape check
+  refuses a number past 1e50. A number inside 64 bits is answered whatever
+  range the column states, so `gte=-1` on a `PositiveIntegerField` is every
+  row on every version, and a decimal or float column still takes any
+  number inside 1e50. **Breaking** only where Django 5.0 and later answered
+  a number past 64 bits without the query: an `exact`, `gt`, `gte`, `lt` or
+  `lte` lookup on an integer column itself, its own or one reached through a
+  relation, a `RangeFilter` given one bound included, answered no rows or
+  every row, and is refused now, so a call has one answer on every version.
+  A model choice filter's key past the range of the column its rows are
+  matched on raised the same `OverflowError` as the FilterSet validated, for
+  a `ModelMultipleChoiceFilter` on every version and for a
+  `ModelChoiceFilter` on Django 4.2; it is no choice now, `invalid_choice`
+  in its form field's words, beside the FilterSet's other refusals. A
+  filter with a `method`, a lookup that reads its value as text such as
+  `contains`, a path through a transform or to an annotation, and a
+  `filter_set` that is not a django-filter `FilterSet` are left to the
   database.
 - **`paginate_output` serves a `limit` past 64 bits.** With no
   `max_page_size`, a `limit` past a signed 64-bit integer reached the

@@ -383,20 +383,21 @@ the same declaration.
   adapter's model choice field and a `ModelForm`'s integer column
   ([the forms adapter](forms.md#what-each-field-declares)), a relation
   write's scoped match ([relations](relations.md#matching-scope-and-orphans))
-  and `resolve_principal`. A FilterSet's filters are held to their columns
-  too: where a filter's path ends on an integer column, or on a foreign key
-  to one, and its lookup reads the value as the column's - `exact`, `gt`,
-  `gte`, `lt`, `lte`, `in` and `range`, a `RangeFilter`'s bounds and a CSV
-  filter's elements included - a number past the column's range is refused
-  before the query, as `max_value` or `min_value` at the argument that
-  carried it, on every version
+  and `resolve_principal`. A FilterSet's filters are held to what any
+  driver binds: where a filter's path ends on an integer column - its own, a
+  foreign key's, or the key of the row a many-to-many or a reverse foreign
+  key reaches - and its lookup reads the value as the column's - `exact`,
+  `gt`, `gte`, `lt`, `lte`, `in` and `range`, a `RangeFilter`'s bounds and a
+  CSV filter's elements included - a number past a signed 64-bit integer is
+  refused before the query, as `max_value` or `min_value` at the argument
+  that carried it, on every version
   ([the codes a refusal carries](arguments.md#the-codes-a-refusal-carries)).
-  Django 5.0 and later would answer an exact or a comparison lookup on the
-  integer column itself, its own or one reached through a relation, with no
-  rows or every row, where on a foreign key's own column the driver raised;
-  they are refused all the same, so a call has one answer on every version.
-  A filter with a `method`, a lookup that reads its value
-  as text, such as `contains`, a path through a transform or to an
+  A number inside 64 bits is answered whatever range the column states, so
+  `gte=-1` on a `PositiveIntegerField` is every row on every version, as an
+  exact `-1` is none. A model choice filter's key past the range of the
+  column its rows are matched on is no choice, refused as `invalid_choice`
+  in its form field's words. A filter with a `method`, a lookup that reads
+  its value as text, such as `contains`, a path through a transform or to an
   annotation, and an object that is not a django-filter `FilterSet` are left
   to the database, as above.
 - **`min_length`** and **`max_length`** bound how many elements an `array`
