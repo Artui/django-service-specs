@@ -60,7 +60,8 @@ def annotate_output_schema(
       as a type, an ``anyOf`` member, ``None`` in an ``enum`` or a ``oneOf``
       entry for a labelled choice - since a null is never formatted. The type is written from ``produces`` rather than
       taken from the fragment, so a renderer cannot contradict its own
-      advertisement, and a fragment's ``enum`` lists the null too where the
+      advertisement, and a fragment's ``enum`` lists the null too, and its
+      ``const`` becomes an ``enum`` of that value and a null, where the
       property admitted one. Not on a ``HANDLE`` either.
 
     Generating both sides from one declaration is the point: a schema that
@@ -158,7 +159,8 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
     ``[produces, "null"]`` and nothing of the spelling is carried over: the
     ``anyOf`` and ``enum`` it came in are discarded with everything else the
     property said. A formatter's own ``enum`` gains the ``None`` as well, so
-    the type and the values it lists never disagree about the null.
+    the type and the values it lists never disagree about the null, and a
+    ``const`` is restated as the ``enum`` of that value and a null.
     """
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
@@ -177,6 +179,15 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
         # test_a_formatters_own_enum_admits_the_null_its_field_does, and the
         # outer guard by
         # test_a_formatters_enum_on_a_field_admitting_no_null_is_left_as_declared.
+        #
+        # A ``const`` refuses it the same way, and is restated as the ``enum``
+        # of that value, which then gains the null as above. Where both are
+        # declared both must hold, so the constant alone is what is left of
+        # the ``enum``. A ``const`` of ``None`` already is the null, and is
+        # left as declared: test_a_formatters_const_none_is_left_as_declared.
+        # No const at all is test_a_nullable_field_stays_nullable.
+        if formatted.get("const") is not None:
+            formatted["enum"] = [formatted.pop("const")]
         if "enum" in formatted and None not in formatted["enum"]:
             formatted["enum"] = [*formatted["enum"], None]
     return formatted
