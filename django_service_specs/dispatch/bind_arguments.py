@@ -76,9 +76,9 @@ def bind_arguments(
         InvalidArguments: from either step. The shape check's tree carries every
             problem at once, and a Validator is only reached with well-shaped
             arguments. A ``many`` spec is the one exception, row by row: the
-            Validator runs on each row that passed the shape check, and a
-            shape refusal and a Validator refusal on different rows come back
-            as one tree keyed by row index.
+            Validator's ``validated_many()`` is handed every row that passed
+            the shape check, and a shape refusal and a Validator refusal on
+            different rows come back as one tree keyed by row index.
     """
     spec = kernel_spec(spec)
     checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)

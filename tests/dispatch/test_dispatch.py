@@ -51,6 +51,7 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
+    Listed,
     OwnerOnly,
     Record,
     Refuse,
@@ -3374,6 +3375,81 @@ class TestMany:
         )
         dispatch(spec, principal=ada, arguments={"items": [{"title": "mine"}]})
         assert [args for args, _ in validator.calls] == [{"title": "mine"}]
+
+    def test_a_validator_validating_the_list_as_one_is_asked_once_and_binds_once(
+        self, ada: Any
+    ) -> None:
+        """``validated_many`` is what dispatch asks of a many spec: once, with
+        each row under its index, ``input_data`` merged over it and only the
+        keys the Validator declares, and what it binds reaches the service."""
+        service = Record()
+        validator = Listed()
+        spec = ServiceSpec(
+            service=service,
+            permissions=OPEN,
+            many=True,
+            validator=validator,
+            input_data=lambda: {"undeclared": 1},
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        [(rows, context, many_argument)] = validator.lists
+        assert rows == {0: {"title": "a"}, 1: {"title": "b"}}
+        assert (context.principal, context.target, many_argument) == (ada, None, "items")
+        # The per-row path is never taken.
+        assert validator.calls == []
+        [call] = service.calls
+        assert call["items"] == call["data"] == [{"title": "A"}, {"title": "B"}]
+        assert call["listed"] is validator
+
+    def test_a_list_level_refusal_sits_beside_the_rows_shape_refusals(self, ada: Any) -> None:
+        """The Validator sees only the rows the shape check let through, each
+        under its own index, so its refusals land on the rows they name; the
+        list's own message sits under ``non_field_errors``, after the rows."""
+        validator = Listed(most=1)
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        rows = [{"title": 3}, {"title": "fine"}, {"title": "bad"}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        detail = refused.value.detail["items"]
+        assert detail == {
+            0: {"title": [expected_type("string")]},
+            2: {"title": ["Not this one."]},
+            "non_field_errors": ["At most 1 rows."],
+        }
+        assert list(detail) == [0, 2, "non_field_errors"]
+        assert [set(rows) for rows, _, _ in validator.lists] == [{1, 2}]
+
+    def test_the_shape_check_s_refusals_stand_when_the_validator_accepts_the_rest(
+        self, ada: Any
+    ) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Listed())
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": 3}]})
+        assert refused.value.detail == {"items": {1: {"title": [expected_type("string")]}}}
+        assert service.calls == []
+
+    def test_values_spread_beside_the_list_are_refused(self, ada: Any) -> None:
+        """A many spec's rows are never spread by field, so ``validated_many``
+        hands back its values under ``many_argument`` alone."""
+
+        class Spreading(Titled):
+            def validated_many(
+                self,
+                rows: Mapping[int, Mapping[str, Any]],
+                context: ValidationContext,
+                *,
+                many_argument: str,
+            ) -> Validated:
+                return Validated(values={many_argument: [], "title": "a"}, data=[])
+
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Spreading())
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+        assert str(refused.value).startswith(
+            "The Validator's validated_many() returned the value(s) ['items', 'title'] for a "
+            "many call; it returns the rows' values under 'items' alone."
+        )
 
     def test_a_value_a_row_binds_is_refused(self, ada: Any) -> None:
         class Binding(Titled):

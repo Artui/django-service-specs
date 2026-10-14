@@ -274,6 +274,16 @@ call - a confirmation - is a read. The service receives the rows' `data` as a
 list under `data`, and their values as a list under `many_argument`; neither
 is spread by field.
 
+Dispatch hands the rows to the Validator's `validated_many()` in one call,
+each under its index in the caller's list. By default that validates each
+row on its own through `validated()`, and refuses a value a row binds, since
+the service runs once for every row. A Validator whose library validates a
+list as one - list-level checks, one bound object for the call - overrides
+it: its refusal is the list's node, each failing row under its index and a
+message about the whole list under `non_field_errors`, and what it binds in
+`Validated.pool` reaches the service once. A row the shape check refused is
+not handed to it, so the indices may have gaps.
+
 The list is an array parameter, so it is bounded as one:
 **`many_min_length`** and **`many_max_length`** are its `min_length` and
 `max_length`. Neither is declared by default, so an empty list runs the
@@ -487,6 +497,10 @@ methods, and a third method and an attribute with defaults:
   `data` and nothing bound, so a Validator overrides it only where its `data`
   is not that mapping. A bound value named after a seed, a validated value or
   a parameter is refused.
+- `validated_many(rows, context, *, many_argument)` is what dispatch calls on
+  a [`many`](#many-rows-in-one-call) spec instead: the rows by index, and a
+  `Validated` whose `values` hold the rows' values under `many_argument`
+  alone. The default is `validated()` on each row.
 - `supports_partial` says whether `validate()` can honour a
   [`partial`](#partial-updates) call by returning only what was sent. It is
   `True` by default. A Validator that builds every field sets it `False`, and
@@ -503,11 +517,11 @@ Three things a newcomer may look for are absent on purpose:
   matches a pydantic model class, and neither was written to this contract.
 - **There is no `instance` or `many` argument.** The row a call acts on is
   target resolution, and many rows are the spec's [`many`](#many-rows-in-one-call),
-  each validated on its own. `partial` arrives in the context, because it is
+  handed to `validated_many()`. `partial` arrives in the context, because it is
   the spec's statement about the call, not the Validator's.
 - **It is sync-only.** It may query, so the async entry point runs it in
-  Django's thread-sensitive executor; a `validate` or `validated` declared
-  `async def` is refused when the spec is built.
+  Django's thread-sensitive executor; a `validate`, `validated` or
+  `validated_many` declared `async def` is refused when the spec is built.
 
 ### The dataclass adapter
 

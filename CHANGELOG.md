@@ -21,6 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a `ServiceSpec` declaring `partial=True` over an instance answering `False`
   is refused when it is built, as one over a class answering `False` is. The
   bundled dataclass and pydantic Validators keep their class-level `False`.
+- **`Validator.validated_many(rows, context, *, many_argument)`**: what
+  dispatch asks of a `many` spec, once for the whole list, where it called
+  `validated()` per row. `rows` maps each row's index in the caller's list
+  to its arguments, after the shape check and with `input_data` merged in;
+  a row the shape check refused is not among them. It returns the call's
+  `Validated`, with the rows' values under `many_argument` alone, the list
+  as `data`, and a `pool` bound once for the call, which now reaches a
+  `many` spec's service. Its refusal is the list's own node: failing rows
+  by index, and a message about the whole list under `non_field_errors`,
+  which dispatch reports after the rows and beside the shape check's
+  refusals. The default is the per-row loop dispatch ran before, so every
+  existing Validator behaves as it did, and a value one row binds is still
+  refused. A Validator whose library validates a list as one overrides it.
+  An override returning values under any other name is refused, and one
+  declared `async def` is refused when the spec is built.
 
 ### Changed
 - **`ModelT` is a pinned import path.** The type variable `ChangeResult` is

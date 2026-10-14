@@ -12,10 +12,13 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch_app.models import Note
@@ -115,6 +118,40 @@ class Titled(Validator):
         if self.returns is not None:
             return dict(self.returns)
         return {"title": arguments["title"].strip()}
+
+
+class Listed(Titled):
+    """Validates a many call's rows as one list, as a list serializer does, and binds itself once.
+
+    Refuses the list as a whole when it holds more than ``most`` rows, under
+    ``non_field_errors``, which a list-level ``validate()`` would raise, and a
+    row titled ``bad`` by its index. Records every ``validated_many`` call.
+    """
+
+    def __init__(self, *, most: int = 10) -> None:
+        super().__init__()
+        self.most = most
+        self.lists: list[tuple[dict[int, dict[str, Any]], ValidationContext, str]] = []
+
+    def validated_many(
+        self,
+        rows: Mapping[int, Mapping[str, Any]],
+        context: ValidationContext,
+        *,
+        many_argument: str,
+    ) -> Validated:
+        self.lists.append(({i: dict(row) for i, row in rows.items()}, context, many_argument))
+        errors: dict[Any, Any] = {
+            index: {"title": ["Not this one."]}
+            for index, row in rows.items()
+            if row.get("title") == "bad"
+        }
+        if len(rows) > self.most:
+            errors[NON_FIELD_ERRORS] = [f"At most {self.most} rows."]
+        if errors:
+            raise InvalidArguments(errors)
+        values = [{"title": row["title"].upper()} for row in rows.values()]
+        return Validated(values={many_argument: values}, data=values, pool={"listed": self})
 
 
 class Titles(Presenter):

@@ -202,7 +202,10 @@ same way, under its `many_argument`: `{"items": {2: {"title": [...]}}}`, a
 message about a row itself under `non_field_errors` inside it, and the list's
 own refusal - absent, null, not a list - as `{"items": [...]}`. The shape
 check's refusals of some rows and the Validator's of others come back in the
-one tree.
+one tree. A Validator that validates the list as one may refuse the list
+itself after its rows pass on their own - too many rows, two rows that
+clash - and that message sits under `non_field_errors` in the list's node,
+after the rows: `{"items": {2: {...}, "non_field_errors": [...]}}`.
 
 Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what `json.dumps` does. The

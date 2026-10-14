@@ -565,6 +565,17 @@ class _AsyncValidated(Titled):
         return Validated(values=dict(arguments), data=dict(arguments))
 
 
+class _AsyncValidatedMany(Titled):
+    async def validated_many(  # What dispatch calls on a many spec, as a coroutine.
+        self,
+        rows: Mapping[int, Mapping[str, Any]],
+        context: ValidationContext,
+        *,
+        many_argument: str,
+    ) -> Validated:
+        return Validated(values={many_argument: []}, data=[])
+
+
 class TestAnAsyncValidatorIsRefused:
     """Dispatch calls the Validator from sync code on both entry points and never awaits it.
 
@@ -574,7 +585,11 @@ class TestAnAsyncValidatorIsRefused:
 
     @pytest.mark.parametrize(
         ("validator", "method"),
-        [(_AsyncValidate(), "validate"), (_AsyncValidated(), "validated")],
+        [
+            (_AsyncValidate(), "validate"),
+            (_AsyncValidated(), "validated"),
+            (_AsyncValidatedMany(), "validated_many"),
+        ],
     )
     def test_at_construction(self, validator: Validator, method: str) -> None:
         named = f"ServiceSpec.validator.{method} is {type(validator).__name__}.{method}"

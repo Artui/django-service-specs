@@ -39,6 +39,7 @@ from tests.dispatch.utils import (
     PK,
     RENAME,
     TENANT_SEEDS,
+    Listed,
     OwnerOnly,
     Record,
     Refuse,
@@ -1036,6 +1037,22 @@ async def test_a_many_spec_validates_every_row_and_writes_them_in_one_hop(
 
     # One transaction for every row, and the rows validated in the same hop.
     assert await Note.objects.aexists() is False
+    assert len(hops) == 1
+
+
+async def test_a_many_spec_validates_its_list_as_one_inside_the_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    received: list[dict[str, Any]] = []
+
+    async def bulk(*, items: list[dict[str, Any]], listed: Any) -> None:
+        received.append({"items": items, "listed": listed})
+
+    validator = Listed()
+    spec = ServiceSpec(service=bulk, permissions=OPEN, many=True, validator=validator)
+    await adispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+    assert received == [{"items": [{"title": "A"}], "listed": validator}]
+    assert [rows for rows, _, _ in validator.lists] == [{0: {"title": "a"}}]
     assert len(hops) == 1
 
 

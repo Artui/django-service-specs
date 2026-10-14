@@ -505,6 +505,7 @@ SURFACE: dict[str, Pin] = {
             "parameters": "()",
             "validate": "(arguments, context)",
             "validated": "(arguments, context)",
+            "validated_many": "(rows, context, *, many_argument)",
         },
     ),
     "ValidationContext": Pin(

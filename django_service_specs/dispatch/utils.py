@@ -1014,13 +1014,15 @@ def validate_arguments(
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
 
-    **A** ``many`` **spec's Validator is run once per row**, on every row the
-    shape check let through, each with ``server_input`` merged over it. A row
-    it refuses is re-rooted under the row's index, beside the shape check's
-    refusals, and the whole tree is raised as one ``InvalidArguments`` under
-    ``many_argument`` once every row has been seen. Otherwise ``data`` is the
-    list of each row's ``data`` and ``values`` holds the list of each row's
-    values under ``many_argument``: neither is spread by field.
+    **A** ``many`` **spec's Validator is asked once, for the whole list**,
+    through ``Validator.validated_many()``: every row the shape check let
+    through, under its index, each with ``server_input`` merged over it. What
+    it refuses - rows by index, the list itself under ``non_field_errors`` -
+    joins the shape check's refusals, and the whole tree is raised as one
+    ``InvalidArguments`` under ``many_argument``, so every failing row is
+    reported at once. Otherwise its ``Validated`` is the call's: ``values``
+    holds the rows' values under ``many_argument`` alone, so no field is
+    spread, ``data`` is the list, and ``pool`` is bound once for the call.
     """
     validator = spec.validator
     if validator is None:
@@ -1043,37 +1045,46 @@ def _validate_rows(
     context: ValidationContext,
     server_input: Mapping[str, Any],
 ) -> Validated:
-    """``validated()`` on each row the shape check passed, and one refusal for every failing row."""
+    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row."""
     declared = validator.parameters().names()
-    errors = dict(checked.errors)
-    values: list[dict[str, Any]] = []
-    data: list[Any] = []
-    for index, row in checked.rows.items():
-        merged = {**row, **server_input}
-        # Only the keys the Validator declares, as on a single call: a row's
-        # own unknown key was refused by the shape check, so only a
-        # provider's can reach here
-        # (test_each_row_s_validator_sees_only_the_keys_it_declares).
-        own = {key: value for key, value in merged.items() if key in declared}
-        try:
-            validated = validator.validated(own, context)
-        except InvalidArguments as refused:
-            errors[index] = refused.detail
-            continue
-        # A value bound for the call has no seat on a call of many rows: each
-        # row would bind its own, and the service is called once. Refused
-        # rather than dropped, as a bound value with no name of its own is.
-        if validated.pool:
-            raise ImproperlyConfigured(
-                f"The Validator bound the key(s) {sorted(validated.pool)} for row {index} of a "
-                "many call. A many spec's service is called once for every row, so a value "
-                "bound for one row has nowhere to go; bind nothing on a many spec."
-            )
-        values.append(validated.values)
-        data.append(validated.data)
-    if errors:
-        raise InvalidArguments({name: dict(sorted(errors.items()))})
-    return Validated(values={name: values}, data=data)
+    # Only the keys the Validator declares, as on a single call: a row's own
+    # unknown key was refused by the shape check, so only a provider's can
+    # reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
+    rows = {
+        index: {key: value for key, value in {**row, **server_input}.items() if key in declared}
+        for index, row in checked.rows.items()
+    }
+    try:
+        validated = validator.validated_many(rows, context, many_argument=name)
+    except InvalidArguments as refused:
+        raise InvalidArguments({name: _list_node({**checked.errors, **refused.detail})}) from None
+    if checked.errors:
+        raise InvalidArguments({name: _list_node(checked.errors)})
+    # A row's fields are never spread into the service's keywords, so the
+    # list is the only value a many call hands over by name
+    # (test_values_spread_beside_the_list_are_refused).
+    if validated.values.keys() != {name}:
+        raise ImproperlyConfigured(
+            f"The Validator's validated_many() returned the value(s) "
+            f"{sorted(validated.values)} for a many call; it returns the rows' values under "
+            f"{name!r} alone."
+        )
+    return validated
+
+
+def _list_node(errors: Mapping[Any, Any]) -> dict[Any, Any]:
+    """A list's refusals in reading order: each row by index, then the list's own message.
+
+    A sort key rather than ``sorted(errors.items())``, which cannot compare an
+    ``int`` index with ``non_field_errors``
+    (test_a_list_level_refusal_sits_beside_the_rows_shape_refusals).
+    """
+    return dict(
+        sorted(
+            errors.items(),
+            key=lambda item: (0, item[0], "") if isinstance(item[0], int) else (1, 0, str(item[0])),
+        )
+    )
 
 
 def prepare_service(
