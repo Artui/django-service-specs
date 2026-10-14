@@ -184,6 +184,22 @@ there is one:
 {"detail": "2 archived notes will be deleted. Confirm to proceed.", "schema": {"confirmed": {"type": "boolean"}}}
 ```
 
+A schema one transport cannot render is the raiser's error, not the caller's,
+so a service asks the same question on every route or on none.
+[`check_requested_input`][django_service_specs.dispatch.check_requested_input.check_requested_input]
+is that rule, for a transport to call before it renders the question. It reads
+the spec's top-level parameters and the schema, runs no query, and raises
+`ImproperlyConfigured` naming the key for a key no top-level parameter
+declares, for a fragment that is not a schema object, for a shape some
+transport cannot render, and for a `type` the declared parameter does not
+take. A declared key the server fills - one a provider is annotated to fill,
+or a seed the call's `pool_seeds` registers - is refused too, because
+dispatch drops the caller's value for it and the answer would never arrive.
+The narrowest renderer is an MCP elicitation form: a `string`, `number`,
+`integer` or `boolean`, or an `array` whose `items` list enum values. On a
+`many` spec the top level is the list and the spec's `reads`, so a
+confirmation asked once for the whole call is a `reads` parameter.
+
 ## Declaring idempotency
 
 `ServiceSpec(idempotent=True)` states that repeating the call with the same
