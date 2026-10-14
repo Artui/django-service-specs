@@ -23,7 +23,6 @@ from django_service_specs.authorization.resolve_principal import resolve_princip
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.commands.add_spec_arguments import add_spec_arguments
 from django_service_specs.commands.describe_parameters import describe_parameters
-from django_service_specs.commands.exit_code import ExitCode
 from django_service_specs.commands.exit_code_for import exit_code_for
 from django_service_specs.commands.parameter_descriptor import ParameterDescriptor
 from django_service_specs.commands.parsed_arguments import parsed_arguments
@@ -149,6 +148,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.exit_code import ExitCode
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter

@@ -161,7 +161,7 @@ it. A service that returns nothing writes nothing.
 
 A refusal ends the run with a `CommandError` whose message goes to stderr and
 whose
-[`ExitCode`][django_service_specs.commands.exit_code.ExitCode] is the
+[`ExitCode`][django_service_specs.types.exit_code.ExitCode] is the
 process's exit status. The codes are a public contract, for a script to
 branch on:
 

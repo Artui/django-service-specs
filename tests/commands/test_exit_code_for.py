@@ -14,8 +14,8 @@ from django_service_specs import (
     ServiceValidationError,
     UnsupportedMediaType,
 )
-from django_service_specs.commands.exit_code import ExitCode
 from django_service_specs.commands.exit_code_for import exit_code_for
+from django_service_specs.types.exit_code import ExitCode
 
 EXPECTED: dict[type[Exception], ExitCode] = {
     DispatchError: ExitCode.INVALID_ARGUMENTS,

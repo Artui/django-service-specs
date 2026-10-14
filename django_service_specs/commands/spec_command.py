@@ -16,7 +16,6 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.commands.add_spec_arguments import add_spec_arguments
 from django_service_specs.commands.describe_parameters import describe_parameters
-from django_service_specs.commands.exit_code import ExitCode
 from django_service_specs.commands.exit_code_for import exit_code_for
 from django_service_specs.commands.parsed_arguments import parsed_arguments
 from django_service_specs.commands.render_result import render_result
@@ -43,6 +42,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.exit_code import ExitCode
 
 _OWN_OPTIONS = frozenset({"--as-user", "--json", "--table"})
 """The options every subcommand owns, which no spec parameter may map to."""
@@ -87,7 +87,7 @@ class SpecCommand(BaseCommand):
       ``SERVICE_SPECS_COMMAND_OUTPUT`` setting, then whether stdout is a
       terminal ([`wants_table`][django_service_specs.commands.wants_table.wants_table]).
     - A refusal ends the run with a ``CommandError`` carrying its message and
-      an [`ExitCode`][django_service_specs.commands.exit_code.ExitCode].
+      an [`ExitCode`][django_service_specs.types.exit_code.ExitCode].
     - ``--explain`` runs no spec: it lists the ones that authorize nothing,
       as the system check does.
 

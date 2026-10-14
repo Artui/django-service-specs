@@ -222,7 +222,6 @@ Installed with the `pydantic` extra and imported from
 ## Commands
 
 ::: django_service_specs.commands.spec_command.SpecCommand
-::: django_service_specs.commands.exit_code.ExitCode
 ::: django_service_specs.commands.exit_code_for.exit_code_for
 ::: django_service_specs.commands.render_result.render_result
 ::: django_service_specs.commands.render_table.render_table
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
 ::: django_service_specs.types.no_input.NoInput
+::: django_service_specs.types.exit_code.ExitCode
