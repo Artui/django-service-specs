@@ -24,6 +24,7 @@ from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -128,6 +129,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.no_input import NoInput
@@ -204,6 +206,7 @@ __all__ = [
     "ServiceSpec",
     "ServiceValidationError",
     "SpecRegistry",
+    "SpecSource",
     "SpecView",
     "UnknownArguments",
     "Unrestricted",
@@ -241,6 +244,7 @@ __all__ = [
     "bind_arguments",
     "can_present_nothing",
     "check_arguments",
+    "check_call",
     "check_requested_input",
     "coerce_flat",
     "combine_progress",
@@ -257,6 +261,7 @@ __all__ = [
     "implements",
     "is_async",
     "is_queryset",
+    "kernel_spec",
     "materialize_retrieve",
     "null_progress",
     "operation_affordances",

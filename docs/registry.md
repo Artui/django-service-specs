@@ -28,6 +28,31 @@ vocabulary: `"read"`, `"admin"`, `"destructive"`. Whether an entry is a read or
 a write is not a tag and not a field; it is read off the spec itself, so a
 stored label can never disagree with the object it describes.
 
+## A declaration of another library's
+
+The `spec` may also be any object with an `as_kernel_spec()` method, a
+[`SpecSource`][django_service_specs.specs.spec_source.SpecSource]:
+djangorestframework-services' spec is one. It is registered as it is, with no
+wrapper, and kept as registered, so `entry.spec` and `specs()` hand back the
+object itself. `dispatch`, `adispatch`, `check_call`, `present`, `apresent`,
+`resolve_target`, the three affordance functions, `spec_input_schema` and
+`audience_projection_for_spec` take it as they take a spec, and
+[`kernel_spec`][django_service_specs.specs.spec_source.kernel_spec] is how a
+transport reads the spec it compiles to anywhere else. It is compiled the
+first time anything reads it, and that compiled spec answers every later call
+for the same object.
+
+The entry answers a read-only `agent_contract`: the registered object's own
+`agent_contract()` when it has one, and `None` otherwise, which is every
+`ServiceSpec` and `SelectorSpec`. It is asked, never passed: `register()` takes
+no `agent_contract=`.
+
+```python
+--8<--
+docs/examples/registry.py:source
+--8<--
+```
+
 ## Registering
 
 `register(name, spec, tags=...)` adds one entry, and refuses three mistakes
@@ -35,9 +60,10 @@ where they are written, at import time:
 
 - **A name already in this registry** raises `ValueError`, so a copy-pasted
   declaration fails instead of shadowing an operation.
-- **Something that is not a `ServiceSpec` or a `SelectorSpec`** raises
-  `TypeError`.
-- **A spec with no permission check** raises `ImproperlyConfigured`. Dispatch
+- **Something that is not a `ServiceSpec` or a `SelectorSpec`, nor compiles
+  to one,** raises `TypeError`, naming the registration.
+- **A spec with no permission check**, whether declared here or compiled from
+  another library's declaration, raises `ImproperlyConfigured`. Dispatch
   would refuse it on every call, and finding out at the first call is later
   than finding out at startup. An operation that is open says so with
   `permissions=[Unrestricted()]`.

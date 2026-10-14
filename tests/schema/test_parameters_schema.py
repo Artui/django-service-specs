@@ -707,3 +707,9 @@ def test_a_minimum_no_call_could_meet_is_refused_when_the_schema_is_built() -> N
     # The schema states the maximum in force, which this declaration has none of.
     with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
         parameters_schema(Parameters.of(Parameter("ids", "array", min_length=4)))
+
+
+@pytest.mark.parametrize("policy", [UnknownArguments.PASSTHROUGH, "passthrough"])
+def test_passthrough_is_refused_rather_than_described_as_the_open_set(policy: Any) -> None:
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        parameters_schema(AUTHOR, unknown_arguments=policy)

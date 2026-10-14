@@ -89,6 +89,16 @@ def test_the_policy_reaches_the_shape_check() -> None:
     assert bound == {"pk": 1}
 
 
+def test_passthrough_is_refused_rather_than_run_as_ignore() -> None:
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        bind_arguments(
+            retrieve(),
+            {"pk": 1, "tenant": "acme"},
+            principal=PRINCIPAL,
+            unknown_arguments=UnknownArguments.PASSTHROUGH,
+        )
+
+
 # --- a service spec -------------------------------------------------------------------
 
 

@@ -25,6 +25,8 @@ One Django setting, read at the call rather than at import, so
 ::: django_service_specs.specs.service_spec.ServiceSpec
 ::: django_service_specs.specs.selector_spec.SelectorSpec
 ::: django_service_specs.specs.selector_kind.SelectorKind
+::: django_service_specs.specs.spec_source.SpecSource
+::: django_service_specs.specs.spec_source.kernel_spec
 
 ## Parameters
 
@@ -93,6 +95,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 ::: django_service_specs.dispatch.check_requested_input.check_requested_input
+::: django_service_specs.dispatch.check_call.check_call
 
 ## Affordances
 

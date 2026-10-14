@@ -13,11 +13,12 @@ from django_service_specs.dispatch.utils import open_call, walk_target
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
 def resolve_target(
-    spec: ServiceSpec,
+    spec: ServiceSpec | SpecSource,
     *,
     principal: Any,
     arguments: Mapping[str, Any],
@@ -74,11 +75,13 @@ def resolve_target(
         TypeError: a ``SelectorSpec``, whose selector is its run rather than
             a lookup in front of one.
     """
-    if not isinstance(spec, ServiceSpec):
+    compiled = kernel_spec(spec)
+    if not isinstance(compiled, ServiceSpec):
         raise TypeError(
-            f"resolve_target() takes a ServiceSpec; got {type(spec).__name__}. A "
+            f"resolve_target() takes a ServiceSpec; got {type(compiled).__name__}. A "
             "SelectorSpec's selector is its run: dispatch it."
         )
+    spec = compiled
     if spec.many:
         raise ImproperlyConfigured(
             "resolve_target() was handed a many spec, which declares no target selector: its "

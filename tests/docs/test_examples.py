@@ -55,6 +55,7 @@ from django_service_specs import (
     coerce_flat,
     dispatch,
     error_response,
+    kernel_spec,
     present,
     server_owned_keys,
     spec_input_schema,
@@ -351,6 +352,17 @@ class TestDispatching:
         with pytest.raises(InvalidArguments) as refused:
             dispatching.bind_rename(ada, note, {"pk": note.pk})
         assert refused.value.detail == {"title": ["This field is required."]}
+
+    def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
+        queue: list[Any] = []
+        dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)
+        assert queue == [(ada.pk, {"pk": 1, "title": "Final"})]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatching.enqueue_rename(ada, {"title": "Final"}, queue)
+        assert refused.value.detail == {"pk": ["This field is required."]}
+        with pytest.raises(NotPermitted):
+            dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
+        assert len(queue) == 1
 
     def test_a_seed_reaches_the_service_and_no_caller_can_supply_it(self, ada: Any) -> None:
         result = dispatching.create_signed_note(ada, "Hello")
@@ -801,6 +813,13 @@ class TestRegistry:
     def test_only_a_spec_can_be_registered(self) -> None:
         with pytest.raises(TypeError, match="expected a ServiceSpec or SelectorSpec"):
             SpecRegistry().register("loose", quickstart.rename_note)
+
+    def test_a_declaration_of_another_library_s_is_kept_and_compiled_once(self) -> None:
+        assert registry.entry is not None
+        assert registry.entry.spec is registry.listing
+        assert kernel_spec(registry.listing) is registry.compiled
+        assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
+        assert registry.contracts == [{"ordering": "title"}, None]
 
     def test_a_name_is_registered_once(self) -> None:
         with pytest.raises(ValueError, match="already registered"):

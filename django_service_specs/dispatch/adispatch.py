@@ -31,13 +31,14 @@ from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.is_async import is_async
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
 async def adispatch(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     *,
     principal: Any = None,
     principal_id: Any = None,
@@ -121,6 +122,8 @@ async def adispatch(
     # by test_principal_id_is_resolved_inside_the_one_hop (``principal_id`` alone).
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
+    # Compiled on the loop, before the branch that reads which kind of spec it is.
+    spec = kernel_spec(spec)
     refuse_target(spec, target)
     rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
     if isinstance(spec, SelectorSpec):

@@ -18,6 +18,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.output.utils import PRIORITIES, InvoicePresenter
+from tests.specs.utils import Foreign
 
 STATUS_LABELS = {"PENDING_REVIEW": "Awaiting review", "PAID": "Paid"}
 
@@ -209,3 +210,8 @@ def test_a_formatter_travels_with_its_marking() -> None:
     projection = of(OutputField("amount", "string", marking=FieldMarking.formatted(money)))
 
     assert projection.formatter("amount") is money
+
+
+def test_a_foreign_declaration_is_projected_as_its_compiled_spec() -> None:
+    spec = listing(InvoicePresenter())
+    assert audience_projection_for_spec(Foreign(spec)) == audience_projection_for_spec(spec)

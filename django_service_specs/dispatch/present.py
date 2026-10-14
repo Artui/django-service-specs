@@ -12,9 +12,10 @@ from django_service_specs.dispatch.utils import sync_result
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 
-def present(spec: ServiceSpec | SelectorSpec, result: DispatchResult) -> Any:
+def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResult) -> Any:
     """Render ``result.value`` as JSON-like data, the way ``spec`` declares it.
 
     The presenter is a selector spec's own, or a service spec's
@@ -57,6 +58,7 @@ def present(spec: ServiceSpec | SelectorSpec, result: DispatchResult) -> Any:
             which is never awaited, so it is refused rather than handed back
             as the payload.
     """
+    spec = kernel_spec(spec)
     if result.kind == "not_found":
         raise ValueError(
             "A not-found result has nothing to present. Answer it as the transport's own "

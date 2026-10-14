@@ -784,8 +784,16 @@ def test_ignore_still_refuses_what_is_declared_and_wrong() -> None:
 def test_the_policy_may_be_given_by_value_and_an_unknown_one_is_a_programming_error() -> None:
     cleaned = check_arguments(AUTHOR, {"name": "Le Guin", "x": 1}, unknown_arguments="ignore")
     assert cleaned == {"name": "Le Guin"}
-    with pytest.raises(ValueError, match="passthrough"):
-        check_arguments(AUTHOR, {"name": "Le Guin"}, unknown_arguments="passthrough")
+    with pytest.raises(ValueError, match="'drop' is not a valid UnknownArguments"):
+        check_arguments(AUTHOR, {"name": "Le Guin"}, unknown_arguments="drop")
+
+
+@pytest.mark.parametrize("policy", [UnknownArguments.PASSTHROUGH, "passthrough"])
+def test_passthrough_is_refused_where_the_policy_is_normalized(policy: Any) -> None:
+    # Sized so the policy is what answers: an undeclared key the IGNORE branch
+    # would drop and return, so a member let through to the walk passes.
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        check_arguments(AUTHOR, {"name": "Le Guin", "tenant": "acme"}, unknown_arguments=policy)
 
 
 # --- every problem at once --------------------------------------------------------------------------

@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 
 class SpecRegistry:
@@ -53,7 +54,7 @@ class SpecRegistry:
     def register(
         self,
         name: str,
-        spec: ServiceSpec | SelectorSpec,
+        spec: ServiceSpec | SelectorSpec | SpecSource,
         *,
         tags: Iterable[str] = (),
     ) -> None:
@@ -64,14 +65,19 @@ class SpecRegistry:
                 duplicate raises rather than overwriting, so a copy-pasted
                 declaration fails at import time instead of silently
                 shadowing an operation.
-            spec: A ``ServiceSpec`` (write) or ``SelectorSpec`` (read).
+            spec: A ``ServiceSpec`` (write) or ``SelectorSpec`` (read), or an
+                object with ``as_kernel_spec()`` compiling to one. The object
+                is kept as registered, and compiled here, once: a declaration
+                that does not compile, or compiles to an unguarded spec, fails
+                at registration.
             tags: Free-form labels, deduplicated into a frozen set.
 
         Raises:
             ValueError: ``name`` is already registered here.
             TypeError: ``spec`` is neither a ``ServiceSpec`` nor a
-                ``SelectorSpec``.
-            ImproperlyConfigured: ``spec.permissions is None``. Off HTTP there
+                ``SelectorSpec``, nor an object compiling to one.
+            ImproperlyConfigured: the spec, or what it compiles to, has
+                ``permissions is None``. Off HTTP there
                 is no view whose policy an undeclared spec could inherit, so
                 registering one that means to be open must say so with
                 ``permissions=[Unrestricted()]``; the alternative is a spec
@@ -89,11 +95,15 @@ class SpecRegistry:
 
     def mutations(self) -> tuple[RegisteredSpec, ...]:
         """The ``ServiceSpec`` entries, in registration order."""
-        return tuple(e for e in self._entries.values() if isinstance(e.spec, ServiceSpec))
+        return tuple(
+            e for e in self._entries.values() if isinstance(kernel_spec(e.spec), ServiceSpec)
+        )
 
     def queries(self) -> tuple[RegisteredSpec, ...]:
         """The ``SelectorSpec`` entries, in registration order."""
-        return tuple(e for e in self._entries.values() if isinstance(e.spec, SelectorSpec))
+        return tuple(
+            e for e in self._entries.values() if isinstance(kernel_spec(e.spec), SelectorSpec)
+        )
 
     def by_tag(self, *tags: str) -> SpecRegistry:
         """A new registry holding the entries carrying **any** of ``tags``.
@@ -126,8 +136,11 @@ class SpecRegistry:
             entry for source in (self, *others) for entry in source._entries.values()
         )
 
-    def specs(self) -> dict[str, ServiceSpec | SelectorSpec]:
+    def specs(self) -> dict[str, ServiceSpec | SelectorSpec | SpecSource]:
         """A fresh ``name -> spec`` dict - the shape adapters already accept.
+
+        Each spec as registered, so an object with ``as_kernel_spec()`` is
+        handed back as itself; every entry point here takes it as it is.
 
         Pass ``registry.specs()`` wherever a ``dict[str, spec]`` goes today.
         Mutating the returned dict does not affect the registry.
@@ -146,12 +159,14 @@ class SpecRegistry:
     def _add(self, entry: RegisteredSpec) -> None:
         if entry.name in self._entries:
             raise ValueError(f"{entry.name!r} is already registered in this SpecRegistry.")
-        if not isinstance(entry.spec, ServiceSpec | SelectorSpec):
-            raise TypeError(
-                f"{entry.name!r}: expected a ServiceSpec or SelectorSpec, got "
-                f"{type(entry.spec).__name__}."
-            )
-        if entry.spec.permissions is None:
+        # Compiled here, so a declaration that does not compile fails at
+        # registration, and named, since the compile's own message cannot
+        # know which registration it was.
+        try:
+            spec = kernel_spec(entry.spec)
+        except TypeError as refused:
+            raise TypeError(f"{entry.name!r}: {refused}") from refused
+        if spec.permissions is None:
             raise ImproperlyConfigured(
                 f"{entry.name!r} declares no permissions. Pass permissions=[Unrestricted()] "
                 "to mean that anyone may run it."

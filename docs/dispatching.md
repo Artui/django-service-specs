@@ -301,6 +301,33 @@ arguments back.
 steps. A caller of `bind_arguments` owns them: it authorizes before binding,
 and passes the row it resolved as `target`, or `None` for a create.
 
+## Checking a call before it runs
+
+A transport that accepts a call now and runs it later - a task queue - can
+refuse at enqueue what the worker's `dispatch` would refuse before it resolves
+anything.
+[`check_call`][django_service_specs.dispatch.check_call.check_call] runs
+dispatch's prelude alone, through the same function, in dispatch's order: a
+deactivated principal, a parameter a registered seed occupies, the shape check,
+then the class-level permission check. Its keywords are dispatch's, less what
+only a run reads. Nothing after the prelude runs - no lookup, object or scope
+check, Validator, affordance or precondition - so a call it passes may still
+be refused when it runs.
+
+```python
+--8<--
+docs/examples/dispatching.py:check_call
+--8<--
+```
+
+It returns the checked arguments and the grant, which `dispatch` honours for
+the same spec and principal in the same process; a grant is not serializable,
+so it never crosses a queue. The kernel's own steps run no query. It is
+`bind_arguments`' complement: `check_call` authorizes and does not validate,
+`bind_arguments` validates and does not authorize, and neither resolves a
+target. A `many` call's refused rows are raised by it, after the permission
+check, in the tree dispatch raises them in.
+
 ## The async entry point
 
 [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] takes the same
