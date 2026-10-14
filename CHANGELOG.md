@@ -129,6 +129,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`enforce_affordances` raises `TypeError` for a `SelectorSpec`**, and
   `aenforce_affordances` raises the same, whatever the selector spec declares;
   the async path used to return `None` for one declaring nothing.
+- **`SpecView` and `AsyncSpecView` serve a `SpecSource` as their `spec`**,
+  compiled when `as_view()` runs; a declaration that does not compile is
+  `ImproperlyConfigured` there. The message for a view given no spec now says
+  what a spec is. `shape_queryset` takes a source too, and raises `TypeError`
+  for a `ServiceSpec` where it raised `AttributeError`.
 - `UnknownArguments` has three members; iterating it yields `PASSTHROUGH`.
 
 ## [0.5.1] — 2026-10-14
