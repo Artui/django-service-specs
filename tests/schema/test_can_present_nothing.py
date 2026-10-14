@@ -10,15 +10,14 @@ import pytest
 
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.specs.kernel_spec import kernel_spec
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch.utils import OPEN, PK, make_user, note_by_pk
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign, Titled

@@ -108,15 +108,7 @@ SURFACE: dict[str, Pin] = {
         "affordances.aunmet_operation_affordance", "spec, pool, *, reserved="
     ),
     # --- authorization ------------------------------------------------------------------------
-    "authorize": _fn("authorization.authorize", "spec, principal, *, grant="),
-    "authorize_scope": _fn("authorization.authorize_scope", "spec, principal, scope, *, grant"),
-    "authorize_target": _fn("authorization.authorize_target", "spec, principal, target, *, grant"),
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
-    "Grant": Pin(
-        "authorization.grant",
-        signature="spec, principal, target_checked=",
-        methods={"covers": "(spec, principal)"},
-    ),
     # Subclassed by the adapter's permission check over DRF permission classes.
     "PermissionCheck": Pin(
         "authorization.permission_check",
@@ -161,14 +153,25 @@ SURFACE: dict[str, Pin] = {
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
+    "audience_projection_for_spec": _fn(
+        "dispatch.audience_projection_for_spec", "spec, *, overrides=, name="
+    ),
     "present_for_audience": _fn("dispatch.present_for_audience", "spec, result, *, projection="),
     "paginate_output": _fn("dispatch.paginate_output", "rows, *, page=, limit=, max_page_size="),
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
     "DispatchResult": Pin(
         "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
     ),
-    # --- filters ------------------------------------------------------------------------------
-    "filter_set_parameters": _fn("filters.filter_set_parameters", "filter_set"),
+    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant="),
+    "authorize_scope": _fn("dispatch.authorize_scope", "spec, principal, scope, *, grant"),
+    "authorize_target": _fn("dispatch.authorize_target", "spec, principal, target, *, grant"),
+    "Grant": Pin(
+        "dispatch.grant",
+        signature="spec, principal, target_checked=",
+        methods={"covers": "(spec, principal)"},
+    ),
+    # --- adapters -----------------------------------------------------------------------------
+    "filter_set_parameters": _fn("adapters.filters.filter_set_parameters", "filter_set"),
     # --- mutations ----------------------------------------------------------------------------
     "apply_input": _fn("mutations.apply_input", "instance, data, *, field_map=, exclude_fields="),
     "create_from_input": _fn(
@@ -211,23 +214,28 @@ SURFACE: dict[str, Pin] = {
     "RelatedObjectChange": Pin(
         "mutations.related_object_change", signature="relation, outcome=, pk="
     ),
-    "RelationOutcome": _enum(
-        "mutations.relation_outcome",
-        {
-            "UNTOUCHED": "untouched",
-            "CREATED": "created",
-            "UPDATED": "updated",
-            "CLEARED": "cleared",
-            "UNLINKED": "unlinked",
-            "DELETED": "deleted",
-            "REMOVED": "removed",
-        },
-        str,
+    "create_model": _fn(
+        "mutations.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
     ),
+    "acreate_model": _fn(
+        "mutations.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
+    ),
+    "update_model": _fn(
+        "mutations.update_model",
+        "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
+    ),
+    "aupdate_model": _fn(
+        "mutations.aupdate_model",
+        "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
+    ),
+    "delete_model": _fn("mutations.delete_model", "model, *, soft_delete=, relations="),
+    "adelete_model": _fn("mutations.adelete_model", "model, *, soft_delete=, relations="),
+    "delete_collection": _fn("mutations.delete_collection", "model, *, soft_delete="),
+    "adelete_collection": _fn("mutations.adelete_collection", "model, *, soft_delete="),
     # --- output -------------------------------------------------------------------------------
     "Output": Pin("output.output", signature="fields=", methods={"names": "()", "get": "(name)"}),
     "OutputField": Pin(
-        "output.output_field",
+        "output.output",
         signature="name, type, *, format=, nullable=, label=, choices=, always_present=, "
         "marking=, fields=, items=, items_nullable=",
     ),
@@ -248,11 +256,6 @@ SURFACE: dict[str, Pin] = {
             "timestamp": "classmethod(fmt=, description=)",
         },
     ),
-    "FieldAudience": _enum(
-        "output.field_audience",
-        {"CONTENT": "content", "LABEL": "label", "HANDLE": "handle", "HIDDEN": "hidden"},
-        str,
-    ),
     "AudienceProjection": Pin(
         "output.audience_projection",
         signature="fields=, label=, choice_labels=, nested=",
@@ -261,13 +264,10 @@ SURFACE: dict[str, Pin] = {
     "annotate_output_schema": _fn(
         "output.annotate_output_schema", "schema, projection, *, handle_description="
     ),
-    "audience_projection_for_spec": _fn(
-        "output.audience_projection_for_spec", "spec, *, overrides=, name="
-    ),
     "project_payload": _fn("output.project_payload", "payload, projection"),
     # --- parameters ---------------------------------------------------------------------------
     "Parameter": Pin(
-        "parameters.parameter",
+        "parameters.parameters",
         signature="name, type, *, required=, format=, items=, items_nullable=, fields=, "
         "choices=, choice_labels=, minimum=, maximum=, min_length=, max_length=, default=, "
         "nullable=, help=",
@@ -366,13 +366,6 @@ SURFACE: dict[str, Pin] = {
         "create_service=, update_service=, delete_service=",
         bases=("RelationSpec",),
     ),
-    "RelationMode": _enum("relations.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
-    "RelationOrphan": _enum(
-        "relations.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
-    ),
-    "RelationPhase": _enum(
-        "relations.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
-    ),
     # --- schema -------------------------------------------------------------------------------
     "can_present_nothing": _fn("schema.can_present_nothing", "spec"),
     "output_schema": _fn("schema.output_schema", "output"),
@@ -407,27 +400,8 @@ SURFACE: dict[str, Pin] = {
     "UpdateService": _protocol("services.update_service", "(*, instance, data, **extras)"),
     "DeleteService": _protocol("services.delete_service", "(*, instance, data=, **extras)"),
     "implements": _fn("services.implements", "proto"),
-    "is_async": _fn("services.is_async", "fn"),
     "run_service": _fn("services.run_service", "fn, kwargs, *, atomic"),
     "arun_service": _fn("services.arun_service", "fn, kwargs, *, atomic"),
-    "create_model": _fn(
-        "services.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
-    ),
-    "acreate_model": _fn(
-        "services.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
-    ),
-    "update_model": _fn(
-        "services.update_model",
-        "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
-    ),
-    "aupdate_model": _fn(
-        "services.aupdate_model",
-        "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
-    ),
-    "delete_model": _fn("services.delete_model", "model, *, soft_delete=, relations="),
-    "adelete_model": _fn("services.adelete_model", "model, *, soft_delete=, relations="),
-    "delete_collection": _fn("services.delete_collection", "model, *, soft_delete="),
-    "adelete_collection": _fn("services.adelete_collection", "model, *, soft_delete="),
     # --- specs --------------------------------------------------------------------------------
     # The adapter's spec classes compile to these two through the seam below.
     "ServiceSpec": Pin(
@@ -451,8 +425,6 @@ SURFACE: dict[str, Pin] = {
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "()", "output": "()"},
     ),
-    "SelectorKind": _enum("specs.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
-    # The compile seam: every entry point takes an object answering as_kernel_spec().
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),
     "server_owned_keys": _fn("specs.server_owned_keys", "spec, *, pool_seeds="),
@@ -476,13 +448,41 @@ SURFACE: dict[str, Pin] = {
         signature="render, produces, schema=",
         methods={"apply": "(value)", "json_schema": "()", "timestamp": "classmethod(fmt=)"},
     ),
-    # --- validation ---------------------------------------------------------------------------
+    "RelationOutcome": _enum(
+        "types.relation_outcome",
+        {
+            "UNTOUCHED": "untouched",
+            "CREATED": "created",
+            "UPDATED": "updated",
+            "CLEARED": "cleared",
+            "UNLINKED": "unlinked",
+            "DELETED": "deleted",
+            "REMOVED": "removed",
+        },
+        str,
+    ),
+    "FieldAudience": _enum(
+        "types.field_audience",
+        {"CONTENT": "content", "LABEL": "label", "HANDLE": "handle", "HIDDEN": "hidden"},
+        str,
+    ),
+    "RelationMode": _enum("types.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
+    "RelationOrphan": _enum(
+        "types.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
+    ),
+    "RelationPhase": _enum(
+        "types.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
+    ),
+    "is_async": _fn("types.is_async", "fn"),
+    "SelectorKind": _enum("types.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
+    # The compile seam: every entry point takes an object answering as_kernel_spec().
     "UnknownArguments": _enum(
-        "validation.unknown_arguments",
+        "types.unknown_arguments",
         {"REJECT": "reject", "IGNORE": "ignore", "PASSTHROUGH": "passthrough"},
         str,
     ),
     # Subclassed by the adapter's serializer validator.
+    # --- validation ---------------------------------------------------------------------------
     "Validator": Pin(
         "validation.validator",
         abstract=frozenset({"parameters", "validate"}),
@@ -510,6 +510,29 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # HTTP through DRF's views, never through these.
         "SpecView",
         "AsyncSpecView",
+        # A management command over a registry: a transport of this package's,
+        # which drfs reaches only by compiling its specs into a registry.
+        "SpecCommand",
+        # Its exit statuses, and the refusal each ends a run with.
+        "ExitCode",
+        "exit_code_for",
+        # How that command writes a presented result to a terminal or a pipe.
+        # drfs presents through DRF's renderers and has no command of its own.
+        "render_result",
+        "render_table",
+        "render_json_lines",
+        "wants_table",
+        # The argv layer that command is built from, which only a command reads.
+        "ParameterDescriptor",
+        "describe_parameters",
+        "add_spec_arguments",
+        "parsed_arguments",
+        # The report of a registry's open specs, read by that command and by the
+        # system check its app registers; drfs serves no management command.
+        "UnguardedReason",
+        "UnguardedSpec",
+        "unguarded_message",
+        "unguarded_specs",
         "UnsupportedMediaType",
         "dispatch_request",
         "adispatch_request",

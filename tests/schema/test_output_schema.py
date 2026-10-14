@@ -7,11 +7,10 @@ import pytest
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.schema.output_schema import output_schema
+from django_service_specs.types.field_audience import FieldAudience
 
 PUBLISHER = Output((OutputField("name", "string"),))
 BOOK = Output(

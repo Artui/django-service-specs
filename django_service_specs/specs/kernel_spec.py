@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import weakref
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-if TYPE_CHECKING:
-    # Annotation-only, and nothing of the package at run time: the
-    # authorization modules import this one at their top, and the spec
-    # modules import those for their ``permissions`` field, so a class import
-    # here would close that loop. A spec is told apart by compiling to itself.
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
-    from django_service_specs.specs.spec_source import SpecSource
+# Imported for the annotations. The body never asks a spec its class: a spec is
+# told apart by compiling to itself, so a declaration of another library's is
+# read by the same rule as a spec of this package's.
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 # id(source) -> (a weak reference to the source, its compiled spec). Keyed by
 # identity rather than held in a ``WeakKeyDictionary``, which reads ``__hash__``

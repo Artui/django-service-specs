@@ -1,0 +1,35 @@
+"""``AffordanceDeclarer``: the spec a ``SelectorSpec``'s ``affordances`` maps a name to."""
+
+from __future__ import annotations
+
+from django.db.models import Q
+
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.affordance_declarer import AffordanceDeclarer
+from django_service_specs.types.selector_kind import SelectorKind
+
+ARCHIVED = Affordance(code="archived", reason="Archived.", when=Q(archived=False))
+
+
+def test_a_service_spec_is_one() -> None:
+    spec = ServiceSpec(service=print, affordances=[ARCHIVED])
+    assert isinstance(spec, AffordanceDeclarer)
+    assert spec.affordances == (ARCHIVED,)
+
+
+def test_a_selector_spec_is_not_one_though_it_has_affordances_of_its_own() -> None:
+    # The reason the base is nominal: a check by attribute would pass this.
+    selector = SelectorSpec(
+        kind=SelectorKind.LIST, selector=list, affordances={"rename": ServiceSpec(service=print)}
+    )
+    assert hasattr(selector, "affordances")
+    assert not isinstance(selector, AffordanceDeclarer)
+
+
+def test_it_adds_no_field_to_a_service_spec() -> None:
+    # An annotation and no value: the base declares what is read, and
+    # ``ServiceSpec`` keeps its own ``affordances`` field and default.
+    assert not hasattr(AffordanceDeclarer, "affordances")
+    assert ServiceSpec(service=print).affordances is None

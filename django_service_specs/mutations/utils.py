@@ -20,7 +20,6 @@ from django.utils.translation import gettext
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
-from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
@@ -30,15 +29,16 @@ from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
-from django_service_specs.relations.relation_orphan import RelationOrphan
-from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
 from django_service_specs.services.arun_service import arun_service
-from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.types.is_async import is_async
+from django_service_specs.types.relation_orphan import RelationOrphan
+from django_service_specs.types.relation_outcome import RelationOutcome
+from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.unset import UNSET
 
 # The kinds whose row the parent owns through a link stored on that row. "Child"
@@ -850,8 +850,8 @@ def resolve_m2m(
     """A row's ``m2m=`` as a plain ``dict``, or ``None`` when none is declared.
 
     A spec states it as a static mapping (``{"tags": [tag1, tag2]}``) or as a
-    callable deriving one from the row, and so does a model write helper in
-    ``services/`` for the row it writes. The callable is caller code, so an
+    callable deriving one from the row, and so does a model write helper
+    (``create_model`` and its siblings) for the row it writes. The callable is caller code, so an
     error it raises is marked on its way out: it runs inside the parent row's
     write, whose translation would otherwise read it as that row's own data
     failing. ``cast`` records which branch is which, because a class can in

@@ -5,10 +5,10 @@ from typing_extensions import TypedDict
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UnsetType
 from tests.specs.utils import PK, Bare, Foreign
 

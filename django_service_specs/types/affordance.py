@@ -130,10 +130,11 @@ def _refuse_async(code: str, when: Callable[..., Any]) -> None:
     answer is read, ``affordances/utils.py`` refuses it at every call; here it
     is refused once, when the operation is declared, naming the affordance.
 
-    Inline rather than through ``services/is_async.py``: ``types/`` imports
-    nothing else in the package. What this cannot see - a plain ``def`` that
-    hands back a coroutine, a decorated ``async def`` - is still refused where
-    the answer is read.
+    Inline rather than through ``types/is_async.py``: that predicate answers
+    whether a call produces a coroutine, and an async generator function's
+    call does not, so it would let one through. What this cannot see - a
+    plain ``def`` that hands back a coroutine, a decorated ``async def`` - is
+    still refused where the answer is read.
 
     Three disjuncts, each held in ``tests/types/test_affordance.py``'s
     ``TestAnAsyncCondition``: ``test_an_async_def_is_refused`` fails without

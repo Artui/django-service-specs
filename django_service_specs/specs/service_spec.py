@@ -13,10 +13,8 @@ from typing_extensions import Self
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.provider_keys import provider_keys
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
     callable_name,
@@ -29,6 +27,8 @@ from django_service_specs.specs.utils import (
     check_reserved,
 )
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.affordance_declarer import AffordanceDeclarer
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import is_row_condition
 from django_service_specs.validation.validator import Validator
 
@@ -43,7 +43,7 @@ _VALIDATOR_METHODS = ("validate", "validated")
 
 
 @dataclass(frozen=True, kw_only=True)
-class ServiceSpec:
+class ServiceSpec(AffordanceDeclarer):
     """A write: what it takes, who may run it, what it acts on, what it returns.
 
     Dispatch runs it in a fixed order, once a deactivated principal has been

@@ -5,10 +5,10 @@ from __future__ import annotations
 from django.db.models import Q
 
 from django_service_specs.affordances.operation_affordances import operation_affordances
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.specs.utils import Foreign
 
 FROZEN = Affordance(code="books_closed", reason="The books are closed.", when=lambda: False)

@@ -15,8 +15,7 @@ from django_service_specs.adapters.dataclass.dataclass_validator import Dataclas
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validated import Validated

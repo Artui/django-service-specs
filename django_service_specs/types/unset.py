@@ -4,7 +4,7 @@ Used to distinguish "field omitted from input" from "field explicitly set to
 ``None``". Critical for partial updates where ``None`` must not stomp on an
 existing value.
 
-It is also the default of a [`Parameter`][django_service_specs.parameters.parameter.Parameter]
+It is also the default of a [`Parameter`][django_service_specs.parameters.parameters.Parameter]
 that declares none. That is the same absence seen from the other side - no
 value was supplied, and none is declared to stand in for one - so it is one
 sentinel rather than two, and ``default is None`` stays a real default of

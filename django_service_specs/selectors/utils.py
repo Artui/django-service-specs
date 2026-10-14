@@ -16,8 +16,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import IntegerField
 from django.utils.translation import gettext
 
-from django_service_specs.filters.filter_set_parameters import filter_set_parameters
-from django_service_specs.filters.utils import import_django_filters, range_suffixes
+from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
+from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.utils import coded_messages

@@ -55,7 +55,7 @@ def create_from_input(
     [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] included. The
     nested payload is read from ``data[relation]`` and written in the order the kind
     dictates, not the order the map is spelled in (see
-    [`RelationPhase`][django_service_specs.relations.relation_phase.RelationPhase]).
+    [`RelationPhase`][django_service_specs.types.relation_phase.RelationPhase]).
     Keep the whole call inside the service's atomic block.
 
     ``context`` is an **opaque** mapping forwarded verbatim down the tree, into the pool

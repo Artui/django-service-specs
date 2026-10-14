@@ -39,7 +39,10 @@ kernel. Until that release, the two share concepts and no code.
 Non-negotiable. They keep the package navigable.
 
 1. **One exported class or function per file.** The file is named after the
-   exported symbol in `snake_case`.
+   exported symbol in `snake_case`. One exception: a recursive pair, where each
+   holds the other, lives in one file named for the container (`Parameters`
+   with `Parameter`, `Output` with `OutputField`), because the alternative is a
+   guarded import.
 2. **Private helpers used only in one file** stay in that file with a `_name`
    prefix.
 3. **Non-exported helpers shared across files** go in that package's `utils.py`.
@@ -47,7 +50,9 @@ Non-negotiable. They keep the package navigable.
    unless a circular import is proven, or the import targets a declared optional
    dependency gated behind an opt-in. Document the reason inline.
 5. **Full type annotations on every function and method signature.** `Any` is
-   allowed only at the Django boundary where the type genuinely is `Any`.
+   allowed only at the Django boundary where the type genuinely is `Any`, and
+   the spec handed to a `PermissionCheck`, which the package that declares
+   specs cannot name without a ring.
 6. **`__init__.py` is the only re-export point.** Each `__init__.py` lists the
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
@@ -57,7 +62,8 @@ Non-negotiable. They keep the package navigable.
    for a **concern** (`parameters/`, `dispatch/`, `authorization/`) and never for
    a kind of thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and
    become a flat root one level down. Three modules on one concern earn a
-   directory. `types/` is the one standing subpackage, for value-shape carriers.
+   directory. `types/` is the one standing subpackage, for value types: carriers,
+   enums, and the predicates they need.
    There is no `exceptions/`: an exception lives in the subpackage that raises
    it.
 8. **`types/` imports nothing else in the package, and that is load-bearing.**
@@ -74,7 +80,24 @@ Non-negotiable. They keep the package navigable.
    `Affordance` sits there for the same reason, with the helpers its
    construction reads in `types/utils.py`: `ServiceSpec` imports it, and
    `affordances/`, which answers the conditions at the call and before it,
-   imports `specs/`.
+   imports `specs/`. `AffordanceDeclarer` sits there too: `ServiceSpec`
+   inherits it, and `SelectorSpec`, which `service_spec` imports, names it to
+   type and refuse its `affordances` values without importing `service_spec`
+   back.
+
+9. **No `if TYPE_CHECKING:` guard.** A guard hides an import cycle from the
+   interpreter while the type checker still sees it, so every guard here is a
+   cycle waiting to be broken, and types are imported like anything else. The
+   ban is ruff's `TID251` (so `make lint` and CI run it) and
+   `tests/test_package_graph.py`, which also holds the graph of every import
+   acyclic. Break the cycle by structure: move the part that names the spec
+   above the spec (`authorize*` and `Grant` are in `dispatch/` for that
+   reason), reverse an edge, put the shared base in `types/`
+   (`AffordanceDeclarer`), or keep a recursive pair in one file (rule 1). A
+   function-local import hides the same ring and is no substitute (rule 4), so
+   the test reads imports at every depth. The one ring it allows is named in
+   it: a nested write calls the same create and update entry points that are
+   writing its parent, through `mutations/utils.py`.
 
 ## Naming the concepts
 
@@ -126,7 +149,10 @@ Each of these reads as an oversight and is not.
   because re-exporting it would import pydantic for every consumer and fail
   for each one who never installed the extra. The exemption is one named set
   in that test, which also proves in a fresh interpreter that the root
-  imports no such library; the reference test reads the same set.
+  imports no such library; the reference test reads the same set. The filters
+  adapter is exported and reads django-filter only inside the function that
+  needs it, and a second named set in the same test holds that: neither the
+  root nor importing the adapter's module may load the library.
 - **Target resolution runs before validation.** The validator's context
   carries the resolved row, because an update's uniqueness check has to
   exclude the row being updated. Class-level authorization runs before either,

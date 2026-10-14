@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django_service_specs.output.field_audience import FieldAudience
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
 
 
@@ -12,7 +12,7 @@ from django_service_specs.types.value_formatter import ValueFormatter
 class FieldMarking:
     """How one output field is presented to an agent audience.
 
-    Carried on the [`OutputField`][django_service_specs.output.output_field.OutputField]
+    Carried on the [`OutputField`][django_service_specs.output.output.OutputField]
     it marks, so it belongs to the declaration of what an operation returns
     rather than to whichever library rendered it. That is what lets a
     transport's projection for an audience work over a dataclass, a pydantic
@@ -21,7 +21,7 @@ class FieldMarking:
     only ``Output``.
 
     Applied only for a caller that names an audience:
-    [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec]
+    [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec]
     reads the markings into an
     [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection],
     which [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]

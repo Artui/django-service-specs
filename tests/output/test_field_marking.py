@@ -6,13 +6,12 @@ import pytest
 from django.contrib.auth import get_user_model
 
 from django_service_specs.http.spec_view import SpecView
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.dispatch_app.models import Note

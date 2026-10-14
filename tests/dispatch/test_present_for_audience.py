@@ -7,20 +7,19 @@ import pytest
 from asgiref.sync import sync_to_async
 
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch.utils import (
     EDIT,
     OPEN,

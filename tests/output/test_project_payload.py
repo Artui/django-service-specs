@@ -5,13 +5,13 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.project_payload import project_payload
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.output.utils import PROJECTED_ROW, ROW, InvoicePresenter

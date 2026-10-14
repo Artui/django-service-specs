@@ -21,18 +21,15 @@ from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.selectors.shape_queryset import shape_queryset
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.adapter_app.models import Author as BookAuthor
 from tests.adapter_app.models import Book, Edition, Placement
-from tests.dispatch.utils import make_user
-from tests.dispatch_app.models import Note
-from tests.filters.utils import (
+from tests.adapters.filters.utils import (
     EditionNumberFilters,
     NoteFilters,
     NoteKeyFilters,
@@ -40,6 +37,8 @@ from tests.filters.utils import (
     TitleFilter,
     UserKeyFilters,
 )
+from tests.dispatch.utils import make_user
+from tests.dispatch_app.models import Note
 from tests.parameters.utils import coded
 from tests.specs.utils import Foreign
 

@@ -145,7 +145,7 @@ value, and a caller says that with `null`.
 
 The adapter reads `base_fields`: the fields the class declares. A field the
 form adds or changes in its own `__init__` is not described, and under
-[`UnknownArguments.REJECT`][django_service_specs.validation.unknown_arguments.UnknownArguments],
+[`UnknownArguments.REJECT`][django_service_specs.types.unknown_arguments.UnknownArguments],
 the default, the closed argument set refuses its key before the form is ever
 built. A field declared `disabled` is not a parameter either: a form ignores
 what a caller sends for it and cleans its `initial`, which `validate()`

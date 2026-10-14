@@ -10,7 +10,7 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 
 # A single registration: ``(name, resolver)``. A tuple rather than a mapping so
 # the registry stays frozen and the resolution order is the registration order,

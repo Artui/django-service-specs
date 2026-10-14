@@ -7,6 +7,93 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-10-14
+
+### Added
+- **`SpecCommand`**: a registry of specs as one management command, declared
+  by subclassing in a project's own `management/commands/` module and naming
+  `registry`. It runs as `manage.py <command> <spec> --as-user PK [--json |
+  --table] [--option value ...]`: one subcommand per registry entry (each `_`
+  shown as `-`), built on every run so `--help` lists them all. Options are
+  derived from the spec's parameters, less the keys the server fills; argv
+  values stay strings and `coerce_flat` coerces them, a boolean takes
+  `--flag`/`--no-flag`, an array is a repeated option, and a nested or file
+  parameter gets no option (the subcommand's epilog names them). No option is
+  matched by a prefix. `dispatch` enforces the permission checks for the user
+  `--as-user` names: the command passes no `Grant` and opens no transaction.
+  The command is a mistake-prevention and attribution surface, never an
+  authorization boundary. It is sync only, and `pool_seeds` on the class names
+  the seeds the specs' callables are resolved with, as `SpecView.pool_seeds`
+  does. `resolve_as_user` is the overridable lookup (by primary key, through
+  `resolve_principal`); an override answering `None` or an anonymous user is
+  refused with exit status 5, so no run goes unattributed.
+- **`ExitCode`, `exit_code_for`**: the exit status a refusal ends a run with,
+  a published contract (0 success, 1 error, 2 usage, 3 invalid arguments, 4
+  not permitted, 5 principal unavailable, 6 not found, 7 conflict, 8 input
+  required, 9 refused by the operation). `AdditionalInputRequired` has its
+  own code because a command line cannot ask: the message names the options
+  to run it again with.
+- **Output**: `render_result`, `render_table`, `render_json_lines` and
+  `wants_table`. A result is a table for a terminal and JSON Lines for a pipe;
+  `--table` and `--json` choose, then the `SERVICE_SPECS_COMMAND_OUTPUT`
+  setting (`auto`, `table` or `json`), then whether stdout is a terminal.
+  JSON Lines writes each row as presented, streamed, with the three Unicode
+  line breaks JSON leaves raw escaped.
+- **The argv functions** `describe_parameters` (with `ParameterDescriptor`),
+  `add_spec_arguments` and `parsed_arguments`, public so a host's own command
+  reads a spec's parameters by the same rules. `add_spec_arguments` refuses a
+  parameter whose option another already claims or the command owns.
+- **`unguarded_specs`, `UnguardedSpec`, `UnguardedReason`,
+  `unguarded_message`**: the specs of a registry that authorize nothing,
+  because every check it declares is `Unrestricted` or a subclass of it.
+  `manage.py <command> --explain` prints them and runs no spec.
+- **The `django_service_specs` app**: listing it in `INSTALLED_APPS` registers
+  a system check over every `SpecCommand` of the installed apps.
+  `django_service_specs.W001` names each spec a command serves that authorizes
+  nothing, as a warning, never an error: an open spec is a choice. W003
+  reports a command that could not be loaded or whose parser could not be
+  built, since without the check nothing would load it until an operator ran
+  it. The package needs no app entry to be used; the entry adds only the
+  check. `call_command` skips system checks, so a test reaches this one
+  through `call_command("check")`.
+- The commands documentation page, and an "Open specs, reported" section in
+  the registry page.
+
+### Changed
+- **Module paths moved; every name importable from `django_service_specs` is
+  unchanged.** The nine enums now live in `types/`, one file each:
+  `SelectorKind`, `FieldAudience`, `UnknownArguments`, `RelationMode`,
+  `RelationOrphan`, `RelationPhase` and `RelationOutcome` (from `specs/`,
+  `output/`, `validation/`, `relations/` and `mutations/`), beside the new
+  `ExitCode` and `UnguardedReason`. `is_async` moved from `services/` to
+  `types/`. The eight model write helpers (`create_model`, `update_model`,
+  `delete_model`, `delete_collection` and their `a` forms) moved from
+  `services/` to `mutations/`, which ends the import cycle between those two
+  packages. `filters/` moved to `adapters/filters/`, beside the other adapters.
+  A project importing by a deep path (`django_service_specs.specs.selector_kind`)
+  or from a subpackage (`django_service_specs.services` for `is_async` or
+  `create_model`, `django_service_specs.filters`) updates the path; one
+  importing from the package root changes nothing.
+- **Further module paths moved, and three typing changes, to break the import
+  rings between packages.** `authorize`, `authorize_scope`, `authorize_target` and `Grant`
+  moved from `authorization/` to `dispatch/`, as did
+  `audience_projection_for_spec` from `output/`; they take a spec, so they sit
+  above the packages a spec is made of. `Parameter` (with `JSON_TYPES`,
+  `PARAMETER_TYPES` and `FORMATS`) moved into `parameters.parameters`, and
+  `OutputField` into `output.output`, because each pair holds the other and
+  can only share a file or a guarded import. The `spec` argument of
+  `PermissionCheck.has_permission`, `has_object_permission`,
+  `has_scope_permission` and `Unrestricted.has_permission` is now `Any`, as
+  every example already wrote it: a subclass may still annotate it with the
+  two spec classes. `ServiceSpec` gains a base class, `AffordanceDeclarer`
+  (`django_service_specs.types.affordance_declarer`, not exported from the
+  root), and `SelectorSpec.affordances` is annotated with it. No
+  `if TYPE_CHECKING:` guard remains in the package and none may be added: a
+  lint rule and a test of the package's import graph, which reads imports at
+  every depth, hold both. The one recursion left is the nested-write entry
+  points and `mutations/utils.py`, which import each other and are named in
+  that test.
+
 ## [0.6.0] — 2026-10-14
 
 ### Added
@@ -1226,7 +1313,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Artui/django-service-specs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Artui/django-service-specs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0

@@ -6,8 +6,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
 
 
@@ -18,7 +18,7 @@ class AudienceProjection:
     Read off the [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking]s
     and the choices an [`Output`][django_service_specs.output.output.Output]
     declares, by
-    [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec].
+    [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec].
     Nothing here depends on the value being presented, so a transport builds
     it **once**, where it registers the spec, and passes it to every
     [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]

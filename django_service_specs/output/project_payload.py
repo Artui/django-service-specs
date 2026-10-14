@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.field_audience import FieldAudience
+from django_service_specs.types.field_audience import FieldAudience
 
 
 def project_payload(payload: Any, projection: AudienceProjection) -> Any:

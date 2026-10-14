@@ -62,7 +62,7 @@ def sync_answer(answer: Any, *, asked: str) -> Any:
 
     A coroutine is closed first, so it is not left behind to warn that it was
     never awaited. Two disjuncts, each held in
-    ``tests/authorization/test_authorize.py``'s ``TestAnAnswerThatIsNotAnAnswer``:
+    ``tests/dispatch/test_authorize.py``'s ``TestAnAnswerThatIsNotAnAnswer``:
     ``test_an_awaitable_that_is_not_a_coroutine_is_refused`` fails without the
     first and ``test_an_async_generator_is_refused`` without the second, since
     an async generator is not awaitable and is truthy too.

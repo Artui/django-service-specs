@@ -6,14 +6,13 @@ import pytest
 
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.schema.output_schema import output_schema
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
-from tests.output.test_audience_projection_for_spec import of
+from tests.dispatch.test_audience_projection_for_spec import of
 from tests.output.test_project_payload import invoice_projection
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA
 

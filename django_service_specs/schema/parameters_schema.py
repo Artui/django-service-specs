@@ -4,13 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import max_length_in_force
+from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.parameters.utils import max_length_in_force, unknown_arguments_policy
 from django_service_specs.schema.utils import allow_null, is_json_native
+from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.validation.unknown_arguments import UnknownArguments
-from django_service_specs.validation.utils import unknown_arguments_policy
 
 
 def parameters_schema(

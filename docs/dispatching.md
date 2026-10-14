@@ -181,7 +181,7 @@ search away when someone asks which operations are open.
 **Dispatch enforces the permission check by default.** A transport that has
 already authorized through its own machinery - an HTTP view that ran its
 framework's permission classes - says so with a
-[`Grant`][django_service_specs.authorization.grant.Grant] rather than by
+[`Grant`][django_service_specs.dispatch.grant.Grant] rather than by
 skipping the check, and pays for one class-level evaluation instead of two:
 
 ```python
@@ -210,9 +210,9 @@ serialized**: pickling one raises `TypeError`, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.
 
-[`authorize`][django_service_specs.authorization.authorize.authorize],
-[`authorize_target`][django_service_specs.authorization.authorize_target.authorize_target]
-and [`authorize_scope`][django_service_specs.authorization.authorize_scope.authorize_scope]
+[`authorize`][django_service_specs.dispatch.authorize.authorize],
+[`authorize_target`][django_service_specs.dispatch.authorize_target.authorize_target]
+and [`authorize_scope`][django_service_specs.dispatch.authorize_scope.authorize_scope]
 are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
 spec and principal, and dispatch skips the other two under `target_checked`
