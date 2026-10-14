@@ -216,6 +216,10 @@ Installed with the `pydantic` extra and imported from
 ## Commands
 
 ::: django_service_specs.commands.spec_command.SpecCommand
+::: django_service_specs.commands.describe_parameters.describe_parameters
+::: django_service_specs.commands.parameter_descriptor.ParameterDescriptor
+::: django_service_specs.commands.add_spec_arguments.add_spec_arguments
+::: django_service_specs.commands.parsed_arguments.parsed_arguments
 
 ## Filters
 
