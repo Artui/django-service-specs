@@ -100,7 +100,12 @@ Each change to the item is the mirror of one the payload undergoes:
 - `price` and `published_on` are described as what their formatters produce,
   and nothing they said about the value before survives: the `"format"` of a
   decimal and a date is gone, since `"EUR 9.99"` is neither. `"null"` stays
-  in `published_on`'s type, because a null is never formatted.
+  in `published_on`'s type, because a null is never formatted. It stays
+  however the property stated it - in a type list, as a `{"type": "null"}`
+  member of an `anyOf` (how a dataclass field typed `X | None` is described),
+  as `None` among an `enum`'s values (a nullable choice), or as a
+  `{"const": null}` entry of a `oneOf` (a labelled one) - and is always written
+  as the formatter's type followed by `"null"`.
 - `id` keeps its values on both sides - a handle is passed to other tools,
   which take the stored value - and carries `handle_description`, the
   transport's sentence for a handle whose marking declares no description of
@@ -128,7 +133,10 @@ rendered from that same format. A date-time is converted to Django's active
 time zone, which is the only zone it can be rendered in: the projection is
 built once, before any request, so a zone chosen per call would describe one
 payload and serve another. A date, like `published_on`, is read as midnight,
-which is why its format names no time.
+which is why its format names no time. A string that is not a date-time, and
+one shaped like a date-time that names no real moment (the thirtieth of
+February), is served as stored: one row's bad data does not fail the page it is
+on.
 
 Both sides of the projection read one formatter, so the payload and the
 schema change together, and a formatter decides over the rest of the field's

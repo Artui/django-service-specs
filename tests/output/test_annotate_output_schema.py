@@ -603,6 +603,57 @@ class TestFormatters:
     def test_a_field_stated_only_as_null_still_admits_it(self) -> None:
         assert self.formatted({"type": "null"}) == {**LOCAL_TIME, "type": ["string", "null"]}
 
+    def test_a_null_stated_as_an_any_of_member_stays_admitted(self) -> None:
+        """The shape a dataclass field typed ``datetime | None`` is described
+        as: the null is a member of a union, not a word in a type."""
+        subschema = {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_listed_in_an_enum_stays_admitted(self) -> None:
+        """The shape ``ChoiceField(allow_null=True)`` is described as: untyped,
+        because its values are of two types, with the null among them."""
+        subschema = {"enum": ["a", "b", None]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_listed_in_an_enum_stays_admitted_whatever_type_is_stated(self) -> None:
+        """The enum lists the null the server serves, so it is read even
+        beside a type that does not name one."""
+        subschema = {"type": "string", "enum": ["a", None]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_stated_as_a_one_of_entry_stays_admitted(self) -> None:
+        """A labelled nullable choice: the null is an entry of its own, as a
+        constant or as a type."""
+        for entry in ({"const": None}, {"type": "null"}):
+            subschema = {"oneOf": [{"const": "a", "title": "Alpha"}, entry]}
+
+            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_inside_an_any_of_member_stays_admitted(self) -> None:
+        """A member is read as a property is: its own type list, its own
+        enum."""
+        for member in ({"type": ["string", "null"]}, {"enum": ["a", None]}):
+            subschema = {"anyOf": [member, {"type": "integer"}]}
+
+            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_union_naming_no_null_admits_none_after_formatting(self) -> None:
+        """The condition of the null kept, per spelling: a union with no null
+        member, a ``oneOf`` with no null entry and an enum without ``None``."""
+        for subschema in (
+            {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            {"oneOf": [{"const": "a"}, {"const": "b"}]},
+            {"enum": ["a", "b"]},
+            {"type": "string", "const": "a"},
+        ):
+            assert self.formatted(subschema) == LOCAL_TIME
+
+    def test_a_null_constant_stays_admitted(self) -> None:
+        assert self.formatted({"const": None}) == {**LOCAL_TIME, "type": ["string", "null"]}
+
     def test_a_type_admitting_no_null_admits_none_after_formatting(self) -> None:
         """The condition of the null kept: only a stated ``"null"`` is."""
         assert self.formatted({"type": ["string", "integer"]}) == LOCAL_TIME
