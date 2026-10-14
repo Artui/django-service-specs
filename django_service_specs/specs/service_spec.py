@@ -13,8 +13,7 @@ from typing_extensions import Self
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (

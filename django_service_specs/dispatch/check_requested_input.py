@@ -7,7 +7,7 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.parameters.parameters import Parameter
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec

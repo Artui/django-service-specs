@@ -9,8 +9,7 @@ from django import forms
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from tests.parameters.utils import coded
 
 NESTED = "This argument has nested parameters, which a flat transport cannot send."

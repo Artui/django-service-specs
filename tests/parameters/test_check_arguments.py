@@ -21,8 +21,7 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.parameters.utils import coded

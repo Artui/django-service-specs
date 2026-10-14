@@ -20,8 +20,7 @@ from django_service_specs.affordances.utils import (
     answer_operation_condition,
 )
 from django_service_specs.dispatch.dispatch import dispatch
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS

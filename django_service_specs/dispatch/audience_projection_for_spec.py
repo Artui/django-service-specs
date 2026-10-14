@@ -34,7 +34,7 @@ def audience_projection_for_spec(
     so the payload it sends and the schema it advertises are projected by one
     declaration.
 
-    Each [`OutputField`][django_service_specs.output.output_field.OutputField]
+    Each [`OutputField`][django_service_specs.output.output.OutputField]
     contributes its ``marking``, its ``choices`` whose display differs from the
     value, and, for an object's ``fields`` or an array's ``items`` declared as
     an ``Output``, a child projection when the child has anything to project.

@@ -11,7 +11,7 @@ from django_service_specs.types.unset import UNSET
 
 @dataclass(frozen=True)
 class ParameterDescriptor:
-    """A [`Parameter`][django_service_specs.parameters.parameter.Parameter] seen from argv.
+    """A [`Parameter`][django_service_specs.parameters.parameters.Parameter] seen from argv.
 
     What a command line can say about a parameter, built by
     [`describe_parameters`][django_service_specs.commands.argv.describe_parameters.describe_parameters]:

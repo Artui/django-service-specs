@@ -9,8 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.authorization.unrestricted import Unrestricted
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec

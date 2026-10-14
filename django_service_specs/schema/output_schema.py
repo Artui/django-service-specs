@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.schema.utils import allow_null, is_json_native
 
 

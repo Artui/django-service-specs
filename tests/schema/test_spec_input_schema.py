@@ -8,8 +8,7 @@ from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.utils import shape_check
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys

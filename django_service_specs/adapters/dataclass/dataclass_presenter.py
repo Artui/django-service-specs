@@ -14,8 +14,7 @@ from django_service_specs.adapters.dataclass.utils import (
     encode_fields,
     read_fields,
 )
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 
 

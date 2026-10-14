@@ -6,8 +6,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 
 _NUMBER_BOUND = 1e50
 """The bound on every decimal a FilterSet reads: django-filter's own.

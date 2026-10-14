@@ -80,8 +80,7 @@ from django_service_specs.mutations.update_model import update_model
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
@@ -89,8 +88,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
-from django_service_specs.parameters.parameter import Parameter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.combine_progress import combine_progress
 from django_service_specs.pool.null_progress import null_progress

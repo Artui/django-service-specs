@@ -235,7 +235,7 @@ SURFACE: dict[str, Pin] = {
     # --- output -------------------------------------------------------------------------------
     "Output": Pin("output.output", signature="fields=", methods={"names": "()", "get": "(name)"}),
     "OutputField": Pin(
-        "output.output_field",
+        "output.output",
         signature="name, type, *, format=, nullable=, label=, choices=, always_present=, "
         "marking=, fields=, items=, items_nullable=",
     ),
@@ -267,7 +267,7 @@ SURFACE: dict[str, Pin] = {
     "project_payload": _fn("output.project_payload", "payload, projection"),
     # --- parameters ---------------------------------------------------------------------------
     "Parameter": Pin(
-        "parameters.parameter",
+        "parameters.parameters",
         signature="name, type, *, required=, format=, items=, items_nullable=, fields=, "
         "choices=, choice_labels=, minimum=, maximum=, min_length=, max_length=, default=, "
         "nullable=, help=",

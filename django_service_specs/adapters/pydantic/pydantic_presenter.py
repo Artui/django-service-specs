@@ -17,8 +17,7 @@ from django_service_specs.adapters.pydantic.utils import (
     inputs,
     read_fields,
 )
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 
 _MISSING = object()

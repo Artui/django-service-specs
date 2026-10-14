@@ -39,7 +39,10 @@ kernel. Until that release, the two share concepts and no code.
 Non-negotiable. They keep the package navigable.
 
 1. **One exported class or function per file.** The file is named after the
-   exported symbol in `snake_case`.
+   exported symbol in `snake_case`. One exception: a recursive pair, where each
+   holds the other, lives in one file named for the container (`Parameters`
+   with `Parameter`, `Output` with `OutputField`), because the alternative is a
+   guarded import.
 2. **Private helpers used only in one file** stay in that file with a `_name`
    prefix.
 3. **Non-exported helpers shared across files** go in that package's `utils.py`.

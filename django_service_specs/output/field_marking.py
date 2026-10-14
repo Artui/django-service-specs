@@ -12,7 +12,7 @@ from django_service_specs.types.value_formatter import ValueFormatter
 class FieldMarking:
     """How one output field is presented to an agent audience.
 
-    Carried on the [`OutputField`][django_service_specs.output.output_field.OutputField]
+    Carried on the [`OutputField`][django_service_specs.output.output.OutputField]
     it marks, so it belongs to the declaration of what an operation returns
     rather than to whichever library rendered it. That is what lets a
     transport's projection for an audience work over a dataclass, a pydantic
