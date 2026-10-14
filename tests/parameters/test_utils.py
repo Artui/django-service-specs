@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import pytest
+from django.utils.translation import gettext_lazy
 
 from django_service_specs.parameters.parameter import JSON_TYPES
-from django_service_specs.parameters.utils import expected_type, parse_number
+from django_service_specs.parameters.utils import expected_type, parse_number, refusal_messages
 
 
 @pytest.mark.parametrize("json_type", sorted(JSON_TYPES))
@@ -76,3 +77,22 @@ def test_an_exponent_in_either_case_spells_a_float(text: str, number: float) -> 
 @pytest.mark.parametrize("text", ["1E400", "-1E400"])
 def test_an_exponent_past_a_float_s_range_in_either_case_spells_none(text: str) -> None:
     assert parse_number("number", text) is None
+
+
+def test_a_refusal_tree_is_read_as_paths_to_messages() -> None:
+    tree = {
+        "non_field_errors": ["Check the shelf."],
+        "title": ["Too long.", gettext_lazy("Twice.")],
+        "books": {"1": {"__all__": ["Missing."], "isbn": ["Malformed."]}},
+    }
+    assert list(refusal_messages(tree)) == [
+        ((), "Check the shelf."),
+        (("title",), "Too long."),
+        (("title",), "Twice."),
+        (("books", "1"), "Missing."),
+        (("books", "1", "isbn"), "Malformed."),
+    ]
+
+
+def test_a_message_that_is_no_list_is_one_message_not_its_characters() -> None:
+    assert list(refusal_messages(gettext_lazy("Whole."))) == [((), "Whole.")]

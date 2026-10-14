@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import argparse
 import inspect
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from typing import Any, TextIO, cast
 
-from django.core.exceptions import NON_FIELD_ERRORS as DJANGO_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.utils.translation import gettext
@@ -28,8 +27,8 @@ from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.utils import relax_partial
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.utils import refusal_messages
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.registry.spec_registry import SpecRegistry
@@ -46,10 +45,6 @@ from django_service_specs.types.exit_code import ExitCode
 
 _OWN_OPTIONS = frozenset({"--as-user", "--json", "--table"})
 """The options every subcommand owns, which no spec parameter may map to."""
-
-_NON_FIELD_KEYS = (NON_FIELD_ERRORS, DJANGO_NON_FIELD_ERRORS)
-"""The keys a message about the whole input sits under, the kernel's and Django's,
-which add nothing to the path a refusal is printed with."""
 
 
 class SpecCommand(BaseCommand):
@@ -340,23 +335,7 @@ def _message(error: DispatchError | ServiceError) -> str:
 
 def _with_fields(header: Any, detail: Any) -> str:
     """``header``, then each message in ``detail`` on its own line, after its path."""
-    rows = [f"{'.'.join(path)}: {text}" if path else text for path, text in _leaves(detail, ())]
+    rows = [
+        f"{'.'.join(path)}: {text}" if path else text for path, text in refusal_messages(detail)
+    ]
     return "\n".join([str(header), *rows])
-
-
-def _leaves(value: Any, path: tuple[str, ...]) -> Iterator[tuple[tuple[str, ...], str]]:
-    """Every message below ``value``, each with its path: ``books.1.title``.
-
-    The tree ``InvalidArguments`` carries, read as ``add_argument_errors``
-    reads it: a row's index is a step of the path, and a ``non_field_errors``
-    key adds none. A leaf is a message whatever its type, a lazy translation
-    included, so it is never taken apart into characters.
-    """
-    if isinstance(value, Mapping):
-        for key, inner in value.items():
-            yield from _leaves(inner, path if key in _NON_FIELD_KEYS else (*path, str(key)))
-    elif isinstance(value, list):
-        for inner in value:
-            yield from _leaves(inner, path)
-    else:
-        yield path, str(value)
