@@ -7,6 +7,130 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`SpecSource`, `kernel_spec`**: any object with an `as_kernel_spec()` method
+  is taken wherever a spec is, and read as the spec it compiles to. The
+  compile runs once per object and is cached by identity, so a `Grant` minted
+  for the object covers dispatching it again. `ServiceSpec` and
+  `SelectorSpec` answer `as_kernel_spec()` with themselves. An object that
+  cannot be weakly referenced, has no callable `as_kernel_spec`, or compiles to
+  something that is not a spec is refused with a `TypeError`. It reaches
+  `dispatch`, `adispatch`, `check_call`, `present`, `apresent`,
+  `resolve_target`, `dispatch_request`, `adispatch_request`,
+  `enforce_affordances`, `aenforce_affordances`, `operation_affordances`,
+  `unmet_operation_affordance`, `aunmet_operation_affordance`,
+  `bind_arguments`, `check_requested_input`, `spec_input_schema`,
+  `spec_output_schema`, `can_present_nothing`, `server_owned_keys`,
+  `present_for_audience`, `audience_projection_for_spec`, `authorize`,
+  `authorize_target`, `authorize_scope`, `shape_queryset` and `SpecRegistry`.
+- **`check_call`**: the prelude of `dispatch` run alone, keyword for keyword
+  and in its order: a deactivated principal refused, a parameter a registered
+  seed occupies refused, the shape check, then the class-level permission
+  check. It returns the checked arguments and the grant, and runs no query of
+  the kernel's own, so a queue can refuse a call at enqueue exactly as
+  `dispatch` would at the worker. It is `bind_arguments`' complement, which
+  validates and does not authorize. It runs no lookup, object-level or scope
+  check, no Validator, no affordance and no precondition.
+- **`check_requested_input(spec, schema)`**: refuses an
+  `AdditionalInputRequired.schema` that some route could not ask or could not
+  hear answered, so a service asks the same question on every route or on
+  none. It reads the spec's top-level `parameters()` and runs no query, and
+  raises `ImproperlyConfigured` naming the key for a key no top-level
+  parameter declares (on a `many` spec the top level is the list and the
+  spec's `reads`, so a key declared only inside a row is refused), a key a
+  provider is annotated to fill or a registered seed occupies (dispatch would
+  drop the answer; it takes `pool_seeds` as `dispatch` does), a fragment that
+  is not a schema object, a shape an MCP elicitation form cannot render
+  (anything but `string`, `number`, `integer`, `boolean` or an array of enum
+  values), and a `type` the declared parameter would refuse. A `schema` of
+  `None` asks nothing and passes. `dispatch_request` and
+  `adispatch_request` call it before writing a 422 body, so a schema nobody
+  could answer is the service's `ImproperlyConfigured` rather than a
+  well-formed answer that cannot be answered.
+- **`register_row_error(error_class, read_detail)`** re-roots a refusal class
+  this package cannot name under the row that raised it, as a relation write
+  does its own. The reader returns the class's detail, which lands at the
+  row's address (a list or string under `non_field_errors`), and the class is
+  rebuilt from the re-rooted tree at every row the refusal passes. The
+  nearest registered class in the method resolution order answers.
+  Registering the same pair again does nothing; a second reader, or a class
+  overlapping one the kernel re-roots already (`Exception`, `ValueError`,
+  Django's `ValidationError`), is refused.
+- **`create_model`, `update_model`, `delete_model`, `delete_collection`** and
+  their async forms **`acreate_model`, `aupdate_model`, `adelete_model`,
+  `adelete_collection`** build the service an operation would otherwise write
+  as one helper call on the relation layer. They return the row, or `None`
+  for a delete, open no transaction, and take the rest of the pool, which the
+  three model services hand on as the helper's `context`. `delete_model` runs
+  `delete_relations` before the delete or `soft_delete`, and refuses a value
+  that is not a relation spec when the service is built. `relations=` is the
+  one map.
+- **`CreateService`, `UpdateService`, `DeleteService`, `ListSelector`,
+  `RetrieveSelector`, `Selector`, `AsyncSelector`**: typing Protocols naming
+  the shapes `dispatch` calls a service or selector with; every other pool key
+  arrives through `**extras`. **`implements`** states which one a callable
+  conforms to, an identity decorator so a type checker such as ty reports
+  drift at the decorator. **`NoInput`** fills a Protocol's input type for a
+  service that reads none.
+- **`combine_progress`**: one progress reporter that hands each report to
+  several sinks. A sink that raises neither silences the sinks after it nor
+  reaches the service.
+- **`aenforce_affordances`, `aunmet_operation_affordance`**: the async twins
+  of the sync affordance helpers. They answer every condition in one
+  thread-sensitive hop, and make none for a spec with nothing to ask.
+- **`can_present_nothing`**: whether a spec's dispatch may present `None`,
+  the answer `spec_output_schema` already used, exported so a transport
+  writing its own output schema gives the same one.
+- **`request_principal`, `route_arguments` and `NON_FIELD_ERRORS`** are
+  public, from the root and their subpackages. The first two are how the HTTP
+  entry points read the principal (a deactivated account refused before
+  anything else is read) and the route (merged last, uncoerced, an undeclared
+  kwarg raising `ImproperlyConfigured`), so a host's own view reads a request
+  by the same rules. `NON_FIELD_ERRORS` moved from `parameters/utils.py` to
+  `parameters/non_field_errors.py`.
+- **`RegisteredSpec.agent_contract`**: read-only, the registered object's own
+  `agent_contract()` when it has one and `None` for every kernel spec. The
+  entry keeps the object as registered.
+- **`UnknownArguments.PASSTHROUGH`**: a member kept as a name and refused as
+  a policy. Every function that takes a policy raises `ValueError` for it
+  rather than running it as `IGNORE`.
+
+### Changed
+- **Breaking: `SpecFormView` is removed.** It moves to a separate package for
+  server-rendered pages; this one serves the plumbing, not the pages a person
+  reads. `add_argument_errors` stays, for placing a refusal on a host's own
+  bound form.
+- **Breaking: `annotate_output_schema` keeps a formatted property's null in
+  every spelling.** It reads a null stated as an `anyOf` member (how a dataclass
+  field typed `X | None` is described), as `None` in an `enum` or a `const` (a
+  nullable choice) and as a `oneOf` entry (a labelled nullable choice), as well
+  as in a type list. A formatted property that admits one is restated as
+  `[produces, "null"]`, so the schema no longer refuses the null the server
+  serves. An `enum` in the formatter's own `schema` fragment lists `None` too,
+  and a `const` there becomes an `enum` of that value and `None`. Schemas
+  supplied from outside, such as those written for a
+  `ChoiceField(allow_null=True)` or a dataclass walk, change; this package's
+  own `output_schema` already stated the null in the type, so its formatted
+  nullable fields change only when their formatter declares an `enum`.
+- **`ValueFormatter.timestamp()` reports a date-time that names no real moment
+  as stored.** A string Django's parser refuses with `ValueError` (the thirtieth
+  of February, a thirteenth month, a 25th hour) is returned unformatted instead
+  of raising, so one bad row no longer fails the page it is paged onto. It was
+  documented and tested as raising.
+- **`SpecRegistry`** keeps a registered declaration as registered, classifies
+  it by what it compiles to, and refuses one that compiles to an unguarded spec
+  as it refuses an unguarded spec. `SpecRegistry.specs()` and
+  `RegisteredSpec.spec` may therefore hand back a non-kernel object.
+- **A `Grant` compares specs as compiled.** A grant minted from a declaration
+  covers dispatching that declaration or the spec it compiles to, and each
+  permission check is asked about the compiled spec. `Grant.covers` can raise
+  `TypeError` where it returned `False`, for a grant holding something that is
+  not a spec or an object that cannot be weakly referenced.
+- **`enforce_affordances` raises `TypeError` for a `SelectorSpec`**, and
+  `aenforce_affordances` raises the same, whatever the selector spec declares;
+  the async path used to return `None` for one declaring nothing.
+- `UnknownArguments` has three members; iterating it yields `PASSTHROUGH`.
+
 ## [0.5.1] — 2026-10-14
 
 ### Added
