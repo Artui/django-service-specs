@@ -513,6 +513,11 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # A management command over a registry: a transport of this package's,
         # which drfs reaches only by compiling its specs into a registry.
         "SpecCommand",
+        # The argv layer that command is built from, which only a command reads.
+        "ParameterDescriptor",
+        "describe_parameters",
+        "add_spec_arguments",
+        "parsed_arguments",
         "UnsupportedMediaType",
         "dispatch_request",
         "adispatch_request",

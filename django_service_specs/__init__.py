@@ -21,6 +21,10 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.commands.add_spec_arguments import add_spec_arguments
+from django_service_specs.commands.describe_parameters import describe_parameters
+from django_service_specs.commands.parameter_descriptor import ParameterDescriptor
+from django_service_specs.commands.parsed_arguments import parsed_arguments
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
@@ -185,6 +189,7 @@ __all__ = [
     "OutputField",
     "OutputPage",
     "Parameter",
+    "ParameterDescriptor",
     "Parameters",
     "PermissionCheck",
     "PoolSeeds",
@@ -226,6 +231,7 @@ __all__ = [
     "acreate_from_input",
     "acreate_model",
     "add_argument_errors",
+    "add_spec_arguments",
     "adelete_collection",
     "adelete_model",
     "adelete_relations",
@@ -258,6 +264,7 @@ __all__ = [
     "delete_collection",
     "delete_model",
     "delete_relations",
+    "describe_parameters",
     "dispatch",
     "dispatch_request",
     "enforce_affordances",
@@ -273,6 +280,7 @@ __all__ = [
     "output_schema",
     "paginate_output",
     "parameters_schema",
+    "parsed_arguments",
     "present",
     "present_for_audience",
     "project_payload",
