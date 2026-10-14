@@ -638,6 +638,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The command line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../forms/" class="md-nav__link">
         
   
@@ -971,24 +998,24 @@ runs, and the helpers own persistence only.</p>
       async
   " href="../reference/#django_service_specs.mutations.adelete_relations.adelete_relations"><code>adelete_relations</code></a>
   are the async forms, for an <code>async def</code> service.</li>
-<li><a class="autorefs autorefs-internal" title="create_model" href="../reference/#django_service_specs.services.create_model.create_model"><code>create_model</code></a>,
-  <a class="autorefs autorefs-internal" title="update_model" href="../reference/#django_service_specs.services.update_model.update_model"><code>update_model</code></a> and
-  <a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.services.delete_model.delete_model"><code>delete_model</code></a>
+<li><a class="autorefs autorefs-internal" title="create_model" href="../reference/#django_service_specs.mutations.create_model.create_model"><code>create_model</code></a>,
+  <a class="autorefs autorefs-internal" title="update_model" href="../reference/#django_service_specs.mutations.update_model.update_model"><code>update_model</code></a> and
+  <a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.mutations.delete_model.delete_model"><code>delete_model</code></a>
   build the service itself, for an operation whose service would be nothing
   but one helper call: <code>create_model(Author, relations=BOOKS)</code> is a service
   taking <code>data</code>, writing the author and its books, and returning the author.
   <code>update_model</code> takes <code>instance</code> as well, and <code>delete_model</code> takes <code>instance</code>
   alone, runs <code>delete_relations</code> first when given a map, and returns <code>None</code>.
-  <a class="autorefs autorefs-internal" title="delete_collection" href="../reference/#django_service_specs.services.delete_collection.delete_collection"><code>delete_collection</code></a>
+  <a class="autorefs autorefs-internal" title="delete_collection" href="../reference/#django_service_specs.mutations.delete_collection.delete_collection"><code>delete_collection</code></a>
   deletes the rows a spec's <code>collection_selector_spec</code> resolved. Each takes the
   rest of the pool as <code>**kwargs</code>, which the three model services hand on as
   the helper's <code>context</code>, opens no transaction of its own, since dispatch runs
   the service inside one, and has an async form:
-  <a class="autorefs autorefs-internal" title="acreate_model" href="../reference/#django_service_specs.services.acreate_model.acreate_model"><code>acreate_model</code></a>,
-  <a class="autorefs autorefs-internal" title="aupdate_model" href="../reference/#django_service_specs.services.aupdate_model.aupdate_model"><code>aupdate_model</code></a>,
-  <a class="autorefs autorefs-internal" title="adelete_model" href="../reference/#django_service_specs.services.adelete_model.adelete_model"><code>adelete_model</code></a>
+  <a class="autorefs autorefs-internal" title="acreate_model" href="../reference/#django_service_specs.mutations.acreate_model.acreate_model"><code>acreate_model</code></a>,
+  <a class="autorefs autorefs-internal" title="aupdate_model" href="../reference/#django_service_specs.mutations.aupdate_model.aupdate_model"><code>aupdate_model</code></a>,
+  <a class="autorefs autorefs-internal" title="adelete_model" href="../reference/#django_service_specs.mutations.adelete_model.adelete_model"><code>adelete_model</code></a>
   and
-  <a class="autorefs autorefs-internal" title="adelete_collection" href="../reference/#django_service_specs.services.adelete_collection.adelete_collection"><code>adelete_collection</code></a>.</li>
+  <a class="autorefs autorefs-internal" title="adelete_collection" href="../reference/#django_service_specs.mutations.adelete_collection.adelete_collection"><code>adelete_collection</code></a>.</li>
 </ul>
 <p><code>data</code> is a dataclass, a mapping, or an object with a <code>__dict__</code> - usually the
 validated values dispatch passes the service as <code>data</code>. A dataclass gives its
@@ -1194,7 +1221,7 @@ reverse accessor is <code>Author.books</code>. The input dataclasses are the one
 <p>The order is a property of the kind, not of how the <code>relations=</code> mapping is
 spelled: a forward target has to exist before the parent is saved, and a
 membership needs both rows saved.
-<a class="autorefs autorefs-internal" title="RelationPhase" href="../reference/#django_service_specs.relations.relation_phase.RelationPhase"><code>RelationPhase</code></a>
+<a class="autorefs autorefs-internal" title="RelationPhase" href="../reference/#django_service_specs.types.relation_phase.RelationPhase"><code>RelationPhase</code></a>
 names the sequence. Within one phase, relations are written in the order they
 are declared.</p>
 <p>How each kind reads its value:</p>
@@ -1298,7 +1325,7 @@ service must be <code>async def</code>.</p>
   " href="../reference/#django_service_specs.mutations.related_object_change.RelatedObjectChange"><code>RelatedObjectChange</code></a>
   per one-row relation - a forward relation or a reverse one-to-one - holding
   one
-  <a class="autorefs autorefs-internal" title="RelationOutcome" href="../reference/#django_service_specs.mutations.relation_outcome.RelationOutcome"><code>RelationOutcome</code></a>
+  <a class="autorefs autorefs-internal" title="RelationOutcome" href="../reference/#django_service_specs.types.relation_outcome.RelationOutcome"><code>RelationOutcome</code></a>
   and the <code>pk</code> it is about. <code>get_relation_change(name)</code> finds one.</li>
 </ul>
 <p>A <code>ChangeResult</code> is falsy when nothing changed.</p>
@@ -1361,7 +1388,7 @@ survive. A forward relation is reported <code>untouched</code>: the row it point
 not the instance's, and refusing it would make a map that is right for writing
 impossible to cascade.</p>
 <p>Where the service is nothing but that cascade and the delete,
-<a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.services.delete_model.delete_model"><code>delete_model</code></a>
+<a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.mutations.delete_model.delete_model"><code>delete_model</code></a>
 builds it. It returns <code>None</code> rather than the report, and refuses a value that
 is not a relation spec when it is built rather than on its first call:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">retire_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>

@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://artui.github.io/django-service-specs/forms/">
       
       
-        <link rel="prev" href="../registry/">
+        <link rel="prev" href="../commands/">
       
       
         <link rel="next" href="../pydantic/">
@@ -461,6 +461,33 @@
     
   
     The registry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The command line
   
 
     
@@ -1088,7 +1115,7 @@ value, and a caller says that with <code>null</code>.</p>
 <h2 id="declare-the-fields-on-the-class">Declare the fields on the class<a class="headerlink" href="#declare-the-fields-on-the-class" title="Permanent link">&para;</a></h2>
 <p>The adapter reads <code>base_fields</code>: the fields the class declares. A field the
 form adds or changes in its own <code>__init__</code> is not described, and under
-<a class="autorefs autorefs-internal" title="UnknownArguments" href="../reference/#django_service_specs.validation.unknown_arguments.UnknownArguments"><code>UnknownArguments.REJECT</code></a>,
+<a class="autorefs autorefs-internal" title="UnknownArguments" href="../reference/#django_service_specs.types.unknown_arguments.UnknownArguments"><code>UnknownArguments.REJECT</code></a>,
 the default, the closed argument set refuses its key before the form is ever
 built. A field declared <code>disabled</code> is not a parameter either: a form ignores
 what a caller sends for it and cleans its <code>initial</code>, which <code>validate()</code>

@@ -16,7 +16,7 @@
         <link rel="prev" href="../relations/">
       
       
-        <link rel="next" href="../forms/">
+        <link rel="next" href="../commands/">
       
       
         
@@ -546,6 +546,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#open-specs-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open specs, reported
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -571,6 +582,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The command line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -770,6 +808,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#open-specs-reported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open specs, reported
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#reading-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -874,7 +923,7 @@ for the same object.</p>
 
   
       dataclass
-  " href="../reference/#django_service_specs.authorization.grant.Grant"><code>Grant</code></a> compares specs as
+  " href="../reference/#django_service_specs.dispatch.grant.Grant"><code>Grant</code></a> compares specs as
 compiled, so a transport that authorizes the object it holds and mints a grant
 from it can dispatch that object or the spec it compiles to under the same
 grant. Each permission check is asked about the compiled spec, the same object
@@ -920,6 +969,59 @@ where they are written, at import time:</p>
   than finding out at startup. An operation that is open says so with
   <code>permissions=[Unrestricted()]</code>.</li>
 </ul>
+<h2 id="open-specs-reported">Open specs, reported<a class="headerlink" href="#open-specs-reported" title="Permanent link">&para;</a></h2>
+<p>A registry refuses a spec that declares no check, and a spec refuses an empty
+<code>permissions</code>, so every registered spec declares at least one. What still
+reaches a registry open to every principal is a spec whose checks are all
+<code>Unrestricted</code>, a subclass of it included. One real check beside an
+<code>Unrestricted()</code> guards the spec, because every check must pass.</p>
+<p><code>unguarded_specs(registry)</code> lists those entries, in registry order, each as an
+<code>UnguardedSpec</code> carrying its name and an <code>UnguardedReason</code>. An entry is judged
+by the spec it compiles to, the one dispatch runs, so a declaration of
+another library's is read through what it compiles to rather than through
+checks of its own. <code>unguarded_message(spec, command_label)</code> is the sentence
+that reports one, naming the command an operator types:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>'refund_order' in manage.py svc authorizes nothing: every permission check it declares is Unrestricted, so any active user named by --as-user may run it.
+</span></code></pre></div>
+<p>Listing <code>"django_service_specs"</code> in <code>INSTALLED_APPS</code> registers a system check
+that prints that sentence for every <code>SpecCommand</code> in the project. It loads
+each command the installed apps serve, Django's own excepted, and keeps the
+<code>SpecCommand</code> ones; with an app label, <code>manage.py check &lt;app_label&gt;</code> loads
+only that app's commands.</p>
+<table>
+<thead>
+<tr>
+<th>Id</th>
+<th>Level</th>
+<th>For</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>django_service_specs.W001</code></td>
+<td>Warning</td>
+<td>One spec that authorizes nothing, with the command class as <code>obj</code></td>
+</tr>
+<tr>
+<td><code>django_service_specs.W003</code></td>
+<td>Warning</td>
+<td>A command that could not be imported or constructed, names no registry, or whose parser could not be built: its specs were not checked</td>
+</tr>
+</tbody>
+</table>
+<p>Both are warnings, never errors: an open spec is a decision or an accident
+the check cannot tell apart, and an error would stop <code>migrate</code> on a project
+working as intended. A command that does not load is reported and skipped
+rather than failing the check, because without the app nothing loads it until
+somebody runs it. <code>SILENCED_SYSTEM_CHECKS</code> silences by id, so silencing
+<code>W001</code> silences it for every spec in the project.</p>
+<p>The check runs wherever Django runs system checks: <code>manage.py check</code>, and
+every <code>manage.py</code> command that keeps <code>requires_system_checks</code>. <code>call_command</code>
+skips them for every command but <code>check</code>.</p>
+<p>Reporting is the whole of it: the check refuses nothing, and neither it nor
+the command is an authorization boundary, since an operator who could be
+refused there has <code>manage.py shell</code>. It makes the declaration visible to
+whoever reads <code>check</code>.</p>
 <h2 id="reading-it">Reading it<a class="headerlink" href="#reading-it" title="Permanent link">&para;</a></h2>
 <table>
 <thead>

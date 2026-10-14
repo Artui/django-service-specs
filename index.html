@@ -569,6 +569,33 @@
   
   
     <li class="md-nav__item">
+      <a href="commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The command line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="forms/" class="md-nav__link">
         
   
@@ -828,7 +855,10 @@ and agent tools.</p>
 </span></code></pre></div>
 <p>The package has no models and needs no entry in <code>INSTALLED_APPS</code>. A principal
 is a user of <code>django.contrib.auth</code>, and a generic-relation write needs
-<code>django.contrib.contenttypes</code>.</p>
+<code>django.contrib.contenttypes</code>. Listing <code>"django_service_specs"</code> there is
+optional, and adds one system check: every spec a management command serves
+that authorizes nothing is <a href="registry/#open-specs-reported">reported</a> by
+<code>manage.py check</code>.</p>
 <table>
 <thead>
 <tr>

@@ -671,6 +671,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../commands/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The command line
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../forms/" class="md-nav__link">
         
   
@@ -1199,7 +1226,7 @@ framework's permission classes - says so with a
 
   
       dataclass
-  " href="../reference/#django_service_specs.authorization.grant.Grant"><code>Grant</code></a> rather than by
+  " href="../reference/#django_service_specs.dispatch.grant.Grant"><code>Grant</code></a> rather than by
 skipping the check, and pays for one class-level evaluation instead of two:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_from_a_view</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">arguments</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="c1"># The view's own permission machinery has already run for this user and</span>
@@ -1226,9 +1253,9 @@ one, and a write's affordances are still answered. And <strong>a grant cannot be
 serialized</strong>: pickling one raises <code>TypeError</code>, so it cannot ride a queue into a
 worker. A task runs later, against state that may have moved, and
 re-authorizes by construction.</p>
-<p><a class="autorefs autorefs-internal" title="authorize" href="../reference/#django_service_specs.authorization.authorize.authorize"><code>authorize</code></a>,
-<a class="autorefs autorefs-internal" title="authorize_target" href="../reference/#django_service_specs.authorization.authorize_target.authorize_target"><code>authorize_target</code></a>
-and <a class="autorefs autorefs-internal" title="authorize_scope" href="../reference/#django_service_specs.authorization.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
+<p><a class="autorefs autorefs-internal" title="authorize" href="../reference/#django_service_specs.dispatch.authorize.authorize"><code>authorize</code></a>,
+<a class="autorefs autorefs-internal" title="authorize_target" href="../reference/#django_service_specs.dispatch.authorize_target.authorize_target"><code>authorize_target</code></a>
+and <a class="autorefs autorefs-internal" title="authorize_scope" href="../reference/#django_service_specs.dispatch.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
 are the three checks dispatch runs, exported for a transport that runs them
 itself; <code>authorize</code> returns the grant it honoured or a new one covering the
 spec and principal, and dispatch skips the other two under <code>target_checked</code>
