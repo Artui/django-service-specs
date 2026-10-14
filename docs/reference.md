@@ -57,7 +57,6 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.output.output.Output
 ::: django_service_specs.output.output_field.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking
-::: django_service_specs.output.field_audience.FieldAudience
 ::: django_service_specs.output.audience_projection.AudienceProjection
 ::: django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec
 ::: django_service_specs.output.project_payload.project_payload
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
 ::: django_service_specs.types.selector_kind.SelectorKind
+::: django_service_specs.types.field_audience.FieldAudience

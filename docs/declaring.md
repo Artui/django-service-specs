@@ -585,7 +585,7 @@ An `OutputField` carries what a reader needs beyond a name and a type: a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying
 who the field is for. The
-[`FieldAudience`][django_service_specs.output.field_audience.FieldAudience] is
+[`FieldAudience`][django_service_specs.types.field_audience.FieldAudience] is
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read
 out to a person, and `HIDDEN` for plumbing. A marking may also carry a

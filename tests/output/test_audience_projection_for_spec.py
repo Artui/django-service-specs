@@ -7,13 +7,13 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of

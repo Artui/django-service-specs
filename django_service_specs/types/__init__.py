@@ -3,6 +3,7 @@
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.exit_code import ExitCode
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
@@ -17,6 +18,7 @@ __all__ = [
     "Affordance",
     "DispatchError",
     "ExitCode",
+    "FieldAudience",
     "NoInput",
     "OutputPage",
     "ProgressReporter",

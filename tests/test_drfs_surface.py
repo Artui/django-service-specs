@@ -249,7 +249,7 @@ SURFACE: dict[str, Pin] = {
         },
     ),
     "FieldAudience": _enum(
-        "output.field_audience",
+        "types.field_audience",
         {"CONTENT": "content", "LABEL": "label", "HANDLE": "handle", "HIDDEN": "hidden"},
         str,
     ),

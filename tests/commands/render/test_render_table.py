@@ -17,10 +17,10 @@ from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.commands.render.render_table import render_table
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.adapter_app.models import Status

@@ -72,7 +72,6 @@ from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField
@@ -147,6 +146,7 @@ from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.exit_code import ExitCode
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
