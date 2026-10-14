@@ -21,14 +21,16 @@ from django_service_specs.http.utils import (
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
 async def adispatch_request(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     request: HttpRequest,
     *,
     url_kwargs: Mapping[str, Any] | None = None,
@@ -52,6 +54,9 @@ async def adispatch_request(
     same hop, because a Validator may read a model to declare what it takes.
     Building the response does not query and stays on the loop.
     """
+    # Compiled once, before anything is read, so the arguments, the answer's
+    # status and the asked-input check all read the one compiled spec.
+    spec = kernel_spec(spec)
     try:
         principal, arguments = await sync_to_async(_read_request, thread_sensitive=True)(
             spec, request, url_kwargs

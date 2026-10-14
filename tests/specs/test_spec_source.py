@@ -8,10 +8,12 @@ import pytest
 
 import django_service_specs
 from django_service_specs.authorization.grant import Grant
+from django_service_specs.http.utils import SpecViewBase
 
 # The entry points docs/registry.md names as taking a source.
 ENTRY_POINTS = [
     "adispatch",
+    "adispatch_request",
     "aenforce_affordances",
     "apresent",
     "audience_projection_for_spec",
@@ -22,7 +24,9 @@ ENTRY_POINTS = [
     "bind_arguments",
     "can_present_nothing",
     "check_call",
+    "check_requested_input",
     "dispatch",
+    "dispatch_request",
     "enforce_affordances",
     "kernel_spec",
     "operation_affordances",
@@ -30,6 +34,7 @@ ENTRY_POINTS = [
     "present_for_audience",
     "resolve_target",
     "server_owned_keys",
+    "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
     "unmet_operation_affordance",
@@ -50,3 +55,8 @@ def test_each_named_entry_point_is_annotated_to_take_a_source(name: str) -> None
 
 def test_a_grant_is_annotated_to_hold_a_source() -> None:
     assert "SpecSource" in str(Grant.__dataclass_fields__["spec"].type)
+
+
+def test_a_spec_view_is_annotated_to_serve_a_source() -> None:
+    # SpecView and AsyncSpecView both take their ``spec`` from here.
+    assert "SpecSource" in SpecViewBase.__annotations__["spec"]

@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import compiled_spec, sync_answer
+from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.specs.kernel_spec import kernel_spec
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
@@ -35,7 +36,7 @@ def authorize_scope(
     Dispatch honours it, as there, only for a service spec's target handed
     in as ``target=``, so never on the list a selector spec reads.
     """
-    spec = compiled_spec(spec)
+    spec = kernel_spec(spec)
     if grant.target_checked:
         return
     for check in spec.permissions or ():

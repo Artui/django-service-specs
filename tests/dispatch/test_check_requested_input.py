@@ -18,6 +18,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from tests.specs.utils import Foreign
 
 pytestmark = pytest.mark.django_db
 
@@ -437,3 +438,11 @@ class TestTheShapeCheckAgrees:
     ) -> None:
         with pytest.raises(InvalidArguments):
             check_arguments(Parameters.of(declared), {declared.name: answer})
+
+
+class TestSources:
+    def test_a_source_is_checked_as_the_spec_it_compiles_to(self, check: Check) -> None:
+        source: Any = Foreign(declaring(Parameter("confirmed", "boolean")))
+
+        check(source, {"confirmed": {"type": "boolean"}})
+        assert UNDECLARED in refusal(check, source, {"other": {"type": "boolean"}})

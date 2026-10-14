@@ -8,7 +8,8 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import compiled_spec, sync_answer
+from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.specs.kernel_spec import kernel_spec
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
@@ -53,7 +54,7 @@ def authorize(
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
     """
-    spec = compiled_spec(spec)
+    spec = kernel_spec(spec)
     if grant is not None:
         if grant.covers(spec, principal):
             return grant

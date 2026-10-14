@@ -73,7 +73,11 @@ OPTIONS is Django's own answer.
 
 `as_view()` checks the spec and the methods when the view is built, so a view
 with no spec, or one naming a method it cannot serve, fails when the URLconf is
-imported rather than on its first request.
+imported rather than on its first request. The `spec` may be a declaration of
+another library's, a
+[`SpecSource`][django_service_specs.specs.spec_source.SpecSource]: it is
+compiled there too, a declaration that does not compile is refused there, and
+its methods follow the spec it compiles to.
 
 [`AsyncSpecView`][django_service_specs.http.async_spec_view.AsyncSpecView] is
 the same view with every handler async, through `adispatch_request`. Django

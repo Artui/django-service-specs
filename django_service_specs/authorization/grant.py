@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn
 
-from django_service_specs.authorization.utils import compiled_spec
+from django_service_specs.specs.kernel_spec import kernel_spec
 
 if TYPE_CHECKING:
     # Annotation-only, for the reason permission_check.py gives.
@@ -66,7 +66,7 @@ class Grant:
         # the object the transport gave it. One arc to coverage, so each
         # operand is named: test_a_grant_for_a_source_covers_the_source_and_the_spec_it_compiles_to
         # holds both, by another declaration and another principal.
-        return self.principal is principal and compiled_spec(self.spec) is compiled_spec(spec)
+        return self.principal is principal and kernel_spec(self.spec) is kernel_spec(spec)
 
     def __reduce__(self) -> NoReturn:
         raise TypeError(

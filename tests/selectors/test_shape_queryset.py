@@ -27,6 +27,7 @@ from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from tests.adapter_app.models import Author as BookAuthor
 from tests.adapter_app.models import Book, Edition, Placement
 from tests.dispatch.utils import make_user
@@ -40,6 +41,7 @@ from tests.filters.utils import (
     UserKeyFilters,
 )
 from tests.parameters.utils import coded
+from tests.specs.utils import Foreign
 
 
 def _bare_selector() -> Any:
@@ -938,3 +940,24 @@ class TestANumberInsideSixtyFourBitsIsTheDatabases:
         with pytest.raises(InvalidArguments) as caught:
             list(dispatch(spec, principal=ada, arguments=arguments).value)
         assert coded(caught.value.detail) == detail
+
+
+class TestSources:
+    def test_a_source_shapes_as_the_selector_spec_it_compiles_to(self) -> None:
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST, selector=_bare_selector, select_related=["content_type"]
+        )
+
+        result = shape_queryset(Permission.objects.all(), Foreign(spec), {}, source_label="x")
+
+        assert result.query.select_related == {"content_type": {}}
+
+    @pytest.mark.parametrize("wrapped", [False, True], ids=["spec", "source"])
+    def test_a_service_spec_is_refused_naming_what_it_takes(self, wrapped: bool) -> None:
+        service = ServiceSpec(service=print)
+        spec: Any = Foreign(service) if wrapped else service
+
+        with pytest.raises(
+            TypeError, match=r"shape_queryset\(\) takes a SelectorSpec; got ServiceSpec"
+        ):
+            shape_queryset(Permission.objects.all(), spec, {}, source_label="x")
