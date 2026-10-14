@@ -421,7 +421,11 @@ docs/examples/dispatching.py:progress
 With no reporter the pool carries
 [`null_progress`][django_service_specs.pool.null_progress.null_progress], so a
 service that declares `progress` runs unchanged on every transport and in
-tests. A spec's own `progress_reporter` provider adds a sink of the author's
+tests. A transport with more than one sink of its own - its client
+channel beside a task record - hands dispatch
+[`combine_progress`][django_service_specs.pool.combine_progress.combine_progress]
+of them: every sink hears each report, and one that raises neither silences
+the rest nor reaches the service. A spec's own `progress_reporter` provider adds a sink of the author's
 beside the transport's - a task record, an audit trail - for the run alone,
 and only for a run that takes `progress`: called on its first report, or
 before an `async def` run once nothing before the run can refuse the call. A

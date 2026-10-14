@@ -3,6 +3,10 @@
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
+from django_service_specs.affordances.aunmet_operation_affordance import (
+    aunmet_operation_affordance,
+)
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.operation_affordances import operation_affordances
 from django_service_specs.affordances.unmet_operation_affordance import (
@@ -66,6 +70,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.combine_progress import combine_progress
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
@@ -82,31 +87,41 @@ from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
+from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.selectors.amaterialize_retrieve import amaterialize_retrieve
 from django_service_specs.selectors.arun_selector import arun_selector
+from django_service_specs.selectors.async_selector import AsyncSelector
 from django_service_specs.selectors.is_queryset import is_queryset
+from django_service_specs.selectors.list_selector import ListSelector
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
+from django_service_specs.selectors.retrieve_selector import RetrieveSelector
 from django_service_specs.selectors.run_selector import run_selector
+from django_service_specs.selectors.selector import Selector
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.services.arun_service import arun_service
+from django_service_specs.services.create_service import CreateService
+from django_service_specs.services.delete_service import DeleteService
+from django_service_specs.services.implements import implements
 from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.services.update_service import UpdateService
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
@@ -122,16 +137,19 @@ __all__ = [
     "ActionUnavailable",
     "AdditionalInputRequired",
     "Affordance",
+    "AsyncSelector",
     "AsyncSpecView",
     "AudienceProjection",
     "ChangeResult",
     "ChildCollectionChange",
     "ChildSpec",
     "CodedMessage",
+    "CreateService",
     "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "DataclassPresenter",
     "DataclassValidator",
+    "DeleteService",
     "DispatchError",
     "DispatchResult",
     "FieldAudience",
@@ -142,7 +160,9 @@ __all__ = [
     "GenericRelationSpec",
     "Grant",
     "InvalidArguments",
+    "ListSelector",
     "ManyToManySpec",
+    "NoInput",
     "NotPermitted",
     "Output",
     "OutputField",
@@ -163,7 +183,9 @@ __all__ = [
     "RelationOutcome",
     "RelationPhase",
     "RelationSpec",
+    "RetrieveSelector",
     "ReverseOneToOneSpec",
+    "Selector",
     "SelectorKind",
     "SelectorSpec",
     "ServiceConflict",
@@ -178,6 +200,7 @@ __all__ = [
     "Unrestricted",
     "UnsetType",
     "UnsupportedMediaType",
+    "UpdateService",
     "ValidationContext",
     "Validated",
     "Validator",
@@ -188,6 +211,7 @@ __all__ = [
     "adelete_relations",
     "adispatch",
     "adispatch_request",
+    "aenforce_affordances",
     "amaterialize_retrieve",
     "annotate_output_schema",
     "apply_input",
@@ -195,15 +219,18 @@ __all__ = [
     "arun_selector",
     "arun_service",
     "audience_projection_for_spec",
+    "aunmet_operation_affordance",
     "aupdate_from_input",
     "authorize",
     "authorize_scope",
     "authorize_target",
     "base_pool",
     "bind_arguments",
+    "can_present_nothing",
     "check_arguments",
     "check_requested_input",
     "coerce_flat",
+    "combine_progress",
     "create_from_input",
     "delete_relations",
     "dispatch",
@@ -211,6 +238,7 @@ __all__ = [
     "enforce_affordances",
     "error_response",
     "filter_set_parameters",
+    "implements",
     "is_async",
     "is_queryset",
     "materialize_retrieve",

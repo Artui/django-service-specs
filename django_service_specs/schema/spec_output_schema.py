@@ -11,6 +11,7 @@ from django_service_specs.affordances.utils import (
 )
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
+from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.utils import allow_null
 from django_service_specs.specs.selector_kind import SelectorKind
@@ -52,6 +53,10 @@ def spec_output_schema(
       ``"null"`` when the spec declares ``allow_none``. Undeclared, a ``None``
       is not stated and the item stays strict: whether a service may return
       one is not otherwise in its declaration.
+
+    Where ``"null"`` is admitted is
+    [`can_present_nothing`][django_service_specs.schema.can_present_nothing.can_present_nothing]'s
+    answer, which a transport writing a schema of its own asks too.
 
     ``paginate`` describes a list served one page at a time, as
     [`paginate_output`][django_service_specs.dispatch.paginate_output.paginate_output]
@@ -96,23 +101,25 @@ def spec_output_schema(
             },
             "required": [*item.get("required", []), AFFORDANCES_KEY],
         }
+    # Whether ``"null"`` is admitted is ``can_present_nothing``'s answer, asked
+    # in one place so a transport writing its own schema gives the same one;
+    # what remains here is the shape around the item.
     if isinstance(spec, SelectorSpec):
-        kind, may_be_none = spec.kind, spec.allow_none
+        kind = spec.kind
     elif spec.output_selector_spec is not None:
-        kind, may_be_none = spec.output_selector_spec.kind, True
+        kind = spec.output_selector_spec.kind
     else:
-        # One value, the service's return, which may be ``None`` only where the
-        # spec says so: test_a_service_allowing_none_admits_null and
-        # test_a_service_presenting_its_own_return_is_the_item. A ``many``
-        # service returns the rows it wrote, which dispatch presents as a list
-        # (test_a_many_service_presents_an_array_of_its_item); a ``None`` return
-        # is still presented as ``None``, so ``allow_none`` wraps the array.
+        # One value, the service's return. A ``many`` service returns the rows
+        # it wrote, which dispatch presents as a list
+        # (test_a_many_service_presents_an_array_of_its_item), never paged; a
+        # ``None`` return is still presented as ``None``, so a ``"null"`` wraps
+        # the array (test_a_many_service_allowing_none_admits_null_for_the_whole_array).
         whole: dict[str, Any] = {"type": "array", "items": item} if spec.many else item
-        return allow_null(whole) if spec.allow_none else whole
+        return allow_null(whole) if can_present_nothing(spec) else whole
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}
         return _paged(array) if paginate else array
-    return allow_null(item) if may_be_none else item
+    return allow_null(item) if can_present_nothing(spec) else item
 
 
 def _paged(array: dict[str, Any]) -> dict[str, Any]:

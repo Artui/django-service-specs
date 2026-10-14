@@ -2,6 +2,7 @@
 
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
@@ -12,6 +13,7 @@ __all__ = [
     "UNSET",
     "Affordance",
     "DispatchError",
+    "NoInput",
     "OutputPage",
     "ProgressReporter",
     "ProviderKeys",
