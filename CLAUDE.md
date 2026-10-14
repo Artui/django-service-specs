@@ -57,7 +57,8 @@ Non-negotiable. They keep the package navigable.
    for a **concern** (`parameters/`, `dispatch/`, `authorization/`) and never for
    a kind of thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and
    become a flat root one level down. Three modules on one concern earn a
-   directory. `types/` is the one standing subpackage, for value-shape carriers.
+   directory. `types/` is the one standing subpackage, for value types: carriers,
+   enums, and the predicates they need.
    There is no `exceptions/`: an exception lives in the subpackage that raises
    it.
 8. **`types/` imports nothing else in the package, and that is load-bearing.**

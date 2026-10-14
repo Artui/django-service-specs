@@ -59,6 +59,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The commands documentation page, and an "Open specs, reported" section in
   the registry page.
 
+### Changed
+- **Module paths moved; every name importable from `django_service_specs` is
+  unchanged.** The nine enums now live in `types/`, one file each:
+  `SelectorKind`, `FieldAudience`, `UnknownArguments`, `RelationMode`,
+  `RelationOrphan`, `RelationPhase` and `RelationOutcome` (from `specs/`,
+  `output/`, `validation/`, `relations/` and `mutations/`), beside the new
+  `ExitCode` and `UnguardedReason`. `is_async` moved from `services/` to
+  `types/`. The eight model write helpers (`create_model`, `update_model`,
+  `delete_model`, `delete_collection` and their `a` forms) moved from
+  `services/` to `mutations/`, which ends the import cycle between those two
+  packages. `filters/` moved to `adapters/filters/`, beside the other adapters
+  over an optional library. A project importing by a deep path
+  (`django_service_specs.specs.selector_kind`) updates the path; one importing
+  from the package root changes nothing.
+
 ## [0.6.0] — 2026-10-14
 
 ### Added
