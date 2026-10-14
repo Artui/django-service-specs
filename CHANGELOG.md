@@ -25,7 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   authorization boundary. It is sync only, and `pool_seeds` on the class names
   the seeds the specs' callables are resolved with, as `SpecView.pool_seeds`
   does. `resolve_as_user` is the overridable lookup (by primary key, through
-  `resolve_principal`).
+  `resolve_principal`); an override answering `None` or an anonymous user is
+  refused with exit status 5, so no run goes unattributed.
 - **`ExitCode`, `exit_code_for`**: the exit status a refusal ends a run with,
   a published contract (0 success, 1 error, 2 usage, 3 invalid arguments, 4
   not permitted, 5 principal unavailable, 6 not found, 7 conflict, 8 input
