@@ -15,8 +15,7 @@ from django.utils import translation
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext

@@ -235,7 +235,7 @@ SURFACE: dict[str, Pin] = {
     # --- output -------------------------------------------------------------------------------
     "Output": Pin("output.output", signature="fields=", methods={"names": "()", "get": "(name)"}),
     "OutputField": Pin(
-        "output.output_field",
+        "output.output",
         signature="name, type, *, format=, nullable=, label=, choices=, always_present=, "
         "marking=, fields=, items=, items_nullable=",
     ),

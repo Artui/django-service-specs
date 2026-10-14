@@ -17,7 +17,7 @@ class FieldAudience(str, Enum):
 
     So the axis this names is **audience**, not protocol. Declared per field
     through [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking],
-    on the field's [`OutputField`][django_service_specs.output.output_field.OutputField],
+    on the field's [`OutputField`][django_service_specs.output.output.OutputField],
     and applied only for a caller that names an audience; one that names none
     keeps presenting every field.
 

@@ -80,8 +80,7 @@ from django_service_specs.mutations.update_model import update_model
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments

@@ -569,7 +569,7 @@ the Validator:
 
 - `output()` declares the result as an
   [`Output`][django_service_specs.output.output.Output], an ordered tuple of
-  [`OutputField`][django_service_specs.output.output_field.OutputField]. It
+  [`OutputField`][django_service_specs.output.output.OutputField]. It
   never queries. The declaration is what a reader that never renders needs: an
   agent tool's output schema, a command's table header when there are no rows,
   a confirmation page. An HTML transport hands the row to a template and never

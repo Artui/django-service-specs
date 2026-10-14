@@ -10,8 +10,7 @@ import pytest
 
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.spec_output_schema import spec_output_schema

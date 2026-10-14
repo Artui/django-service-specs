@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from django_service_specs.authorization.permission_check import PermissionCheck
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec

@@ -17,8 +17,7 @@ from pydantic.fields import ComputedFieldInfo, FieldInfo
 from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPresenter
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output
-from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.output import Output, OutputField
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
