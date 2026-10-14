@@ -128,8 +128,12 @@ def refuse_overlaid_values(spec: ServiceSpec, validated: Validated, overlay: Ove
     so a key naming one would replace what the Validator computed from the
     call's arguments with a value it never saw. Those names are known only
     once it has run, so this is asked after validation, still before the
-    affordances, the preconditions and the run, in ``dispatch`` and in
-    ``adispatch``'s hop alike. The two exemptions of
+    affordances, the preconditions and the run
+    (test_a_computed_value_s_refusal_answers_before_an_affordance_or_a_precondition),
+    in ``dispatch`` and in ``adispatch``'s hop alike
+    (test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_before_the_run),
+    and on a ``many`` call, whose pool is bound once
+    (test_a_many_call_s_bound_value_is_refused_as_a_single_call_s_is). The two exemptions of
     ``refuse_overlaid_parameters`` hold here too, through
     ``overlay_supplies``: an ``UNSET`` entry
     (test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused) and
@@ -158,7 +162,14 @@ def overlay_supplies(spec: ServiceSpec | SelectorSpec, overlay: Overlay) -> set[
 
     An ``UNSET`` entry supplies nothing, and a key the spec's typed ``kwargs``
     provider is annotated to fill is the provider's alone, the overlay's value
-    for it dropped beneath it, so neither can stand in for anything.
+    for it dropped beneath it, so neither can stand in for anything. Each
+    exemption is held twice, once per refusal reading this:
+    test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused and
+    test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused fail
+    without the ``UNSET`` filter, and
+    test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused and
+    test_a_computed_value_the_spec_s_typed_provider_owns_is_not_refused without
+    subtracting ``owned``.
     """
     keys = provider_keys(spec.kwargs)
     owned = keys.filled if keys is not None else frozenset()

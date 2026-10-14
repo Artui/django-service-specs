@@ -4026,6 +4026,38 @@ class TestOverlays:
         )
         assert service.calls == []
 
+    def test_a_many_call_s_bound_value_is_refused_as_a_single_call_s_is(self, ada: Any) -> None:
+        """``validated_many`` binds its pool once for the call, and the
+        overlay merges above it as on a single call."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Listed())
+        with pytest.raises(ImproperlyConfigured, match=r"names the key\(s\) \['listed'\]"):
+            dispatch(
+                spec,
+                principal=ada,
+                arguments={"items": [{"title": "a"}]},
+                extra_kwargs={"listed": 1},
+            )
+        assert service.calls == []
+
+    def test_a_computed_value_s_refusal_answers_before_an_affordance_or_a_precondition(
+        self, ada: Any
+    ) -> None:
+        """Refused as soon as the Validator's names are known: an affordance
+        refusing, or a precondition raising, would answer instead if it ran
+        first."""
+        condition, precondition = _Condition(returns=False), _Precondition(Boom())
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=_Binds({}, returns={"title": "T", "slug": "t"}),
+            affordances=[Affordance(code="closed", reason="Closed.", when=condition)],
+            preconditions=[precondition],
+        )
+        with pytest.raises(ImproperlyConfigured, match="Validator computed"):
+            dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"slug": "view"})
+        assert (condition.calls, precondition.calls) == ([], [])
+
     def test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused(self, ada: Any) -> None:
         service = Record()
         validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})

@@ -111,7 +111,10 @@ async def adispatch(
 
     ``extra_kwargs`` is ``dispatch``'s overlay, copied on entry, merged
     beneath the spec's ``kwargs`` provider inside the hop, on every path, and
-    refused there where it names a declared parameter; that refusal and the
+    refused there where it names a declared parameter, or, once the
+    Validator has run and before the run, a value it computed or bound
+    (test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_before_the_run);
+    the first refusal and the
     read of whether a check declares ``arguments`` both run off the loop
     (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).
 
