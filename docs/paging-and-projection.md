@@ -103,8 +103,9 @@ Each change to the item is the mirror of one the payload undergoes:
   in `published_on`'s type, because a null is never formatted. It stays
   however the property stated it - in a type list, as a `{"type": "null"}`
   member of an `anyOf` (how a dataclass field typed `X | None` is described),
-  or as `None` among an `enum`'s values (a nullable choice) - and is always
-  written as the formatter's type followed by `"null"`.
+  as `None` among an `enum`'s values (a nullable choice), or as a
+  `{"const": null}` entry of a `oneOf` (a labelled one) - and is always written
+  as the formatter's type followed by `"null"`.
 - `id` keeps its values on both sides - a handle is passed to other tools,
   which take the stored value - and carries `handle_description`, the
   transport's sentence for a handle whose marking declares no description of

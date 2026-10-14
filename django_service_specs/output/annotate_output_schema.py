@@ -57,8 +57,8 @@ def annotate_output_schema(
       the produced value, in place of everything the property said about the
       value before, choices included. Its ``title`` and ``description`` are
       kept, and so is a ``null`` the property admitted - however it stated one,
-      as a type, an ``anyOf`` member or ``None`` in an ``enum`` - since a null
-      is never formatted. The type is written from ``produces`` rather than
+      as a type, an ``anyOf`` member, ``None`` in an ``enum`` or a ``oneOf``
+      entry for a labelled choice - since a null is never formatted. The type is written from ``produces`` rather than
       taken from the fragment, so a renderer cannot contradict its own
       advertisement. Not on a ``HANDLE`` either.
 
@@ -151,10 +151,12 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
     A property that admits ``"null"`` still admits it, after the type the
     formatter produces: ``apply`` passes a null through unformatted, so a
     nullable field still serves one, and a schema refusing it would be false.
-    ``_admits_null`` reads the three spellings a schema states one in, so the
-    formatter's type is always written as ``[produces, "null"]`` and nothing of
-    the spelling is carried over: the ``anyOf`` and ``enum`` it came in are
-    discarded with everything else the property said.
+    ``_admits_null`` reads every spelling a schema states one in - a type, an
+    ``anyOf`` member, ``None`` in an ``enum`` and, for a labelled nullable
+    choice, a ``oneOf`` entry - so the formatter's type is always written as
+    ``[produces, "null"]`` and nothing of the spelling is carried over: the
+    ``anyOf`` and ``enum`` it came in are discarded with everything else the
+    property said.
     """
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
