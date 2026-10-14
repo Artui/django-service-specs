@@ -1237,3 +1237,20 @@ async def test_a_check_declaring_no_arguments_is_asked_as_before(ada: Any) -> No
     await adispatch(spec, principal=ada, arguments={"pk": note.pk})
 
     assert [row.pk for row in scoped.rows] == [note.pk]
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        ServiceSpec(service=_async_with_pk, atomic=False, permissions=OPEN, reads=PK),
+        SelectorSpec(kind=RETRIEVE, selector=_async_by_pk, reads=PK, permissions=OPEN),
+    ],
+    ids=["_prepare", "_open_selector"],
+)
+async def test_extra_kwargs_naming_a_declared_parameter_is_refused_inside_the_hop(
+    spec: Any, ada: Any
+) -> None:
+    with pytest.raises(
+        ImproperlyConfigured, match=r"extra_kwargs names the parameter\(s\) \['pk'\]"
+    ):
+        await adispatch(spec, principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})

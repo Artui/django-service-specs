@@ -94,9 +94,9 @@ docs/examples/dispatching.py:overlays
 ```
 
 `extra_kwargs` sits beneath the spec's `kwargs` provider and `extra_input_data`
-beneath its `input_data` provider: **the spec's own provider wins on a clash**,
-and the overlay wins over the caller's arguments. Each is read as its
-provider's return is:
+beneath its `input_data` provider: **the spec's own provider wins on a clash**.
+`extra_input_data` wins over the caller's arguments; `extra_kwargs` never meets
+one, by the rule below. Each is read as its provider's return is:
 
 - an entry whose value is `UNSET` is dropped, so the caller's value stands;
 - a key the spec's provider is annotated to fill is the provider's alone, and
@@ -105,6 +105,19 @@ provider's return is:
   when it declines;
 - an `extra_kwargs` key naming a seed, such as `user`, is refused as
   `ImproperlyConfigured`.
+
+**An `extra_kwargs` key naming a parameter the spec declares is refused**, as
+`ImproperlyConfigured`, before the shape check, the way a seed's name is. A
+declared parameter is anything `spec.parameters()` lists: the spec's `reads`,
+its Validator's fields, its target selector's `reads`, and a `many` spec's
+list. The caller's value for one is what the [permission checks](#permissions)
+are handed and what the target selector looks the row up by, so an overlay
+standing in for it would run the call on a value neither saw: the value
+authorized is the value run. Two keys that name one are not refused: an `UNSET`
+entry, which supplies nothing, and a parameter the spec's own typed `kwargs`
+provider fills, whose caller's value is dropped before any check and whose
+overlay value is dropped beneath the provider. To set such a value per call,
+fill it from that provider.
 
 `extra_kwargs` reaches a read's own selector and a write's service, never a
 target or output selector. `extra_input_data` reaches the Validator, under

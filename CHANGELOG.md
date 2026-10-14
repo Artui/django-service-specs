@@ -63,10 +63,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`extra_kwargs=` and `extra_input_data=` on `dispatch` and `adispatch`**:
   a transport's per-call values, merged beneath the spec's `kwargs` and
   `input_data` providers, so a view's per-request hooks need no spec rebuilt
-  for the call. The spec's provider wins on a clash and the overlay wins over
-  the caller's arguments. Each is read as its provider's return is: an
-  `UNSET` entry is dropped, a key the provider is annotated to fill is the
-  provider's alone, and an `extra_kwargs` key naming a seed is refused.
+  for the call. The spec's provider wins on a clash, and `extra_input_data`
+  wins over the caller's arguments. Each is read as its provider's return
+  is: an `UNSET` entry is dropped, a key the provider is annotated to fill is
+  the provider's alone, and an `extra_kwargs` key naming a seed is refused.
+  So is an `extra_kwargs` key naming a parameter the spec declares - a read,
+  a Validator field, a target selector's read, a `many` spec's list - unless
+  its value is `UNSET` or the spec's typed `kwargs` provider fills it: the
+  caller's value for a parameter is what the permission checks and the
+  target selector see, so the value authorized is the value run.
   `extra_kwargs` reaches a selector spec's selector and a service spec's
   service, never a target or output selector; `extra_input_data` reaches the
   Validator, on every row of a `many` call, and a selector spec refuses it

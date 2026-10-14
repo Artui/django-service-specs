@@ -97,6 +97,9 @@ def overlay_for(
     refused (test_a_selector_spec_s_kwargs_provider_outranks_the_overlay);
     without the second, a service spec's is
     (test_input_data_overlays_the_caller_and_the_spec_s_provider_overlays_it).
+
+    A key naming a declared parameter is refused in ``open_call``, inside
+    the hop, since reading the declaration may query.
     """
     if extra_input_data and isinstance(spec, SelectorSpec):
         raise TypeError(
@@ -104,6 +107,42 @@ def overlay_for(
             "Validator; a SelectorSpec validates nothing."
         )
     return Overlay(dict(extra_kwargs or {}), dict(extra_input_data or {}))
+
+
+def refuse_overlaid_parameters(
+    spec: ServiceSpec | SelectorSpec, declared: Parameters, overlay: Overlay
+) -> None:
+    """Refuse an ``extra_kwargs`` key that would stand in for a caller's argument.
+
+    A key naming a parameter the spec declares is refused, as a seed's name
+    is: the caller's value for a parameter - a
+    read, a Validator field, the target selector's read - is what the
+    permission checks are handed and the target selector looks the row up
+    by, so an overlay standing in for it would run the call on a value
+    neither saw (test_an_extra_kwargs_key_naming_a_declared_parameter_is_refused,
+    test_a_validator_field_and_a_target_read_are_declared_parameters_too).
+    Refusing is the end that can be relaxed later without breaking a caller.
+    Two kinds of key name one and stand: an ``UNSET`` entry, which supplies
+    nothing (test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused),
+    and a parameter the spec's own typed ``kwargs`` provider fills, whose
+    caller's value is dropped before any check and whose overlay value is
+    dropped beneath the provider, so nothing diverges
+    (test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused). A
+    key naming no parameter is the overlay's to add, and stands
+    (test_the_spec_s_kwargs_provider_outranks_the_overlay); each of the three
+    parts of the set expression below is held by the test named for it here.
+    """
+    keys = provider_keys(spec.kwargs)
+    owned = keys.filled if keys is not None else frozenset()
+    supplied = {name for name, value in overlay.kwargs.items() if value is not UNSET}
+    taken = sorted((supplied & declared.names()) - owned)
+    if taken:
+        raise ImproperlyConfigured(
+            f"extra_kwargs names the parameter(s) {taken}, which the {type(spec).__name__} "
+            "declares. A caller's value for a parameter is what the permission checks and the "
+            "target selector see, so an overlay may not stand in for it; rename the key, or "
+            "fill it from the spec's typed kwargs provider."
+        )
 
 
 def overlaid(
@@ -121,7 +160,7 @@ def overlaid(
     (test_the_spec_s_kwargs_provider_outranks_the_overlay). Treated as the
     provider's own answer is: a key whose value is ``UNSET`` is declined, so
     a value beneath it stands
-    (test_the_overlay_outranks_the_caller_and_unset_leaves_the_caller_s_value),
+    (test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused),
     and a key named in ``reserved`` is refused, as ``provide`` refuses it.
     A key the provider is annotated to fill, and may not decline, is the
     provider's alone, so the overlay's value for it is dropped: a provider
@@ -209,6 +248,7 @@ def open_call(
     unknown_arguments: UnknownArguments,
     parameters: Parameters | None = None,
     settle_rows: bool = False,
+    overlay: Overlay = NO_OVERLAY,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
@@ -242,7 +282,8 @@ def open_call(
     is wrong for every caller. The dispatcher's own names never reach this
     check: ``spec.parameters()`` refuses them as it assembles. A registered
     seed is the project's, so only dispatch - which is handed the registry -
-    can see the collision.
+    can see the collision. So is an ``overlay`` key naming a declared
+    parameter, for the same reason (see ``refuse_overlaid_parameters``).
 
     Class-level authorization runs before anything is resolved, so a principal
     it refuses learns nothing about which rows exist. It runs after the shape
@@ -264,6 +305,7 @@ def open_call(
             "pool seed occupies. An argument must never meet a seed in one pool; rename "
             "the parameter."
         )
+    refuse_overlaid_parameters(spec, declared, overlay)
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
     granted = authorize(spec, principal, grant=grant, arguments=checks_arguments(checked))
     if settle_rows:
@@ -1286,6 +1328,7 @@ def prepare_service(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        overlay=overlay,
     )
     resolved = walk_target(
         spec, principal, checked, grant=granted, pool_seeds=pool_seeds, target=target

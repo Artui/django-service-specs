@@ -169,12 +169,17 @@ def dispatch(
     ``extra_kwargs`` and ``extra_input_data`` are the transport's per-call
     overlays for the spec's ``kwargs`` and ``input_data`` providers - what an
     HTTP view's per-request hooks add - merged **beneath** them, so the spec's
-    own provider wins on a clash and the overlay wins over the caller's
-    arguments. Each is treated as its provider's own return is: an ``UNSET``
+    own provider wins on a clash, and ``extra_input_data`` wins over the
+    caller's arguments. Each is treated as its provider's own return is: an ``UNSET``
     entry is dropped, a key the spec's provider is annotated to fill is the
     server's and the overlay's value for it is dropped too, so an overlay
     never fills a key its provider declined to. ``extra_kwargs`` naming a
-    registered seed is refused, as a provider's is. ``extra_kwargs`` reaches
+    registered seed is refused, as a provider's is, and so, before step one,
+    is one naming a parameter the spec declares - a read, a Validator field,
+    a target read, a ``many`` spec's list - unless its value is ``UNSET`` or
+    the spec's typed ``kwargs`` provider fills it: the caller's value for a
+    parameter is what step two and three read, so an overlay standing in for
+    it would run the call on a value they never saw. ``extra_kwargs`` reaches
     a selector spec's own selector and a service spec's service, never a
     target or output selector; ``extra_input_data`` reaches the Validator,
     under every row of a ``many`` call, and a selector spec refuses it. An
@@ -223,6 +228,7 @@ def dispatch(
             grant=grant,
             pool_seeds=pool_seeds,
             unknown_arguments=unknown_arguments,
+            overlay=overlay,
         )
         pool = selector_pool(
             spec,

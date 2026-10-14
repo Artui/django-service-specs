@@ -3894,22 +3894,68 @@ class TestOverlays:
         [call] = service.calls
         assert (call["tag"], call["extra"]) == ("spec", 1)
 
-    def test_the_overlay_outranks_the_caller_and_unset_leaves_the_caller_s_value(
-        self, ada: Any
-    ) -> None:
+    def test_an_extra_kwargs_key_naming_a_declared_parameter_is_refused(self, ada: Any) -> None:
+        """The caller's value for a declared parameter is what the checks and
+        the target selector read, so an overlay standing in for it would run
+        the call on a value they never saw. Refused before anything runs."""
         service = Record()
         spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
-        dispatch(spec, principal=ada, arguments={"q": "caller"}, extra_kwargs={"q": "view"})
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"q": "caller"}, extra_kwargs={"q": "view"})
+        assert str(refused.value) == (
+            "extra_kwargs names the parameter(s) ['q'], which the ServiceSpec declares. A "
+            "caller's value for a parameter is what the permission checks and the target "
+            "selector see, so an overlay may not stand in for it; rename the key, or fill "
+            "it from the spec's typed kwargs provider."
+        )
+        assert service.calls == []
+
+    def test_a_validator_field_and_a_target_read_are_declared_parameters_too(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="old")
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=Titled(),
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        for key in ("title", "pk"):
+            with pytest.raises(ImproperlyConfigured, match=rf"\['{key}'\]"):
+                dispatch(
+                    spec,
+                    principal=ada,
+                    arguments={"pk": note.pk, "title": "new"},
+                    extra_kwargs={key: 1},
+                )
+
+    def test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused(
+        self, ada: Any
+    ) -> None:
+        """It supplies no value, so nothing diverges: the caller's stands."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
         dispatch(
             spec,
             principal=ada,
             arguments={"q": "caller"},
             extra_kwargs={"q": UNSET, "other": UNSET},
         )
-        first, second = service.calls
-        assert first["q"] == "view"
-        assert second["q"] == "caller"
-        assert "other" not in second
+        assert service.calls[0]["q"] == "caller"
+        assert "other" not in service.calls[0]
+
+    def test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused(self, ada: Any) -> None:
+        """The caller's value for it is dropped before any check, and the
+        overlay's is dropped beneath the provider, so the two cannot diverge."""
+        provider, _ = _project_provider()
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=PROJECT, kwargs=provider)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"project_pk": 99})
+        assert service.calls[0]["project_pk"] == 7
+
+    def test_a_selector_spec_s_read_is_refused_as_a_service_spec_s_is(self, ada: Any) -> None:
+        with pytest.raises(ImproperlyConfigured, match="which the SelectorSpec declares"):
+            dispatch(retrieve(), principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})
 
     def test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s(self, ada: Any) -> None:
         """The provider is the key's only source: one that leaves it out

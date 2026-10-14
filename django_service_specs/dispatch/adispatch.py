@@ -278,6 +278,7 @@ def _open_selector(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        overlay=overlay,
     )
     pool = selector_pool(
         spec,
