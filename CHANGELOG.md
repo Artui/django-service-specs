@@ -74,8 +74,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or from a subpackage (`django_service_specs.services` for `is_async` or
   `create_model`, `django_service_specs.filters`) updates the path; one
   importing from the package root changes nothing.
-- **Further module paths moved, and four annotations changed, to break every
-  import ring.** `authorize`, `authorize_scope`, `authorize_target` and `Grant`
+- **Further module paths moved, and three typing changes, to break the import
+  rings between packages.** `authorize`, `authorize_scope`, `authorize_target` and `Grant`
   moved from `authorization/` to `dispatch/`, as did
   `audience_projection_for_spec` from `output/`; they take a spec, so they sit
   above the packages a spec is made of. `Parameter` (with `JSON_TYPES`,
@@ -86,10 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `has_scope_permission` and `Unrestricted.has_permission` is now `Any`, as
   every example already wrote it: a subclass may still annotate it with the
   two spec classes. `ServiceSpec` gains a base class, `AffordanceDeclarer`
-  (in `django_service_specs.types`, not exported from the root), and
-  `SelectorSpec.affordances` is annotated with it. No `if TYPE_CHECKING:`
-  guard remains in the package and none may be added: a lint rule and a test
-  of the package's import graph hold both.
+  (`django_service_specs.types.affordance_declarer`, not exported from the
+  root), and `SelectorSpec.affordances` is annotated with it. No
+  `if TYPE_CHECKING:` guard remains in the package and none may be added: a
+  lint rule and a test of the package's import graph, which reads imports at
+  every depth, hold both. The one recursion left is the nested-write entry
+  points and `mutations/utils.py`, which import each other and are named in
+  that test.
 
 ## [0.6.0] — 2026-10-14
 

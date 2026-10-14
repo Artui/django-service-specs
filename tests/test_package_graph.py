@@ -8,6 +8,8 @@ ones included, is held acyclic here.
 
 An ``if TYPE_CHECKING:`` guard is how a ring is hidden from the interpreter
 while the type checker still sees it, so none may exist in the package at all.
+A function-local import hides one the same way, so imports are read at every
+depth, and the one module-level recursion the package has is named.
 """
 
 from __future__ import annotations
@@ -19,6 +21,24 @@ from pathlib import Path
 import django_service_specs
 
 ROOT = Path(django_service_specs.__file__).parent
+ROOT_MODULES = {"settings", "checks", "apps", "version"}
+
+# The one recursion the package writes down: a nested write persists a related
+# row by calling the same create/update entry point that is writing its parent,
+# and the helpers both sides share are in ``mutations/utils.py``. An import ring
+# that cannot be broken by moving a part above or below another, only by
+# threading the four entry points through every helper as arguments. Each of
+# these modules imports ``utils`` at the top, and ``utils`` imports each back
+# inside the function that recurses.
+RECURSION = [
+    [
+        "django_service_specs.mutations.acreate_from_input",
+        "django_service_specs.mutations.aupdate_from_input",
+        "django_service_specs.mutations.create_from_input",
+        "django_service_specs.mutations.update_from_input",
+        "django_service_specs.mutations.utils",
+    ]
+]
 
 
 def _package_of(dotted: str) -> str | None:
@@ -40,17 +60,53 @@ def _modules() -> list[tuple[str, ast.Module]]:
     ]
 
 
+def _imported(tree: ast.AST) -> list[str]:
+    """Every module the tree imports, at any depth: a function body is an import too.
+
+    A function-local import is how a ring is hidden from the interpreter
+    without a guard, so it counts exactly as a top-level one does.
+    """
+    found: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            found.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            found.append(node.module)
+            # ``from pkg import module`` imports ``pkg.module`` when that is one.
+            found.extend(f"{node.module}.{alias.name}" for alias in node.names)
+    return found
+
+
 def _graph() -> dict[str, set[str]]:
+    """Package-level edges: which subpackage imports which, root modules included."""
     edges: dict[str, set[str]] = defaultdict(set)
     for module, tree in _modules():
-        source = _package_of(module)
+        source = _package_of(module) or _root_module(module)
         if source is None:
             continue
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ImportFrom) and node.module:
-                target = _package_of(node.module)
-                if target is not None and target != source:
-                    edges[source].add(target)
+        for imported in _imported(tree):
+            target = _package_of(imported) or _root_module(imported)
+            if target is not None and target != source:
+                edges[source].add(target)
+    return edges
+
+
+def _root_module(dotted: str) -> str | None:
+    """The package root's own modules (``settings``, ``checks``) as nodes of their own."""
+    parts = dotted.split(".")
+    if parts[0] == "django_service_specs" and len(parts) == 2 and parts[1] in ROOT_MODULES:
+        return parts[1]
+    return None
+
+
+def _module_graph() -> dict[str, set[str]]:
+    """Module-level edges between the package's leaf modules, which a package graph cannot see."""
+    modules = {module for module, _ in _modules()}
+    edges: dict[str, set[str]] = defaultdict(set)
+    for module, tree in _modules():
+        for imported in _imported(tree):
+            if imported in modules and imported != module:
+                edges[module].add(imported)
     return edges
 
 
@@ -106,6 +162,10 @@ def test_the_imports_form_no_ring() -> None:
     assert _rings(_graph()) == []
 
 
+def test_the_modules_form_no_ring_but_the_named_recursion() -> None:
+    assert _rings(_module_graph()) == RECURSION
+
+
 def test_the_ring_finder_finds_a_ring() -> None:
     # The negative control: a finder that returned nothing for every graph
     # would pass the test above for a package that was all rings.
@@ -117,10 +177,20 @@ def test_no_module_guards_an_import_with_type_checking() -> None:
     assert {module: lines for module, tree in _modules() if (lines := _guards(tree))} == {}
 
 
+def test_the_import_finder_reads_every_depth_and_spelling() -> None:
+    tree = ast.parse("import a.b\nfrom c import d\ndef f():\n    import e\n    from g.h import i\n")
+    assert _imported(tree) == ["a.b", "c", "c.d", "e", "g.h", "g.h.i"]
+
+
 def test_the_guard_finder_finds_each_spelling() -> None:
     for source in (
         "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pass\n",
         "import typing\nif typing.TYPE_CHECKING:\n    pass\n",
+        # Only the name arm sees these two; ruff's ban misses both.
+        "TYPE_CHECKING = False\nif TYPE_CHECKING:\n    pass\n",
+        "from typing import *\nif TYPE_CHECKING:\n    pass\n",
+        # Only the alias arm sees a guard that is imported and never used here.
+        "from typing import TYPE_CHECKING as TC\n",
     ):
         assert _guards(ast.parse(source)) != []
     assert _guards(ast.parse("x = 1\n")) == []

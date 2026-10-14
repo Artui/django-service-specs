@@ -149,7 +149,7 @@ ban-relative-imports = "all"
 # A TYPE_CHECKING guard exists to hide an import cycle from the interpreter
 # while the type checker still sees it. Break the cycle instead: reorder the
 # packages, put the shared base in ``types/``, or keep a recursive pair in one
-# file (CLAUDE.md, rules 1 and 8).
+# file (CLAUDE.md, rules 1, 8 and 9).
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "typing.TYPE_CHECKING".msg = "Break the import cycle instead of guarding it."
 "typing_extensions.TYPE_CHECKING".msg = "Break the import cycle instead of guarding it."

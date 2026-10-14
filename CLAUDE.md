@@ -94,7 +94,10 @@ Non-negotiable. They keep the package navigable.
    above the spec (`authorize*` and `Grant` are in `dispatch/` for that
    reason), reverse an edge, put the shared base in `types/`
    (`AffordanceDeclarer`), or keep a recursive pair in one file (rule 1). A
-   function-local import hides the same ring and is no substitute (rule 4).
+   function-local import hides the same ring and is no substitute (rule 4), so
+   the test reads imports at every depth. The one ring it allows is named in
+   it: a nested write calls the same create and update entry points that are
+   writing its parent, through `mutations/utils.py`.
 
 ## Naming the concepts
 
