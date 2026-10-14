@@ -56,10 +56,11 @@ def annotate_output_schema(
       says it produces, plus whatever that declaration adds about the shape of
       the produced value, in place of everything the property said about the
       value before, choices included. Its ``title`` and ``description`` are
-      kept, and so is a ``"null"`` in its type, since a null is never
-      formatted. The type is written from ``produces`` rather than taken from
-      the fragment, so a renderer cannot contradict its own advertisement. Not
-      on a ``HANDLE`` either.
+      kept, and so is a ``null`` the property admitted - however it stated one,
+      as a type, an ``anyOf`` member or ``None`` in an ``enum`` - since a null
+      is never formatted. The type is written from ``produces`` rather than
+      taken from the fragment, so a renderer cannot contradict its own
+      advertisement. Not on a ``HANDLE`` either.
 
     Generating both sides from one declaration is the point: a schema that
     advertises a field the payload no longer carries is worse than either
@@ -147,22 +148,55 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
     ``description``. The formatter's own fragment merges over both, so a
     formatter that wants to say something else about the field still can.
 
-    A stated type that admits ``"null"`` still admits it, after the type the
+    A property that admits ``"null"`` still admits it, after the type the
     formatter produces: ``apply`` passes a null through unformatted, so a
-    nullable field still serves one. djangorestframework-services drops it.
-    Only a stated type list is read: a null stated as an ``anyOf`` member, or
-    as ``None`` in an ``enum``, is the spelling a schema written elsewhere may
-    use, and under a formatter it is lost, as it is there. This package's own
-    output schema states nullability as a type list. Each spelling read is
-    held by ``test_a_nullable_field_stays_nullable`` and
-    ``test_a_field_stated_only_as_null_still_admits_it``.
+    nullable field still serves one, and a schema refusing it would be false.
+    ``_admits_null`` reads the three spellings a schema states one in, so the
+    formatter's type is always written as ``[produces, "null"]`` and nothing of
+    the spelling is carried over: the ``anyOf`` and ``enum`` it came in are
+    discarded with everything else the property said.
     """
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
-    stated = schema.get("type")
-    if "null" in (stated if isinstance(stated, list) else [stated]):
+    # One boolean, read by ``_admits_null``, which names the test that holds
+    # each spelling it reads.
+    if _admits_null(schema):
         formatted["type"] = [formatted["type"], "null"]
     return formatted
+
+
+def _admits_null(schema: dict[str, Any]) -> bool:
+    """Whether ``schema`` states that it admits a ``null``, in any spelling.
+
+    - a type naming it: ``["string", "null"]``, or ``"null"`` alone;
+    - ``None`` among an ``enum``'s values, or as a ``const``. It is read
+      whatever ``type`` is stated beside it, because it lists a value the
+      server serves. ``_retyped`` weighs a listed ``None`` against the stated
+      type instead, because there the displays replace the values and the
+      type is what says whether a null was ever admitted;
+    - a member of ``anyOf`` or an entry of ``oneOf`` that admits one by any of
+      these rules: ``{"type": "null"}``, which is how a dataclass field typed
+      ``X | None`` is described, ``{"const": None}``, which is how a labelled
+      nullable choice is, or a member that is itself nullable.
+
+    One boolean, so one branch to coverage; each spelling has a test that
+    fails without it: test_a_nullable_field_stays_nullable (a type list),
+    test_a_field_stated_only_as_null_still_admits_it (``"null"`` alone),
+    test_a_null_listed_in_an_enum_stays_admitted, test_a_null_constant_stays_admitted,
+    test_a_null_stated_as_an_any_of_member_stays_admitted,
+    test_a_null_stated_as_a_one_of_entry_stays_admitted (both entries) and
+    test_a_null_inside_an_any_of_member_stays_admitted (the recursion). The
+    negative of each is test_a_union_naming_no_null_admits_none_after_formatting.
+    """
+    stated = schema.get("type")
+    return (
+        "null" in (stated if isinstance(stated, list) else [stated])
+        or None in schema.get("enum", ())
+        or schema.get("const", ...) is None
+        or any(
+            _admits_null(member) for union in ("anyOf", "oneOf") for member in schema.get(union, ())
+        )
+    )
 
 
 def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[str, Any]:
