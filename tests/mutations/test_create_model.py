@@ -14,9 +14,9 @@ from django.test.utils import CaptureQueriesContext
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.mutations.create_model import create_model
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.services.create_model import create_model
 from django_service_specs.specs.service_spec import ServiceSpec
 from tests.relations_app.models import Author, Catalog, Post, Section, Tag
 

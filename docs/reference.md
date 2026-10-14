@@ -148,14 +148,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.update_service.UpdateService
 ::: django_service_specs.services.delete_service.DeleteService
 ::: django_service_specs.services.implements.implements
-::: django_service_specs.services.create_model.create_model
-::: django_service_specs.services.acreate_model.acreate_model
-::: django_service_specs.services.update_model.update_model
-::: django_service_specs.services.aupdate_model.aupdate_model
-::: django_service_specs.services.delete_model.delete_model
-::: django_service_specs.services.adelete_model.adelete_model
-::: django_service_specs.services.delete_collection.delete_collection
-::: django_service_specs.services.adelete_collection.adelete_collection
 
 ## Pool
 
@@ -183,6 +175,14 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
 ::: django_service_specs.mutations.related_object_change.RelatedObjectChange
+::: django_service_specs.mutations.create_model.create_model
+::: django_service_specs.mutations.acreate_model.acreate_model
+::: django_service_specs.mutations.update_model.update_model
+::: django_service_specs.mutations.aupdate_model.aupdate_model
+::: django_service_specs.mutations.delete_model.delete_model
+::: django_service_specs.mutations.adelete_model.adelete_model
+::: django_service_specs.mutations.delete_collection.delete_collection
+::: django_service_specs.mutations.adelete_collection.adelete_collection
 
 ## Relations
 

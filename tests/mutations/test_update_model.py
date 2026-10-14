@@ -9,9 +9,9 @@ import pytest
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from django_service_specs.mutations.update_model import update_model
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.services.update_model import update_model
 from tests.relations_app.models import Catalog, Post, Section, Tag
 
 

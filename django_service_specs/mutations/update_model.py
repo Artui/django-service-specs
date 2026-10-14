@@ -26,7 +26,7 @@ def update_model(
             return update_from_input(instance, data).instance
 
     ``model`` is not read: it is taken for symmetry with
-    [`create_model`][django_service_specs.services.create_model.create_model] and
+    [`create_model`][django_service_specs.mutations.create_model.create_model] and
     to bind the row's type for a type checker, since the row is the
     ``instance`` the spec's instance selector resolved. ``field_map``,
     ``exclude_fields``, ``update_fields`` and ``relations`` are handed to

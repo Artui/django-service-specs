@@ -23,7 +23,7 @@ def delete_model(
             instance.delete()
 
     ``model`` is not read, as in
-    [`update_model`][django_service_specs.services.update_model.update_model]:
+    [`update_model`][django_service_specs.mutations.update_model.update_model]:
     the row is the ``instance`` the spec's instance selector resolved.
 
     ``soft_delete`` is called with the row *instead of* ``instance.delete()``,

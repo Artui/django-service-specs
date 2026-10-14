@@ -14,11 +14,11 @@ from django.test.utils import CaptureQueriesContext
 
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.mutations.delete_model import delete_model
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
-from django_service_specs.services.delete_model import delete_model
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec

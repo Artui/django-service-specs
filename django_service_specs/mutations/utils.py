@@ -850,8 +850,8 @@ def resolve_m2m(
     """A row's ``m2m=`` as a plain ``dict``, or ``None`` when none is declared.
 
     A spec states it as a static mapping (``{"tags": [tag1, tag2]}``) or as a
-    callable deriving one from the row, and so does a model write helper in
-    ``services/`` for the row it writes. The callable is caller code, so an
+    callable deriving one from the row, and so does a model write helper
+    (``create_model`` and its siblings) for the row it writes. The callable is caller code, so an
     error it raises is marked on its way out: it runs inside the parent row's
     write, whose translation would otherwise read it as that row's own data
     failing. ``cast`` records which branch is which, because a class can in

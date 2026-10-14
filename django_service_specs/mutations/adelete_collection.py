@@ -11,7 +11,7 @@ def adelete_collection(
     *,
     soft_delete: Callable[[Any], Awaitable[None]] | None = None,
 ) -> Callable[..., Awaitable[None]]:
-    """The async twin of [`delete_collection`][django_service_specs.services.delete_collection.delete_collection].
+    """The async twin of [`delete_collection`][django_service_specs.mutations.delete_collection.delete_collection].
 
     Deletes with ``await collection.adelete()``. ``soft_delete`` is an
     ``async def`` called with the ``collection`` in its place.

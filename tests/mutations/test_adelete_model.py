@@ -10,11 +10,11 @@ from asgiref.sync import async_to_sync
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_delete
 
+from django_service_specs.mutations.adelete_model import adelete_model
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.services.adelete_model import adelete_model
 from django_service_specs.types.is_async import is_async
+from tests.mutations.utils import savepoints_during
 from tests.relations_app.models import Author, Catalog, Item, Section
-from tests.services.utils import savepoints_during
 
 
 @pytest.fixture

@@ -8,12 +8,12 @@ from typing import Any
 import pytest
 from asgiref.sync import async_to_sync, sync_to_async
 
+from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.services.acreate_model import acreate_model
 from django_service_specs.types.is_async import is_async
+from tests.mutations.utils import savepoints_during
 from tests.relations_app.models import Author, Catalog, Post, Section, Tag
-from tests.services.utils import savepoints_during
 
 
 @dataclass

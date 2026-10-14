@@ -411,23 +411,23 @@ SURFACE: dict[str, Pin] = {
     "run_service": _fn("services.run_service", "fn, kwargs, *, atomic"),
     "arun_service": _fn("services.arun_service", "fn, kwargs, *, atomic"),
     "create_model": _fn(
-        "services.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
+        "mutations.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
     ),
     "acreate_model": _fn(
-        "services.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
+        "mutations.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
     ),
     "update_model": _fn(
-        "services.update_model",
+        "mutations.update_model",
         "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
     ),
     "aupdate_model": _fn(
-        "services.aupdate_model",
+        "mutations.aupdate_model",
         "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
     ),
-    "delete_model": _fn("services.delete_model", "model, *, soft_delete=, relations="),
-    "adelete_model": _fn("services.adelete_model", "model, *, soft_delete=, relations="),
-    "delete_collection": _fn("services.delete_collection", "model, *, soft_delete="),
-    "adelete_collection": _fn("services.adelete_collection", "model, *, soft_delete="),
+    "delete_model": _fn("mutations.delete_model", "model, *, soft_delete=, relations="),
+    "adelete_model": _fn("mutations.adelete_model", "model, *, soft_delete=, relations="),
+    "delete_collection": _fn("mutations.delete_collection", "model, *, soft_delete="),
+    "adelete_collection": _fn("mutations.adelete_collection", "model, *, soft_delete="),
     # --- specs --------------------------------------------------------------------------------
     # The adapter's spec classes compile to these two through the seam below.
     "ServiceSpec": Pin(

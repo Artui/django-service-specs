@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 from django.db.models.signals import post_delete
 
-from django_service_specs.services.delete_collection import delete_collection
+from django_service_specs.mutations.delete_collection import delete_collection
+from tests.mutations.utils import savepoints_during
 from tests.relations_app.models import Author, Post
-from tests.services.utils import savepoints_during
 
 
 @pytest.fixture
