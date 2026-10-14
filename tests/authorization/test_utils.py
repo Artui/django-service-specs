@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import gc
+import weakref
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -90,3 +92,30 @@ def test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing(
     method: str,
 ) -> None:
     assert asked_with(_Shapes(), method, {"pk": 1}) == {}
+
+
+def test_a_check_is_not_kept_once_asked() -> None:
+    """The signature is cached under the function a bound method wraps, never
+    under the bound method, which would hold its check for the process's life."""
+    check = _Shapes()
+    held = weakref.ref(check)
+    assert asked_with(check, "keyword_only", {"pk": 1}) == {"arguments": {"pk": 1}}
+    del check
+    gc.collect()
+    assert held() is None
+
+
+def test_a_callable_set_on_the_instance_is_not_kept_once_asked() -> None:
+    """Only a function a class defines is cached; one set on an instance, or
+    a mock, is read uncached, so a cache does not hold every one ever asked."""
+    check = _Shapes()
+
+    def shadow(principal: Any, spec: Any, *, arguments: Any = None) -> bool:
+        return True
+
+    cast(Any, check).undeclared = shadow
+    held = weakref.ref(shadow)
+    assert asked_with(check, "undeclared", {"pk": 1}) == {"arguments": {"pk": 1}}
+    del check, shadow
+    gc.collect()
+    assert held() is None

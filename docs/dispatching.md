@@ -223,7 +223,10 @@ A method that does not declare the keyword is asked exactly as before, so no
 existing check changes. The base methods do not declare it, which keeps every
 check written without it a valid override under a type checker. Opt-in is by
 name: a method spreading `**kwargs` is not handed it, since a wrapper would
-pass it on to a method that never asked. A [`many`](declaring.md#many-rows-in-one-call)
+pass it on to a method that never asked. What is read is what dispatch
+calls, `getattr(check, method)`: a callable set on the instance, or a mock
+patched over the method, answers for its own signature, and a
+`functools.wraps` wrapper for its own rather than the one it wraps. A [`many`](declaring.md#many-rows-in-one-call)
 call's rows are not among the arguments: they are validated after every
 check, so a check sees the call's `reads` alone. The
 [`authorize`][django_service_specs.dispatch.authorize.authorize] functions

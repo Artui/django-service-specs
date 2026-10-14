@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType, SimpleNamespace
 from typing import Any, cast
+from unittest import mock
 
 import pytest
 from django import forms
@@ -4146,6 +4147,98 @@ class TestArgumentsChannel:
         monkeypatch.setattr(Plain, "has_permission", declaring)
         dispatch(spec, principal=ada, arguments={"pk": 1})
         assert seen == ["plain", "declaring {'pk': 1}"]
+
+    def test_a_method_shadowed_on_the_instance_is_read_as_the_shadow(self, ada: Any) -> None:
+        """Dispatch calls ``getattr(check, method)``, so that is what is read:
+        a callable set on the instance answers for its own signature, not
+        for the class method it shadows."""
+        seen: list[tuple[Any, ...]] = []
+        check = Arguing()
+
+        def shadow(principal: Any, spec: Any) -> bool:
+            seen.append((principal, spec))
+            return True
+
+        cast(Any, check).has_permission = shadow
+        spec = ServiceSpec(service=Record(), permissions=(check,))
+        dispatch(spec, principal=ada, arguments={})
+        assert seen == [(ada, spec)]
+
+    def test_a_mock_patched_over_a_method_is_asked_as_before(self, ada: Any) -> None:
+        """A mock's signature spreads ``**kwargs``, so it is asked exactly as a
+        check that never opted in, whatever the method it replaces declared."""
+        check = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(check,))
+        with mock.patch.object(
+            check, "has_permission", side_effect=lambda principal, spec: True
+        ) as patched:
+            dispatch(spec, principal=ada, arguments={})
+        patched.assert_called_once_with(ada, spec)
+
+    def test_a_callable_the_class_holds_unhashed_is_read_by_its_own_signature(
+        self, ada: Any
+    ) -> None:
+        """An ``eq=True`` dataclass has no hash, so nothing can be cached
+        under it; its signature is read on every call instead."""
+
+        @dataclass
+        class Rule:
+            seen: list[Mapping[str, Any] | None]
+
+            def __call__(
+                self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+            ) -> bool:
+                self.seen.append(arguments)
+                return True
+
+        rule = Rule(seen=[])
+
+        class Ruled(PermissionCheck):
+            has_permission = rule
+
+        spec = ServiceSpec(service=Record(), permissions=(Ruled(),), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        assert [dict(arguments or {}) for arguments in rule.seen] == [{"title": "t"}]
+
+    def test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper(
+        self, ada: Any
+    ) -> None:
+        """``functools.wraps`` points ``__wrapped__`` at a method declaring
+        ``arguments``; the wrapper is what is called, and it does not."""
+
+        def narrowing(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def asked(self: Any, principal: Any, spec: Any) -> bool:
+                return method(self, principal, spec, arguments={"pinned": True})
+
+            return asked
+
+        class Narrowed(Arguing):
+            has_permission = narrowing(Arguing.has_permission)
+
+        check = Narrowed()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", {"pinned": True})
+
+    def test_a_wrapper_spreading_its_keywords_is_handed_nothing_whatever_it_wraps(
+        self, ada: Any
+    ) -> None:
+        """The wrapper's own ``**kwargs`` decides, as for any method spreading
+        them, even where the method it wraps declares ``arguments``."""
+
+        def spreading(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def asked(self: Any, *args: Any, **kwargs: Any) -> bool:
+                return method(self, *args, **kwargs)
+
+            return asked
+
+        class Spread(Arguing):
+            has_permission = spreading(Arguing.has_permission)
+
+        check = Spread()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", None)
 
     def test_a_caller_s_value_for_a_key_the_server_fills_is_never_a_check_s(self, ada: Any) -> None:
         """The caller's value for a read the ``kwargs`` provider is annotated
