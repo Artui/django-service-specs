@@ -1406,6 +1406,15 @@ takes the spec's <code>reads</code> and nothing else, so a value asked once for 
 call - a confirmation - is a read. The service receives the rows' <code>data</code> as a
 list under <code>data</code>, and their values as a list under <code>many_argument</code>; neither
 is spread by field.</p>
+<p>Dispatch hands the rows to the Validator's <code>validated_many()</code> in one call,
+each under its index in the caller's list. By default that validates each
+row on its own through <code>validated()</code>, and refuses a value a row binds, since
+the service runs once for every row. A Validator whose library validates a
+list as one - list-level checks, one bound object for the call - overrides
+it: its refusal is the list's node, each failing row under its index and a
+message about the whole list under <code>non_field_errors</code>, and what it binds in
+<code>Validated.pool</code> reaches the service once. A row the shape check refused is
+not handed to it, so the indices may have gaps.</p>
 <p>The list is an array parameter, so it is bounded as one:
 <strong><code>many_min_length</code></strong> and <strong><code>many_max_length</code></strong> are its <code>min_length</code> and
 <code>max_length</code>. Neither is declared by default, so an empty list runs the
@@ -1643,7 +1652,12 @@ methods, and a third method and an attribute with defaults:</p>
   carrying the principal and the resolved target. It may query - a uniqueness
   check does - and the target is there so that an update's check can exclude
   the row being updated. The context also says whether the call is
-  <a href="#partial-updates"><code>partial</code></a>.</li>
+  <a href="#partial-updates"><code>partial</code></a>, and carries the call's resolved seeds as
+  <code>ambient</code>: <code>user</code>, <code>progress</code> and every seed registered through
+  <code>PoolSeeds</code>, such as an HTTP adapter's <code>request</code>, for a library whose
+  validation reads what its caller registered. It is read-only at its top
+  level; its values are the call's own live objects, which a Validator must
+  not mutate.</li>
 <li><code>validated(arguments, context)</code> is what dispatch calls: a
   <a class="autorefs autorefs-internal" title="Validated
 
@@ -1657,10 +1671,17 @@ methods, and a third method and an attribute with defaults:</p>
   <code>data</code> and nothing bound, so a Validator overrides it only where its <code>data</code>
   is not that mapping. A bound value named after a seed, a validated value or
   a parameter is refused.</li>
-<li><code>supports_partial</code>, a class attribute, says whether <code>validate()</code> can honour
-  a <a href="#partial-updates"><code>partial</code></a> call by returning only what was sent. It is
+<li><code>validated_many(rows, context, *, many_argument)</code> is what dispatch calls on
+  a <a href="#many-rows-in-one-call"><code>many</code></a> spec instead: the rows by index, and a
+  <code>Validated</code> whose <code>values</code> hold the rows' values under <code>many_argument</code>
+  alone. The default is <code>validated()</code> on each row.</li>
+<li><code>supports_partial</code> says whether <code>validate()</code> can honour a
+  <a href="#partial-updates"><code>partial</code></a> call by returning only what was sent. It is
   <code>True</code> by default. A Validator that builds every field sets it <code>False</code>, and
-  a partial spec over it is then refused when the spec is built.</li>
+  a partial spec over it is then refused when the spec is built. A class sets
+  it as a class attribute; an adapter whose answer depends on what it was
+  built over sets it on the instance in <code>__init__</code>, and the spec reads the
+  instance.</li>
 </ul>
 <p>Three things a newcomer may look for are absent on purpose:</p>
 <ul>
@@ -1670,11 +1691,11 @@ methods, and a third method and an attribute with defaults:</p>
   matches a pydantic model class, and neither was written to this contract.</li>
 <li><strong>There is no <code>instance</code> or <code>many</code> argument.</strong> The row a call acts on is
   target resolution, and many rows are the spec's <a href="#many-rows-in-one-call"><code>many</code></a>,
-  each validated on its own. <code>partial</code> arrives in the context, because it is
+  handed to <code>validated_many()</code>. <code>partial</code> arrives in the context, because it is
   the spec's statement about the call, not the Validator's.</li>
 <li><strong>It is sync-only.</strong> It may query, so the async entry point runs it in
-  Django's thread-sensitive executor; a <code>validate</code> or <code>validated</code> declared
-  <code>async def</code> is refused when the spec is built.</li>
+  Django's thread-sensitive executor; a <code>validate</code>, <code>validated</code> or
+  <code>validated_many</code> declared <code>async def</code> is refused when the spec is built.</li>
 </ul>
 <h3 id="the-dataclass-adapter">The dataclass adapter<a class="headerlink" href="#the-dataclass-adapter" title="Permanent link">&para;</a></h3>
 <p><a class="autorefs autorefs-internal" title="DataclassValidator" href="../reference/#django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator"><code>DataclassValidator</code></a>
@@ -1799,8 +1820,27 @@ the Validator:</p>
   items over one at a time, so a Presenter never has to guess whether it was
   given a row or a collection. It may query, and it is sync-only: an
   <code>async def</code> <code>present</code> is refused when the spec is built.</li>
+<li><code>presented(value, context)</code> is what dispatch's <code>present</code> calls: the value,
+  and the call's
+  <a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>,
+  carrying its principal, the target a service spec resolved, and its
+  resolved seeds as <code>ambient</code>, read-only at its top level, its values the
+  call's own live objects, not to be mutated. The default is <code>present(value)</code>,
+  so only a Presenter whose library renders under a context - a field
+  defaulting to the current user, a link built from a request a transport
+  registered as a seed - overrides it. Dispatch carries the context on the
+  <code>DispatchResult</code> as <code>context</code>; a result built by hand has none, and is
+  presented with <code>None</code>.</li>
 </ul>
-<p>An <code>OutputField</code> carries what a reader needs beyond a name and a type: a
+<p>An <code>OutputField</code>'s type is one of the JSON types, or <code>any</code> for a value whose
+JSON type is open, such as a computed field or a JSON column: its schema is
+<code>{}</code> rather than a claim that it is a string. An <code>OutputField</code> carries what a
+reader needs beyond a name and a type: a
 <code>label</code>, <code>choices</code> as value-and-display pairs (a table shows the display, a
 schema states it), <code>always_present</code> for a key that some rows omit, and a
 <a class="autorefs autorefs-internal" title="FieldMarking

@@ -1072,6 +1072,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator.Validator.validated_many" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validated_many
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1144,8 +1155,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.presenter.Presenter.presented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        presented
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.presentation_context.PresentationContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PresentationContext
+      
+    </span>
+  </a>
   
 </li>
       
@@ -4428,6 +4461,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator.Validator.validated_many" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validated_many
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4500,8 +4544,30 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.presenter.Presenter.presented" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        presented
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.output.presentation_context.PresentationContext" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PresentationContext
+      
+    </span>
+  </a>
   
 </li>
       
@@ -9094,9 +9160,15 @@ rows:</p>
 <li>rows, keyed by their <code>int</code> index, only the rows that failed:
   <code>{"books": {1: {"title": ["..."]}}}</code></li>
 <li>a message about a row itself, under <code>non_field_errors</code> inside the row</li>
+<li>a message about a <code>many</code> call's list as a whole, under
+  <code>non_field_errors</code> beside the failing rows' indices, after them</li>
 </ul>
 <p>Every leaf is a list of <code>str</code>, so the whole tree is JSON-serializable once
-the integer keys are written as strings, which is what <code>json.dumps</code> does.</p>
+the integer keys are written as strings, which is what <code>json.dumps</code> does.
+A <code>many</code> call's node that carries the list's own message mixes <code>int</code>
+indices with <code>non_field_errors</code>, so <code>json.dumps(..., sort_keys=True)</code>
+over it raises <code>TypeError</code>: it is already in reading order, and is
+written as it stands.</p>
 
 
 
@@ -9251,8 +9323,9 @@ opt-in. A structural check on a method name is the gate that lets stock
 classes through by accident: an <code>is_valid</code> protocol matches a Django form
 and a DRF serializer, and a <code>validate</code> protocol matches a DRF serializer
 and a pydantic model class, none of which was written to this contract.</p>
-<p>No <code>instance</code> and no <code>many</code>: the row a call acts on is target
-resolution, and a list is an array parameter. <code>partial</code> arrives in the
+<p>No <code>instance</code> and no <code>many</code> keyword: the row a call acts on is target
+resolution, and a <code>many</code> spec's list is handed to <code>validated_many()</code>,
+a method of its own. <code>partial</code> arrives in the
 <a class="autorefs autorefs-internal" title="ValidationContext
 
 
@@ -9270,9 +9343,11 @@ learns it when it is declared rather than on its first call: a
 <code>ServiceSpec</code> declaring <code>partial=True</code> over a Validator whose
 <code>supports_partial</code> is <code>False</code> is refused when it is built. <code>True</code>
 by default; <code>DataclassValidator</code> and <code>PydanticValidator</code> set it
-<code>False</code>, since each builds every field, and a subclass of either that
-does handle a partial call sets it back. The refusal at the call stays,
-for a Validator called directly.</p>
+<code>False</code> as a class attribute, since each builds every field, and a
+subclass of either that does handle a partial call sets it back. An
+adapter whose answer depends on what it was built over sets it on the
+instance in <code>__init__</code> instead, and the spec reads the instance. The
+refusal at the call stays, for a Validator called directly.</p>
 <p><strong>Sync-only.</strong> A Validator may query - a uniqueness check does - so dispatch
 runs it in the executor on the async path, and it must not be <code>async def</code>.</p>
 <p><code>validate()</code> receives only the arguments its own <code>parameters()</code>
@@ -9286,6 +9361,11 @@ call. An adapter overrides it where its <code>data</code> is not the mapping
 <code>validate()</code> returns, as the dataclass adapter's is its instance, or
 where the library leaves an object the service may want; the rest need
 not touch it.</p>
+<p><code>validated_many()</code> is what dispatch asks of a <code>many</code> spec instead: the
+whole list at once. By default it is <code>validated()</code> on each row, which
+serves a Validator whose library validates one row at a time. An adapter
+whose library validates a list as one, running list-level checks and
+binding one object for the call, overrides it.</p>
 
 
 
@@ -9373,6 +9453,53 @@ not touch it.</p>
 <p>One <code>validate()</code> call, so a Validator that queries queries once. An
 override returns the same <code>values</code> its <code>validate()</code> would, and may
 hand an object as <code>data</code> and bind values in <code>pool</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.validation.validator.Validator.validated_many" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validated_many</span>
+
+
+<a href="#django_service_specs.validation.validator.Validator.validated_many" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">validated_many</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">rows</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]],</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">context</span><span class="p">:</span> <span class="n">ValidationContext</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">many_argument</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Validated</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>A <code>many</code> call's rows, validated as one call: what dispatch asks of a <code>many</code> spec.</p>
+<p><code>rows</code> maps each row's index in the caller's list to its arguments,
+already through the shape check, with the spec's <code>input_data</code> merged
+over each and only the keys <code>parameters()</code> declares, as on a single
+call. A row the shape check refused is not among them, so the indices
+may have gaps: an override validating a list maps its library's
+positions back through <code>list(rows)</code>, and a list-level verdict it
+reaches sees only the rows handed to it.</p>
+<p>Returns the call's <code>Validated</code>: <code>values</code> holds the rows' values as
+a list under <code>many_argument</code> and nothing else, since a row's fields
+are never spread into the service's keywords; <code>data</code> is the list a
+service declaring <code>data</code> receives; <code>pool</code> is what the Validator
+binds once for the whole call.</p>
+<p>Refuses with <code>InvalidArguments</code> whose <code>detail</code> is the list's own
+node: each failing row's tree under its <code>int</code> index, and a message
+about the list as a whole under <code>non_field_errors</code>. Dispatch puts
+the shape check's refusals beside it and raises the whole under
+<code>many_argument</code>, so every failing row is reported at once.</p>
+<p>By default, <code>validated()</code> on each row in order, every refusal
+collected before any is raised, and each row's <code>data</code> and values in
+a list. A value a row binds is refused with <code>ImproperlyConfigured</code>:
+the service runs once for every row, so a value bound for one has
+nowhere to go. An override that binds for the call binds once.</p>
 
 
     </div>
@@ -9473,7 +9600,7 @@ neither belongs among the values a caller's argument names.</p>
 
 
 
-        <p>The principal, the target the operation acts on, and whether the call is partial.</p>
+        <p>The principal, the target the operation acts on, whether the call is partial, and its seeds.</p>
 <p><code>target</code> is here, rather than a constructor keyword the way DRF takes
 <code>instance=</code>, because the kernel is what resolves it: target resolution
 runs <strong>before</strong> validation, so an update's uniqueness check can exclude the
@@ -9486,6 +9613,18 @@ refused an absent required one. A Validator then returns only the fields
 the caller sent, or refuses the call with <code>ImproperlyConfigured</code> if it
 cannot. It trails the other two with a default, so a context built from a
 principal and a target is a whole call, as it always was.</p>
+<p><code>ambient</code> is the call's base pool as dispatch resolved it: <code>user</code>,
+<code>progress</code> and every registered seed - an HTTP adapter's <code>request</code>,
+a view it registers, a tenant - read-only at its top level. Its values
+are the call's own live objects - the principal itself, for one - so a
+Validator must not mutate them
+(test_the_validator_reads_the_registered_seeds_and_the_user holds both
+halves). A library whose validation
+reads what its caller registered, as a serializer reads its context's
+<code>request</code>, finds it here rather than in an argument. It never holds an
+argument, a validated value or the target, which have seats of their
+own. Empty for a context built by hand, and in <code>bind_arguments</code>, which
+is handed no seeds; it trails the others, so neither changes.</p>
 
 
 
@@ -9542,9 +9681,24 @@ but its confirmation page still reads what the result declares.</p>
 <p><code>present</code> takes <strong>one</strong> value. A list result is presented item by item by
 dispatch's <code>present</code>, so a Presenter never has to guess whether it was
 handed a row or a collection of them.</p>
+<p><code>presented()</code> is what dispatch's <code>present</code> asks for: one value and the
+call's <a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>.
+By default it is <code>present(value)</code>, so a Presenter that reads nothing of
+the call overrides <code>present()</code> alone. One whose library renders under a
+context - the principal, a request a transport registered as a seed -
+overrides <code>presented()</code> and reads it there. A method of its own rather
+than a keyword on <code>present()</code>, so every Presenter written against
+<code>present(value)</code> is still one, and nothing reads a signature to decide
+whether to pass the context.</p>
 <p><strong>Sync-only.</strong> Presenting a row that reads a relation is a query, and the
 kernel cannot tell in advance whether the row was prefetched, so the async
-path runs every Presenter in the executor.</p>
+path runs every Presenter in the executor. An <code>async def</code> <code>present</code> or
+<code>presented</code> is refused when the spec is built.</p>
 
 
 
@@ -9614,6 +9768,109 @@ path runs every Presenter in the executor.</p>
     </div>
 
 </div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.presenter.Presenter.presented" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">presented</span>
+
+
+<a href="#django_service_specs.output.presenter.Presenter.presented" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">presented</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">PresentationContext</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>One value to JSON-like data, for the call <code>context</code> describes: <code>present(value)</code>.</p>
+<p><code>context</code> is <code>None</code> for a result dispatch did not build, such as
+a <code>DispatchResult</code> a transport constructed itself.</p>
+
+
+    </div>
+
+</div>
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.output.presentation_context.PresentationContext" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PresentationContext</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.output.presentation_context.PresentationContext" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>The principal a call ran for, the target it acted on, and its resolved seeds.</p>
+<p>The output-side counterpart of
+<a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>.
+Dispatch builds one per call and carries it on the
+<a class="autorefs autorefs-internal" title="DispatchResult
+
+
+  
+      dataclass
+  " href="#django_service_specs.dispatch.dispatch_result.DispatchResult"><code>DispatchResult</code></a>,
+and <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> hands it to
+<a class="autorefs autorefs-internal" title="presented" href="#django_service_specs.output.presenter.Presenter.presented"><code>Presenter.presented()</code></a>
+with every value it presents, so a library that renders under a context -
+a field defaulting to the current user, a link built from the request - can
+read the call it is rendering for.</p>
+<ul>
+<li><code>principal</code> is who the call ran for.</li>
+<li><code>target</code> is the row or the queryset a service spec resolved, <code>None</code>
+  for a create and for a selector spec, whose rows are the value itself.</li>
+<li><code>ambient</code> is the call's base pool, read-only at its top level:
+  <code>user</code>, <code>progress</code> and every registered seed, such as an HTTP
+  adapter's <code>request</code>. Its values are the call's own live objects, so a
+  presenter must not mutate them
+  (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context
+  holds both halves). Never an argument, a validated value or a
+  provider's key.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
 
 
 
@@ -9767,6 +10024,12 @@ carrying what a reader needs that names and types alone do not give:</p>
 <p><code>fields</code> and <code>items</code> describe a nested object and an array's element,
 and <code>items_nullable</code> whether a <code>null</code> may stand in for an element, as on
 <code>Parameter</code>.</p>
+<p><code>type</code> is one of the JSON types, or <code>any</code> for a value whose JSON type
+is open - a computed field, a JSON column - which a schema then describes
+with no <code>type</code> at all rather than as a string it may not be. As on
+<code>Parameter</code>, <code>any</code> lists no choices, since a list of values says what
+type they are, and an array of any element declares no <code>items</code> rather
+than <code>items="any"</code>.</p>
 
 
 
@@ -10824,7 +11087,9 @@ differences a description of what came back needs:</p>
 <li><strong>A field</strong> states its type, <code>[t, "null"]</code> when nullable, its
   <code>"format"</code> when it declares one, and <code>"title"</code> from its <code>label</code>
   when it has one. Adapters set a label only where the author wrote one,
-  so a title is never a field name restated in worse English.</li>
+  so a title is never a field name restated in worse English. An <code>any</code>
+  field states no type, nullable or not, since <code>{}</code> admits every value
+  and the null with it.</li>
 <li><strong>Nesting</strong> is as on input: <code>fields</code> make an object schema, an
   object with none is <code>{"type": "object"}</code>, and an array's <code>items</code> are
   <code>{"type": t}</code>, a nested item's object schema, or <code>{}</code> when undeclared.
@@ -11894,7 +12159,8 @@ every attribute is missing.</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">UNSET</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">extra_kwargs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -12017,6 +12283,29 @@ row, not-found unless the instance selector says <code>allow_none</code>; a crea
 takes <code>None</code> and refuses anything else. <strong>Dispatch trusts it</strong>: the
 target's <code>reads</code> are still checked as declared, and keeping them and
 <code>target</code> in agreement is the caller's. A selector spec refuses it.</p>
+<p><code>extra_kwargs</code> is the transport's per-call overlay for the spec's
+<code>kwargs</code> provider - what an HTTP view's per-request hook adds - merged
+<strong>beneath</strong> it, so the spec's own provider wins on a clash. It is treated
+as the provider's own return is: an <code>UNSET</code> entry is dropped, a key the
+provider is annotated to fill is the server's and the overlay's value for
+it is dropped too, so an overlay never fills a key the provider declined
+to, and a key naming a registered seed is refused. So, before step one,
+is a key naming a parameter the spec declares - a read, a Validator
+field, a target read, a <code>many</code> spec's list - unless its value is
+<code>UNSET</code> or the spec's typed <code>kwargs</code> provider fills it: the caller's
+value for a parameter is what steps two and three read, so an overlay
+standing in for it would run the call on a value they never saw. That is
+the only refusal of a key the spec could own, because it is static: it
+turns on the spec alone, never on what a request sent. The overlay is the
+lowest of three tiers: beneath the spec's provider, and beneath what the
+Validator computed or bound in step five, so a key among those is left
+to the Validator's value and the overlay's entry is dropped for that
+call - a Validator computing a key only from some requests makes it the
+overlay's on the others, and an error on none. It
+reaches a selector spec's own selector and a service spec's service,
+never a target or output selector. There is no overlay for the
+Validator's input: a transport merges such values into <code>arguments</code>,
+where the checks and the Validator read one value.</p>
 <p><code>kind</code> is <code>"list"</code> for a LIST selector spec, a service whose output
 selector is a LIST, or a <code>many</code> service with no output selector that
 returned something, and <code>"instance"</code> otherwise. Nothing is presented here;
@@ -12112,7 +12401,8 @@ was deleted.</p>
                 <p>a spec that declares no permissions, a parameter,
 a validated, bound or provided value named after a seed, a bound
 value named after a validated one, any value bound for a row of a
-<code>many</code> call, shaping declared on a
+<code>many</code> call, an <code>extra_kwargs</code> key naming a declared
+parameter, shaping declared on a
 selector that returned something other than a queryset, a
 condition on the row with no row to answer it for, or a
 precondition answering with a coroutine or an async generator.</p>
@@ -12150,7 +12440,8 @@ precondition answering with a coroutine or an async generator.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">UNSET</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">extra_kwargs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -12206,6 +12497,13 @@ standing in for the lookup inside the one hop, and checked there unless
 the grant says. A selector spec and a <code>many</code> spec
 refuse it before any hop, and a selector spec's row or list is checked
 whatever the grant says, as <code>dispatch</code>'s is.</p>
+<p><code>extra_kwargs</code> is <code>dispatch</code>'s overlay, copied on entry, merged
+beneath the spec's <code>kwargs</code> provider inside the hop, on every path, and
+refused there where it names a declared parameter; beneath the
+Validator's computed and bound values too, as in <code>dispatch</code>, on both
+hops (test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops).
+That refusal and the read of whether a check declares <code>arguments</code> both run off the loop
+(test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).</p>
 <p>A <code>many</code> spec checks, validates and writes its rows as <code>dispatch</code>
 does, every row inside the one hop.</p>
 
@@ -12225,7 +12523,8 @@ does, every row inside the one hop.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>both or neither of <code>principal</code> and <code>principal_id</code>.</p>
+                <p>both or neither of <code>principal</code> and <code>principal_id</code>;
+<code>target</code> where <code>dispatch</code> refuses it.</p>
               </div>
             </td>
           </tr>
@@ -12362,6 +12661,26 @@ mapping, or the instance a dataclass Validator builds.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.dispatch.dispatch_result.DispatchResult.context">context</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+   (django_service_specs.output.presentation_context.PresentationContext)" href="#django_service_specs.output.presentation_context.PresentationContext">PresentationContext</a> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The call a presenter renders for: its principal, its target
+and its resolved seeds, which <code>present</code> hands to
+<code>Presenter.presented()</code>. <code>None</code> on a result dispatch did not
+build, and on a not-found, which is never presented. It takes no
+part in equality: two results of one value are one result.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -12435,6 +12754,17 @@ is not a row and carries none. The answers are read off the rows as the
 selector's dispatch left them - annotations on a queryset's rows, or the
 answers it attached to rows a selector returned directly - so presenting
 them costs no query. A spec declaring none presents exactly as before.</p>
+<p><strong>The call's context.</strong> Each value is handed to the presenter's
+<code>presented()</code> with <code>result.context</code>, the
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>
+dispatch built for the call, or <code>None</code> on a result it did not build. A
+Presenter that reads nothing of the call is unchanged, since
+<code>presented()</code> is <code>present()</code> unless overridden.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -12968,9 +13298,9 @@ not validate.</p>
                 <p>from either step. The shape check's tree carries every
 problem at once, and a Validator is only reached with well-shaped
 arguments. A <code>many</code> spec is the one exception, row by row: the
-Validator runs on each row that passed the shape check, and a
-shape refusal and a Validator refusal on different rows come back
-as one tree keyed by row index.</p>
+Validator's <code>validated_many()</code> is handed every row that passed
+the shape check, and a shape refusal and a Validator refusal on
+different rows come back as one tree keyed by row index.</p>
               </div>
             </td>
           </tr>
@@ -14475,6 +14805,22 @@ reads, and of <code>None</code> where the call acts on no existing row (a create
 It is a separate method rather than <code>has_object_permission</code> handed a set
 or <code>None</code>, because a check written for a row would read an attribute off
 it and fail on neither; it allows by default for the same reason.</p>
+<p><strong>A method may ask for the call's arguments</strong> by declaring a keyword
+<code>arguments</code>: dispatch then hands it the call's shape-checked arguments,
+as a read-only mapping, at each of the three questions - a route's captured <code>pk</code>, a
+filter the caller sent - and a method that does not declare it is asked
+exactly as before. The base methods do not declare it, so every check
+written without it stays a valid override; a <code>many</code> call's rows are
+not among them, as they are validated after every check. Opt-in is by
+name, read layer by layer down the <code>__wrapped__</code> chain
+<code>functools.wraps</code> leaves: a layer spreading <code>**kwargs</code> passes the
+keyword to the one beneath, so it is handed only where a layer names it
+before any layer without <code>**kwargs</code>, and a forwarding decorator keeps a
+check opted in. <code>arguments</code> is <code>None</code> where a transport calls
+<code>authorize()</code> without them, and a check that needs them decides for
+itself what that means; reading it as an allow fails open. Only the mapping
+is read-only: its values are the call's own objects, the ones the run
+receives, so a check must not mutate them.</p>
 <p><code>message</code> is what <a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
 says when this check refuses; <code>None</code> keeps the generic wording.</p>
 <p><strong>Sync-only</strong>, like every concept: a check may query, so the async path runs
@@ -14755,7 +15101,8 @@ covers one declaration and not another that compares equal to it.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14782,6 +15129,12 @@ refusal raises
 with that check's own message, or the generic one when it declares none.
 An answer still to be awaited - a coroutine from a check that is not
 sync - raises <code>ImproperlyConfigured</code> rather than being read as a pass.</p>
+<p><code>arguments</code> is handed to each check's method that declares a keyword
+of that name, and to no other, so a check written before the keyword
+existed is asked as it always was. Dispatch passes the call's
+shape-checked arguments as a read-only mapping, whose values are the
+call's own and must not be mutated; <code>None</code> when the caller has none to
+hand.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -14845,7 +15198,8 @@ sync - raises <code>ImproperlyConfigured</code> rather than being read as a pass
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">scope</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14865,6 +15219,12 @@ checked as the spec it compiles to.</p>
 transport that already ran the target-level checks has claimed them.
 Dispatch honours it, as there, only for a service spec's target handed
 in as <code>target=</code>, so never on the list a selector spec reads.</p>
+<p><code>arguments</code> is handed to each check's method that declares a keyword
+of that name, and to no other, so a check written before the keyword
+existed is asked as it always was. Dispatch passes the call's
+shape-checked arguments as a read-only mapping, whose values are the
+call's own and must not be mutated; <code>None</code> when the caller has none to
+hand.</p>
 
 
     </div>
@@ -14885,7 +15245,8 @@ in as <code>target=</code>, so never on the list a selector spec reads.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14910,6 +15271,12 @@ configuration error: <a class="autorefs autorefs-internal" title="authorize" hre
 already refused an undeclared spec before any target could be resolved, so
 this function is never reached with one - iterating an empty tuple in its
 place is simpler than asserting an invariant this module cannot enforce.</p>
+<p><code>arguments</code> is handed to each check's method that declares a keyword
+of that name, and to no other, so a check written before the keyword
+existed is asked as it always was. Dispatch passes the call's
+shape-checked arguments as a read-only mapping, whose values are the
+call's own and must not be mutated; <code>None</code> when the caller has none to
+hand.</p>
 
 
     </div>

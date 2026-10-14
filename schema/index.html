@@ -1142,7 +1142,10 @@ contradict, and states everything the declaration knows.</p>
 <li><strong>An <code>any</code> is <code>{}</code> too</strong>, since every JSON value is one; its <code>default</code> and
   <code>description</code> are stated as on any other node. Like a file's, its node
   admits <code>null</code> whether or not it is <code>nullable</code>, and the shape check is what
-  refuses a <code>null</code> it does not allow.</li>
+  refuses a <code>null</code> it does not allow.
+  An output field may be <code>any</code> as well, for a value whose JSON type is open
+  (a computed field, a JSON column): its node is <code>{}</code>, with its <code>title</code> if it
+  has a label, rather than a string the value may not be.</li>
 <li><strong><code>required</code> lists what the shape check refuses when absent</strong>: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it

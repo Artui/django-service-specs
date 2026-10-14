@@ -1129,7 +1129,10 @@ same way, under its <code>many_argument</code>: <code>{"items": {2: {"title": [.
 message about a row itself under <code>non_field_errors</code> inside it, and the list's
 own refusal - absent, null, not a list - as <code>{"items": [...]}</code>. The shape
 check's refusals of some rows and the Validator's of others come back in the
-one tree.</p>
+one tree. A Validator that validates the list as one may refuse the list
+itself after its rows pass on their own - too many rows, two rows that
+clash - and that message sits under <code>non_field_errors</code> in the list's node,
+after the rows: <code>{"items": {2: {...}, "non_field_errors": [...]}}</code>.</p>
 <p>Every leaf is a list of strings, so the tree is JSON-serializable once the
 integer keys are written as strings, which is what <code>json.dumps</code> does. The
 messages are spelled as Django's own form fields spell them wherever one has
