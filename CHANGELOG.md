@@ -74,7 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `many` spec's list - unless its value is `UNSET` or the spec's typed
   `kwargs` provider fills it: the caller's value for a parameter is what the
   permission checks and the target selector see, so the value authorized is
-  the value run. It reaches a selector spec's selector and a service spec's
+  the value run. So, once the Validator has run and before anything after
+  it, is a key naming a value the Validator computed or a pool key it bound,
+  with the same two exemptions, since the overlay would replace what the
+  Validator computed. It reaches a selector spec's selector and a service spec's
   service, never a target or output selector. There is no overlay for the
   Validator's input; a transport merges such values into `arguments`.
 - **A permission check can read the call's arguments.** A

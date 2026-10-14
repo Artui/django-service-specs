@@ -3999,6 +3999,58 @@ class TestOverlays:
         dispatch(spec, principal=ada, arguments={}, extra_kwargs={"project_pk": 99})
         assert service.calls[0]["project_pk"] == 7
 
+    @pytest.mark.parametrize(
+        ("overlay", "named"),
+        [
+            # Returned by the Validator and declared by no parameter, so only
+            # the validated values' own names refuse it.
+            pytest.param({"slug": "view"}, "['slug']", id="a-validated-value"),
+            pytest.param({"form": "view"}, "['form']", id="a-bound-value"),
+        ],
+    )
+    def test_an_extra_kwargs_key_naming_a_value_the_validator_computed_is_refused(
+        self, ada: Any, overlay: Mapping[str, Any], named: str
+    ) -> None:
+        """The overlay merges above the Validator's values and its pool, so it
+        would replace what the Validator computed from the call's arguments.
+        Those keys are known once it has run: refused there, before the run."""
+        service = Record()
+        validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs=overlay)
+        assert str(refused.value) == (
+            f"extra_kwargs names the key(s) {named}, which the ServiceSpec's Validator "
+            "computed. An overlay may not stand in for a value the spec's own Validator "
+            "computes; rename the key."
+        )
+        assert service.calls == []
+
+    def test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused(self, ada: Any) -> None:
+        service = Record()
+        validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"title": "T"},
+            extra_kwargs={"slug": UNSET, "form": UNSET},
+        )
+        assert (service.calls[0]["slug"], service.calls[0]["form"]) == ("t", "bound")
+
+    def test_a_computed_value_the_spec_s_typed_provider_owns_is_not_refused(self, ada: Any) -> None:
+        """The overlay's value for a key the provider owns is dropped beneath
+        it, so it reaches nothing and the Validator's value stands."""
+
+        def owns() -> _OwnsScope:
+            return {}
+
+        service = Record()
+        validator = _Binds({}, returns={"title": "T", "scope": "validated"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator, kwargs=owns)
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"scope": "view"})
+        assert service.calls[0]["scope"] == "validated"
+
     def test_a_selector_spec_s_read_is_refused_as_a_service_spec_s_is(self, ada: Any) -> None:
         with pytest.raises(ImproperlyConfigured, match="which the SelectorSpec declares"):
             dispatch(retrieve(), principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})

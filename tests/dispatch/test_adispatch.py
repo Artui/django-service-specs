@@ -1261,6 +1261,41 @@ async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop
     assert not any(on for _, on in on_the_loop)
 
 
+class _Computes(Titled):
+    """Returns a value no parameter declares, beside the title."""
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return {**super().validate(arguments, context), "slug": "computed"}
+
+
+@pytest.mark.parametrize("path", ["_dispatch", "_prepare"])
+async def test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_before_the_run(
+    path: str, ada: Any, hops: list[str]
+) -> None:
+    """Refused inside the one hop that validates, so the run is never reached:
+    a sync service's ``dispatch``, or a non-atomic async one's prelude."""
+    ran: list[Mapping[str, Any]] = []
+
+    def sync_service(**pool: Any) -> None:
+        ran.append(pool)
+
+    async def async_service(**pool: Any) -> None:
+        ran.append(pool)
+
+    spec = (
+        ServiceSpec(service=sync_service, permissions=OPEN, validator=_Computes())
+        if path == "_dispatch"
+        else ServiceSpec(
+            service=async_service, atomic=False, permissions=OPEN, validator=_Computes()
+        )
+    )
+    with pytest.raises(ImproperlyConfigured, match=r"extra_kwargs names the key\(s\) \['slug'\]"):
+        await adispatch(
+            spec, principal=ada, arguments={"title": "t"}, extra_kwargs={"slug": "view"}
+        )
+    assert (hops, ran) == ([path], [])
+
+
 async def test_there_is_no_input_data_overlay(ada: Any, hops: list[str]) -> None:
     with pytest.raises(TypeError, match="unexpected keyword argument 'extra_input_data'"):
         await adispatch(EDIT, principal=ada, arguments={}, extra_input_data={"x": 1})

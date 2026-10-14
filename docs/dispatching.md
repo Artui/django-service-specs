@@ -118,6 +118,15 @@ provider fills, whose caller's value is dropped before any check and whose
 overlay value is dropped beneath the provider. To set such a value per call,
 fill it from that provider.
 
+**So is a key naming a value the spec's Validator computed**: a key of the
+`values` its `validated()` returned, or of the `pool` it bound. The overlay
+merges above both, so it would replace what the Validator computed from the
+call's arguments with a value the Validator never saw. Those names are known
+only once the Validator has run, so this refusal comes after step five rather
+than before step one - still before the affordances, the preconditions and the
+run, so the service never runs - and in `adispatch` inside the same hop. The same two keys stand: an `UNSET` entry, and
+one the spec's typed `kwargs` provider fills.
+
 `extra_kwargs` reaches a read's own selector and a write's service, never a
 target or output selector.
 

@@ -176,7 +176,11 @@ def dispatch(
     field, a target read, a ``many`` spec's list - unless its value is
     ``UNSET`` or the spec's typed ``kwargs`` provider fills it: the caller's
     value for a parameter is what steps two and three read, so an overlay
-    standing in for it would run the call on a value they never saw. It
+    standing in for it would run the call on a value they never saw. So too,
+    once step five has run and before anything after it, is a key naming a
+    value the spec's Validator computed or a pool key it bound, with the same
+    two exemptions: the overlay merges above them, so it would replace what
+    the Validator computed from the call's arguments. It
     reaches a selector spec's own selector and a service spec's service,
     never a target or output selector. There is no overlay for the
     Validator's input: a transport merges such values into ``arguments``,
@@ -208,7 +212,8 @@ def dispatch(
         ImproperlyConfigured: a spec that declares no permissions, a parameter,
             a validated, bound or provided value named after a seed, a bound
             value named after a validated one, any value bound for a row of a
-            ``many`` call, shaping declared on a
+            ``many`` call, an ``extra_kwargs`` key naming a declared
+            parameter or a value the Validator computed or bound, shaping declared on a
             selector that returned something other than a queryset, a
             condition on the row with no row to answer it for, or a
             precondition answering with a coroutine or an async generator.
