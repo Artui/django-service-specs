@@ -53,8 +53,7 @@ Non-negotiable. They keep the package navigable.
 3. **Non-exported helpers shared across files** go in that package's `utils.py`.
 4. **Top-level imports only.** Lazy or function-local imports are forbidden
    unless the import targets a declared optional dependency gated behind an
-   opt-in, or a model module that cannot load while the app registry populates.
-   Document the reason inline. A circular import is never the reason (rule 9).
+   opt-in. Document the reason inline. A circular import is never the reason (rule 9).
 5. **Full type annotations on every function and method signature.** `Any` is
    allowed only at the Django boundary where the type genuinely is `Any`, and
    the spec handed to a `PermissionCheck`, which the package that declares

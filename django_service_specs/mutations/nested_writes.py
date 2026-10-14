@@ -98,10 +98,10 @@ _RowSpec = (
 def _content_type_for(instance: Model) -> Any:
     """The ``ContentType`` row for ``instance``'s model.
 
-    The import is function-local because this module is imported while
-    ``apps.populate()`` runs, where an eager model import raises
-    ``AppRegistryNotReady``; the ``is_installed`` guard turns the absent-app
-    case into a message about ``contenttypes``.
+    The model is read from the app registry rather than imported, because this
+    module is imported while ``apps.populate()`` runs, where an eager model
+    import raises ``AppRegistryNotReady``; the ``is_installed`` guard turns the
+    absent-app case into a message about ``contenttypes``.
     """
     if not apps.is_installed("django.contrib.contenttypes"):
         raise ImproperlyConfigured(
@@ -110,9 +110,8 @@ def _content_type_for(instance: Model) -> Any:
             "there is no content type to link it to. Add the app, or link the rows with "
             "a plain foreign key and declare the relation as a ChildSpec."
         )
-    from django.contrib.contenttypes.models import ContentType
-
-    return ContentType.objects.get_for_model(instance)
+    content_type = apps.get_model("contenttypes", "ContentType")
+    return content_type.objects.get_for_model(instance)
 
 
 def _link_fields(spec: _OwnedRowSpec) -> tuple[str, ...]:

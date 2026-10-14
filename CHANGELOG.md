@@ -17,12 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call, the row create and update those call back and the delete cascade over
   owned relations now live in one private module,
   `django_service_specs.mutations.nested_writes`, and the four entry points
-  are thin callers of it. No public import path, signature or behaviour
-  changed. Private helpers moved from `mutations/utils.py` to that module, and
-  five that both modules read lost their leading underscore. A nested row is
-  now written through the module's own create and update rather than through
-  the public functions, so code that wraps or patches `create_from_input` and
-  its siblings sees the top-level call only. The test of the import graph now
+  are thin callers of it. No public import path or signature changed, and no
+  call returns or raises differently. Private helpers moved from `mutations/utils.py` to that module, and
+  five that both modules read lost their leading underscore. A nested row no
+  longer looks up the entry point on its module at call time, so a patch of
+  `django_service_specs.mutations.create_from_input.create_from_input` or a
+  sibling now sees the top-level call only. The test of the import graph now
   allows no ring at all.
 
 ## [0.7.0] — 2026-10-14
