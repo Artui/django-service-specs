@@ -184,7 +184,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
 ::: django_service_specs.mutations.related_object_change.RelatedObjectChange
-::: django_service_specs.mutations.relation_outcome.RelationOutcome
 
 ## Relations
 
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.relation_mode.RelationMode
 ::: django_service_specs.types.relation_orphan.RelationOrphan
 ::: django_service_specs.types.relation_phase.RelationPhase
+::: django_service_specs.types.relation_outcome.RelationOutcome

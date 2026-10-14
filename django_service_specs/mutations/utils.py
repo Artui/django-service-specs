@@ -20,7 +20,6 @@ from django.utils.translation import gettext
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
-from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
@@ -38,6 +37,7 @@ from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.types.relation_orphan import RelationOrphan
+from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.unset import UNSET
 

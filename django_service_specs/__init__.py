@@ -67,7 +67,6 @@ from django_service_specs.mutations.delete_relations import delete_relations
 from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.register_row_error import register_row_error
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
-from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
@@ -150,6 +149,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
 from django_service_specs.types.relation_mode import RelationMode
 from django_service_specs.types.relation_orphan import RelationOrphan
+from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unguarded_reason import UnguardedReason

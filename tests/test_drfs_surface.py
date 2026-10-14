@@ -212,7 +212,7 @@ SURFACE: dict[str, Pin] = {
         "mutations.related_object_change", signature="relation, outcome=, pk="
     ),
     "RelationOutcome": _enum(
-        "mutations.relation_outcome",
+        "types.relation_outcome",
         {
             "UNTOUCHED": "untouched",
             "CREATED": "created",

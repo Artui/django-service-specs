@@ -219,7 +219,7 @@ Every helper returns a
   [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
   per one-row relation - a forward relation or a reverse one-to-one - holding
   one
-  [`RelationOutcome`][django_service_specs.mutations.relation_outcome.RelationOutcome]
+  [`RelationOutcome`][django_service_specs.types.relation_outcome.RelationOutcome]
   and the `pk` it is about. `get_relation_change(name)` finds one.
 
 A `ChangeResult` is falsy when nothing changed.
