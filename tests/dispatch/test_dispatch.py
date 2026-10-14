@@ -4466,6 +4466,20 @@ class TestArgumentsChannel:
         dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
         assert check.questions()[0] == ("has_permission", {})
 
+    def test_a_callable_with_no_signature_is_asked_as_before(self, ada: Any) -> None:
+        """A builtin behind a partial has no signature to read; it never
+        opted in, so it is asked as a check that did not."""
+
+        class Builtin(PermissionCheck):
+            has_permission = staticmethod(functools.partial(max, key=id))
+
+        result = dispatch(
+            ServiceSpec(service=lambda: "ran", permissions=(Builtin(),)),
+            principal=ada,
+            arguments={},
+        )
+        assert result.value == "ran"
+
     def test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing(
         self, ada: Any
     ) -> None:

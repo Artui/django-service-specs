@@ -165,6 +165,7 @@ def _names_arguments(asked: Callable[..., Any]) -> bool:
       and the answer is no (test_a_method_taking_only_keywords_is_handed_nothing,
       test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing).
 
+    A layer with no signature to read ends it with no too (``_own_parameters``).
     A layer met twice ends the walk with no, since a chain that loops names
     nothing new (test_a_wrapped_chain_that_loops_is_handed_nothing; without
     that conjunct the test never finishes). The other conjunct stops the walk
@@ -175,7 +176,9 @@ def _names_arguments(asked: Callable[..., Any]) -> bool:
     walked: list[Any] = []
     while layer is not None and not any(layer is seen for seen in walked):
         walked.append(layer)
-        parameters = inspect.signature(layer, follow_wrapped=False).parameters
+        parameters = _own_parameters(layer)
+        if parameters is None:
+            return False
         if _reached_by_keyword(parameters.get("arguments")):
             return True
         if not any(
@@ -184,6 +187,23 @@ def _names_arguments(asked: Callable[..., Any]) -> bool:
             return False
         layer = getattr(layer, "__wrapped__", None)
     return False
+
+
+def _own_parameters(layer: Any) -> Mapping[str, inspect.Parameter] | None:
+    """``layer``'s own parameters, or ``None`` where it has no signature to read.
+
+    A builtin, or a partial over one, has none (``ValueError``:
+    test_a_callable_with_no_signature_is_handed_nothing,
+    test_a_callable_with_no_signature_is_asked_as_before), nor has a
+    ``__wrapped__`` that cannot be called (``TypeError``:
+    test_a_wrapped_layer_that_is_not_callable_is_handed_nothing). Such a
+    layer never declared ``arguments``, so it is read as not having opted
+    in, and a check that never did is asked as it always was.
+    """
+    try:
+        return inspect.signature(layer, follow_wrapped=False).parameters
+    except (ValueError, TypeError):
+        return None
 
 
 def _reached_by_keyword(parameter: inspect.Parameter | None) -> bool:

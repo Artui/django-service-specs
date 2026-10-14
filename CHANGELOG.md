@@ -97,7 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `functools.wraps` chain is read a layer at a time: a layer spreading
   `**kwargs` passes the keyword on, so it is handed only where a layer names
   it before any layer without `**kwargs`, and a forwarding decorator keeps an
-  opted-in check opted in. A check
+  opted-in check opted in. A callable with no signature to read, such as a
+  builtin behind `functools.partial`, is asked as one that never opted in. A check
   that needs the arguments decides for itself what `None` - a transport
   calling `authorize()` without them - means. A `many` call's rows are not among them,
   since they are validated after every check. `dispatch`, `adispatch`,

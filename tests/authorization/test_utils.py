@@ -206,3 +206,24 @@ def test_a_forwarding_wrapper_over_a_positional_only_arguments_is_handed_nothing
     check = _Shapes()
     cast(Any, check).positional_only = _forwarding(_Shapes.positional_only)
     assert asked_with(check, "positional_only", {"pk": 1}) == {}
+
+
+def test_a_callable_with_no_signature_is_handed_nothing() -> None:
+    """``inspect.signature`` raises ``ValueError`` for a builtin method; it
+    never opted in, so it is read as not having done so."""
+    check = _Shapes()
+    cast(Any, check).undeclared = "abc".startswith
+    assert asked_with(check, "undeclared", {"pk": 1}) == {}
+
+
+def test_a_wrapped_layer_that_is_not_callable_is_handed_nothing() -> None:
+    """``inspect.signature`` raises ``TypeError`` for a ``__wrapped__`` that
+    cannot be called; the walk stops there, not opted in."""
+
+    def forwarded(*args: Any, **kwargs: Any) -> bool:
+        return True
+
+    cast(Any, forwarded).__wrapped__ = 5
+    check = _Shapes()
+    cast(Any, check).undeclared = forwarded
+    assert asked_with(check, "undeclared", {"pk": 1}) == {}

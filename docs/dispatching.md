@@ -247,6 +247,8 @@ neither would refuse it. So the keyword is handed only where a layer names it
 before any layer without `**kwargs`: an ordinary forwarding decorator, or
 several, keeps an opted-in check opted in, while a narrower layer anywhere in
 the chain, or `**kwargs` with nothing beneath that asked, is handed nothing.
+A callable with no signature to read, such as a builtin behind
+`functools.partial`, is asked as a check that never opted in.
 `arguments` is `None` where a transport calls `authorize()` without
 `arguments=`, and a check that needs them decides for itself what that means:
 the example above refuses. A [`many`](declaring.md#many-rows-in-one-call)
