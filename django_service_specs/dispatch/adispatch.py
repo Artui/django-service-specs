@@ -8,10 +8,10 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
     Prepared,

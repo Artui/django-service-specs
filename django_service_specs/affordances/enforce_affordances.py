@@ -37,7 +37,7 @@ def enforce_affordances(
     receive and the pool seeds' ``reserved`` set. A transport that runs a
     service **without** them - a chain that owns the transaction and hands each
     step its own pool, say - must call it too, exactly as it calls
-    [`authorize`][django_service_specs.authorization.authorize.authorize], or a
+    [`authorize`][django_service_specs.dispatch.authorize.authorize], or a
     condition the direct path refuses is skipped on that one. Neither entry
     point calls it for a selector spec, whose ``affordances`` are answers about
     each row rather than a refusal of the read.

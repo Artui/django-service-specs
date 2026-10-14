@@ -2,17 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
-
-if TYPE_CHECKING:
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
-    from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize_scope(
@@ -21,7 +19,7 @@ def authorize_scope(
     """Run ``spec``'s scope-level permission checks against ``scope``.
 
     The counterpart of
-    [`authorize_target`][django_service_specs.authorization.authorize_target.authorize_target]
+    [`authorize_target`][django_service_specs.dispatch.authorize_target.authorize_target]
     for a call that resolves no single row: ``scope`` is the resolved set of a
     bulk or collection call, or ``None`` for a create. Every check's
     ``has_scope_permission`` must pass, in order, and the first refusal raises

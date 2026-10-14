@@ -6,8 +6,8 @@ from collections.abc import Callable
 
 import pytest
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind

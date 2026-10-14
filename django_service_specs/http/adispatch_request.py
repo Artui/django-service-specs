@@ -8,9 +8,9 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.http import HttpRequest, HttpResponse
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.request_principal import request_principal

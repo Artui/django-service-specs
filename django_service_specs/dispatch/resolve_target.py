@@ -7,8 +7,8 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import open_call, walk_target
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds

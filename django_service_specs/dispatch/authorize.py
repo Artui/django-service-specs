@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
-
-if TYPE_CHECKING:
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
-    from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize(
@@ -29,7 +27,7 @@ def authorize(
     through its own machinery - an HTTP view running its framework's
     permission classes - passes the ``Grant`` it produced instead of paying for
     a second evaluation; the grant is honoured only if it
-    [`covers`][django_service_specs.authorization.grant.Grant.covers] this exact
+    [`covers`][django_service_specs.dispatch.grant.Grant.covers] this exact
     spec and principal, by identity, so a grant carried over from another
     operation or another user is refused rather than trusted.
 

@@ -108,15 +108,7 @@ SURFACE: dict[str, Pin] = {
         "affordances.aunmet_operation_affordance", "spec, pool, *, reserved="
     ),
     # --- authorization ------------------------------------------------------------------------
-    "authorize": _fn("authorization.authorize", "spec, principal, *, grant="),
-    "authorize_scope": _fn("authorization.authorize_scope", "spec, principal, scope, *, grant"),
-    "authorize_target": _fn("authorization.authorize_target", "spec, principal, target, *, grant"),
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
-    "Grant": Pin(
-        "authorization.grant",
-        signature="spec, principal, target_checked=",
-        methods={"covers": "(spec, principal)"},
-    ),
     # Subclassed by the adapter's permission check over DRF permission classes.
     "PermissionCheck": Pin(
         "authorization.permission_check",
@@ -166,6 +158,14 @@ SURFACE: dict[str, Pin] = {
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
     "DispatchResult": Pin(
         "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
+    ),
+    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant="),
+    "authorize_scope": _fn("dispatch.authorize_scope", "spec, principal, scope, *, grant"),
+    "authorize_target": _fn("dispatch.authorize_target", "spec, principal, target, *, grant"),
+    "Grant": Pin(
+        "dispatch.grant",
+        signature="spec, principal, target_checked=",
+        methods={"covers": "(spec, principal)"},
     ),
     # --- adapters -----------------------------------------------------------------------------
     "filter_set_parameters": _fn("adapters.filters.filter_set_parameters", "filter_set"),

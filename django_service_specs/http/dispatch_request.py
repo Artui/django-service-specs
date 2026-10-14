@@ -7,8 +7,8 @@ from typing import Any
 
 from django.http import HttpRequest, HttpResponse
 
-from django_service_specs.authorization.grant import Grant
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.present import present
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments

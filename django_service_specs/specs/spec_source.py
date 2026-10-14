@@ -37,7 +37,7 @@ class SpecSource(Protocol):
     first read is not seen. Two first reads that overlap - concurrent, or a
     compile that reads its own object - may each compile, and both answer the
     spec published first. One compiled spec per object is also what lets a
-    [`Grant`][django_service_specs.authorization.grant.Grant], bound to a spec
+    [`Grant`][django_service_specs.dispatch.grant.Grant], bound to a spec
     by identity, carry from ``resolve_target`` to ``dispatch`` when both are
     handed the same object.
     """

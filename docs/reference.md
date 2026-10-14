@@ -130,10 +130,10 @@ Installed with the `pydantic` extra and imported from
 
 ::: django_service_specs.authorization.permission_check.PermissionCheck
 ::: django_service_specs.authorization.unrestricted.Unrestricted
-::: django_service_specs.authorization.grant.Grant
-::: django_service_specs.authorization.authorize.authorize
-::: django_service_specs.authorization.authorize_scope.authorize_scope
-::: django_service_specs.authorization.authorize_target.authorize_target
+::: django_service_specs.dispatch.grant.Grant
+::: django_service_specs.dispatch.authorize.authorize
+::: django_service_specs.dispatch.authorize_scope.authorize_scope
+::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.not_permitted.NotPermitted
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
