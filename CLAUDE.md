@@ -77,7 +77,10 @@ Non-negotiable. They keep the package navigable.
    `Affordance` sits there for the same reason, with the helpers its
    construction reads in `types/utils.py`: `ServiceSpec` imports it, and
    `affordances/`, which answers the conditions at the call and before it,
-   imports `specs/`.
+   imports `specs/`. `AffordanceDeclarer` sits there too: `ServiceSpec`
+   inherits it, and `SelectorSpec`, which `service_spec` imports, names it to
+   type and refuse its `affordances` values without importing `service_spec`
+   back.
 
 ## Naming the concepts
 

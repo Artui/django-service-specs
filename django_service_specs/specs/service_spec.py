@@ -28,6 +28,7 @@ from django_service_specs.specs.utils import (
     check_reserved,
 )
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import is_row_condition
 from django_service_specs.validation.validator import Validator
@@ -43,7 +44,7 @@ _VALIDATOR_METHODS = ("validate", "validated")
 
 
 @dataclass(frozen=True, kw_only=True)
-class ServiceSpec:
+class ServiceSpec(AffordanceDeclarer):
     """A write: what it takes, who may run it, what it acts on, what it returns.
 
     Dispatch runs it in a fixed order, once a deactivated principal has been
