@@ -510,6 +510,43 @@ class TestModelChoices:
         assert list(validator.validate({"rows": [_BEYOND_THE_COLUMN]}, CONTEXT)["rows"]) == [book]
 
     @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    @pytest.mark.parametrize("many", [False, True], ids=["one", "a-list"])
+    def test_a_key_spelled_as_digits_past_the_column_s_range_is_no_choice(self, many: bool) -> None:
+        # A caller handing ``validate`` the string, where dispatch's shape
+        # check hands on an ``int``: the field's lookup reads the digits as
+        # the integer they spell, and handed that to the driver.
+        key = str(_BEYOND_THE_COLUMN)
+        if many:
+            form_class = _form("Pick", rows=_many_books())
+            arguments: dict[str, Any] = {"rows": [key]}
+            message = f"Select a valid choice. {key} is not one of the available choices."
+        else:
+            form_class = _form("Pick", rows=forms.ModelChoiceField(queryset=Book.objects.all()))
+            arguments = {"rows": key}
+            message = "Select a valid choice. That choice is not one of the available choices."
+        assert coded(_refusal(form_class, arguments)) == {"rows": [(message, "invalid_choice")]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_a_key_that_spells_no_number_is_the_field_s(self) -> None:
+        # The column's lookup refuses ``"abc"`` with a ValueError, which the
+        # field catches and answers in its words.
+        form_class = _form("Pick", rows=_many_books())
+        assert coded(_refusal(form_class, {"rows": ["abc"]})) == {
+            "rows": [("\u201cabc\u201d is not a valid value.", "invalid_pk_value")]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_an_optional_key_sent_as_null_is_the_field_s(self) -> None:
+        # ``None`` names no number, so no range is compared with it.
+        field = forms.ModelChoiceField(queryset=Book.objects.all(), required=False)
+        assert FormValidator(_form("Pick", row=field)).validate({"row": None}, CONTEXT) == {
+            "row": None
+        }
+
+    @pytest.mark.django_db
     def test_a_key_sent_as_a_string_is_left_to_the_field(self) -> None:
         # Dispatch's shape check hands an integer key on as an ``int``; a
         # caller handing ``validate`` the string is answered by the field.

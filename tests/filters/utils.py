@@ -84,6 +84,27 @@ class NoteKeyFilters(django_filters.FilterSet):
         return queryset if value >= 2**63 else queryset.filter(pk=value)
 
 
+class UserKeyFilters(django_filters.FilterSet):
+    """Filters on a user's keys reached through a many-to-many and a reverse foreign key."""
+
+    group_key = django_filters.NumberFilter(field_name="groups")
+    note_key = django_filters.NumberFilter(field_name="notes")
+    note_keys = NumberInFilter(field_name="notes", lookup_expr="in")
+    group = django_filters.ModelChoiceFilter(field_name="groups", queryset=Group.objects.all())
+    groups = django_filters.ModelMultipleChoiceFilter(
+        field_name="groups", queryset=Group.objects.all()
+    )
+
+
+class EditionNumberFilters(django_filters.FilterSet):
+    """Number filters on a column whose type holds no negative number."""
+
+    number = django_filters.NumberFilter()
+    number_min = django_filters.NumberFilter(field_name="number", lookup_expr="gte")
+    numbers = NumberInFilter(field_name="number", lookup_expr="in")
+    number_range = django_filters.RangeFilter(field_name="number")
+
+
 class TitleFilter(django_filters.FilterSet):
     """One filter, for the tests about applying rather than reading."""
 

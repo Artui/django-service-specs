@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from unittest import mock
 
 import pytest
@@ -70,6 +71,14 @@ def test_an_unrelated_failure_is_not_read_as_a_missing_principal() -> None:
         pytest.raises(RuntimeError, match="down"),
     ):
         resolve_principal(1)
+
+
+@pytest.mark.parametrize("identifier", [math.inf, -math.inf], ids=["above", "below"])
+def test_an_infinite_identifier_is_no_principal(identifier: float) -> None:
+    # The integer key's lookup reads it through ``int``, which raised
+    # OverflowError for an infinity: past every column, so no row.
+    with pytest.raises(PrincipalUnavailable, match="No principal with identifier"):
+        resolve_principal(identifier)
 
 
 @pytest.mark.django_db

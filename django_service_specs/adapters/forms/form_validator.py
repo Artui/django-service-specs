@@ -20,7 +20,11 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
-from django_service_specs.relations.utils import integer_column_range, integer_range_refusal
+from django_service_specs.relations.utils import (
+    choices_past_their_columns,
+    integer_column_range,
+    integer_range_refusal,
+)
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -353,7 +357,7 @@ class FormValidator(Validator):
                 del form.fields[name]
         # Taken off the form and refused in its words, beside the rest: the
         # field itself would hand the key to the driver.
-        beyond = {**_keys_beyond_the_column(form), **_values_beyond_the_column(form)}
+        beyond = {**choices_past_their_columns(form), **_values_beyond_the_column(form)}
         for name in beyond:
             del form.fields[name]
         # One branch to coverage, so each condition is held by its own test:
@@ -668,54 +672,6 @@ def _key_field(queryset: models.QuerySet[Any], to_field_name: str | None) -> Any
     return key
 
 
-def _keys_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationError]]:
-    """Each model choice field sent a key its integer column cannot hold, and its refusal.
-
-    The range is the database's own for the column, as Django reads it to
-    answer an exact lookup past it with no rows, from the connection the
-    field's queryset reads. A key no row can hold is refused as Django
-    refuses a key no row holds: ``invalid_choice``, in the field's own words.
-    Only an ``int`` is read, which is what the shape check hands on for an
-    integer key; anything else is the field's.
-    """
-    beyond: dict[str, list[ValidationError]] = {}
-    for name, field in form.fields.items():
-        # One branch to coverage, so each condition is held by its own test:
-        # test_a_list_naming_a_key_past_the_column_s_range_is_no_choice (the
-        # field: its ``title`` has no rows to match) and
-        # test_flat_strings_reach_the_form_through_coerce_flat_and_the_shape_check
-        # (the key sent: an optional choice field may be absent).
-        if not isinstance(field, forms.ModelChoiceField) or name not in form.data:
-            continue
-        # Never ``None``: the Validator refused a field with no queryset
-        # when it was built.
-        queryset: Any = field.queryset
-        key = _key_field(queryset, field.to_field_name)
-        bounds = integer_column_range(key, queryset.db)
-        # test_a_key_past_an_integer_range_on_a_text_column_is_matched fails
-        # without this: a text column holds any integer's digits.
-        if bounds is None:
-            continue
-        low, high = bounds
-        sent = form.data[name]
-        values = sent if isinstance(sent, list | tuple) else [sent]
-        # One branch to coverage, so each condition is held by its own test:
-        # test_a_key_sent_as_a_string_is_left_to_the_field (the ``int``:
-        # without it, a string is compared with the range and raises) and
-        # test_the_keys_at_either_end_of_the_column_s_range_are_matched (the
-        # range, at both of its ends).
-        past = [value for value in values if isinstance(value, int) and not low <= value <= high]
-        if past:
-            beyond[name] = [
-                ValidationError(
-                    field.error_messages["invalid_choice"],
-                    code="invalid_choice",
-                    params={"value": past[0]},
-                )
-            ]
-    return beyond
-
-
 def _values_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationError]]:
     """Each ``ModelForm`` field whose integer its model's integer column cannot hold, and its refusal.
 
@@ -731,7 +687,7 @@ def _values_beyond_the_column(form: forms.BaseForm) -> dict[str, list[Validation
     answer first, as they do where Django validates the model, and the model
     is then never asked about that field. A ``clean_<field>()`` method is the
     exception: it is not run on a value past the column's range, where
-    Django 5.0 or later, refusing the value itself, ran it first. A model choice field is ``_keys_beyond_the_column``'s, since its
+    Django 5.0 or later, refusing the value itself, ran it first. A model choice field is ``choices_past_their_columns``'s, since its
     column is a foreign key, which holds the key of another row.
     """
     beyond: dict[str, list[ValidationError]] = {}

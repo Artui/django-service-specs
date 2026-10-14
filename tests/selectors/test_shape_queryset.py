@@ -27,10 +27,17 @@ from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.adapter_app.models import Author as BookAuthor
-from tests.adapter_app.models import Book
+from tests.adapter_app.models import Book, Edition
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
-from tests.filters.utils import NoteFilters, NoteKeyFilters, RequestScopedFilter, TitleFilter
+from tests.filters.utils import (
+    EditionNumberFilters,
+    NoteFilters,
+    NoteKeyFilters,
+    RequestScopedFilter,
+    TitleFilter,
+    UserKeyFilters,
+)
 from tests.parameters.utils import coded
 
 
@@ -658,3 +665,225 @@ async def test_adispatch_refuses_a_filter_value_past_its_column(
         result = await adispatch(spec, principal=ada, arguments=arguments)
         await sync_to_async(list)(result.value)
     assert coded(caught.value.detail) == detail
+
+
+def _users_filtered(filter_set: Any) -> SelectorSpec:
+    return SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=User.objects.all,
+        permissions=[Unrestricted()],
+        filter_set=filter_set,
+    )
+
+
+@pytest.mark.django_db
+class TestAKeyReachedThroughAnyRelation:
+    """A many-to-many and a reverse foreign key compare the related row's key.
+
+    So the number is held to that key's column, as a foreign key's is: past
+    it, the driver raises ``OverflowError`` on every Django version.
+    """
+
+    @pytest.mark.parametrize(
+        ("arguments", "detail"),
+        [
+            pytest.param({"group_key": _PAST_TOP}, {"group_key": [_ABOVE]}, id="many-to-many"),
+            pytest.param({"note_key": _PAST_BOTTOM}, {"note_key": [_BELOW]}, id="reverse"),
+            pytest.param(
+                {"note_keys": ["1", _PAST_TOP]}, {"note_keys": {1: [_ABOVE]}}, id="reverse-in"
+            ),
+        ],
+    )
+    def test_it_is_refused_at_the_argument_that_sent_it(
+        self, arguments: dict[str, Any], detail: dict[str, Any]
+    ) -> None:
+        ada = make_user("ada")
+        with pytest.raises(InvalidArguments) as caught:
+            list(
+                dispatch(_users_filtered(UserKeyFilters), principal=ada, arguments=arguments).value
+            )
+        assert coded(caught.value.detail) == detail
+
+    def test_a_key_inside_the_range_is_matched_through_either(self) -> None:
+        ada = _three_notes()
+        group = Group.objects.create(name="staff")
+        ada.groups.add(group)
+        make_user("bob")
+        note = Note.objects.filter(owner=ada).first()
+        spec = _users_filtered(UserKeyFilters)
+        for arguments in ({"group_key": str(group.pk)}, {"note_key": str(note.pk)}):
+            rows = dispatch(spec, principal=ada, arguments=arguments).value
+            assert [user.username for user in rows] == ["ada"]
+
+
+_NO_CHOICE = (
+    "Select a valid choice. That choice is not one of the available choices.",
+    "invalid_choice",
+)
+
+
+def _no_choice_in_list(key: str) -> tuple[str, str]:
+    return (f"Select a valid choice. {key} is not one of the available choices.", "invalid_choice")
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("unstated_ranges")
+class TestARelatedRowsKeyPastItsColumn:
+    """A model choice filter's key past the range of the column its rows are matched on.
+
+    Its form field matches the key with a query before the FilterSet has
+    cleaned anything, which handed the key to the driver: ``OverflowError``
+    for a list on every Django version, and for one key where the backend
+    states no range, as Django 4.2's SQLite does. No row holds such a key, so
+    it is no choice, refused in the form field's own words.
+    """
+
+    @pytest.mark.parametrize(
+        ("arguments", "detail"),
+        [
+            pytest.param({"group": _PAST_TOP}, {"group": [_NO_CHOICE]}, id="one"),
+            pytest.param(
+                {"groups": ["1", _PAST_BOTTOM]},
+                {"groups": [_no_choice_in_list(_PAST_BOTTOM)]},
+                id="a-list",
+            ),
+        ],
+    )
+    def test_it_is_no_choice(self, arguments: dict[str, Any], detail: dict[str, Any]) -> None:
+        ada = make_user("ada")
+        with pytest.raises(InvalidArguments) as caught:
+            list(
+                dispatch(_users_filtered(UserKeyFilters), principal=ada, arguments=arguments).value
+            )
+        assert coded(caught.value.detail) == detail
+
+    def test_it_is_refused_beside_the_filterset_s_own_refusals(self) -> None:
+        ada = make_user("ada")
+        arguments = {"groups": [_PAST_TOP], "note_key": "x"}
+        with pytest.raises(InvalidArguments) as caught:
+            shape_queryset(
+                User.objects.all(), _users_filtered(UserKeyFilters), arguments, source_label="x"
+            )
+        assert coded(caught.value.detail) == {
+            "groups": [_no_choice_in_list(_PAST_TOP)],
+            "note_key": [("Enter a number.", "invalid")],
+        }
+        assert ada.pk
+
+    def test_a_key_inside_the_range_is_matched(self) -> None:
+        ada = make_user("ada")
+        group = Group.objects.create(name="staff")
+        ada.groups.add(group)
+        make_user("bob")
+        spec = _users_filtered(UserKeyFilters)
+        for arguments in ({"group": str(group.pk)}, {"groups": [str(group.pk)]}):
+            rows = dispatch(spec, principal=ada, arguments=arguments).value
+            assert [user.username for user in rows] == ["ada"]
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.usefixtures("unstated_ranges")
+@pytest.mark.parametrize(
+    ("arguments", "detail"),
+    [
+        pytest.param({"group": _PAST_TOP}, {"group": [_NO_CHOICE]}, id="one"),
+        pytest.param(
+            {"groups": [_PAST_TOP]}, {"groups": [_no_choice_in_list(_PAST_TOP)]}, id="a-list"
+        ),
+    ],
+)
+async def test_adispatch_refuses_a_related_row_s_key_past_its_column(
+    arguments: dict[str, Any], detail: dict[str, Any]
+) -> None:
+    async def users() -> QuerySet[User]:
+        return User.objects.all()
+
+    ada = await sync_to_async(make_user)("ada")
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=users,
+        permissions=[Unrestricted()],
+        filter_set=UserKeyFilters,
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        result = await adispatch(spec, principal=ada, arguments=arguments)
+        await sync_to_async(list)(result.value)
+    assert coded(caught.value.detail) == detail
+
+
+def _editions() -> QuerySet[Edition]:
+    return Edition.objects.all()
+
+
+def _two_editions() -> Any:
+    book = Book.objects.create(author=BookAuthor.objects.create(name="Ada"), title="t", price=1)
+    for number in (1, 2):
+        Edition.objects.create(book=book, number=number)
+    return make_user("ada")
+
+
+def _numbers(rows: Any) -> list[int]:
+    return sorted(edition.number for edition in rows)
+
+
+_UNDER_ZERO = "-1"
+
+
+@pytest.mark.django_db
+class TestANumberInsideSixtyFourBitsIsTheDatabases:
+    """A filter value a signed 64-bit integer holds is answered, whatever the column's type states.
+
+    A positive column states no negative number on Django 5.0 and later, and
+    none at all on 4.2's SQLite; ``-1`` is a value the driver binds either way,
+    and ``gte=-1`` means every row. Each case runs with the range the backend
+    states and with none, so it has one answer on every version.
+    """
+
+    @pytest.fixture(params=["stated", "unstated"])
+    def ranges(self, request: pytest.FixtureRequest) -> None:
+        if request.param == "unstated":
+            request.getfixturevalue("unstated_ranges")
+
+    @pytest.mark.usefixtures("ranges")
+    @pytest.mark.parametrize(
+        ("arguments", "numbers"),
+        [
+            pytest.param({"number": _UNDER_ZERO}, [], id="exact"),
+            pytest.param({"number_min": _UNDER_ZERO}, [1, 2], id="gte"),
+            pytest.param({"numbers": [_UNDER_ZERO, "2"]}, [2], id="in"),
+            pytest.param(
+                {"number_range_min": _UNDER_ZERO, "number_range_max": "1"}, [1], id="range"
+            ),
+        ],
+    )
+    def test_it_is_answered(self, arguments: dict[str, Any], numbers: list[int]) -> None:
+        ada = _two_editions()
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST,
+            selector=_editions,
+            permissions=[Unrestricted()],
+            filter_set=EditionNumberFilters,
+        )
+        assert _numbers(dispatch(spec, principal=ada, arguments=arguments).value) == numbers
+
+    @pytest.mark.usefixtures("ranges")
+    @pytest.mark.parametrize(
+        ("arguments", "detail"),
+        [
+            pytest.param({"number": _PAST_TOP}, {"number": [_ABOVE]}, id="above"),
+            pytest.param({"number_min": _PAST_BOTTOM}, {"number_min": [_BELOW]}, id="below"),
+        ],
+    )
+    def test_past_sixty_four_bits_it_is_refused_in_those_bits_words(
+        self, arguments: dict[str, Any], detail: dict[str, Any]
+    ) -> None:
+        ada = _two_editions()
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST,
+            selector=_editions,
+            permissions=[Unrestricted()],
+            filter_set=EditionNumberFilters,
+        )
+        with pytest.raises(InvalidArguments) as caught:
+            list(dispatch(spec, principal=ada, arguments=arguments).value)
+        assert coded(caught.value.detail) == detail
