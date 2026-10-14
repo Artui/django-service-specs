@@ -663,6 +663,13 @@ class TestFormatters:
         ):
             assert self.formatted(subschema) == LOCAL_TIME
 
+    def test_a_schema_stating_nothing_about_its_value_still_admits_null(self) -> None:
+        """An ``any`` field is described as ``{}``, which admits every value and
+        the null with it, so a formatter over one keeps serving the null it
+        passes through unformatted. A title says nothing about the value."""
+        for subschema in ({}, {"title": "Extra"}):
+            assert self.formatted(subschema)["type"] == ["string", "null"]
+
     def test_a_null_constant_stays_admitted(self) -> None:
         assert self.formatted({"const": None}) == {**LOCAL_TIME, "type": ["string", "null"]}
 

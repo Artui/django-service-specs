@@ -26,7 +26,9 @@ def output_schema(output: Output) -> dict[str, Any]:
     - **A field** states its type, ``[t, "null"]`` when nullable, its
       ``"format"`` when it declares one, and ``"title"`` from its ``label``
       when it has one. Adapters set a label only where the author wrote one,
-      so a title is never a field name restated in worse English.
+      so a title is never a field name restated in worse English. An ``any``
+      field states no type, nullable or not, since ``{}`` admits every value
+      and the null with it.
     - **Nesting** is as on input: ``fields`` make an object schema, an
       object with none is ``{"type": "object"}``, and an array's ``items`` are
       ``{"type": t}``, a nested item's object schema, or ``{}`` when undeclared.
@@ -72,6 +74,10 @@ def _field_schema(field: OutputField) -> dict[str, Any]:
     elif field.fields is not None:
         # Only an object carries ``fields``; ``OutputField`` refuses them elsewhere.
         schema = output_schema(field.fields)
+    elif field.type == "any":
+        # An open JSON type constrains nothing, as a ``Parameter``'s ``any``:
+        # held by test_any_states_no_type.
+        schema = {}
     else:
         schema = {"type": field.type}
     if field.format is not None:

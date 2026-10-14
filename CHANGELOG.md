@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`OutputField` takes `any` as its type**, as `Parameter` does, for a value
+  whose JSON type is open: a computed field, a JSON column. `output_schema`
+  describes it as `{}`, with its `title` when it has a label, and never as a
+  string it may not be. As on `Parameter`, an `any` field lists no choices, and
+  an array of any element declares no `items` rather than `items="any"`, which
+  is refused. A formatter over a property that states nothing about its value
+  keeps admitting the null it passes through unformatted.
+
 ### Changed
 - **No module imports another back, at any depth.** A nested write persists
   each related row through the same create or update that is writing its

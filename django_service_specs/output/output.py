@@ -17,6 +17,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.parameters.parameters import FORMATS, JSON_TYPES
 
+_OUTPUT_TYPES = JSON_TYPES | {"any"}
+
 
 @dataclass(frozen=True)
 class OutputField:
@@ -40,6 +42,13 @@ class OutputField:
     ``fields`` and ``items`` describe a nested object and an array's element,
     and ``items_nullable`` whether a ``null`` may stand in for an element, as on
     ``Parameter``.
+
+    ``type`` is one of the JSON types, or ``any`` for a value whose JSON type
+    is open - a computed field, a JSON column - which a schema then describes
+    with no ``type`` at all rather than as a string it may not be. As on
+    ``Parameter``, ``any`` lists no choices, since a list of values says what
+    type they are, and an array of any element declares no ``items`` rather
+    than ``items="any"``.
     """
 
     name: str
@@ -57,9 +66,10 @@ class OutputField:
 
     def __post_init__(self) -> None:
         where = f"OutputField {self.name!r}"
-        if self.type not in JSON_TYPES:
+        if self.type not in _OUTPUT_TYPES:
             raise ImproperlyConfigured(
-                f"{where}: type {self.type!r} is not a JSON type; use one of {sorted(JSON_TYPES)}."
+                f"{where}: type {self.type!r} is not a JSON type; use one of "
+                f"{sorted(_OUTPUT_TYPES)}."
             )
         if self.format is not None:
             if self.format not in FORMATS:
@@ -77,6 +87,12 @@ class OutputField:
             raise ImproperlyConfigured(f"{where}: fields describes an object's own fields.")
         if self.items is not None and self.type != "array":
             raise ImproperlyConfigured(f"{where}: items describes an array's element.")
+        # One spelling for an element of any type, and the array with no items
+        # is it, as on Parameter. Held by test_refuses_a_declaration_no_reader_can_act_on.
+        if self.items == "any":
+            raise ImproperlyConfigured(
+                f"{where}: an array with no items takes any element already; declare no items."
+            )
         if self.items_nullable and self.items is None:
             raise ImproperlyConfigured(
                 f"{where}: items_nullable describes a declared element; declare items."
@@ -87,6 +103,12 @@ class OutputField:
                 raise ImproperlyConfigured(
                     f"{where}: choices are (value, display) pairs, so a reader can show "
                     "the display and a schema can state it."
+                )
+            # A list of values says what type they are, as on Parameter.
+            if self.type == "any":
+                raise ImproperlyConfigured(
+                    f"{where}: an untyped value is matched by no list; declare its type to list "
+                    "choices."
                 )
             object.__setattr__(self, "choices", pairs)
 

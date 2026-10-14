@@ -88,6 +88,14 @@ class TestFields:
     def test_a_scalar_states_its_type(self, json_type: str) -> None:
         assert one(OutputField("value", json_type)) == {"type": json_type}
 
+    def test_any_states_no_type(self) -> None:
+        """An open JSON type is a schema that constrains nothing, as a ``Parameter``'s is."""
+        assert one(OutputField("extra", "any")) == {}
+
+    def test_a_nullable_any_states_no_type_either(self) -> None:
+        """``{}`` admits a null already, so there is no type to widen; a label is still a title."""
+        assert one(OutputField("extra", "any", nullable=True, label="Extra")) == {"title": "Extra"}
+
     @pytest.mark.parametrize("fmt", ["decimal", "date-time", "date"])
     def test_a_format_is_stated_beside_its_type(self, fmt: str) -> None:
         assert one(OutputField("value", "string", format=fmt)) == {"type": "string", "format": fmt}

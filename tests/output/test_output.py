@@ -41,6 +41,11 @@ def test_choices_are_value_and_display_pairs() -> None:
         ({"type": "string", "items": "string"}, "items describes an array"),
         ({"type": "array", "items_nullable": True}, "items_nullable describes a declared element"),
         ({"type": "string", "choices": ["d", "p"]}, "choices are \\(value, display\\) pairs"),
+        # As on Parameter: a list of values says what type they are.
+        ({"type": "any", "choices": [("d", "Draft")]}, "an untyped value is matched by no list"),
+        # As on Parameter: one spelling for an element of any type.
+        ({"type": "array", "items": "any"}, "an array with no items takes any element"),
+        ({"type": "any", "format": "date"}, "a format describes a string"),
     ],
 )
 def test_refuses_a_declaration_no_reader_can_act_on(kwargs: dict, message: str) -> None:
@@ -52,6 +57,13 @@ def test_nesting_is_legal_where_the_type_allows_it() -> None:
     inner = Output((OutputField("name", "string"),))
     assert OutputField("author", "object", fields=inner).fields is inner
     assert OutputField("books", "array", items=inner).items is inner
+
+
+def test_any_declares_a_value_whose_json_type_is_open() -> None:
+    """A computed field or a JSON column holds whatever its producer returns,
+    so the declaration must be able to say so rather than claim a string."""
+    f = OutputField("extra", "any", nullable=True, label="Extra")
+    assert (f.type, f.nullable, f.label) == ("any", True, "Extra")
 
 
 def test_a_format_on_a_string_is_kept() -> None:

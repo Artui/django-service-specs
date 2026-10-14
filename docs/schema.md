@@ -190,6 +190,9 @@ contradict, and states everything the declaration knows.
   `description` are stated as on any other node. Like a file's, its node
   admits `null` whether or not it is `nullable`, and the shape check is what
   refuses a `null` it does not allow.
+  An output field may be `any` as well, for a value whose JSON type is open
+  (a computed field, a JSON column): its node is `{}`, with its `title` if it
+  has a label, rather than a string the value may not be.
 - **`required` lists what the shape check refuses when absent**: a required
   parameter with no default. A required parameter that declares a default is
   not refused when omitted, because the Validator supplies the default, so it

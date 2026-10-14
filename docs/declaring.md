@@ -580,7 +580,10 @@ the Validator:
   given a row or a collection. It may query, and it is sync-only: an
   `async def` `present` is refused when the spec is built.
 
-An `OutputField` carries what a reader needs beyond a name and a type: a
+An `OutputField`'s type is one of the JSON types, or `any` for a value whose
+JSON type is open, such as a computed field or a JSON column: its schema is
+`{}` rather than a claim that it is a string. An `OutputField` carries what a
+reader needs beyond a name and a type: a
 `label`, `choices` as value-and-display pairs (a table shows the display, a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying
