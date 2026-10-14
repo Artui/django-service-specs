@@ -14,7 +14,8 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
+from types import MappingProxyType
 from typing import Any, Literal, cast
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -34,6 +35,7 @@ from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -61,6 +63,105 @@ from django_service_specs.validation.validator import Validator
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
 
+
+@dataclass(frozen=True)
+class Overlay:
+    """A call's own keywords beneath the spec's ``kwargs`` provider: ``extra_kwargs``.
+
+    What a transport resolves per call and the spec cannot carry - a view's
+    hook returning service keywords, say - handed to ``dispatch`` rather than
+    folded into a spec rebuilt for the call, which would lose its provider's
+    annotations and its identity. Copied on entry, so the caller's mapping is
+    never read again.
+
+    There is no overlay for ``input_data``: every key one could carry to the
+    Validator names a parameter the caller sends, so it would stand in for a
+    value the permission checks saw. A transport merges such values into the
+    arguments it hands dispatch instead, where the checks and the Validator
+    read one value (test_there_is_no_input_data_overlay).
+    """
+
+    kwargs: Mapping[str, Any] = field(default_factory=dict)
+
+
+NO_OVERLAY = Overlay()
+
+
+def refuse_overlaid_parameters(
+    spec: ServiceSpec | SelectorSpec, declared: Parameters, overlay: Overlay
+) -> None:
+    """Refuse an ``extra_kwargs`` key that would stand in for a caller's argument.
+
+    A key naming a parameter the spec declares is refused, as a seed's name
+    is: the caller's value for a parameter - a
+    read, a Validator field, the target selector's read - is what the
+    permission checks are handed and the target selector looks the row up
+    by, so an overlay standing in for it would run the call on a value
+    neither saw (test_an_extra_kwargs_key_naming_a_declared_parameter_is_refused,
+    test_a_validator_field_and_a_target_read_are_declared_parameters_too).
+    Refusing is the end that can be relaxed later without breaking a caller.
+    Two kinds of key name one and stand: an ``UNSET`` entry, which supplies
+    nothing (test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused),
+    and a parameter the spec's own typed ``kwargs`` provider fills, whose
+    caller's value is dropped before any check and whose overlay value is
+    dropped beneath the provider, so nothing diverges
+    (test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused). A
+    key naming no parameter is the overlay's to add, and stands
+    (test_the_spec_s_kwargs_provider_outranks_the_overlay); each of the three
+    parts of the set expression below is held by the test named for it here.
+    Refused because it is static: whether a key names a declared parameter
+    is known from the spec alone, so the same overlay is refused on every
+    call, never on some requests and not others.
+    """
+    keys = provider_keys(spec.kwargs)
+    owned = keys.filled if keys is not None else frozenset()
+    supplied = {name for name, value in overlay.kwargs.items() if value is not UNSET}
+    taken = sorted((supplied & declared.names()) - owned)
+    if taken:
+        raise ImproperlyConfigured(
+            f"extra_kwargs names the parameter(s) {taken}, which the {type(spec).__name__} "
+            "declares. A caller's value for a parameter is what the permission checks and the "
+            "target selector see, so an overlay may not stand in for it; rename the key, or "
+            "fill it from the spec's typed kwargs provider."
+        )
+
+
+def overlaid(
+    overlay: Mapping[str, Any],
+    provided: Mapping[str, Any],
+    provider: Callable[..., Any] | None,
+    *,
+    label: str,
+    reserved: frozenset[str],
+) -> dict[str, Any]:
+    """``overlay`` beneath ``provided``, what the spec's own ``provider`` answered.
+
+    The provider outranks the overlay on a clash, as djangorestframework-services
+    puts a view's hooks before the spec's provider
+    (test_the_spec_s_kwargs_provider_outranks_the_overlay). Treated as the
+    provider's own answer is: a key whose value is ``UNSET`` is declined, so
+    a value beneath it stands
+    (test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused),
+    and a key named in ``reserved`` is refused, as ``provide`` refuses it.
+    A key the provider is annotated to fill, and may not decline, is the
+    provider's alone, so the overlay's value for it is dropped: a provider
+    that leaves it out leaves it absent rather than the overlay's
+    (test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s), and
+    one that may decline it lets the overlay's through
+    (test_a_key_the_provider_may_decline_falls_to_the_overlay).
+    """
+    taken = sorted(overlay.keys() & reserved)
+    if taken:
+        raise ImproperlyConfigured(
+            f"{label} returned the key(s) {taken}, which dispatch seeds itself. A "
+            "provider's value must never outrank a seeded one; rename the key."
+        )
+    keys = provider_keys(provider)
+    owned = keys.filled if keys is not None else frozenset()
+    kept = {key: value for key, value in overlay.items() if value is not UNSET and key not in owned}
+    return {**kept, **provided}
+
+
 # Named in shaping's misconfiguration error, so it points at the declaration to
 # fix rather than at "a selector" of which a service spec may carry three.
 SELECTOR_SOURCE = "SelectorSpec.selector"
@@ -83,6 +184,10 @@ class Prepared:
     # The Validator's ``data``: a mapping, or the instance a dataclass one builds.
     data: Any
     kwargs: dict[str, Any]
+    # The call's base pool, read-only at its top level, its values the call's
+    # own live objects: what the Validator's context and the presenter's carry
+    # as ``ambient``.
+    ambient: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -99,6 +204,24 @@ class _CheckedRows:
     errors: dict[int, Any]
 
 
+def checks_arguments(checked: Mapping[str, Any]) -> Mapping[str, Any]:
+    """What a permission check that declares ``arguments`` is handed: ``checked``, as a read-only mapping.
+
+    The shape-checked arguments the call carries, less a ``many`` call's
+    rows: they are refused or validated in step five, after every check, so
+    a check would be deciding on rows nobody has validated, and the carrier
+    they travel in is dispatch's own
+    (test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows). A
+    copy of the top level behind a proxy, so a check can neither add nor
+    remove an argument; the values are the call's own objects, not copies,
+    so a check must not mutate them
+    (test_the_mapping_is_read_only_at_its_top_level_and_its_values_are_the_call_s).
+    """
+    return MappingProxyType(
+        {name: value for name, value in checked.items() if not isinstance(value, _CheckedRows)}
+    )
+
+
 def open_call(
     spec: ServiceSpec | SelectorSpec,
     principal: Any,
@@ -109,6 +232,7 @@ def open_call(
     unknown_arguments: UnknownArguments,
     parameters: Parameters | None = None,
     settle_rows: bool = False,
+    overlay: Overlay = NO_OVERLAY,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
@@ -142,7 +266,8 @@ def open_call(
     is wrong for every caller. The dispatcher's own names never reach this
     check: ``spec.parameters()`` refuses them as it assembles. A registered
     seed is the project's, so only dispatch - which is handed the registry -
-    can see the collision.
+    can see the collision. So is an ``overlay`` key naming a declared
+    parameter, for the same reason (see ``refuse_overlaid_parameters``).
 
     Class-level authorization runs before anything is resolved, so a principal
     it refuses learns nothing about which rows exist. It runs after the shape
@@ -164,8 +289,9 @@ def open_call(
             "pool seed occupies. An argument must never meet a seed in one pool; rename "
             "the parameter."
         )
+    refuse_overlaid_parameters(spec, declared, overlay)
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    granted = authorize(spec, principal, grant=grant)
+    granted = authorize(spec, principal, grant=grant, arguments=checks_arguments(checked))
     if settle_rows:
         # Only a ``many`` spec's list is ever carried as ``_CheckedRows``: a
         # refused row raises as step five raises it
@@ -468,6 +594,7 @@ def selector_pool(
     principal: Any,
     pool_seeds: PoolSeeds,
     progress: ProgressReporter | None = None,
+    extra_kwargs: Mapping[str, Any] = MappingProxyType({}),
 ) -> dict[str, Any]:
     """The pool a selector is called from: the base pool, its ``reads``, then its ``kwargs``.
 
@@ -487,13 +614,26 @@ def selector_pool(
     only the run hears it, joined to its keywords by ``with_run_progress``
     once they are bound, as a service's run is. A nested selector declaring
     one is refused when the service spec is built.
+
+    ``extra_kwargs`` is the call's overlay, merged beneath the ``kwargs``
+    provider's answer (see ``overlaid``); only a selector spec's own selector
+    is handed one, never a service spec's target selector.
     """
     reads = selector_spec.reads.names()
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
     pool = {**base, **{name: value for name, value in checked.items() if name in reads}}
     pool.update(
-        provide(
-            selector_spec.kwargs, pool, label="SelectorSpec.kwargs", reserved=pool_seeds.reserved
+        overlaid(
+            extra_kwargs,
+            provide(
+                selector_spec.kwargs,
+                pool,
+                label="SelectorSpec.kwargs",
+                reserved=pool_seeds.reserved,
+            ),
+            selector_spec.kwargs,
+            label="extra_kwargs",
+            reserved=pool_seeds.reserved,
         )
     )
     return pool
@@ -842,7 +982,14 @@ def lookup(
 
 
 def conclude_selector(
-    spec: SelectorSpec, value: Any, *, principal: Any, grant: Grant, pool: Mapping[str, Any]
+    spec: SelectorSpec,
+    value: Any,
+    *,
+    principal: Any,
+    grant: Grant,
+    pool: Mapping[str, Any],
+    reserved: frozenset[str],
+    checked: Mapping[str, Any],
 ) -> DispatchResult:
     """Step four for a selector spec, its ``preconditions``, and its result.
 
@@ -872,19 +1019,34 @@ def conclude_selector(
     class-level check it was minted for
     (test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds,
     test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads).
+
+    The result's presentation context carries the pool's seeds alone, the
+    names in ``reserved``: a selector's pool also holds its reads, its
+    ``kwargs`` provider's keys and the caller's ``extra_kwargs``, which are
+    arguments rather than the call's surroundings
+    (test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay,
+    which fails with the whole pool handed over).
+
+    ``checked`` is the call's shape-checked arguments, handed to a check that
+    declares ``arguments`` as step two handed them.
     """
     grant = replace(grant, target_checked=False)
+    handed = checks_arguments(checked)
     fillable = spec.reads.names()
+    context = PresentationContext(
+        principal,
+        ambient=MappingProxyType({name: entry for name, entry in pool.items() if name in reserved}),
+    )
     if spec.kind is SelectorKind.LIST:
-        authorize_scope(spec, principal, value, grant=grant)
+        authorize_scope(spec, principal, value, grant=grant, arguments=handed)
         run_preconditions(spec, {**pool, "collection": value}, fillable=fillable)
-        return DispatchResult(kind="list", value=value)
+        return DispatchResult(kind="list", value=value, context=context)
     if value is not None:
-        authorize_target(spec, principal, value, grant=grant)
+        authorize_target(spec, principal, value, grant=grant, arguments=handed)
         run_preconditions(spec, {**pool, "instance": value}, fillable=fillable)
     elif not spec.allow_none:
         return NOT_FOUND
-    return DispatchResult(kind="instance", value=value)
+    return DispatchResult(kind="instance", value=value, context=context)
 
 
 def walk_target(
@@ -912,6 +1074,9 @@ def walk_target(
     - **A collection**, empty or not: ``authorize_scope`` of the set.
     - **A create**, which resolves nothing: ``authorize_scope`` of ``None``.
 
+    Each is handed ``checked`` for a check that declares ``arguments``, as
+    step two was.
+
     ``target``, when given, is the target a caller resolved itself, and stands
     in for the lookup alone: the checks above still run on it, unless
     ``grant.target_checked`` says they ran already. A create takes ``None``
@@ -928,6 +1093,7 @@ def walk_target(
     """
     if target is UNSET:
         grant = replace(grant, target_checked=False)
+    handed = checks_arguments(checked)
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector
@@ -939,11 +1105,11 @@ def walk_target(
                 instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
             )
         if target is not None:
-            authorize_target(spec, principal, target, grant=grant)
+            authorize_target(spec, principal, target, grant=grant, arguments=handed)
         elif not instance_spec.allow_none:
             return NOT_FOUND
         else:
-            authorize_scope(spec, principal, None, grant=grant)
+            authorize_scope(spec, principal, None, grant=grant, arguments=handed)
         return {"instance": target}
     if collection_spec is not None:
         if target is UNSET:
@@ -953,7 +1119,7 @@ def walk_target(
             target = lookup(
                 collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
             )
-        authorize_scope(spec, principal, target, grant=grant)
+        authorize_scope(spec, principal, target, grant=grant, arguments=handed)
         return {"collection": target}
     # One arc to coverage, so each conjunct is held by its own test: a create
     # dispatched with no ``target=`` (test_a_create_asks_the_scope_check_of_nothing)
@@ -963,7 +1129,7 @@ def walk_target(
             "dispatch() was handed a target= for a ServiceSpec that declares no target "
             "selector. A create acts on no existing row; pass target=None or nothing."
         )
-    authorize_scope(spec, principal, None, grant=grant)
+    authorize_scope(spec, principal, None, grant=grant, arguments=handed)
     return {}
 
 
@@ -999,6 +1165,7 @@ def validate_arguments(
     principal: Any,
     target: Any,
     server_input: Mapping[str, Any],
+    ambient: Mapping[str, Any] = MappingProxyType({}),
 ) -> Validated:
     """Step five: the Validator's whole result, on only the arguments its own ``parameters()`` declare.
 
@@ -1010,30 +1177,35 @@ def validate_arguments(
     for. The caller's arguments have been through the shape check, and the
     server's are the author's own values, which the Validator checks.
 
-    ``ValidationContext.partial`` is the spec's ``partial``. A spec with no
+    ``ValidationContext.partial`` is the spec's ``partial``, and its
+    ``ambient`` is ``ambient``: the call's base pool behind a read-only
+    proxy over its top level, whose values are the call's own, or empty for a caller with no seeds (``bind_arguments``). A spec
+    with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
 
-    **A** ``many`` **spec's Validator is run once per row**, on every row the
-    shape check let through, each with ``server_input`` merged over it. A row
-    it refuses is re-rooted under the row's index, beside the shape check's
-    refusals, and the whole tree is raised as one ``InvalidArguments`` under
-    ``many_argument`` once every row has been seen. Otherwise ``data`` is the
-    list of each row's ``data`` and ``values`` holds the list of each row's
-    values under ``many_argument``: neither is spread by field.
+    **A** ``many`` **spec's Validator is asked once, for the whole list**,
+    through ``Validator.validated_many()``: every row the shape check let
+    through, under its index, each with ``server_input`` merged over it. What
+    it refuses - rows by index, the list itself under ``non_field_errors`` -
+    joins the shape check's refusals, and the whole tree is raised as one
+    ``InvalidArguments`` under ``many_argument``, so every failing row is
+    reported at once. Otherwise its ``Validated`` is the call's: ``values``
+    holds the rows' values under ``many_argument`` alone, so no field is
+    spread, ``data`` is the list, and ``pool`` is bound once for the call.
     """
     validator = spec.validator
     if validator is None:
         return Validated(values={}, data={})
     declared = validator.parameters().names()
+    context = ValidationContext(principal, target, partial=spec.partial, ambient=ambient)
     if spec.many:
-        context = ValidationContext(principal, target, partial=spec.partial)
         return _validate_rows(
             validator, checked[spec.many_argument], spec.many_argument, context, server_input
         )
     merged = {**checked, **server_input}
     own = {name: value for name, value in merged.items() if name in declared}
-    return validator.validated(own, ValidationContext(principal, target, partial=spec.partial))
+    return validator.validated(own, context)
 
 
 def _validate_rows(
@@ -1043,37 +1215,49 @@ def _validate_rows(
     context: ValidationContext,
     server_input: Mapping[str, Any],
 ) -> Validated:
-    """``validated()`` on each row the shape check passed, and one refusal for every failing row."""
+    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row."""
     declared = validator.parameters().names()
-    errors = dict(checked.errors)
-    values: list[dict[str, Any]] = []
-    data: list[Any] = []
-    for index, row in checked.rows.items():
-        merged = {**row, **server_input}
-        # Only the keys the Validator declares, as on a single call: a row's
-        # own unknown key was refused by the shape check, so only a
-        # provider's can reach here
-        # (test_each_row_s_validator_sees_only_the_keys_it_declares).
-        own = {key: value for key, value in merged.items() if key in declared}
-        try:
-            validated = validator.validated(own, context)
-        except InvalidArguments as refused:
-            errors[index] = refused.detail
-            continue
-        # A value bound for the call has no seat on a call of many rows: each
-        # row would bind its own, and the service is called once. Refused
-        # rather than dropped, as a bound value with no name of its own is.
-        if validated.pool:
-            raise ImproperlyConfigured(
-                f"The Validator bound the key(s) {sorted(validated.pool)} for row {index} of a "
-                "many call. A many spec's service is called once for every row, so a value "
-                "bound for one row has nowhere to go; bind nothing on a many spec."
-            )
-        values.append(validated.values)
-        data.append(validated.data)
-    if errors:
-        raise InvalidArguments({name: dict(sorted(errors.items()))})
-    return Validated(values={name: values}, data=data)
+    # Only the keys the Validator declares, as on a single call: a row's own
+    # unknown key was refused by the shape check, so only a provider's can
+    # reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
+    rows = {
+        index: {key: value for key, value in {**row, **server_input}.items() if key in declared}
+        for index, row in checked.rows.items()
+    }
+    try:
+        validated = validator.validated_many(rows, context, many_argument=name)
+    except InvalidArguments as refused:
+        raise InvalidArguments({name: _list_node({**checked.errors, **refused.detail})}) from None
+    if checked.errors:
+        raise InvalidArguments({name: _list_node(checked.errors)})
+    # A row's fields are never spread into the service's keywords, so the
+    # list is the only value a many call hands over by name
+    # (test_values_spread_beside_the_list_are_refused).
+    if validated.values.keys() != {name}:
+        raise ImproperlyConfigured(
+            f"The Validator's validated_many() returned the value(s) "
+            f"{sorted(validated.values)} for a many call; it returns the rows' values under "
+            f"{name!r} alone."
+        )
+    return validated
+
+
+def _list_node(errors: Mapping[Any, Any]) -> dict[Any, Any]:
+    """A list's refusals in reading order: each row by index, then the list's own message.
+
+    A sort key rather than ``sorted(errors.items())``, which cannot compare an
+    ``int`` index with ``non_field_errors``
+    (test_a_list_level_refusal_sits_beside_the_rows_shape_refusals). Sorted at
+    all because the shape check's refusals and the Validator's are merged in
+    the order each raised them
+    (test_the_refusals_are_in_index_order_whatever_order_the_validator_raised_them_in).
+    """
+    return dict(
+        sorted(
+            errors.items(),
+            key=lambda item: (0, item[0], "") if isinstance(item[0], int) else (1, 0, str(item[0])),
+        )
+    )
 
 
 def prepare_service(
@@ -1086,6 +1270,7 @@ def prepare_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     target: Any = UNSET,
+    overlay: Overlay = NO_OVERLAY,
 ) -> Prepared | DispatchResult:
     """Steps one to six for a service spec, its preconditions, and the keywords its run is called with.
 
@@ -1108,7 +1293,8 @@ def prepare_service(
     3. The spec's ``reads``, as the caller sent them.
     4. ``data``, the Validator's ``data``, and what else the Validator binds
        for the call (its ``Validated.pool``).
-    5. The spec's ``kwargs`` provider, the author's values after the caller's.
+    5. The spec's ``kwargs`` provider, the author's values after the caller's,
+       over the call's ``extra_kwargs`` overlay.
     6. ``instance`` or ``collection``.
 
     No entry outranks a seed: a parameter named after one is refused by
@@ -1130,6 +1316,7 @@ def prepare_service(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        overlay=overlay,
     )
     resolved = walk_target(
         spec, principal, checked, grant=granted, pool_seeds=pool_seeds, target=target
@@ -1144,12 +1331,21 @@ def prepare_service(
     # providers and the service alike. Its ``progress`` is the transport's: the
     # spec's own sink is the run's alone, and joins the run's keywords last.
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    # Behind a proxy, so neither the Validator nor the presenter can change the
+    # pool the service is called from. No copy: nothing writes to ``base`` once
+    # it is built, and every pool made from it is a dict of its own.
+    ambient = MappingProxyType(base)
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**base, **reads, **resolved}
     server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
     validated = validate_arguments(
-        spec, checked, principal=principal, target=target, server_input=server_input
+        spec,
+        checked,
+        principal=principal,
+        target=target,
+        server_input=server_input,
+        ambient=ambient,
     )
     values = validated.values
     # A Validator returning ``user`` is a bug, and letting its value outrank the
@@ -1177,7 +1373,23 @@ def prepare_service(
             "returned as a value, or the spec declares as a parameter. A value bound for "
             "the call needs a name of its own."
         )
-    author = provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved)
+    # The overlay is the lowest tier: beneath the spec's provider, and beneath
+    # what the Validator computed or bound, whose keys it never replaces. Its
+    # entry is dropped for the call rather than refused, since whether the
+    # Validator computes a key can turn on what the caller sent
+    # (test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call).
+    # Each side of the union is held by a case of
+    # test_a_value_the_validator_computed_outranks_the_overlay:
+    # ``a-validated-value`` fails without ``values``, ``a-bound-value`` without
+    # the pool.
+    computed = values.keys() | validated.pool.keys()
+    author = overlaid(
+        {name: value for name, value in overlay.kwargs.items() if name not in computed},
+        provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved),
+        spec.kwargs,
+        label="extra_kwargs",
+        reserved=reserved,
+    )
     pool = {
         **base,
         **values,
@@ -1243,7 +1455,7 @@ def prepare_service(
         kwargs["progress"] = run_progress(
             spec.progress_reporter, spec.service, base, transport=progress
         )
-    return Prepared(principal, target, validated.data, kwargs)
+    return Prepared(principal, target, validated.data, kwargs, ambient)
 
 
 def finish_service(
@@ -1304,4 +1516,5 @@ def finish_service(
         service_result=result,
         instance=prepared.target,
         data=prepared.data,
+        context=PresentationContext(prepared.principal, prepared.target, prepared.ambient),
     )

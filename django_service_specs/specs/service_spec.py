@@ -39,7 +39,7 @@ _DEFAULT_MANY_ARGUMENT = "items"
 # Unicode letter a header, a form field or a shell may not carry.
 _IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 # The Validator methods dispatch calls: ``validated``, which calls ``validate``.
-_VALIDATOR_METHODS = ("validate", "validated")
+_VALIDATOR_METHODS = ("validate", "validated", "validated_many")
 
 
 @dataclass(frozen=True, kw_only=True)

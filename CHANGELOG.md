@@ -7,7 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-14
+
+### Added
+- **`OutputField` takes `any` as its type**, as `Parameter` does, for a value
+  whose JSON type is open: a computed field, a JSON column. `output_schema`
+  describes it as `{}`, with its `title` when it has a label, and never as a
+  string it may not be. As on `Parameter`, an `any` field lists no choices, and
+  an array of any element declares no `items` rather than `items="any"`, which
+  is refused. A formatter over a property that states nothing about its value
+  - `{}`, or annotations such as a `title` alone - keeps admitting the null
+  it passes through unformatted; one carrying a `$ref`, a composition or a
+  shape is read as before.
+- **`Validator.supports_partial` may be set per instance.** It is declared
+  as an ordinary `bool` attribute rather than a `ClassVar`, so an adapter
+  whose answer depends on what it was built over sets it in `__init__`, and
+  a `ServiceSpec` declaring `partial=True` over an instance answering `False`
+  is refused when it is built, as one over a class answering `False` is. The
+  bundled dataclass and pydantic Validators keep their class-level `False`.
+- **`Validator.validated_many(rows, context, *, many_argument)`**: what
+  dispatch asks of a `many` spec, once for the whole list, where it called
+  `validated()` per row. `rows` maps each row's index in the caller's list
+  to its arguments, after the shape check and with `input_data` merged in;
+  a row the shape check refused is not among them. It returns the call's
+  `Validated`, with the rows' values under `many_argument` alone, the list
+  as `data`, and a `pool` bound once for the call, which now reaches a
+  `many` spec's service. Its refusal is the list's own node: failing rows
+  by index, and a message about the whole list under `non_field_errors`,
+  which dispatch reports after the rows and beside the shape check's
+  refusals, in index order whatever order they were raised in. Where that
+  node carries the list's own message it mixes `int` keys with a string one,
+  so `json.dumps(..., sort_keys=True)` over it raises `TypeError`. The
+  default is the per-row loop dispatch ran before, so every existing
+  Validator behaves as it did, and a value one row binds is still refused. A
+  Validator whose library validates a list as one overrides it. An override
+  returning values under any other name is refused, and one declared
+  `async def` is refused when the spec is built.
+- **`ValidationContext.ambient`**: the call's resolved seeds, as a mapping
+  read-only at its top level, whose values are the call's own live objects
+  and must not be mutated - `user`, `progress` and every seed registered through
+  `PoolSeeds`, such as an HTTP adapter's `request` - so a library whose
+  validation reads what its caller registered, as a serializer reads its
+  context, finds it there. `dispatch` and `adispatch` fill it, on a single
+  call and on every row of a `many` call alike; it holds no argument, no
+  validated value and not the target. It trails the other fields with an
+  empty default and takes no part in equality, so a context built by hand,
+  and the one `bind_arguments` builds, which is handed no seeds, are as
+  they were.
+- **`PresentationContext` and `Presenter.presented(value, context)`**: a
+  Presenter can read the call it renders for. `dispatch` and `adispatch`
+  carry a `PresentationContext` on the `DispatchResult` as `context` - the
+  principal, the target a service spec resolved (`None` for a create and
+  for a selector spec), and the call's resolved seeds as `ambient`,
+  read-only at its top level, its values the call's own live objects - and
+  `present`, `apresent` and `present_for_audience` hand it to `presented()`
+  with each value. `presented()` is `present(value)` by
+  default, so every existing Presenter is unchanged; one whose library
+  renders under a context overrides it. A method of its own rather than a
+  keyword on `present()`, so no Presenter written against `present(value)`
+  stops being one and nothing inspects a signature. `DispatchResult.context`
+  is `None` on a result built by hand and takes no part in equality. An
+  `async def` `presented` is refused when the spec is built, as an
+  `async def` `present` is.
+- **`extra_kwargs=` on `dispatch` and `adispatch`**: a transport's per-call
+  service keywords, merged beneath the spec's `kwargs` provider, so a view's
+  per-request hook needs no spec rebuilt for the call. The spec's provider
+  wins on a clash. It is read as the provider's return is: an `UNSET` entry
+  is dropped, a key the provider is annotated to fill is the provider's
+  alone, and a key naming a seed is refused. So is a key naming a parameter
+  the spec declares - a read, a Validator field, a target selector's read, a
+  `many` spec's list - unless its value is `UNSET` or the spec's typed
+  `kwargs` provider fills it: the caller's value for a parameter is what the
+  permission checks and the target selector see, so the value authorized is
+  the value run. Those refusals are static, turning on the spec alone. The
+  overlay is the lowest of three tiers: beneath the spec's provider, and
+  beneath the values the Validator computed and the pool it bound, so a key
+  among those is left to the Validator and the overlay's entry is dropped
+  for that call, never refused - whether a Validator computes a key can turn
+  on the request. It reaches a selector spec's selector and a service spec's
+  service, never a target or output selector. There is no overlay for the
+  Validator's input; a transport merges such values into `arguments`.
+- **A permission check can read the call's arguments.** A
+  `PermissionCheck` method that declares a keyword `arguments` - on
+  `has_permission`, `has_object_permission` or `has_scope_permission` - is
+  handed the call's shape-checked arguments at that question, as a read-only
+  mapping whose values are the call's own objects, which a check must not
+  mutate: what an HTTP permission class reads off the view's captured
+  kwargs. The base methods do not declare it, so every existing check keeps
+  its signature, stays a valid override under a type checker, and is asked
+  exactly as before; opt-in is by name. The callable dispatch calls is the
+  one read, so a callable set on the instance or a mock patched over the
+  method answers for its own signature. Behind decorators the
+  `functools.wraps` chain is read a layer at a time: a layer spreading
+  `**kwargs` passes the keyword on, so it is handed only where a layer names
+  it before any layer without `**kwargs`, and a forwarding decorator keeps an
+  opted-in check opted in. A callable with no signature to read, such as a
+  builtin behind `functools.partial`, is asked as one that never opted in. A
+  check that needs the arguments decides for itself what `None` - a transport
+  calling `authorize()` without them - means. A `many` call's rows are not
+  among them, since they are validated after every check. `dispatch`, `adispatch`,
+  `check_call` and `resolve_target` hand them over, and `authorize`,
+  `authorize_target` and `authorize_scope` take them as `arguments=` for a
+  transport that calls them itself.
+
 ### Changed
+- **`ModelT` is a pinned import path.** The type variable `ChangeResult` is
+  generic over, `django_service_specs.mutations.change_result.ModelT`, is
+  read by a downstream subclass that parameterizes `ChangeResult` with it,
+  so its module, name, bound (`Model`) and place as `ChangeResult`'s only
+  type parameter are now held by the surface test. It stays importable from
+  that module alone, not from the package root.
 - **No module imports another back, at any depth.** A nested write persists
   each related row through the same create or update that is writing its
   parent, and that recursion was the one import ring the package still had:
@@ -18,8 +127,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   owned relations now live in one private module,
   `django_service_specs.mutations.nested_writes`, and the four entry points
   are thin callers of it. No public import path or signature changed, and no
-  call returns or raises differently. Private helpers moved from `mutations/utils.py` to that module, and
-  five that both modules read lost their leading underscore. A nested row no
+  call returns or raises differently. Private helpers moved from
+  `mutations/utils.py` to that module, and five that both modules read lost
+  their leading underscore. A nested row no
   longer looks up the entry point on its module at call time, so a patch of
   `django_service_specs.mutations.create_from_input.create_from_input` or a
   sibling now sees the top-level call only. The test of the import graph now
@@ -1331,7 +1441,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Artui/django-service-specs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Artui/django-service-specs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Artui/django-service-specs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1

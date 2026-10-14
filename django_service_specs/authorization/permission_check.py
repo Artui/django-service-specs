@@ -26,6 +26,23 @@ class PermissionCheck(abc.ABC):
     or ``None``, because a check written for a row would read an attribute off
     it and fail on neither; it allows by default for the same reason.
 
+    **A method may ask for the call's arguments** by declaring a keyword
+    ``arguments``: dispatch then hands it the call's shape-checked arguments,
+    as a read-only mapping, at each of the three questions - a route's captured ``pk``, a
+    filter the caller sent - and a method that does not declare it is asked
+    exactly as before. The base methods do not declare it, so every check
+    written without it stays a valid override; a ``many`` call's rows are
+    not among them, as they are validated after every check. Opt-in is by
+    name, read layer by layer down the ``__wrapped__`` chain
+    ``functools.wraps`` leaves: a layer spreading ``**kwargs`` passes the
+    keyword to the one beneath, so it is handed only where a layer names it
+    before any layer without ``**kwargs``, and a forwarding decorator keeps a
+    check opted in. ``arguments`` is ``None`` where a transport calls
+    ``authorize()`` without them, and a check that needs them decides for
+    itself what that means; reading it as an allow fails open. Only the mapping
+    is read-only: its values are the call's own objects, the ones the run
+    receives, so a check must not mutate them.
+
     ``message`` is what [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     says when this check refuses; ``None`` keeps the generic wording.
 

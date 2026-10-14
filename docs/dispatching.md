@@ -58,7 +58,11 @@ A [`many`](declaring.md#many-rows-in-one-call) write resolves nothing in steps
 three and four, where its scope check is asked of `None`, never of the
 caller's rows. Step one raises only the top level's refusal; a row's is raised
 in step five, beside the Validator's refusals of the other rows, so a
-principal refused in step two learns nothing about the rows it sent.
+principal refused in step two learns nothing about the rows it sent. That
+node reads in index order, then the list's own `non_field_errors`. Where it
+carries that message it mixes `int` keys with a string one, so
+`json.dumps(..., sort_keys=True)` over it raises `TypeError` - write it as it
+stands.
 
 The order is the design, and each place reads as if it could move:
 
@@ -79,6 +83,61 @@ The order is the design, and each place reads as if it could move:
   come before the run's transaction opens, so a refusal never opens one.
   Preconditions follow them, in the same place, as djangorestframework-services
   orders the two.
+
+## Per-call values beneath the provider
+
+A transport sometimes knows a service keyword per call that the spec cannot
+carry: what an HTTP view's per-request hook returns. `dispatch` and `adispatch`
+take it as `extra_kwargs`, so the spec need not be rebuilt for the call:
+
+```python
+--8<--
+docs/examples/dispatching.py:overlays
+--8<--
+```
+
+`extra_kwargs` is the lowest of three tiers: beneath the spec's `kwargs`
+provider, so **the spec's own provider wins on a clash**, and beneath what the
+spec's Validator computed or bound. It is read as the provider's return is:
+
+- an entry whose value is `UNSET` is dropped;
+- a key the spec's provider is annotated to fill is the provider's alone, and
+  the overlay's value for it is dropped, so a provider that leaves the key out
+  leaves it absent; one annotated `UNSET`-able lets the overlay's value through
+  when it declines;
+- a key naming a seed, such as `user`, is refused as `ImproperlyConfigured`.
+
+**A key naming a parameter the spec declares is refused**, as
+`ImproperlyConfigured`, before the shape check, the way a seed's name is. A
+declared parameter is anything `spec.parameters()` lists: the spec's `reads`,
+its Validator's fields, its target selector's `reads`, and a `many` spec's
+list. The caller's value for one is what the [permission checks](#permissions)
+are handed and what the target selector looks the row up by, so an overlay
+standing in for it would run the call on a value neither saw: the value
+authorized is the value run. Two keys that name one are not refused: an `UNSET`
+entry, which supplies nothing, and a parameter the spec's own typed `kwargs`
+provider fills, whose caller's value is dropped before any check and whose
+overlay value is dropped beneath the provider. To set such a value per call,
+fill it from that provider.
+
+**A key naming a value the spec's Validator computed is never the
+overlay's**: a key of the `values` its `validated()` returned, or of the `pool`
+it bound, is left to the Validator, and the overlay's entry is dropped for that
+call rather than refused. Whether a Validator computes a key can turn on what
+the caller sent - a `slug` derived from a `title` only when one arrives - so a
+refusal there would let a request decide whether a misconfiguration error
+fires. The overlay fills such a key on the calls where the Validator leaves it
+out. Refusal is kept for what is static: a key naming a declared parameter, or
+a seed, is refused on every call alike.
+
+`extra_kwargs` reaches a read's own selector and a write's service, never a
+target or output selector.
+
+**There is no overlay for the Validator's input.** Every value one could carry
+to the Validator is a field the caller sends, so an overlay would stand in for
+a value the permission checks saw. A transport with per-request values for the
+Validator merges them into the `arguments` it hands `dispatch`, where the
+checks and the Validator read the same value.
 
 ## The result
 
@@ -161,6 +220,42 @@ allows unless overridden too. It is a method of its own rather than
 row reads an attribute off it and would fail on either. `message` is what
 [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
 says when the check refuses.
+
+**A check can read the call's arguments** by declaring a keyword `arguments`
+on any of its three methods. Dispatch then hands that method the call's
+shape-checked arguments as a read-only mapping - a route's captured `pk`, a
+filter the caller sent - as an HTTP permission class reads the view's captured
+kwargs. Only the mapping is read-only: its values are the call's own objects,
+the ones the run receives, so a check must not mutate them.
+
+```python
+--8<--
+docs/examples/dispatching.py:arguments_channel
+--8<--
+```
+
+A method that does not declare the keyword is asked exactly as before, so no
+existing check changes. The base methods do not declare it, which keeps every
+check written without it a valid override under a type checker. Opt-in is by
+name. What is read is what dispatch calls, `getattr(check, method)`: a
+callable set on the instance, or a mock patched over the method, answers for
+its own signature. Behind decorators, the `__wrapped__` chain
+`functools.wraps` leaves is read one layer at a time, each by its own
+signature, since each is called in turn: a layer naming `arguments` takes it,
+a layer spreading `**kwargs` passes it to the layer beneath, and a layer with
+neither would refuse it. So the keyword is handed only where a layer names it
+before any layer without `**kwargs`: an ordinary forwarding decorator, or
+several, keeps an opted-in check opted in, while a narrower layer anywhere in
+the chain, or `**kwargs` with nothing beneath that asked, is handed nothing.
+A callable with no signature to read, such as a builtin behind
+`functools.partial`, is asked as a check that never opted in.
+`arguments` is `None` where a transport calls `authorize()` without
+`arguments=`, and a check that needs them decides for itself what that means:
+the example above refuses. A [`many`](declaring.md#many-rows-in-one-call)
+call's rows are not among the arguments: they are validated after every
+check, so a check sees the call's `reads` alone. The
+[`authorize`][django_service_specs.dispatch.authorize.authorize] functions
+take the same mapping as `arguments=` for a transport that calls them itself.
 
 **A check is sync-only**: it may query, so the async entry point runs it in
 the executor. An `async def` method would answer with a coroutine, which is

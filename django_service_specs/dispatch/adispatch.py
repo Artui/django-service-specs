@@ -14,6 +14,7 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
+    Overlay,
     Prepared,
     conclude_selector,
     finish_service,
@@ -49,6 +50,7 @@ async def adispatch(
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
+    extra_kwargs: Mapping[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
@@ -107,11 +109,20 @@ async def adispatch(
     refuse it before any hop, and a selector spec's row or list is checked
     whatever the grant says, as ``dispatch``'s is.
 
+    ``extra_kwargs`` is ``dispatch``'s overlay, copied on entry, merged
+    beneath the spec's ``kwargs`` provider inside the hop, on every path, and
+    refused there where it names a declared parameter; beneath the
+    Validator's computed and bound values too, as in ``dispatch``, on both
+    hops (test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops).
+    That refusal and the read of whether a check declares ``arguments`` both run off the loop
+    (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).
+
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.
 
     Raises:
-        TypeError: both or neither of ``principal`` and ``principal_id``.
+        TypeError: both or neither of ``principal`` and ``principal_id``;
+            ``target`` where ``dispatch`` refuses it.
         PrincipalUnavailable: ``principal_id`` names no principal who may act,
             or ``principal`` is deactivated.
         InvalidArguments, NotPermitted, ImproperlyConfigured: as ``dispatch``.
@@ -126,7 +137,20 @@ async def adispatch(
     # Compiled on the loop, before the branch that reads which kind of spec it is.
     spec = kernel_spec(spec)
     refuse_target(spec, target)
-    rest = (principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress)
+    # Copied here, on the loop, so a caller changing its dict while the call
+    # is in a hop changes nothing the run sees
+    # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
+    overlay = Overlay(dict(extra_kwargs or {}))
+    rest = (
+        principal,
+        principal_id,
+        arguments,
+        grant,
+        pool_seeds,
+        unknown_arguments,
+        progress,
+        overlay,
+    )
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
             return await _await_selector(spec, *rest)
@@ -151,6 +175,7 @@ def _dispatch(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    overlay: Overlay,
     target: Any,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
@@ -163,6 +188,7 @@ def _dispatch(
         unknown_arguments=unknown_arguments,
         progress=progress,
         target=target,
+        extra_kwargs=overlay.kwargs,
     )
 
 
@@ -175,6 +201,7 @@ def _prepare(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    overlay: Overlay,
     target: Any,
 ) -> Prepared | DispatchResult:
     return prepare_service(
@@ -186,6 +213,7 @@ def _prepare(
         unknown_arguments=unknown_arguments,
         progress=progress,
         target=target,
+        overlay=overlay,
     )
 
 
@@ -198,6 +226,7 @@ async def _await_service(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    overlay: Overlay,
     target: Any,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
@@ -210,6 +239,7 @@ async def _await_service(
         pool_seeds,
         unknown_arguments,
         progress,
+        overlay,
         target,
     )
     if isinstance(prepared, DispatchResult):
@@ -235,7 +265,8 @@ def _open_selector(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
-) -> tuple[Any, Grant, dict[str, Any], dict[str, Any]]:
+    overlay: Overlay,
+) -> tuple[Any, Grant, dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Steps one and two, the selector's pool, and its keywords, in the one sync hop.
 
     The keywords are bound here, a read the caller left out refused as on
@@ -250,8 +281,16 @@ def _open_selector(
         grant=grant,
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
+        overlay=overlay,
     )
-    pool = selector_pool(spec, checked, principal=who, pool_seeds=pool_seeds, progress=progress)
+    pool = selector_pool(
+        spec,
+        checked,
+        principal=who,
+        pool_seeds=pool_seeds,
+        progress=progress,
+        extra_kwargs=overlay.kwargs,
+    )
     kwargs = with_run_progress(
         spec,
         call_keywords(spec.selector, pool, fillable=spec.reads.names()),
@@ -259,7 +298,7 @@ def _open_selector(
         reserved=pool_seeds.reserved,
         transport=progress,
     )
-    return who, granted, pool, kwargs
+    return who, granted, pool, kwargs, checked
 
 
 def _settle_and_conclude(
@@ -269,11 +308,14 @@ def _settle_and_conclude(
     who: Any,
     granted: Grant,
     reserved: frozenset[str],
+    checked: dict[str, Any],
 ) -> DispatchResult:
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
-    return conclude_selector(spec, value, principal=who, grant=granted, pool=pool)
+    return conclude_selector(
+        spec, value, principal=who, grant=granted, pool=pool, reserved=reserved, checked=checked
+    )
 
 
 async def _await_selector(
@@ -285,6 +327,7 @@ async def _await_selector(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
+    overlay: Overlay,
 ) -> DispatchResult:
     """An ``async def`` selector spec: steps one and two, the await, then shaping and step four.
 
@@ -296,8 +339,18 @@ async def _await_selector(
     """
     # Bound before the await and outside the ``try``: a read the caller left
     # out is refused as a missing argument, as on every other path.
-    who, granted, pool, kwargs = await sync_to_async(_open_selector, thread_sensitive=True)(
-        spec, principal, principal_id, arguments, grant, pool_seeds, unknown_arguments, progress
+    who, granted, pool, kwargs, checked = await sync_to_async(
+        _open_selector, thread_sensitive=True
+    )(
+        spec,
+        principal,
+        principal_id,
+        arguments,
+        grant,
+        pool_seeds,
+        unknown_arguments,
+        progress,
+        overlay,
     )
     try:
         raw = await spec.selector(**kwargs)
@@ -305,7 +358,15 @@ async def _await_selector(
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
-        return conclude_selector(spec, None, principal=who, grant=granted, pool=pool)
+        return conclude_selector(
+            spec,
+            None,
+            principal=who,
+            grant=granted,
+            pool=pool,
+            reserved=pool_seeds.reserved,
+            checked=checked,
+        )
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
-        spec, raw, pool, who, granted, pool_seeds.reserved
+        spec, raw, pool, who, granted, pool_seeds.reserved, checked
     )

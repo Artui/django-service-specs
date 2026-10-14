@@ -274,6 +274,16 @@ call - a confirmation - is a read. The service receives the rows' `data` as a
 list under `data`, and their values as a list under `many_argument`; neither
 is spread by field.
 
+Dispatch hands the rows to the Validator's `validated_many()` in one call,
+each under its index in the caller's list. By default that validates each
+row on its own through `validated()`, and refuses a value a row binds, since
+the service runs once for every row. A Validator whose library validates a
+list as one - list-level checks, one bound object for the call - overrides
+it: its refusal is the list's node, each failing row under its index and a
+message about the whole list under `non_field_errors`, and what it binds in
+`Validated.pool` reaches the service once. A row the shape check refused is
+not handed to it, so the indices may have gaps.
+
 The list is an array parameter, so it is bounded as one:
 **`many_min_length`** and **`many_max_length`** are its `min_length` and
 `max_length`. Neither is declared by default, so an empty list runs the
@@ -478,7 +488,12 @@ methods, and a third method and an attribute with defaults:
   carrying the principal and the resolved target. It may query - a uniqueness
   check does - and the target is there so that an update's check can exclude
   the row being updated. The context also says whether the call is
-  [`partial`](#partial-updates).
+  [`partial`](#partial-updates), and carries the call's resolved seeds as
+  `ambient`: `user`, `progress` and every seed registered through
+  `PoolSeeds`, such as an HTTP adapter's `request`, for a library whose
+  validation reads what its caller registered. It is read-only at its top
+  level; its values are the call's own live objects, which a Validator must
+  not mutate.
 - `validated(arguments, context)` is what dispatch calls: a
   [`Validated`][django_service_specs.validation.validated.Validated] carrying
   the `values` the service is spread with, the call's `data`, and a `pool` of
@@ -487,10 +502,17 @@ methods, and a third method and an attribute with defaults:
   `data` and nothing bound, so a Validator overrides it only where its `data`
   is not that mapping. A bound value named after a seed, a validated value or
   a parameter is refused.
-- `supports_partial`, a class attribute, says whether `validate()` can honour
-  a [`partial`](#partial-updates) call by returning only what was sent. It is
+- `validated_many(rows, context, *, many_argument)` is what dispatch calls on
+  a [`many`](#many-rows-in-one-call) spec instead: the rows by index, and a
+  `Validated` whose `values` hold the rows' values under `many_argument`
+  alone. The default is `validated()` on each row.
+- `supports_partial` says whether `validate()` can honour a
+  [`partial`](#partial-updates) call by returning only what was sent. It is
   `True` by default. A Validator that builds every field sets it `False`, and
-  a partial spec over it is then refused when the spec is built.
+  a partial spec over it is then refused when the spec is built. A class sets
+  it as a class attribute; an adapter whose answer depends on what it was
+  built over sets it on the instance in `__init__`, and the spec reads the
+  instance.
 
 Three things a newcomer may look for are absent on purpose:
 
@@ -500,11 +522,11 @@ Three things a newcomer may look for are absent on purpose:
   matches a pydantic model class, and neither was written to this contract.
 - **There is no `instance` or `many` argument.** The row a call acts on is
   target resolution, and many rows are the spec's [`many`](#many-rows-in-one-call),
-  each validated on its own. `partial` arrives in the context, because it is
+  handed to `validated_many()`. `partial` arrives in the context, because it is
   the spec's statement about the call, not the Validator's.
 - **It is sync-only.** It may query, so the async entry point runs it in
-  Django's thread-sensitive executor; a `validate` or `validated` declared
-  `async def` is refused when the spec is built.
+  Django's thread-sensitive executor; a `validate`, `validated` or
+  `validated_many` declared `async def` is refused when the spec is built.
 
 ### The dataclass adapter
 
@@ -579,8 +601,22 @@ the Validator:
   items over one at a time, so a Presenter never has to guess whether it was
   given a row or a collection. It may query, and it is sync-only: an
   `async def` `present` is refused when the spec is built.
+- `presented(value, context)` is what dispatch's `present` calls: the value,
+  and the call's
+  [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
+  carrying its principal, the target a service spec resolved, and its
+  resolved seeds as `ambient`, read-only at its top level, its values the
+  call's own live objects, not to be mutated. The default is `present(value)`,
+  so only a Presenter whose library renders under a context - a field
+  defaulting to the current user, a link built from a request a transport
+  registered as a seed - overrides it. Dispatch carries the context on the
+  `DispatchResult` as `context`; a result built by hand has none, and is
+  presented with `None`.
 
-An `OutputField` carries what a reader needs beyond a name and a type: a
+An `OutputField`'s type is one of the JSON types, or `any` for a value whose
+JSON type is open, such as a computed field or a JSON column: its schema is
+`{}` rather than a claim that it is a string. An `OutputField` carries what a
+reader needs beyond a name and a type: a
 `label`, `choices` as value-and-display pairs (a table shows the display, a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying

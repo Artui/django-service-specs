@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import functools
+import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from types import SimpleNamespace
-from typing import Any
+from types import MappingProxyType, SimpleNamespace
+from typing import Any, cast
+from unittest import mock
 
 import pytest
 from django import forms
@@ -48,9 +50,12 @@ from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
+    EDIT,
     OPEN,
     PK,
     TENANT_SEEDS,
+    Arguing,
+    Listed,
     OwnerOnly,
     Record,
     Refuse,
@@ -3375,6 +3380,110 @@ class TestMany:
         dispatch(spec, principal=ada, arguments={"items": [{"title": "mine"}]})
         assert [args for args, _ in validator.calls] == [{"title": "mine"}]
 
+    def test_a_validator_validating_the_list_as_one_is_asked_once_and_binds_once(
+        self, ada: Any
+    ) -> None:
+        """``validated_many`` is what dispatch asks of a many spec: once, with
+        each row under its index, ``input_data`` merged over it and only the
+        keys the Validator declares, and what it binds reaches the service."""
+        service = Record()
+        validator = Listed()
+        spec = ServiceSpec(
+            service=service,
+            permissions=OPEN,
+            many=True,
+            validator=validator,
+            input_data=lambda: {"undeclared": 1},
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        [(rows, context, many_argument)] = validator.lists
+        assert rows == {0: {"title": "a"}, 1: {"title": "b"}}
+        assert (context.principal, context.target, many_argument) == (ada, None, "items")
+        # The per-row path is never taken.
+        assert validator.calls == []
+        [call] = service.calls
+        assert call["items"] == call["data"] == [{"title": "A"}, {"title": "B"}]
+        assert call["listed"] is validator
+
+    def test_a_list_level_refusal_sits_beside_the_rows_shape_refusals(self, ada: Any) -> None:
+        """The Validator sees only the rows the shape check let through, each
+        under its own index, so its refusals land on the rows they name; the
+        list's own message sits under ``non_field_errors``, after the rows."""
+        validator = Listed(most=1)
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        rows = [{"title": 3}, {"title": "fine"}, {"title": "bad"}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        detail = refused.value.detail["items"]
+        assert detail == {
+            0: {"title": [expected_type("string")]},
+            2: {"title": ["Not this one."]},
+            "non_field_errors": ["At most 1 rows."],
+        }
+        assert list(detail) == [0, 2, "non_field_errors"]
+        assert [set(rows) for rows, _, _ in validator.lists] == [{1, 2}]
+
+    def test_the_refusals_are_in_index_order_whatever_order_the_validator_raised_them_in(
+        self, ada: Any
+    ) -> None:
+        """The shape check's refusal of a later row and a Validator that puts
+        the list's message first still read row by row, then the list's own:
+        merged as raised they would read 2, ``non_field_errors``, 0. The ints
+        and the string do not compare, so ``sort_keys`` cannot order them."""
+
+        class ListFirst(Listed):
+            def validated_many(
+                self,
+                rows: Mapping[int, Mapping[str, Any]],
+                context: ValidationContext,
+                *,
+                many_argument: str,
+            ) -> Validated:
+                raise InvalidArguments(
+                    {"non_field_errors": ["Not as a list."], 0: {"title": ["Not this one."]}}
+                )
+
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=ListFirst())
+        rows = [{"title": "bad"}, {"title": "fine"}, {"title": 3}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        detail = refused.value.detail["items"]
+        assert list(detail) == [0, 2, "non_field_errors"]
+        with pytest.raises(TypeError):
+            json.dumps(refused.value.detail, sort_keys=True)
+
+    def test_the_shape_check_s_refusals_stand_when_the_validator_accepts_the_rest(
+        self, ada: Any
+    ) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Listed())
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": 3}]})
+        assert refused.value.detail == {"items": {1: {"title": [expected_type("string")]}}}
+        assert service.calls == []
+
+    def test_values_spread_beside_the_list_are_refused(self, ada: Any) -> None:
+        """A many spec's rows are never spread by field, so ``validated_many``
+        hands back its values under ``many_argument`` alone."""
+
+        class Spreading(Titled):
+            def validated_many(
+                self,
+                rows: Mapping[int, Mapping[str, Any]],
+                context: ValidationContext,
+                *,
+                many_argument: str,
+            ) -> Validated:
+                return Validated(values={many_argument: [], "title": "a"}, data=[])
+
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Spreading())
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+        assert str(refused.value).startswith(
+            "The Validator's validated_many() returned the value(s) ['items', 'title'] for a "
+            "many call; it returns the rows' values under 'items' alone."
+        )
+
     def test_a_value_a_row_binds_is_refused(self, ada: Any) -> None:
         class Binding(Titled):
             def validated(
@@ -3764,3 +3873,655 @@ def test_a_check_is_asked_about_the_compiled_spec_on_either_route(ada: Any) -> N
 
     assert len(check.asked) == 2
     assert all(asked is kernel_spec(source) for asked in check.asked)
+
+
+class TestAmbient:
+    """The Validator's context carries the call's resolved seeds, read-only."""
+
+    def test_the_validator_reads_the_registered_seeds_and_the_user(self, ada: Any) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+        dispatch(spec, principal=ada, arguments={"title": "a"}, pool_seeds=TENANT_SEEDS)
+        [(_, context)] = validator.calls
+        assert context.ambient["tenant"] == "tenant-of-ada"
+        assert context.ambient["user"] is ada
+        # Nothing the caller sent, and nothing the Validator has yet to return.
+        assert "title" not in context.ambient
+        with pytest.raises(TypeError):
+            context.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
+
+    def test_each_row_of_a_many_call_reads_them_too(self, ada: Any) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"items": [{"title": "a"}, {"title": "b"}]},
+            pool_seeds=TENANT_SEEDS,
+        )
+        assert [context.ambient["tenant"] for _, context in validator.calls] == [
+            "tenant-of-ada",
+            "tenant-of-ada",
+        ]
+
+
+class _OwnsScope(TypedDict, total=False):
+    scope: str
+
+
+class _MayDeclineScope(TypedDict):
+    scope: str | UnsetType
+
+
+_READ_Q = Parameters.of(Parameter("q", "string"))
+
+
+class TestOverlays:
+    """``extra_kwargs``: a call's own service keywords beneath the spec's provider."""
+
+    def test_the_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=lambda: {"tag": "spec"})
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1})
+        [call] = service.calls
+        assert (call["tag"], call["extra"]) == ("spec", 1)
+
+    def test_an_extra_kwargs_key_naming_a_declared_parameter_is_refused(self, ada: Any) -> None:
+        """The caller's value for a declared parameter is what the checks and
+        the target selector read, so an overlay standing in for it would run
+        the call on a value they never saw. Refused before anything runs."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"q": "caller"}, extra_kwargs={"q": "view"})
+        assert str(refused.value) == (
+            "extra_kwargs names the parameter(s) ['q'], which the ServiceSpec declares. A "
+            "caller's value for a parameter is what the permission checks and the target "
+            "selector see, so an overlay may not stand in for it; rename the key, or fill "
+            "it from the spec's typed kwargs provider."
+        )
+        assert service.calls == []
+
+    def test_a_validator_field_and_a_target_read_are_declared_parameters_too(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="old")
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=Titled(),
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        for key in ("title", "pk"):
+            with pytest.raises(ImproperlyConfigured, match=rf"\['{key}'\]"):
+                dispatch(
+                    spec,
+                    principal=ada,
+                    arguments={"pk": note.pk, "title": "new"},
+                    extra_kwargs={key: 1},
+                )
+
+    def test_a_many_spec_s_list_is_a_declared_parameter_too(self, ada: Any) -> None:
+        """The rows are the call's argument under ``many_argument``, so an
+        overlay may not stand in for the list either."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Titled())
+        with pytest.raises(ImproperlyConfigured, match=r"\['items'\]"):
+            dispatch(
+                spec,
+                principal=ada,
+                arguments={"items": [{"title": "a"}]},
+                extra_kwargs={"items": []},
+            )
+        assert service.calls == []
+
+    def test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused(
+        self, ada: Any
+    ) -> None:
+        """It supplies no value, so nothing diverges: the caller's stands."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"q": "caller"},
+            extra_kwargs={"q": UNSET, "other": UNSET},
+        )
+        assert service.calls[0]["q"] == "caller"
+        assert "other" not in service.calls[0]
+
+    def test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused(self, ada: Any) -> None:
+        """The caller's value for it is dropped before any check, and the
+        overlay's is dropped beneath the provider, so the two cannot diverge."""
+        provider, _ = _project_provider()
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=PROJECT, kwargs=provider)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"project_pk": 99})
+        assert service.calls[0]["project_pk"] == 7
+
+    @pytest.mark.parametrize(
+        ("overlay", "key", "computed"),
+        [
+            # Returned by the Validator and declared by no parameter.
+            pytest.param({"slug": "view"}, "slug", "t", id="a-validated-value"),
+            pytest.param({"form": "view"}, "form", "bound", id="a-bound-value"),
+        ],
+    )
+    def test_a_value_the_validator_computed_outranks_the_overlay(
+        self, ada: Any, overlay: Mapping[str, Any], key: str, computed: str
+    ) -> None:
+        """The overlay is the lowest tier: the Validator's values and the pool
+        it binds stand over it, and its entry is dropped for the call rather
+        than refused, since whether a key is computed can turn on the request."""
+        service = Record()
+        validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs=overlay)
+        assert service.calls[0][key] == computed
+
+    def test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call(
+        self, ada: Any
+    ) -> None:
+        """A Validator computing ``slug`` only from a ``title`` sent: the same
+        overlay fills the gap on a call without one and yields on a call with
+        one, and neither call is an error."""
+
+        class _SlugWhenTitled(Validator):
+            def parameters(self) -> Parameters:
+                return Parameters.of(Parameter("title", "string"), Parameter("body", "string"))
+
+            def validate(
+                self, arguments: Mapping[str, Any], context: ValidationContext
+            ) -> dict[str, Any]:
+                values = dict(arguments)
+                if "title" in values:
+                    values["slug"] = values["title"].lower()
+                return values
+
+        service = Record()
+        spec = ServiceSpec(
+            service=service, permissions=OPEN, validator=_SlugWhenTitled(), partial=True
+        )
+        dispatch(spec, principal=ada, arguments={"body": "b"}, extra_kwargs={"slug": "view"})
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"slug": "view"})
+        assert [call["slug"] for call in service.calls] == ["view", "t"]
+
+    def test_a_many_call_s_bound_value_outranks_the_overlay(self, ada: Any) -> None:
+        """``validated_many`` binds its pool once for the call, and stands over
+        the overlay as on a single call."""
+        service, validator = Record(), Listed()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"items": [{"title": "a"}]},
+            extra_kwargs={"listed": "view"},
+        )
+        assert service.calls[0]["listed"] is validator
+
+    def test_an_unset_entry_naming_a_computed_value_leaves_it_to_the_validator(
+        self, ada: Any
+    ) -> None:
+        service = Record()
+        validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"title": "T"},
+            extra_kwargs={"slug": UNSET, "form": UNSET},
+        )
+        assert (service.calls[0]["slug"], service.calls[0]["form"]) == ("t", "bound")
+
+    def test_a_computed_value_the_spec_s_typed_provider_owns_is_never_the_overlay_s(
+        self, ada: Any
+    ) -> None:
+        """The overlay's value for a key the provider owns is dropped beneath
+        it, so it reaches nothing and the Validator's value stands."""
+
+        def owns() -> _OwnsScope:
+            return {}
+
+        service = Record()
+        validator = _Binds({}, returns={"title": "T", "scope": "validated"})
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator, kwargs=owns)
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"scope": "view"})
+        assert service.calls[0]["scope"] == "validated"
+
+    def test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing(
+        self, ada: Any
+    ) -> None:
+        """The caller's dict is changed while the call runs, here by a check;
+        the run still sees the overlay as it was on entry."""
+        extra = {"tag": "view"}
+
+        class Changing(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any) -> bool:
+                extra["tag"] = "changed"
+                return True
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=(Changing(),))
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs=extra)
+        assert (extra["tag"], service.calls[0]["tag"]) == ("changed", "view")
+
+    def test_a_selector_spec_s_read_is_refused_as_a_service_spec_s_is(self, ada: Any) -> None:
+        with pytest.raises(ImproperlyConfigured, match="which the SelectorSpec declares"):
+            dispatch(retrieve(), principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})
+
+    def test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s(self, ada: Any) -> None:
+        """The provider is the key's only source: one that leaves it out
+        leaves it absent, whatever the overlay says."""
+
+        def owns() -> _OwnsScope:
+            return {}
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=owns)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"scope": "view"})
+        assert "scope" not in service.calls[0]
+
+    def test_a_key_the_provider_may_decline_falls_to_the_overlay(self, ada: Any) -> None:
+        def declines() -> _MayDeclineScope:
+            return {"scope": UNSET}
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=declines)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"scope": "view"})
+        assert service.calls[0]["scope"] == "view"
+
+    def test_an_overlay_naming_a_seed_is_refused(self, ada: Any) -> None:
+        spec = ServiceSpec(service=Record(), permissions=OPEN)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={}, extra_kwargs={"user": "someone"})
+        assert str(refused.value).startswith(
+            "extra_kwargs returned the key(s) ['user'], which dispatch seeds itself."
+        )
+
+    def test_a_selector_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
+        seen: list[dict[str, Any]] = []
+
+        def rows(*, user: Any, tag: str, extra: int) -> list[Any]:
+            seen.append({"tag": tag, "extra": extra})
+            return []
+
+        spec = SelectorSpec(
+            kind=LIST, selector=rows, permissions=OPEN, kwargs=lambda: {"tag": "spec"}
+        )
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1})
+        assert seen == [{"tag": "spec", "extra": 1}]
+
+    @pytest.mark.parametrize("spec", [EDIT, retrieve()], ids=["service", "selector"])
+    def test_there_is_no_input_data_overlay(self, spec: Any, ada: Any) -> None:
+        """A transport merges what it would overlay into the arguments it
+        hands dispatch, so the checks and the Validator see one value."""
+        with pytest.raises(TypeError, match="unexpected keyword argument 'extra_input_data'"):
+            dispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
+
+
+def _forwarding(method: Callable[..., bool]) -> Callable[..., bool]:
+    """An ordinary decorator: ``functools.wraps`` over ``*args, **kwargs``."""
+
+    @functools.wraps(method)
+    def forwarded(*args: Any, **kwargs: Any) -> bool:
+        return method(*args, **kwargs)
+
+    return forwarded
+
+
+class TestArgumentsChannel:
+    """A check that declares ``arguments`` is handed the call's checked arguments."""
+
+    def test_a_read_s_checks_are_handed_the_arguments_at_both_questions(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="mine")
+        arguing, scoped = Arguing(), Scoped()
+        dispatch(retrieve(permissions=(arguing, scoped)), principal=ada, arguments={"pk": note.pk})
+        assert arguing.questions() == [
+            ("has_permission", {"pk": note.pk}),
+            ("has_object_permission", {"pk": note.pk}),
+        ]
+        # A check declaring no ``arguments`` is asked as it always was.
+        assert scoped.rows == [note]
+
+    def test_a_list_s_scope_check_is_handed_them(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=(arguing,))
+        dispatch(spec, principal=ada, arguments={})
+        assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]
+
+    def test_an_update_s_checks_are_handed_the_target_s_reads_and_the_fields(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="old")
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing, Scoped()),
+            validator=Titled(),
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"})
+        handed = {"pk": note.pk, "title": "new"}
+        assert arguing.questions() == [
+            ("has_permission", handed),
+            ("has_object_permission", handed),
+        ]
+
+    def test_a_create_s_scope_check_is_handed_them(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(arguing,), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        assert arguing.questions() == [
+            ("has_permission", {"title": "t"}),
+            ("has_scope_permission", {"title": "t"}),
+        ]
+
+    def test_the_mapping_is_read_only(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(arguing,), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        [(_, handed), _] = arguing.asked
+        assert handed is not None
+        assert isinstance(handed, MappingProxyType)
+
+    def test_the_mapping_is_read_only_at_its_top_level_and_its_values_are_the_call_s(
+        self, ada: Any
+    ) -> None:
+        """No key can be set or removed, and that is all the proxy promises:
+        a value is the call's own object, the one the run receives, so a
+        check must not mutate it. No copy is made to make it otherwise."""
+        arguing, service = Arguing(), Record()
+        spec = ServiceSpec(
+            service=service,
+            permissions=(arguing,),
+            reads=Parameters.of(Parameter("tags", "array", items="string")),
+        )
+        dispatch(spec, principal=ada, arguments={"tags": ["a"]})
+        [(_, handed), _] = arguing.asked
+        assert handed is not None
+        with pytest.raises(TypeError):
+            cast(Any, handed)["tags"] = []
+        assert handed["tags"] is service.calls[0]["tags"]
+
+    def test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows(self, ada: Any) -> None:
+        """The rows are refused or validated in step five, after every
+        check, so they are not the checks' to read."""
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing,),
+            many=True,
+            validator=Titled(),
+            reads=Parameters.of(Parameter("project", "integer", required=True)),
+        )
+        dispatch(spec, principal=ada, arguments={"project": 7, "items": [{"title": "a"}]})
+        assert arguing.questions() == [
+            ("has_permission", {"project": 7}),
+            ("has_scope_permission", {"project": 7}),
+        ]
+
+    def test_a_method_taking_only_keywords_is_handed_nothing(self, ada: Any) -> None:
+        """Opt-in is by name: a method spreading ``**kwargs`` - a wrapper
+        forwarding to one that never declared ``arguments`` - is not handed
+        a keyword it might pass on to a call that refuses it."""
+        seen: list[dict[str, Any]] = []
+
+        class Spreading(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, **extra: Any) -> bool:
+                seen.append(extra)
+                return True
+
+        dispatch(retrieve(permissions=(Spreading(),)), principal=ada, arguments={"pk": 1})
+        assert seen == [{}]
+
+    def test_a_subclass_inherits_the_declaration(self, ada: Any) -> None:
+        class Inheriting(Arguing):
+            pass
+
+        note = Note.objects.create(owner=ada, title="mine")
+        check = Inheriting()
+        dispatch(retrieve(permissions=(check,)), principal=ada, arguments={"pk": note.pk})
+        assert check.questions()[0] == ("has_permission", {"pk": note.pk})
+
+    def test_a_method_replaced_on_its_class_is_read_as_it_now_is(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Read from the method dispatch is about to call, not from a
+        snapshot taken when the class was defined, so patching the method
+        in or out of the keyword is followed."""
+        seen: list[str] = []
+
+        class Plain(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any) -> bool:
+                seen.append("plain")
+                return True
+
+        def declaring(
+            self: Any, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+        ) -> bool:
+            seen.append(f"declaring {dict(arguments or {})}")
+            return True
+
+        spec = retrieve(permissions=(Plain(),))
+        dispatch(spec, principal=ada, arguments={"pk": 1})
+        monkeypatch.setattr(Plain, "has_permission", declaring)
+        dispatch(spec, principal=ada, arguments={"pk": 1})
+        assert seen == ["plain", "declaring {'pk': 1}"]
+
+    def test_a_method_shadowed_on_the_instance_is_read_as_the_shadow(self, ada: Any) -> None:
+        """Dispatch calls ``getattr(check, method)``, so that is what is read:
+        a callable set on the instance answers for its own signature, not
+        for the class method it shadows."""
+        seen: list[tuple[Any, ...]] = []
+        check = Arguing()
+
+        def shadow(principal: Any, spec: Any) -> bool:
+            seen.append((principal, spec))
+            return True
+
+        cast(Any, check).has_permission = shadow
+        spec = ServiceSpec(service=Record(), permissions=(check,))
+        dispatch(spec, principal=ada, arguments={})
+        assert seen == [(ada, spec)]
+
+    def test_a_mock_patched_over_a_method_is_asked_as_before(self, ada: Any) -> None:
+        """A mock's signature spreads ``**kwargs``, so it is asked exactly as a
+        check that never opted in, whatever the method it replaces declared."""
+        check = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(check,))
+        with mock.patch.object(
+            check, "has_permission", side_effect=lambda principal, spec: True
+        ) as patched:
+            dispatch(spec, principal=ada, arguments={})
+        patched.assert_called_once_with(ada, spec)
+
+    def test_a_callable_the_class_holds_unhashed_is_read_by_its_own_signature(
+        self, ada: Any
+    ) -> None:
+        """An ``eq=True`` dataclass has no hash, so nothing can be cached
+        under it; its signature is read on every call instead."""
+
+        @dataclass
+        class Rule:
+            seen: list[Mapping[str, Any] | None]
+
+            def __call__(
+                self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+            ) -> bool:
+                self.seen.append(arguments)
+                return True
+
+        rule = Rule(seen=[])
+
+        class Ruled(PermissionCheck):
+            has_permission = rule
+
+        spec = ServiceSpec(service=Record(), permissions=(Ruled(),), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        assert [dict(arguments or {}) for arguments in rule.seen] == [{"title": "t"}]
+
+    def test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper(
+        self, ada: Any
+    ) -> None:
+        """``functools.wraps`` points ``__wrapped__`` at a method declaring
+        ``arguments``; the wrapper is what is called, and it does not."""
+
+        def narrowing(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def asked(self: Any, principal: Any, spec: Any) -> bool:
+                return method(self, principal, spec, arguments={"pinned": True})
+
+            return asked
+
+        class Narrowed(Arguing):
+            has_permission = narrowing(Arguing.has_permission)
+
+        check = Narrowed()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", {"pinned": True})
+
+    def test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them(
+        self, ada: Any
+    ) -> None:
+        """An ordinary ``functools.wraps`` decorator spreading ``*args,
+        **kwargs`` forwards the keyword to the method it wraps, so a check
+        that opted in stays opted in behind one."""
+
+        def spreading(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def asked(self: Any, *args: Any, **kwargs: Any) -> bool:
+                return method(self, *args, **kwargs)
+
+            return asked
+
+        class Spread(Arguing):
+            has_permission = spreading(Arguing.has_permission)
+
+        check = Spread()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", {})
+
+    def test_a_decorated_check_refusing_by_an_argument_still_refuses(self, ada: Any) -> None:
+        """Handed nothing, the check below would read the absent mapping and
+        decide without the ``x`` it guards; it must be handed the call's."""
+
+        def forwarding(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def wrapper(*args: Any, **kwargs: Any) -> bool:
+                return method(*args, **kwargs)
+
+            return wrapper
+
+        class Locked(PermissionCheck):
+            @forwarding
+            def has_permission(
+                self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+            ) -> bool:
+                return arguments is not None and arguments.get("x") != 7
+
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(Locked(),),
+            reads=Parameters.of(Parameter("x", "integer")),
+        )
+        dispatch(spec, principal=ada, arguments={"x": 1})
+        with pytest.raises(NotPermitted):
+            dispatch(spec, principal=ada, arguments={"x": 7})
+
+    def test_a_forwarding_wrapper_over_a_narrower_one_is_handed_nothing(self, ada: Any) -> None:
+        """Each layer answers for itself: the forwarding one passes the keyword
+        to the narrow one beneath it, which would refuse it, so neither is
+        handed it, whatever the method at the bottom declares."""
+        seen: list[Any] = []
+
+        def guarded(
+            self: Any, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+        ) -> bool:
+            seen.append(arguments)
+            return True
+
+        def narrow(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def narrowed(self: Any, principal: Any, spec: Any) -> bool:
+                return method(self, principal, spec)
+
+            return narrowed
+
+        class Layered(PermissionCheck):
+            has_permission = _forwarding(narrow(guarded))
+
+        dispatch(
+            ServiceSpec(service=Record(), permissions=(Layered(),)), principal=ada, arguments={}
+        )
+        assert seen == [None]
+
+    def test_forwarding_layers_over_an_opted_in_method_are_handed_them(self, ada: Any) -> None:
+        """Every layer between spreads ``**kwargs``, so the keyword reaches the
+        method that asked, however many there are."""
+
+        class Layered(Arguing):
+            has_permission = _forwarding(_forwarding(Arguing.has_permission))
+
+        check = Layered()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", {})
+
+    def test_a_callable_with_no_signature_is_asked_as_before(self, ada: Any) -> None:
+        """A builtin behind a partial has no signature to read; it never
+        opted in, so it is asked as a check that did not."""
+
+        class Builtin(PermissionCheck):
+            has_permission = staticmethod(functools.partial(max, key=id))
+
+        result = dispatch(
+            ServiceSpec(service=lambda: "ran", permissions=(Builtin(),)),
+            principal=ada,
+            arguments={},
+        )
+        assert result.value == "ran"
+
+    def test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing(
+        self, ada: Any
+    ) -> None:
+        """``**kwargs`` alone opts nothing in: the method it forwards to never
+        asked, and would refuse the keyword."""
+        seen: list[tuple[Any, ...]] = []
+
+        def plain(self: Any, principal: Any, spec: Any) -> bool:
+            seen.append((principal, spec))
+            return True
+
+        @functools.wraps(plain)
+        def spreading(self: Any, *args: Any, **kwargs: Any) -> bool:
+            return plain(self, *args, **kwargs)
+
+        class Spread(PermissionCheck):
+            has_permission = spreading
+
+        spec = ServiceSpec(service=Record(), permissions=(Spread(),))
+        dispatch(spec, principal=ada, arguments={})
+        assert seen == [(ada, spec)]
+
+    def test_a_caller_s_value_for_a_key_the_server_fills_is_never_a_check_s(self, ada: Any) -> None:
+        """The caller's value for a read the ``kwargs`` provider is annotated
+        to fill, or a field the ``input_data`` provider is, is checked and then
+        dropped, so it is not the call's argument for a check to decide on."""
+        provider, _ = _project_provider()
+
+        class _ServerTitle(TypedDict):
+            title: str
+
+        def server_title() -> _ServerTitle:
+            return {"title": "server"}
+
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing,),
+            validator=Titled(),
+            reads=PROJECT,
+            kwargs=provider,
+            input_data=server_title,
+        )
+        dispatch(spec, principal=ada, arguments={"project_pk": 99, "title": "caller"})
+        assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]

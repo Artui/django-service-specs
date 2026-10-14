@@ -31,6 +31,7 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
+    Arguing,
     OwnerOnly,
     Record,
     Refuse,
@@ -460,3 +461,19 @@ def test_a_foreign_selector_declaration_is_refused_as_a_selector_spec_is(ada: An
     source = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN))
     with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
         resolve_target(source, principal=ada, arguments={})
+
+
+def test_a_check_declaring_arguments_is_handed_the_target_s_reads(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    arguing = Arguing()
+    resolve_target(_update(arguing), principal=ada, arguments={"pk": note.pk})
+    assert arguing.questions() == [
+        ("has_permission", {"pk": note.pk}),
+        ("has_object_permission", {"pk": note.pk}),
+    ]
+
+
+def test_a_collection_s_scope_check_is_handed_them_too(ada: Any) -> None:
+    arguing = Arguing()
+    resolve_target(_bulk(arguing), principal=ada, arguments={})
+    assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]

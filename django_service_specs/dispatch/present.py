@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.affordances.utils import rendered_affordances, with_affordances
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import sync_result
+from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -46,6 +47,13 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     selector's dispatch left them - annotations on a queryset's rows, or the
     answers it attached to rows a selector returned directly - so presenting
     them costs no query. A spec declaring none presents exactly as before.
+
+    **The call's context.** Each value is handed to the presenter's
+    ``presented()`` with ``result.context``, the
+    [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
+    dispatch built for the call, or ``None`` on a result it did not build. A
+    Presenter that reads nothing of the call is unchanged, since
+    ``presented()`` is ``present()`` unless overridden.
 
     Raises:
         ValueError: ``kind="not_found"``. Presenting nothing as a success is the
@@ -85,7 +93,7 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
         items = list(value)
         if presenter is None:
             return items
-        payload = [_presented(presenter, item) for item in items]
+        payload = [_presented(presenter, item, result.context) for item in items]
         if affordances is None:
             return payload
         return with_affordances(payload, items, affordances, many=True)
@@ -94,14 +102,14 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     # test_an_instance_with_no_presenter_is_returned_as_it_is (the second).
     if value is None or presenter is None:
         return value
-    presented = _presented(presenter, value)
+    presented = _presented(presenter, value, result.context)
     if affordances is None:
         return presented
     return with_affordances(presented, value, affordances, many=False)
 
 
-def _presented(presenter: Presenter, value: Any) -> Any:
-    """``presenter.present(value)``, refusing an answer still to be awaited.
+def _presented(presenter: Presenter, value: Any, context: PresentationContext | None) -> Any:
+    """``presenter.presented(value, context)``, refusing an answer still to be awaited.
 
     ``present`` is sync-only and runs after the write has committed, so an
     answer that is a coroutine - a decorated ``async def present`` - would
@@ -111,7 +119,7 @@ def _presented(presenter: Presenter, value: Any) -> Any:
     row (the same test, ``instance``).
     """
     return sync_result(
-        presenter.present(value),
+        presenter.presented(value, context),
         asked=f"{type(presenter).__qualname__}.present",
         seat="A presenter",
     )

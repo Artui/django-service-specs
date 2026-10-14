@@ -25,6 +25,7 @@ from tests.authorization.utils import (
     refuses,
     refuses_lazily,
 )
+from tests.dispatch.utils import Arguing
 from tests.specs.utils import Foreign
 
 
@@ -186,3 +187,11 @@ def test_a_source_s_grant_is_honoured_for_the_source() -> None:
 
     assert authorize(source, principal, grant=grant) is grant
     assert authorize(kernel_spec(source), principal, grant=grant) is grant
+
+
+def test_a_check_declaring_arguments_is_handed_them_as_given_and_none_without() -> None:
+    arguing, legacy = Arguing(), Allow()
+    spec, principal, arguments = _spec([arguing, legacy]), object(), {"pk": 1}
+    authorize(spec, principal, arguments=arguments)
+    authorize(spec, principal)
+    assert arguing.asked == [("has_permission", arguments), ("has_permission", None)]

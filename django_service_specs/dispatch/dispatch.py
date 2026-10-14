@@ -9,6 +9,7 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     SELECTOR_SOURCE,
+    Overlay,
     conclude_selector,
     finish_service,
     lookup,
@@ -38,6 +39,7 @@ def dispatch(
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
+    extra_kwargs: Mapping[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` for ``principal`` with ``arguments``, in a fixed order.
 
@@ -163,6 +165,30 @@ def dispatch(
     target's ``reads`` are still checked as declared, and keeping them and
     ``target`` in agreement is the caller's. A selector spec refuses it.
 
+    ``extra_kwargs`` is the transport's per-call overlay for the spec's
+    ``kwargs`` provider - what an HTTP view's per-request hook adds - merged
+    **beneath** it, so the spec's own provider wins on a clash. It is treated
+    as the provider's own return is: an ``UNSET`` entry is dropped, a key the
+    provider is annotated to fill is the server's and the overlay's value for
+    it is dropped too, so an overlay never fills a key the provider declined
+    to, and a key naming a registered seed is refused. So, before step one,
+    is a key naming a parameter the spec declares - a read, a Validator
+    field, a target read, a ``many`` spec's list - unless its value is
+    ``UNSET`` or the spec's typed ``kwargs`` provider fills it: the caller's
+    value for a parameter is what steps two and three read, so an overlay
+    standing in for it would run the call on a value they never saw. That is
+    the only refusal of a key the spec could own, because it is static: it
+    turns on the spec alone, never on what a request sent. The overlay is the
+    lowest of three tiers: beneath the spec's provider, and beneath what the
+    Validator computed or bound in step five, so a key among those is left
+    to the Validator's value and the overlay's entry is dropped for that
+    call - a Validator computing a key only from some requests makes it the
+    overlay's on the others, and an error on none. It
+    reaches a selector spec's own selector and a service spec's service,
+    never a target or output selector. There is no overlay for the
+    Validator's input: a transport merges such values into ``arguments``,
+    where the checks and the Validator read one value.
+
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
     selector is a LIST, or a ``many`` service with no output selector that
     returned something, and ``"instance"`` otherwise. Nothing is presented here;
@@ -189,13 +215,18 @@ def dispatch(
         ImproperlyConfigured: a spec that declares no permissions, a parameter,
             a validated, bound or provided value named after a seed, a bound
             value named after a validated one, any value bound for a row of a
-            ``many`` call, shaping declared on a
+            ``many`` call, an ``extra_kwargs`` key naming a declared
+            parameter, shaping declared on a
             selector that returned something other than a queryset, a
             condition on the row with no row to answer it for, or a
             precondition answering with a coroutine or an async generator.
     """
     spec = kernel_spec(spec)
     refuse_target(spec, target)
+    # Copied on entry, so a change to the caller's dict while the call runs -
+    # by a check, say - reaches nothing the run sees
+    # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
+    overlay = Overlay(dict(extra_kwargs or {}))
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
             spec,
@@ -204,9 +235,15 @@ def dispatch(
             grant=grant,
             pool_seeds=pool_seeds,
             unknown_arguments=unknown_arguments,
+            overlay=overlay,
         )
         pool = selector_pool(
-            spec, checked, principal=principal, pool_seeds=pool_seeds, progress=progress
+            spec,
+            checked,
+            principal=principal,
+            pool_seeds=pool_seeds,
+            progress=progress,
+            extra_kwargs=overlay.kwargs,
         )
         value = lookup(
             spec,
@@ -216,7 +253,15 @@ def dispatch(
             run=True,
             transport=progress,
         )
-        return conclude_selector(spec, value, principal=principal, grant=granted, pool=pool)
+        return conclude_selector(
+            spec,
+            value,
+            principal=principal,
+            grant=granted,
+            pool=pool,
+            reserved=pool_seeds.reserved,
+            checked=checked,
+        )
     prepared = prepare_service(
         spec,
         principal,
@@ -226,6 +271,7 @@ def dispatch(
         unknown_arguments=unknown_arguments,
         progress=progress,
         target=target,
+        overlay=overlay,
     )
     if isinstance(prepared, DispatchResult):
         return prepared

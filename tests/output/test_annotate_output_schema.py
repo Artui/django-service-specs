@@ -663,6 +663,52 @@ class TestFormatters:
         ):
             assert self.formatted(subschema) == LOCAL_TIME
 
+    def test_a_schema_stating_nothing_about_its_value_still_admits_null(self) -> None:
+        """An ``any`` field is described as ``{}``, which admits every value and
+        the null with it, so a formatter over one keeps serving the null it
+        passes through unformatted. A title says nothing about the value."""
+        for subschema in ({}, {"title": "Extra"}):
+            assert self.formatted(subschema)["type"] == ["string", "null"]
+
+    @pytest.mark.parametrize(
+        "keyword",
+        [
+            "title",
+            "description",
+            "examples",
+            "default",
+            "$comment",
+            "deprecated",
+            "readOnly",
+            "writeOnly",
+        ],
+    )
+    def test_an_annotation_alone_states_nothing_about_the_value(self, keyword: str) -> None:
+        """Each annotation keyword describes the field, not its value, so a
+        schema carrying only it still admits the null an ``any`` field passes."""
+        assert self.formatted({keyword: "x"})["type"] == ["string", "null"]
+
+    @pytest.mark.parametrize(
+        "subschema",
+        [
+            {"$ref": "#/$defs/Status"},
+            {"allOf": [{"$ref": "#/$defs/Status"}], "description": "s"},
+            {"not": {"type": "null"}},
+            {"properties": {"a": {"type": "string"}}, "required": ["a"]},
+            {"format": "date-time"},
+            {"items": {"type": "string"}},
+            {"anyOf": [{"$ref": "#/$defs/A"}, {"$ref": "#/$defs/B"}]},
+        ],
+        ids=["ref", "allOf", "not", "properties", "format", "items", "anyOf-of-refs"],
+    )
+    def test_a_schema_stating_its_value_another_way_admits_no_null(
+        self, subschema: dict[str, Any]
+    ) -> None:
+        """A reference, a composition, a negation or a shape says something
+        about the value, so only the spellings above admit a null: a formatter
+        over one serves a string, as it did before ``any`` existed."""
+        assert self.formatted(subschema)["type"] == "string"
+
     def test_a_null_constant_stays_admitted(self) -> None:
         assert self.formatted({"const": None}) == {**LOCAL_TIME, "type": ["string", "null"]}
 

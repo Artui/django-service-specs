@@ -51,6 +51,7 @@ from django_service_specs import (
     ServiceValidationError,
     SpecRegistry,
     ValidationContext,
+    authorize,
     check_arguments,
     coerce_flat,
     dispatch,
@@ -313,6 +314,24 @@ class TestDispatching:
         # ``target_checked`` was not claimed, so the object-level check still runs.
         with pytest.raises(NotPermitted):
             dispatching.rename_from_a_view(bob, {"pk": note.pk, "title": "Mine now"})
+
+    def test_a_check_declaring_arguments_refuses_by_what_the_call_names(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Mine")
+        spec = dispatching.lockable_note_spec
+        assert dispatch(spec, principal=ada, arguments={"pk": note.pk}).value == note
+        # Refused before the lookup, so a locked pk is refused whether or not it exists.
+        with pytest.raises(NotPermitted, match="That note is locked."):
+            dispatch(spec, principal=ada, arguments={"pk": 7})
+
+    def test_the_lock_check_refuses_a_call_it_is_handed_no_arguments_for(self, ada: Any) -> None:
+        """``None`` is a transport calling ``authorize()`` without them; the
+        example decides that is a refusal, never an allow."""
+        with pytest.raises(NotPermitted, match="That note is locked."):
+            authorize(dispatching.lockable_note_spec, ada)
+
+    def test_an_overlay_sits_beneath_the_spec_s_provider(self, ada: Any) -> None:
+        result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})
+        assert result.value == "From the caller via web on api"
 
     def test_a_grant_covers_one_principal_and_never_crosses_a_queue(
         self, ada: Any, bob: Any

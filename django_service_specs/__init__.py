@@ -81,6 +81,7 @@ from django_service_specs.output.annotate_output_schema import annotate_output_s
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
+from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
@@ -201,6 +202,7 @@ __all__ = [
     "Parameters",
     "PermissionCheck",
     "PoolSeeds",
+    "PresentationContext",
     "Presenter",
     "PrincipalUnavailable",
     "ProgressReporter",

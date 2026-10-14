@@ -3,6 +3,7 @@ from __future__ import annotations
 import inspect
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -11,10 +12,13 @@ from django.db import connection
 from django.db.models import QuerySet
 from django.db.models.manager import BaseManager
 from django.test.utils import CaptureQueriesContext
+from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
+from django_service_specs.dispatch.paginate_output import paginate_output
 from django_service_specs.dispatch.present import present
+from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.selectors.shape_queryset import shape_queryset
@@ -32,6 +36,8 @@ from tests.dispatch.utils import (
     REFUSED_ARCHIVED,
     REFUSED_CLOSED,
     RENAME,
+    TENANT_SEEDS,
+    Contextual,
     NoteRows,
     Record,
     Titles,
@@ -533,6 +539,117 @@ def test_rows_shaped_outside_dispatch_carry_no_answers_and_are_refused() -> None
 
     with pytest.raises(ImproperlyConfigured, match="no 'affordance__rename__note_archived' answer"):
         present(spec, DispatchResult("list", rows))
+
+
+@pytest.mark.django_db
+class TestTheCallsContext:
+    """A presenter reads the call it presents for: its principal, its target, its seeds."""
+
+    def test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context(self) -> None:
+        ada = make_user("ada")
+        Note.objects.create(owner=ada, title="a")
+        Note.objects.create(owner=ada, title="b")
+        presenter = Contextual()
+        spec = selector_spec(LIST, presenter=presenter)
+
+        result = dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+
+        assert present(spec, result) == [{"title": "a"}, {"title": "b"}]
+        first, second = presenter.contexts
+        assert first is second
+        assert (first.principal, first.target) == (ada, None)
+        assert first.ambient["tenant"] == "tenant-of-ada"
+        assert first.ambient["user"] is ada
+        # The seeds alone: never an argument, a provider's key or the rows.
+        assert set(first.ambient) == {"user", "progress", "tenant"}
+        with pytest.raises(TypeError):
+            first.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
+
+    def test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay(
+        self,
+    ) -> None:
+        """A retrieve's pool holds a read, a ``kwargs`` provider's key and an
+        ``extra_kwargs`` key beside the seeds; the context is handed the seeds
+        alone, since the rest are the call's arguments, not its surroundings."""
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="a")
+        presenter = Contextual()
+
+        class _Server(TypedDict):
+            scope: str
+
+        def server() -> _Server:
+            return {"scope": "server"}
+
+        def by_pk(*, pk: int, scope: str, audit: str) -> QuerySet[Note]:
+            return Note.objects.filter(pk=pk)
+
+        spec = SelectorSpec(
+            kind=RETRIEVE,
+            selector=by_pk,
+            reads=PK,
+            kwargs=server,
+            permissions=OPEN,
+            presenter=presenter,
+        )
+        result = dispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            extra_kwargs={"audit": "overlay"},
+            pool_seeds=TENANT_SEEDS,
+        )
+
+        assert present(spec, result) == {"title": "a"}
+        [context] = presenter.contexts
+        assert set(context.ambient) == {"user", "progress", "tenant"}
+
+    def test_a_service_spec_s_context_carries_its_resolved_target(self) -> None:
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="a")
+        presenter = Contextual()
+        spec = ServiceSpec(
+            service=lambda *, instance: instance,
+            permissions=OPEN,
+            instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+            presenter=presenter,
+        )
+
+        result = dispatch(spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=TENANT_SEEDS)
+
+        assert present(spec, result) == {"title": "a"}
+        [context] = presenter.contexts
+        assert (context.principal, context.target) == (ada, note)
+        assert context.ambient["tenant"] == "tenant-of-ada"
+
+    def test_a_page_presented_for_an_audience_keeps_the_call_s_context(self) -> None:
+        ada = make_user("ada")
+        Note.objects.create(owner=ada, title="a")
+        presenter = Contextual()
+        spec = selector_spec(LIST, presenter=presenter)
+        result = dispatch(spec, principal=ada, arguments={})
+
+        page = paginate_output(result.value, limit=1)
+        present_for_audience(spec, replace(result, value=page.items))
+
+        [context] = presenter.contexts
+        assert context.principal == ada
+
+    def test_a_result_dispatch_did_not_build_is_presented_with_no_context(self) -> None:
+        presenter = Contextual()
+        present(selector_spec(presenter=presenter), DispatchResult("instance", Row("a")))
+        assert presenter.contexts == [None]
+
+    def test_the_context_takes_no_part_in_a_result_s_equality(self) -> None:
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="a")
+        spec = ServiceSpec(
+            service=lambda *, instance: instance,
+            permissions=OPEN,
+            instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        result = dispatch(spec, principal=ada, arguments={"pk": note.pk})
+        assert result == DispatchResult("instance", note, note, note, {})
 
 
 def test_a_foreign_declaration_is_presented_through_its_compiled_spec() -> None:

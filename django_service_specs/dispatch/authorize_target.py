@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.authorization.utils import asked_with, sync_answer
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -14,7 +15,12 @@ from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize_target(
-    spec: ServiceSpec | SelectorSpec | SpecSource, principal: Any, target: Any, *, grant: Grant
+    spec: ServiceSpec | SelectorSpec | SpecSource,
+    principal: Any,
+    target: Any,
+    *,
+    grant: Grant,
+    arguments: Mapping[str, Any] | None = None,
 ) -> None:
     """Run ``spec``'s object-level permission checks against a resolved ``target``.
 
@@ -39,11 +45,20 @@ def authorize_target(
     already refused an undeclared spec before any target could be resolved, so
     this function is never reached with one - iterating an empty tuple in its
     place is simpler than asserting an invariant this module cannot enforce.
+
+    ``arguments`` is handed to each check's method that declares a keyword
+    of that name, and to no other, so a check written before the keyword
+    existed is asked as it always was. Dispatch passes the call's
+    shape-checked arguments as a read-only mapping, whose values are the
+    call's own and must not be mutated; ``None`` when the caller has none to
+    hand.
     """
     spec = kernel_spec(spec)
     if grant.target_checked:
         return
     for check in spec.permissions or ():
-        answer = check.has_object_permission(principal, spec, target)
+        answer = check.has_object_permission(
+            principal, spec, target, **asked_with(check, "has_object_permission", arguments)
+        )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_object_permission"):
             raise NotPermitted(check.message)
