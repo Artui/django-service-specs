@@ -19,6 +19,12 @@ import django_service_specs
 # the extra. Each is keyed to the library it must not pull in.
 OPTIONAL_LIBRARY_ADAPTERS = {"django_service_specs.adapters.pydantic": "pydantic"}
 
+# An adapter that is exported from the root, yet reads its optional library
+# only inside the function that needs it. The library is still not the root's
+# to load, so it is held by the same probe: neither the root nor importing the
+# adapter's module may pull it in. Keyed to the library, as above.
+LAZY_LIBRARY_ADAPTERS = {"django_service_specs.adapters.filters": "django_filters"}
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -78,20 +84,29 @@ import django
 django.setup()
 import django_service_specs
 adapters = {OPTIONAL_LIBRARY_ADAPTERS!r}
+lazy = {LAZY_LIBRARY_ADAPTERS!r}
+loaded_lazy = lambda: sorted(library for library in lazy.values() if library in sys.modules)
+before_lazy = loaded_lazy()
 before = sorted(library for library in adapters.values() if library in sys.modules)
 for adapter in adapters:
     importlib.import_module(adapter)
 after = sorted(library for library in adapters.values() if library in sys.modules)
-print(json.dumps([before, after]))
+for adapter in lazy:
+    importlib.import_module(adapter)
+print(json.dumps([before, after, before_lazy, loaded_lazy()]))
 """
     completed = subprocess.run(
         [sys.executable, "-c", probe], cwd=REPO_ROOT, capture_output=True, text=True
     )
 
     assert completed.returncode == 0, completed.stderr
-    before, after = json.loads(completed.stdout)
+    before, after, lazy_before, lazy_after = json.loads(completed.stdout)
     assert before == []
     assert after == sorted(OPTIONAL_LIBRARY_ADAPTERS.values())
+    # The lazy adapter's library stays unloaded, on the root and on its module:
+    # a top-level import of it would make the root need an optional extra.
+    assert lazy_before == []
+    assert lazy_after == []
 
 
 def test_the_form_page_view_is_not_served_from_this_package() -> None:
