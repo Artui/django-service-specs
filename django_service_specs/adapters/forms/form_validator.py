@@ -109,14 +109,16 @@ class FormValidator(Validator):
       JSON number as well, and an integer whatever its digits. ``FloatField``:
       a ``number``, and an integer past a float's range is refused as the
       field refuses an infinity, ``invalid`` in its own words.
-      ``IntegerField``: an ``integer``. On a ``ModelForm``, a field that
+      ``IntegerField``: an ``integer``. On a ``ModelForm``, a value the form
       cleans to an integer past the range of the model's integer column is
       refused in the words and with the code of the validator Django's model
       field carries from 5.0, ``max_value`` or ``min_value``, before a
       uniqueness check or a constraint queries with it: Django 4.2 states no
-      range for SQLite, whose driver raises ``OverflowError`` for one. A
-      value the field refuses itself is the field's to refuse, its own
-      bounds included.
+      range for SQLite, whose driver raises ``OverflowError`` for one. It is
+      judged where Django 5.0 and later judge it, after the field, its
+      ``clean_<field>()`` and the form's ``clean()``, so each of those answers
+      first, and a value a ``clean_<field>()`` brings inside the range is
+      taken.
     - ``DateTimeField`` and ``DateField``: a ``string`` in the ``date-time`` or
       ``date`` format. ``TimeField`` and ``DurationField``: a ``string``.
     - ``ChoiceField``: choices, with the empty choice dropped and option
@@ -357,9 +359,10 @@ class FormValidator(Validator):
                 del form.fields[name]
         # Taken off the form and refused in its words, beside the rest: the
         # field itself would hand the key to the driver.
-        beyond = {**choices_past_their_columns(form), **_values_beyond_the_column(form)}
+        beyond = choices_past_their_columns(form)
         for name in beyond:
             del form.fields[name]
+        _hold_to_the_columns(form)
         # One branch to coverage, so each condition is held by its own test:
         # test_a_list_naming_a_key_past_the_column_s_range_is_no_choice (the
         # key: without it, the form refuses the rest and passes the key) and
@@ -672,51 +675,74 @@ def _key_field(queryset: models.QuerySet[Any], to_field_name: str | None) -> Any
     return key
 
 
-def _values_beyond_the_column(form: forms.BaseForm) -> dict[str, list[ValidationError]]:
-    """Each ``ModelForm`` field whose integer its model's integer column cannot hold, and its refusal.
+def _hold_to_the_columns(form: forms.BaseForm) -> None:
+    """Have a bound ``ModelForm`` refuse a value its integer column cannot hold, before the model sees it.
+
+    A ``ModelForm`` writes what it cleaned onto its instance and validates the
+    instance in its ``_post_clean``, the step after the form's own ``clean()``
+    that every validation runs. Its uniqueness checks and constraints query
+    with each value, and Django 4.2 states no range for SQLite, whose driver
+    raised ``OverflowError`` for a value past the column's. So the values are
+    judged as that step starts, by ``_values_beyond_the_column``, and each
+    refusal is added to the form as a field's own error, which takes the value
+    out of ``cleaned_data``: the instance keeps what it held, and Django leaves
+    a field with an error out of every check on the instance. Wrapped on the
+    one bound form, which the Validator builds per call and never hands out.
+    A plain form has no model to read a column from
+    (test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number).
+    """
+    if not isinstance(form, forms.BaseModelForm):
+        return
+    # ``Any``, as Django's own step is to the stubs, which declare it on
+    # neither form class.
+    bound: Any = form
+    post_clean = bound._post_clean
+
+    def checked() -> None:
+        for name, refusal in _values_beyond_the_column(form).items():
+            form.add_error(name, refusal)
+        post_clean()
+
+    bound._post_clean = checked
+
+
+def _values_beyond_the_column(form: forms.BaseModelForm) -> dict[str, ValidationError]:
+    """Each value ``form`` cleaned that its model's integer column cannot hold, and its refusal.
 
     In the words, and with the code, of the validator Django's model integer
     field carries from 5.0, where the backend states the column's range:
-    ``max_value`` past its top, ``min_value`` past its bottom. Django 4.2
-    states none for SQLite, so the form took such a value, and a uniqueness
-    check or a constraint querying with it raised ``OverflowError`` from the
-    driver. The range is the one ``integer_column_range`` reads, from the
-    database the row is written to. The value is the one the field cleans
-    the argument to, so a string of digits is the integer it spells; one the
-    field refuses is left to it, so its own words, its own bounds included,
-    answer first, as they do where Django validates the model, and the model
-    is then never asked about that field. A ``clean_<field>()`` method is the
-    exception: it is not run on a value past the column's range, where
-    Django 5.0 or later, refusing the value itself, ran it first. A model choice field is ``choices_past_their_columns``'s, since its
-    column is a foreign key, which holds the key of another row.
+    ``max_value`` past its top, ``min_value`` past its bottom. The range is
+    the one ``integer_column_range`` reads, from the database the row is
+    written to. The value is the one the form cleaned, after the field, its
+    ``clean_<field>()`` and the form's ``clean()``, read as the model reads
+    it, so digits a text field cleans to are the integer they spell
+    (test_digits_a_text_field_cleans_to_are_held_to_the_column). A value the
+    field or a ``clean`` method refused is no longer in ``cleaned_data``, and
+    is theirs. A model choice field is ``choices_past_their_columns``'s, since
+    its column is a foreign key, which holds the key of another row.
     """
-    beyond: dict[str, list[ValidationError]] = {}
-    # test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number fails
-    # without this: a plain form has no model to read a column from.
-    if not isinstance(form, forms.BaseModelForm):
-        return beyond
+    beyond: dict[str, ValidationError] = {}
     model = form._meta.model
-    columns = {column.name: column for column in model._meta.concrete_fields}
+    columns: dict[str, Any] = {column.name: column for column in model._meta.concrete_fields}
     using = router.db_for_write(model, instance=form.instance)
-    for name, field in form.fields.items():
-        bounds = integer_column_range(columns.get(name), using)
+    for name, cleaned in form.cleaned_data.items():
+        column: Any = columns.get(name)
+        bounds = integer_column_range(column, using)
         # test_an_integer_field_no_column_holds_is_the_field_s fails without
-        # this: a field that is no model column has no range to unpack. It
-        # comes first so that a model choice field, which queries to clean,
-        # is never cleaned twice.
+        # this: a field that is no model column has no range to unpack.
         if bounds is None:
             continue
         try:
-            value = field.clean(form.data.get(name))
+            value = column.to_python(cleaned)
         except ValidationError:
-            # test_a_field_s_own_limit_answers_before_the_column_s and
-            # test_a_value_that_is_no_integer_is_left_to_the_field.
+            # Text the column reads as no number: the model refuses it, in its
+            # words (test_text_the_column_reads_as_no_number_is_the_model_s).
             continue
         # test_an_optional_integer_left_out_is_the_field_s fails without
         # this: an optional field sent nothing cleans to ``None``.
-        if type(value) is not int:
+        if value is None:
             continue
         refusal = integer_range_refusal(value, bounds)
         if refusal is not None:
-            beyond[name] = [refusal]
+            beyond[name] = refusal
     return beyond

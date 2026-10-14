@@ -952,6 +952,65 @@ class TestANumberPastItsRange:
             "views": [("Enter a whole number.", "invalid")]
         }
 
+    @pytest.fixture(params=["stated", "unstated"])
+    def ranges(self, request: pytest.FixtureRequest) -> None:
+        """The range the backend states, and none, as Django 4.2's SQLite states."""
+        if request.param == "unstated":
+            request.getfixturevalue("unstated_ranges")
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_clean_method_bringing_a_value_inside_the_range_is_taken(self) -> None:
+        # The method runs on the value the field cleaned, as Django runs it,
+        # and the column holds what it hands back.
+        class Clamped(_EditionForm):
+            def clean_number(self) -> int:
+                return min(self.cleaned_data["number"], 10)
+
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        cleaned = FormValidator(Clamped).validate({"book": book.pk, "number": 2**63}, CONTEXT)
+        assert cleaned["number"] == 10
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("ranges")
+    def test_a_clean_method_s_own_refusal_answers_for_a_value_past_the_range(self) -> None:
+        class Capped(_EditionForm):
+            def clean_number(self) -> int:
+                raise forms.ValidationError("Too many editions.", code="too_many")
+
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(Capped, {"book": book.pk, "number": 2**63})
+        assert coded(detail) == {"number": [("Too many editions.", "too_many")]}
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_digits_a_text_field_cleans_to_are_held_to_the_column(self) -> None:
+        # The model reads the digits as the integer they spell, and the
+        # constraint's check queried with it.
+        form_class = type("Spelled", (_EditionForm,), {"number": forms.CharField()})
+        book = Book.objects.create(
+            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+        )
+        detail = _refusal(form_class, {"book": book.pk, "number": str(2**63)})
+        assert coded(detail) == {
+            "number": [
+                ("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")
+            ]
+        }
+
+    @pytest.mark.django_db
+    @pytest.mark.usefixtures("unstated_ranges")
+    def test_text_the_column_reads_as_no_number_is_the_model_s(self) -> None:
+        # Never compared with the range: the model refuses it in its words.
+        form_class = _form_over_views(forms.CharField())
+        assert coded(_refusal(form_class, {"title": "Hi", "views": "abc"})) == {
+            "views": [("\u201cabc\u201d value must be an integer.", "invalid")]
+        }
+
     @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
     def test_the_values_at_either_end_of_the_column_s_range_are_taken(self) -> None:

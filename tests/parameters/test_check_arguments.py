@@ -268,6 +268,7 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
         ("number", "3.0", 3.0),
         ("number", " 3 ", 3),
         ("number", "1e3", 1000.0),
+        ("number", "1E3", 1000.0),
         ("number", "2.5", 2.5),
     ],
 )

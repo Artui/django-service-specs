@@ -65,3 +65,18 @@ def test_a_number_spelling_an_integer_is_that_exact_int(text: str, number: float
     parsed = parse_number("number", text)
     assert parsed == number
     assert type(parsed) is type(number)
+
+
+@pytest.mark.parametrize(
+    ("text", "number"), [("1E5", 100000.0), ("1e5", 100000.0), ("2.5E-1", 0.25)]
+)
+def test_an_exponent_in_either_case_spells_a_float(text: str, number: float) -> None:
+    # JSON spells an exponent ``e`` or ``E``, and so does a decoder's float.
+    parsed = parse_number("number", text)
+    assert parsed == number
+    assert type(parsed) is float
+
+
+@pytest.mark.parametrize("text", ["1E400", "-1E400"])
+def test_an_exponent_past_a_float_s_range_in_either_case_spells_none(text: str) -> None:
+    assert parse_number("number", text) is None
