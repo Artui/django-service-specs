@@ -1,14 +1,17 @@
 """Internal helpers shared across the ``relations`` package.
 
-``pk_input_targets``, ``integer_column_range``, ``integer_range_refusal``
-and ``key_past_its_column`` are the exceptions to the package name. The
-write path in ``mutations`` shares the first, so the three spellings of a
-primary key are written down once rather than agreed between two modules.
-The others are shared by every place a number a caller sent reaches an
-integer column - a relation write's scoped match, the forms adapter's model
-choice field and ``ModelForm`` integer column, ``resolve_principal``, and
-the selector applying a FilterSet's filters - so each is held to one reading
-of the column's range, and refused past it in one set of words.
+``pk_input_targets`` and the helpers about a number and an integer column
+are the exceptions to the package name. The write path in ``mutations``
+shares the first, so the three spellings of a primary key are written down
+once rather than agreed between two modules. The others are shared by every
+place a number a caller sent reaches an integer column - a relation write's
+scoped match, the forms adapter's model choice field and ``ModelForm``
+integer column, ``resolve_principal``, and the selector applying a
+FilterSet's filters - so each reads a lookup's path to its column one way
+(``path_column``), and refuses a number in one set of words. A key is held
+to the range its column states (``integer_column_range``), since past it no
+row holds the key on any version; a filter's value, which a comparison
+reads, is held to ``WIDEST_INTEGER``, what any driver binds.
 """
 
 from __future__ import annotations

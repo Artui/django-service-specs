@@ -144,7 +144,9 @@ and a payload carrying a `match_key` raises `ImproperlyConfigured` rather than
 letting any caller write any row of that model by guessing a key. A key
 outside the scope is refused with `ServiceValidationError`, at the row, and so
 is one past the range of the integer column it is matched on, which no row
-holds, before the lookup hands it to the database.
+holds, before the lookup hands it to the database. A `match_key` written as a
+path, `catalog__pk`, is held to the column the path ends on, and one naming a
+relation to the key of the row it reaches.
 
 What removing a row *does* is the **`orphan`** setting of a child collection,
 a reverse one-to-one or a generic relation. `"auto"`, the default, reads the

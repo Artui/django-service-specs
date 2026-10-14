@@ -78,18 +78,20 @@ before the form queries, because Django hands a `ModelMultipleChoiceField`'s
 keys to the database driver in an `__in` lookup, and SQLite's raises
 `OverflowError` for one past 64 bits on every Django version, as it does for a
 `ModelChoiceField`'s on Django 4.2. The range is the database's own for the
-column, as Django reads it to answer an exact lookup past it with no rows.
+column, as Django reads it to answer an exact lookup past it with no rows, and
+a key sent as a string of digits is the integer it spells.
 
-A `ModelForm`'s field that cleans to an integer past the range of its
-model's integer column is refused in the words, and with the code, of the
-validator Django's model field carries from 5.0: `max_value` past its top,
-`min_value` past its bottom. Django 4.2 states no range for SQLite, so there
-the form took such a value, and a uniqueness check or a constraint querying
-with it raised the driver's `OverflowError`. A value the field refuses itself
-is refused in the field's words, its own bounds included, as where Django
-validates the model. A `clean_<field>()` method is not run on a value past
-the column's range: where Django 5.0 or later refuses one itself, the method
-ran first, and a refusal of its own was the one reported.
+A `ModelForm` value past the range of its model's integer column is refused in
+the words, and with the code, of the validator Django's model field carries
+from 5.0: `max_value` past its top, `min_value` past its bottom. Django 4.2
+states no range for SQLite, so there the form took such a value, and a
+uniqueness check or a constraint querying with it raised the driver's
+`OverflowError`. The value is judged where Django 5.0 and later judge it: after
+the form field, its `clean_<field>()` and the form's `clean()`, on what they
+hand back, read as the model reads it, so digits a text field cleans to are
+the integer they spell. So a value the field refuses is refused in the field's
+words, its own bounds included, a `clean_<field>()` refusing it is reported in
+its own words, and one that brings the value inside the range has it taken.
 
 Every choice field's choices carry their labels as `choice_labels`, the label
 Django displays keyed by the value as the caller sends it, so a schema states

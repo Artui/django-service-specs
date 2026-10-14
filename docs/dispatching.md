@@ -265,7 +265,8 @@ HTTP has a session to resolve a user from; a queue payload, a command argument
 or an agent's notion of who is asking carries an identifier.
 [`resolve_principal`][django_service_specs.authorization.resolve_principal.resolve_principal]
 is the one place that becomes a user row, and it refuses a missing, malformed
-or deactivated one, or a key past its integer column's range, with
+or deactivated one, or a key past its integer column's range, an infinite
+one included, with
 [`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable].
 It never falls back to an anonymous user: an operation dispatched with no
 resolvable principal has no principal, not an anonymous one. The stock
