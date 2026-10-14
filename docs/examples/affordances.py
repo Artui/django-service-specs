@@ -19,7 +19,6 @@ from django_service_specs import (
     authorize_target,
     base_pool,
     bind_arguments,
-    check_requested_input,
     dispatch,
     enforce_affordances,
     present,
@@ -134,21 +133,6 @@ def purge(user: Any, arguments: dict[str, Any]) -> int:
 
 
 # --8<-- [end:confirm]
-
-
-# --8<-- [start:check-requested]
-def purge_or_ask(user: Any, arguments: dict[str, Any]) -> int | dict[str, Any]:
-    """A transport's step: the count, or the question to ask before the next call."""
-    try:
-        return purge(user, arguments)
-    except AdditionalInputRequired as asked:
-        # Before the question is rendered: one this route could not ask, or
-        # whose answer the operation could not take, is the raiser's error.
-        check_requested_input(purge_spec, asked.schema)
-        return {"ask": asked.schema}
-
-
-# --8<-- [end:check-requested]
 
 
 # --8<-- [start:selector]

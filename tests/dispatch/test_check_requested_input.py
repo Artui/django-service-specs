@@ -5,12 +5,14 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -27,6 +29,7 @@ UNDECLARED = "declares no top-level parameter"
 NOT_A_SCHEMA = "instead of a schema object"
 UNRENDERABLE = "which not every transport can render"
 DISAGREES = "would fail the shape check"
+SERVER_OWNED = "fills it, so the caller's answer would be dropped"
 
 
 class Declaring(Validator):
@@ -148,6 +151,52 @@ class TestUndeclared:
     def test_a_schema_that_is_no_mapping_is_refused(self, check: Check) -> None:
         message = refusal(check, declaring(), ["confirmed"])
         assert "not a mapping" in message
+
+
+class _Confirmed(TypedDict):
+    confirmed: bool
+
+
+def fill_confirmed() -> _Confirmed:
+    return {"confirmed": False}
+
+
+class TestServerOwned:
+    def test_a_declared_key_a_provider_fills_is_refused(self, check: Check) -> None:
+        # Declared at the top level, so the undeclared check passes it, and the
+        # provider's value replaces whatever the caller answers.
+        spec = ServiceSpec(
+            service=service,
+            reads=Parameters.of(Parameter("confirmed", "boolean")),
+            kwargs=fill_confirmed,
+        )
+        message = refusal(check, spec, {"confirmed": {"type": "boolean"}})
+        assert "'confirmed'" in message
+        assert SERVER_OWNED in message
+        assert UNDECLARED not in message
+
+    def test_the_server_owned_check_answers_before_the_fragment_is_read(self, check: Check) -> None:
+        spec = ServiceSpec(
+            service=service,
+            reads=Parameters.of(Parameter("confirmed", "boolean")),
+            kwargs=fill_confirmed,
+        )
+        message = refusal(check, spec, {"confirmed": "boolean"})
+        assert SERVER_OWNED in message
+        assert NOT_A_SCHEMA not in message
+
+    def test_the_pool_seeds_given_are_the_ones_read(self, django_assert_num_queries: Any) -> None:
+        # A parameter a registered seed occupies is refused at the call, and
+        # the parameters are assembled against the default seeds, so a seed
+        # registered for the call is read from the keyword or not at all.
+        spec = declaring(Parameter("confirmed", "boolean"))
+        schema = {"confirmed": {"type": "boolean"}}
+        seeds = PoolSeeds().extend(confirmed=lambda: None)
+        with django_assert_num_queries(0):
+            check_requested_input(spec, schema)
+            with pytest.raises(ImproperlyConfigured) as raised:
+                check_requested_input(spec, schema, pool_seeds=seeds)
+        assert SERVER_OWNED in str(raised.value)
 
 
 class TestNotASchema:

@@ -192,16 +192,13 @@ the spec's top-level parameters and the schema, runs no query, and raises
 `ImproperlyConfigured` naming the key for a key no top-level parameter
 declares, for a fragment that is not a schema object, for a shape some
 transport cannot render, and for a `type` the declared parameter does not
-take. The narrowest renderer is an MCP elicitation form: a `string`, `number`,
+take. A declared key the server fills - one a provider is annotated to fill,
+or a seed the call's `pool_seeds` registers - is refused too, because
+dispatch drops the caller's value for it and the answer would never arrive.
+The narrowest renderer is an MCP elicitation form: a `string`, `number`,
 `integer` or `boolean`, or an `array` whose `items` list enum values. On a
 `many` spec the top level is the list and the spec's `reads`, so a
 confirmation asked once for the whole call is a `reads` parameter.
-
-```python
---8<--
-docs/examples/affordances.py:check-requested
---8<--
-```
 
 ## Declaring idempotency
 

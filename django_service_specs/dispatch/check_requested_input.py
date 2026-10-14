@@ -8,7 +8,9 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.parameters.parameter import Parameter
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 
 _SCALAR_TYPES = frozenset({"string", "number", "integer", "boolean"})
@@ -32,7 +34,10 @@ list, which is read on its own."""
 
 
 def check_requested_input(
-    spec: ServiceSpec | SelectorSpec, schema: Mapping[str, Any] | None
+    spec: ServiceSpec | SelectorSpec,
+    schema: Mapping[str, Any] | None,
+    *,
+    pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
 ) -> None:
     """Refuse an ``AdditionalInputRequired.schema`` some route could not ask, or could not hear answered.
 
@@ -51,6 +56,12 @@ def check_requested_input(
       carry it. On a ``many`` spec the top level is the list and the spec's
       ``reads``, so a value asked once for the whole call is a ``reads``
       parameter, and a key declared only inside a row is refused.
+    - **A key the server fills**: one a provider the dispatch runs is
+      annotated to fill, or a seed ``pool_seeds`` registers, as
+      [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+      reads them. Dispatch drops the caller's value for such a key, so the
+      answer would never reach the service. ``pool_seeds`` is the call's, as
+      ``dispatch`` takes it.
     - **A fragment that is not a schema object**: a ``dict``, as JSON carries
       one.
     - **A shape some transport cannot render.** The narrowest is an MCP
@@ -82,10 +93,17 @@ def check_requested_input(
             "argument names to schema fragments."
         )
     parameters = spec.parameters()
+    owned = server_owned_keys(spec, pool_seeds=pool_seeds)
     for name, fragment in schema.items():
         declared = parameters.get(name)
         if declared is None:
             raise ImproperlyConfigured(_undeclared(spec, name))
+        if name in owned:
+            raise ImproperlyConfigured(
+                f"AdditionalInputRequired asked for {name!r}, and a provider or a pool seed "
+                "fills it, so the caller's answer would be dropped: ask under a key the "
+                "server leaves to the caller."
+            )
         if not isinstance(fragment, dict):
             raise ImproperlyConfigured(
                 f"AdditionalInputRequired asked for {name!r} with {type(fragment).__name__} "
