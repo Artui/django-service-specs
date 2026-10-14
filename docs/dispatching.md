@@ -59,9 +59,10 @@ three and four, where its scope check is asked of `None`, never of the
 caller's rows. Step one raises only the top level's refusal; a row's is raised
 in step five, beside the Validator's refusals of the other rows, so a
 principal refused in step two learns nothing about the rows it sent. That
-node reads in index order, then the list's own `non_field_errors`; it mixes
-`int` keys with a string one, so `json.dumps(..., sort_keys=True)` over it
-raises `TypeError` - write it as it stands.
+node reads in index order, then the list's own `non_field_errors`. Where it
+carries that message it mixes `int` keys with a string one, so
+`json.dumps(..., sort_keys=True)` over it raises `TypeError` - write it as it
+stands.
 
 The order is the design, and each place reads as if it could move:
 

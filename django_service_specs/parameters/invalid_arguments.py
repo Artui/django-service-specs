@@ -36,9 +36,10 @@ class InvalidArguments(DispatchError):
 
     Every leaf is a list of ``str``, so the whole tree is JSON-serializable once
     the integer keys are written as strings, which is what ``json.dumps`` does.
-    A ``many`` call's node mixes ``int`` indices with ``non_field_errors``, so
-    ``json.dumps(..., sort_keys=True)`` over it raises ``TypeError``: it is
-    already in reading order, and is written as it stands.
+    A ``many`` call's node that carries the list's own message mixes ``int``
+    indices with ``non_field_errors``, so ``json.dumps(..., sort_keys=True)``
+    over it raises ``TypeError``: it is already in reading order, and is
+    written as it stands.
     """
 
     default_message: ClassVar[str] = "Invalid arguments."
