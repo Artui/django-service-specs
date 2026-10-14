@@ -51,6 +51,7 @@ from django_service_specs.mutations.child_collection_change import ChildCollecti
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.mutations.delete_relations import delete_relations
 from django_service_specs.mutations.field_change import FieldChange
+from django_service_specs.mutations.register_row_error import register_row_error
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.mutations.update_from_input import update_from_input
@@ -102,10 +103,17 @@ from django_service_specs.selectors.retrieve_selector import RetrieveSelector
 from django_service_specs.selectors.run_selector import run_selector
 from django_service_specs.selectors.selector import Selector
 from django_service_specs.selectors.shape_queryset import shape_queryset
+from django_service_specs.services.acreate_model import acreate_model
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
+from django_service_specs.services.adelete_collection import adelete_collection
+from django_service_specs.services.adelete_model import adelete_model
 from django_service_specs.services.arun_service import arun_service
+from django_service_specs.services.aupdate_model import aupdate_model
+from django_service_specs.services.create_model import create_model
 from django_service_specs.services.create_service import CreateService
+from django_service_specs.services.delete_collection import delete_collection
+from django_service_specs.services.delete_model import delete_model
 from django_service_specs.services.delete_service import DeleteService
 from django_service_specs.services.implements import implements
 from django_service_specs.services.is_async import is_async
@@ -114,6 +122,7 @@ from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.services.update_model import update_model
 from django_service_specs.services.update_service import UpdateService
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -134,6 +143,10 @@ from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
 
 __all__ = [
+    "DEFAULT_PAGE_SIZE",
+    "DEFAULT_POOL_SEEDS",
+    "RESERVED_POOL_SEEDS",
+    "UNSET",
     "ActionUnavailable",
     "AdditionalInputRequired",
     "Affordance",
@@ -145,8 +158,6 @@ __all__ = [
     "ChildSpec",
     "CodedMessage",
     "CreateService",
-    "DEFAULT_PAGE_SIZE",
-    "DEFAULT_POOL_SEEDS",
     "DataclassPresenter",
     "DataclassValidator",
     "DeleteService",
@@ -175,7 +186,6 @@ __all__ = [
     "PrincipalUnavailable",
     "ProgressReporter",
     "ProviderKeys",
-    "RESERVED_POOL_SEEDS",
     "RegisteredSpec",
     "RelatedObjectChange",
     "RelationMode",
@@ -195,19 +205,21 @@ __all__ = [
     "ServiceValidationError",
     "SpecRegistry",
     "SpecView",
-    "UNSET",
     "UnknownArguments",
     "Unrestricted",
     "UnsetType",
     "UnsupportedMediaType",
     "UpdateService",
-    "ValidationContext",
     "Validated",
+    "ValidationContext",
     "Validator",
     "ValueFormatter",
     "__version__",
     "acreate_from_input",
+    "acreate_model",
     "add_argument_errors",
+    "adelete_collection",
+    "adelete_model",
     "adelete_relations",
     "adispatch",
     "adispatch_request",
@@ -221,6 +233,7 @@ __all__ = [
     "audience_projection_for_spec",
     "aunmet_operation_affordance",
     "aupdate_from_input",
+    "aupdate_model",
     "authorize",
     "authorize_scope",
     "authorize_target",
@@ -232,6 +245,9 @@ __all__ = [
     "coerce_flat",
     "combine_progress",
     "create_from_input",
+    "create_model",
+    "delete_collection",
+    "delete_model",
     "delete_relations",
     "dispatch",
     "dispatch_request",
@@ -243,7 +259,6 @@ __all__ = [
     "is_queryset",
     "materialize_retrieve",
     "null_progress",
-    "provider_keys",
     "operation_affordances",
     "output_schema",
     "paginate_output",
@@ -251,18 +266,21 @@ __all__ = [
     "present",
     "present_for_audience",
     "project_payload",
+    "provider_keys",
+    "register_row_error",
     "request_arguments",
     "request_principal",
     "resolve_callable_kwargs",
-    "server_owned_keys",
     "resolve_principal",
     "resolve_target",
     "route_arguments",
     "run_selector",
     "run_service",
+    "server_owned_keys",
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
     "unmet_operation_affordance",
     "update_from_input",
+    "update_model",
 ]

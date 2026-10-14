@@ -735,6 +735,46 @@ _DJANGO_WRITE_ERRORS = (ValueError, TypeError, ValidationError)
 # The helper path translates both kinds.
 _HELPER_WRITE_ERRORS = (*_ROW_WRITE_ERRORS, *_DJANGO_WRITE_ERRORS)
 
+# Every class a row write re-roots by the kernel's own rule, which a
+# registration may neither narrow nor cover: see ``register_row_error``.
+KERNEL_ROW_ERRORS: tuple[type[Exception], ...] = _HELPER_WRITE_ERRORS
+
+# A refusal class this package cannot name, mapped to the function reading its
+# detail, filled by ``register_row_error``. Process-wide, as the relation specs
+# reading it are; a test registering a class of its own restores it after.
+ROW_ERROR_READERS: dict[type[Exception], Callable[[Any], Any]] = {}
+
+
+def _row_write_errors() -> tuple[type[Exception], ...]:
+    """What a row service's refusal is caught as: the kernel's two and every registered class.
+
+    Read per call rather than once, because a registration may come after
+    this module loads, which is the usual order: an adapter registers in its
+    own import or ``AppConfig.ready()``.
+    """
+    return (*_ROW_WRITE_ERRORS, *ROW_ERROR_READERS)
+
+
+def _helper_write_errors() -> tuple[type[Exception], ...]:
+    """What the helper path catches: a row service's refusals and Django's write failures."""
+    return (*_HELPER_WRITE_ERRORS, *ROW_ERROR_READERS)
+
+
+def _registered_reader(exc: Exception) -> tuple[type[Exception], Callable[[Any], Any]] | None:
+    """The registered class ``exc`` was caught as, with its reader, or ``None``.
+
+    Read off the method resolution order, because ``except`` catches a
+    subclass as its base: the nearest registered class answers, so a
+    narrower registration beside a wider one reads its own subclass
+    (``test_the_nearest_registered_class_answers``).
+    """
+    mro = type(exc).__mro__
+    caught_as = [(klass, reader) for klass, reader in ROW_ERROR_READERS.items() if klass in mro]
+    if not caught_as:
+        return None
+    return min(caught_as, key=lambda registered: mro.index(registered[0]))
+
+
 # Set on an exception raised by caller code the helpers run, as it passes out.
 # An attribute rather than a wrapper, because the rule for caller code is that
 # it passes through untouched: the caller catches the very exception it raised.
@@ -757,10 +797,7 @@ def _caller_raised(exc: BaseException) -> bool:
     return getattr(exc, _CALLER_RAISED, False) is True
 
 
-def _namespaced_row_error(
-    exc: ServiceValidationError | InvalidArguments | ValueError | TypeError | ValidationError,
-    path: _RowPath,
-) -> ServiceValidationError | InvalidArguments:
+def _namespaced_row_error(exc: Exception, path: _RowPath) -> Exception:
     """The same refusal, with the relation (and row) that carried it named.
 
     The class of a refusal is preserved, because it says who refused. One of
@@ -780,6 +817,12 @@ def _namespaced_row_error(
     messages are rendered by ``coded_messages``, the reading every step that
     hands on Django's ``ValidationError`` shares; a field-keyed one is read
     a field at a time here, so its field names stay the row's addresses.
+
+    A class registered through
+    [`register_row_error`][django_service_specs.mutations.register_row_error.register_row_error]
+    is read by its reader and rebuilt as the registered class from the
+    re-rooted tree. It is asked before the fallback, which would otherwise
+    flatten it into the ``str()`` of an ``InvalidArguments``.
     """
     if isinstance(exc, ServiceValidationError):
         return ServiceValidationError(path.namespace(exc.detail))
@@ -792,17 +835,22 @@ def _namespaced_row_error(
             else coded_messages(exc.error_list)
         )
         return InvalidArguments(path.namespace(detail))
+    registered = _registered_reader(exc)
+    if registered is not None:
+        error_class, read_detail = registered
+        return error_class(path.namespace(read_detail(exc)))
     return InvalidArguments(path.namespace([CodedMessage(str(exc), "invalid")]))
 
 
-def _resolve_m2m(
+def resolve_m2m(
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None,
     data: Any,
 ) -> dict[str, Any] | None:
     """A row's ``m2m=`` as a plain ``dict``, or ``None`` when none is declared.
 
     A spec states it as a static mapping (``{"tags": [tag1, tag2]}``) or as a
-    callable deriving one from the row. The callable is caller code, so an
+    callable deriving one from the row, and so does a model write helper in
+    ``services/`` for the row it writes. The callable is caller code, so an
     error it raises is marked on its way out: it runs inside the parent row's
     write, whose translation would otherwise read it as that row's own data
     failing. ``cast`` records which branch is which, because a class can in
@@ -1074,7 +1122,7 @@ def _write_forward_relation(
     if value is None:
         return (None, RelatedObjectChange(relation=relation, outcome=RelationOutcome.CLEARED))
     item = coerce_to_dict(value)
-    row_m2m = _resolve_m2m(spec.m2m, item)
+    row_m2m = resolve_m2m(spec.m2m, item)
     path = _RowPath(relation)
     target = _match_scoped_target(item, spec, path=path, context=context)
     if target is None:
@@ -1098,7 +1146,7 @@ async def _awrite_forward_relation(
     if value is None:
         return (None, RelatedObjectChange(relation=relation, outcome=RelationOutcome.CLEARED))
     item = coerce_to_dict(value)
-    row_m2m = _resolve_m2m(spec.m2m, item)
+    row_m2m = resolve_m2m(spec.m2m, item)
     path = _RowPath(relation)
     target = await _amatch_scoped_target(item, spec, path=path, context=context)
     if target is None:
@@ -1309,7 +1357,7 @@ def _write_reverse_one_to_one(
         sync_relation_cache(parent, relation, None)
         return RelatedObjectChange(relation=relation, outcome=status, pk=pk)
     item = coerce_to_dict(value)
-    row_m2m = _resolve_m2m(spec.m2m, item)
+    row_m2m = resolve_m2m(spec.m2m, item)
     path = _RowPath(relation)
     if existing is None:
         row = _create_row(
@@ -1357,7 +1405,7 @@ async def _awrite_reverse_one_to_one(
         sync_relation_cache(parent, relation, None)
         return RelatedObjectChange(relation=relation, outcome=status, pk=pk)
     item = coerce_to_dict(value)
-    row_m2m = _resolve_m2m(spec.m2m, item)
+    row_m2m = resolve_m2m(spec.m2m, item)
     path = _RowPath(relation)
     if existing is None:
         row = await _acreate_row(
@@ -1426,7 +1474,7 @@ def _write_owned_collection(
     matched: set[Any] = set()
     rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
-        child_m2m = _resolve_m2m(spec.m2m, item)
+        child_m2m = resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
         key = item.get(spec.match_key)
         if not _omitted(key) and key in existing_by_key:
@@ -1488,7 +1536,7 @@ def _write_m2m_relation(
     targets: list[Any] = []
     rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
-        row_m2m = _resolve_m2m(spec.m2m, item)
+        row_m2m = resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
         match = _match_scoped_target(item, spec, path=path, context=context)
         if match is None:
@@ -1561,7 +1609,7 @@ def _create_row(
     if spec.create_service is not None:
         try:
             return _run_child_service(spec.create_service, _child_pool(context, data=data, **seeds))
-        except _ROW_WRITE_ERRORS as exc:
+        except _row_write_errors() as exc:
             raise _namespaced_row_error(exc, path) from exc
     try:
         return create_from_input(
@@ -1573,7 +1621,7 @@ def _create_row(
             relations=spec.relations,
             context=context,
         ).instance
-    except _HELPER_WRITE_ERRORS as exc:
+    except _helper_write_errors() as exc:
         if _caller_raised(exc):
             raise
         raise _namespaced_row_error(exc, path) from exc
@@ -1601,7 +1649,7 @@ async def _acreate_row(
                 relation=path.relation,
                 slot="create_service",
             )
-        except _ROW_WRITE_ERRORS as exc:
+        except _row_write_errors() as exc:
             raise _namespaced_row_error(exc, path) from exc
     try:
         result = await acreate_from_input(
@@ -1613,7 +1661,7 @@ async def _acreate_row(
             relations=spec.relations,
             context=context,
         )
-    except _HELPER_WRITE_ERRORS as exc:
+    except _helper_write_errors() as exc:
         if _caller_raised(exc):
             raise
         raise _namespaced_row_error(exc, path) from exc
@@ -1643,7 +1691,7 @@ def _update_row(
                 spec.update_service,
                 _child_pool(context, data=data, instance=instance, **seeds),
             )
-        except _ROW_WRITE_ERRORS as exc:
+        except _row_write_errors() as exc:
             raise _namespaced_row_error(exc, path) from exc
         return instance if returned is None else returned
     try:
@@ -1656,7 +1704,7 @@ def _update_row(
             relations=spec.relations,
             context=context,
         )
-    except _HELPER_WRITE_ERRORS as exc:
+    except _helper_write_errors() as exc:
         if _caller_raised(exc):
             raise
         raise _namespaced_row_error(exc, path) from exc
@@ -1685,7 +1733,7 @@ async def _aupdate_row(
                 relation=path.relation,
                 slot="update_service",
             )
-        except _ROW_WRITE_ERRORS as exc:
+        except _row_write_errors() as exc:
             raise _namespaced_row_error(exc, path) from exc
         return instance if returned is None else returned
     try:
@@ -1698,7 +1746,7 @@ async def _aupdate_row(
             relations=spec.relations,
             context=context,
         )
-    except _HELPER_WRITE_ERRORS as exc:
+    except _helper_write_errors() as exc:
         if _caller_raised(exc):
             raise
         raise _namespaced_row_error(exc, path) from exc
@@ -1792,7 +1840,7 @@ async def _awrite_owned_collection(
     matched: set[Any] = set()
     rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
-        child_m2m = _resolve_m2m(spec.m2m, item)
+        child_m2m = resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
         key = item.get(spec.match_key)
         if not _omitted(key) and key in existing_by_key:
@@ -1847,7 +1895,7 @@ async def _awrite_m2m_relation(
     targets: list[Any] = []
     rows = _collection_rows(items, relation=relation)
     for index, item in enumerate(rows):
-        row_m2m = _resolve_m2m(spec.m2m, item)
+        row_m2m = resolve_m2m(spec.m2m, item)
         path = _RowPath(relation, index)
         match = await _amatch_scoped_target(item, spec, path=path, context=context)
         if match is None:

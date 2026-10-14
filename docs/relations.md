@@ -29,6 +29,24 @@ runs, and the helpers own persistence only.
   [`aupdate_from_input`][django_service_specs.mutations.aupdate_from_input.aupdate_from_input]
   and [`adelete_relations`][django_service_specs.mutations.adelete_relations.adelete_relations]
   are the async forms, for an `async def` service.
+- [`create_model`][django_service_specs.services.create_model.create_model],
+  [`update_model`][django_service_specs.services.update_model.update_model] and
+  [`delete_model`][django_service_specs.services.delete_model.delete_model]
+  build the service itself, for an operation whose service would be nothing
+  but one helper call: `create_model(Author, relations=BOOKS)` is a service
+  taking `data`, writing the author and its books, and returning the author.
+  `update_model` takes `instance` as well, and `delete_model` takes `instance`
+  alone, runs `delete_relations` first when given a map, and returns `None`.
+  [`delete_collection`][django_service_specs.services.delete_collection.delete_collection]
+  deletes the rows a spec's `collection_selector_spec` resolved. Each takes the
+  rest of the pool as `**kwargs`, which the three model services hand on as
+  the helper's `context`, opens no transaction of its own, since dispatch runs
+  the service inside one, and has an async form:
+  [`acreate_model`][django_service_specs.services.acreate_model.acreate_model],
+  [`aupdate_model`][django_service_specs.services.aupdate_model.aupdate_model],
+  [`adelete_model`][django_service_specs.services.adelete_model.adelete_model]
+  and
+  [`adelete_collection`][django_service_specs.services.adelete_collection.adelete_collection].
 
 `data` is a dataclass, a mapping, or an object with a `__dict__` - usually the
 validated values dispatch passes the service as `data`. A dataclass gives its
@@ -240,6 +258,20 @@ survive. A forward relation is reported `untouched`: the row it points at is
 not the instance's, and refusing it would make a map that is right for writing
 impossible to cascade.
 
+Where the service is nothing but that cascade and the delete,
+[`delete_model`][django_service_specs.services.delete_model.delete_model]
+builds it. It returns `None` rather than the report, and refuses a value that
+is not a relation spec when it is built rather than on its first call:
+
+```python
+--8<--
+docs/examples/deleting.py:model
+--8<--
+```
+
+`soft_delete=` calls a function with the row in place of `delete()`, after the
+cascade, which is the case Django never cascades through.
+
 ## Errors from a nested write
 
 A refusal inside a row is **re-rooted under the row's address**, in the tree
@@ -264,3 +296,25 @@ any depth: reading its `TypeError` as a refusal of the arguments would report
 the caller's own bug as the client's mistake. An `IntegrityError` is left alone
 too: a constraint is a conflict with rows that exist rather than a shape, and
 the backend's message can quote another row's values.
+
+### A refusal from another library
+
+A row service written for another library may raise that library's own
+validation error, which this package cannot name: the one
+`djangorestframework-services` registers is DRF's `ValidationError`. Register
+the class with a function reading its detail, and a relation write re-roots it
+as it does its own two:
+
+```python
+--8<--
+docs/examples/row_errors.py:register
+--8<--
+```
+
+The detail is placed at the row's address by the same rule, a list or a string
+under `non_field_errors` inside the row, and the class is rebuilt from the
+re-rooted tree, so a caller catching `CatalogueRefusal` here reads
+`{"books": {1: {"title": ["No titles in capitals."]}}}`. Registering the same
+pair again does nothing; a second reader for one class, or a class overlapping
+one the kernel re-roots already, is refused with `ImproperlyConfigured`. See
+[`register_row_error`][django_service_specs.mutations.register_row_error.register_row_error].
