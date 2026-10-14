@@ -1,15 +1,13 @@
-"""The subpackages import one another in a line, never in a ring.
+"""The subpackages import one another in a line, never in a ring, and no import is guarded.
 
 A ring of packages is the shape rule 8 describes: the first leaf loaded from
 any of them runs a package ``__init__`` that imports the rest, and one of those
 imports the leaf back, half-initialized. It also leaves no order the packages
-can be read in. So the graph of imports that run is held acyclic here.
+can be read in. So the graph of every import in the package, annotation-only
+ones included, is held acyclic here.
 
-An import under ``if TYPE_CHECKING:`` runs nothing, so it is not an edge of
-that graph. It is still a dependency a reader has to know, which is why the
-packages that annotate each other are one named set below and not left
-implicit. The set is empty: no package names another's types without
-importing it.
+An ``if TYPE_CHECKING:`` guard is how a ring is hidden from the interpreter
+while the type checker still sees it, so none may exist in the package at all.
 """
 
 from __future__ import annotations
@@ -22,12 +20,6 @@ import django_service_specs
 
 ROOT = Path(django_service_specs.__file__).parent
 
-# Annotation-only edges: (importing package, imported package). Each is an
-# import that exists to type a signature whose module the other package
-# already imports at run time. None is left: a check is handed the spec it
-# judges typed ``Any``, since a spec declares its checks.
-ANNOTATION_ONLY: set[tuple[str, str]] = set()
-
 
 def _package_of(dotted: str) -> str | None:
     parts = dotted.split(".")
@@ -38,48 +30,27 @@ def _package_of(dotted: str) -> str | None:
     return parts[1]
 
 
-def _type_checking_body(node: ast.AST) -> list[ast.stmt] | None:
-    """The statements under ``if TYPE_CHECKING:``, or ``None`` if ``node`` is no such block."""
-    if isinstance(node, ast.If) and "TYPE_CHECKING" in ast.dump(node.test):
-        return node.body
-    return None
-
-
-def _imports(node: ast.AST, *, annotation_only: bool) -> list[str]:
-    """The ``from django_service_specs...`` modules under ``node``, in or out of ``TYPE_CHECKING``."""
-    found: list[str] = []
-    for child in ast.iter_child_nodes(node):
-        guarded = _type_checking_body(child)
-        if guarded is not None:
-            if annotation_only:
-                for inner in guarded:
-                    found.extend(_all_imports(inner))
-            continue
-        if isinstance(child, ast.ImportFrom) and child.module:
-            if not annotation_only:
-                found.append(child.module)
-        else:
-            found.extend(_imports(child, annotation_only=annotation_only))
-    return found
-
-
-def _all_imports(node: ast.AST) -> list[str]:
+def _modules() -> list[tuple[str, ast.Module]]:
     return [
-        n.module for n in ast.walk(node) if isinstance(n, ast.ImportFrom) and n.module is not None
+        (
+            ".".join(path.relative_to(ROOT.parent).with_suffix("").parts),
+            ast.parse(path.read_text()),
+        )
+        for path in ROOT.rglob("*.py")
     ]
 
 
-def _graph(*, annotation_only: bool) -> dict[str, set[str]]:
+def _graph() -> dict[str, set[str]]:
     edges: dict[str, set[str]] = defaultdict(set)
-    for path in ROOT.rglob("*.py"):
-        module = ".".join(path.relative_to(ROOT.parent).with_suffix("").parts)
+    for module, tree in _modules():
         source = _package_of(module)
         if source is None:
             continue
-        for imported in _imports(ast.parse(path.read_text()), annotation_only=annotation_only):
-            target = _package_of(imported)
-            if target is not None and target != source:
-                edges[source].add(target)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.module:
+                target = _package_of(node.module)
+                if target is not None and target != source:
+                    edges[source].add(target)
     return edges
 
 
@@ -118,16 +89,38 @@ def _rings(edges: dict[str, set[str]]) -> list[list[str]]:
     return rings
 
 
-def test_the_imports_that_run_form_no_ring() -> None:
-    assert _rings(_graph(annotation_only=False)) == []
+def _guards(tree: ast.AST) -> list[int]:
+    """The lines naming ``TYPE_CHECKING`` as a name or an attribute (``typing.TYPE_CHECKING``)."""
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if (isinstance(node, ast.Name) and node.id == "TYPE_CHECKING")
+        or (isinstance(node, ast.Attribute) and node.attr == "TYPE_CHECKING")
+        or (
+            isinstance(node, ast.alias) and node.name == "TYPE_CHECKING" and hasattr(node, "lineno")
+        )
+    ]
 
 
-def test_the_packages_that_annotate_each_other_are_the_named_ones() -> None:
-    running = _graph(annotation_only=False)
-    only = {
-        (source, target)
-        for source, targets in _graph(annotation_only=True).items()
-        for target in targets
-        if target not in running.get(source, set())
-    }
-    assert only == ANNOTATION_ONLY
+def test_the_imports_form_no_ring() -> None:
+    assert _rings(_graph()) == []
+
+
+def test_the_ring_finder_finds_a_ring() -> None:
+    # The negative control: a finder that returned nothing for every graph
+    # would pass the test above for a package that was all rings.
+    assert _rings({"a": {"b"}, "b": {"c"}, "c": {"a"}, "d": {"a"}}) == [["a", "b", "c"]]
+    assert _rings({"a": {"b"}, "b": {"c"}}) == []
+
+
+def test_no_module_guards_an_import_with_type_checking() -> None:
+    assert {module: lines for module, tree in _modules() if (lines := _guards(tree))} == {}
+
+
+def test_the_guard_finder_finds_each_spelling() -> None:
+    for source in (
+        "from typing import TYPE_CHECKING\nif TYPE_CHECKING:\n    pass\n",
+        "import typing\nif typing.TYPE_CHECKING:\n    pass\n",
+    ):
+        assert _guards(ast.parse(source)) != []
+    assert _guards(ast.parse("x = 1\n")) == []

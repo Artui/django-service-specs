@@ -85,6 +85,17 @@ Non-negotiable. They keep the package navigable.
    type and refuse its `affordances` values without importing `service_spec`
    back.
 
+9. **No `if TYPE_CHECKING:` guard.** A guard hides an import cycle from the
+   interpreter while the type checker still sees it, so every guard here is a
+   cycle waiting to be broken, and types are imported like anything else. The
+   ban is ruff's `TID251` (so `make lint` and CI run it) and
+   `tests/test_package_graph.py`, which also holds the graph of every import
+   acyclic. Break the cycle by structure: move the part that names the spec
+   above the spec (`authorize*` and `Grant` are in `dispatch/` for that
+   reason), reverse an edge, put the shared base in `types/`
+   (`AffordanceDeclarer`), or keep a recursive pair in one file (rule 1). A
+   function-local import hides the same ring and is no substitute (rule 4).
+
 ## Naming the concepts
 
 **No public name that Django, DRF or pydantic already uses for something else,
@@ -135,7 +146,10 @@ Each of these reads as an oversight and is not.
   because re-exporting it would import pydantic for every consumer and fail
   for each one who never installed the extra. The exemption is one named set
   in that test, which also proves in a fresh interpreter that the root
-  imports no such library; the reference test reads the same set.
+  imports no such library; the reference test reads the same set. The filters
+  adapter is exported and reads django-filter only inside the function that
+  needs it, and a second named set in the same test holds that: neither the
+  root nor importing the adapter's module may load the library.
 - **Target resolution runs before validation.** The validator's context
   carries the resolved row, because an update's uniqueness check has to
   exclude the row being updated. Class-level authorization runs before either,
