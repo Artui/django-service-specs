@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-10-14
+
 ### Added
 - `CodedMessage`, a `str` carrying a `code`, and every refusal the kernel and
   its shipped adapters make is one: the shape check's, `coerce_flat`'s,
@@ -1085,7 +1087,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/Artui/django-service-specs/compare/v0.4.0...v0.4.1
