@@ -21,7 +21,7 @@ class FieldMarking:
     only ``Output``.
 
     Applied only for a caller that names an audience:
-    [`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec]
+    [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec]
     reads the markings into an
     [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection],
     which [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]

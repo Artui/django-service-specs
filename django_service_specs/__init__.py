@@ -33,6 +33,7 @@ from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
@@ -78,7 +79,6 @@ from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.mutations.update_model import update_model
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField

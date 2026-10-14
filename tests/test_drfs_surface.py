@@ -153,6 +153,9 @@ SURFACE: dict[str, Pin] = {
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
+    "audience_projection_for_spec": _fn(
+        "dispatch.audience_projection_for_spec", "spec, *, overrides=, name="
+    ),
     "present_for_audience": _fn("dispatch.present_for_audience", "spec, result, *, projection="),
     "paginate_output": _fn("dispatch.paginate_output", "rows, *, page=, limit=, max_page_size="),
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
@@ -260,9 +263,6 @@ SURFACE: dict[str, Pin] = {
     ),
     "annotate_output_schema": _fn(
         "output.annotate_output_schema", "schema, projection, *, handle_description="
-    ),
-    "audience_projection_for_spec": _fn(
-        "output.audience_projection_for_spec", "spec, *, overrides=, name="
     ),
     "project_payload": _fn("output.project_payload", "payload, projection"),
     # --- parameters ---------------------------------------------------------------------------

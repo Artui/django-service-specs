@@ -1,7 +1,8 @@
-"""Running one operation, from any transport, and the authorization it runs first."""
+"""Running one operation, from any transport, and the authorization checks it runs."""
 
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
@@ -22,6 +23,7 @@ __all__ = [
     "Grant",
     "adispatch",
     "apresent",
+    "audience_projection_for_spec",
     "authorize",
     "authorize_scope",
     "authorize_target",

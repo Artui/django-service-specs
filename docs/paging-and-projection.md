@@ -36,7 +36,7 @@ docs/examples/paging_and_projection.py:register
 --8<--
 ```
 
-[`audience_projection_for_spec`][django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec]
+[`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec]
 reads the spec's [`Output`][django_service_specs.output.output.Output] into an
 [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection]:
 each field's marking, the one field marked as the label, each choice field's
