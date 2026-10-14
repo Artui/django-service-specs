@@ -80,6 +80,42 @@ The order is the design, and each place reads as if it could move:
   Preconditions follow them, in the same place, as djangorestframework-services
   orders the two.
 
+## Per-call values beneath the providers
+
+A transport sometimes knows a value per call that the spec cannot carry: an
+HTTP view's hook returning extra service keywords, or extra data for the
+Validator. `dispatch` and `adispatch` take them as two overlays, so the spec
+need not be rebuilt for the call:
+
+```python
+--8<--
+docs/examples/dispatching.py:overlays
+--8<--
+```
+
+`extra_kwargs` sits beneath the spec's `kwargs` provider and `extra_input_data`
+beneath its `input_data` provider: **the spec's own provider wins on a clash**,
+and the overlay wins over the caller's arguments. Each is read as its
+provider's return is:
+
+- an entry whose value is `UNSET` is dropped, so the caller's value stands;
+- a key the spec's provider is annotated to fill is the provider's alone, and
+  the overlay's value for it is dropped, so a provider that leaves the key out
+  leaves it absent; one annotated `UNSET`-able lets the overlay's value through
+  when it declines;
+- an `extra_kwargs` key naming a seed, such as `user`, is refused as
+  `ImproperlyConfigured`.
+
+`extra_kwargs` reaches a read's own selector and a write's service, never a
+target or output selector. `extra_input_data` reaches the Validator, under
+every row of a [`many`](declaring.md#many-rows-in-one-call) call, and a read
+refuses it with a `TypeError` before anything runs.
+
+An overlay relaxes nothing in step one. The shape check reads the caller's
+arguments before any provider runs, so a required Validator field that only
+`extra_input_data` supplies is still refused as missing: declare it optional,
+or have the spec's `input_data` provider fill it under an annotation.
+
 ## The result
 
 A `DispatchResult` has a `kind` and a `value`:

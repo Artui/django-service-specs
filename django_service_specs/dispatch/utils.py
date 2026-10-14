@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Literal, cast
 
@@ -62,6 +62,85 @@ from django_service_specs.validation.validator import Validator
 
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
+
+
+@dataclass(frozen=True)
+class Overlay:
+    """A call's own values beneath a spec's providers: ``extra_kwargs`` and ``extra_input_data``.
+
+    What a transport resolves per call and the spec cannot carry - a view's
+    hook returning service keywords, say - handed to ``dispatch`` rather than
+    folded into a spec rebuilt for the call, which would lose its providers'
+    annotations and its identity. Copied on entry, so the caller's mappings
+    are never read again.
+    """
+
+    kwargs: Mapping[str, Any] = field(default_factory=dict)
+    input_data: Mapping[str, Any] = field(default_factory=dict)
+
+
+NO_OVERLAY = Overlay()
+
+
+def overlay_for(
+    spec: ServiceSpec | SelectorSpec,
+    extra_kwargs: Mapping[str, Any] | None,
+    extra_input_data: Mapping[str, Any] | None,
+) -> Overlay:
+    """The call's ``Overlay``, refusing ``extra_input_data`` where no Validator could receive it.
+
+    A selector spec validates nothing, so input data handed to one stands in
+    for nothing, and is refused before anything runs rather than ignored
+    (test_input_data_on_a_selector_spec_is_refused_before_anything_runs).
+    The guard is one branch to coverage, so each conjunct is held by its own
+    test: without the first, a selector spec called with no input data is
+    refused (test_a_selector_spec_s_kwargs_provider_outranks_the_overlay);
+    without the second, a service spec's is
+    (test_input_data_overlays_the_caller_and_the_spec_s_provider_overlays_it).
+    """
+    if extra_input_data and isinstance(spec, SelectorSpec):
+        raise TypeError(
+            "extra_input_data= is a ServiceSpec's, merged beneath its input_data before its "
+            "Validator; a SelectorSpec validates nothing."
+        )
+    return Overlay(dict(extra_kwargs or {}), dict(extra_input_data or {}))
+
+
+def overlaid(
+    overlay: Mapping[str, Any],
+    provided: Mapping[str, Any],
+    provider: Callable[..., Any] | None,
+    *,
+    label: str,
+    reserved: frozenset[str],
+) -> dict[str, Any]:
+    """``overlay`` beneath ``provided``, what the spec's own ``provider`` answered.
+
+    The provider outranks the overlay on a clash, as djangorestframework-services
+    puts a view's hooks before the spec's provider
+    (test_the_spec_s_kwargs_provider_outranks_the_overlay). Treated as the
+    provider's own answer is: a key whose value is ``UNSET`` is declined, so
+    a value beneath it stands
+    (test_the_overlay_outranks_the_caller_and_unset_leaves_the_caller_s_value),
+    and a key named in ``reserved`` is refused, as ``provide`` refuses it.
+    A key the provider is annotated to fill, and may not decline, is the
+    provider's alone, so the overlay's value for it is dropped: a provider
+    that leaves it out leaves it absent rather than the overlay's
+    (test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s), and
+    one that may decline it lets the overlay's through
+    (test_a_key_the_provider_may_decline_falls_to_the_overlay).
+    """
+    taken = sorted(overlay.keys() & reserved)
+    if taken:
+        raise ImproperlyConfigured(
+            f"{label} returned the key(s) {taken}, which dispatch seeds itself. A "
+            "provider's value must never outrank a seeded one; rename the key."
+        )
+    keys = provider_keys(provider)
+    owned = keys.filled if keys is not None else frozenset()
+    kept = {key: value for key, value in overlay.items() if value is not UNSET and key not in owned}
+    return {**kept, **provided}
+
 
 # Named in shaping's misconfiguration error, so it points at the declaration to
 # fix rather than at "a selector" of which a service spec may carry three.
@@ -473,6 +552,7 @@ def selector_pool(
     principal: Any,
     pool_seeds: PoolSeeds,
     progress: ProgressReporter | None = None,
+    extra_kwargs: Mapping[str, Any] = MappingProxyType({}),
 ) -> dict[str, Any]:
     """The pool a selector is called from: the base pool, its ``reads``, then its ``kwargs``.
 
@@ -492,13 +572,26 @@ def selector_pool(
     only the run hears it, joined to its keywords by ``with_run_progress``
     once they are bound, as a service's run is. A nested selector declaring
     one is refused when the service spec is built.
+
+    ``extra_kwargs`` is the call's overlay, merged beneath the ``kwargs``
+    provider's answer (see ``overlaid``); only a selector spec's own selector
+    is handed one, never a service spec's target selector.
     """
     reads = selector_spec.reads.names()
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
     pool = {**base, **{name: value for name, value in checked.items() if name in reads}}
     pool.update(
-        provide(
-            selector_spec.kwargs, pool, label="SelectorSpec.kwargs", reserved=pool_seeds.reserved
+        overlaid(
+            extra_kwargs,
+            provide(
+                selector_spec.kwargs,
+                pool,
+                label="SelectorSpec.kwargs",
+                reserved=pool_seeds.reserved,
+            ),
+            selector_spec.kwargs,
+            label="extra_kwargs",
+            reserved=pool_seeds.reserved,
         )
     )
     return pool
@@ -1122,6 +1215,7 @@ def prepare_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     target: Any = UNSET,
+    overlay: Overlay = NO_OVERLAY,
 ) -> Prepared | DispatchResult:
     """Steps one to six for a service spec, its preconditions, and the keywords its run is called with.
 
@@ -1144,7 +1238,8 @@ def prepare_service(
     3. The spec's ``reads``, as the caller sent them.
     4. ``data``, the Validator's ``data``, and what else the Validator binds
        for the call (its ``Validated.pool``).
-    5. The spec's ``kwargs`` provider, the author's values after the caller's.
+    5. The spec's ``kwargs`` provider, the author's values after the caller's,
+       over the call's ``extra_kwargs`` overlay.
     6. ``instance`` or ``collection``.
 
     No entry outranks a seed: a parameter named after one is refused by
@@ -1186,7 +1281,13 @@ def prepare_service(
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**base, **reads, **resolved}
-    server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
+    server_input = overlaid(
+        overlay.input_data,
+        resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data"),
+        spec.input_data,
+        label="extra_input_data",
+        reserved=frozenset(),
+    )
     validated = validate_arguments(
         spec,
         checked,
@@ -1221,7 +1322,13 @@ def prepare_service(
             "returned as a value, or the spec declares as a parameter. A value bound for "
             "the call needs a name of its own."
         )
-    author = provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved)
+    author = overlaid(
+        overlay.kwargs,
+        provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved),
+        spec.kwargs,
+        label="extra_kwargs",
+        reserved=reserved,
+    )
     pool = {
         **base,
         **values,

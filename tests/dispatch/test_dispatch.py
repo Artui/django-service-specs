@@ -3870,3 +3870,138 @@ class TestAmbient:
             "tenant-of-ada",
             "tenant-of-ada",
         ]
+
+
+class _OwnsScope(TypedDict, total=False):
+    scope: str
+
+
+class _MayDeclineScope(TypedDict):
+    scope: str | UnsetType
+
+
+_READ_Q = Parameters.of(Parameter("q", "string"))
+
+
+class TestOverlays:
+    """``extra_kwargs`` and ``extra_input_data``: per-call values beneath the spec's providers."""
+
+    def test_the_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=lambda: {"tag": "spec"})
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1})
+        [call] = service.calls
+        assert (call["tag"], call["extra"]) == ("spec", 1)
+
+    def test_the_overlay_outranks_the_caller_and_unset_leaves_the_caller_s_value(
+        self, ada: Any
+    ) -> None:
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
+        dispatch(spec, principal=ada, arguments={"q": "caller"}, extra_kwargs={"q": "view"})
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"q": "caller"},
+            extra_kwargs={"q": UNSET, "other": UNSET},
+        )
+        first, second = service.calls
+        assert first["q"] == "view"
+        assert second["q"] == "caller"
+        assert "other" not in second
+
+    def test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s(self, ada: Any) -> None:
+        """The provider is the key's only source: one that leaves it out
+        leaves it absent, whatever the overlay says."""
+
+        def owns() -> _OwnsScope:
+            return {}
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=owns)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"scope": "view"})
+        assert "scope" not in service.calls[0]
+
+    def test_a_key_the_provider_may_decline_falls_to_the_overlay(self, ada: Any) -> None:
+        def declines() -> _MayDeclineScope:
+            return {"scope": UNSET}
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, kwargs=declines)
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"scope": "view"})
+        assert service.calls[0]["scope"] == "view"
+
+    def test_an_overlay_naming_a_seed_is_refused(self, ada: Any) -> None:
+        spec = ServiceSpec(service=Record(), permissions=OPEN)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={}, extra_kwargs={"user": "someone"})
+        assert str(refused.value).startswith(
+            "extra_kwargs returned the key(s) ['user'], which dispatch seeds itself."
+        )
+
+    def test_input_data_overlays_the_caller_and_the_spec_s_provider_overlays_it(
+        self, ada: Any
+    ) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"title": "caller"},
+            extra_input_data={"title": " view ", "undeclared": 1},
+        )
+        provided = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=validator,
+            input_data=lambda: {"title": "spec"},
+        )
+        dispatch(
+            provided,
+            principal=ada,
+            arguments={"title": "caller"},
+            extra_input_data={"title": "view"},
+        )
+        # Only what the Validator declares reaches it, as from the provider.
+        assert [args for args, _ in validator.calls] == [{"title": " view "}, {"title": "spec"}]
+
+    def test_input_data_overlays_every_row_of_a_many_call(self, ada: Any) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"items": [{"title": "a"}, {"title": "b"}]},
+            extra_input_data={"title": "view"},
+        )
+        assert [args for args, _ in validator.calls] == [{"title": "view"}, {"title": "view"}]
+
+    def test_an_overlay_relaxes_no_parameter_the_caller_owes(self, ada: Any) -> None:
+        """The shape check reads the caller's arguments before any provider
+        runs, and only a typed provider's annotation says which keys the server
+        fills, so a required field only the overlay supplies is still the
+        caller's to send."""
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={}, extra_input_data={"title": "view"})
+        assert refused.value.detail == {"title": ["This field is required."]}
+        assert validator.calls == []
+
+    def test_a_selector_spec_s_kwargs_provider_outranks_the_overlay(self, ada: Any) -> None:
+        seen: list[dict[str, Any]] = []
+
+        def rows(*, user: Any, tag: str, extra: int) -> list[Any]:
+            seen.append({"tag": tag, "extra": extra})
+            return []
+
+        spec = SelectorSpec(
+            kind=LIST, selector=rows, permissions=OPEN, kwargs=lambda: {"tag": "spec"}
+        )
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1})
+        assert seen == [{"tag": "spec", "extra": 1}]
+
+    def test_input_data_on_a_selector_spec_is_refused_before_anything_runs(self, ada: Any) -> None:
+        spec = retrieve()
+        with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
+            dispatch(spec, principal=ada, arguments={"pk": 1}, extra_input_data={"x": 1})

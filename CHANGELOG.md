@@ -60,6 +60,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is `None` on a result built by hand and takes no part in equality. An
   `async def` `presented` is refused when the spec is built, as an
   `async def` `present` is.
+- **`extra_kwargs=` and `extra_input_data=` on `dispatch` and `adispatch`**:
+  a transport's per-call values, merged beneath the spec's `kwargs` and
+  `input_data` providers, so a view's per-request hooks need no spec rebuilt
+  for the call. The spec's provider wins on a clash and the overlay wins over
+  the caller's arguments. Each is read as its provider's return is: an
+  `UNSET` entry is dropped, a key the provider is annotated to fill is the
+  provider's alone, and an `extra_kwargs` key naming a seed is refused.
+  `extra_kwargs` reaches a selector spec's selector and a service spec's
+  service, never a target or output selector; `extra_input_data` reaches the
+  Validator, on every row of a `many` call, and a selector spec refuses it
+  with a `TypeError`. Neither relaxes the shape check: a required parameter
+  only an overlay supplies is still the caller's to send.
 
 ### Changed
 - **`ModelT` is a pinned import path.** The type variable `ChangeResult` is

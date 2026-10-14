@@ -1108,3 +1108,71 @@ async def test_a_foreign_async_service_declaration_is_awaited_as_its_compiled_sp
 
     assert result.value == "async t"
     assert len(hops) == 1
+
+
+# --- per-call overlays -------------------------------------------------------------------
+
+
+def _sync_tagged(*, tag: str, extra: int) -> list[Any]:
+    return [tag, extra]
+
+
+async def _async_tagged(*, tag: str, extra: int) -> list[Any]:
+    return [tag, extra]
+
+
+async def _async_tagged_selector(*, user: Any, tag: str, extra: int) -> list[Any]:
+    return [tag, extra]
+
+
+def _tagged() -> dict[str, str]:
+    return {"tag": "spec"}
+
+
+# Each path ``adispatch`` can take to a run, so the overlay is seen to reach
+# the run's pool through every helper that builds one.
+_OVERLAID: dict[str, Any] = {
+    "_dispatch-service": ServiceSpec(service=_sync_tagged, permissions=OPEN, kwargs=_tagged),
+    "_prepare": ServiceSpec(service=_async_tagged, atomic=False, permissions=OPEN, kwargs=_tagged),
+    "_dispatch-selector": SelectorSpec(
+        kind=LIST, selector=_sync_tagged, permissions=OPEN, kwargs=_tagged
+    ),
+    "_open_selector": SelectorSpec(
+        kind=LIST, selector=_async_tagged_selector, permissions=OPEN, kwargs=_tagged
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_OVERLAID))
+async def test_extra_kwargs_reach_the_run_beneath_the_provider_on_every_path(
+    path: str, ada: Any
+) -> None:
+    result = await adispatch(
+        _OVERLAID[path], principal=ada, arguments={}, extra_kwargs={"tag": "view", "extra": 1}
+    )
+
+    assert result.value == ["spec", 1]
+
+
+async def test_extra_input_data_reaches_an_awaited_service_s_validator(ada: Any) -> None:
+    async def service(*, title: str) -> str:
+        return title
+
+    validator = Titled()
+    spec = ServiceSpec(service=service, atomic=False, permissions=OPEN, validator=validator)
+
+    await adispatch(
+        spec, principal=ada, arguments={"title": "caller"}, extra_input_data={"title": "view"}
+    )
+
+    assert [args for args, _ in validator.calls] == [{"title": "view"}]
+
+
+async def test_extra_input_data_on_a_selector_spec_is_refused_before_any_hop(
+    ada: Any, hops: list[str]
+) -> None:
+    spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN)
+
+    with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
+        await adispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
+    assert hops == []

@@ -314,6 +314,10 @@ class TestDispatching:
         with pytest.raises(NotPermitted):
             dispatching.rename_from_a_view(bob, {"pk": note.pk, "title": "Mine now"})
 
+    def test_overlays_sit_beneath_the_spec_s_providers_and_over_the_caller(self, ada: Any) -> None:
+        result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})
+        assert result.value == "From the hook via web on api"
+
     def test_a_grant_covers_one_principal_and_never_crosses_a_queue(
         self, ada: Any, bob: Any
     ) -> None:

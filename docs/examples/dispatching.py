@@ -68,6 +68,35 @@ def rename_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
 # --8<-- [end:grant]
 
 
+# --8<-- [start:overlays]
+def stamp(*, title: str, source: str, channel: str) -> str:
+    return f"{title} via {source} on {channel}"
+
+
+stamp_spec = ServiceSpec(
+    service=stamp,
+    permissions=[IsSignedIn()],
+    validator=DataclassValidator(Rename),
+    kwargs=lambda: {"channel": "api"},  # the spec's own provider
+)
+
+
+def stamp_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
+    # What the view's per-request hooks resolved, beneath the spec's providers:
+    # the provider's ``channel`` wins, the hook's ``source`` fills the gap, and
+    # the hook's ``title`` stands over the caller's before the Validator runs.
+    return dispatch(
+        stamp_spec,
+        principal=user,
+        arguments=arguments,
+        extra_kwargs={"source": "web", "channel": "web"},
+        extra_input_data={"title": "From the hook"},
+    )
+
+
+# --8<-- [end:overlays]
+
+
 # --8<-- [start:bind]
 def bind_rename(user: Any, note: Note, arguments: dict[str, Any]) -> dict[str, Any]:
     # A transport that binds input itself authorizes and resolves first, then
