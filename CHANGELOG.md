@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-10-14
+
 ### Added
 - **`SpecSource`, `kernel_spec`**: any object with an `as_kernel_spec()` method
   is taken wherever a spec is, and read as the spec it compiles to. The
@@ -1216,7 +1218,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/Artui/django-service-specs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/Artui/django-service-specs/compare/v0.4.2...v0.5.0
 [0.4.2]: https://github.com/Artui/django-service-specs/compare/v0.4.1...v0.4.2
