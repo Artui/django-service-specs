@@ -12,6 +12,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -24,6 +25,7 @@ from tests.authorization.utils import (
     refuses,
     refuses_lazily,
 )
+from tests.specs.utils import Foreign
 
 
 def _spec(permissions: list | None) -> SelectorSpec:
@@ -159,3 +161,28 @@ async def test_adispatch_does_not_run_a_service_its_check_answered_with_a_corout
         await adispatch(spec, principal=object(), arguments={})
     assert ran == []
     assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+
+def test_a_source_is_authorized_as_the_spec_it_compiles_to() -> None:
+    asked: list[Any] = []
+
+    class Recording(Unrestricted):
+        def has_permission(self, principal: Any, spec: Any) -> bool:
+            asked.append(spec)
+            return True
+
+    source, principal = Foreign(_spec([Recording()])), object()
+    grant = authorize(source, principal)
+
+    # The check is asked about the compiled spec, the one dispatch hands it.
+    assert asked == [kernel_spec(source)]
+    assert asked[0] is kernel_spec(source)
+    assert grant.covers(source, principal)
+
+
+def test_a_source_s_grant_is_honoured_for_the_source() -> None:
+    source, principal = Foreign(_spec([Refuse()])), object()
+    grant = Grant(source, principal)
+
+    assert authorize(source, principal, grant=grant) is grant
+    assert authorize(kernel_spec(source), principal, grant=grant) is grant

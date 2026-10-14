@@ -6,15 +6,16 @@ from typing import TYPE_CHECKING, Any
 
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.authorization.utils import compiled_spec, sync_answer
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
+    from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize_target(
-    spec: ServiceSpec | SelectorSpec, principal: Any, target: Any, *, grant: Grant
+    spec: ServiceSpec | SelectorSpec | SpecSource, principal: Any, target: Any, *, grant: Grant
 ) -> None:
     """Run ``spec``'s object-level permission checks against a resolved ``target``.
 
@@ -30,7 +31,9 @@ def authorize_target(
     in order, and the first refusal raises
     [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     with that check's own message. An answer still to be awaited raises
-    ``ImproperlyConfigured`` rather than being read as a pass.
+    ``ImproperlyConfigured`` rather than being read as a pass. A
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    checked as the spec it compiles to.
 
     ``spec.permissions is None`` means nothing to check here rather than a
     configuration error: [`authorize`][django_service_specs.authorization.authorize.authorize]
@@ -38,6 +41,7 @@ def authorize_target(
     this function is never reached with one - iterating an empty tuple in its
     place is simpler than asserting an invariant this module cannot enforce.
     """
+    spec = compiled_spec(spec)
     if grant.target_checked:
         return
     for check in spec.permissions or ():

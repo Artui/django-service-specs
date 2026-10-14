@@ -18,6 +18,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from tests.specs.utils import Foreign
 
 PRINCIPAL = object()
 ROW = object()
@@ -320,3 +321,19 @@ def test_a_filled_field_the_caller_sends_never_reaches_the_validator() -> None:
         bind_arguments(spec, {"title": "caller's"}, principal=PRINCIPAL)
     assert caught.value.detail == {"title": ["The merged input has no title."]}
     assert validator.calls == [{}]
+
+
+def test_a_selector_source_binds_as_the_spec_it_compiles_to() -> None:
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(Foreign(retrieve()), {"pk": 1, "tenant": "acme"}, principal=PRINCIPAL)
+    assert caught.value.detail == {"tenant": ["Unknown argument."]}
+
+
+def test_a_service_source_reaches_the_validator_of_the_spec_it_compiles_to() -> None:
+    validator = Recording()
+    source = Foreign(ServiceSpec(service=service, validator=validator))
+
+    assert bind_arguments(source, {"title": "Lathe"}, principal=PRINCIPAL) == {
+        "title": "LATHE",
+        "validated": True,
+    }

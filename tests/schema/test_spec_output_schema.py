@@ -29,7 +29,7 @@ from tests.dispatch.utils import (
 )
 from tests.dispatch_app.models import Note
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA, InvoicePresenter
-from tests.specs.utils import Titled
+from tests.specs.utils import Foreign, Titled
 
 
 class NoteTitle(Presenter):
@@ -477,3 +477,24 @@ class TestAffordances:
                 assert set(declared["required"]) <= set(answer) <= set(declared["properties"])
                 assert answer.get("code", "note_archived") in ["note_archived", "books_closed"]
         assert rows[1]["affordances"]["rename"]["code"] == "note_archived"
+
+
+class TestSources:
+    @pytest.mark.parametrize(
+        "compiled",
+        [
+            pytest.param(listing(presenter=NoteTitle()), id="list"),
+            pytest.param(retrieve(presenter=NoteTitle(), allow_none=True), id="retrieve"),
+            pytest.param(
+                ServiceSpec(
+                    service=write,
+                    permissions=OPEN,
+                    output_selector_spec=retrieve(presenter=NoteTitle()),
+                ),
+                id="re-read",
+            ),
+        ],
+    )
+    def test_a_source_is_described_as_the_spec_it_compiles_to(self, compiled: Any) -> None:
+        assert spec_output_schema(Foreign(compiled)) == spec_output_schema(compiled)
+        assert spec_output_schema(Foreign(compiled)) is not None

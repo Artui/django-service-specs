@@ -10,7 +10,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UnsetType
-from tests.specs.utils import PK, Bare
+from tests.specs.utils import PK, Bare, Foreign
 
 
 class _Scope(TypedDict):
@@ -87,3 +87,10 @@ def test_a_collection_lookup_s_provider_is_owned_too() -> None:
     target = SelectorSpec(kind=SelectorKind.LIST, selector=list, kwargs=owner)
     spec = ServiceSpec(service=print, collection_selector_spec=target)
     assert server_owned_keys(spec) == RESERVED_POOL_SEEDS | {"owner"}
+
+
+def test_a_source_owns_what_the_spec_it_compiles_to_owns() -> None:
+    spec = listing(kwargs=scope)
+
+    assert server_owned_keys(Foreign(spec)) == server_owned_keys(spec)
+    assert server_owned_keys(Foreign(spec)) > RESERVED_POOL_SEEDS

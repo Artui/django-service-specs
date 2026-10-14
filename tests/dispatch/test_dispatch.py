@@ -37,6 +37,7 @@ from django_service_specs.parameters.utils import expected_type
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -3695,3 +3696,72 @@ def test_a_foreign_declaration_s_grant_is_its_compiled_spec_s(ada: Any) -> None:
     dispatch(source, principal=ada, arguments={}, grant=Grant(compiled, ada))
 
     assert asked == []
+
+
+class _Counted(PermissionCheck):
+    """Admits everyone, and records the spec each check is asked about."""
+
+    def __init__(self) -> None:
+        self.asked: list[Any] = []
+        self.rows: list[Any] = []
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.asked.append(spec)
+        return True
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        self.rows.append(target)
+        return True
+
+
+def test_a_grant_built_from_a_source_covers_the_source_and_its_compiled_spec(ada: Any) -> None:
+    # The shape of an HTTP transport over another library's declarations: its
+    # view authorizes the object it holds, mints the grant from that object,
+    # and dispatches either the object or what it compiles to.
+    check = _Counted()
+    source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=[check]))
+    grant = Grant(source, ada)
+
+    dispatch(source, principal=ada, arguments={}, grant=grant)
+    dispatch(kernel_spec(source), principal=ada, arguments={}, grant=grant)
+
+    assert check.asked == []
+
+
+def test_a_grant_built_from_another_source_is_refused(ada: Any) -> None:
+    source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN))
+    other = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN))
+
+    with pytest.raises(NotPermitted, match="does not cover"):
+        dispatch(source, principal=ada, arguments={}, grant=Grant(other, ada))
+
+
+def test_a_source_s_grant_that_checked_the_target_covers_the_target_handed_in(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    check = _Counted()
+    record = Record()
+    source = Foreign(
+        ServiceSpec(
+            service=record,
+            permissions=[check],
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+    )
+    grant = Grant(source, ada, target_checked=True)
+
+    dispatch(source, principal=ada, arguments={"pk": note.pk}, target=note, grant=grant)
+
+    assert check.asked == []
+    assert check.rows == []
+    assert record.calls[0]["instance"] == note
+
+
+def test_a_check_is_asked_about_the_compiled_spec_on_either_route(ada: Any) -> None:
+    check = _Counted()
+    source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=[check]))
+
+    authorize(source, ada)
+    dispatch(source, principal=ada, arguments={})
+
+    assert len(check.asked) == 2
+    assert all(asked is kernel_spec(source) for asked in check.asked)

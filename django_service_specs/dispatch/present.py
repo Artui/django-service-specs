@@ -10,9 +10,10 @@ from django_service_specs.affordances.utils import rendered_affordances, with_af
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import sync_result
 from django_service_specs.output.presenter import Presenter
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResult) -> Any:

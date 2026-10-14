@@ -8,14 +8,25 @@ the HTTP entry points, refusing ``request.user`` before the request is read.
 It is written once here so the three cannot disagree about who is refused.
 Nothing here imports anything that imports dispatch, so each of the three can
 read it without a cycle.
+
+``compiled_spec`` is ``kernel_spec`` for the modules here, which the spec
+modules import and so cannot import a spec module at their top: the three
+``authorize`` functions and ``Grant.covers`` read a declaration of another
+library's through it, as every other entry point does.
 """
 
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from django.core.exceptions import ImproperlyConfigured
+
+if TYPE_CHECKING:
+    # Annotation-only, for the reason permission_check.py gives.
+    from django_service_specs.specs.selector_spec import SelectorSpec
+    from django_service_specs.specs.service_spec import ServiceSpec
+    from django_service_specs.specs.spec_source import SpecSource
 
 
 def is_deactivated(principal: Any) -> bool:
@@ -76,3 +87,23 @@ def sync_answer(answer: Any, *, asked: str) -> Any:
             "is refused rather than allowed; declare the method with def."
         )
     return answer
+
+
+def compiled_spec(spec: ServiceSpec | SelectorSpec | SpecSource) -> ServiceSpec | SelectorSpec:
+    """``spec`` as a spec of this package's, as ``kernel_spec`` answers it.
+
+    For the authorization modules alone, which cannot import ``kernel_spec`` at
+    their top; every other module imports it directly.
+    """
+    # A proven cycle, and the one function-local import in this subpackage.
+    # ``kernel_spec`` recognizes a spec by its class, so its module imports
+    # ``ServiceSpec`` and ``SelectorSpec``; their modules import
+    # ``permission_check`` for the ``permissions`` field, which loads this
+    # subpackage's ``__init__``, which loads ``grant`` and the three
+    # ``authorize`` functions. A top-level import of ``kernel_spec`` in any of
+    # those fails with ``SelectorSpec`` half-initialized. By the time a grant
+    # or a check is asked anything, every spec module has finished loading, so
+    # this resolves from ``sys.modules`` and runs nothing.
+    from django_service_specs.specs.kernel_spec import kernel_spec
+
+    return kernel_spec(spec)

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 
-def can_present_nothing(spec: ServiceSpec | SelectorSpec) -> bool:
+def can_present_nothing(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool:
     """Whether a successful dispatch of ``spec`` may present ``None`` as its result.
 
     The question an output schema answers before it admits ``"null"``, asked in
@@ -38,7 +40,13 @@ def can_present_nothing(spec: ServiceSpec | SelectorSpec) -> bool:
 
     It answers whether ``None`` *may* come back, not whether a schema exists: a
     spec with no presenter has no output schema to widen, whatever this says.
+
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] answers
+    as the spec it compiles to, never by attributes of its own that share these
+    names: its kinds are another library's, and none of them is this one's
+    ``RETRIEVE``.
     """
+    spec = kernel_spec(spec)
     if isinstance(spec, SelectorSpec):
         # One arc to coverage, so each operand is named:
         # test_a_list_selector_never_presents_nothing holds the kind, and

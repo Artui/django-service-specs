@@ -11,13 +11,15 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 
 
 async def aunmet_operation_affordance(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     pool: dict[str, Any],
     *,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,
@@ -35,15 +37,19 @@ async def aunmet_operation_affordance(
     [`operation_affordances`][django_service_specs.affordances.operation_affordances.operation_affordances],
     which is every ``SelectorSpec`` and every spec declaring only conditions on
     the row - returns ``None`` before the hop: a transport asks this for every
-    operation it lists, and most declare nothing.
+    operation it lists, and most declare nothing. ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource], read as
+    the spec it compiles to.
 
     A caller that must release a connection a condition opens - a long-lived
     agent run, a worker with its own event loop - makes its own hop instead,
     calls ``unmet_operation_affordance`` inside it, and releases the connection
     in that same hop.
     """
-    if not operation_affordances(spec):
+    # Compiled once, so the check and the hop read the one compiled spec.
+    compiled = kernel_spec(spec)
+    if not operation_affordances(compiled):
         return None
     return await sync_to_async(unmet_operation_affordance, thread_sensitive=True)(
-        spec, pool, reserved=reserved
+        compiled, pool, reserved=reserved
     )

@@ -36,7 +36,7 @@ class RegisteredSpec:
       [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] that
       compiles to one, **kept as registered**: a transport reads the spec it
       runs through
-      [`kernel_spec`][django_service_specs.specs.spec_source.kernel_spec], and
+      [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec], and
       the object itself is still there to be asked what only it knows. The
       kind is deliberately **not** stored as its own field: it is derived by
       ``isinstance`` on the compiled spec wherever it is needed, so a stored

@@ -13,6 +13,7 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.authorization.utils import AnswersWith, refuses
+from tests.specs.utils import Foreign
 
 
 class _ScopeCheck(PermissionCheck):
@@ -86,3 +87,12 @@ def test_a_check_answering_with_a_coroutine_is_refused_rather_than_read_as_a_pas
         authorize_scope(spec, principal, None, grant=Grant(spec, principal))
     assert "AnswersWith.has_scope_permission" in str(caught.value)
     assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+
+def test_a_source_s_scope_checks_are_the_spec_it_compiles_to_s() -> None:
+    check = _ScopeCheck(allow=False, message="Not this set.")
+    source, principal = Foreign(_spec([check])), object()
+
+    with pytest.raises(NotPermitted, match="Not this set."):
+        authorize_scope(source, principal, ["row"], grant=Grant(source, principal))
+    assert check.scopes == [["row"]]
