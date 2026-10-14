@@ -33,7 +33,15 @@ from tests.dispatch.utils import (
     make_user,
 )
 from tests.dispatch_app.models import Note
-from tests.http.utils import ASYNC_FACTORY, Conflicting, body, note_spec, notes_spec, titled_spec
+from tests.http.utils import (
+    ASYNC_FACTORY,
+    Conflicting,
+    asking_spec,
+    body,
+    note_spec,
+    notes_spec,
+    titled_spec,
+)
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -170,3 +178,21 @@ async def test_each_presented_row_carries_its_affordances(ada: Any) -> None:
         {"title": "One", "affordances": {"rename": {"available": True}}},
         {"title": "Two", "affordances": {"rename": REFUSED_ARCHIVED}},
     ]
+
+
+async def test_a_schema_naming_a_declared_key_is_written_as_the_422_body(ada: Any) -> None:
+    schema = {"title": {"type": "string"}}
+    response = await adispatch_request(asking_spec(schema), post(ada, {"title": "x"}))
+    assert (response.status_code, body(response)) == (
+        422,
+        {"detail": "Say which.", "schema": schema},
+    )
+
+
+async def test_a_schema_naming_an_undeclared_key_is_the_services_error_not_a_422(
+    ada: Any,
+) -> None:
+    with pytest.raises(ImproperlyConfigured, match="colour"):
+        await adispatch_request(
+            asking_spec({"colour": {"type": "string"}}), post(ada, {"title": "x"})
+        )

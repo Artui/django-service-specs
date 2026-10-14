@@ -32,6 +32,7 @@ from tests.http.utils import (
     FACTORY,
     Conflicting,
     Seen,
+    asking_spec,
     body,
     note_spec,
     notes_spec,
@@ -318,3 +319,21 @@ class TestPassedThrough:
             url_kwargs={"pk": mine.pk},
         )
         assert body(response) == {"title": "Mine"}
+
+
+class TestAskedInput:
+    # The schema a service asks under is checked before it is written to the
+    # body: a schema the route could not hear answered is the raiser's error.
+    def test_a_schema_naming_a_declared_key_is_written_as_the_422_body(self, ada: Any) -> None:
+        schema = {"title": {"type": "string"}}
+        response = dispatch_request(asking_spec(schema), post(ada, {"title": "x"}))
+        assert (response.status_code, body(response)) == (
+            422,
+            {"detail": "Say which.", "schema": schema},
+        )
+
+    def test_a_schema_naming_an_undeclared_key_is_the_services_error_not_a_422(
+        self, ada: Any
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured, match="colour"):
+            dispatch_request(asking_spec({"colour": {"type": "string"}}), post(ada, {"title": "x"}))

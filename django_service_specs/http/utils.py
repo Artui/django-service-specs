@@ -24,7 +24,9 @@ from django.utils.decorators import classonlymethod
 from django.utils.translation import gettext
 from django.views import View
 
+from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
@@ -35,6 +37,19 @@ ANSWERABLE: Final = ("get", "head", "post", "put", "patch", "delete")
 OPTIONS is not one: Django's ``View`` answers it from the methods served, and a
 spec has nothing to add to that answer. TRACE is not one either, since
 nothing about an operation is a loop-back of the request."""
+
+
+def check_asked_input(spec: ServiceSpec | SelectorSpec, refused: Exception) -> None:
+    """Refuse, as the service's own error, a request for input no route could hear answered.
+
+    A 422 body carries the schema a service asked under, and a client builds
+    its next call from it. A schema naming a key the closed argument set would
+    refuse, or a shape a transport cannot render, is not the caller's mistake,
+    so it surfaces as the ``ImproperlyConfigured`` it is rather than as a
+    well-formed answer that cannot be answered. Anything else passes.
+    """
+    if isinstance(refused, AdditionalInputRequired):
+        check_requested_input(spec, refused.schema)
 
 
 def not_found_response() -> JsonResponse:

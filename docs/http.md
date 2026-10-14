@@ -240,6 +240,14 @@ matched before its base. **Every 400 body is a field map**: a
 tree too, and the tree's integer row keys are strings on the wire. Messages
 render in the active language, lazy ones included.
 
+**A schema no route could hear answered is not a 422.** `dispatch_request` and
+`adispatch_request` pass an `AdditionalInputRequired` schema through
+[`check_requested_input`][django_service_specs.dispatch.check_requested_input.check_requested_input]
+before writing it: a schema naming a key the spec does not declare, or a shape
+an MCP elicitation form cannot render, raises `ImproperlyConfigured` naming the
+key, as it does on every other route. `error_response` alone has no spec in
+hand and writes whatever it is given.
+
 **Never 401.** A session has no challenge to answer, and a 401 tells a client
 to start an authentication flow it has no way to finish. An anonymous caller
 a permission check refuses is a 403, like any other refused principal.

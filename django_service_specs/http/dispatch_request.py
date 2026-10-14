@@ -13,7 +13,11 @@ from django_service_specs.dispatch.present import present
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.request_principal import request_principal
-from django_service_specs.http.utils import not_found_response, success_response
+from django_service_specs.http.utils import (
+    check_asked_input,
+    not_found_response,
+    success_response,
+)
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -80,4 +84,5 @@ def dispatch_request(
             return not_found_response()
         return success_response(spec, present(spec, result), success_status)
     except (DispatchError, ServiceError) as refused:
+        check_asked_input(spec, refused)
         return error_response(refused)
