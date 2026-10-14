@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from django_service_specs.dispatch.utils import shape_check, validate_arguments
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 if TYPE_CHECKING:
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 
 
 def bind_arguments(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     arguments: Mapping[str, Any],
     *,
     principal: Any,
@@ -27,7 +28,9 @@ def bind_arguments(
     ``dispatch`` - an MCP server answering a malformed call before it opens a
     transaction, a queue validating a task in the worker. It is the same two
     steps dispatch takes, so a transport that binds for itself cannot drift
-    from the gate dispatch applies:
+    from the gate dispatch applies. ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource], bound as
+    the spec it compiles to:
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()``, under ``unknown_arguments``: the closed
@@ -78,6 +81,7 @@ def bind_arguments(
             shape refusal and a Validator refusal on different rows come back
             as one tree keyed by row index.
     """
+    spec = kernel_spec(spec)
     checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked

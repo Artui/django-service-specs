@@ -11,10 +11,11 @@ from django_service_specs.output.audience_projection_for_spec import audience_pr
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 
 def present_for_audience(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     result: DispatchResult,
     *,
     projection: AudienceProjection | None = None,
@@ -67,6 +68,8 @@ def present_for_audience(
     Raises:
         ValueError: ``kind="not_found"``, as ``present``.
     """
+    # Compiled once, so presenting and projecting read the one compiled spec.
+    spec = kernel_spec(spec)
     payload: Any = present(spec, result)
     if projection is None:
         projection = audience_projection_for_spec(spec)
