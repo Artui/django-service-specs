@@ -19,6 +19,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import TENANT_SEEDS, make_user
+from tests.specs.utils import Foreign
 
 UNAVAILABLE_ROW = Affordance(code="never", reason="No row is.", when=Q(pk__in=[]))
 
@@ -119,3 +120,9 @@ def test_a_condition_answering_with_a_coroutine_is_refused_not_offered() -> None
     with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
         unmet_operation_affordance(spec, {})
     assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
+
+
+def test_a_foreign_declaration_answers_what_its_compiled_spec_does() -> None:
+    first = closed("first")
+    spec = ServiceSpec(service=print, affordances=[opened("a"), first])
+    assert unmet_operation_affordance(Foreign(spec), {}) is first

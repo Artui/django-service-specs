@@ -25,6 +25,7 @@ from django_service_specs.adapters.pydantic.pydantic_validator import PydanticVa
 from django_service_specs.authorization.authorize import authorize
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -63,7 +64,7 @@ from tests.dispatch.utils import (
 )
 from tests.dispatch_app.models import Note
 from tests.parameters.utils import coded
-from tests.specs.utils import Bare
+from tests.specs.utils import Bare, Foreign
 
 LIST = SelectorKind.LIST
 RETRIEVE = SelectorKind.RETRIEVE
@@ -3653,3 +3654,44 @@ def test_passthrough_is_refused_rather_than_run_as_ignore(ada: Any) -> None:
             arguments={"tenant": "acme"},
             unknown_arguments=UnknownArguments.PASSTHROUGH,
         )
+
+
+# --- a declaration of another library's ----------------------------------------------------
+
+
+def test_a_foreign_selector_declaration_runs_as_its_compiled_spec(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN))
+
+    result = dispatch(source, principal=ada, arguments={})
+
+    assert [row.pk for row in result.value] == [note.pk]
+    assert source.compiles == [1]
+
+
+def test_a_foreign_service_declaration_runs_as_its_compiled_spec(ada: Any) -> None:
+    record = Record(returns="done")
+    source = Foreign(ServiceSpec(service=record, permissions=OPEN, validator=Titled()))
+
+    result = dispatch(source, principal=ada, arguments={"title": "T"})
+
+    assert result.value == "done"
+    assert record.calls[0]["title"] == "T"
+
+
+def test_a_foreign_declaration_s_grant_is_its_compiled_spec_s(ada: Any) -> None:
+    # A grant bound to the compiled spec covers the object it was compiled
+    # from, so the class-level check is not asked twice.
+    asked: list[Any] = []
+
+    class Counted(PermissionCheck):
+        def has_permission(self, principal: Any, spec: Any) -> bool:
+            asked.append(spec)
+            return True
+
+    compiled = SelectorSpec(kind=LIST, selector=notes_of, permissions=[Counted()])
+    source = Foreign(compiled)
+
+    dispatch(source, principal=ada, arguments={}, grant=Grant(compiled, ada))
+
+    assert asked == []

@@ -7,6 +7,7 @@ from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from tests.specs.utils import Foreign, ForeignWithContract
 
 
 def _noop() -> None:
@@ -52,3 +53,29 @@ class TestRegisteredSpec:
             spec=SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Unrestricted()]),
         )
         assert not hasattr(entry, "kind")
+
+
+class TestAgentContract:
+    def test_a_kernel_spec_has_none(self) -> None:
+        assert RegisteredSpec("refund_order", _service()).agent_contract is None
+
+    def test_a_declaration_with_no_agent_contract_has_none(self) -> None:
+        assert RegisteredSpec("refund_order", Foreign(_service())).agent_contract is None
+
+    def test_a_declaration_answers_its_own(self) -> None:
+        contract = object()
+        entry = RegisteredSpec("refund_order", ForeignWithContract(_service(), contract=contract))
+        assert entry.agent_contract is contract
+
+    def test_an_agent_contract_attribute_that_is_not_callable_is_not_read(self) -> None:
+        class Holding(Foreign):
+            agent_contract = "a value, not the method"
+
+        assert RegisteredSpec("refund_order", Holding(_service())).agent_contract is None
+
+    def test_it_is_read_only_and_not_a_field(self) -> None:
+        entry = RegisteredSpec("refund_order", _service())
+        with pytest.raises(AttributeError):
+            entry.agent_contract = object()  # type: ignore[misc]
+        with pytest.raises(TypeError, match="agent_contract"):
+            RegisteredSpec("refund_order", _service(), agent_contract=object())  # type: ignore[call-arg]

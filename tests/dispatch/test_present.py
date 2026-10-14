@@ -41,6 +41,7 @@ from tests.dispatch.utils import (
     notes_of,
 )
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 LIST = SelectorKind.LIST
 RETRIEVE = SelectorKind.RETRIEVE
@@ -533,3 +534,9 @@ def test_rows_shaped_outside_dispatch_carry_no_answers_and_are_refused() -> None
 
     with pytest.raises(ImproperlyConfigured, match="no 'affordance__rename__note_archived' answer"):
         present(spec, DispatchResult("list", rows))
+
+
+def test_a_foreign_declaration_is_presented_through_its_compiled_spec() -> None:
+    source = Foreign(selector_spec(presenter=Titles()))
+
+    assert present(source, DispatchResult("instance", Row("a"))) == {"title": "a"}

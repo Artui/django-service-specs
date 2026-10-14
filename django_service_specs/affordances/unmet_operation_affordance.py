@@ -9,11 +9,12 @@ from django_service_specs.affordances.utils import answer_operation_condition
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 
 
 def unmet_operation_affordance(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     pool: dict[str, Any],
     *,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,

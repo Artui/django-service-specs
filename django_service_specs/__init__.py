@@ -103,6 +103,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.output_page import OutputPage
@@ -168,6 +169,7 @@ __all__ = [
     "ServiceError",
     "ServiceNotFound",
     "ServiceSpec",
+    "SpecSource",
     "ServiceValidationError",
     "SpecFormView",
     "SpecRegistry",
@@ -211,6 +213,7 @@ __all__ = [
     "filter_set_parameters",
     "is_async",
     "is_queryset",
+    "kernel_spec",
     "materialize_retrieve",
     "null_progress",
     "provider_keys",

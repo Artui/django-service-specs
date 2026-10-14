@@ -11,6 +11,7 @@ from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
+from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 if TYPE_CHECKING:
     # Annotation-only: ``specs/`` imports ``output/`` for the presenter and the
@@ -20,7 +21,7 @@ if TYPE_CHECKING:
 
 
 def audience_projection_for_spec(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     *,
     overrides: Mapping[str, FieldMarking] | None = None,
     name: str | None = None,
@@ -56,7 +57,7 @@ def audience_projection_for_spec(
             override does. A record has one name, and picking one silently
             would name it by whichever came first.
     """
-    output = spec.output()
+    output = kernel_spec(spec).output()
     projection = AudienceProjection() if output is None else _project(output, path="")
     if not overrides:
         return projection

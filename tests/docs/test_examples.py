@@ -54,6 +54,7 @@ from django_service_specs import (
     coerce_flat,
     dispatch,
     error_response,
+    kernel_spec,
     present,
     server_owned_keys,
     spec_input_schema,
@@ -764,6 +765,13 @@ class TestRegistry:
     def test_only_a_spec_can_be_registered(self) -> None:
         with pytest.raises(TypeError, match="expected a ServiceSpec or SelectorSpec"):
             SpecRegistry().register("loose", quickstart.rename_note)
+
+    def test_a_declaration_of_another_library_s_is_kept_and_compiled_once(self) -> None:
+        assert registry.entry is not None
+        assert registry.entry.spec is registry.listing
+        assert kernel_spec(registry.listing) is registry.compiled
+        assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
+        assert registry.contracts == [{"ordering": "title"}, None]
 
     def test_a_name_is_registered_once(self) -> None:
         with pytest.raises(ValueError, match="already registered"):
