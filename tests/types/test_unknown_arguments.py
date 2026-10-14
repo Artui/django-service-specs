@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.types.unknown_arguments import UnknownArguments
 
 
 def test_passthrough_is_a_member_so_a_comparison_against_it_evaluates() -> None:

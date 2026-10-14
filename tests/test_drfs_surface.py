@@ -478,7 +478,7 @@ SURFACE: dict[str, Pin] = {
     ),
     # --- validation ---------------------------------------------------------------------------
     "UnknownArguments": _enum(
-        "validation.unknown_arguments",
+        "types.unknown_arguments",
         {"REJECT": "reject", "IGNORE": "ignore", "PASSTHROUGH": "passthrough"},
         str,
     ),

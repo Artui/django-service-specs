@@ -149,7 +149,7 @@ nested object as well as at the top: closed only at the top, an unknown key in
 a row would reach the row's constructor and come back as a `TypeError` naming
 no row.
 
-[`UnknownArguments.REJECT`][django_service_specs.validation.unknown_arguments.UnknownArguments]
+[`UnknownArguments.REJECT`][django_service_specs.types.unknown_arguments.UnknownArguments]
 is the default everywhere. An untrusted caller's undeclared key is refused
 before it costs a query, and a trusted caller's typo - a command's misspelt
 option, a task enqueued with last month's argument name - fails where the

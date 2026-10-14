@@ -43,8 +43,8 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
-from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator

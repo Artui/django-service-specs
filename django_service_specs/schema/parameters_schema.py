@@ -8,8 +8,8 @@ from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import max_length_in_force
 from django_service_specs.schema.utils import allow_null, is_json_native
+from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.utils import unknown_arguments_policy
 
 

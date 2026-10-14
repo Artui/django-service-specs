@@ -49,7 +49,6 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.validation.validated.Validated
 
 ::: django_service_specs.validation.validation_context.ValidationContext
-::: django_service_specs.validation.unknown_arguments.UnknownArguments
 
 ## Output
 
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
 ::: django_service_specs.types.selector_kind.SelectorKind
 ::: django_service_specs.types.field_audience.FieldAudience
+::: django_service_specs.types.unknown_arguments.UnknownArguments
