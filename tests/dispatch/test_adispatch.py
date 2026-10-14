@@ -1269,11 +1269,11 @@ class _Computes(Titled):
 
 
 @pytest.mark.parametrize("path", ["_dispatch", "_prepare"])
-async def test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_before_the_run(
-    path: str, ada: Any, hops: list[str]
+async def test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops(
+    path: str, ada: Any
 ) -> None:
-    """Refused inside the one hop that validates, so the run is never reached:
-    a sync service's ``dispatch``, or a non-atomic async one's prelude."""
+    """A sync service's ``dispatch`` and a non-atomic async one's prelude both
+    leave the key to the Validator's value."""
     ran: list[Mapping[str, Any]] = []
 
     def sync_service(**pool: Any) -> None:
@@ -1289,11 +1289,8 @@ async def test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_bef
             service=async_service, atomic=False, permissions=OPEN, validator=_Computes()
         )
     )
-    with pytest.raises(ImproperlyConfigured, match=r"extra_kwargs names the key\(s\) \['slug'\]"):
-        await adispatch(
-            spec, principal=ada, arguments={"title": "t"}, extra_kwargs={"slug": "view"}
-        )
-    assert (hops, ran) == ([path], [])
+    await adispatch(spec, principal=ada, arguments={"title": "t"}, extra_kwargs={"slug": "view"})
+    assert [pool["slug"] for pool in ran] == ["computed"]
 
 
 async def test_there_is_no_input_data_overlay(ada: Any, hops: list[str]) -> None:

@@ -4000,65 +4000,68 @@ class TestOverlays:
         assert service.calls[0]["project_pk"] == 7
 
     @pytest.mark.parametrize(
-        ("overlay", "named"),
+        ("overlay", "key", "computed"),
         [
-            # Returned by the Validator and declared by no parameter, so only
-            # the validated values' own names refuse it.
-            pytest.param({"slug": "view"}, "['slug']", id="a-validated-value"),
-            pytest.param({"form": "view"}, "['form']", id="a-bound-value"),
+            # Returned by the Validator and declared by no parameter.
+            pytest.param({"slug": "view"}, "slug", "t", id="a-validated-value"),
+            pytest.param({"form": "view"}, "form", "bound", id="a-bound-value"),
         ],
     )
-    def test_an_extra_kwargs_key_naming_a_value_the_validator_computed_is_refused(
-        self, ada: Any, overlay: Mapping[str, Any], named: str
+    def test_a_value_the_validator_computed_outranks_the_overlay(
+        self, ada: Any, overlay: Mapping[str, Any], key: str, computed: str
     ) -> None:
-        """The overlay merges above the Validator's values and its pool, so it
-        would replace what the Validator computed from the call's arguments.
-        Those keys are known once it has run: refused there, before the run."""
+        """The overlay is the lowest tier: the Validator's values and the pool
+        it binds stand over it, and its entry is dropped for the call rather
+        than refused, since whether a key is computed can turn on the request."""
         service = Record()
         validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
         spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
-        with pytest.raises(ImproperlyConfigured) as refused:
-            dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs=overlay)
-        assert str(refused.value) == (
-            f"extra_kwargs names the key(s) {named}, which the ServiceSpec's Validator "
-            "computed. An overlay may not stand in for a value the spec's own Validator "
-            "computes; rename the key."
-        )
-        assert service.calls == []
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs=overlay)
+        assert service.calls[0][key] == computed
 
-    def test_a_many_call_s_bound_value_is_refused_as_a_single_call_s_is(self, ada: Any) -> None:
-        """``validated_many`` binds its pool once for the call, and the
-        overlay merges above it as on a single call."""
-        service = Record()
-        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Listed())
-        with pytest.raises(ImproperlyConfigured, match=r"names the key\(s\) \['listed'\]"):
-            dispatch(
-                spec,
-                principal=ada,
-                arguments={"items": [{"title": "a"}]},
-                extra_kwargs={"listed": 1},
-            )
-        assert service.calls == []
-
-    def test_a_computed_value_s_refusal_answers_before_an_affordance_or_a_precondition(
+    def test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call(
         self, ada: Any
     ) -> None:
-        """Refused as soon as the Validator's names are known: an affordance
-        refusing, or a precondition raising, would answer instead if it ran
-        first."""
-        condition, precondition = _Condition(returns=False), _Precondition(Boom())
-        spec = ServiceSpec(
-            service=Record(),
-            permissions=OPEN,
-            validator=_Binds({}, returns={"title": "T", "slug": "t"}),
-            affordances=[Affordance(code="closed", reason="Closed.", when=condition)],
-            preconditions=[precondition],
-        )
-        with pytest.raises(ImproperlyConfigured, match="Validator computed"):
-            dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"slug": "view"})
-        assert (condition.calls, precondition.calls) == ([], [])
+        """A Validator computing ``slug`` only from a ``title`` sent: the same
+        overlay fills the gap on a call without one and yields on a call with
+        one, and neither call is an error."""
 
-    def test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused(self, ada: Any) -> None:
+        class _SlugWhenTitled(Validator):
+            def parameters(self) -> Parameters:
+                return Parameters.of(Parameter("title", "string"), Parameter("body", "string"))
+
+            def validate(
+                self, arguments: Mapping[str, Any], context: ValidationContext
+            ) -> dict[str, Any]:
+                values = dict(arguments)
+                if "title" in values:
+                    values["slug"] = values["title"].lower()
+                return values
+
+        service = Record()
+        spec = ServiceSpec(
+            service=service, permissions=OPEN, validator=_SlugWhenTitled(), partial=True
+        )
+        dispatch(spec, principal=ada, arguments={"body": "b"}, extra_kwargs={"slug": "view"})
+        dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"slug": "view"})
+        assert [call["slug"] for call in service.calls] == ["view", "t"]
+
+    def test_a_many_call_s_bound_value_outranks_the_overlay(self, ada: Any) -> None:
+        """``validated_many`` binds its pool once for the call, and stands over
+        the overlay as on a single call."""
+        service, validator = Record(), Listed()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"items": [{"title": "a"}]},
+            extra_kwargs={"listed": "view"},
+        )
+        assert service.calls[0]["listed"] is validator
+
+    def test_an_unset_entry_naming_a_computed_value_leaves_it_to_the_validator(
+        self, ada: Any
+    ) -> None:
         service = Record()
         validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
         spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
@@ -4070,7 +4073,9 @@ class TestOverlays:
         )
         assert (service.calls[0]["slug"], service.calls[0]["form"]) == ("t", "bound")
 
-    def test_a_computed_value_the_spec_s_typed_provider_owns_is_not_refused(self, ada: Any) -> None:
+    def test_a_computed_value_the_spec_s_typed_provider_owns_is_never_the_overlay_s(
+        self, ada: Any
+    ) -> None:
         """The overlay's value for a key the provider owns is dropped beneath
         it, so it reaches nothing and the Validator's value stands."""
 

@@ -96,8 +96,9 @@ docs/examples/dispatching.py:overlays
 --8<--
 ```
 
-`extra_kwargs` sits beneath the spec's `kwargs` provider: **the spec's own
-provider wins on a clash**. It is read as the provider's return is:
+`extra_kwargs` is the lowest of three tiers: beneath the spec's `kwargs`
+provider, so **the spec's own provider wins on a clash**, and beneath what the
+spec's Validator computed or bound. It is read as the provider's return is:
 
 - an entry whose value is `UNSET` is dropped;
 - a key the spec's provider is annotated to fill is the provider's alone, and
@@ -119,14 +120,15 @@ provider fills, whose caller's value is dropped before any check and whose
 overlay value is dropped beneath the provider. To set such a value per call,
 fill it from that provider.
 
-**So is a key naming a value the spec's Validator computed**: a key of the
-`values` its `validated()` returned, or of the `pool` it bound. The overlay
-merges above both, so it would replace what the Validator computed from the
-call's arguments with a value the Validator never saw. Those names are known
-only once the Validator has run, so this refusal comes after step five rather
-than before step one - still before the affordances, the preconditions and the
-run, so the service never runs - and in `adispatch` inside the same hop. The same two keys stand: an `UNSET` entry, and
-one the spec's typed `kwargs` provider fills.
+**A key naming a value the spec's Validator computed is never the
+overlay's**: a key of the `values` its `validated()` returned, or of the `pool`
+it bound, is left to the Validator, and the overlay's entry is dropped for that
+call rather than refused. Whether a Validator computes a key can turn on what
+the caller sent - a `slug` derived from a `title` only when one arrives - so a
+refusal there would let a request decide whether a misconfiguration error
+fires. The overlay fills such a key on the calls where the Validator leaves it
+out. Refusal is kept for what is static: a key naming a declared parameter, or
+a seed, is refused on every call alike.
 
 `extra_kwargs` reaches a read's own selector and a write's service, never a
 target or output selector.

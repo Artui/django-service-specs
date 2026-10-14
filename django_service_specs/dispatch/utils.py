@@ -108,10 +108,15 @@ def refuse_overlaid_parameters(
     (test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused). A
     key naming no parameter is the overlay's to add, and stands
     (test_the_spec_s_kwargs_provider_outranks_the_overlay); each of the three
-    parts of ``overlay_supplies``' set expression, with ``declared`` here, is
-    held by the test named for it here.
+    parts of the set expression below is held by the test named for it here.
+    Refused because it is static: whether a key names a declared parameter
+    is known from the spec alone, so the same overlay is refused on every
+    call, never on some requests and not others.
     """
-    taken = sorted(overlay_supplies(spec, overlay) & declared.names())
+    keys = provider_keys(spec.kwargs)
+    owned = keys.filled if keys is not None else frozenset()
+    supplied = {name for name, value in overlay.kwargs.items() if value is not UNSET}
+    taken = sorted((supplied & declared.names()) - owned)
     if taken:
         raise ImproperlyConfigured(
             f"extra_kwargs names the parameter(s) {taken}, which the {type(spec).__name__} "
@@ -119,61 +124,6 @@ def refuse_overlaid_parameters(
             "target selector see, so an overlay may not stand in for it; rename the key, or "
             "fill it from the spec's typed kwargs provider."
         )
-
-
-def refuse_overlaid_values(spec: ServiceSpec, validated: Validated, overlay: Overlay) -> None:
-    """Refuse an ``extra_kwargs`` key naming a value the spec's own Validator computed.
-
-    The overlay merges above the Validator's values and the pool it binds,
-    so a key naming one would replace what the Validator computed from the
-    call's arguments with a value it never saw. Those names are known only
-    once it has run, so this is asked after validation, still before the
-    affordances, the preconditions and the run
-    (test_a_computed_value_s_refusal_answers_before_an_affordance_or_a_precondition),
-    in ``dispatch`` and in ``adispatch``'s hop alike
-    (test_extra_kwargs_naming_a_value_the_validator_computed_is_refused_before_the_run),
-    and on a ``many`` call, whose pool is bound once
-    (test_a_many_call_s_bound_value_is_refused_as_a_single_call_s_is). The two exemptions of
-    ``refuse_overlaid_parameters`` hold here too, through
-    ``overlay_supplies``: an ``UNSET`` entry
-    (test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused) and
-    a key the spec's typed provider owns, whose overlay value is dropped
-    beneath it (test_a_computed_value_the_spec_s_typed_provider_owns_is_not_refused).
-
-    One branch to coverage, so each side of the union is held by its own case
-    of test_an_extra_kwargs_key_naming_a_value_the_validator_computed_is_refused:
-    ``a-validated-value`` fails without ``values``, and ``a-bound-value``
-    without ``pool``. A key naming a declared parameter was refused before the
-    shape check, so it never reaches here.
-    """
-    taken = sorted(
-        overlay_supplies(spec, overlay) & (validated.values.keys() | validated.pool.keys())
-    )
-    if taken:
-        raise ImproperlyConfigured(
-            f"extra_kwargs names the key(s) {taken}, which the {type(spec).__name__}'s "
-            "Validator computed. An overlay may not stand in for a value the spec's own "
-            "Validator computes; rename the key."
-        )
-
-
-def overlay_supplies(spec: ServiceSpec | SelectorSpec, overlay: Overlay) -> set[str]:
-    """The overlay's keys that would reach the run: those not ``UNSET`` and not the spec's provider's.
-
-    An ``UNSET`` entry supplies nothing, and a key the spec's typed ``kwargs``
-    provider is annotated to fill is the provider's alone, the overlay's value
-    for it dropped beneath it, so neither can stand in for anything. Each
-    exemption is held twice, once per refusal reading this:
-    test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused and
-    test_an_unset_entry_naming_a_computed_value_is_dropped_not_refused fail
-    without the ``UNSET`` filter, and
-    test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused and
-    test_a_computed_value_the_spec_s_typed_provider_owns_is_not_refused without
-    subtracting ``owned``.
-    """
-    keys = provider_keys(spec.kwargs)
-    owned = keys.filled if keys is not None else frozenset()
-    return {name for name, value in overlay.kwargs.items() if value is not UNSET} - owned
 
 
 def overlaid(
@@ -1422,10 +1372,18 @@ def prepare_service(
             "returned as a value, or the spec declares as a parameter. A value bound for "
             "the call needs a name of its own."
         )
-    # Once the Validator's names are known and before anything else can run.
-    refuse_overlaid_values(spec, validated, overlay)
+    # The overlay is the lowest tier: beneath the spec's provider, and beneath
+    # what the Validator computed or bound, whose keys it never replaces. Its
+    # entry is dropped for the call rather than refused, since whether the
+    # Validator computes a key can turn on what the caller sent
+    # (test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call).
+    # Each side of the union is held by a case of
+    # test_a_value_the_validator_computed_outranks_the_overlay:
+    # ``a-validated-value`` fails without ``values``, ``a-bound-value`` without
+    # the pool.
+    computed = values.keys() | validated.pool.keys()
     author = overlaid(
-        overlay.kwargs,
+        {name: value for name, value in overlay.kwargs.items() if name not in computed},
         provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved),
         spec.kwargs,
         label="extra_kwargs",
