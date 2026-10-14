@@ -8,7 +8,8 @@ can be read in. So the graph of imports that run is held acyclic here.
 An import under ``if TYPE_CHECKING:`` runs nothing, so it is not an edge of
 that graph. It is still a dependency a reader has to know, which is why the
 packages that annotate each other are one named set below and not left
-implicit.
+implicit. The set is empty: no package names another's types without
+importing it.
 """
 
 from __future__ import annotations
@@ -23,11 +24,9 @@ ROOT = Path(django_service_specs.__file__).parent
 
 # Annotation-only edges: (importing package, imported package). Each is an
 # import that exists to type a signature whose module the other package
-# already imports at run time.
-ANNOTATION_ONLY = {
-    # A check is handed the spec it judges, and a spec declares its checks.
-    ("authorization", "specs"),
-}
+# already imports at run time. None is left: a check is handed the spec it
+# judges typed ``Any``, since a spec declares its checks.
+ANNOTATION_ONLY: set[tuple[str, str]] = set()
 
 
 def _package_of(dotted: str) -> str | None:
