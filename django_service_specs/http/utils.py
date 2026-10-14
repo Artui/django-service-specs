@@ -135,6 +135,13 @@ def answered_methods(spec: Any, methods: Sequence[str] | None, *, label: str) ->
         compiled = kernel_spec(spec)
     except TypeError as error:
         raise ImproperlyConfigured(f"{label}.as_view() needs a spec: {error}") from error
+    # ``kernel_spec`` tells a spec by its compiling to itself, which an object
+    # that is no spec can also do; it would otherwise fail on the first request.
+    if not isinstance(compiled, ServiceSpec | SelectorSpec):
+        raise ImproperlyConfigured(
+            f"{label}.as_view() needs a spec: {type(compiled).__name__}.as_kernel_spec() answers "
+            "itself but it is neither a ServiceSpec nor a SelectorSpec."
+        )
     if methods is None:
         return ("get", "head") if isinstance(compiled, SelectorSpec) else ("post",)
     named = {method.lower() for method in methods}

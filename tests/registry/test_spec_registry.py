@@ -79,6 +79,23 @@ class TestRegister:
         ):
             registry.register("nonsense", "not a spec")  # type: ignore[arg-type]
 
+    def test_an_object_compiling_to_itself_that_is_no_spec_is_rejected(self) -> None:
+        # Compiling to itself is how ``kernel_spec`` tells a spec, and an
+        # object that is no spec can do it too: registered, it would be listed
+        # by ``specs()`` and dropped by ``mutations()`` and ``queries()``.
+        class SelfCompiling:
+            permissions = [Unrestricted()]
+
+            def as_kernel_spec(self) -> SelfCompiling:
+                return self
+
+        registry = SpecRegistry()
+        with pytest.raises(
+            TypeError, match="'fake': SelfCompiling.as_kernel_spec.. answers itself"
+        ):
+            registry.register("fake", SelfCompiling())  # type: ignore[arg-type]
+        assert "fake" not in registry
+
     def test_a_spec_with_no_declared_permissions_is_rejected(self) -> None:
         # Off HTTP there is no view whose policy an undeclared spec could
         # inherit, so registering one is refused rather than left to fail on

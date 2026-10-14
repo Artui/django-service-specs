@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for the object covers dispatching it again. `ServiceSpec` and
   `SelectorSpec` answer `as_kernel_spec()` with themselves. An object that
   cannot be weakly referenced, has no callable `as_kernel_spec`, or compiles to
-  something that is not a spec is refused with a `TypeError`. It reaches
+  something that is not a spec is refused with a `TypeError`; `SpecRegistry`
+  and the views also refuse an object that answers itself but is neither
+  spec class. It reaches
   `dispatch`, `adispatch`, `check_call`, `present`, `apresent`,
   `resolve_target`, `dispatch_request`, `adispatch_request`,
   `enforce_affordances`, `aenforce_affordances`, `operation_affordances`,
@@ -56,8 +58,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rebuilt from the re-rooted tree at every row the refusal passes. The
   nearest registered class in the method resolution order answers.
   Registering the same pair again does nothing; a second reader, or a class
-  overlapping one the kernel re-roots already (`Exception`, `ValueError`,
-  Django's `ValidationError`), is refused.
+  overlapping one the kernel re-roots already (`ServiceValidationError`,
+  `InvalidArguments`, `ValueError`, `TypeError`, Django's `ValidationError`) or
+  a base of one of them such as `Exception`, is refused.
 - **`create_model`, `update_model`, `delete_model`, `delete_collection`** and
   their async forms **`acreate_model`, `aupdate_model`, `adelete_model`,
   `adelete_collection`** build the service an operation would otherwise write
@@ -103,7 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reads. `add_argument_errors` stays, for placing a refusal on a host's own
   bound form.
 - **Breaking: `annotate_output_schema` keeps a formatted property's null in
-  every spelling.** It reads a null stated as an `anyOf` member (how a dataclass
+  the spellings below.** It reads a null stated as an `anyOf` member (how a dataclass
   field typed `X | None` is described), as `None` in an `enum` or a `const` (a
   nullable choice) and as a `oneOf` entry (a labelled nullable choice), as well
   as in a type list. A formatted property that admits one is restated as
@@ -131,6 +134,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`enforce_affordances` raises `TypeError` for a `SelectorSpec`**, and
   `aenforce_affordances` raises the same, whatever the selector spec declares;
   the async path used to return `None` for one declaring nothing.
+- **Breaking: `dispatch_request` and `adispatch_request` raise
+  `ImproperlyConfigured` for an asked schema no route could hear** (an
+  undeclared key, a server-filled one, an unrenderable shape or a type the
+  parameter disagrees with, per `check_requested_input`), where they wrote it
+  into a 422 body; a client now sees a 500, and the service is what to fix.
 - **`SpecView` and `AsyncSpecView` serve a `SpecSource` as their `spec`**,
   compiled when `as_view()` runs; a declaration that does not compile is
   `ImproperlyConfigured` there. The message for a view given no spec now says

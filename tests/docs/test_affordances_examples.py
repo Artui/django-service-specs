@@ -23,6 +23,7 @@ from django_service_specs import (
     AdditionalInputRequired,
     NotPermitted,
     ServiceNotFound,
+    check_requested_input,
     error_response,
     operation_affordances,
     spec_output_schema,
@@ -173,6 +174,11 @@ class TestAskingForOneMoreValue:
     def test_one_note_needs_no_confirmation(self, ada: Any) -> None:
         Note.objects.create(owner=ada, title="a", archived=True)
         assert affordances.purge(ada, {}) == 1
+
+    def test_the_question_the_example_asks_is_one_a_transport_can_render(self) -> None:
+        affordances.check_the_question()
+        with pytest.raises(ImproperlyConfigured, match="shout"):
+            check_requested_input(affordances.purge_spec, {"shout": {"type": "boolean"}})
 
     def test_the_page_shows_the_422_error_response_answers(self, ada: Any) -> None:
         for title in ("a", "b"):

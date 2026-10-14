@@ -190,7 +190,9 @@ spec does not declare, so the caller merges it last and types it in the same
 call as everything else, and one refusal carries every problem:
 
 ```python
-arguments = coerce_flat(parameters, {**read, **route_arguments(parameters, url_kwargs)})
+--8<--
+docs/examples/http.py:route_arguments
+--8<--
 ```
 
 ## The principal

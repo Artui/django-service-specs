@@ -205,7 +205,8 @@ def _admits_null(schema: dict[str, Any]) -> bool:
     - a member of ``anyOf`` or an entry of ``oneOf`` that admits one by any of
       these rules: ``{"type": "null"}``, which is how a dataclass field typed
       ``X | None`` is described, ``{"const": None}``, which is how a labelled
-      nullable choice is, or a member that is itself nullable.
+      nullable choice is, a member that is itself nullable, or one that admits
+      anything (``true`` or ``{}``).
 
     One boolean, so one branch to coverage; each spelling has a test that
     fails without it: test_a_nullable_field_stays_nullable (a type list),
@@ -222,9 +223,24 @@ def _admits_null(schema: dict[str, Any]) -> bool:
         or None in schema.get("enum", ())
         or schema.get("const", ...) is None
         or any(
-            _admits_null(member) for union in ("anyOf", "oneOf") for member in schema.get(union, ())
+            _member_admits_null(member)
+            for union in ("anyOf", "oneOf")
+            for member in schema.get(union, ())
         )
     )
+
+
+def _member_admits_null(member: Any) -> bool:
+    """Whether one entry of an ``anyOf`` or ``oneOf`` admits a ``null``.
+
+    A schema may be a boolean, and ``true`` or ``{}`` admits anything, the
+    null included, where ``false`` admits nothing. Anything else that is not an
+    object is no schema to read. Each of the three is a case of
+    test_a_boolean_or_empty_union_member_is_read_as_a_schema_is.
+    """
+    if isinstance(member, dict):
+        return not member or _admits_null(member)
+    return member is True
 
 
 def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[str, Any]:

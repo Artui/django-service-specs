@@ -167,6 +167,14 @@ class SpecRegistry:
             spec = kernel_spec(entry.spec)
         except TypeError as refused:
             raise TypeError(f"{entry.name!r}: {refused}") from refused
+        # ``kernel_spec`` tells a spec by its compiling to itself, which an
+        # object that is no spec can also do; every transport iterating
+        # ``mutations()`` and ``queries()`` would then drop it without a word.
+        if not isinstance(spec, ServiceSpec | SelectorSpec):
+            raise TypeError(
+                f"{entry.name!r}: {type(spec).__name__}.as_kernel_spec() answers itself but it is "
+                "neither a ServiceSpec nor a SelectorSpec."
+            )
         if spec.permissions is None:
             raise ImproperlyConfigured(
                 f"{entry.name!r} declares no permissions. Pass permissions=[Unrestricted()] "

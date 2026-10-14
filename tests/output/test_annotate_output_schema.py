@@ -640,6 +640,19 @@ class TestFormatters:
 
             assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
 
+    def test_a_boolean_or_empty_union_member_is_read_as_a_schema_is(self) -> None:
+        """``true`` and ``{}`` admit anything, null included; ``false`` admits
+        nothing, and an entry that is no schema at all is not read."""
+        for union in ("anyOf", "oneOf"):
+            for admitting in (True, {}):
+                subschema = {union: [{"type": "string"}, admitting]}
+
+                assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+            for admitting_nothing in (False, "string"):
+                subschema = {union: [{"type": "string"}, admitting_nothing]}
+
+                assert self.formatted(subschema) == LOCAL_TIME
+
     def test_a_union_naming_no_null_admits_none_after_formatting(self) -> None:
         """The condition of the null kept, per spelling: a union with no null
         member, a ``oneOf`` with no null entry and an enum without ``None``."""

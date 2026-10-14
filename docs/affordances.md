@@ -211,6 +211,12 @@ The narrowest renderer is an MCP elicitation form: a `string`, `number`,
 `many` spec the top level is the list and the spec's `reads`, so a
 confirmation asked once for the whole call is a `reads` parameter.
 
+```python
+--8<--
+docs/examples/affordances.py:check_asked
+--8<--
+```
+
 ## Declaring idempotency
 
 `ServiceSpec(idempotent=True)` states that repeating the call with the same

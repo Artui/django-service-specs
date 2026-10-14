@@ -146,6 +146,14 @@ class TestConfiguration:
             SpecView.as_view(spec=notes_spec)
         assert str(refused.value) == NO_SPEC.format(got="function")
 
+    def test_an_object_compiling_to_itself_that_is_no_spec_is_refused(self) -> None:
+        class SelfCompiling:
+            def as_kernel_spec(self) -> SelfCompiling:
+                return self
+
+        with pytest.raises(ImproperlyConfigured, match="SelfCompiling.as_kernel_spec.. answers"):
+            SpecView.as_view(spec=SelfCompiling())
+
     def test_a_method_it_cannot_answer_is_refused_at_as_view(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
             SpecView.as_view(spec=notes_spec(), methods=["get", "options", "trace"])
