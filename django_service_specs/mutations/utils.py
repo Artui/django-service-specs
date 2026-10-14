@@ -23,7 +23,8 @@ from django_service_specs.mutations.related_object_change import RelatedObjectCh
 from django_service_specs.mutations.relation_outcome import RelationOutcome
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, coded_messages
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
+from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec

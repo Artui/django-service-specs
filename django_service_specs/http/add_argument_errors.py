@@ -8,7 +8,7 @@ from typing import Any, Final
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.forms import BaseForm
 
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.relations.utils import clean_held_to_their_columns
 
 _NON_FIELD_KEYS: Final = (NON_FIELD_ERRORS, FORM_NON_FIELD_ERRORS)
