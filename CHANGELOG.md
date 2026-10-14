@@ -33,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `many` spec's service. Its refusal is the list's own node: failing rows
   by index, and a message about the whole list under `non_field_errors`,
   which dispatch reports after the rows and beside the shape check's
-  refusals. The default is the per-row loop dispatch ran before, so every
+  refusals, in index order whatever order they were raised in. That node
+  mixes `int` keys with a string one, so `json.dumps(..., sort_keys=True)`
+  over it raises `TypeError`. The default is the per-row loop dispatch ran before, so every
   existing Validator behaves as it did, and a value one row binds is still
   refused. A Validator whose library validates a list as one overrides it.
   An override returning values under any other name is refused, and one

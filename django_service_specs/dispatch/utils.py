@@ -1243,7 +1243,10 @@ def _list_node(errors: Mapping[Any, Any]) -> dict[Any, Any]:
 
     A sort key rather than ``sorted(errors.items())``, which cannot compare an
     ``int`` index with ``non_field_errors``
-    (test_a_list_level_refusal_sits_beside_the_rows_shape_refusals).
+    (test_a_list_level_refusal_sits_beside_the_rows_shape_refusals). Sorted at
+    all because the shape check's refusals and the Validator's are merged in
+    the order each raised them
+    (test_the_refusals_are_in_index_order_whatever_order_the_validator_raised_them_in).
     """
     return dict(
         sorted(

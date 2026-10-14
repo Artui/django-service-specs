@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -3421,6 +3422,35 @@ class TestMany:
         }
         assert list(detail) == [0, 2, "non_field_errors"]
         assert [set(rows) for rows, _, _ in validator.lists] == [{1, 2}]
+
+    def test_the_refusals_are_in_index_order_whatever_order_the_validator_raised_them_in(
+        self, ada: Any
+    ) -> None:
+        """The shape check's refusal of a later row and a Validator that puts
+        the list's message first still read row by row, then the list's own:
+        merged as raised they would read 2, ``non_field_errors``, 0. The ints
+        and the string do not compare, so ``sort_keys`` cannot order them."""
+
+        class ListFirst(Listed):
+            def validated_many(
+                self,
+                rows: Mapping[int, Mapping[str, Any]],
+                context: ValidationContext,
+                *,
+                many_argument: str,
+            ) -> Validated:
+                raise InvalidArguments(
+                    {"non_field_errors": ["Not as a list."], 0: {"title": ["Not this one."]}}
+                )
+
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=ListFirst())
+        rows = [{"title": "bad"}, {"title": "fine"}, {"title": 3}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"items": rows})
+        detail = refused.value.detail["items"]
+        assert list(detail) == [0, 2, "non_field_errors"]
+        with pytest.raises(TypeError):
+            json.dumps(refused.value.detail, sort_keys=True)
 
     def test_the_shape_check_s_refusals_stand_when_the_validator_accepts_the_rest(
         self, ada: Any
