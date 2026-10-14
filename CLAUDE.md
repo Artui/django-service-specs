@@ -47,7 +47,9 @@ Non-negotiable. They keep the package navigable.
    unless a circular import is proven, or the import targets a declared optional
    dependency gated behind an opt-in. Document the reason inline.
 5. **Full type annotations on every function and method signature.** `Any` is
-   allowed only at the Django boundary where the type genuinely is `Any`.
+   allowed only at the Django boundary where the type genuinely is `Any`, and
+   the spec handed to a `PermissionCheck`, which the package that declares
+   specs cannot name without a ring.
 6. **`__init__.py` is the only re-export point.** Each `__init__.py` lists the
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
@@ -75,7 +77,10 @@ Non-negotiable. They keep the package navigable.
    `Affordance` sits there for the same reason, with the helpers its
    construction reads in `types/utils.py`: `ServiceSpec` imports it, and
    `affordances/`, which answers the conditions at the call and before it,
-   imports `specs/`.
+   imports `specs/`. `AffordanceDeclarer` sits there too: `ServiceSpec`
+   inherits it, and `SelectorSpec`, which `service_spec` imports, names it to
+   type and refuse its `affordances` values without importing `service_spec`
+   back.
 
 ## Naming the concepts
 

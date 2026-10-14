@@ -5,7 +5,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, QuerySet
@@ -25,13 +25,9 @@ from django_service_specs.specs.utils import (
     check_providers,
     check_reserved,
 )
+from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import affordance_alias
-
-if TYPE_CHECKING:
-    # For the ``affordances`` annotation only; see ``_check_affordances`` for
-    # why the runtime import cannot sit up here.
-    from django_service_specs.specs.service_spec import ServiceSpec
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -164,7 +160,7 @@ class SelectorSpec:
     # needs, here the answer for each row. Keyed by a name the caller chooses
     # rather than taken from a registry, since a ``ServiceSpec`` does not know
     # what it is called.
-    affordances: Mapping[str, ServiceSpec] | None = None
+    affordances: Mapping[str, AffordanceDeclarer] | None = None
     # djangorestframework-services' names for the same three declarations, so a
     # spec moving between the two packages keeps its field names. Typed open
     # (``...``) because each is bound from the keyword pool, so its signature
@@ -322,13 +318,6 @@ def _check_affordances(spec: SelectorSpec) -> None:
     At construction, like ``ServiceSpec``'s own check: a selector reaches
     transports that never ask before they present its rows.
     """
-    # A proven cycle, and the one function-local import here. ``service_spec``
-    # imports this module at its top for ``SelectorSpec``, so a top-level import
-    # of ``ServiceSpec`` here fails whichever of the two loads first. By the
-    # time any ``SelectorSpec`` is constructed both modules have finished
-    # loading, so this resolves from ``sys.modules`` and runs nothing.
-    from django_service_specs.specs.service_spec import ServiceSpec
-
     affordances: Any = spec.affordances
     if affordances is None:
         return
@@ -346,7 +335,10 @@ def _check_affordances(spec: SelectorSpec) -> None:
             raise ImproperlyConfigured(
                 f"SelectorSpec.affordances keys must be non-empty strings; got {name!r}."
             )
-        if not isinstance(service_spec, ServiceSpec):
+        # A base only ``ServiceSpec`` inherits, so a ``SelectorSpec``, which has
+        # an ``affordances`` of its own, is refused too
+        # (test_a_value_must_be_a_service_spec[selector-spec]).
+        if not isinstance(service_spec, AffordanceDeclarer):
             raise ImproperlyConfigured(
                 f"SelectorSpec.affordances[{name!r}] must be a ServiceSpec; got "
                 f"{type(service_spec).__name__}. The mapping holds the spec whose "
