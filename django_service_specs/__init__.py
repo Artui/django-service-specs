@@ -20,6 +20,7 @@ from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
@@ -202,6 +203,7 @@ __all__ = [
     "authorize_target",
     "base_pool",
     "bind_arguments",
+    "check_call",
     "check_arguments",
     "coerce_flat",
     "create_from_input",

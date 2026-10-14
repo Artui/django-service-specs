@@ -170,7 +170,8 @@ name for the transports of the current djangorestframework-services release,
 which compare a policy against it. It is not a policy: every function that
 takes one raises `ValueError` for it rather than running it as `IGNORE`.
 
-`dispatch`, `adispatch` and `bind_arguments` each take `unknown_arguments=`.
+`dispatch`, `adispatch`, `check_call` and `bind_arguments` each take
+`unknown_arguments=`.
 
 ## The refusal tree
 

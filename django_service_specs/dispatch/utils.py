@@ -109,11 +109,24 @@ def open_call(
     pool_seeds: PoolSeeds,
     unknown_arguments: UnknownArguments,
     parameters: Parameters | None = None,
+    settle_rows: bool = False,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
+    The one prelude: ``dispatch``, ``adispatch`` and ``resolve_target`` call
+    it, and so does ``check_call``, its public face, so a transport that checks
+    a call before enqueueing it and the dispatch that later runs it cannot
+    refuse different calls.
+
     ``parameters`` is what is checked, ``spec.parameters()`` unless given:
     ``resolve_target`` checks its target selector's alone.
+
+    ``settle_rows`` is for a caller with no step five to come, ``check_call``:
+    a ``many`` call's rows, which the shape check carries to the Validator's
+    step rather than raising, are raised here instead, after the permission
+    check and in the tree step five raises them in, and otherwise handed back
+    as the list of checked rows. Without it they stay carried, for
+    ``validate_arguments`` to report beside the Validator's own refusals.
 
     **A deactivated principal is refused before anything else**, as
     ``PrincipalUnavailable``, by the rule ``resolve_principal`` and the HTTP
@@ -153,7 +166,19 @@ def open_call(
             "the parameter."
         )
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    return checked, authorize(spec, principal, grant=grant)
+    granted = authorize(spec, principal, grant=grant)
+    if settle_rows:
+        # Only a ``many`` spec's list is ever carried as ``_CheckedRows``: a
+        # refused row raises as step five raises it
+        # (test_a_many_spec_s_refused_rows_are_raised_as_dispatch_raises_them),
+        # and the rows come back as a list rather than as dispatch's carrier
+        # (test_a_many_spec_s_rows_come_back_as_a_list_of_checked_rows).
+        for name, value in checked.items():
+            if isinstance(value, _CheckedRows):
+                if value.errors:
+                    raise InvalidArguments({name: dict(sorted(value.errors.items()))})
+                checked[name] = [value.rows[index] for index in sorted(value.rows)]
+    return checked, granted
 
 
 def shape_check(

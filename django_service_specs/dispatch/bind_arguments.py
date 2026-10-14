@@ -65,6 +65,11 @@ def bind_arguments(
     owns both: it authorizes before binding, and passes the row it resolved as
     ``target``, or ``None`` for a create.
 
+    It is the complement of
+    [`check_call`][django_service_specs.dispatch.check_call.check_call]: this
+    validates and does not authorize, and ``check_call`` authorizes and does
+    not validate.
+
     Raises:
         InvalidArguments: from either step. The shape check's tree carries every
             problem at once, and a Validator is only reached with well-shaped

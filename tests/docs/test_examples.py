@@ -350,6 +350,17 @@ class TestDispatching:
             dispatching.bind_rename(ada, note, {"pk": note.pk})
         assert refused.value.detail == {"title": ["This field is required."]}
 
+    def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
+        queue: list[Any] = []
+        dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)
+        assert queue == [(ada.pk, {"pk": 1, "title": "Final"})]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatching.enqueue_rename(ada, {"title": "Final"}, queue)
+        assert refused.value.detail == {"pk": ["This field is required."]}
+        with pytest.raises(NotPermitted):
+            dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
+        assert len(queue) == 1
+
     def test_a_seed_reaches_the_service_and_no_caller_can_supply_it(self, ada: Any) -> None:
         result = dispatching.create_signed_note(ada, "Hello")
         assert result.value.title == "Hello, by ada"

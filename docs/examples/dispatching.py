@@ -17,6 +17,7 @@ from django_service_specs import (
     SelectorSpec,
     ServiceSpec,
     bind_arguments,
+    check_call,
     dispatch,
     present,
     resolve_target,
@@ -75,6 +76,17 @@ def bind_rename(user: Any, note: Note, arguments: dict[str, Any]) -> dict[str, A
 
 
 # --8<-- [end:bind]
+
+
+# --8<-- [start:check_call]
+def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> None:
+    # Refused here, before anything is queued, by the steps dispatch runs
+    # first; the job carries what was sent, and the worker dispatches it.
+    check_call(rename_note_spec, principal=user, arguments=arguments)
+    queue.append((user.pk, arguments))
+
+
+# --8<-- [end:check_call]
 
 
 # --8<-- [start:resolve_target]
