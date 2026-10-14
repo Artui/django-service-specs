@@ -603,6 +603,134 @@ class TestFormatters:
     def test_a_field_stated_only_as_null_still_admits_it(self) -> None:
         assert self.formatted({"type": "null"}) == {**LOCAL_TIME, "type": ["string", "null"]}
 
+    def test_a_null_stated_as_an_any_of_member_stays_admitted(self) -> None:
+        """The shape a dataclass field typed ``datetime | None`` is described
+        as: the null is a member of a union, not a word in a type."""
+        subschema = {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_listed_in_an_enum_stays_admitted(self) -> None:
+        """The shape ``ChoiceField(allow_null=True)`` is described as: untyped,
+        because its values are of two types, with the null among them."""
+        subschema = {"enum": ["a", "b", None]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_listed_in_an_enum_stays_admitted_whatever_type_is_stated(self) -> None:
+        """The enum lists the null the server serves, so it is read even
+        beside a type that does not name one."""
+        subschema = {"type": "string", "enum": ["a", None]}
+
+        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_stated_as_a_one_of_entry_stays_admitted(self) -> None:
+        """A labelled nullable choice: the null is an entry of its own, as a
+        constant or as a type."""
+        for entry in ({"const": None}, {"type": "null"}):
+            subschema = {"oneOf": [{"const": "a", "title": "Alpha"}, entry]}
+
+            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_null_inside_an_any_of_member_stays_admitted(self) -> None:
+        """A member is read as a property is: its own type list, its own
+        enum."""
+        for member in ({"type": ["string", "null"]}, {"enum": ["a", None]}):
+            subschema = {"anyOf": [member, {"type": "integer"}]}
+
+            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_boolean_or_empty_union_member_is_read_as_a_schema_is(self) -> None:
+        """``true`` and ``{}`` admit anything, null included; ``false`` admits
+        nothing, and an entry that is no schema at all is not read."""
+        for union in ("anyOf", "oneOf"):
+            for admitting in (True, {}):
+                subschema = {union: [{"type": "string"}, admitting]}
+
+                assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
+            for admitting_nothing in (False, "string"):
+                subschema = {union: [{"type": "string"}, admitting_nothing]}
+
+                assert self.formatted(subschema) == LOCAL_TIME
+
+    def test_a_union_naming_no_null_admits_none_after_formatting(self) -> None:
+        """The condition of the null kept, per spelling: a union with no null
+        member, a ``oneOf`` with no null entry and an enum without ``None``."""
+        for subschema in (
+            {"anyOf": [{"type": "string"}, {"type": "integer"}]},
+            {"oneOf": [{"const": "a"}, {"const": "b"}]},
+            {"enum": ["a", "b"]},
+            {"type": "string", "const": "a"},
+        ):
+            assert self.formatted(subschema) == LOCAL_TIME
+
+    def test_a_null_constant_stays_admitted(self) -> None:
+        assert self.formatted({"const": None}) == {**LOCAL_TIME, "type": ["string", "null"]}
+
+    def test_a_formatters_own_enum_admits_the_null_its_field_does(self) -> None:
+        """The type now admits a null, so an ``enum`` the formatter lists beside
+        it must too, or the schema would refuse the null it just admitted."""
+        produced = ValueFormatter(str, produces="string", schema={"enum": ("a", "b")})
+        marking = FieldMarking.formatted(produced)
+
+        assert self.formatted({"type": ["string", "null"]}, marking) == {
+            "enum": ["a", "b", None],
+            "type": ["string", "null"],
+        }
+        # The declaration itself is never modified.
+        assert produced.schema == {"enum": ("a", "b")}
+
+    def test_a_formatters_enum_already_listing_none_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"enum": ["a", None]})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "enum": ["a", None],
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_enum_on_a_field_admitting_no_null_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"enum": ["a", "b"]})
+
+        assert self.formatted({"type": "string"}, FieldMarking.formatted(produced)) == {
+            "enum": ["a", "b"],
+            "type": "string",
+        }
+
+    def test_a_formatters_own_const_admits_the_null_its_field_does(self) -> None:
+        """A ``const`` is a one-value ``enum``: restated as the ``enum`` of that
+        value and a null, the smallest statement that still admits both."""
+        produced = ValueFormatter(str, produces="string", schema={"const": "n/a"})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "enum": ["n/a", None],
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_and_enum_together_are_one_value_and_a_null(self) -> None:
+        """Both must hold, so the values left are the constant alone."""
+        produced = ValueFormatter(str, produces="string", schema={"const": "a", "enum": ["a", "b"]})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "enum": ["a", None],
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_none_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"const": None})
+
+        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
+            "const": None,
+            "type": ["string", "null"],
+        }
+
+    def test_a_formatters_const_on_a_field_admitting_no_null_is_left_as_declared(self) -> None:
+        produced = ValueFormatter(str, produces="string", schema={"const": "a"})
+
+        assert self.formatted({"type": "string"}, FieldMarking.formatted(produced)) == {
+            "const": "a",
+            "type": "string",
+        }
+
     def test_a_type_admitting_no_null_admits_none_after_formatting(self) -> None:
         """The condition of the null kept: only a stated ``"null"`` is."""
         assert self.formatted({"type": ["string", "integer"]}) == LOCAL_TIME

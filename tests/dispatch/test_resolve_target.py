@@ -32,6 +32,7 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
+    OwnerOnly,
     Record,
     Refuse,
     Scoped,
@@ -41,6 +42,7 @@ from tests.dispatch.utils import (
     notes_of,
 )
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 pytestmark = pytest.mark.django_db
 
@@ -433,3 +435,29 @@ def test_its_grant_handed_on_without_the_target_covers_no_other_row(ada: Any, bo
         dispatch(spec, principal=ada, arguments={"pk": theirs.pk, "title": "T"}, grant=grant)
     assert check.rows == [mine, theirs]
     assert spec.service.calls == []
+
+
+# --- a declaration of another library's ----------------------------------------------------
+
+
+def test_a_foreign_declaration_resolves_and_its_grant_carries_to_dispatch(ada: Any) -> None:
+    # One compiled spec per object is what lets the grant, bound to the spec
+    # by identity, cover the dispatch handed the same object: the row's check
+    # is asked once across the two calls.
+    note = Note.objects.create(owner=ada, title="mine")
+    check = OwnerOnly()
+    source = Foreign(_update(check))
+    target, grant = _found(resolve_target(source, principal=ada, arguments={"pk": note.pk}))
+    assert target == note
+    result = dispatch(
+        source, principal=ada, arguments={"pk": note.pk, "title": "T"}, grant=grant, target=target
+    )
+    assert result.instance == note
+    assert check.rows == [note]
+    assert source.compiles == [1]
+
+
+def test_a_foreign_selector_declaration_is_refused_as_a_selector_spec_is(ada: Any) -> None:
+    source = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN))
+    with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
+        resolve_target(source, principal=ada, arguments={})

@@ -296,6 +296,12 @@ on its presenter:
 | A service spec with no output selector, with `allow_none=True` | the item, with `"null"` in its type |
 | A `many` service spec with no output selector | `{"type": "array", "items": <item>}`, with `"null"` in its type under `allow_none=True` |
 
+Where the table says `"null"` is
+[`can_present_nothing`][django_service_specs.schema.can_present_nothing.can_present_nothing]'s
+answer, exported for a transport that writes an output schema of its own, so
+the two cannot disagree. It does not read `many`: a `many` service's list may
+be `None` exactly where any service's return may.
+
 A `RETRIEVE` selector spec without `allow_none` answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
 its item is not nullable. A service spec's `RETRIEVE` output selector is

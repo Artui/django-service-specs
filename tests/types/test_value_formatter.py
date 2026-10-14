@@ -9,11 +9,42 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.utils import timezone
 
+from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.dispatch.paginate_output import paginate_output
+from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.output import Output
+from django_service_specs.output.output_field import OutputField
+from django_service_specs.output.presenter import Presenter
+from django_service_specs.specs.selector_kind import SelectorKind
+from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.value_formatter import ValueFormatter
+from tests.dispatch.utils import OPEN, make_user, notes_of
+from tests.dispatch_app.models import Note
 
 MONEY = ValueFormatter(
     lambda amount: f"EUR {amount}", produces="string", schema={"examples": ["EUR 1240.00"]}
 )
+
+
+class StampedNotes(Presenter):
+    """A note's title served as a timestamp, which is where a row's stored text
+    meets the formatter."""
+
+    def output(self) -> Output:
+        return Output(
+            (
+                OutputField(
+                    "stamp",
+                    "string",
+                    format="date-time",
+                    marking=FieldMarking.formatted(ValueFormatter.timestamp()),
+                ),
+            )
+        )
+
+    def present(self, value: Any) -> Any:
+        return {"stamp": value.title}
 
 
 def refuse(value: Any) -> Any:
@@ -87,12 +118,40 @@ class TestTimestamp:
     def test_anything_that_is_not_a_date_time_passes_through(self, value: Any) -> None:
         assert ValueFormatter.timestamp().apply(value) == value
 
-    def test_a_date_time_string_naming_no_real_moment_raises(self) -> None:
-        """The limit of passing through, kept from djangorestframework-services:
-        Django's parser accepts the shape and then refuses the day. The
-        message is Python's, and its wording differs between versions."""
-        with pytest.raises(ValueError):
-            ValueFormatter.timestamp().apply("2026-02-30T10:00:00")
+    @pytest.mark.parametrize(
+        "value",
+        ["2026-02-30T10:00:00", "2026-13-01T10:00:00", "2026-01-31T25:00:00", "2026-02-30T10:00Z"],
+        ids=["february-30th", "month-13", "hour-25", "february-30th-zoned"],
+    )
+    def test_a_date_time_string_naming_no_real_moment_is_reported_as_stored(
+        self, value: str
+    ) -> None:
+        """Django's parser accepts the shape and then refuses the day with a
+        ``ValueError``; one row's bad data must not fail the call, so the row
+        is reported as it is stored, as any other string that is not a
+        date-time is."""
+        assert ValueFormatter.timestamp().apply(value) == value
+
+    @pytest.mark.django_db
+    def test_one_bad_row_does_not_fail_its_page(self) -> None:
+        """Paging is what turned one row's bad data into a failed page: the
+        row is served as stored and its neighbours are formatted."""
+        ada = make_user("ada")
+        stored = ["2026-01-31T14:05:09", "2026-02-30T10:00:00", "2026-03-01T08:00:00"]
+        Note.objects.bulk_create([Note(owner=ada, title=title) for title in stored])
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=StampedNotes()
+        )
+
+        result = dispatch(spec, principal=ada, arguments={})
+        page = paginate_output(result.value, page=1, limit=3)
+        rendered = present_for_audience(spec, dataclasses.replace(result, value=page.items))
+
+        assert [row["stamp"] for row in page.envelope(rendered)["items"]] == [
+            "31 Jan 2026 14:05",
+            "2026-02-30T10:00:00",
+            "01 Mar 2026 08:00",
+        ]
 
     def test_the_example_is_rendered_from_the_format_in_use(self) -> None:
         """A day past the twelfth and an hour past noon, so the example tells

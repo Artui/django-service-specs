@@ -28,6 +28,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from tests.dispatch.utils import PK, TENANT_SEEDS, make_user, note_by_pk
 from tests.dispatch_app.models import LiveNote, Note
+from tests.specs.utils import Foreign
 
 NOT_ARCHIVED = Affordance(
     code="note_archived", reason="An archived note cannot be renamed.", when=Q(archived=False)
@@ -274,3 +275,22 @@ class TestDeclarationOrder:
         assert refusal(spec_with(TITLED, NOT_ARCHIVED), pool_for(ada, note), note).code == (
             "untitled"
         )
+
+
+@pytest.mark.django_db
+def test_a_foreign_declaration_is_enforced_as_its_compiled_spec(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="Draft", archived=True)
+    with pytest.raises(ActionUnavailable) as refused:
+        enforce_affordances(Foreign(spec_with(NOT_ARCHIVED)), pool_for(ada, note), instance=note)
+    assert refused.value.code == "note_archived"
+
+
+@pytest.mark.parametrize("wrap", [lambda spec: spec, Foreign], ids=["spec", "foreign"])
+def test_a_selector_spec_is_refused_rather_than_its_mapping_read_as_conditions(wrap: Any) -> None:
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=note_by_pk,
+        affordances={"edit": ServiceSpec(service=print)},
+    )
+    with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
+        enforce_affordances(wrap(spec), {}, instance=None)

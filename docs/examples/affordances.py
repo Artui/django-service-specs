@@ -19,6 +19,7 @@ from django_service_specs import (
     authorize_target,
     base_pool,
     bind_arguments,
+    check_requested_input,
     dispatch,
     enforce_affordances,
     present,
@@ -133,6 +134,17 @@ def purge(user: Any, arguments: dict[str, Any]) -> int:
 
 
 # --8<-- [end:confirm]
+
+
+# --8<-- [start:check_asked]
+def check_the_question() -> None:
+    # What a transport calls before it renders the question: `confirmed` is a
+    # declared boolean, so a form can ask it. A key the spec does not declare
+    # would raise ImproperlyConfigured naming it.
+    check_requested_input(purge_spec, {"confirmed": {"type": "boolean"}})
+
+
+# --8<-- [end:check_asked]
 
 
 # --8<-- [start:selector]

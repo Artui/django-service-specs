@@ -17,6 +17,7 @@ import importlib
 import json
 import pickle
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -54,11 +55,13 @@ from django_service_specs import (
     coerce_flat,
     dispatch,
     error_response,
+    kernel_spec,
     present,
     server_owned_keys,
     spec_input_schema,
     update_from_input,
 )
+from django_service_specs.mutations.utils import ROW_ERROR_READERS
 from docs.examples import (
     arguments,
     async_dispatch,
@@ -69,6 +72,7 @@ from docs.examples import (
     quickstart,
     registry,
     relations,
+    row_errors,
     transport,
 )
 from tests.adapter_app.models import Author, Book
@@ -348,6 +352,17 @@ class TestDispatching:
         with pytest.raises(InvalidArguments) as refused:
             dispatching.bind_rename(ada, note, {"pk": note.pk})
         assert refused.value.detail == {"title": ["This field is required."]}
+
+    def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
+        queue: list[Any] = []
+        dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)
+        assert queue == [(ada.pk, {"pk": 1, "title": "Final"})]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatching.enqueue_rename(ada, {"title": "Final"}, queue)
+        assert refused.value.detail == {"pk": ["This field is required."]}
+        with pytest.raises(NotPermitted):
+            dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
+        assert len(queue) == 1
 
     def test_a_seed_reaches_the_service_and_no_caller_can_supply_it(self, ada: Any) -> None:
         result = dispatching.create_signed_note(ada, "Hello")
@@ -727,6 +742,40 @@ class TestRelations:
         assert not Author.objects.filter(pk=author.pk).exists()
         assert not Book.objects.filter(pk__in=books).exists()
 
+    def test_delete_model_takes_the_books_first_and_returns_nothing(self, ada: Any) -> None:
+        author = self._create(ada).value
+        books = list(author.books.values_list("pk", flat=True))
+        assert books
+        result = dispatch(deleting.retire_author_spec, principal=ada, arguments={"pk": author.pk})
+        assert result.value is None
+        assert not Author.objects.filter(pk=author.pk).exists()
+        assert not Book.objects.filter(pk__in=books).exists()
+
+
+@pytest.fixture
+def row_error_registered() -> Iterator[None]:
+    """The example's registration, undone after the test so it reaches no other."""
+    before = dict(ROW_ERROR_READERS)
+    row_errors.ready()
+    yield
+    ROW_ERROR_READERS.clear()
+    ROW_ERROR_READERS.update(before)
+
+
+@pytest.mark.django_db
+class TestRowErrors:
+    def test_a_registered_refusal_lands_at_its_row_and_keeps_its_class(
+        self, row_error_registered: None
+    ) -> None:
+        books = [{"title": "Fine", "price": "1"}, {"title": "LOUD", "price": "1"}]
+        with pytest.raises(row_errors.CatalogueRefusal) as refused:
+            row_errors.create_author(data={"name": "Ada", "books": books})
+        assert refused.value.detail == {"books": {1: {"title": ["No titles in capitals."]}}}
+
+    def test_registering_it_again_changes_nothing(self, row_error_registered: None) -> None:
+        row_errors.ready()
+        assert ROW_ERROR_READERS[row_errors.CatalogueRefusal] is row_errors.read_refusal
+
 
 class TestRegistry:
     def test_views_are_snapshots_in_the_order_asked_for(self) -> None:
@@ -764,6 +813,13 @@ class TestRegistry:
     def test_only_a_spec_can_be_registered(self) -> None:
         with pytest.raises(TypeError, match="expected a ServiceSpec or SelectorSpec"):
             SpecRegistry().register("loose", quickstart.rename_note)
+
+    def test_a_declaration_of_another_library_s_is_kept_and_compiled_once(self) -> None:
+        assert registry.entry is not None
+        assert registry.entry.spec is registry.listing
+        assert kernel_spec(registry.listing) is registry.compiled
+        assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
+        assert registry.contracts == [{"ordering": "title"}, None]
 
     def test_a_name_is_registered_once(self) -> None:
         with pytest.raises(ValueError, match="already registered"):

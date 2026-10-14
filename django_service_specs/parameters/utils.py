@@ -12,7 +12,6 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Iterable
-from typing import Final
 
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.utils.translation import gettext
@@ -20,14 +19,6 @@ from django.utils.translation import gettext
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.settings import max_array_length
-
-NON_FIELD_ERRORS: Final = "non_field_errors"
-"""The key a message about a node itself sits under, beside its fields' messages.
-
-A row that is not an object has no field to hang the message on, so it goes
-here inside the row: ``{"books": {1: {"non_field_errors": ["..."]}}}``. It is
-Django's and DRF's spelling of the same idea, so a transport rendering either's
-errors reads the kernel's without a translation table."""
 
 
 def expected_type(json_type: str) -> CodedMessage:

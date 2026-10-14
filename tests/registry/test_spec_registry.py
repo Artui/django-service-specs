@@ -9,6 +9,7 @@ from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from tests.specs.utils import Foreign, ForeignWithContract
 
 
 def _noop() -> None:
@@ -72,8 +73,28 @@ class TestRegister:
 
     def test_a_non_spec_is_rejected(self) -> None:
         registry = SpecRegistry()
-        with pytest.raises(TypeError, match="expected a ServiceSpec or SelectorSpec, got str"):
+        with pytest.raises(
+            TypeError,
+            match=r"'nonsense': expected a ServiceSpec or SelectorSpec, or an object with as_kernel_spec\(\); got str",
+        ):
             registry.register("nonsense", "not a spec")  # type: ignore[arg-type]
+
+    def test_an_object_compiling_to_itself_that_is_no_spec_is_rejected(self) -> None:
+        # Compiling to itself is how ``kernel_spec`` tells a spec, and an
+        # object that is no spec can do it too: registered, it would be listed
+        # by ``specs()`` and dropped by ``mutations()`` and ``queries()``.
+        class SelfCompiling:
+            permissions = [Unrestricted()]
+
+            def as_kernel_spec(self) -> SelfCompiling:
+                return self
+
+        registry = SpecRegistry()
+        with pytest.raises(
+            TypeError, match="'fake': SelfCompiling.as_kernel_spec.. answers itself"
+        ):
+            registry.register("fake", SelfCompiling())  # type: ignore[arg-type]
+        assert "fake" not in registry
 
     def test_a_spec_with_no_declared_permissions_is_rejected(self) -> None:
         # Off HTTP there is no view whose policy an undeclared spec could
@@ -362,3 +383,53 @@ class TestSpecMetadataRoundTrip:
         assert entry is not None
         assert entry.tags == {"write"}
         assert entry.spec.metadata is None
+
+
+class TestAForeignDeclaration:
+    """A declaration with ``as_kernel_spec()``, registered as it is, with no wrapper."""
+
+    def test_is_kept_as_registered_and_classified_by_what_it_compiles_to(self) -> None:
+        registry = SpecRegistry()
+        write, read = Foreign(_service()), Foreign(_selector())
+        registry.register("refund_order", write)
+        registry.register("list_orders", read)
+
+        entry = registry.get("refund_order")
+        assert entry is not None
+        assert entry.spec is write
+        assert registry.specs() == {"refund_order": write, "list_orders": read}
+        assert [e.name for e in registry.mutations()] == ["refund_order"]
+        assert [e.name for e in registry.queries()] == ["list_orders"]
+        assert write.compiles == [1]
+
+    def test_one_compiling_to_an_unguarded_spec_is_refused_as_an_unguarded_spec_is(self) -> None:
+        registry = SpecRegistry()
+        with pytest.raises(ImproperlyConfigured, match="'orphan' declares no permissions"):
+            registry.register("orphan", Foreign(ServiceSpec(service=_noop)))
+        assert "orphan" not in registry
+
+    def test_seeding_one_is_validated_as_register_validates_it(self) -> None:
+        entry = RegisteredSpec("orphan", Foreign(ServiceSpec(service=_noop)))
+        with pytest.raises(ImproperlyConfigured, match="'orphan' declares no permissions"):
+            SpecRegistry([entry])
+
+    def test_one_compiling_to_something_else_is_refused_naming_the_registration(self) -> None:
+        class Wrong:
+            def as_kernel_spec(self) -> object:
+                return "not a spec"
+
+        with pytest.raises(TypeError, match=r"'wrong': Wrong.as_kernel_spec\(\) must return"):
+            SpecRegistry().register("wrong", Wrong())  # type: ignore[arg-type]
+
+    def test_register_takes_no_agent_contract(self) -> None:
+        with pytest.raises(TypeError, match="agent_contract"):
+            SpecRegistry().register("refund_order", _service(), agent_contract=object())  # type: ignore[call-arg]
+
+    def test_the_entry_answers_the_declaration_s_own_agent_contract(self) -> None:
+        contract = object()
+        registry = SpecRegistry()
+        registry.register("kernel", _service())
+        registry.register("bare", Foreign(_service()))
+        registry.register("carrying", ForeignWithContract(_service(), contract=contract))
+
+        assert [e.agent_contract for e in registry] == [None, None, contract]

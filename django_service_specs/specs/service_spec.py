@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
+from typing_extensions import Self
 
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
@@ -333,6 +334,17 @@ class ServiceSpec:
     def target_selector_spec(self) -> SelectorSpec | None:
         """The selector resolving what the service acts on, if it declares one."""
         return self.instance_selector_spec or self.collection_selector_spec
+
+    def as_kernel_spec(self) -> Self:
+        """This spec, as its own compiled form.
+
+        What makes a spec a
+        [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] like
+        any declaration of another library's, and how
+        [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec]
+        tells the two apart: a spec compiles to itself, and is never cached.
+        """
+        return self
 
     def parameters(self) -> Parameters:
         """Everything this spec takes: its target selector's reads, its own, then its Validator's.

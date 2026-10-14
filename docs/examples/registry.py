@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-# --8<-- [start:registry]
-from django_service_specs import SpecRegistry
-from docs.examples.declaring import list_notes_spec
+from dataclasses import dataclass
+from typing import Any
+
+from django_service_specs import SelectorKind, SelectorSpec, SpecRegistry, kernel_spec
+from docs.examples.declaring import IsSignedIn, list_notes_spec, notes_of
 from docs.examples.quickstart import rename_note_spec
 from docs.examples.relations import create_author_spec, update_author_spec
 
+# --8<-- [start:registry]
 registry = SpecRegistry()
 registry.register("list_notes", list_notes_spec, tags=("notes", "read"))
 registry.register("rename_note", rename_note_spec, tags=("notes", "write"))
@@ -19,3 +22,29 @@ registry.register("update_author", update_author_spec, tags=("catalogue", "write
 agent_tools = registry.by_tag("notes")  # list_notes, rename_note
 command_line = registry.subset("create_author", "list_notes")  # in the order named
 # --8<-- [end:registry]
+
+
+# --8<-- [start:source]
+@dataclass(frozen=True)
+class OtherLibrarysListing:
+    """A read declared in another library's vocabulary, compiled on demand."""
+
+    ordering: str = "title"
+
+    def as_kernel_spec(self) -> SelectorSpec:
+        return SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=[IsSignedIn()])
+
+    def agent_contract(self) -> dict[str, Any]:
+        return {"ordering": self.ordering}
+
+
+listing = OtherLibrarysListing()
+mixed = SpecRegistry()
+mixed.register("legacy_notes", listing, tags=("notes", "read"))
+mixed.register("list_notes", list_notes_spec, tags=("notes", "read"))
+
+entry = mixed.get("legacy_notes")
+assert entry is not None and entry.spec is listing  # kept as registered
+compiled = kernel_spec(listing)  # compiled once; the same object every time
+contracts = [e.agent_contract for e in mixed]  # [{"ordering": "title"}, None]
+# --8<-- [end:source]

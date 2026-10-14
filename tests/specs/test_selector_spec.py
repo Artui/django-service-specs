@@ -373,3 +373,11 @@ def test_an_async_shaping_callable_is_refused(field: str, value: object, named: 
 def test_a_filterset_class_is_not_mistaken_for_an_async_callable() -> None:
     # A class's ``__call__`` is its metaclass's, which is sync.
     assert listing(filter_set=TitleFilter).filter_set is TitleFilter
+
+
+def test_a_selector_spec_compiles_to_itself() -> None:
+    # What makes it a SpecSource, and how kernel_spec tells a spec from a
+    # declaration that compiles to one without importing either class.
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list)
+
+    assert spec.as_kernel_spec() is spec

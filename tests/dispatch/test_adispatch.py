@@ -50,6 +50,7 @@ from tests.dispatch.utils import (
     notes_of,
 )
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 LIST = SelectorKind.LIST
 RETRIEVE = SelectorKind.RETRIEVE
@@ -1053,3 +1054,31 @@ async def test_a_many_spec_refuses_a_pre_resolved_target_before_any_hop(
     with pytest.raises(TypeError, match="a many spec resolves no target"):
         await adispatch(spec, principal=ada, arguments={"items": []}, target=None)
     assert hops == []
+
+
+# --- a declaration of another library's ----------------------------------------------------
+
+
+async def test_a_foreign_selector_declaration_runs_as_its_compiled_spec(ada: Any) -> None:
+    note = await _create(owner=ada, title="mine")
+    source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN))
+
+    result = await adispatch(source, principal=ada, arguments={})
+
+    assert [row.pk for row in await sync_to_async(list)(result.value)] == [note.pk]
+
+
+async def test_a_foreign_async_service_declaration_is_awaited_as_its_compiled_spec(
+    ada: Any, hops: list[str]
+) -> None:
+    async def service(*, title: str) -> str:
+        return f"async {title}"
+
+    source = Foreign(
+        ServiceSpec(service=service, permissions=OPEN, validator=Titled(), atomic=False)
+    )
+
+    result = await adispatch(source, principal=ada, arguments={"title": "t"})
+
+    assert result.value == "async t"
+    assert len(hops) == 1

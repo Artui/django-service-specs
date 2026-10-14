@@ -187,10 +187,10 @@ class ValueFormatter:
         local and is formatted as it is. A value that is not a date-time, and a
         string that does not read as one, passes through unchanged, for the
         same reason an unrecognised choice value does: a stale or oddly-typed
-        row should still be reported rather than fail the call. A string shaped
-        like a date-time that names no real moment, the thirtieth of February
-        say, raises Django's ``ValueError``, as djangorestframework-services'
-        does. Declaring this on a field that never carries a date is a
+        row should still be reported rather than fail the call. So is a string
+        shaped like a date-time that names no real moment, the thirtieth of
+        February say, which Django's parser refuses with a ``ValueError``: paging
+        would otherwise turn one row's bad data into a failed page. Declaring this on a field that never carries a date is a
         misdeclaration nothing here can detect.
         """
 
@@ -223,5 +223,18 @@ def _local_datetime(value: Any, fmt: str) -> Any:
 
 
 def _parsed(value: Any) -> datetime | None:
-    """``value`` read as a date-time string, or ``None`` if it is neither."""
-    return parse_datetime(value) if isinstance(value, str) else None
+    """``value`` read as a date-time string, or ``None`` if it is not one.
+
+    Django's parser raises ``ValueError`` on a string shaped like a date-time
+    that names no moment, the thirtieth of February or a thirteenth month: it
+    reads the shape with a pattern and builds the ``datetime`` afterwards.
+    That is a row stored wrongly, not a declaration made wrongly, so it is
+    reported as not a date-time and the formatter hands the row back as stored.
+    Only the reading is guarded, not the rendering that follows it.
+    """
+    if not isinstance(value, str):
+        return None
+    try:
+        return parse_datetime(value)
+    except ValueError:
+        return None

@@ -9,14 +9,19 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.specs.kernel_spec import kernel_spec
 
 if TYPE_CHECKING:
     from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
+    from django_service_specs.specs.spec_source import SpecSource
 
 
 def authorize(
-    spec: ServiceSpec | SelectorSpec, principal: Any, *, grant: Grant | None = None
+    spec: ServiceSpec | SelectorSpec | SpecSource,
+    principal: Any,
+    *,
+    grant: Grant | None = None,
 ) -> Grant:
     """Run ``spec``'s class-level permission checks for ``principal``.
 
@@ -27,6 +32,11 @@ def authorize(
     [`covers`][django_service_specs.authorization.grant.Grant.covers] this exact
     spec and principal, by identity, so a grant carried over from another
     operation or another user is refused rather than trusted.
+
+    ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]: each
+    check is asked about the spec it compiles to, the object dispatch hands
+    it for the same declaration, and the grant returned covers both.
 
     Without a grant, ``spec.permissions is None`` is a configuration error, not
     the principal's fault: off HTTP there is no view whose policy an
@@ -44,6 +54,7 @@ def authorize(
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
     """
+    spec = kernel_spec(spec)
     if grant is not None:
         if grant.covers(spec, principal):
             return grant

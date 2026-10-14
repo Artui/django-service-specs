@@ -7,12 +7,14 @@ from typing import Any
 
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def server_owned_keys(
-    spec: ServiceSpec | SelectorSpec, *, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
+    spec: ServiceSpec | SelectorSpec | SpecSource, *, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
 ) -> frozenset[str]:
     """Every name ``spec``'s dispatch fills from the server, whatever the caller sends.
 
@@ -46,9 +48,12 @@ def server_owned_keys(
     provider whose return says nothing about its keys, which may fill any name
     and so names none.
 
-    djangorestframework-services' own reading adds the keys its reflected
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] owns
+    what the spec it compiles to owns. djangorestframework-services' own
+    reading adds the keys its reflected
     input markers hide, which this package does not read.
     """
+    spec = kernel_spec(spec)
     owned: set[str] = set(pool_seeds.reserved)
     providers: list[Callable[..., Any] | None] = [spec.kwargs]
     if isinstance(spec, ServiceSpec):

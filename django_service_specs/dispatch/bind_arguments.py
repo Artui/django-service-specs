@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from django_service_specs.dispatch.utils import shape_check, validate_arguments
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 if TYPE_CHECKING:
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
 
 
 def bind_arguments(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     arguments: Mapping[str, Any],
     *,
     principal: Any,
@@ -27,7 +29,9 @@ def bind_arguments(
     ``dispatch`` - an MCP server answering a malformed call before it opens a
     transaction, a queue validating a task in the worker. It is the same two
     steps dispatch takes, so a transport that binds for itself cannot drift
-    from the gate dispatch applies:
+    from the gate dispatch applies. ``spec`` may be a
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource], bound as
+    the spec it compiles to:
 
     1. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        over ``spec.parameters()``, under ``unknown_arguments``: the closed
@@ -65,6 +69,11 @@ def bind_arguments(
     owns both: it authorizes before binding, and passes the row it resolved as
     ``target``, or ``None`` for a create.
 
+    It is the complement of
+    [`check_call`][django_service_specs.dispatch.check_call.check_call]: this
+    validates and does not authorize, and ``check_call`` authorizes and does
+    not validate.
+
     Raises:
         InvalidArguments: from either step. The shape check's tree carries every
             problem at once, and a Validator is only reached with well-shaped
@@ -73,6 +82,7 @@ def bind_arguments(
             shape refusal and a Validator refusal on different rows come back
             as one tree keyed by row index.
     """
+    spec = kernel_spec(spec)
     checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked

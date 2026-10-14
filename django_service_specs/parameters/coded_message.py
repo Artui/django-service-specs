@@ -47,7 +47,7 @@ class CodedMessage(str):
         return (type(self), (str(self), self.code))
 
     # No ``__repr__`` of its own, on purpose: ``str``'s, so the text ``str``
-    # makes of a tree - a log line, the ``BadRequest`` SpecFormView raises -
+    # makes of a tree - a log line, a ``BadRequest`` -
     # reads ``{'n': ['This field is required.']}``, as it did before messages
     # carried codes, rather than naming this class in every message
     # (test_its_repr_is_its_message_s).

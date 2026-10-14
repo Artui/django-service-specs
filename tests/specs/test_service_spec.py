@@ -744,3 +744,11 @@ class TestProviderReach:
         named = "ServiceSpec.input_data is annotated to fill ['project'], which ServiceSpec.reads"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
             spec.parameters()
+
+
+def test_a_service_spec_compiles_to_itself() -> None:
+    # What makes it a SpecSource, and how kernel_spec tells a spec from a
+    # declaration that compiles to one without importing either class.
+    spec = ServiceSpec(service=print)
+
+    assert spec.as_kernel_spec() is spec

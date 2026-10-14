@@ -9,6 +9,7 @@ from django_service_specs import (
     SelectorKind,
     SelectorSpec,
     ServiceSpec,
+    delete_model,
     delete_relations,
 )
 from docs.examples.declaring import IsSignedIn
@@ -35,3 +36,13 @@ delete_author_spec = ServiceSpec(
     ),
 )
 # --8<-- [end:delete]
+
+
+# --8<-- [start:model]
+retire_author_spec = ServiceSpec(
+    # The books go first, through the map the writes use, then the author.
+    service=delete_model(Author, relations=BOOKS),
+    permissions=[IsSignedIn()],
+    instance_selector_spec=delete_author_spec.instance_selector_spec,
+)
+# --8<-- [end:model]

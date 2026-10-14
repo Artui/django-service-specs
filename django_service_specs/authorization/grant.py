@@ -5,10 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, NoReturn
 
+from django_service_specs.specs.kernel_spec import kernel_spec
+
 if TYPE_CHECKING:
     # Annotation-only, for the reason permission_check.py gives.
     from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
+    from django_service_specs.specs.spec_source import SpecSource
 
 
 @dataclass(frozen=True)
@@ -43,13 +46,27 @@ class Grant:
     may have moved, and it re-authorizes by construction.
     """
 
-    spec: ServiceSpec | SelectorSpec
+    spec: ServiceSpec | SelectorSpec | SpecSource
     principal: Any
     target_checked: bool = False
 
-    def covers(self, spec: ServiceSpec | SelectorSpec, principal: Any) -> bool:
-        """Whether this grant is for exactly this spec and this principal."""
-        return self.spec is spec and self.principal is principal
+    def covers(self, spec: ServiceSpec | SelectorSpec | SpecSource, principal: Any) -> bool:
+        """Whether this grant is for exactly this spec and this principal.
+
+        The spec is compared as compiled: a grant minted for a
+        [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]
+        covers that object and the spec it compiles to, and a grant minted for
+        the compiled spec covers the object, since each compiles once. Any
+        other object is covered exactly when it compiles to that very spec:
+        objects are compiled each on its own, so where a library compiles
+        each declaration afresh, as djangorestframework-services does, a grant
+        covers one declaration and not another that compares equal to it.
+        """
+        # Compiled here rather than when the grant is built, so ``spec`` keeps
+        # the object the transport gave it. One arc to coverage, so each
+        # operand is named: test_a_grant_for_a_source_covers_the_source_and_the_spec_it_compiles_to
+        # holds both, by another declaration and another principal.
+        return self.principal is principal and kernel_spec(self.spec) is kernel_spec(spec)
 
     def __reduce__(self) -> NoReturn:
         raise TypeError(

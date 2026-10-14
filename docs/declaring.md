@@ -80,6 +80,38 @@ Nothing the output selector declares is refused either: its pool carries no
 argument, and the service has already run. Where an argument may be left out,
 give the parameter a default.
 
+### Typing a callable
+
+Nothing above reads an annotation, so a service is typed for its author and
+the type checker rather than for dispatch. Seven Protocols name the shapes
+dispatch calls:
+[`CreateService`][django_service_specs.services.create_service.CreateService]
+takes `data`,
+[`UpdateService`][django_service_specs.services.update_service.UpdateService]
+takes `instance` and `data`, and
+[`DeleteService`][django_service_specs.services.delete_service.DeleteService]
+takes `instance` with `data` optional;
+[`ListSelector`][django_service_specs.selectors.list_selector.ListSelector] and
+[`RetrieveSelector`][django_service_specs.selectors.retrieve_selector.RetrieveSelector]
+type a selector's result, and
+[`Selector`][django_service_specs.selectors.selector.Selector] and
+[`AsyncSelector`][django_service_specs.selectors.async_selector.AsyncSelector]
+describe any selector at all. Every other key of the pool arrives through
+`**extras`.
+[`implements`][django_service_specs.services.implements.implements] states the
+Protocol on the definition, where a type checker such as ty reports a callable
+that does not conform, and returns the callable unchanged:
+
+```python
+--8<--
+docs/examples/typing_services.py:typed
+--8<--
+```
+
+[`NoInput`][django_service_specs.types.no_input.NoInput] fills the input type
+of a service that reads none. A delete that does take input declares `data`
+with a default of its own, since the Protocol's caller may leave it out.
+
 ## A read
 
 ```python

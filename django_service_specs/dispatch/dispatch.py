@@ -19,15 +19,17 @@ from django_service_specs.dispatch.utils import (
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.run_service import run_service
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 
 
 def dispatch(
-    spec: ServiceSpec | SelectorSpec,
+    spec: ServiceSpec | SelectorSpec | SpecSource,
     *,
     principal: Any,
     arguments: Mapping[str, Any],
@@ -192,6 +194,7 @@ def dispatch(
             condition on the row with no row to answer it for, or a
             precondition answering with a coroutine or an async generator.
     """
+    spec = kernel_spec(spec)
     refuse_target(spec, target)
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(

@@ -25,12 +25,15 @@ One Django setting, read at the call rather than at import, so
 ::: django_service_specs.specs.service_spec.ServiceSpec
 ::: django_service_specs.specs.selector_spec.SelectorSpec
 ::: django_service_specs.specs.selector_kind.SelectorKind
+::: django_service_specs.specs.spec_source.SpecSource
+::: django_service_specs.specs.kernel_spec.kernel_spec
 
 ## Parameters
 
 ::: django_service_specs.parameters.parameter.Parameter
 ::: django_service_specs.parameters.parameters.Parameters
 ::: django_service_specs.parameters.check_arguments.check_arguments
+::: django_service_specs.parameters.non_field_errors.NON_FIELD_ERRORS
 ::: django_service_specs.parameters.coerce_flat.coerce_flat
 ::: django_service_specs.parameters.invalid_arguments.InvalidArguments
 ::: django_service_specs.parameters.coded_message.CodedMessage
@@ -61,6 +64,7 @@ One Django setting, read at the call rather than at import, so
 ::: django_service_specs.schema.spec_output_schema.spec_output_schema
 ::: django_service_specs.schema.parameters_schema.parameters_schema
 ::: django_service_specs.schema.output_schema.output_schema
+::: django_service_specs.schema.can_present_nothing.can_present_nothing
 
 ## Dataclass adapters
 
@@ -91,12 +95,16 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.paginate_output.paginate_output
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
+::: django_service_specs.dispatch.check_requested_input.check_requested_input
+::: django_service_specs.dispatch.check_call.check_call
 
 ## Affordances
 
 ::: django_service_specs.affordances.enforce_affordances.enforce_affordances
 ::: django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance
 ::: django_service_specs.affordances.operation_affordances.operation_affordances
+::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
+::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
 
 ## HTTP
 
@@ -104,8 +112,9 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.http.adispatch_request.adispatch_request
 ::: django_service_specs.http.spec_view.SpecView
 ::: django_service_specs.http.async_spec_view.AsyncSpecView
-::: django_service_specs.http.spec_form_view.SpecFormView
 ::: django_service_specs.http.request_arguments.request_arguments
+::: django_service_specs.http.request_principal.request_principal
+::: django_service_specs.http.route_arguments.route_arguments
 ::: django_service_specs.http.error_response.error_response
 ::: django_service_specs.http.unsupported_media_type.UnsupportedMediaType
 ::: django_service_specs.http.add_argument_errors.add_argument_errors
@@ -133,6 +142,18 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.service_not_found.ServiceNotFound
 ::: django_service_specs.services.action_unavailable.ActionUnavailable
 ::: django_service_specs.services.additional_input_required.AdditionalInputRequired
+::: django_service_specs.services.create_service.CreateService
+::: django_service_specs.services.update_service.UpdateService
+::: django_service_specs.services.delete_service.DeleteService
+::: django_service_specs.services.implements.implements
+::: django_service_specs.services.create_model.create_model
+::: django_service_specs.services.acreate_model.acreate_model
+::: django_service_specs.services.update_model.update_model
+::: django_service_specs.services.aupdate_model.aupdate_model
+::: django_service_specs.services.delete_model.delete_model
+::: django_service_specs.services.adelete_model.adelete_model
+::: django_service_specs.services.delete_collection.delete_collection
+::: django_service_specs.services.adelete_collection.adelete_collection
 
 ## Pool
 
@@ -141,6 +162,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
 ::: django_service_specs.pool.null_progress.null_progress
+::: django_service_specs.pool.combine_progress.combine_progress
 ::: django_service_specs.pool.provider_keys.provider_keys
 ::: django_service_specs.specs.server_owned_keys.server_owned_keys
 ::: django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs
@@ -154,6 +176,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.mutations.apply_input.apply_input
 ::: django_service_specs.mutations.delete_relations.delete_relations
 ::: django_service_specs.mutations.adelete_relations.adelete_relations
+::: django_service_specs.mutations.register_row_error.register_row_error
 ::: django_service_specs.mutations.change_result.ChangeResult
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
@@ -185,6 +208,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.selectors.materialize_retrieve.materialize_retrieve
 ::: django_service_specs.selectors.amaterialize_retrieve.amaterialize_retrieve
 ::: django_service_specs.selectors.is_queryset.is_queryset
+::: django_service_specs.selectors.selector.Selector
+::: django_service_specs.selectors.async_selector.AsyncSelector
+::: django_service_specs.selectors.list_selector.ListSelector
+::: django_service_specs.selectors.retrieve_selector.RetrieveSelector
 
 ## Filters
 
@@ -200,3 +227,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.provider_keys.ProviderKeys
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
+::: django_service_specs.types.no_input.NoInput

@@ -20,9 +20,9 @@ from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS
 from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.parameters.utils import coded
@@ -784,8 +784,16 @@ def test_ignore_still_refuses_what_is_declared_and_wrong() -> None:
 def test_the_policy_may_be_given_by_value_and_an_unknown_one_is_a_programming_error() -> None:
     cleaned = check_arguments(AUTHOR, {"name": "Le Guin", "x": 1}, unknown_arguments="ignore")
     assert cleaned == {"name": "Le Guin"}
-    with pytest.raises(ValueError, match="passthrough"):
-        check_arguments(AUTHOR, {"name": "Le Guin"}, unknown_arguments="passthrough")
+    with pytest.raises(ValueError, match="'drop' is not a valid UnknownArguments"):
+        check_arguments(AUTHOR, {"name": "Le Guin"}, unknown_arguments="drop")
+
+
+@pytest.mark.parametrize("policy", [UnknownArguments.PASSTHROUGH, "passthrough"])
+def test_passthrough_is_refused_where_the_policy_is_normalized(policy: Any) -> None:
+    # Sized so the policy is what answers: an undeclared key the IGNORE branch
+    # would drop and return, so a member let through to the walk passes.
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        check_arguments(AUTHOR, {"name": "Le Guin", "tenant": "acme"}, unknown_arguments=policy)
 
 
 # --- every problem at once --------------------------------------------------------------------------

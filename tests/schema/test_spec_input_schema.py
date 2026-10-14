@@ -19,6 +19,7 @@ from django_service_specs.validation.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import OPEN, PK, note_by_pk, notes_of
+from tests.specs.utils import Foreign
 
 ROW = Parameters.of(Parameter("title", "string", required=True))
 
@@ -394,3 +395,14 @@ class TestPartialMany:
         assert "required" not in row
         assert "required" not in row["properties"]["meta"]
         assert not _refused(spec, {"title": "t", "items": [{}, {"meta": {}}]})
+
+
+def test_passthrough_is_refused() -> None:
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK)
+    with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
+        spec_input_schema(spec, unknown_arguments=UnknownArguments.PASSTHROUGH)
+
+
+def test_a_foreign_declaration_is_described_as_its_compiled_spec() -> None:
+    spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK)
+    assert spec_input_schema(Foreign(spec)) == spec_input_schema(spec)

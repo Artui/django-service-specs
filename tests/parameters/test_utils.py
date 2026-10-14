@@ -3,11 +3,7 @@ from __future__ import annotations
 import pytest
 
 from django_service_specs.parameters.parameter import JSON_TYPES
-from django_service_specs.parameters.utils import NON_FIELD_ERRORS, expected_type, parse_number
-
-
-def test_non_field_errors_is_django_and_drfs_spelling() -> None:
-    assert NON_FIELD_ERRORS == "non_field_errors"
+from django_service_specs.parameters.utils import expected_type, parse_number
 
 
 @pytest.mark.parametrize("json_type", sorted(JSON_TYPES))

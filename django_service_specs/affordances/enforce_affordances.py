@@ -15,13 +15,15 @@ from django_service_specs.affordances.utils import (
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.service_not_found import ServiceNotFound
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.utils import is_row_condition
 
 
 def enforce_affordances(
-    spec: ServiceSpec,
+    spec: ServiceSpec | SpecSource,
     pool: dict[str, Any],
     *,
     instance: Any,
@@ -65,14 +67,26 @@ def enforce_affordances(
     built with. A callable's result is read for truth, so one that returns
     nothing refuses rather than allows.
 
+    ``spec`` may be a declaration with ``as_kernel_spec()``, read as the
+    service spec it compiles to.
+
     Raises:
         ActionUnavailable: An affordance is not met.
         ServiceNotFound: A condition on the row was reached and the row is gone:
             resolved a moment ago, and there is now nothing to do it to.
         ImproperlyConfigured: A condition on the row was reached and
             ``instance`` is not a model instance.
+        TypeError: ``spec`` is, or compiles to, a ``SelectorSpec``, whose
+            ``affordances`` name other operations rather than conditions on
+            this one.
     """
-    affordances: Sequence[Affordance] | None = spec.affordances
+    compiled = kernel_spec(spec)
+    if not isinstance(compiled, ServiceSpec):
+        raise TypeError(
+            f"enforce_affordances() takes a ServiceSpec; got {type(compiled).__name__}, whose "
+            "affordances are answers about each row rather than conditions on the call."
+        )
+    affordances: Sequence[Affordance] | None = compiled.affordances
     if not affordances:
         return
     row_flags: dict[int, bool] | None = None

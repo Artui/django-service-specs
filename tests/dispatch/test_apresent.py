@@ -28,6 +28,7 @@ from tests.dispatch.utils import (
     notes_of,
 )
 from tests.dispatch_app.models import Note
+from tests.specs.utils import Foreign
 
 # By import path: the package's attribute of this name is the function.
 _module = importlib.import_module("django_service_specs.dispatch.apresent")
@@ -134,4 +135,22 @@ async def test_the_answers_are_presented_in_the_same_one_hop(hops: list[str]) ->
             "affordances": {"rename": REFUSED_ARCHIVED, "edit": {"available": True}},
         },
     ]
+    assert hops == ["present"]
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_a_foreign_declaration_is_presented_through_its_compiled_spec(
+    hops: list[str],
+) -> None:
+    owner = await sync_to_async(make_user)("ada")
+    await Note.objects.acreate(owner=owner, title="a")
+    source = Foreign(
+        SelectorSpec(
+            kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=OwnerNames()
+        )
+    )
+
+    rendered = await apresent(source, DispatchResult("list", Note.objects.all()))
+
+    assert rendered == [{"owner": "ada"}]
     assert hops == ["present"]

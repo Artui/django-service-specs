@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import json
 import pkgutil
 import subprocess
@@ -91,3 +92,12 @@ print(json.dumps([before, after]))
     before, after = json.loads(completed.stdout)
     assert before == []
     assert after == sorted(OPTIONAL_LIBRARY_ADAPTERS.values())
+
+
+def test_the_form_page_view_is_not_served_from_this_package() -> None:
+    # A page a person reads belongs to a package that owns presentation, and
+    # this one is the plumbing under it: the view that rendered a spec's form
+    # as a page is not importable from here, at the root or at its old path.
+    assert importlib.util.find_spec("django_service_specs.http.spec_form_view") is None
+    assert not hasattr(django_service_specs, "SpecFormView")
+    assert "SpecFormView" not in django_service_specs.__all__
