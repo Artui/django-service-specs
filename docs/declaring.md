@@ -398,8 +398,12 @@ the same declaration.
   column its rows are matched on is no choice, refused as `invalid_choice`
   in its form field's words. A filter with a `method`, a lookup that reads
   its value as text, such as `contains`, a path through a transform or to an
-  annotation, and an object that is not a django-filter `FilterSet` are left
-  to the database, as above.
+  annotation, a relation over more than one column, and an object that is
+  not a django-filter `FilterSet` are left to the database, as above. A
+  number filter on a decimal or float column takes any number inside 1e50,
+  except on Django 4.2.0 and 4.2.1, where a decimal past the column's
+  `max_digits` raises in Django's own decimal handling, which this does not
+  change.
 - **`min_length`** and **`max_length`** bound how many elements an `array`
   takes, inclusively, each a non-negative `int`, and are refused on any other
   type. An array that declares no `max_length` is still bounded, by the

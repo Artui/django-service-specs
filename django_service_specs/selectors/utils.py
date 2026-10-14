@@ -282,7 +282,10 @@ def _past_their_columns(bound: Any, queryset: Any) -> dict[str, Any]:
     one still means every row (TestANumberInsideSixtyFourBitsIsTheDatabases),
     so a call has one answer on every Django version. The 1e50 bound every
     number filter is held to is not this one, because it must hold for a
-    decimal or float column too.
+    decimal or float column too. A decimal column takes any number inside it
+    from Django 4.2.2: on 4.2.0 and 4.2.1 a value past the column's
+    ``max_digits`` raises in Django's own decimal handling, which this does
+    not change.
 
     The refusal is the one a model integer field gives: ``max_value`` or
     ``min_value``, in the words of Django's range validators. It is keyed at
@@ -299,7 +302,8 @@ def _past_their_columns(bound: Any, queryset: Any) -> dict[str, Any]:
     means (test_a_filter_with_a_method_is_left_to_its_method); a lookup that
     does not read its value as the column's, such as ``contains``
     (test_a_lookup_reading_the_value_as_text_is_left_to_it); a path that
-    names no integer column; a value no integer column reads as a number,
+    names no integer column, a relation over more than one column among them
+    (test_a_number_sent_to_a_relation_over_several_columns_is_the_database_s); a value no integer column reads as a number,
     such as the row a model choice filter cleans to, or a choice filter's
     empty value and ``null`` choice, which it reads as nothing sent and as a
     null; and an object that is no FilterSet, which has no cleaned data to

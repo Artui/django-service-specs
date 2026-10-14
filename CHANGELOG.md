@@ -236,7 +236,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   on the value they hand back, read as the model reads it, so digits a text
   field cleans to are the integer they spell. A value the field or a
   `clean_<field>()` refuses is still refused in their words, and one a
-  `clean_<field>()` brings inside the range is taken, on every version.
+  `clean_<field>()` brings inside the range is taken, on every version. Only
+  a column Django validates is judged, as Django leaves the others out of
+  the model's checks: a value `clean()` sets in `cleaned_data` for a column
+  the form has no field for, and a field the form declares over a column
+  `Meta.fields` leaves out or `Meta.exclude` names, are the form's, whatever
+  their size.
 - **A relation write's key past its column's range names no row.** A
   forward relation's or a many-to-many's `match_key` past the range of the
   integer column it is matched on reached the database driver through the
@@ -267,7 +272,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuses a number past 1e50. A number inside 64 bits is answered whatever
   range the column states, so `gte=-1` on a `PositiveIntegerField` is every
   row on every version, and a decimal or float column still takes any
-  number inside 1e50. **Breaking** only where Django 5.0 and later answered
+  number inside 1e50; on Django 4.2.0 and 4.2.1 a decimal past the column's
+  `max_digits` raises in Django's own decimal handling, fixed in Django
+  4.2.2, which this does not change. **Breaking** only where Django 5.0 and later answered
   a number past 64 bits without the query: an `exact`, `gt`, `gte`, `lt` or
   `lte` lookup on an integer column itself, its own or one reached through a
   relation, a `RangeFilter` given one bound included, answered no rows or
@@ -278,9 +285,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ModelChoiceFilter` on Django 4.2; it is no choice now, `invalid_choice`
   in its form field's words, beside the FilterSet's other refusals. A
   filter with a `method`, a lookup that reads its value as text such as
-  `contains`, a path through a transform or to an annotation, and a
-  `filter_set` that is not a django-filter `FilterSet` are left to the
-  database.
+  `contains`, a path through a transform or to an annotation, a relation
+  over more than one column, and a `filter_set` that is not a django-filter
+  `FilterSet` are left to the database.
 - **`paginate_output` serves a `limit` past 64 bits.** With no
   `max_page_size`, a `limit` past a signed 64-bit integer reached the
   queryset's slice whole, and SQLite refused the `LIMIT` with
@@ -321,6 +328,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spec's affordance conditions, `extend_queryset` and preconditions now read
   the transport's reporter, as a service spec's do; the spec's own sink is
   the run's alone.
+- **`SpecFormView` re-renders a refused post carrying a number no column
+  holds.** To place a refusal, the view validated the page's own form and
+  then cleared its errors, and that validation has none of the Validator's
+  guards: a refused post carrying a key past its column's range, or a
+  `ModelForm` integer past its column's, re-rendered by handing the value to
+  the database driver, which raised `OverflowError`, answered as a 500 - for
+  a `ModelMultipleChoiceField` on every Django version, and for a
+  `ModelChoiceField` and a `ModelForm` integer on Django 4.2. The page's form
+  is never validated now: its errors start empty, and the refusal is placed
+  on them, so the page still carries the refusal and nothing else.
+  `add_argument_errors`, handed a form not yet validated, validates it with
+  the guards a `FormValidator`'s form is validated with, reading a model
+  choice field's keys as the field reads them, every value a `QueryDict`
+  carries and the form's prefix included: the key is refused as
+  `invalid_choice` and the integer as `max_value` or `min_value`, the words
+  the kernel's refusal uses, so it is placed once.
 
 ## [0.5.0] — 2026-10-13
 

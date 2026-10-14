@@ -5,6 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, ClassVar
 
+import django
 import django_filters
 import pytest
 from asgiref.sync import sync_to_async
@@ -27,7 +28,7 @@ from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from tests.adapter_app.models import Author as BookAuthor
-from tests.adapter_app.models import Book, Edition
+from tests.adapter_app.models import Book, Edition, Placement
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.filters.utils import (
@@ -472,6 +473,30 @@ _PAST_TOP = str(2**63)
 _PAST_BOTTOM = str(-(2**63) - 1)
 
 
+class _Shelved(django_filters.FilterSet):
+    """A filter on a relation over two columns, beside one on a plain column."""
+
+    shelf = django_filters.NumberFilter(field_name="shelf")
+    title = django_filters.CharFilter()
+
+
+def _shelved() -> SelectorSpec:
+    return SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=Placement.objects.all,
+        permissions=[Unrestricted()],
+        filter_set=_Shelved,
+    )
+
+
+def _outcome(call: Any) -> Any:
+    """What ``call`` returns, or the type and words of what it raises."""
+    try:
+        return call()
+    except Exception as error:
+        return (type(error), str(error))
+
+
 @pytest.mark.django_db
 class TestAFilterValuePastItsColumn:
     """A number no integer column can hold, sent to a filter on one.
@@ -600,6 +625,32 @@ class TestAFilterValuePastItsColumn:
         rows = dispatch(spec, principal=ada, arguments={"title_length": "5"})
         assert _titles(rows.value) == ["draft", "final", "other"]
 
+    def test_a_relation_over_several_columns_leaves_a_call_sending_nothing_alone(self) -> None:
+        # A FilterSet declaring a filter on it is asked about every filter it
+        # declares, on every call: a relation comparing two columns with a
+        # value has no one column's range, and must not raise for asking.
+        Placement.objects.create(title="t", shelf_row=5, shelf_position=1)
+        rows = shape_queryset(Placement.objects.all(), _shelved(), {}, source_label="x")
+        assert [row.title for row in rows] == ["t"]
+
+    def test_a_number_sent_to_a_relation_over_several_columns_is_the_database_s(self) -> None:
+        # Answered as the FilterSet alone answers it, which is Django's to
+        # decide and differs by version: so the oracle is django-filter's own.
+        Placement.objects.create(title="t", shelf_row=5, shelf_position=1)
+        queryset = Placement.objects.all()
+        expected = _outcome(lambda: [row.title for row in _Shelved({"shelf": "5"}, queryset).qs])
+        answered = _outcome(
+            lambda: [
+                row.title
+                for row in shape_queryset(queryset, _shelved(), {"shelf": "5"}, source_label="x")
+            ]
+        )
+        assert answered == expected
+
+    @pytest.mark.skipif(
+        django.VERSION < (4, 2, 2),
+        reason="Django fixed a DecimalField query past max_digits in 4.2.2",
+    )
     def test_a_decimal_column_takes_a_number_past_any_integer_s(self) -> None:
         # The 1e50 bound is the only one a number filter on a decimal or float
         # column has: neither holds an integer column's range.

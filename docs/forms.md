@@ -92,6 +92,11 @@ hand back, read as the model reads it, so digits a text field cleans to are
 the integer they spell. So a value the field refuses is refused in the field's
 words, its own bounds included, a `clean_<field>()` refusing it is reported in
 its own words, and one that brings the value inside the range has it taken.
+Only a column Django validates is judged, the ones it does not leave out of
+the model's checks: a value `clean()` sets in `cleaned_data` for a column the
+form has no field for, and a field the form declares over a column
+`Meta.fields` leaves out or `Meta.exclude` names, are never written onto the
+row by the form, and are the form's to use, whatever their size.
 
 Every choice field's choices carry their labels as `choice_labels`, the label
 Django displays keyed by the value as the caller sends it, so a schema states
