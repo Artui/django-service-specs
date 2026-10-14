@@ -33,7 +33,8 @@ from django_service_specs.http.async_spec_view import AsyncSpecView
 from django_service_specs.http.dispatch_request import dispatch_request
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
-from django_service_specs.http.spec_form_view import SpecFormView
+from django_service_specs.http.request_principal import request_principal
+from django_service_specs.http.route_arguments import route_arguments
 from django_service_specs.http.spec_view import SpecView
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
@@ -169,7 +170,6 @@ __all__ = [
     "ServiceNotFound",
     "ServiceSpec",
     "ServiceValidationError",
-    "SpecFormView",
     "SpecRegistry",
     "SpecView",
     "UNSET",
@@ -222,10 +222,12 @@ __all__ = [
     "present_for_audience",
     "project_payload",
     "request_arguments",
+    "request_principal",
     "resolve_callable_kwargs",
     "server_owned_keys",
     "resolve_principal",
     "resolve_target",
+    "route_arguments",
     "run_selector",
     "run_service",
     "shape_queryset",
