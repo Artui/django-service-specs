@@ -94,6 +94,7 @@ nav:
   - Affordances: affordances.md
   - Relation writes: relations.md
   - The registry: registry.md
+  - The command line: commands.md
   - The forms adapter: forms.md
   - The pydantic adapter: pydantic.md
   - JSON Schema: schema.md

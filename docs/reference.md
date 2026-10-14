@@ -222,6 +222,8 @@ Installed with the `pydantic` extra and imported from
 ## Commands
 
 ::: django_service_specs.commands.spec_command.SpecCommand
+::: django_service_specs.commands.exit_code.ExitCode
+::: django_service_specs.commands.exit_code_for.exit_code_for
 ::: django_service_specs.commands.render_result.render_result
 ::: django_service_specs.commands.render_table.render_table
 ::: django_service_specs.commands.render_json_lines.render_json_lines
