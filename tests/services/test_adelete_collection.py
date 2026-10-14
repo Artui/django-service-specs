@@ -2,19 +2,21 @@
 
 from __future__ import annotations
 
-import inspect
 from typing import Any
 
 import pytest
+from asgiref.sync import async_to_sync
 
 from django_service_specs.services.adelete_collection import adelete_collection
+from django_service_specs.services.is_async import is_async
 from tests.relations_app.models import Author
+from tests.services.utils import savepoints_during
 
 
 @pytest.mark.django_db(transaction=True)
 class TestADeleteCollection:
-    async def test_the_service_is_a_coroutine_function(self) -> None:
-        assert inspect.iscoroutinefunction(adelete_collection(Author))
+    async def test_dispatch_reads_the_service_as_async(self) -> None:
+        assert is_async(adelete_collection(Author))
 
     async def test_deletes_every_row_in_the_collection_and_returns_none(self) -> None:
         kept = await Author.objects.acreate(name="kept")
@@ -39,3 +41,10 @@ class TestADeleteCollection:
         await adelete_collection(Author, soft_delete=archive)(collection=collection, user=object())
         assert handed == [collection]
         assert await Author.objects.acount() == 1
+
+
+@pytest.mark.django_db
+def test_opens_no_savepoint_of_its_own() -> None:
+    Author.objects.create(name="a")
+    service = async_to_sync(adelete_collection(Author))
+    assert savepoints_during(lambda: service(collection=Author.objects.all())) == []

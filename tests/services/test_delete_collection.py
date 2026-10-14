@@ -10,6 +10,7 @@ from django.db.models.signals import post_delete
 
 from django_service_specs.services.delete_collection import delete_collection
 from tests.relations_app.models import Author, Post
+from tests.services.utils import savepoints_during
 
 
 @pytest.fixture
@@ -61,3 +62,11 @@ class TestDeleteCollection:
         Author.objects.create(name="a")
         delete_collection(Author)(collection=Author.objects.all(), user=object(), extra=1)
         assert not Author.objects.exists()
+
+
+@pytest.mark.django_db
+def test_opens_no_savepoint_of_its_own() -> None:
+    Author.objects.create(name="a")
+    assert (
+        savepoints_during(lambda: delete_collection(Author)(collection=Author.objects.all())) == []
+    )

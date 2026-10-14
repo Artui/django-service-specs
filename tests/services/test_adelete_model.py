@@ -2,17 +2,19 @@
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from asgiref.sync import async_to_sync
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_delete
 
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.services.adelete_model import adelete_model
+from django_service_specs.services.is_async import is_async
 from tests.relations_app.models import Author, Catalog, Item, Section
+from tests.services.utils import savepoints_during
 
 
 @pytest.fixture
@@ -44,8 +46,8 @@ _CASCADE = {
 
 @pytest.mark.django_db(transaction=True)
 class TestADeleteModel:
-    async def test_the_service_is_a_coroutine_function(self) -> None:
-        assert inspect.iscoroutinefunction(adelete_model(Author))
+    async def test_dispatch_reads_the_service_as_async(self) -> None:
+        assert is_async(adelete_model(Author))
 
     async def test_deletes_the_row_and_returns_none(self, deleted: list[str]) -> None:
         author = await Author.objects.acreate(name="a")
@@ -105,3 +107,12 @@ class TestADeleteModel:
     def test_a_relation_that_is_not_a_spec_is_refused_when_built(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="relations\\['sections'\\] is a dict"):
             adelete_model(Catalog, relations={"sections": {"model": Section}})
+
+
+@pytest.mark.django_db
+def test_opens_no_savepoint_of_its_own() -> None:
+    catalog = Catalog.objects.create(name="c")
+    section = Section.objects.create(catalog=catalog, title="s")
+    Item.objects.create(section=section, label="i")
+    service = async_to_sync(adelete_model(Catalog, relations=_CASCADE))
+    assert savepoints_during(lambda: service(instance=catalog)) == []

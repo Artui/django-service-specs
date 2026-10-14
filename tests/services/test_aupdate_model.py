@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,7 +13,9 @@ from django.test.utils import CaptureQueriesContext
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.services.aupdate_model import aupdate_model
+from django_service_specs.services.is_async import is_async
 from tests.relations_app.models import Catalog, Post, Section, Tag
+from tests.services.utils import savepoints_during
 
 
 @dataclass
@@ -69,8 +70,8 @@ class TestUpdateFieldsIsHandedOn:
 
 @pytest.mark.django_db(transaction=True)
 class TestAUpdateModel:
-    async def test_the_service_is_a_coroutine_function(self) -> None:
-        assert inspect.iscoroutinefunction(aupdate_model(Post))
+    async def test_dispatch_reads_the_service_as_async(self) -> None:
+        assert is_async(aupdate_model(Post))
 
     async def test_writes_the_data_onto_the_row_and_returns_it(self) -> None:
         post = await Post.objects.acreate(title="old")
@@ -146,3 +147,11 @@ class TestAUpdateModel:
             await aupdate_model(Catalog, relations=_SECTIONS)(
                 instance=catalog, data={"sections": [None]}
             )
+
+
+@pytest.mark.django_db
+def test_opens_no_savepoint_of_its_own() -> None:
+    catalog = Catalog.objects.create(name="c")
+    service = async_to_sync(aupdate_model(Catalog, relations=_SECTIONS))
+    data = {"sections": [{"title": "a"}]}
+    assert savepoints_during(lambda: service(instance=catalog, data=data)) == []

@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.services.acreate_model import acreate_model
+from django_service_specs.services.is_async import is_async
 from tests.relations_app.models import Author, Catalog, Post, Section, Tag
+from tests.services.utils import savepoints_during
 
 
 @dataclass
@@ -37,8 +38,8 @@ _SECTIONS = {"sections": ChildSpec(model=Section, fk="catalog")}
 
 @pytest.mark.django_db(transaction=True)
 class TestACreateModel:
-    async def test_the_service_is_a_coroutine_function(self) -> None:
-        assert inspect.iscoroutinefunction(acreate_model(Author))
+    async def test_dispatch_reads_the_service_as_async(self) -> None:
+        assert is_async(acreate_model(Author))
 
     async def test_builds_and_saves_the_row_and_returns_it(self) -> None:
         author = await acreate_model(Author)(data=_AuthorIn(name="Ada"))
@@ -100,3 +101,10 @@ class TestACreateModel:
             await acreate_model(Catalog, relations=_SECTIONS)(
                 data={"name": "c", "sections": [None]}
             )
+
+
+@pytest.mark.django_db
+def test_opens_no_savepoint_of_its_own() -> None:
+    service = async_to_sync(acreate_model(Catalog, relations=_SECTIONS))
+    data = {"name": "c", "sections": [{"title": "a"}]}
+    assert savepoints_during(lambda: service(data=data)) == []

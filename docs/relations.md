@@ -39,8 +39,9 @@ runs, and the helpers own persistence only.
   alone, runs `delete_relations` first when given a map, and returns `None`.
   [`delete_collection`][django_service_specs.services.delete_collection.delete_collection]
   deletes the rows a spec's `collection_selector_spec` resolved. Each takes the
-  rest of the pool as `**kwargs` and hands it on as the helper's `context`,
-  opens no transaction of its own, and has an async form:
+  rest of the pool as `**kwargs`, which the three model services hand on as
+  the helper's `context`, opens no transaction of its own, since dispatch runs
+  the service inside one, and has an async form:
   [`acreate_model`][django_service_specs.services.acreate_model.acreate_model],
   [`aupdate_model`][django_service_specs.services.aupdate_model.aupdate_model],
   [`adelete_model`][django_service_specs.services.adelete_model.adelete_model]

@@ -56,10 +56,8 @@ def register_row_error(error_class: type[ErrorT], read_detail: Callable[[ErrorT]
       ``test_a_class_the_kernel_already_reads_is_refused``, and the wider
       direction by ``test_a_class_wider_than_one_the_kernel_reads_is_refused``.
 
-    Registrations are process-wide, as the relation specs that read them are.
-    The registry has no public removal, since an adapter registers for the
-    life of the process; a test suite registering a class of its own restores
-    ``django_service_specs.mutations.utils.ROW_ERROR_READERS`` after the test.
+    Registrations are process-wide, as the relation specs that read them are,
+    and there is no removal: an adapter registers for the life of the process.
     """
     if not isinstance(error_class, type) or not issubclass(error_class, Exception):
         raise ImproperlyConfigured(
