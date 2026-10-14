@@ -1,4 +1,4 @@
-"""What an operation takes, and the refusal of arguments that do not fit."""
+"""What an operation takes, the refusal of arguments that do not fit, and the policy for undeclared ones."""
 
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coded_message import CodedMessage

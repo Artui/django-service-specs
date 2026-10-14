@@ -4,7 +4,9 @@
 documents the tree these go into. They live here so that everything producing
 one - the shape check, ``coerce_flat``, a relation write re-rooting a row's
 refusal, an adapter's Validator - spells them the same way, rather than each
-its own and a transport learning several.
+its own and a transport learning several. The one reading of an
+unknown-arguments policy sits here too, shared by the shape check and its
+schema.
 """
 
 from __future__ import annotations
@@ -22,6 +24,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.settings import max_array_length
+from django_service_specs.types.unknown_arguments import UnknownArguments
 
 NON_FIELD_KEYS: Final = (NON_FIELD_ERRORS, DJANGO_NON_FIELD_ERRORS)
 """The keys a message about the whole input sits under: the kernel's, and Django's.
@@ -269,3 +272,22 @@ def parse_number(json_type: str, text: str) -> int | float | None:
         # at all, never the neighbour ``float`` rounds it to
         # (test_an_integer_literal_past_int_s_digit_limit_is_refused_never_rounded).
         return number if any(mark in text for mark in ".eE") else None
+
+
+def unknown_arguments_policy(value: UnknownArguments | str) -> UnknownArguments:
+    """``value`` as a policy: a member, or its plain value, refusing what is not a policy.
+
+    Normalized, so the policy's plain value works and a misspelt one raises
+    ``ValueError`` rather than quietly falling through to one policy or the
+    other. ``PASSTHROUGH`` is a valid member and not a policy, so it is
+    refused here too: both readers test only ``is REJECT`` after this, and a
+    member let through would run as ``IGNORE`` with nothing failing.
+    """
+    policy = UnknownArguments(value)
+    if policy is UnknownArguments.PASSTHROUGH:
+        raise ValueError(
+            "UnknownArguments.PASSTHROUGH is refused: it is kept as a name and is not a "
+            "policy, since an argument no parameter declares never reaches a callable. "
+            "Pass REJECT, or IGNORE to drop the undeclared argument."
+        )
+    return policy

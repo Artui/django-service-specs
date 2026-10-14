@@ -4,7 +4,13 @@ import pytest
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.parameters.parameter import JSON_TYPES
-from django_service_specs.parameters.utils import expected_type, parse_number, refusal_messages
+from django_service_specs.parameters.utils import (
+    expected_type,
+    parse_number,
+    refusal_messages,
+    unknown_arguments_policy,
+)
+from django_service_specs.types.unknown_arguments import UnknownArguments
 
 
 @pytest.mark.parametrize("json_type", sorted(JSON_TYPES))
@@ -100,3 +106,21 @@ def test_a_message_that_is_no_list_is_one_message_not_its_characters() -> None:
     # a join over the messages raises on a proxy.
     assert (path, type(text)) == ((), str)
     assert text == "Whole."
+
+
+@pytest.mark.parametrize("policy", [UnknownArguments.REJECT, UnknownArguments.IGNORE])
+def test_a_policy_is_read_as_its_member_from_the_member_or_its_value(
+    policy: UnknownArguments,
+) -> None:
+    assert unknown_arguments_policy(policy) is policy
+    assert unknown_arguments_policy(policy.value) is policy
+
+
+def test_passthrough_is_refused_naming_the_two_policies() -> None:
+    with pytest.raises(ValueError, match="Pass REJECT, or IGNORE"):
+        unknown_arguments_policy(UnknownArguments.PASSTHROUGH)
+
+
+def test_a_value_that_is_no_member_is_refused() -> None:
+    with pytest.raises(ValueError, match="'drop' is not a valid UnknownArguments"):
+        unknown_arguments_policy("drop")
