@@ -3,6 +3,7 @@
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
@@ -16,6 +17,7 @@ __all__ = [
     "adispatch",
     "apresent",
     "bind_arguments",
+    "check_requested_input",
     "dispatch",
     "paginate_output",
     "present",

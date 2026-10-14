@@ -91,6 +91,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.paginate_output.paginate_output
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
+::: django_service_specs.dispatch.check_requested_input.check_requested_input
 
 ## Affordances
 
