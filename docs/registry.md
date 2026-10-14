@@ -48,8 +48,8 @@ for the same object.
 A [`Grant`][django_service_specs.authorization.grant.Grant] compares specs as
 compiled, so a transport that authorizes the object it holds and mints a grant
 from it can dispatch that object or the spec it compiles to under the same
-grant, and each permission check is asked about the compiled spec on every
-route.
+grant. Each permission check is asked about the compiled spec, the same object
+`dispatch` hands it for that declaration.
 
 The entry answers a read-only `agent_contract`: the registered object's own
 `agent_contract()` when it has one, and `None` otherwise, which is every

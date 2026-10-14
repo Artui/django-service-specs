@@ -56,9 +56,11 @@ class Grant:
         The spec is compared as compiled: a grant minted for a
         [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]
         covers that object and the spec it compiles to, and a grant minted for
-        the compiled spec covers the object, since each compiles once. Another
-        object, even one comparing equal, compiles to another spec and is not
-        covered.
+        the compiled spec covers the object, since each compiles once. Any
+        other object is covered exactly when it compiles to that very spec:
+        objects are compiled each on its own, so where a library compiles
+        each declaration afresh, as djangorestframework-services does, a grant
+        covers one declaration and not another that compares equal to it.
         """
         # Compiled here rather than when the grant is built, so ``spec`` keeps
         # the object the transport gave it. One arc to coverage, so each

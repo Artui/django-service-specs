@@ -58,3 +58,14 @@ def test_a_grant_keeps_the_object_it_was_given() -> None:
     source = Foreign(_spec())
 
     assert Grant(source, object()).spec is source
+
+
+def test_a_grant_does_not_cover_an_equal_declaration_compiled_on_its_own() -> None:
+    # Two declarations comparing equal, each compiling to a spec of its own,
+    # as a library compiling afresh per declaration does.
+    first = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=list))
+    second = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=list))
+    principal = object()
+    assert first == second
+
+    assert not Grant(first, principal).covers(second, principal)

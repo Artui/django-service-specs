@@ -1,7 +1,8 @@
 """``SpecSource`` - a declaration of another library's that compiles to a spec of this one.
 
-Every entry point that takes a spec takes one of these too, and reads it
-through [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec]:
+The entry points that dispatch, bind, authorize, present and describe a spec
+take one of these too, as the registry page lists them, and read it through
+[`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec]:
 the one place it is compiled, and cached, so every entry point reading one
 object reads the same compiled spec.
 """
