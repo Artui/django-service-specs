@@ -14,14 +14,14 @@ from django.utils.translation import gettext
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
-from django_service_specs.commands.add_spec_arguments import add_spec_arguments
-from django_service_specs.commands.describe_parameters import describe_parameters
+from django_service_specs.commands.argv.add_spec_arguments import add_spec_arguments
+from django_service_specs.commands.argv.describe_parameters import describe_parameters
+from django_service_specs.commands.argv.parsed_arguments import parsed_arguments
+from django_service_specs.commands.argv.utils import option_string
 from django_service_specs.commands.exit_code_for import exit_code_for
-from django_service_specs.commands.parsed_arguments import parsed_arguments
 from django_service_specs.commands.render_result import render_result
 from django_service_specs.commands.unguarded_message import unguarded_message
 from django_service_specs.commands.unguarded_specs import unguarded_specs
-from django_service_specs.commands.utils import option_string
 from django_service_specs.commands.wants_table import wants_table
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
@@ -72,7 +72,7 @@ class SpecCommand(BaseCommand):
 
     - **One subcommand per registry entry**, named after the entry with each
       ``_`` shown as ``-``. Its options are the spec's parameters, as
-      [`add_spec_arguments`][django_service_specs.commands.add_spec_arguments.add_spec_arguments]
+      [`add_spec_arguments`][django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments]
       spells them, less any key the server fills
       ([`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]).
       No option is matched by a prefix: an abbreviation is refused rather

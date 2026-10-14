@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from django_service_specs.commands.utils import option_string
+from django_service_specs.commands.argv.utils import option_string
 from django_service_specs.types.unset import UNSET
 
 
@@ -14,7 +14,7 @@ class ParameterDescriptor:
     """A [`Parameter`][django_service_specs.parameters.parameter.Parameter] seen from argv.
 
     What a command line can say about a parameter, built by
-    [`describe_parameters`][django_service_specs.commands.describe_parameters.describe_parameters]:
+    [`describe_parameters`][django_service_specs.commands.argv.describe_parameters.describe_parameters]:
     the option it is sent with, and what ``--help`` can honestly show about
     the value. Each field is the declaration's, read for a person typing it,
     and three are narrower than the ``Parameter`` they come from:

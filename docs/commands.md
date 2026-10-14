@@ -61,7 +61,7 @@ it adds the [system check](#open-specs-explain).
 Each registry entry is a subcommand named after it, with each `_` shown as
 `-`: `rename_note` is `rename-note`. Its options are the spec's
 [parameters](arguments.md), spelled by
-[`add_spec_arguments`][django_service_specs.commands.add_spec_arguments.add_spec_arguments]:
+[`add_spec_arguments`][django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments]:
 `--due-at` for `due_at`, a `--flag`/`--no-flag` pair for a boolean, and an
 array as a repeated option, `--tag a --tag b`. Every value reaches
 [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat] as

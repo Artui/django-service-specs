@@ -6,10 +6,10 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy
 
-from django_service_specs.commands.add_spec_arguments import add_spec_arguments
+from django_service_specs.commands.argv.add_spec_arguments import add_spec_arguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
-from tests.commands.utils import FLAT, UNSENDABLE, parser_for
+from tests.commands.argv.utils import FLAT, UNSENDABLE, parser_for
 
 # Django's BaseCommand options and the ones a spec command adds, as a caller
 # passes them.

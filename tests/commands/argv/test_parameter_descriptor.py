@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from django_service_specs.commands.parameter_descriptor import ParameterDescriptor
+from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
 from django_service_specs.types.unset import UNSET
 
 

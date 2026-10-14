@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from django_service_specs.commands.utils import destination
+from django_service_specs.commands.argv.utils import destination
 from django_service_specs.parameters.parameters import Parameters
 
 
 def parsed_arguments(namespace: argparse.Namespace, parameters: Parameters) -> dict[str, Any]:
-    """The spec's arguments from a namespace filled by [`add_spec_arguments`][django_service_specs.commands.add_spec_arguments.add_spec_arguments]'s options.
+    """The spec's arguments from a namespace filled by [`add_spec_arguments`][django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments]'s options.
 
     The raw dict a command hands to
     [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat],

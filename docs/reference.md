@@ -227,10 +227,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.render_table.render_table
 ::: django_service_specs.commands.render_json_lines.render_json_lines
 ::: django_service_specs.commands.wants_table.wants_table
-::: django_service_specs.commands.describe_parameters.describe_parameters
-::: django_service_specs.commands.parameter_descriptor.ParameterDescriptor
-::: django_service_specs.commands.add_spec_arguments.add_spec_arguments
-::: django_service_specs.commands.parsed_arguments.parsed_arguments
+::: django_service_specs.commands.argv.describe_parameters.describe_parameters
+::: django_service_specs.commands.argv.parameter_descriptor.ParameterDescriptor
+::: django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments
+::: django_service_specs.commands.argv.parsed_arguments.parsed_arguments
 ::: django_service_specs.commands.unguarded_specs.unguarded_specs
 ::: django_service_specs.commands.unguarded_spec.UnguardedSpec
 ::: django_service_specs.commands.unguarded_message.unguarded_message
