@@ -972,11 +972,11 @@ extends.</p>
 </tr>
 <tr>
 <td><code>DecimalField</code></td>
-<td>A <code>string</code> in the <code>decimal</code> format. It takes a JSON number too.</td>
+<td>A <code>string</code> in the <code>decimal</code> format. It takes a JSON number too, and an integer whatever its digits.</td>
 </tr>
 <tr>
 <td><code>FloatField</code></td>
-<td>A <code>number</code>.</td>
+<td>A <code>number</code>. An integer past a float's range is refused as the field refuses an infinity: <code>invalid</code>, in its own words.</td>
 </tr>
 <tr>
 <td><code>IntegerField</code></td>
@@ -1000,7 +1000,7 @@ extends.</p>
 </tr>
 <tr>
 <td><code>MultipleChoiceField</code>, <code>TypedMultipleChoiceField</code></td>
-<td>An <code>array</code> of the same, whose choices constrain each element.</td>
+<td>An <code>array</code> of the same, whose choices constrain each element. No choice field declares a length, so the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting bounds every list one takes.</td>
 </tr>
 <tr>
 <td><code>ModelChoiceField</code></td>
@@ -1008,7 +1008,7 @@ extends.</p>
 </tr>
 <tr>
 <td><code>ModelMultipleChoiceField</code></td>
-<td>An <code>array</code> of the same. It validates to a queryset.</td>
+<td>An <code>array</code> of the same, so one matching rows on a <code>DecimalField</code> declares the <code>decimal</code> format for each element and <code>?rows=12.50,9.99</code> is two of them. Django matches each against the column's own spelling, <code>"12.50"</code> and not <code>12.5</code>. It validates to a queryset.</td>
 </tr>
 <tr>
 <td><code>FileField</code>, <code>ImageField</code></td>
@@ -1020,6 +1020,31 @@ extends.</p>
 </tr>
 </tbody>
 </table>
+<p>A key past the range of the integer column rows are matched on names no row,
+so either field refuses it as it refuses a key no row holds: <code>invalid_choice</code>,
+in its own words, beside the form's other refusals. The adapter answers it
+before the form queries, because Django hands a <code>ModelMultipleChoiceField</code>'s
+keys to the database driver in an <code>__in</code> lookup, and SQLite's raises
+<code>OverflowError</code> for one past 64 bits on every Django version, as it does for a
+<code>ModelChoiceField</code>'s on Django 4.2. The range is the database's own for the
+column, as Django reads it to answer an exact lookup past it with no rows, and
+a key sent as a string of digits is the integer it spells.</p>
+<p>A <code>ModelForm</code> value past the range of its model's integer column is refused in
+the words, and with the code, of the validator Django's model field carries
+from 5.0: <code>max_value</code> past its top, <code>min_value</code> past its bottom. Django 4.2
+states no range for SQLite, so there the form took such a value, and a
+uniqueness check or a constraint querying with it raised the driver's
+<code>OverflowError</code>. The value is judged where Django 5.0 and later judge it: after
+the form field, its <code>clean_&lt;field&gt;()</code> and the form's <code>clean()</code>, on what they
+hand back, read as the model reads it, so digits a text field cleans to are
+the integer they spell. So a value the field refuses is refused in the field's
+words, its own bounds included, a <code>clean_&lt;field&gt;()</code> refusing it is reported in
+its own words, and one that brings the value inside the range has it taken.
+Only a column Django validates is judged, the ones it does not leave out of
+the model's checks: a value <code>clean()</code> sets in <code>cleaned_data</code> for a column the
+form has no field for, and a field the form declares over a column
+<code>Meta.fields</code> leaves out or <code>Meta.exclude</code> names, are never written onto the
+row by the form, and are the form's to use, whatever their size.</p>
 <p>Every choice field's choices carry their labels as <code>choice_labels</code>, the label
 Django displays keyed by the value as the caller sends it, so a schema states
 each as a <code>title</code>. A choice set given as a callable is computed per form and

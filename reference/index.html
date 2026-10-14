@@ -646,6 +646,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#specs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -886,6 +897,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.coded_message.CodedMessage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CodedMessage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CodedMessage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.coded_message.CodedMessage.code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        code
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3428,6 +3467,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#specs" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3668,6 +3718,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.coded_message.CodedMessage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CodedMessage
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="CodedMessage">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.parameters.coded_message.CodedMessage.code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        code
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -6207,6 +6285,17 @@ code; the subpackage paths are where each name is defined.</p>
 <p>The pydantic adapters are the one exception. pydantic is an optional extra,
 so they are exported from <code>django_service_specs.adapters.pydantic</code> alone, and
 importing the package root never imports pydantic.</p>
+<h2 id="settings">Settings<a class="headerlink" href="#settings" title="Permanent link">&para;</a></h2>
+<p>One Django setting, read at the call rather than at import, so
+<code>override_settings</code> reaches a spec built before it.</p>
+<ul>
+<li><strong><code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code></strong>: the most elements an array argument
+  takes where its parameter declares no <code>max_length</code>, and the most rows a
+  <code>many</code> call carries where its spec declares no <code>many_max_length</code>. <code>1000</code>
+  when unset; <code>None</code> bounds no array. Anything but a non-negative <code>int</code> or
+  <code>None</code> is refused as <code>ImproperlyConfigured</code> where it is read. See
+  <a href="../arguments/#how-long-a-list-may-be">how long a list may be</a>.</li>
+</ul>
 <h2 id="specs">Specs<a class="headerlink" href="#specs" title="Permanent link">&para;</a></h2>
 
 
@@ -6359,6 +6448,39 @@ refused, since nothing would read it.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.many_min_length">many_min_length</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The fewest rows a <code>many</code> call may carry, as the
+list's own <code>min_length</code>. <code>None</code> by default, so an empty list
+runs the service on no rows; <code>1</code> is how a spec refuses an empty
+one. A list short of it is refused at <code>many_argument</code>, as a
+whole, before any row is checked.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.many_max_length">many_max_length</span></code></td>
+            <td>
+                  <code><span title="int">int</span> | None</code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The most rows a <code>many</code> call may carry, as the
+list's own <code>max_length</code>. Where it is <code>None</code>, as by default, the
+<code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting bounds the list, 1000
+unless the project sets another, since every row is one Validator
+run inside one transaction. A list past it is refused at
+<code>many_argument</code>, as a whole, before any row is checked. Each of
+the two is refused on a spec that is not <code>many</code>, and a pair no
+list could meet when the spec is built.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.validator">validator</span></code></td>
             <td>
                   <code><a class="autorefs autorefs-internal" title="Validator (django_service_specs.validation.validator.Validator)" href="#django_service_specs.validation.validator.Validator">Validator</a> | None</code>
@@ -6420,8 +6542,9 @@ acts on. At most one of the two target selectors.</p>
             <td>
               <div class="doc-md-description">
                 <p>Re-reads what the service produced, with its
-return value as <code>result</code> in the pool - the way to return a row
-with fresh annotations, or a list after a bulk write.</p>
+return value in the pool as both <code>result</code> and <code>instance</code> - the
+way to return a row with fresh annotations, or a list after a bulk
+write. <code>instance</code> there is the return, never the resolved target.</p>
               </div>
             </td>
           </tr>
@@ -6849,9 +6972,16 @@ selector, whose rows the service consumes rather than returns.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p><code>RETRIEVE</code> only. A missing row is the value <code>None</code>
+                <p>On a <code>RETRIEVE</code>, a missing row is the value <code>None</code>
 rather than not-found - the shape of an optional singleton, or of an
-upsert's target.</p>
+upsert's target. On a <code>LIST</code>, a selector returning <code>None</code> has
+returned the empty list: the shaping is skipped, since there is
+nothing to shape, and the result is <code>[]</code> wherever the selector
+runs, so a selector spec's own scope check and <code>preconditions</code>
+see the empty set, as they see an empty queryset, and its output
+schema stays an array. Without it, a <code>LIST</code> selector's <code>None</code>
+is passed on as it came, and presenting it fails as the author's
+error.</p>
               </div>
             </td>
           </tr>
@@ -6891,10 +7021,15 @@ one declared <code>async def</code> is refused at construction.</p>
               <div class="doc-md-description">
                 <p>Applied after <code>extend_queryset</code>: a django-filter
 <code>FilterSet</code> class, called as <code>filter_set(data=..., queryset=...)</code>
-and answering <code>.qs</code>. An object with no <code>base_filters</code> - a
-duck-typed stand-in - is refused at construction, because it
-declares no Parameters and so would be handed none of the
-caller's data. Its filters are reads: read as Parameters by
+and answering <code>.qs</code>. One that declares no filters - its
+<code>base_filters</code> missing, empty or <code>None</code> - is refused at
+construction unless it is a django-filter <code>FilterSet</code> class,
+because it declares no Parameters and so would be handed none of
+the caller's data: a duck-typed stand-in must declare its filters
+in <code>base_filters</code>, and a step narrowing the queryset by no
+argument belongs in <code>extend_queryset</code>. A real <code>FilterSet</code>
+declaring none is accepted and narrows nothing. Its filters are
+reads: read as Parameters by
 <a class="autorefs autorefs-internal" title="filter_set_parameters" href="#django_service_specs.filters.filter_set_parameters.filter_set_parameters"><code>filter_set_parameters</code></a>
 and added to <code>reads</code> after the author's own, so the schema, the
 closed argument set and the shape check all cover them, and a
@@ -6986,11 +7121,18 @@ enclosing service spec's.</p>
 <a class="autorefs autorefs-internal" title="ProgressReporter" href="#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a>
 sink the run reports to beside the transport's - a task record, an
 audit trail - called with the keywords it declares from the base
-pool. Resolved on first use, so a call refused before its run never
-calls it, and a provider returning <code>None</code> declines. The
-object-level and scope checks and the <code>preconditions</code> answer
-after the selector, which is the run, so a call they refuse may
-already have called it. Refused on a nested selector.</p>
+pool. The run is the selector, and the provider is called only for
+a selector that takes <code>progress</code>, once its keywords are bound:
+a sync selector calls it on its first report, and an <code>async
+def</code> one before the await. So a call refused before the run,
+a read the caller left out included, never calls it, and a
+provider returning <code>None</code> declines. The object-level and scope
+checks and the <code>preconditions</code> answer after the selector, so a
+call they refuse may already have called it. Nothing but the
+selector reports to it: <code>extend_queryset</code>, the
+<code>preconditions</code> and the affordance conditions answered for the
+rows read <code>progress</code> from the pool, which is the transport's
+reporter. Refused on a nested selector.</p>
               </div>
             </td>
           </tr>
@@ -7205,8 +7347,30 @@ being built as the integer it names. Each is an <code>int</code> or a finite
 <code>float</code>, a JSON number the schema can state. They exist for the bound a
 reader needs before any Validator runs: a filter whose form field has none
 hands the value to the database's integer conversion, which builds every
-digit. Any other bound - a length, a Validator's <code>max_value</code> - is still
-the Validator's alone.</p>
+digit. Any other bound - a string's length, a Validator's <code>max_value</code> -
+is still the Validator's alone.</p>
+<p><strong>On an array,</strong> <code>format</code>, <code>minimum</code> <strong>and</strong> <code>maximum</code> <strong>describe
+each element</strong>, as <code>choices</code> do: an array of <code>integer</code> or <code>number</code>
+takes a bound, and an array of <code>string</code> takes <code>format="decimal"</code> and
+then a bound too, which is what a django-filter CSV number filter
+declares. A decimal is the one format an element takes: a number element
+is read as a float on the way, which rounds a fraction past a float's
+precision, where a decimal string is compared and handed on as it was
+sent. Any other format on an array, and a format or a bound on an
+element that cannot carry it, is refused. The list's own count is
+<code>min_length</code> and <code>max_length</code>'s, so an array may carry both pairs.</p>
+<p><code>min_length</code> and <code>max_length</code> bound how many elements an <code>array</code>
+takes, inclusively, and are refused on anything else: each a
+non-negative <code>int</code>. They are checked on the list whole, before any
+element is read, so a list past its maximum costs no per-element work.
+<strong>An array that declares no</strong> <code>max_length</code> <strong>is still bounded</strong>, by the
+<code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 unless the project sets
+another count or <code>None</code>: a list a caller controls the length of is a
+cost the caller controls, and the setting is read at the call, so it
+applies to a declaration built before settings were configured. A
+declared <code>max_length</code> outranks it either way, wider or narrower.
+<code>min_length</code> has no default: an empty list is taken unless one says
+otherwise.</p>
 
 
 
@@ -7408,11 +7572,12 @@ declaration stays hashable and ordered.</p>
     <div class="doc doc-contents first">
 
         <p>The shape check: what a caller can get wrong that the declaration can see.</p>
-<p>Presence, JSON type, format, bounds, choices and nullability, at every
+<p>Presence, JSON type, format, bounds, length, choices and nullability, at every
 level of nesting, with no query. It is what runs at enqueue time and in front of an
 untrusted caller's Validator, so a malformed call is refused before it costs
 a row lookup, and <strong>it is no stricter than the libraries behind it</strong>, with
-two exceptions named below, ASCII digits and a declared bound. So a
+three exceptions named below: ASCII digits, a declared bound, and the
+length of an array. So a
 decimal accepts a JSON number as well as a string, because every decimal
 validator does, and a check stricter than the worker refuses what would
 have run.</p>
@@ -7473,11 +7638,22 @@ have run.</p>
   than the library behind it. <code>filter_set_parameters</code> draws
   django-filter's <code>1e50</code> below zero and on a range's bounds too, where
   django-filter draws none, because past it an integer column's
-  conversion builds every digit of the value. A decimal string is compared as the decimal it
-  spells, which reads its exponent and builds none of its digits, so
-  <code>"1E+999999999"</code> is refused as fast as <code>"2"</code> is taken.</li>
+  conversion builds every digit of the value. A decimal string is
+  compared as the decimal it spells, which reads its exponent and builds
+  none of its digits, so <code>"1E+999999999"</code> is refused as fast as <code>"2"</code>
+  is taken. An array's bounds bound each element, refused at its index.</li>
+<li><strong>An array's length</strong> is read before any of its elements: within its
+  <code>min_length</code> and <code>max_length</code>, and where it declares no maximum,
+  within the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 unless the
+  project says otherwise. <strong>The third exception</strong>, since that default is
+  the kernel's and may be stricter than the library behind it: a list is
+  a cost its caller controls the size of, one Validator run per row of a
+  <code>many</code> call and one query variable per value of an <code>in</code> filter.
+  The refusal is the list's own, at its name, in DRF's words.</li>
 <li><code>choices</code> constrain the value, and an array's choices constrain each of
-  its elements, since an array is never one of a list of scalars.</li>
+  its elements, since an array is never one of a list of scalars. So do
+  an array's <code>format</code> and bounds: a <code>decimal</code> array's elements are
+  each read as a decimal is, and handed on as they were sent.</li>
 <li>An <code>object</code> with no <code>fields</code> is free-form: its type is checked and
   its contents are not, because nothing is declared inside it to check
   against. An array with no <code>items</code> takes any element, and each is
@@ -7559,6 +7735,9 @@ query string's <code>"3"</code> reaches the shape check and the Validator as
   are read the same way, a repeated query-string key's included. A string
   outside ASCII spells no integer or number, Arabic-Indic or fullwidth digits
   included, although Django's fields read them: see <code>parse_number</code>.</li>
+<li><strong>An array longer than it takes is refused whole</strong>, at its name, before
+  any element is read: the shape check's own length rule, which this
+  shares, so a flat list of a million malformed values costs one message.</li>
 <li>An array's elements are each coerced by its <code>items</code> type, and a single
   value becomes a one-element list, since a flat transport sends a
   one-element list as a bare value. <code>None</code> is not wrapped: an option
@@ -7659,6 +7838,101 @@ the integer keys are written as strings, which is what <code>json.dumps</code> d
 
 
 
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.parameters.coded_message.CodedMessage" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">CodedMessage</span>
+
+
+<a href="#django_service_specs.parameters.coded_message.CodedMessage" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code></p>
+
+
+
+        <p>A message in an <a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a> tree, carrying the code of the mistake it names.</p>
+<p>The words are for a person and are translated; the <code>code</code> is for a
+program and is not. Every refusal the kernel and its shipped adapters
+make carries one - the shape check, <code>coerce_flat</code>, <code>request_arguments</code>,
+a selector or <code>extend_queryset</code> refusing a read nothing filled, a
+FilterSet refusing its data, a relation write refusing a row, and
+<code>DataclassValidator</code>, <code>FormValidator</code> and <code>PydanticValidator</code> - and
+the code is the one a
+DRF field gives the same mistake (<code>"required"</code>, <code>"null"</code>,
+<code>"invalid"</code>, <code>"not_a_list"</code>, <code>"max_length"</code> and the rest), so an
+adapter building DRF's error details maps each one across unchanged.
+Where Django or pydantic refused, their own code comes through: Django's
+as it raised it, and pydantic's error type as DRF's code for the same
+mistake. The arguments page lists them, refusal by refusal.</p>
+<p><strong>It is its message to everything that reads a string.</strong> Equality,
+hashing, <code>json.dumps</code>, <code>%</code>-formatting and <code>repr</code> all see the plain
+<code>str</code>, and the code takes no part in any of them: a tree with codes
+compares equal to the same tree written with plain strings, the body a
+transport writes is unchanged by them, and so is the text <code>str</code> makes of
+a tree, which a log line or Django's <code>BadRequest</code> carries. That is the difference from DRF's <code>ErrorDetail</code>,
+whose equality reads the code too, and why this is not one. Read the code
+with <code>getattr(message, "code", None)</code>, since a Validator's own messages
+reach the same tree as it raised them, a plain <code>str</code> among them.</p>
+<p>A copy, a deep copy and a pickle each keep the code.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.parameters.coded_message.CodedMessage.code" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">code</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.parameters.coded_message.CodedMessage.code" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">code</span><span class="p">:</span> <span class="nb">str</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The mistake, as DRF's codes name it. Never translated.</p>
+
+    </div>
+
+</div>
 
 
 
@@ -9438,7 +9712,10 @@ Parameter does not carry.</p>
   the node an adapter truncates a recursive declaration to.</li>
 <li><strong>An array</strong> is <code>{"type": "array", "items": ...}</code>: a type name's
   <code>{"type": t}</code>, the object schema of its rows, or <code>{}</code> for an array
-  that declares no <code>items</code> and accepts any element.</li>
+  that declares no <code>items</code> and accepts any element. The array's
+  <code>format</code> and bounds describe each element, so they go on <code>items</code>,
+  as its choices do: a CSV number filter's are <code>{"type": "string",
+  "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}</code>.</li>
 <li><strong>A file</strong> is <code>{}</code>. No JSON value is one, so any JSON type stated here
   would be false, and JSON Schema has no keyword for a multipart part.
   What is still known is the rest: whether it is required, its
@@ -9449,6 +9726,12 @@ Parameter does not carry.</p>
   A decimal is therefore <code>{"type": "string", "format": "decimal"}</code>: the
   form every decimal validator reads without a binary float's rounding.
   The shape check also accepts a JSON number, which this does not advertise.</li>
+<li><strong>An array's length</strong> is <code>"minItems"</code> as declared, and <code>"maxItems"</code>
+  as in force: the declared <code>max_length</code>, or where none is declared the
+  <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting's, 1000 unless the project
+  sets another. The shape check refuses past it either way, so a client
+  told nothing would send a call that cannot run; under a setting of
+  <code>None</code> an array that declares no maximum states none.</li>
 <li><strong>Bounds</strong> are <code>"minimum"</code> and <code>"maximum"</code>, inclusive, as declared.
   JSON Schema applies them to a number instance only, so on a decimal
   string a validating client enforces neither; the shape check does, and
@@ -9490,8 +9773,10 @@ has no label of its own; a <code>title</code> is only ever a choice's.
 No <code>$defs</code> or <code>$ref</code> ever: most MCP clients refuse a schema with a
 reference in it, so every schema is flat and self-contained, however deep
 the declaration nests. No <code>$schema</code> key, which a transport adds if its
-wire wants one. And no bound a Parameter does not declare (<code>maxLength</code>,
-a Validator's <code>max_value</code>): the Validator enforces those.</p>
+wire wants one. And no bound the shape check does not enforce
+(<code>maxLength</code>, a Validator's <code>max_value</code>): the Validator enforces those.
+The one stated without being declared is an array's default maximum,
+because the shape check enforces it.</p>
 <p>Every call builds a new schema, so a transport may add its own keys to the
 result without reaching the declaration or another transport's copy.
 Defaults and choice values are placed in it as declared, not copied.</p>
@@ -9593,9 +9878,12 @@ types and builds the instance, nested dataclasses included.</p>
 <ul>
 <li><code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code>: their JSON types. <code>float</code> takes an
   integer as well, since JSON writes <code>2.0</code> as <code>2</code>; nothing else crosses
-  types, so <code>true</code> is not an <code>int</code>.</li>
+  types, so <code>true</code> is not an <code>int</code>. An integer past a float's range
+  is refused as no number, in the words the shape check refuses a
+  non-finite one in, since no finite float stands for it.</li>
 <li><code>Decimal</code>, <code>datetime</code>, <code>date</code>: a string, with the format it decodes
-  from. A decimal takes a JSON number too, as every decimal validator does.</li>
+  from. A decimal takes a JSON number too, as every decimal validator does,
+  and an integer exactly, whatever its digits.</li>
 <li><code>X | None</code>: nullable. Inside a list, <code>list[X | None]</code>, it is the
   element that is, declared as <code>items_nullable</code> and not as the array's
   own nullability.</li>
@@ -9604,9 +9892,19 @@ types and builds the instance, nested dataclasses included.</p>
   share. An <code>Enum</code> decodes to the member.</li>
 <li><code>list[X]</code>: an array; <code>list[SomeDataclass]</code> is an array of rows, each
   declared as nested Parameters. For any other element, <code>Parameter.items</code>
-  can hold only its JSON type, so a list of decimals is declared as an
-  array of strings and decoded here. A list of choices declares them on
-  the array, where they constrain each element.</li>
+  holds its JSON type, and what else describes the element is declared on
+  the array, where it constrains each element: a list of choices declares
+  them there, and <code>list[Decimal]</code> the <code>decimal</code> format, so each
+  element is read as a scalar decimal is, a JSON number included, and a
+  query string's <code>?prices=1.5,2.25</code> is two of them. A list of dates or
+  date-times is an array of strings, since an element takes no other
+  format, and is decoded here.</li>
+<li>A list declares no length, since a dataclass has no way to state one,
+  so the shape check in front of this Validator holds it to the
+  <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default. A list a
+  caller may send more of is declared with a Validator that states its
+  length, such as a pydantic model's <code>Field(max_length=...)</code>, or under
+  a larger setting.</li>
 <li>a dataclass: an object, with its own fields as nested Parameters.</li>
 <li><code>X | UnsetType</code>: the argument may be left out, with or without a
   default, and the field then holds <code>UNSET</code> rather than a value a
@@ -9887,8 +10185,22 @@ shape check in front of it enforces what the declaration can see.</p>
 <ul>
 <li><code>BooleanField</code> and <code>NullBooleanField</code>: a <code>boolean</code>.</li>
 <li><code>DecimalField</code>: a <code>string</code> in the <code>decimal</code> format, which takes a
-  JSON number as well. <code>FloatField</code>: a <code>number</code>. <code>IntegerField</code>: an
-  <code>integer</code>.</li>
+  JSON number as well, and an integer whatever its digits. <code>FloatField</code>:
+  a <code>number</code>, and an integer past a float's range is refused as the
+  field refuses an infinity, <code>invalid</code> in its own words.
+  <code>IntegerField</code>: an <code>integer</code>. On a <code>ModelForm</code>, a value the form
+  cleans to an integer past the range of the model's integer column is
+  refused in the words and with the code of the validator Django's model
+  field carries from 5.0, <code>max_value</code> or <code>min_value</code>, before a
+  uniqueness check or a constraint queries with it: Django 4.2 states no
+  range for SQLite, whose driver raises <code>OverflowError</code> for one. It is
+  judged where Django 5.0 and later judge it, after the field, its
+  <code>clean_&lt;field&gt;()</code> and the form's <code>clean()</code>, so each of those answers
+  first, and a value a <code>clean_&lt;field&gt;()</code> brings inside the range is
+  taken. Only a column Django validates is judged: a value <code>clean()</code>
+  sets for a column the form has no field for, and a field declared over
+  a column <code>Meta.fields</code> leaves out or <code>Meta.exclude</code> names, are the
+  form's, as Django never writes them onto the row.</li>
 <li><code>DateTimeField</code> and <code>DateField</code>: a <code>string</code> in the <code>date-time</code> or
   <code>date</code> format. <code>TimeField</code> and <code>DurationField</code>: a <code>string</code>.</li>
 <li><code>ChoiceField</code>: choices, with the empty choice dropped and option
@@ -9904,7 +10216,22 @@ shape check in front of it enforces what the declaration can see.</p>
 <li><code>ModelChoiceField</code>: the JSON type of the model field it matches rows
   on - its <code>to_field_name</code>, or the primary key - and no choices, since
   they are rows and reading them would query. <code>ModelMultipleChoiceField</code>:
-  an array of that. They validate to the row, and to a queryset of rows.</li>
+  an array of that, so one matching rows on a <code>DecimalField</code> takes an
+  array of <code>decimal</code> strings, and a query string's
+  <code>?rows=12.50,9.99</code> is two of them. Django matches each against the
+  column's own spelling, so <code>"12.50"</code> names a row a two-place column
+  holds and <code>12.5</code> names none. A date or a
+  date-time key is an array of strings, since an element takes no other
+  format. They validate to the row, and to a queryset of rows. A key
+  past the range of the integer column rows are matched on names no row,
+  and is refused as the field refuses a key no row holds,
+  <code>invalid_choice</code> in its own words, before the form queries: Django
+  hands a <code>ModelMultipleChoiceField</code>'s keys to the database driver,
+  which raises <code>OverflowError</code> for one, and so does a
+  <code>ModelChoiceField</code>'s on Django 4.2.</li>
+<li>No choice field declares a length, since Django's have none, so the
+  shape check in front of this Validator holds a list to the
+  <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default.</li>
 <li>any other <code>CharField</code> (email, URL, slug, UUID, regex, IP address): a
   <code>string</code>.</li>
 <li><code>FileField</code> and <code>ImageField</code>: a <code>file</code>, which no JSON caller can
@@ -10143,11 +10470,25 @@ the same field declare the same parameter: <code>str</code>, <code>int</code>, <
 <code>bool</code>; <code>Decimal</code>, <code>datetime</code> and <code>date</code> as strings with their
 format; <code>X | None</code> as nullable; <code>Literal[...]</code> and an <code>Enum</code> as
 choices; <code>Annotated</code> looked through; and <code>list[X]</code> of any of these,
-where <code>list[X | None]</code> makes the element nullable and not the array.
-On top of those:</p>
+where <code>list[X | None]</code> makes the element nullable and not the array
+and <code>list[Decimal]</code> declares each element a <code>decimal</code>. On top of
+those:</p>
 <ul>
-<li>a nested model is an object with its own fields as nested Parameters,
-  and <code>list[SomeModel]</code> an array of rows;</li>
+<li>
+<p>a list's length, however the model states it - <code>Field(min_length=,
+  max_length=)</code>, <code>conlist</code>, <code>annotated_types</code>' <code>Len</code>, <code>MinLen</code>
+  and <code>MaxLen</code> - is the parameter's <code>min_length</code> and <code>max_length</code>,
+  so a list the model allows more of than <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code>
+  is not held to it. Where a field states one twice, the last pydantic
+  applies is the one declared, as it is the one pydantic enforces. A
+  number's bounds are not declared: <code>gt</code> and <code>lt</code> are exclusive,
+  which a parameter cannot state, and the model keeps every bound in
+  its own words rather than some in the kernel's;</p>
+</li>
+<li>
+<p>a nested model is an object with its own fields as nested Parameters,
+  and <code>list[SomeModel]</code> an array of rows;</p>
+</li>
 <li><code>dict[str, X]</code> is an object with no declared fields, whose values are
   pydantic's to validate;</li>
 <li>a model that contains itself is described four times on one path
@@ -10175,8 +10516,22 @@ tree: <code>{"books": {1: {"title": ["..."]}}}</code>, with a row's index as an
 <code>int</code>. A message about a model itself - its <code>model_validator</code> refusing
 - sits under <code>non_field_errors</code> inside that model, or at the top for the
 model being validated. The kernel's shape check runs first and refuses a
-wrong JSON type in the kernel's words, so pydantic's are what a caller
-reads for its own rules: bounds, patterns, validators.</p>
+wrong JSON type, and a list past its declared length, in the kernel's
+words, under the code pydantic's would carry; pydantic's are what a
+caller reads for the model's other rules: bounds, patterns, validators.</p>
+<p><strong>Each message carries a code</strong>, the one a DRF field gives the same
+mistake where pydantic's error type has one: <code>missing</code> is
+<code>"required"</code>, a <code>None</code> refused by a type is <code>"null"</code>, a string or a
+list too long or too short <code>"max_length"</code> or <code>"min_length"</code>, a number
+past a bound <code>"max_value"</code> or <code>"min_value"</code> (an exclusive bound too,
+which no DRF field has), a <code>Literal</code> or an <code>Enum</code> <code>"invalid_choice"</code>,
+a list's type <code>"not_a_list"</code>, a decimal's digits <code>"max_digits"</code>,
+<code>"max_decimal_places"</code> and <code>"max_whole_digits"</code>, and a forbidden extra
+key the kernel's <code>"unknown"</code>. Any other of pydantic's own types is
+<code>"invalid"</code>, DRF's code for a value it cannot take, and a
+<code>ValueError</code> or an <code>assert</code> in a validator is too, as DRF says for a
+message raised with no code. A <code>PydanticCustomError</code>'s type is the
+author's code, and is kept, as a Django <code>ValidationError</code>'s is.</p>
 <p><strong>Time zones are pydantic's</strong>: an offset-less date-time stays naive, where
 <code>DataclassValidator</code> makes it aware as Django's forms do. Declare the
 offset, or convert in the service.</p>
@@ -10514,22 +10869,23 @@ transport. A target or output selector, and its affordance conditions,
 always get <code>null_progress</code>: a lookup has nothing to
 report, and one reporting after the service finished would read as the
 work restarting. The run alone also reports to the spec's
-<code>progress_reporter</code>, called on the run's first report, or before an
-<code>async def</code> run once nothing before the run can refuse the call; either
-way a call refused before its run never calls it. A selector spec's run
-is its selector, and its step four and <code>preconditions</code> answer after it,
-so a selector spec refused there may already have called it: by the
-selector's first report, or, for an <code>async def</code> selector, before the
-await.</p>
+<code>progress_reporter</code>, and only a run that takes <code>progress</code>: called on
+the run's first report, or before an <code>async def</code> run once nothing before
+the run can refuse the call; either way a call refused before its run
+never calls it. A selector spec's run is its selector, and its step four
+and <code>preconditions</code> answer after it, so a selector spec refused there
+may already have called it: by the selector's first report, or, for an
+<code>async def</code> selector, before the await.</p>
 <p><code>target</code> is a service spec's target resolved by the caller - the row
 an HTTP view's <code>get_object()</code> found, or what <code>resolve_target</code>
 returned - and stands in for step three: no lookup runs, and the call's
 <code>instance</code> or <code>collection</code> is <code>target</code>. Step four still runs on it,
 unless <code>grant</code> says <code>target_checked</code>, so with that grant
 <code>has_object_permission</code> is asked once across both. Without <code>target</code>
-a service spec's step four runs whatever the grant says: the grant
-vouches for the target the caller found, not for what the arguments make
-the lookup find. <code>None</code> is a missing
+step four runs whatever the grant says: the grant vouches for the target
+the caller found, not for what the arguments make the lookup find. So a
+selector spec, which takes no <code>target</code>, runs it on the row or the list
+its selector found, whatever the grant says. <code>None</code> is a missing
 row, not-found unless the instance selector says <code>allow_none</code>; a create
 takes <code>None</code> and refuses anything else. <strong>Dispatch trusts it</strong>: the
 target's <code>reads</code> are still checked as declared, and keeping them and
@@ -10721,7 +11077,8 @@ hop, once nothing before the run can refuse the call.</p>
 standing in for the lookup inside the one hop, and checked there unless
 <code>grant</code> says <code>target_checked</code>; without <code>target</code>, checked whatever
 the grant says. A selector spec and a <code>many</code> spec
-refuse it before any hop.</p>
+refuse it before any hop, and a selector spec's row or list is checked
+whatever the grant says, as <code>dispatch</code>'s is.</p>
 <p>A <code>many</code> spec checks, validates and writes its rows as <code>dispatch</code>
 does, every row inside the one hop.</p>
 
@@ -11324,7 +11681,10 @@ about what a page is.</p>
 <p>The upper clamp on <code>page</code> is why <code>total</code> is counted <strong>before</strong> the
 slice: <code>(page - 1) * limit</code> on an unclamped page is an arbitrarily large
 SQL <code>OFFSET</code>, which a backend either scans towards or refuses outright
-with a <code>DatabaseError</code> this does not catch.</p>
+with a <code>DatabaseError</code> this does not catch. No slice is longer than
+<code>total</code> for the same reason, so a <code>limit</code> past any integer a database
+holds, which no <code>max_page_size</code> bounded, still serves every row; the
+page reports the <code>limit</code> asked for.</p>
 <p>A queryset is counted with <code>COUNT</code> and sliced lazily, so the page's
 <code>items</code> is still a queryset: present them, as
 <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does a list,
@@ -12113,9 +12473,23 @@ beside <code>view</code> and <code>spec</code>: the names Django's <code>FormVie
 <code>extra_context</code> merged in as Django's <code>ContextMixin</code> does. The spec's
 class-level permission check runs first, through
 <a class="autorefs autorefs-internal" title="authorize" href="#django_service_specs.authorization.authorize.authorize"><code>authorize</code></a>, so
-a page is never offered to a principal the post would refuse. The form is
-always unbound: showing an update's current row as its initial data is a
-page of its own, which this view does not build.</p>
+a page is never offered to a principal the post would refuse.</p>
+<p><strong>An update's page shows the row it updates.</strong> Every GET then finds its
+target as dispatch would, through
+<a class="autorefs autorefs-internal" title="resolve_target" href="#django_service_specs.dispatch.resolve_target.resolve_target"><code>resolve_target</code></a>
+on the route's kwargs, coerced as a post's are: the row or set a target
+selector resolves, or <code>None</code> for a create. A check refusing it - the
+object-level check on a row, the scope check on a set or on <code>None</code> -
+raises <code>PermissionDenied</code>, as the post would be refused; a missing row
+or a selector's <code>ServiceNotFound</code> raises <code>Http404</code>; and a route value
+the spec's parameters refuse raises Django's <code>BadRequest</code>. The form
+shows a row's values for its own fields: a <code>ModelForm</code> of the row's
+model is built on a copy of it, as the Validator binds one, and any other
+form takes the row's values for the enabled fields it names as its
+<code>initial</code>. So a file the row holds is shown, with the clear checkbox an
+optional file's <code>ClearableFileInput</code> offers beside it. A create, a
+collection target and a missing row <code>allow_none</code> lets through show an
+empty form.</p>
 <p><strong>POST starts as GET does</strong>: the route first, then that check, and only
 then is the form built from the post. A refused post is answered with the
 page again, and dispatch's shape check comes before its own permission
@@ -12129,8 +12503,17 @@ for that principal. The
   
       dataclass
   " href="#django_service_specs.authorization.grant.Grant"><code>Grant</code></a> it returns goes
-to dispatch, so the class-level check runs once; the object-level check
-is still dispatch's, on the row it resolves.</p>
+to dispatch, so the class-level check runs once.</p>
+<p><strong>Then the post finds its target, as GET does</strong>, before the form is
+built or read, so the form a refused post re-renders is built on the row
+as the page's was, its held file and clear checkbox shown. The target
+answers before the shape check: the object-level and scope checks and a
+missing row refuse a malformed post as they would a well-formed one,
+rather than dispatch re-rendering the page for a principal the row
+refuses. Dispatch is handed the target and the grant <code>resolve_target</code>
+returns, so it looks nothing up again and asks no check twice. A route
+value the target's reads refuse is left to dispatch, whose one refusal
+carries it beside the form's own.</p>
 <p><strong>POST</strong> binds the form to the post and reads the arguments through its
 own widgets - a checkbox is <code>True</code> or <code>False</code>, a multi-select a list -
 because that is how Django reads a form, and a flat reading refuses a
@@ -12166,14 +12549,17 @@ Then <a class="autorefs autorefs-internal" title="dispatch" href="#django_servic
   raises <code>Http404</code>, for the host's own 403 and 404 pages.</li>
 </ul>
 <p><strong>A re-rendered form carries the refusal and nothing else</strong>: the page says
-what dispatch decided. The page's own form is bound to no row, so its own
-errors are not shown: its uniqueness check would tell an update page that
-an unchanged unique value was taken. After a shape-check refusal, then,
+what dispatch decided. The page's own form is never validated: its
+errors start empty and the refusal is placed on them, so nothing the
+Validator did not decide reaches the page, and a value the Validator
+refused because no column holds it never reaches the database through
+the page's own checks. After a shape-check refusal, then,
 the form's further checks - a length, <code>clean()</code>, uniqueness - answer the
 next post rather than this one.</p>
 <p><code>as_view()</code> refuses, when the URLconf is imported, a view with no
-<code>ServiceSpec</code>, a spec whose Validator is not a <code>FormValidator</code>, and a
-view with no <code>success_url</code> that does not override <code>get_success_url</code>.</p>
+<code>ServiceSpec</code>, a spec whose Validator is not a <code>FormValidator</code>, a
+<code>many</code> spec, whose list of rows no form posts, and a view with no
+<code>success_url</code> that does not override <code>get_success_url</code>.</p>
 <p><strong>Sync only</strong>, in this release. <strong>CSRF is the host's middleware</strong>, as for
 any Django view, and the template renders <code>{% csrf_token %}</code>.</p>
 
@@ -12316,7 +12702,7 @@ any Django view, and the template renders <code>{% csrf_token %}</code>.</p>
 
     <div class="doc doc-contents ">
 
-        <p>The page, with an unbound form, for a principal the spec's class check admits.</p>
+        <p>The page, with an unbound form showing the target row, for a principal admitted to it.</p>
 
 
     </div>
@@ -12452,15 +12838,21 @@ any Django view, and the template renders <code>{% csrf_token %}</code>.</p>
 <p><strong>A flat source</strong> is read by the declaration. A parameter of type
 <code>array</code> takes every value its key was sent with, and anything else takes
 the last, as <code>QueryDict</code> reads a repeated key. <strong>An array of numbers,
-integers or booleans also reads a value holding commas as its elements</strong>,
-<code>?ids=1,2</code> as <code>[1, 2]</code> with the space around a part trimmed, because
-a comma cannot be part of such a value and it is the spelling a
-django-filter CSV filter advertises; repeated keys and commas may mix. An
+integers, booleans or decimal strings also reads a value holding commas
+as its elements</strong>, <code>?ids=1,2</code> as <code>[1, 2]</code> with the space around a
+part trimmed, because a comma cannot be part of such a value and it is
+the spelling a django-filter CSV filter advertises; repeated keys and
+commas may mix. A decimal element stays the string it spells. An
 empty part (<code>?ids=1,,2</code>) is not dropped as a blank element is: it is
 refused at its index as any malformed element is. A string array is
 split only where its choices hold no comma, as an ordering's do, so
 <code>?o=title,-pk</code> is <code>["title", "-pk"]</code>; otherwise it is never split,
-since a comma is part of a string. <strong>A blank value is
+since a comma is part of a string. <strong>An array is read no further than one
+element past the most it takes</strong> - its <code>max_length</code>, or the
+<code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting's default - so a list over it is
+refused at its name as a whole, without a million commas becoming a
+million elements first; Django's <code>DATA_UPLOAD_MAX_NUMBER_FIELDS</code> counts
+keys, and a comma list is one. <strong>A blank value is
 absent unless</strong> <code>""</code> <strong>is one the parameter can take</strong>: a plain string
 can, and a number, a boolean, a date, a decimal, or a string whose
 choices leave the blank out cannot. A flat wire has no other spelling of
@@ -12746,9 +13138,19 @@ person reading the form looks for it, through Django's public
 is not added again. The form validating the same data says the same thing
 the kernel does - a <code>FormValidator</code>'s refusal <em>is</em> the form's errors, and
 the shape check spells its messages as Django's fields do - so without this
-most refusals would show twice. Reading <code>form.errors</code> runs the form's
-<code>full_clean()</code> first, as Django documents for <code>add_error</code> called from a
-view, so the form's own errors are always the ones compared against.</p>
+most refusals would show twice. A form not yet validated is validated
+first, as reading <code>form.errors</code> would, so the form's own errors are
+always the ones compared against; but with the guards a
+<code>FormValidator</code>'s form is validated with, since the form's own
+validation would hand the database driver a number no integer column
+holds, which SQLite's refuses with <code>OverflowError</code>. A model choice
+field's key past its column's range is refused as <code>invalid_choice</code> and
+a <code>ModelForm</code>'s value past its integer column's range as <code>max_value</code>
+or <code>min_value</code>, in the words a <code>FormValidator</code> refuses them with, so
+the refusal of one is placed once
+(test_a_list_s_key_past_its_column_is_refused_once,
+test_a_model_form_s_integer_past_its_column_is_refused_once). A form
+already validated is compared as it stands.</p>
 <p>A leaf is a message whatever its type: a string, a lazy translation (which
 is not a <code>str</code>, and is never taken apart into characters), or a list of
 either. The form must be bound, as Django's <code>add_error</code> requires.</p>
@@ -12983,20 +13385,15 @@ another operation or another user covers nothing, and dispatch refuses it.</p>
 <p><code>target_checked</code> says the target-level checks ran too -
 <code>has_object_permission</code> on a row, <code>has_scope_permission</code> on a set or
 on nothing - which a transport can only claim once it has resolved the
-target itself. What it covers depends on the spec:</p>
-<ul>
-<li><strong>A service spec</strong>: the target handed to dispatch as <code>target=</code>, and
-  nothing else. Dispatch skips the checks only on that target; when it
-  looks the target up itself, from the arguments, it runs them whatever
-  the grant says, since the row it finds may not be the one the grant
-  was minted for. <code>resolve_target</code> mints such a grant for the target it
-  returns, to be handed on with it.</li>
-<li><strong>A selector spec</strong>, whose selector is its run and takes no
-  <code>target=</code>: whatever that selector returns. Dispatch skips
-  <code>has_object_permission</code> on the row it retrieves and
-  <code>has_scope_permission</code> on the list, so a transport claims it only
-  when it has checked what this very call will return.</li>
-</ul>
+target itself. It covers <strong>the target handed to dispatch as</strong>
+<code>target=</code>, <strong>and nothing else</strong>: dispatch skips the checks only on that
+target. When dispatch looks the target up itself, from the arguments, it
+runs them whatever the grant says, since the row it finds may not be the
+one the grant was minted for. <code>resolve_target</code> mints such a grant for
+the target it returns, to be handed on with it. A selector spec takes no
+<code>target=</code>, so on one the flag covers nothing: its selector finds the
+row or the list from the arguments, and the checks run on what it
+found.</p>
 <p>Without it, dispatch runs those checks on what it resolves.</p>
 <p><strong>Not serializable.</strong> Pickling one raises <code>TypeError</code>, so a grant cannot
 ride a queue into a worker: a task runs minutes later against state that
@@ -13158,7 +13555,9 @@ bulk or collection call, or <code>None</code> for a create. Every check's
 with that check's own message. An answer still to be awaited raises
 <code>ImproperlyConfigured</code> rather than being read as a pass.</p>
 <p><code>grant.target_checked</code> skips the checks here as it does there: a
-transport that already ran the object-level check has claimed it.</p>
+transport that already ran the target-level checks has claimed them.
+Dispatch honours it, as there, only for a service spec's target handed
+in as <code>target=</code>, so never on the list a selector spec reads.</p>
 
 
     </div>
@@ -13186,8 +13585,9 @@ no single object to check against, and a member-level rule belongs to the
 presenter or the query that shaped it.</p>
 <p><code>grant.target_checked</code> lets a transport that resolved the row itself and
 already ran the object-level check claim it once, so dispatch does not pay
-for it twice; dispatch honours it on a service spec only for a target
-handed in as <code>target=</code> (see <code>Grant</code>); otherwise every check's <code>has_object_permission</code> must pass,
+for it twice; dispatch honours it only for a service spec's target
+handed in as <code>target=</code>, and never on a selector spec's row (see
+<code>Grant</code>); otherwise every check's <code>has_object_permission</code> must pass,
 in order, and the first refusal raises
 <a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
 with that check's own message. An answer still to be awaited raises
@@ -13225,7 +13625,9 @@ notion of who is asking) and this is the one place that becomes a user row.</p>
 <a class="autorefs autorefs-internal" title="PrincipalUnavailable" href="#django_service_specs.authorization.principal_unavailable.PrincipalUnavailable"><code>PrincipalUnavailable</code></a>,
 terminal and never a fallback:</p>
 <ul>
-<li>no row with that primary key (<code>DoesNotExist</code>);</li>
+<li>no row with that primary key (<code>DoesNotExist</code>), including a key past
+  the range of an integer key's column, an infinite one among them, which
+  no row can hold;</li>
 <li>a malformed primary key (<code>ValueError</code>, <code>TypeError</code>, or Django's own
   <code>ValidationError</code> - a non-UUID string against a UUID primary key raises
   that one instead of <code>ValueError</code>);</li>
@@ -14112,7 +14514,8 @@ step has them.</p>
         <p>The names dispatch seeds into a callable's keyword pool, which no argument may use.</p>
 <p><code>user</code> is the principal, <code>progress</code> the caller's progress reporter,
 <code>data</code> the validated values, <code>instance</code> and <code>collection</code> the resolved
-target, <code>result</code> the service's return (in an output selector's pool) and
+target, <code>result</code> the service's return (in an output selector's pool, where
+<code>instance</code> is that return too, as djangorestframework-services binds it) and
 <code>queryset</code> what <code>extend_queryset</code> shapes. They are the names
 <code>djangorestframework-services</code> seeds for the same values, so a callable
 written for it runs under this kernel unchanged.</p>
@@ -14559,7 +14962,10 @@ perform a full save, or an explicit list to control exactly which columns
 are written (no auto-injection in that case).</p>
 <p>A file field is written as a <code>ModelForm</code> writes it, through the model
 field's <code>save_form_data</code>: a file replaces the one the row holds, <code>None</code> keeps it, and <code>False</code>,
-a form's value for a cleared file, leaves no file, reported as a change to <code>""</code>.</p>
+a form's value for a cleared file, leaves no file, reported as a change to <code>""</code>.
+An upload, or any <code>File</code> that is not one a row holds, is always written and reported,
+even under the name of the file it replaces, since a name says nothing of the content;
+the held file handed back as itself is no change.</p>
 <p><code>m2m</code> assigns many-to-many rows that already exist, and only where the set
 of primary keys differs from the current one;
 <a class="autorefs autorefs-internal" title="ManyToManySpec
@@ -17987,15 +18393,17 @@ choice set built by a callable, and a related row's key, offer only
 <code>date-time</code> string, and <code>string</code> for the rest. <strong>A number filter, and
 each bound of a numeric range, is a</strong> <code>decimal</code> <strong>string</strong>, because its
 form field is a <code>DecimalField</code> and reads one exactly, where a float read
-on the way loses a key past <code>2**53</code>; a JSON number is still taken. A CSV
-filter's numbers stay <code>number</code>, which over HTTP is what splits
-<code>?pks=1,2</code>, and keep that float reading. <strong>Each decimal is bounded</strong>,
-<code>minimum=-1e50</code> and <code>maximum=1e50</code>: the line django-filter's number
-filter draws above, drawn below too and on a range's bounds, which it
-leaves open. A value past it is refused by the shape check before it
-reaches the database's integer conversion, which builds every digit of
-<code>"1E+999999999"</code>. A float reading cannot reach that far, so a CSV
-filter's numbers carry no bound.</p>
+on the way loses a key past <code>2**53</code>; a JSON number is still taken. <strong>So
+is each value of a CSV number filter</strong>: an array whose <code>format</code> and
+bounds describe each element, as its choices would, so a fraction keeps
+every digit it was sent with and <code>?pks=1,2</code> still splits over HTTP,
+since no decimal holds a comma. <strong>Each decimal is bounded</strong>,
+<code>minimum=-1e50</code> and <code>maximum=1e50</code>, a CSV filter's values each: the
+line django-filter's number filter draws above, drawn below too and on a
+range's bounds, which it leaves open. A value past it is refused by the
+shape check, at its index in a CSV filter's list, before it reaches the
+database's integer conversion, which builds every digit of
+<code>"1E+999999999"</code>.</p>
 <p><strong>Every one is optional</strong>, because a filter narrows a read and never
 stands between a caller and it. <code>help</code> is the author's <code>help_text</code> when
 there is one; otherwise it says what the filter matches when the
@@ -18004,16 +18412,17 @@ bound, which bound of which field it is.</p>
 <p>Two filters that read one key - a range <code>joined</code> and a filter called
 <code>joined_after</code> - are refused, as any two Parameters of one name are,
 because django-filter would hand one value to both.</p>
-<p>An object with no <code>base_filters</code> declares nothing, and is read without
-django-filter. A
+<p>An object whose <code>base_filters</code> is missing, empty or <code>None</code> declares
+nothing, and is read without django-filter. A
 <a class="autorefs autorefs-internal" title="SelectorSpec
 
 
   
       dataclass
   " href="#django_service_specs.specs.selector_spec.SelectorSpec"><code>SelectorSpec</code></a>
-refuses one as its <code>filter_set</code>, since nothing it declares would be
-handed to it. Reading any filter needs the <code>[filter]</code> extra.</p>
+refuses one as its <code>filter_set</code> unless it is a django-filter
+<code>FilterSet</code> class, since none of the caller's data would be handed to
+it. Reading any filter needs the <code>[filter]</code> extra.</p>
 
 
     </div>

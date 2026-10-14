@@ -1030,7 +1030,7 @@ same parameter:</p>
 </tr>
 <tr>
 <td><code>list[X]</code></td>
-<td>An array. <code>list[SomeModel]</code> is an array of rows, each declared as nested Parameters.</td>
+<td>An array. <code>list[SomeModel]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, as <code>list[Decimal]</code> on a dataclass does. The list's length is declared: see below.</td>
 </tr>
 <tr>
 <td>a model</td>
@@ -1043,7 +1043,19 @@ same parameter:</p>
 </tbody>
 </table>
 <p><code>Annotated</code> is looked through, so <code>Annotated[str, Field(max_length=100)]</code>
-declares a string. Anything else - <code>Any</code>, a union of two types, <code>UnsetType</code>, a
+declares a string.</p>
+<p><strong>A list's length is declared</strong> as the model states it: <code>Field(min_length=,
+max_length=)</code>, <code>conlist(...)</code>, <code>annotated_types</code>' <code>Len</code>, <code>MinLen</code> and
+<code>MaxLen</code>, whether on the field or inside an <code>Annotated</code> in its annotation,
+become the parameter's <code>min_length</code> and <code>max_length</code>, and a schema's
+<code>"minItems"</code> and <code>"maxItems"</code>. So <code>tags: list[str] = Field(max_length=5000)</code>
+takes 5000 tags where an undeclared list is held to the
+<code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default, and a list the
+model allows 5 of is refused at 6 by the shape check before the model runs.
+Where a field states a length twice, the declaration takes the one pydantic
+enforces: the last it applies, the annotation's innermost first and the
+field's own last. A length on a string or a <code>dict</code> is the model's alone,
+since a parameter's length counts an array's elements. Anything else - <code>Any</code>, a union of two types, <code>UnsetType</code>, a
 <code>RootModel</code>, <code>set</code>, <code>tuple</code>, a <code>dict</code> not keyed by <code>str</code> - is refused with
 <code>ImproperlyConfigured</code> naming the model and the field, when the validator or
 presenter is constructed.</p>
@@ -1108,9 +1120,12 @@ times: the count is per path.</p>
   validated: <code>{"books": {1: {"non_field_errors": ["Value error, A published
   book has a publication date."]}}}</code>.</li>
 </ul>
-<p>The kernel's shape check runs first, so a wrong JSON type is refused in the
-kernel's words and never reaches the model. pydantic's words are what a caller
-reads for the model's own rules: bounds, patterns, validators.</p>
+<p>The kernel's shape check runs first, so a wrong JSON type, and a list past
+the length it declares, is refused in the kernel's words and never reaches the
+model: <code>Ensure this field has no more than 5 elements.</code> where the model would
+say <code>List should have at most 5 items after validation, not 6</code>, under the same
+<code>max_length</code> code. pydantic's words are what a caller reads for the model's
+own rules: bounds, patterns, validators.</p>
 <p>The context reaches pydantic's validators as <code>info.context</code>, a dict with
 <code>"principal"</code> and <code>"target"</code>, so a <code>field_validator</code> can check a value against
 the caller or the row being updated.</p>
@@ -1157,8 +1172,15 @@ adapter declared it, and the model's own JSON Schema is not consulted. There is
 one dialect: a <code>Decimal</code> is a <code>string</code> in the <code>decimal</code> format for a model as
 for a dataclass, where pydantic's schema describes it as a number or a
 patterned string. The price of that is that what <code>Parameters</code> cannot carry -
-<code>max_length</code>, <code>gt</code>, a pattern - is not described. It is still enforced, by the
-model, in <code>validate()</code>.</p>
+a string's <code>max_length</code>, <code>gt</code>, a pattern - is not described. It is still
+enforced, by the model, in <code>validate()</code>. A list's length is the exception, as
+<code>Parameters</code> carries one and the kernel bounds every list without it.</p>
+<p>A number's bounds are not declared either, although a parameter takes an
+inclusive <code>minimum</code> and <code>maximum</code>. pydantic's <code>gt</code> and <code>lt</code> are exclusive,
+which a parameter cannot state, and its bounds may be a <code>Decimal</code> or a date,
+which a parameter does not take; declaring only <code>ge</code> and <code>le</code> would answer
+one model's bounds in two dialects, the kernel's words for some and
+pydantic's for the rest. So every bound stays the model's, in its words.</p>
 
 
 

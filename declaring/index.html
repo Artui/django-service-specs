@@ -1044,7 +1044,7 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 <tr>
 <td><code>result</code></td>
 <td>The service's return</td>
-<td>The output selector</td>
+<td>The output selector, which is handed it as <code>instance</code> too</td>
 </tr>
 <tr>
 <td><code>queryset</code></td>
@@ -1155,7 +1155,12 @@ or <code>RETRIEVE</code>. A retrieve returns one row: a queryset is read with <c
 a <code>DoesNotExist</code> raised by a selector written with <code>.get()</code> means the same
 missing row, and a missing row is reported as not-found unless the spec sets
 <code>allow_none=True</code>, which makes it the value <code>None</code> - the shape of an optional
-singleton, or of an upsert's target.</p>
+singleton, or of an upsert's target. On a list, <code>allow_none=True</code> says the
+selector may return <code>None</code> for "no rows": the result is the empty list, its
+scope check and <code>preconditions</code> are asked of that empty set as they are of an
+empty queryset, and the shaping is skipped, since there is nothing to shape.
+Without it, a list selector's <code>None</code> is passed on as it came, and presenting it
+fails as the author's error.</p>
 <p><code>reads</code> is the selector's whole input. There is no Validator in front of a
 read, so these Parameters are what the closed argument set and the shape check
 hold the caller to: an argument the spec does not declare is refused before
@@ -1166,10 +1171,14 @@ the shaped queryset as <code>queryset</code>, and <code>filter_set</code> last. 
 them on a selector that returns something other than a queryset is refused at
 dispatch.</p>
 <p><code>filter_set</code> is a django-filter <code>FilterSet</code> class, installed with the
-<code>filter</code> extra. An object with no <code>base_filters</code> - a duck-typed stand-in
-taking <code>(data, queryset)</code> - is refused with <code>ImproperlyConfigured</code> when the
-spec is built: it declares no Parameters, so it would be handed none of the
-caller's data and never filter. Its filters are reads: each is read as a Parameter by
+<code>filter</code> extra. One that declares no filters - its <code>base_filters</code> missing,
+empty or <code>None</code> - is refused with <code>ImproperlyConfigured</code> when the spec is
+built, unless it is a django-filter <code>FilterSet</code> class: it declares no
+Parameters, so it would be handed none of the caller's data and never
+filter. A duck-typed stand-in taking <code>(data, queryset)</code> declares its filters
+in <code>base_filters</code>, and a step narrowing the queryset by no argument belongs
+in <code>extend_queryset</code>. A real <code>FilterSet</code> declaring no filters is accepted,
+and narrows nothing. Its filters are reads: each is read as a Parameter by
 <a class="autorefs autorefs-internal" title="filter_set_parameters" href="../reference/#django_service_specs.filters.filter_set_parameters.filter_set_parameters"><code>filter_set_parameters</code></a>
 and joins <code>reads</code> after the author's own, named as django-filter reads it -
 <code>price_min</code> and <code>price_max</code> for a range - so the schema, the closed argument
@@ -1183,8 +1192,12 @@ number filter refuses a value past <code>1e50</code> and leaves a range's bounds
 every negative value open, while an integer column's conversion builds every
 digit of a value such as <code>"1E+999999999"</code>, which holds a worker for minutes.
 So the shape check refuses either side of the line before the FilterSet is
-reached. A CSV filter's numbers stay <code>number</code>, so <code>?pks=1,2</code> splits, and keep
-the float reading, which cannot reach that far.</p>
+reached. A CSV number filter is an array of the same bounded decimals:
+<code>Parameter("pks", "array", items="string", format="decimal",
+minimum=-1e50, maximum=1e50)</code>, whose format and bounds describe each
+element. <code>?pks=1,2</code> still splits, since no decimal holds a comma, each value
+reaches the filter with every digit it was sent with, a fraction included,
+and one past the line is refused at its index in the list.</p>
 <p>A selector spec also takes <code>kwargs</code>, <code>preconditions</code> and <code>progress_reporter</code>,
 which <a href="#providers-and-preconditions">a write</a> declares the same way. Its
 <code>kwargs</code> provider is called from the base pool and its <code>reads</code>, and on a
@@ -1273,8 +1286,10 @@ service over all of them, inside one transaction under <code>atomic</code>:</p>
 </span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">NoteIn</span><span class="p">),</span>  <span class="c1"># what each row is</span>
 </span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">many</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># the rows travel under "items"</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"archived"</span><span class="p">,</span> <span class="s2">"boolean"</span><span class="p">)),</span>  <span class="c1"># asked once, beside the list</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="p">)</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">many_min_length</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>  <span class="c1"># an empty list is refused rather than run on no rows</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">many_max_length</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span>  <span class="c1"># and so is one past 200, before any row is read</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"archived"</span><span class="p">,</span> <span class="s2">"boolean"</span><span class="p">)),</span>  <span class="c1"># asked once, beside the list</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>Each row is shape-checked and validated by the spec's Validator, which
 declares what a row is, before the service runs, and every failing row is
@@ -1285,6 +1300,16 @@ takes the spec's <code>reads</code> and nothing else, so a value asked once for 
 call - a confirmation - is a read. The service receives the rows' <code>data</code> as a
 list under <code>data</code>, and their values as a list under <code>many_argument</code>; neither
 is spread by field.</p>
+<p>The list is an array parameter, so it is bounded as one:
+<strong><code>many_min_length</code></strong> and <strong><code>many_max_length</code></strong> are its <code>min_length</code> and
+<code>max_length</code>. Neither is declared by default, so an empty list runs the
+service on no rows, and <code>many_min_length=1</code> is how a spec refuses one. Where
+no <code>many_max_length</code> is declared, the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code>
+setting bounds the list, 1000 rows by default, since every row is a Validator
+run inside one transaction. A list outside either is refused at
+<code>many_argument</code> as a whole, <code>{"items": ["Ensure this field has no more than
+200 elements."]}</code>, before any row is checked, beside the top level's other
+refusals. Either is refused on a spec that is not <code>many</code>.</p>
 <p>A <code>many</code> spec must declare a Validator and no target selector, since a list of
 rows resolves no target, and a condition on the row among its <code>affordances</code> is
 refused. With no output selector its result is <code>kind="list"</code>, unless the
@@ -1318,9 +1343,14 @@ sync-only: an <code>async def</code> one is refused when the spec is built.</p>
 <li><strong><code>progress_reporter</code></strong> returns a
   <a class="autorefs autorefs-internal" title="ProgressReporter" href="../reference/#django_service_specs.types.progress_reporter.ProgressReporter"><code>ProgressReporter</code></a>
   the run reports to beside the transport's - a task record, an audit trail -
-  called on the run's first report. A service spec refused before its run
-  never calls it; a selector spec's selector is its run, so one refused at
-  its object check, its scope check or a precondition may already have.</li>
+  called only for a run that takes <code>progress</code>, once its keywords are bound:
+  on the run's first report, or before the await of an <code>async def</code> run. A
+  call refused before its run never calls it; a selector spec's selector is
+  its run, so one refused at its object check, its scope check or a
+  precondition may already have. Nothing but the run reports to it: a
+  selector spec's <code>extend_queryset</code>, its preconditions and the affordance
+  conditions answered for its rows read <code>progress</code> from the pool, the
+  transport's reporter, as a service spec's conditions do.</li>
 </ul>
 <p>Both providers are called from the base pool, the <code>reads</code> and the resolved
 target, and never see the Validator's values. A provider returning a name
@@ -1398,7 +1428,11 @@ the same declaration.</p>
   bound, and an array's <code>items</code> never name it: an array with no <code>items</code> takes
   any element already.</li>
 <li><strong><code>format</code></strong> is <code>decimal</code>, <code>date-time</code> or <code>date</code>, on a <code>string</code>: a value JSON
-  cannot carry, which travels as a string for the Validator to decode.</li>
+  cannot carry, which travels as a string for the Validator to decode. On an
+  array it describes each element, as <code>choices</code> do, and is <code>decimal</code> on
+  <code>items="string"</code> alone: a number element is read as a float on the way and
+  loses a fraction's digits past a float's precision, where a decimal string
+  is handed on as it was sent.</li>
 <li><strong><code>items</code></strong> is an array's element: a JSON type name for a flat list, or the
   <code>Parameters</code> of the object each row is. <strong><code>fields</code></strong> is the same for an
   <code>object</code>. Nesting is what lets a write declare its rows, so a malformed row
@@ -1411,7 +1445,50 @@ the same declaration.</p>
   finite <code>float</code>, and a bound on any other type is refused where it is
   written. A decimal string is compared as the decimal it spells, by its
   exponent, so <code>"1E+999999999"</code> is refused without building the integer it
-  names. The schema states both as <code>"minimum"</code> and <code>"maximum"</code>.</li>
+  names. The schema states both as <code>"minimum"</code> and <code>"maximum"</code>. On an array
+  they bound each element, as its <code>format</code> describes each: an array of
+  <code>integer</code> or <code>number</code>, or of <code>decimal</code> strings, takes them, and an element
+  past one is refused at its index. The list's own count is <code>min_length</code> and
+  <code>max_length</code>'s, so an array may carry both pairs, and the schema states
+  the element's on <code>"items"</code>. <strong>No <code>integer</code> is bounded unless it says so</strong>,
+  and one a selector or a service hands the database past its column's range
+  is the database's to answer. On SQLite, past 64 bits, an <code>__in</code> lookup and
+  a write raise the driver's <code>OverflowError</code> on every Django version, and so
+  does any lookup on Django 4.2; from 5.0 an exact or a comparison lookup is
+  answered without the query, as no rows or every row. Bound an
+  integer that reaches a column unchecked, as a key a selector looks rows up
+  by does. Four lookups the kernel makes itself with a key a caller sent
+  answer such a key as one no row holds, on every version: the forms
+  adapter's model choice field and a <code>ModelForm</code>'s integer column
+  (<a href="../forms/#what-each-field-declares">the forms adapter</a>), a relation
+  write's scoped match (<a href="../relations/#matching-scope-and-orphans">relations</a>)
+  and <code>resolve_principal</code>. A FilterSet's filters are held to what any
+  driver binds: where a filter's path ends on an integer column - its own, a
+  foreign key's, or the key of the row a many-to-many or a reverse foreign
+  key reaches - and its lookup reads the value as the column's - <code>exact</code>,
+  <code>gt</code>, <code>gte</code>, <code>lt</code>, <code>lte</code>, <code>in</code> and <code>range</code>, a <code>RangeFilter</code>'s bounds and a
+  CSV filter's elements included - a number past a signed 64-bit integer is
+  refused before the query, as <code>max_value</code> or <code>min_value</code> at the argument
+  that carried it, on every version
+  (<a href="../arguments/#the-codes-a-refusal-carries">the codes a refusal carries</a>).
+  A number inside 64 bits is answered whatever range the column states, so
+  <code>gte=-1</code> on a <code>PositiveIntegerField</code> is every row on every version, as an
+  exact <code>-1</code> is none. A model choice filter's key past the range of the
+  column its rows are matched on is no choice, refused as <code>invalid_choice</code>
+  in its form field's words. A filter with a <code>method</code>, a lookup that reads
+  its value as text, such as <code>contains</code>, a path through a transform or to an
+  annotation, a relation over more than one column, and an object that is
+  not a django-filter <code>FilterSet</code> are left to the database, as above. A
+  number filter on a decimal or float column takes any number inside 1e50,
+  except on Django 4.2.0 and 4.2.1, where a decimal past the column's
+  <code>max_digits</code> raises in Django's own decimal handling, which this does not
+  change.</li>
+<li><strong><code>min_length</code></strong> and <strong><code>max_length</code></strong> bound how many elements an <code>array</code>
+  takes, inclusively, each a non-negative <code>int</code>, and are refused on any other
+  type. An array that declares no <code>max_length</code> is still bounded, by the
+  <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default; see
+  <a href="../arguments/#how-long-a-list-may-be">how long a list may be</a>. The schema
+  states them as <code>"minItems"</code> and <code>"maxItems"</code>.</li>
 <li><strong><code>choice_labels</code></strong> names the choices for a reader, as a mapping of a choice
   to its label or as Django's pairs. The labels constrain nothing; the schema
   states each as a choice's <code>title</code>. A label may be a lazy translation.</li>
@@ -1536,11 +1613,11 @@ partial spec over it is refused when the spec is built.</p>
 <tbody>
 <tr>
 <td><code>str</code>, <code>int</code>, <code>float</code>, <code>bool</code></td>
-<td>Their JSON types. <code>float</code> also takes an integer; nothing else crosses types, so <code>true</code> is not an <code>int</code>. Through dispatch, the shape check hands an <code>int</code> field a whole float such as <code>2.0</code> as <code>2</code>.</td>
+<td>Their JSON types. <code>float</code> also takes an integer; nothing else crosses types, so <code>true</code> is not an <code>int</code>. Through dispatch, the shape check hands an <code>int</code> field a whole float such as <code>2.0</code> as <code>2</code>. An integer past a float's range is refused as no number, <code>"Enter a number."</code>, since no finite float stands for it.</td>
 </tr>
 <tr>
 <td><code>Decimal</code>, <code>datetime</code>, <code>date</code></td>
-<td>A <code>string</code> with the format it decodes from. A decimal also takes a JSON number.</td>
+<td>A <code>string</code> with the format it decodes from. A decimal also takes a JSON number, and an integer exactly, whatever its digits.</td>
 </tr>
 <tr>
 <td><code>X \| None</code></td>
@@ -1552,7 +1629,7 @@ partial spec over it is refused when the spec is built.</p>
 </tr>
 <tr>
 <td><code>list[X]</code></td>
-<td>An array. <code>list[SomeDataclass]</code> is an array of rows, each declared as nested Parameters.</td>
+<td>An array. <code>list[SomeDataclass]</code> is an array of rows, each declared as nested Parameters. <code>list[Decimal]</code> declares the <code>decimal</code> format for each element, so each is read as a decimal is, a JSON number included, and <code>?prices=1.5,2.25</code> is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting bounds it.</td>
 </tr>
 <tr>
 <td>a dataclass</td>

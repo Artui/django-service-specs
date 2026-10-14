@@ -952,7 +952,10 @@ makes a partial update's omitted fields omitted. A file field's value is
 written as a <code>ModelForm</code> writes it, through the model field's
 <code>save_form_data</code>: a file replaces the one the row holds, <code>None</code> keeps it, and
 <code>False</code>, a form's value for a <a href="../forms/#clearing-a-file">cleared file</a>,
-leaves no file, reported as a change to <code>""</code>. <code>field_map</code> renames input keys
+leaves no file, reported as a change to <code>""</code>. An upload, or any <code>File</code> a row
+does not already hold, is always written and reported, even under the name of
+the file it replaces; the file the row holds, handed back as itself, is no
+change. <code>field_map</code> renames input keys
 onto model fields and <code>exclude_fields</code> drops keys. <code>m2m={name: rows}</code> assigns
 many-to-many rows <strong>that already exist</strong>; writing the target rows from the
 payload is a <code>ManyToManySpec</code>, and naming one relation in both is refused.</p>
@@ -1157,7 +1160,8 @@ are declared.</p>
   are updated, the rest are created, and in <code>"replace"</code> mode the existing rows
   the input left out are removed. <code>"merge"</code> mode only upserts. A <code>null</code> row
   is refused, every one of them and before any row is written, with
-  <code>"This field cannot be null."</code> under the row's <code>non_field_errors</code>: a
+  <code>"This field cannot be null."</code>, coded <code>null</code>, under the row's
+  <code>non_field_errors</code>: a
   declaration may let one through (<code>list[Row | None]</code>), and nothing in a
   relation spec says what it stands for.</li>
 </ul>
@@ -1170,7 +1174,11 @@ resolved from <code>context</code> (<code>lambda user: Author.objects.filter(own
 of the rows this caller may write. Without a scope the spec is create-only,
 and a payload carrying a <code>match_key</code> raises <code>ImproperlyConfigured</code> rather than
 letting any caller write any row of that model by guessing a key. A key
-outside the scope is refused with <code>ServiceValidationError</code>, at the row.</p>
+outside the scope is refused with <code>ServiceValidationError</code>, at the row, and so
+is one past the range of the integer column it is matched on, which no row
+holds, before the lookup hands it to the database. A <code>match_key</code> written as a
+path, <code>catalog__pk</code>, is held to the column the path ends on, and one naming a
+relation to the key of the row it reaches.</p>
 <p>What removing a row <em>does</em> is the <strong><code>orphan</code></strong> setting of a child collection,
 a reverse one-to-one or a generic relation. <code>"auto"</code>, the default, reads the
 schema: a nullable link is set to <code>None</code> (<strong>unlinked</strong>, like
@@ -1303,11 +1311,17 @@ impossible to cascade.</p>
 <p>A refusal inside a row is <strong>re-rooted under the row's address</strong>, in the tree
 <a href="../arguments/#the-refusal-tree">Arguments and refusals</a> describes, and keeps
 its class: a <code>ServiceValidationError</code> from a row stays one, an
-<code>InvalidArguments</code> stays one, because the class says who refused. A grandchild's
+<code>InvalidArguments</code> stays one, because the class says who refused. Its
+messages are kept as they were, each one's
+<a href="../arguments/#the-codes-a-refusal-carries">code</a> included. A grandchild's
 refusal carries both addresses.</p>
 <p>Django's own failures to write a row's data - a value a field cannot coerce, a
 key the model has no field for - carry no detail and would otherwise escape as
-an unhandled error naming no row. They become <code>InvalidArguments</code> at the row.</p>
+an unhandled error naming no row. They become <code>InvalidArguments</code> at the row.
+A <code>ValidationError</code> keeps each message's own code, which is the one DRF gives
+the same mistake, and its field names where it has them; a message raised
+with no code, and the message of a <code>TypeError</code> or <code>ValueError</code>, is coded
+<code>invalid</code>.</p>
 <p>Code the caller wrote is treated differently. Any other error a row service, a
 <code>scope</code> callable or an <code>m2m</code> callable raises passes through <strong>untouched</strong>, at
 any depth: reading its <code>TypeError</code> as a refusal of the arguments would report

@@ -1066,7 +1066,7 @@ principal refused in step two learns nothing about the rows it sent.</p>
 <tr>
 <td><code>"list"</code></td>
 <td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> write with no output selector whose service returned something</td>
-<td>The rows, a queryset when the selector returned one</td>
+<td>The rows, a queryset when the selector returned one, <code>[]</code> when a selector declaring <code>allow_none</code> returned <code>None</code></td>
 </tr>
 <tr>
 <td><code>"instance"</code></td>
@@ -1113,6 +1113,12 @@ found rather than refused: it does not exist for them.</p>
 nothing</strong>. The service has already run and, under <code>atomic</code>, committed, so
 reporting not-found would tell the caller the write did not happen. The value
 is <code>None</code> under <code>kind="instance"</code> instead.</p>
+<p>The output selector is called from the base pool plus the service's return,
+under two names: <code>result</code>, and <code>instance</code>, as djangorestframework-services
+binds it. They are one value, whatever the service returned, <code>None</code> included,
+so a re-read declares whichever its author wrote. <code>instance</code> there is what the
+service returned, not the target it acted on, which the result carries as
+<code>result.instance</code>.</p>
 <h2 id="presenting">Presenting<a class="headerlink" href="#presenting" title="Permanent link">&para;</a></h2>
 <p>Nothing is rendered by <code>dispatch</code>.
 <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a> renders a result
@@ -1186,7 +1192,13 @@ it says <code>target_checked=True</code>, which a transport can claim once it ha
 the row and run the object-level check itself, and which covers a service
 spec's target only when that target is handed to <code>dispatch</code> as <code>target=</code>;
 otherwise dispatch still runs <code>has_object_permission</code> on the row it resolves.
-A selector spec's claim covers whatever its selector returns. A grant stands in for neither
+<strong>On a selector spec the claim covers nothing</strong>: a selector spec takes no
+<code>target=</code>, so there is no row handed in to bind the claim to, and the row
+the arguments make the selector find may be one the transport never
+checked. Dispatch runs the check on the row the call returns, shaped and
+annotated, and the scope check on the list it returns, whatever the grant
+says, as djangorestframework-services checks the row its selector returned.
+A grant stands in for neither
 check that is not about permission: a deactivated principal is refused with
 one, and a write's affordances are still answered. And <strong>a grant cannot be
 serialized</strong>: pickling one raises <code>TypeError</code>, so it cannot ride a queue into a
@@ -1197,8 +1209,8 @@ re-authorizes by construction.</p>
 and <a class="autorefs autorefs-internal" title="authorize_scope" href="../reference/#django_service_specs.authorization.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
 are the three checks dispatch runs, exported for a transport that runs them
 itself; <code>authorize</code> returns the grant it honoured or a new one covering the
-spec and principal, and the other two are skipped under <code>target_checked</code>
-where the target was handed in as <code>target=</code>.</p>
+spec and principal, and dispatch skips the other two under <code>target_checked</code>
+only where a service spec's target was handed in as <code>target=</code>.</p>
 <h3 id="a-target-resolved-ahead-of-the-call">A target resolved ahead of the call<a class="headerlink" href="#a-target-resolved-ahead-of-the-call" title="Permanent link">&para;</a></h3>
 <p>A page that shows the row before the call acts on it - the form in front of
 an update, the confirmation in front of a delete - must show the row dispatch
@@ -1253,7 +1265,8 @@ target in agreement is the caller's.</p>
 or an agent's notion of who is asking carries an identifier.
 <a class="autorefs autorefs-internal" title="resolve_principal" href="../reference/#django_service_specs.authorization.resolve_principal.resolve_principal"><code>resolve_principal</code></a>
 is the one place that becomes a user row, and it refuses a missing, malformed
-or deactivated one with
+or deactivated one, or a key past its integer column's range, an infinite
+one included, with
 <a class="autorefs autorefs-internal" title="PrincipalUnavailable" href="../reference/#django_service_specs.authorization.principal_unavailable.PrincipalUnavailable"><code>PrincipalUnavailable</code></a>.
 It never falls back to an anonymous user: an operation dispatched with no
 resolvable principal has no principal, not an anonymous one. The stock
@@ -1463,10 +1476,14 @@ on the executor thread, and an <code>async def</code> run on an event loop.</p>
 service that declares <code>progress</code> runs unchanged on every transport and in
 tests. A spec's own <code>progress_reporter</code> provider adds a sink of the author's
 beside the transport's - a task record, an audit trail - for the run alone,
-called on its first report, or before an <code>async def</code> run once nothing can
-refuse the call. A service spec refused before its run never calls it; a
-selector spec's selector is its run, so one refused at its object check, its
-scope check or a precondition may already have. A target or output selector always gets <code>null_progress</code>: a lookup has
+and only for a run that takes <code>progress</code>: called on its first report, or
+before an <code>async def</code> run once nothing before the run can refuse the call. A
+call refused before its run never calls it, a selector spec's whose selector
+is refused a read the caller left out included. A selector spec's selector is
+its run, though, and its object check, scope check and preconditions answer
+what the run returned, so a selector spec refused at one of those may already
+have called it. The selector spec's affordance conditions, <code>extend_queryset</code>
+and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets <code>null_progress</code>: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.</p>
 
