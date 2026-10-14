@@ -40,8 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. A Validator whose library validates a list as one overrides it.
   An override returning values under any other name is refused, and one
   declared `async def` is refused when the spec is built.
-- **`ValidationContext.ambient`**: the call's resolved seeds, as a read-only
-  mapping - `user`, `progress` and every seed registered through
+- **`ValidationContext.ambient`**: the call's resolved seeds, as a mapping
+  read-only at its top level, whose values are the call's own live objects
+  and must not be mutated - `user`, `progress` and every seed registered through
   `PoolSeeds`, such as an HTTP adapter's `request` - so a library whose
   validation reads what its caller registered, as a serializer reads its
   context, finds it there. `dispatch` and `adispatch` fill it, on a single
@@ -54,8 +55,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Presenter can read the call it renders for. `dispatch` and `adispatch`
   carry a `PresentationContext` on the `DispatchResult` as `context` - the
   principal, the target a service spec resolved (`None` for a create and
-  for a selector spec), and the call's resolved seeds as a read-only
-  `ambient` - and `present`, `apresent` and `present_for_audience` hand it
+  for a selector spec), and the call's resolved seeds as `ambient`,
+  read-only at its top level, its values the call's own live objects - and `present`, `apresent` and `present_for_audience` hand it
   to `presented()` with each value. `presented()` is `present(value)` by
   default, so every existing Presenter is unchanged; one whose library
   renders under a context overrides it. A method of its own rather than a

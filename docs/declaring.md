@@ -490,8 +490,10 @@ methods, and a third method and an attribute with defaults:
   the row being updated. The context also says whether the call is
   [`partial`](#partial-updates), and carries the call's resolved seeds as
   `ambient`: `user`, `progress` and every seed registered through
-  `PoolSeeds`, such as an HTTP adapter's `request`, read-only, for a library
-  whose validation reads what its caller registered.
+  `PoolSeeds`, such as an HTTP adapter's `request`, for a library whose
+  validation reads what its caller registered. It is read-only at its top
+  level; its values are the call's own live objects, which a Validator must
+  not mutate.
 - `validated(arguments, context)` is what dispatch calls: a
   [`Validated`][django_service_specs.validation.validated.Validated] carrying
   the `values` the service is spread with, the call's `data`, and a `pool` of
@@ -603,7 +605,8 @@ the Validator:
   and the call's
   [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
   carrying its principal, the target a service spec resolved, and its
-  resolved seeds as `ambient`, read-only. The default is `present(value)`,
+  resolved seeds as `ambient`, read-only at its top level, its values the
+  call's own live objects, not to be mutated. The default is `present(value)`,
   so only a Presenter whose library renders under a context - a field
   defaulting to the current user, a link built from a request a transport
   registered as a seed - overrides it. Dispatch carries the context on the

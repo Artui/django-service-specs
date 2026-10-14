@@ -28,7 +28,11 @@ class ValidationContext:
 
     ``ambient`` is the call's base pool as dispatch resolved it: ``user``,
     ``progress`` and every registered seed - an HTTP adapter's ``request``,
-    a view it registers, a tenant - read-only. A library whose validation
+    a view it registers, a tenant - read-only at its top level. Its values
+    are the call's own live objects, the principal and the request
+    themselves, so a Validator must not mutate them
+    (test_the_validator_reads_the_registered_seeds_and_the_user holds both
+    halves). A library whose validation
     reads what its caller registered, as a serializer reads its context's
     ``request``, finds it here rather than in an argument. It never holds an
     argument, a validated value or the target, which have seats of their

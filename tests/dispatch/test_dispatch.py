@@ -4088,6 +4088,23 @@ class TestOverlays:
         dispatch(spec, principal=ada, arguments={"title": "T"}, extra_kwargs={"scope": "view"})
         assert service.calls[0]["scope"] == "validated"
 
+    def test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing(
+        self, ada: Any
+    ) -> None:
+        """The caller's dict is changed while the call runs, here by a check;
+        the run still sees the overlay as it was on entry."""
+        extra = {"tag": "view"}
+
+        class Changing(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any) -> bool:
+                extra["tag"] = "changed"
+                return True
+
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=(Changing(),))
+        dispatch(spec, principal=ada, arguments={}, extra_kwargs=extra)
+        assert (extra["tag"], service.calls[0]["tag"]) == ("changed", "view")
+
     def test_a_selector_spec_s_read_is_refused_as_a_service_spec_s_is(self, ada: Any) -> None:
         with pytest.raises(ImproperlyConfigured, match="which the SelectorSpec declares"):
             dispatch(retrieve(), principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})

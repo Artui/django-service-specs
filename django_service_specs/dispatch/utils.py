@@ -184,8 +184,9 @@ class Prepared:
     # The Validator's ``data``: a mapping, or the instance a dataclass one builds.
     data: Any
     kwargs: dict[str, Any]
-    # The call's base pool, read-only: what the Validator's context and the
-    # presenter's carry as ``ambient``.
+    # The call's base pool, read-only at its top level, its values the call's
+    # own live objects: what the Validator's context and the presenter's carry
+    # as ``ambient``.
     ambient: Mapping[str, Any]
 
 
@@ -1178,7 +1179,7 @@ def validate_arguments(
 
     ``ValidationContext.partial`` is the spec's ``partial``, and its
     ``ambient`` is ``ambient``: the call's base pool behind a read-only
-    proxy, or empty for a caller with no seeds (``bind_arguments``). A spec
+    proxy over its top level, whose values are the call's own, or empty for a caller with no seeds (``bind_arguments``). A spec
     with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.

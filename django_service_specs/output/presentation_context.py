@@ -25,9 +25,13 @@ class PresentationContext:
     - ``principal`` is who the call ran for.
     - ``target`` is the row or the queryset a service spec resolved, ``None``
       for a create and for a selector spec, whose rows are the value itself.
-    - ``ambient`` is the call's base pool, read-only: ``user``, ``progress``
-      and every registered seed, such as an HTTP adapter's ``request``. Never
-      an argument, a validated value or a provider's key.
+    - ``ambient`` is the call's base pool, read-only at its top level:
+      ``user``, ``progress`` and every registered seed, such as an HTTP
+      adapter's ``request``. Its values are the call's own live objects, so a
+      presenter must not mutate them
+      (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context
+      holds both halves). Never an argument, a validated value or a
+      provider's key.
     """
 
     principal: Any

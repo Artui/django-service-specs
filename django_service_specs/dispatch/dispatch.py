@@ -223,6 +223,9 @@ def dispatch(
     """
     spec = kernel_spec(spec)
     refuse_target(spec, target)
+    # Copied on entry, so a change to the caller's dict while the call runs -
+    # by a check, say - reaches nothing the run sees
+    # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
     overlay = Overlay(dict(extra_kwargs or {}))
     if isinstance(spec, SelectorSpec):
         checked, granted = open_call(
