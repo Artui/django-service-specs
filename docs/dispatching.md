@@ -303,14 +303,16 @@ and passes the row it resolved as `target`, or `None` for a create.
 
 ## Checking a call before it runs
 
-A transport that accepts a call now and runs it later - a task queue - should
-refuse at enqueue what the worker's `dispatch` would refuse, rather than
-accept a job that can only fail.
+A transport that accepts a call now and runs it later - a task queue - can
+refuse at enqueue what the worker's `dispatch` would refuse before it resolves
+anything.
 [`check_call`][django_service_specs.dispatch.check_call.check_call] runs
 dispatch's prelude alone, through the same function, in dispatch's order: a
 deactivated principal, a parameter a registered seed occupies, the shape check,
 then the class-level permission check. Its keywords are dispatch's, less what
-only a run reads.
+only a run reads. Nothing after the prelude runs - no lookup, object or scope
+check, Validator, affordance or precondition - so a call it passes may still
+be refused when it runs.
 
 ```python
 --8<--

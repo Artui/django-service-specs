@@ -21,7 +21,7 @@ from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.unknown_arguments import UnknownArguments
-from tests.dispatch.utils import OPEN, PK, TENANT_SEEDS, Record, Refuse, Titled, make_user
+from tests.dispatch.utils import OPEN, PK, TENANT_SEEDS, Record, Refuse, Scoped, Titled, make_user
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign
 
@@ -240,3 +240,15 @@ def test_a_pk_read_is_checked_as_declared(ada: Any) -> None:
     with pytest.raises(InvalidArguments) as caught:
         check_call(spec, principal=ada, arguments={})
     assert caught.value.detail == {"pk": ["This field is required."]}
+
+
+def test_a_scope_check_is_left_to_dispatch(ada: Any) -> None:
+    # Nothing after the prelude runs: a create whose scope check refuses
+    # passes here, and is refused when dispatch runs it.
+    check = Scoped(refuse_scope=True)
+    spec = ServiceSpec(service=Record(), permissions=[check])
+
+    check_call(spec, principal=ada, arguments={})
+    assert check.scopes == []
+    with pytest.raises(NotPermitted, match="Not within your scope."):
+        dispatch(spec, principal=ada, arguments={})

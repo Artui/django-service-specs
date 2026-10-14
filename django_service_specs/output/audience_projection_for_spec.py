@@ -14,8 +14,10 @@ from django_service_specs.output.output import Output
 from django_service_specs.specs.spec_source import SpecSource, kernel_spec
 
 if TYPE_CHECKING:
-    # Annotation-only: ``specs/`` imports ``output/`` for the presenter and the
-    # ``Output`` it declares, and this reads only ``spec.output()``.
+    # Annotation-only, as ``specs/`` imports ``output/`` for the presenter and
+    # the ``Output`` it declares. ``spec_source`` is imported at run time, for
+    # ``kernel_spec``: the package root loads ``output/`` before ``specs/``,
+    # through the adapters, so that edge resolves on every import order.
     from django_service_specs.specs.selector_spec import SelectorSpec
     from django_service_specs.specs.service_spec import ServiceSpec
 

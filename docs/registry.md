@@ -34,12 +34,13 @@ The `spec` may also be any object with an `as_kernel_spec()` method, a
 [`SpecSource`][django_service_specs.specs.spec_source.SpecSource]:
 djangorestframework-services' spec is one. It is registered as it is, with no
 wrapper, and kept as registered, so `entry.spec` and `specs()` hand back the
-object itself. Every entry point that takes a spec - `dispatch`,
-`adispatch`, `present`, `resolve_target`, the affordance functions,
-`spec_input_schema`, `audience_projection_for_spec` - takes it too, and
+object itself. `dispatch`, `adispatch`, `check_call`, `present`, `apresent`,
+`resolve_target`, the three affordance functions, `spec_input_schema` and
+`audience_projection_for_spec` take it as they take a spec, and
 [`kernel_spec`][django_service_specs.specs.spec_source.kernel_spec] is how a
-transport reads the spec it compiles to. It is compiled once per object, the
-first time anything reads it, and that compiled spec answers every later call.
+transport reads the spec it compiles to anywhere else. It is compiled the
+first time anything reads it, and that compiled spec answers every later call
+for the same object.
 
 The entry answers a read-only `agent_contract`: the registered object's own
 `agent_contract()` when it has one, and `None` otherwise, which is every

@@ -26,8 +26,11 @@ def check_call(
     """``dispatch``'s prelude, run alone: the checked arguments and the grant, or its refusal.
 
     For a transport that answers a call before it runs - a task queue
-    refusing at enqueue what the worker's ``dispatch`` would refuse, rather
-    than accepting a job that can only fail. The steps are
+    refusing at enqueue what the worker's ``dispatch`` would refuse before it
+    resolves anything. Only that: no lookup runs, so no object or scope
+    check, no Validator, no affordance and no precondition, and a call this
+    passes may still be refused by ``dispatch`` at any of those
+    (test_a_scope_check_is_left_to_dispatch). The steps are
     [`dispatch`][django_service_specs.dispatch.dispatch.dispatch]'s own, in
     its order, and the same function runs them for both, so the two cannot
     drift apart:

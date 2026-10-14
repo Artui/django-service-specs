@@ -8,23 +8,28 @@ import pytest
 from django_service_specs.specs import spec_source
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import kernel_spec
 from tests.dispatch.utils import OPEN, notes_of
 from tests.specs.utils import Foreign
 
 LISTING = SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN)
+WRITING = ServiceSpec(service=print, permissions=OPEN)
+BOTH_KINDS = pytest.mark.parametrize("spec", [LISTING, WRITING], ids=["selector", "service"])
 
 
-def test_a_kernel_spec_is_its_own_kernel_spec_and_is_not_cached() -> None:
+@BOTH_KINDS
+def test_a_kernel_spec_is_its_own_kernel_spec_and_is_not_cached(spec: Any) -> None:
     before = dict(spec_source._COMPILED)
-    assert kernel_spec(LISTING) is LISTING
+    assert kernel_spec(spec) is spec
     assert before == spec_source._COMPILED
 
 
-def test_a_source_is_compiled_once_and_answers_the_same_spec_every_time() -> None:
-    source = Foreign(LISTING)
-    assert kernel_spec(source) is LISTING
-    assert kernel_spec(source) is LISTING
+@BOTH_KINDS
+def test_a_source_is_compiled_once_and_answers_the_same_spec_every_time(spec: Any) -> None:
+    source = Foreign(spec)
+    assert kernel_spec(source) is spec
+    assert kernel_spec(source) is spec
     assert source.compiles == [1]
 
 

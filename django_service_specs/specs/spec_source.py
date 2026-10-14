@@ -1,8 +1,11 @@
 """``SpecSource`` - a declaration of another library's that compiles to a spec of this one.
 
-Every entry point that takes a spec takes one of these too, and reads it
-through ``kernel_spec``: the one place it is compiled, and cached, so a
-declaration is compiled once per object however many entry points read it.
+``dispatch``, ``adispatch``, ``check_call``, ``present``, ``apresent``,
+``resolve_target``, the registry, the three affordance functions,
+``spec_input_schema`` and ``audience_projection_for_spec`` take one of these
+as they take a spec, and read it through ``kernel_spec``: the one place it is
+compiled, and cached, so every entry point reading one object reads the same
+compiled spec.
 """
 
 from __future__ import annotations
@@ -31,10 +34,12 @@ class SpecSource(Protocol):
     registry, the schemas and the rest as it is, with no wrapper of this
     package's around it.
 
-    ``as_kernel_spec()`` is called once per object, the first time any entry
-    point reads it, and its answer is used for every later call: the object
-    is read as a declaration, and a change to it after that first read is not
-    seen. One compiled spec per object is also what lets a
+    ``as_kernel_spec()`` is called the first time any entry point reads the
+    object, and the compiled spec it answers is the one every later call
+    reads: the object is read as a declaration, and a change to it after that
+    first read is not seen. Two first reads that overlap - concurrent, or a
+    compile that reads its own object - may each compile, and both answer the
+    spec published first. One compiled spec per object is also what lets a
     [`Grant`][django_service_specs.authorization.grant.Grant], bound to a spec
     by identity, carry from ``resolve_target`` to ``dispatch`` when both are
     handed the same object.
@@ -64,6 +69,10 @@ def kernel_spec(spec: ServiceSpec | SelectorSpec | SpecSource) -> ServiceSpec | 
             object forever; or ``as_kernel_spec()`` answered something that
             is not a ``ServiceSpec`` or ``SelectorSpec``.
     """
+    # One arc to coverage per union, so each member is held by a case of its
+    # own: test_a_kernel_spec_is_its_own_kernel_spec_and_is_not_cached here,
+    # and test_a_source_is_compiled_once_and_answers_the_same_spec_every_time
+    # for the compiled spec's check below, each run for both kinds.
     if isinstance(spec, ServiceSpec | SelectorSpec):
         return spec
     compile_spec = getattr(spec, "as_kernel_spec", None)
