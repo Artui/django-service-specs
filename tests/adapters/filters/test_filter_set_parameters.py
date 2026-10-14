@@ -14,20 +14,20 @@ from django.core.exceptions import ImproperlyConfigured
 from django.http import HttpRequest
 from django.test import RequestFactory
 
+from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.dispatch.dispatch import dispatch
-from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.selectors.shape_queryset import shape_queryset
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
+from tests.adapters.filters.utils import NoteFilters, NumberInFilter, UserFilters, notes
 from tests.dispatch.utils import Refuse, make_user
 from tests.dispatch_app.models import Note
-from tests.filters.utils import NoteFilters, NumberInFilter, UserFilters, notes
 from tests.parameters.utils import coded
 
 CSV_HELP = "Multiple values may be separated by commas."

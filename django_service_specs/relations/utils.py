@@ -34,8 +34,8 @@ from django.db.models import ForeignObjectRel, IntegerField, Model
 from django.db.models.constants import LOOKUP_SEP
 from django.db.models.fields.related import RelatedField
 
-from django_service_specs.relations.relation_mode import RelationMode
-from django_service_specs.relations.relation_orphan import RelationOrphan
+from django_service_specs.types.relation_mode import RelationMode
+from django_service_specs.types.relation_orphan import RelationOrphan
 
 VALID_RELATION_MODES = tuple(mode.value for mode in RelationMode)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from typing import Any
 
-from django_service_specs.filters.utils import import_django_filters, range_suffixes
+from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 

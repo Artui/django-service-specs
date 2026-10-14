@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING, Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.types.field_audience import FieldAudience
 
 if TYPE_CHECKING:
     # Annotation-only, as ``specs/`` imports ``output/`` for the presenter and

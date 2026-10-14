@@ -120,7 +120,7 @@ docs/examples/declaring.py:selector
 --8<--
 ```
 
-`kind` is [`SelectorKind.LIST`][django_service_specs.specs.selector_kind.SelectorKind]
+`kind` is [`SelectorKind.LIST`][django_service_specs.types.selector_kind.SelectorKind]
 or `RETRIEVE`. A retrieve returns one row: a queryset is read with `.first()`,
 a `DoesNotExist` raised by a selector written with `.get()` means the same
 missing row, and a missing row is reported as not-found unless the spec sets
@@ -152,7 +152,7 @@ filter. A duck-typed stand-in taking `(data, queryset)` declares its filters
 in `base_filters`, and a step narrowing the queryset by no argument belongs
 in `extend_queryset`. A real `FilterSet` declaring no filters is accepted,
 and narrows nothing. Its filters are reads: each is read as a Parameter by
-[`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
+[`filter_set_parameters`][django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters]
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument
 set and the shape check cover every filter, and a filter named like a read
@@ -585,7 +585,7 @@ An `OutputField` carries what a reader needs beyond a name and a type: a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying
 who the field is for. The
-[`FieldAudience`][django_service_specs.output.field_audience.FieldAudience] is
+[`FieldAudience`][django_service_specs.types.field_audience.FieldAudience] is
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read
 out to a person, and `HIDDEN` for plumbing. A marking may also carry a

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.utils import unknown_arguments_policy
 
 

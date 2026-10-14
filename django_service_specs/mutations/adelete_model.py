@@ -15,7 +15,7 @@ def adelete_model(
     soft_delete: Callable[[ModelT], Awaitable[None]] | None = None,
     relations: Mapping[str, RelationSpec] | None = None,
 ) -> Callable[..., Awaitable[None]]:
-    """The async twin of [`delete_model`][django_service_specs.services.delete_model.delete_model].
+    """The async twin of [`delete_model`][django_service_specs.mutations.delete_model.delete_model].
 
     Deletes with ``await instance.adelete()``, after the cascade
     [`adelete_relations`][django_service_specs.mutations.adelete_relations.adelete_relations]

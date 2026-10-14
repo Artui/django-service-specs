@@ -11,12 +11,11 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Prefetch, QuerySet
 from typing_extensions import Self
 
+from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.authorization.permission_check import PermissionCheck
-from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.utils import (
     check_callable,
     check_metadata,
@@ -26,6 +25,7 @@ from django_service_specs.specs.utils import (
     check_providers,
     check_reserved,
 )
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import affordance_alias
 
 if TYPE_CHECKING:
@@ -44,7 +44,7 @@ class SelectorSpec:
 
     Attributes:
         kind: ``LIST`` or ``RETRIEVE``; see
-            [`SelectorKind`][django_service_specs.specs.selector_kind.SelectorKind].
+            [`SelectorKind`][django_service_specs.types.selector_kind.SelectorKind].
         selector: The read itself. Called with the keywords it declares, from
             the principal (``user``), any registered pool seed, and the arguments
             ``reads`` declares. It may be ``async def``: the selector is this
@@ -88,7 +88,7 @@ class SelectorSpec:
             argument belongs in ``extend_queryset``. A real ``FilterSet``
             declaring none is accepted and narrows nothing. Its filters are
             reads: read as Parameters by
-            [`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
+            [`filter_set_parameters`][django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters]
             and added to ``reads`` after the author's own, so the schema, the
             closed argument set and the shape check all cover them, and a
             filter named like a read declared differently is refused here. Its

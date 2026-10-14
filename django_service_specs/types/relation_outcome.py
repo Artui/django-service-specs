@@ -19,7 +19,7 @@ class RelationOutcome(str, Enum):
 
     Inheriting from ``str`` keeps the value JSON-serializable and lets a caller
     compare against the plain string, matching
-    [`SelectorKind`][django_service_specs.specs.selector_kind.SelectorKind].
+    [`SelectorKind`][django_service_specs.types.selector_kind.SelectorKind].
     """
 
     UNTOUCHED = "untouched"

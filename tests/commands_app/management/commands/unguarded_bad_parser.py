@@ -7,8 +7,8 @@ from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.registry.spec_registry import SpecRegistry
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
 
 
 def _noop() -> None:

@@ -10,8 +10,8 @@ from django_service_specs.authorization.authorize_scope import authorize_scope
 from django_service_specs.authorization.grant import Grant
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
-from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import AnswersWith, refuses
 from tests.specs.utils import Foreign
 

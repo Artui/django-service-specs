@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from django_service_specs.mutations.relation_outcome import RelationOutcome
+from django_service_specs.types.relation_outcome import RelationOutcome
 
 
 @dataclass(frozen=True)

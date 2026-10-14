@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.relations.relation_orphan import RelationOrphan
 from django_service_specs.relations.utils import (
     pk_input_targets,
     validate_pk_field_map,
     validate_relation_orphan,
 )
+from django_service_specs.types.relation_orphan import RelationOrphan
 from tests.relations_app.models import Author, Profile
 
 

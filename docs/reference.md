@@ -30,7 +30,6 @@ Two Django settings, each read at the call rather than at import, so
 
 ::: django_service_specs.specs.service_spec.ServiceSpec
 ::: django_service_specs.specs.selector_spec.SelectorSpec
-::: django_service_specs.specs.selector_kind.SelectorKind
 ::: django_service_specs.specs.spec_source.SpecSource
 ::: django_service_specs.specs.kernel_spec.kernel_spec
 
@@ -50,7 +49,6 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.validation.validated.Validated
 
 ::: django_service_specs.validation.validation_context.ValidationContext
-::: django_service_specs.validation.unknown_arguments.UnknownArguments
 
 ## Output
 
@@ -58,7 +56,6 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.output.output.Output
 ::: django_service_specs.output.output_field.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking
-::: django_service_specs.output.field_audience.FieldAudience
 ::: django_service_specs.output.audience_projection.AudienceProjection
 ::: django_service_specs.output.audience_projection_for_spec.audience_projection_for_spec
 ::: django_service_specs.output.project_payload.project_payload
@@ -80,6 +77,10 @@ Two Django settings, each read at the call rather than at import, so
 ## Forms adapter
 
 ::: django_service_specs.adapters.forms.form_validator.FormValidator
+
+## Filters adapter
+
+::: django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters
 
 ## Pydantic adapters
 
@@ -141,7 +142,6 @@ Installed with the `pydantic` extra and imported from
 
 ::: django_service_specs.services.run_service.run_service
 ::: django_service_specs.services.arun_service.arun_service
-::: django_service_specs.services.is_async.is_async
 ::: django_service_specs.services.service_error.ServiceError
 ::: django_service_specs.services.service_validation_error.ServiceValidationError
 ::: django_service_specs.services.service_conflict.ServiceConflict
@@ -152,14 +152,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.services.update_service.UpdateService
 ::: django_service_specs.services.delete_service.DeleteService
 ::: django_service_specs.services.implements.implements
-::: django_service_specs.services.create_model.create_model
-::: django_service_specs.services.acreate_model.acreate_model
-::: django_service_specs.services.update_model.update_model
-::: django_service_specs.services.aupdate_model.aupdate_model
-::: django_service_specs.services.delete_model.delete_model
-::: django_service_specs.services.adelete_model.adelete_model
-::: django_service_specs.services.delete_collection.delete_collection
-::: django_service_specs.services.adelete_collection.adelete_collection
 
 ## Pool
 
@@ -187,7 +179,14 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.mutations.field_change.FieldChange
 ::: django_service_specs.mutations.child_collection_change.ChildCollectionChange
 ::: django_service_specs.mutations.related_object_change.RelatedObjectChange
-::: django_service_specs.mutations.relation_outcome.RelationOutcome
+::: django_service_specs.mutations.create_model.create_model
+::: django_service_specs.mutations.acreate_model.acreate_model
+::: django_service_specs.mutations.update_model.update_model
+::: django_service_specs.mutations.aupdate_model.aupdate_model
+::: django_service_specs.mutations.delete_model.delete_model
+::: django_service_specs.mutations.adelete_model.adelete_model
+::: django_service_specs.mutations.delete_collection.delete_collection
+::: django_service_specs.mutations.adelete_collection.adelete_collection
 
 ## Relations
 
@@ -197,9 +196,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.relations.reverse_one_to_one_spec.ReverseOneToOneSpec
 ::: django_service_specs.relations.many_to_many_spec.ManyToManySpec
 ::: django_service_specs.relations.generic_relation_spec.GenericRelationSpec
-::: django_service_specs.relations.relation_mode.RelationMode
-::: django_service_specs.relations.relation_orphan.RelationOrphan
-::: django_service_specs.relations.relation_phase.RelationPhase
 
 ## Registry
 
@@ -235,10 +231,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.report.unguarded_spec.UnguardedSpec
 ::: django_service_specs.commands.report.unguarded_message.unguarded_message
 
-## Filters
-
-::: django_service_specs.filters.filter_set_parameters.filter_set_parameters
-
 ## Types
 
 ::: django_service_specs.types.dispatch_error.DispatchError
@@ -252,3 +244,11 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.no_input.NoInput
 ::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
+::: django_service_specs.types.selector_kind.SelectorKind
+::: django_service_specs.types.field_audience.FieldAudience
+::: django_service_specs.types.unknown_arguments.UnknownArguments
+::: django_service_specs.types.relation_mode.RelationMode
+::: django_service_specs.types.relation_orphan.RelationOrphan
+::: django_service_specs.types.relation_phase.RelationPhase
+::: django_service_specs.types.relation_outcome.RelationOutcome
+::: django_service_specs.types.is_async.is_async

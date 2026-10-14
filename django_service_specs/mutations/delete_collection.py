@@ -24,7 +24,7 @@ def delete_collection(
     key's ``on_delete`` and sends ``pre_delete`` and ``post_delete`` for every
     row, as a single row's delete does. An empty collection deletes nothing, so
     running the operation twice is harmless. ``model`` is not read,
-    as in [`delete_model`][django_service_specs.services.delete_model.delete_model].
+    as in [`delete_model`][django_service_specs.mutations.delete_model.delete_model].
 
     ``soft_delete`` is called with the ``collection`` *instead of* ``delete()``,
     as in ``lambda rows: rows.update(is_archived=True)``. The service opens no

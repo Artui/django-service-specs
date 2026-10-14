@@ -14,7 +14,7 @@ class AsyncSelector(Protocol):
     To a type checker the two Protocols differ in the return, an awaitable
     here. An ``isinstance`` check cannot tell them apart, since both ask only
     whether the object is callable;
-    [`is_async`][django_service_specs.services.is_async.is_async] is the run-time
+    [`is_async`][django_service_specs.types.is_async.is_async] is the run-time
     question.
     """
 

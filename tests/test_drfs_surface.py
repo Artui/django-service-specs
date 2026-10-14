@@ -168,7 +168,7 @@ SURFACE: dict[str, Pin] = {
         "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
     ),
     # --- filters ------------------------------------------------------------------------------
-    "filter_set_parameters": _fn("filters.filter_set_parameters", "filter_set"),
+    "filter_set_parameters": _fn("adapters.filters.filter_set_parameters", "filter_set"),
     # --- mutations ----------------------------------------------------------------------------
     "apply_input": _fn("mutations.apply_input", "instance, data, *, field_map=, exclude_fields="),
     "create_from_input": _fn(
@@ -212,7 +212,7 @@ SURFACE: dict[str, Pin] = {
         "mutations.related_object_change", signature="relation, outcome=, pk="
     ),
     "RelationOutcome": _enum(
-        "mutations.relation_outcome",
+        "types.relation_outcome",
         {
             "UNTOUCHED": "untouched",
             "CREATED": "created",
@@ -249,7 +249,7 @@ SURFACE: dict[str, Pin] = {
         },
     ),
     "FieldAudience": _enum(
-        "output.field_audience",
+        "types.field_audience",
         {"CONTENT": "content", "LABEL": "label", "HANDLE": "handle", "HIDDEN": "hidden"},
         str,
     ),
@@ -366,12 +366,12 @@ SURFACE: dict[str, Pin] = {
         "create_service=, update_service=, delete_service=",
         bases=("RelationSpec",),
     ),
-    "RelationMode": _enum("relations.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
+    "RelationMode": _enum("types.relation_mode", {"REPLACE": "replace", "MERGE": "merge"}, str),
     "RelationOrphan": _enum(
-        "relations.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
+        "types.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
     ),
     "RelationPhase": _enum(
-        "relations.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
+        "types.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
     ),
     # --- schema -------------------------------------------------------------------------------
     "can_present_nothing": _fn("schema.can_present_nothing", "spec"),
@@ -407,27 +407,27 @@ SURFACE: dict[str, Pin] = {
     "UpdateService": _protocol("services.update_service", "(*, instance, data, **extras)"),
     "DeleteService": _protocol("services.delete_service", "(*, instance, data=, **extras)"),
     "implements": _fn("services.implements", "proto"),
-    "is_async": _fn("services.is_async", "fn"),
+    "is_async": _fn("types.is_async", "fn"),
     "run_service": _fn("services.run_service", "fn, kwargs, *, atomic"),
     "arun_service": _fn("services.arun_service", "fn, kwargs, *, atomic"),
     "create_model": _fn(
-        "services.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
+        "mutations.create_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
     ),
     "acreate_model": _fn(
-        "services.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
+        "mutations.acreate_model", "model, *, field_map=, exclude_fields=, m2m=, relations="
     ),
     "update_model": _fn(
-        "services.update_model",
+        "mutations.update_model",
         "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
     ),
     "aupdate_model": _fn(
-        "services.aupdate_model",
+        "mutations.aupdate_model",
         "model, *, field_map=, exclude_fields=, m2m=, update_fields=, relations=",
     ),
-    "delete_model": _fn("services.delete_model", "model, *, soft_delete=, relations="),
-    "adelete_model": _fn("services.adelete_model", "model, *, soft_delete=, relations="),
-    "delete_collection": _fn("services.delete_collection", "model, *, soft_delete="),
-    "adelete_collection": _fn("services.adelete_collection", "model, *, soft_delete="),
+    "delete_model": _fn("mutations.delete_model", "model, *, soft_delete=, relations="),
+    "adelete_model": _fn("mutations.adelete_model", "model, *, soft_delete=, relations="),
+    "delete_collection": _fn("mutations.delete_collection", "model, *, soft_delete="),
+    "adelete_collection": _fn("mutations.adelete_collection", "model, *, soft_delete="),
     # --- specs --------------------------------------------------------------------------------
     # The adapter's spec classes compile to these two through the seam below.
     "ServiceSpec": Pin(
@@ -451,7 +451,7 @@ SURFACE: dict[str, Pin] = {
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "()", "output": "()"},
     ),
-    "SelectorKind": _enum("specs.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
+    "SelectorKind": _enum("types.selector_kind", {"LIST": "list", "RETRIEVE": "retrieve"}, str),
     # The compile seam: every entry point takes an object answering as_kernel_spec().
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),
@@ -478,7 +478,7 @@ SURFACE: dict[str, Pin] = {
     ),
     # --- validation ---------------------------------------------------------------------------
     "UnknownArguments": _enum(
-        "validation.unknown_arguments",
+        "types.unknown_arguments",
         {"REJECT": "reject", "IGNORE": "ignore", "PASSTHROUGH": "passthrough"},
         str,
     ),

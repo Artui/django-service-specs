@@ -5,8 +5,8 @@ import dataclasses
 import pytest
 
 from django_service_specs.output.audience_projection import AudienceProjection
-from django_service_specs.output.field_audience import FieldAudience
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
 
 MONEY = ValueFormatter(str, produces="string")

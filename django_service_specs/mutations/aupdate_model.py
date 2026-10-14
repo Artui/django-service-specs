@@ -18,7 +18,7 @@ def aupdate_model(
     update_fields: bool | list[str] = True,
     relations: Mapping[str, RelationSpec] | None = None,
 ) -> Callable[..., Awaitable[ModelT]]:
-    """The async twin of [`update_model`][django_service_specs.services.update_model.update_model].
+    """The async twin of [`update_model`][django_service_specs.mutations.update_model.update_model].
 
     An ``async def`` service over
     [`aupdate_from_input`][django_service_specs.mutations.aupdate_from_input.aupdate_from_input].

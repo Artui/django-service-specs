@@ -23,8 +23,8 @@ from django_service_specs.mutations.utils import (
     relations_in_phase,
 )
 from django_service_specs.relations.child_spec import ChildSpec
-from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
+from django_service_specs.types.relation_phase import RelationPhase
 from tests.relations_app.models import Catalog, Item, Note, Section
 
 

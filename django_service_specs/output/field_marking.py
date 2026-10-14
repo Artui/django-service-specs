@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django_service_specs.output.field_audience import FieldAudience
+from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.value_formatter import ValueFormatter
 
 

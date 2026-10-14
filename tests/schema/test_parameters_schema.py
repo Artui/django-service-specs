@@ -20,7 +20,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.schema.parameters_schema import parameters_schema
-from django_service_specs.validation.unknown_arguments import UnknownArguments
+from django_service_specs.types.unknown_arguments import UnknownArguments
 
 PUBLISHER = Parameters.of(Parameter("name", "string", required=True))
 BOOK = Parameters.of(
