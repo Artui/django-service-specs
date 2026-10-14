@@ -19,8 +19,8 @@ from django.db.models.signals import post_save
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
+from django_service_specs.mutations.nested_writes import acascade_owned, cascade_owned
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import acascade_owned, cascade_owned
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec

@@ -6,21 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.mutations.change_result import ChangeResult, ModelT
-from django_service_specs.mutations.utils import (
-    apply_forward_relations,
-    apply_m2m,
-    apply_relations,
-    changes_for_create,
-    coerce_to_dict,
-    extract_relation_data,
-    filter_input,
-    form_values,
-    m2m_changes,
-    reject_m2m_overlap,
-    relation_map,
-    split_file_values,
-    write_values,
-)
+from django_service_specs.mutations.nested_writes import create_instance
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -63,36 +49,12 @@ def create_from_input(
     helper never reads it — it exists so per-row work downstream can see the acting
     caller. A service opts in by handing on the pool it was called with,
     ``context=kwargs``."""
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
+    return create_instance(
+        model,
+        data,
         field_map=field_map,
         exclude_fields=exclude_fields,
-    )
-    forward_values, forward_changes = apply_forward_relations(
-        relation_data, relation_specs, context=context
-    )
-    new_values.update(forward_values)
-    new_values = form_values(model, new_values)
-    # Built as ``construct_instance`` builds a ModelForm's row: the file
-    # fields written last, through ``save_form_data``.
-    plain_values, file_values = split_file_values(model, new_values)
-    instance: ModelT = model(**plain_values)
-    write_values(instance, file_values)
-    instance.save()
-    field_changes = changes_for_create(new_values)
-    m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=True)
-    apply_m2m(instance, to_apply)
-    child_changes, related_changes = apply_relations(
-        instance, relation_data, relation_specs, created=True, context=context
-    )
-    return ChangeResult(
-        instance=instance,
-        created=True,
-        changes=field_changes + m2m_field_changes,
-        children=child_changes,
-        relations=forward_changes + related_changes,
+        m2m=m2m,
+        relations=relations,
+        context=context,
     )

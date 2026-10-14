@@ -16,7 +16,7 @@ import pytest
 
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.create_from_input import create_from_input
-from django_service_specs.mutations.utils import _RowPath
+from django_service_specs.mutations.nested_writes import _RowPath
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec

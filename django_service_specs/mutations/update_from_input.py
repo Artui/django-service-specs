@@ -6,24 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.mutations.change_result import ChangeResult, ModelT
-from django_service_specs.mutations.utils import (
-    apply_forward_relations,
-    apply_m2m,
-    apply_relations,
-    auto_now_field_names,
-    coerce_to_dict,
-    diff_attrs,
-    dimension_field_names,
-    extract_relation_data,
-    filter_input,
-    form_values,
-    m2m_changes,
-    reject_m2m_overlap,
-    relation_map,
-    resolve_update_fields,
-    sync_relation_cache,
-    write_values,
-)
+from django_service_specs.mutations.nested_writes import update_instance
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -81,44 +64,13 @@ def update_from_input(
     helper never reads it. See
     [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input].
     """
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
+    return update_instance(
+        instance,
+        data,
         field_map=field_map,
         exclude_fields=exclude_fields,
-    )
-    forward_values, forward_changes = apply_forward_relations(
-        relation_data, relation_specs, context=context
-    )
-    new_values.update(forward_values)
-    new_values = form_values(type(instance), new_values)
-    field_changes = diff_attrs(instance, new_values)
-    write_values(instance, {change.field: change.new for change in field_changes})
-    for relation, target in forward_values.items():
-        sync_relation_cache(instance, relation, target)
-    m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=False)
-    changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
-    save_fields: list[str] | None = resolve_update_fields(
-        update_fields,
-        changed_field_names,
-        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
-    )
-    if field_changes or update_fields is False:
-        if save_fields is None:
-            instance.save()
-        else:
-            instance.save(update_fields=save_fields)
-    apply_m2m(instance, to_apply)
-    child_changes, related_changes = apply_relations(
-        instance, relation_data, relation_specs, created=False, context=context
-    )
-    return ChangeResult(
-        instance=instance,
-        created=False,
-        changes=field_changes + m2m_field_changes,
-        children=child_changes,
-        relations=forward_changes + related_changes,
+        m2m=m2m,
+        update_fields=update_fields,
+        relations=relations,
+        context=context,
     )
