@@ -45,7 +45,10 @@ pip install django-service-specs
 
 The package has no models and needs no entry in `INSTALLED_APPS`. A principal
 is a user of `django.contrib.auth`, and a generic-relation write needs
-`django.contrib.contenttypes`.
+`django.contrib.contenttypes`. Listing `"django_service_specs"` there is
+optional, and adds one system check: every spec a management command serves
+that authorizes nothing is [reported](registry.md#open-specs-reported) by
+`manage.py check`.
 
 | | Minimum |
 | --- | --- |
