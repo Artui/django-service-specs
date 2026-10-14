@@ -33,5 +33,7 @@ class PresentationContext:
     principal: Any
     target: Any = None
     # Excluded from equality, as on ``ValidationContext``: a mapping proxy
-    # cannot be hashed, and two contexts of one call are one context.
+    # cannot be hashed, and two contexts of one call are one context. Held by
+    # test_two_contexts_differing_in_ambient_alone_are_equal and
+    # test_a_context_carrying_ambient_values_is_hashable_where_its_target_is.
     ambient: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)

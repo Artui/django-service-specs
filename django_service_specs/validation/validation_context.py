@@ -40,5 +40,7 @@ class ValidationContext:
     target: Any = None
     partial: bool = False
     # Excluded from equality: two contexts of one call are one context whatever
-    # the seeds resolved to, and a mapping proxy cannot be hashed.
+    # the seeds resolved to, and a mapping proxy cannot be hashed. Held by
+    # test_two_contexts_differing_in_ambient_alone_are_equal and
+    # test_a_context_carrying_ambient_values_is_hashable.
     ambient: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)
