@@ -21,8 +21,8 @@ import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_spec import UnguardedSpec
+from django_service_specs.commands.report.unguarded_message import unguarded_message
+from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from docs.examples import commands
 from tests.dispatch_app.models import Note

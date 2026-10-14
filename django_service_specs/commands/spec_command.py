@@ -21,8 +21,8 @@ from django_service_specs.commands.argv.utils import option_string
 from django_service_specs.commands.exit_code_for import exit_code_for
 from django_service_specs.commands.render.render_result import render_result
 from django_service_specs.commands.render.wants_table import wants_table
-from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_specs import unguarded_specs
+from django_service_specs.commands.report.unguarded_message import unguarded_message
+from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.utils import relax_partial

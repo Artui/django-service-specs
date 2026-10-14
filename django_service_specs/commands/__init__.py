@@ -9,10 +9,10 @@ from django_service_specs.commands.render.render_json_lines import render_json_l
 from django_service_specs.commands.render.render_result import render_result
 from django_service_specs.commands.render.render_table import render_table
 from django_service_specs.commands.render.wants_table import wants_table
+from django_service_specs.commands.report.unguarded_message import unguarded_message
+from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
+from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.commands.spec_command import SpecCommand
-from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_spec import UnguardedSpec
-from django_service_specs.commands.unguarded_specs import unguarded_specs
 
 __all__ = [
     "ParameterDescriptor",

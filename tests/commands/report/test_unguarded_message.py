@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_spec import UnguardedSpec
+from django_service_specs.commands.report.unguarded_message import unguarded_message
+from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
 from django_service_specs.types.unguarded_reason import UnguardedReason
 
 

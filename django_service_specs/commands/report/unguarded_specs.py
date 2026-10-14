@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from django_service_specs.authorization.unrestricted import Unrestricted
-from django_service_specs.commands.unguarded_spec import UnguardedSpec
+from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.types.unguarded_reason import UnguardedReason
