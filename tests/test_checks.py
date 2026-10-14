@@ -110,10 +110,13 @@ class TestACommandThatDoesNotLoad:
         ]
 
     def test_a_spec_command_naming_no_registry_is_reported(self) -> None:
+        # Only that it is reported: how a ``SpecCommand`` with no registry
+        # fails - reading it, constructing it, declaring it - is the command's
+        # to decide, and each is caught by the same walk.
         [message] = self._w003("unguarded_no_registry")
-        assert message.endswith(
-            "could not be loaded, so its specs were not checked: AttributeError: "
-            "'Command' object has no attribute 'registry'"
+        assert message.startswith(
+            "The command 'unguarded_no_registry' from tests.commands_app could not be loaded, "
+            "so its specs were not checked: "
         )
 
     def test_the_warning_says_how_to_see_the_traceback(self) -> None:
@@ -273,3 +276,19 @@ class TestTheAppIsTheOptIn:
         completed = _probe(BASE_APPS, CHECK)
         assert completed.returncode == 0, completed.stderr
         assert "django_service_specs." not in completed.stdout
+
+    def test_a_manage_py_command_runs_it_before_its_own_handle(self) -> None:
+        # The command line, unlike ``call_command``, does not skip system
+        # checks, so a command keeping ``requires_system_checks`` prints the
+        # report to stderr on every run.
+        completed = _probe(
+            [*BASE_APPS, "django_service_specs"],
+            """
+from django.core.management import execute_from_command_line
+execute_from_command_line(["manage.py", "unguarded_plain"])
+""",
+        )
+        assert completed.returncode == 0, completed.stderr
+        assert "(django_service_specs.W001) 'open_service' in manage.py unguarded_report" in (
+            completed.stderr
+        )
