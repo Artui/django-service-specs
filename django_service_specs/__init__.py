@@ -21,6 +21,7 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
@@ -208,6 +209,7 @@ __all__ = [
     "ServiceNotFound",
     "ServiceSpec",
     "ServiceValidationError",
+    "SpecCommand",
     "SpecRegistry",
     "SpecSource",
     "SpecView",

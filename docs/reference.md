@@ -213,6 +213,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.selectors.list_selector.ListSelector
 ::: django_service_specs.selectors.retrieve_selector.RetrieveSelector
 
+## Commands
+
+::: django_service_specs.commands.spec_command.SpecCommand
+
 ## Filters
 
 ::: django_service_specs.filters.filter_set_parameters.filter_set_parameters

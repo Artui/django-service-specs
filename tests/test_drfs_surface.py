@@ -510,6 +510,9 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # HTTP through DRF's views, never through these.
         "SpecView",
         "AsyncSpecView",
+        # A management command over a registry: a transport of this package's,
+        # which drfs reaches only by compiling its specs into a registry.
+        "SpecCommand",
         "UnsupportedMediaType",
         "dispatch_request",
         "adispatch_request",
