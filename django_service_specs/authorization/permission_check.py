@@ -33,9 +33,11 @@ class PermissionCheck(abc.ABC):
     exactly as before. The base methods do not declare it, so every check
     written without it stays a valid override; a ``many`` call's rows are
     not among them, as they are validated after every check. Opt-in is by
-    name: a method spreading ``**kwargs`` is handed it only where the method
-    it wraps through ``functools.wraps`` names it, so a forwarding decorator
-    keeps a check opted in. ``arguments`` is ``None`` where a transport calls
+    name, read layer by layer down the ``__wrapped__`` chain
+    ``functools.wraps`` leaves: a layer spreading ``**kwargs`` passes the
+    keyword to the one beneath, so it is handed only where a layer names it
+    before any layer without ``**kwargs``, and a forwarding decorator keeps a
+    check opted in. ``arguments`` is ``None`` where a transport calls
     ``authorize()`` without them, and a check that needs them decides for
     itself what that means; reading it as an allow fails open. Only the mapping
     is read-only: its values are the call's own objects, the ones the run

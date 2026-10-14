@@ -4159,6 +4159,16 @@ class TestOverlays:
             dispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
 
 
+def _forwarding(method: Callable[..., bool]) -> Callable[..., bool]:
+    """An ordinary decorator: ``functools.wraps`` over ``*args, **kwargs``."""
+
+    @functools.wraps(method)
+    def forwarded(*args: Any, **kwargs: Any) -> bool:
+        return method(*args, **kwargs)
+
+    return forwarded
+
+
 class TestArgumentsChannel:
     """A check that declares ``arguments`` is handed the call's checked arguments."""
 
@@ -4417,6 +4427,44 @@ class TestArgumentsChannel:
         dispatch(spec, principal=ada, arguments={"x": 1})
         with pytest.raises(NotPermitted):
             dispatch(spec, principal=ada, arguments={"x": 7})
+
+    def test_a_forwarding_wrapper_over_a_narrower_one_is_handed_nothing(self, ada: Any) -> None:
+        """Each layer answers for itself: the forwarding one passes the keyword
+        to the narrow one beneath it, which would refuse it, so neither is
+        handed it, whatever the method at the bottom declares."""
+        seen: list[Any] = []
+
+        def guarded(
+            self: Any, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+        ) -> bool:
+            seen.append(arguments)
+            return True
+
+        def narrow(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def narrowed(self: Any, principal: Any, spec: Any) -> bool:
+                return method(self, principal, spec)
+
+            return narrowed
+
+        class Layered(PermissionCheck):
+            has_permission = _forwarding(narrow(guarded))
+
+        dispatch(
+            ServiceSpec(service=Record(), permissions=(Layered(),)), principal=ada, arguments={}
+        )
+        assert seen == [None]
+
+    def test_forwarding_layers_over_an_opted_in_method_are_handed_them(self, ada: Any) -> None:
+        """Every layer between spreads ``**kwargs``, so the keyword reaches the
+        method that asked, however many there are."""
+
+        class Layered(Arguing):
+            has_permission = _forwarding(_forwarding(Arguing.has_permission))
+
+        check = Layered()
+        dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
+        assert check.questions()[0] == ("has_permission", {})
 
     def test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing(
         self, ada: Any

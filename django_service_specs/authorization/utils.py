@@ -148,30 +148,42 @@ def _function_declares_arguments(function: FunctionType) -> bool:
 def _names_arguments(asked: Callable[..., Any]) -> bool:
     """Whether ``asked`` takes ``arguments`` by keyword, itself or by forwarding it.
 
-    Its own signature first, not the one ``functools.wraps`` points
-    ``__wrapped__`` at: the wrapper is what is called, so a wrapper narrower
-    than the method it wraps is not handed a keyword it would refuse
-    (test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper).
+    A walk down the ``__wrapped__`` chain ``functools.wraps`` leaves, one
+    layer at a time, each read by its own signature - every layer is called
+    in turn, so each must take the keyword or pass it on:
 
-    A callable spreading ``**kwargs`` is handed it only where what it wraps
-    names it: an ordinary forwarding decorator keeps an opted-in check opted
-    in (test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them,
-    test_a_decorated_check_refusing_by_an_argument_still_refuses), while a
-    method spreading them over nothing that asked, or a wrapper over a method
-    that never declared ``arguments``, is not handed a keyword it would pass
-    on to a call that refuses it
-    (test_a_method_taking_only_keywords_is_handed_nothing,
-    test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing).
-    The wrapped chain is read only behind ``**kwargs``: without that guard
-    the narrower wrapper's test fails, and without the chain the forwarding
-    tests do.
+    - a layer naming ``arguments`` by keyword takes it, and the answer is
+      yes (test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them,
+      test_forwarding_layers_over_an_opted_in_method_are_handed_them);
+    - a layer with no ``**kwargs`` would refuse it, and the answer is no,
+      whatever lies beneath: a wrapper narrower than what it wraps
+      (test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper),
+      or one met lower down
+      (test_a_forwarding_wrapper_over_a_narrower_one_is_handed_nothing);
+    - a layer spreading ``**kwargs`` passes it on, so the walk steps to what
+      it wraps; with nothing beneath, nothing that asked would receive it,
+      and the answer is no (test_a_method_taking_only_keywords_is_handed_nothing,
+      test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing).
+
+    A layer met twice ends the walk with no, since a chain that loops names
+    nothing new (test_a_wrapped_chain_that_loops_is_handed_nothing; without
+    that conjunct the test never finishes). The other conjunct stops the walk
+    at the bottom of the chain: without it,
+    test_a_decorator_without_wraps_answers_for_its_own_spread_alone fails.
     """
-    own = inspect.signature(asked, follow_wrapped=False).parameters
-    if _reached_by_keyword(own.get("arguments")):
-        return True
-    if not any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in own.values()):
-        return False
-    return _reached_by_keyword(inspect.signature(asked).parameters.get("arguments"))
+    layer: Any = asked
+    walked: list[Any] = []
+    while layer is not None and not any(layer is seen for seen in walked):
+        walked.append(layer)
+        parameters = inspect.signature(layer, follow_wrapped=False).parameters
+        if _reached_by_keyword(parameters.get("arguments")):
+            return True
+        if not any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
+        ):
+            return False
+        layer = getattr(layer, "__wrapped__", None)
+    return False
 
 
 def _reached_by_keyword(parameter: inspect.Parameter | None) -> bool:
@@ -182,7 +194,9 @@ def _reached_by_keyword(parameter: inspect.Parameter | None) -> bool:
     ``test_a_method_that_names_no_arguments_is_handed_nothing`` fails without
     the first, and
     ``test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing``
-    without the second: a parameter of that name that is positional-only or
+    without the second (as does
+    ``test_a_forwarding_wrapper_over_a_positional_only_arguments_is_handed_nothing``
+    beneath a forwarding layer): a parameter of that name that is positional-only or
     variadic is not reached.
     """
     return parameter is not None and parameter.kind in (

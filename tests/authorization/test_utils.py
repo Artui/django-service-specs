@@ -178,3 +178,31 @@ def test_a_class_built_at_runtime_is_not_kept_once_asked() -> None:
     del check
     gc.collect()
     assert held() is None
+
+
+def test_a_wrapped_chain_that_loops_is_handed_nothing() -> None:
+    def forwarded(*args: Any, **kwargs: Any) -> bool:
+        return True
+
+    cast(Any, forwarded).__wrapped__ = forwarded
+    check = _Shapes()
+    cast(Any, check).undeclared = forwarded
+    assert asked_with(check, "undeclared", {"pk": 1}) == {}
+
+
+def test_a_decorator_without_wraps_answers_for_its_own_spread_alone() -> None:
+    """With no ``__wrapped__`` there is nothing to walk to: ``**kwargs`` over
+    nothing named is not handed the keyword."""
+
+    def unwrapped(*args: Any, **kwargs: Any) -> bool:
+        return _Shapes.keyword_only(*args, **kwargs)
+
+    check = _Shapes()
+    cast(Any, check).keyword_only = unwrapped
+    assert asked_with(check, "keyword_only", {"pk": 1}) == {}
+
+
+def test_a_forwarding_wrapper_over_a_positional_only_arguments_is_handed_nothing() -> None:
+    check = _Shapes()
+    cast(Any, check).positional_only = _forwarding(_Shapes.positional_only)
+    assert asked_with(check, "positional_only", {"pk": 1}) == {}

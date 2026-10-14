@@ -93,9 +93,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   signature, stays a valid override under a type checker, and is asked
   exactly as before; opt-in is by name. The callable dispatch calls is the
   one read, so a callable set on the instance or a mock patched over the
-  method answers for its own signature; one spreading `**kwargs` is handed
-  the keyword only where the method it wraps through `functools.wraps` names
-  it, so a forwarding decorator keeps an opted-in check opted in. A check
+  method answers for its own signature. Behind decorators the
+  `functools.wraps` chain is read a layer at a time: a layer spreading
+  `**kwargs` passes the keyword on, so it is handed only where a layer names
+  it before any layer without `**kwargs`, and a forwarding decorator keeps an
+  opted-in check opted in. A check
   that needs the arguments decides for itself what `None` - a transport
   calling `authorize()` without them - means. A `many` call's rows are not among them,
   since they are validated after every check. `dispatch`, `adispatch`,

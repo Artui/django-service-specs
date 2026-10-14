@@ -239,11 +239,14 @@ existing check changes. The base methods do not declare it, which keeps every
 check written without it a valid override under a type checker. Opt-in is by
 name. What is read is what dispatch calls, `getattr(check, method)`: a
 callable set on the instance, or a mock patched over the method, answers for
-its own signature. A method spreading `**kwargs` is handed the keyword only
-where the method it wraps through `functools.wraps` names it, so an ordinary
-forwarding decorator keeps an opted-in check opted in, while `**kwargs` over
-nothing that asked is handed nothing it would pass on to a call that refuses
-it; a wrapper with a narrower signature and no `**kwargs` answers for itself.
+its own signature. Behind decorators, the `__wrapped__` chain
+`functools.wraps` leaves is read one layer at a time, each by its own
+signature, since each is called in turn: a layer naming `arguments` takes it,
+a layer spreading `**kwargs` passes it to the layer beneath, and a layer with
+neither would refuse it. So the keyword is handed only where a layer names it
+before any layer without `**kwargs`: an ordinary forwarding decorator, or
+several, keeps an opted-in check opted in, while a narrower layer anywhere in
+the chain, or `**kwargs` with nothing beneath that asked, is handed nothing.
 `arguments` is `None` where a transport calls `authorize()` without
 `arguments=`, and a check that needs them decides for itself what that means:
 the example above refuses. A [`many`](declaring.md#many-rows-in-one-call)
