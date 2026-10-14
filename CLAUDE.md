@@ -42,13 +42,19 @@ Non-negotiable. They keep the package navigable.
    exported symbol in `snake_case`. One exception: a recursive pair, where each
    holds the other, lives in one file named for the container (`Parameters`
    with `Parameter`, `Output` with `OutputField`), because the alternative is a
-   guarded import.
+   guarded import. A recursive group, not only a pair, does the same: functions
+   that call one another round a cycle share one module named for what the group
+   is, beside `utils.py`, and a public entry point among them stays in its own
+   file as a thin caller. `mutations/nested_writes.py` is that module for a
+   nested write, which writes each related row through the same create or update
+   that is writing its parent.
 2. **Private helpers used only in one file** stay in that file with a `_name`
    prefix.
 3. **Non-exported helpers shared across files** go in that package's `utils.py`.
 4. **Top-level imports only.** Lazy or function-local imports are forbidden
-   unless a circular import is proven, or the import targets a declared optional
-   dependency gated behind an opt-in. Document the reason inline.
+   unless the import targets a declared optional dependency gated behind an
+   opt-in, or a model module that cannot load while the app registry populates.
+   Document the reason inline. A circular import is never the reason (rule 9).
 5. **Full type annotations on every function and method signature.** `Any` is
    allowed only at the Django boundary where the type genuinely is `Any`, and
    the spec handed to a `PermissionCheck`, which the package that declares
@@ -93,11 +99,10 @@ Non-negotiable. They keep the package navigable.
    acyclic. Break the cycle by structure: move the part that names the spec
    above the spec (`authorize*` and `Grant` are in `dispatch/` for that
    reason), reverse an edge, put the shared base in `types/`
-   (`AffordanceDeclarer`), or keep a recursive pair in one file (rule 1). A
-   function-local import hides the same ring and is no substitute (rule 4), so
-   the test reads imports at every depth. The one ring it allows is named in
-   it: a nested write calls the same create and update entry points that are
-   writing its parent, through `mutations/utils.py`.
+   (`AffordanceDeclarer`), or keep a recursive pair or group in one file
+   (rule 1). A function-local import hides the same ring and is no substitute
+   (rule 4), so the test reads imports at every depth, and it allows no module
+   ring at all.
 
 ## Naming the concepts
 

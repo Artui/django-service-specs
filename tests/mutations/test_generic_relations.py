@@ -339,7 +339,7 @@ class TestTheContentTypeAppIsAGate:
     def test_the_lookup_names_the_missing_app_and_the_remedy(self, monkeypatch: Any) -> None:
         from django.apps import apps
 
-        from django_service_specs.mutations.utils import _content_type_for
+        from django_service_specs.mutations.nested_writes import _content_type_for
 
         monkeypatch.setattr(apps, "is_installed", lambda label: False)
         with pytest.raises(ImproperlyConfigured) as excinfo:

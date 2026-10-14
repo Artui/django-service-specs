@@ -9,7 +9,8 @@ ones included, is held acyclic here.
 An ``if TYPE_CHECKING:`` guard is how a ring is hidden from the interpreter
 while the type checker still sees it, so none may exist in the package at all.
 A function-local import hides one the same way, so imports are read at every
-depth, and the one module-level recursion the package has is named.
+depth, and no module ring is allowed either: functions that recurse through one
+another live in one module, where the recursion is a call rather than an import.
 """
 
 from __future__ import annotations
@@ -22,23 +23,6 @@ import django_service_specs
 
 ROOT = Path(django_service_specs.__file__).parent
 ROOT_MODULES = {"settings", "checks", "apps", "version"}
-
-# The one recursion the package writes down: a nested write persists a related
-# row by calling the same create/update entry point that is writing its parent,
-# and the helpers both sides share are in ``mutations/utils.py``. An import ring
-# that cannot be broken by moving a part above or below another, only by
-# threading the four entry points through every helper as arguments. Each of
-# these modules imports ``utils`` at the top, and ``utils`` imports each back
-# inside the function that recurses.
-RECURSION = [
-    [
-        "django_service_specs.mutations.acreate_from_input",
-        "django_service_specs.mutations.aupdate_from_input",
-        "django_service_specs.mutations.create_from_input",
-        "django_service_specs.mutations.update_from_input",
-        "django_service_specs.mutations.utils",
-    ]
-]
 
 
 def _package_of(dotted: str) -> str | None:
@@ -162,8 +146,8 @@ def test_the_imports_form_no_ring() -> None:
     assert _rings(_graph()) == []
 
 
-def test_the_modules_form_no_ring_but_the_named_recursion() -> None:
-    assert _rings(_module_graph()) == RECURSION
+def test_the_modules_form_no_ring() -> None:
+    assert _rings(_module_graph()) == []
 
 
 def test_the_ring_finder_finds_a_ring() -> None:
