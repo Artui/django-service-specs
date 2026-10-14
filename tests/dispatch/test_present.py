@@ -12,6 +12,7 @@ from django.db import connection
 from django.db.models import QuerySet
 from django.db.models.manager import BaseManager
 from django.test.utils import CaptureQueriesContext
+from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -563,6 +564,45 @@ class TestTheCallsContext:
         assert set(first.ambient) == {"user", "progress", "tenant"}
         with pytest.raises(TypeError):
             first.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
+
+    def test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay(
+        self,
+    ) -> None:
+        """A retrieve's pool holds a read, a ``kwargs`` provider's key and an
+        ``extra_kwargs`` key beside the seeds; the context is handed the seeds
+        alone, since the rest are the call's arguments, not its surroundings."""
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="a")
+        presenter = Contextual()
+
+        class _Server(TypedDict):
+            scope: str
+
+        def server() -> _Server:
+            return {"scope": "server"}
+
+        def by_pk(*, pk: int, scope: str, audit: str) -> QuerySet[Note]:
+            return Note.objects.filter(pk=pk)
+
+        spec = SelectorSpec(
+            kind=RETRIEVE,
+            selector=by_pk,
+            reads=PK,
+            kwargs=server,
+            permissions=OPEN,
+            presenter=presenter,
+        )
+        result = dispatch(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            extra_kwargs={"audit": "overlay"},
+            pool_seeds=TENANT_SEEDS,
+        )
+
+        assert present(spec, result) == {"title": "a"}
+        [context] = presenter.contexts
+        assert set(context.ambient) == {"user", "progress", "tenant"}
 
     def test_a_service_spec_s_context_carries_its_resolved_target(self) -> None:
         ada = make_user("ada")

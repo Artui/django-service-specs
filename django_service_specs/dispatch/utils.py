@@ -1017,10 +1017,11 @@ def conclude_selector(
     test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads).
 
     The result's presentation context carries the pool's seeds alone, the
-    names in ``reserved``: a selector's pool also holds its reads and its
-    ``kwargs`` provider's keys, which are arguments rather than the call's
-    surroundings
-    (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context).
+    names in ``reserved``: a selector's pool also holds its reads, its
+    ``kwargs`` provider's keys and the caller's ``extra_kwargs``, which are
+    arguments rather than the call's surroundings
+    (test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay,
+    which fails with the whole pool handed over).
 
     ``checked`` is the call's shape-checked arguments, handed to a check that
     declares ``arguments`` as step two handed them.
