@@ -513,6 +513,9 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # A management command over a registry: a transport of this package's,
         # which drfs reaches only by compiling its specs into a registry.
         "SpecCommand",
+        # Its exit statuses, and the refusal each ends a run with.
+        "ExitCode",
+        "exit_code_for",
         # How that command writes a presented result to a terminal or a pipe.
         # drfs presents through DRF's renderers and has no command of its own.
         "render_result",
