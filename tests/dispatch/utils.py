@@ -154,6 +154,23 @@ class Listed(Titled):
         return Validated(values={many_argument: values}, data=values, pool={"listed": self})
 
 
+class Contextual(Presenter):
+    """Renders a note as its title, and records the call's context it was handed with each value."""
+
+    def __init__(self) -> None:
+        self.contexts: list[Any] = []
+
+    def output(self) -> Output:
+        return Output((OutputField("title", "string"),))
+
+    def present(self, value: Any) -> Any:
+        return {"title": value.title}
+
+    def presented(self, value: Any, context: Any) -> Any:
+        self.contexts.append(context)
+        return self.present(value)
+
+
 class Titles(Presenter):
     """Renders a note as its title; records every value it was handed."""
 

@@ -216,7 +216,14 @@ def dispatch(
             run=True,
             transport=progress,
         )
-        return conclude_selector(spec, value, principal=principal, grant=granted, pool=pool)
+        return conclude_selector(
+            spec,
+            value,
+            principal=principal,
+            grant=granted,
+            pool=pool,
+            reserved=pool_seeds.reserved,
+        )
     prepared = prepare_service(
         spec,
         principal,

@@ -26,3 +26,18 @@ def test_a_complete_presenter_instantiates() -> None:
             return value
 
     assert _Identity().present(1) == 1
+
+
+def test_by_default_a_value_is_presented_whatever_the_call() -> None:
+    """``presented()`` is what dispatch's ``present`` asks for; a presenter that
+    reads nothing of the call overrides ``present()`` alone."""
+
+    class _Doubling(Presenter):
+        def output(self) -> Output:
+            return Output()
+
+        def present(self, value: Any) -> Any:
+            return value * 2
+
+    assert _Doubling().presented(2, None) == 4
+    assert _Doubling().presented(3, object()) == 6

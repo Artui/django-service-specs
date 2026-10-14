@@ -599,6 +599,16 @@ the Validator:
   items over one at a time, so a Presenter never has to guess whether it was
   given a row or a collection. It may query, and it is sync-only: an
   `async def` `present` is refused when the spec is built.
+- `presented(value, context)` is what dispatch's `present` calls: the value,
+  and the call's
+  [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
+  carrying its principal, the target a service spec resolved, and its
+  resolved seeds as `ambient`, read-only. The default is `present(value)`,
+  so only a Presenter whose library renders under a context - a field
+  defaulting to the current user, a link built from a request a transport
+  registered as a seed - overrides it. Dispatch carries the context on the
+  `DispatchResult` as `context`; a result built by hand has none, and is
+  presented with `None`.
 
 An `OutputField`'s type is one of the JSON types, or `any` for a value whose
 JSON type is open, such as a computed field or a JSON column: its schema is

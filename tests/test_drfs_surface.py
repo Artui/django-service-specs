@@ -170,7 +170,8 @@ SURFACE: dict[str, Pin] = {
     "paginate_output": _fn("dispatch.paginate_output", "rows, *, page=, limit=, max_page_size="),
     "DEFAULT_PAGE_SIZE": Pin("dispatch.paginate_output", value=100),
     "DispatchResult": Pin(
-        "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
+        "dispatch.dispatch_result",
+        signature="kind, value=, service_result=, instance=, data=, context=",
     ),
     "authorize": _fn("dispatch.authorize", "spec, principal, *, grant="),
     "authorize_scope": _fn("dispatch.authorize_scope", "spec, principal, scope, *, grant"),
@@ -258,7 +259,11 @@ SURFACE: dict[str, Pin] = {
     "Presenter": Pin(
         "output.presenter",
         abstract=frozenset({"output", "present"}),
-        methods={"output": "()", "present": "(value)"},
+        methods={"output": "()", "present": "(value)", "presented": "(value, context)"},
+    ),
+    # What the adapter's serializer presenter reads its serializer context from.
+    "PresentationContext": Pin(
+        "output.presentation_context", signature="principal, target=, ambient="
     ),
     "FieldMarking": Pin(
         "output.field_marking",

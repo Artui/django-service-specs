@@ -210,6 +210,11 @@ class _AsyncPresent(Named):
         return {"name": str(value)}
 
 
+class _AsyncPresented(Named):
+    async def presented(self, value: Any, context: Any) -> Any:  # What present() asks for.
+        return {"name": str(value)}
+
+
 class TestAnAsyncPresenterIsRefused:
     """``present`` is called from sync code on both entry points and never awaited."""
 
@@ -222,6 +227,11 @@ class TestAnAsyncPresenterIsRefused:
         named = "SelectorSpec.presenter.present is _AsyncPresent.present, an async callable"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
             SelectorSpec(kind=SelectorKind.LIST, selector=_selector, presenter=_AsyncPresent())
+
+    def test_an_async_presented_is_refused_too(self) -> None:
+        named = "ServiceSpec.presenter.presented is _AsyncPresented.presented, an async callable"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            ServiceSpec(service=_service, presenter=_AsyncPresented())
 
     def test_a_sync_presenter_is_accepted(self) -> None:
         presenter = Named()

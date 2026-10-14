@@ -22,6 +22,8 @@ from tests.dispatch.utils import (
     OPEN,
     REFUSED_ARCHIVED,
     RENAME,
+    TENANT_SEEDS,
+    Contextual,
     NoteRows,
     make_user,
     notes_of,
@@ -74,6 +76,22 @@ async def test_a_list_is_presented_in_one_hop_and_comes_back_evaluated(
     assert type(rendered) is list
     assert rendered == ([{"owner": "ada"}] if presenter is not None else [note])
     assert hops == ["present"]
+
+
+@pytest.mark.django_db(transaction=True)
+async def test_the_async_path_presents_with_the_call_s_context(hops: list[str]) -> None:
+    owner = await sync_to_async(make_user)("ada")
+    await Note.objects.acreate(owner=owner, title="a")
+    presenter = Contextual()
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=presenter
+    )
+
+    result = await adispatch(spec, principal=owner, arguments={}, pool_seeds=TENANT_SEEDS)
+
+    assert await apresent(spec, result) == [{"title": "a"}]
+    [context] = presenter.contexts
+    assert (context.principal, context.ambient["tenant"]) == (owner, "tenant-of-ada")
 
 
 async def test_a_presenter_answering_with_a_coroutine_is_refused_as_present_refuses_it() -> None:

@@ -53,6 +53,7 @@ Two Django settings, each read at the call rather than at import, so
 ## Output
 
 ::: django_service_specs.output.presenter.Presenter
+::: django_service_specs.output.presentation_context.PresentationContext
 ::: django_service_specs.output.output.Output
 ::: django_service_specs.output.output.OutputField
 ::: django_service_specs.output.field_marking.FieldMarking

@@ -35,6 +35,7 @@ from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -84,6 +85,9 @@ class Prepared:
     # The Validator's ``data``: a mapping, or the instance a dataclass one builds.
     data: Any
     kwargs: dict[str, Any]
+    # The call's base pool, read-only: what the Validator's context and the
+    # presenter's carry as ``ambient``.
+    ambient: Mapping[str, Any]
 
 
 @dataclass(frozen=True)
@@ -843,7 +847,13 @@ def lookup(
 
 
 def conclude_selector(
-    spec: SelectorSpec, value: Any, *, principal: Any, grant: Grant, pool: Mapping[str, Any]
+    spec: SelectorSpec,
+    value: Any,
+    *,
+    principal: Any,
+    grant: Grant,
+    pool: Mapping[str, Any],
+    reserved: frozenset[str],
 ) -> DispatchResult:
     """Step four for a selector spec, its ``preconditions``, and its result.
 
@@ -873,19 +883,29 @@ def conclude_selector(
     class-level check it was minted for
     (test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds,
     test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_reads).
+
+    The result's presentation context carries the pool's seeds alone, the
+    names in ``reserved``: a selector's pool also holds its reads and its
+    ``kwargs`` provider's keys, which are arguments rather than the call's
+    surroundings
+    (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context).
     """
     grant = replace(grant, target_checked=False)
     fillable = spec.reads.names()
+    context = PresentationContext(
+        principal,
+        ambient=MappingProxyType({name: entry for name, entry in pool.items() if name in reserved}),
+    )
     if spec.kind is SelectorKind.LIST:
         authorize_scope(spec, principal, value, grant=grant)
         run_preconditions(spec, {**pool, "collection": value}, fillable=fillable)
-        return DispatchResult(kind="list", value=value)
+        return DispatchResult(kind="list", value=value, context=context)
     if value is not None:
         authorize_target(spec, principal, value, grant=grant)
         run_preconditions(spec, {**pool, "instance": value}, fillable=fillable)
     elif not spec.allow_none:
         return NOT_FOUND
-    return DispatchResult(kind="instance", value=value)
+    return DispatchResult(kind="instance", value=value, context=context)
 
 
 def walk_target(
@@ -1000,7 +1020,7 @@ def validate_arguments(
     principal: Any,
     target: Any,
     server_input: Mapping[str, Any],
-    ambient: Mapping[str, Any] | None = None,
+    ambient: Mapping[str, Any] = MappingProxyType({}),
 ) -> Validated:
     """Step five: the Validator's whole result, on only the arguments its own ``parameters()`` declare.
 
@@ -1013,8 +1033,9 @@ def validate_arguments(
     server's are the author's own values, which the Validator checks.
 
     ``ValidationContext.partial`` is the spec's ``partial``, and its
-    ``ambient`` a read-only view of ``ambient``, the call's base pool, or
-    empty for a caller with no seeds (``bind_arguments``). A spec with no
+    ``ambient`` is ``ambient``: the call's base pool behind a read-only
+    proxy, or empty for a caller with no seeds (``bind_arguments``). A spec
+    with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
 
@@ -1032,11 +1053,7 @@ def validate_arguments(
     if validator is None:
         return Validated(values={}, data={})
     declared = validator.parameters().names()
-    # A copy behind a proxy, so the Validator can neither change the pool the
-    # service is called from nor see a later change to it.
-    context = ValidationContext(
-        principal, target, partial=spec.partial, ambient=MappingProxyType(dict(ambient or {}))
-    )
+    context = ValidationContext(principal, target, partial=spec.partial, ambient=ambient)
     if spec.many:
         return _validate_rows(
             validator, checked[spec.many_argument], spec.many_argument, context, server_input
@@ -1163,12 +1180,20 @@ def prepare_service(
     # providers and the service alike. Its ``progress`` is the transport's: the
     # spec's own sink is the run's alone, and joins the run's keywords last.
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    # A copy behind a proxy, so neither the Validator nor the presenter can
+    # change the pool the service is called from, or see a later change to it.
+    ambient = MappingProxyType(dict(base))
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**base, **reads, **resolved}
     server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
     validated = validate_arguments(
-        spec, checked, principal=principal, target=target, server_input=server_input, ambient=base
+        spec,
+        checked,
+        principal=principal,
+        target=target,
+        server_input=server_input,
+        ambient=ambient,
     )
     values = validated.values
     # A Validator returning ``user`` is a bug, and letting its value outrank the
@@ -1262,7 +1287,7 @@ def prepare_service(
         kwargs["progress"] = run_progress(
             spec.progress_reporter, spec.service, base, transport=progress
         )
-    return Prepared(principal, target, validated.data, kwargs)
+    return Prepared(principal, target, validated.data, kwargs, ambient)
 
 
 def finish_service(
@@ -1323,4 +1348,5 @@ def finish_service(
         service_result=result,
         instance=prepared.target,
         data=prepared.data,
+        context=PresentationContext(prepared.principal, prepared.target, prepared.ambient),
     )

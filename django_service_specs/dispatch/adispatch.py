@@ -273,7 +273,9 @@ def _settle_and_conclude(
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
-    return conclude_selector(spec, value, principal=who, grant=granted, pool=pool)
+    return conclude_selector(
+        spec, value, principal=who, grant=granted, pool=pool, reserved=reserved
+    )
 
 
 async def _await_selector(
@@ -305,7 +307,9 @@ async def _await_selector(
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
-        return conclude_selector(spec, None, principal=who, grant=granted, pool=pool)
+        return conclude_selector(
+            spec, None, principal=who, grant=granted, pool=pool, reserved=pool_seeds.reserved
+        )
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
         spec, raw, pool, who, granted, pool_seeds.reserved
     )

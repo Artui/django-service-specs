@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
+
+from django_service_specs.output.presentation_context import PresentationContext
 
 
 @dataclass(frozen=True)
@@ -24,6 +26,11 @@ class DispatchResult:
         instance: The resolved target - the row, or the collection's queryset.
         data: The Validator's ``data`` the service received: the validated
             mapping, or the instance a dataclass Validator builds.
+        context: The call a presenter renders for: its principal, its target
+            and its resolved seeds, which ``present`` hands to
+            ``Presenter.presented()``. ``None`` on a result dispatch did not
+            build, and on a not-found, which is never presented. It takes no
+            part in equality: two results of one value are one result.
     """
 
     kind: Literal["instance", "list", "not_found"]
@@ -31,3 +38,4 @@ class DispatchResult:
     service_result: Any = None
     instance: Any = None
     data: Any = None
+    context: PresentationContext | None = field(default=None, compare=False)

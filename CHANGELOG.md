@@ -46,6 +46,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty default and takes no part in equality, so a context built by hand,
   and the one `bind_arguments` builds, which is handed no seeds, are as
   they were.
+- **`PresentationContext` and `Presenter.presented(value, context)`**: a
+  Presenter can read the call it renders for. `dispatch` and `adispatch`
+  carry a `PresentationContext` on the `DispatchResult` as `context` - the
+  principal, the target a service spec resolved (`None` for a create and
+  for a selector spec), and the call's resolved seeds as a read-only
+  `ambient` - and `present`, `apresent` and `present_for_audience` hand it
+  to `presented()` with each value. `presented()` is `present(value)` by
+  default, so every existing Presenter is unchanged; one whose library
+  renders under a context overrides it. A method of its own rather than a
+  keyword on `present()`, so no Presenter written against `present(value)`
+  stops being one and nothing inspects a signature. `DispatchResult.context`
+  is `None` on a result built by hand and takes no part in equality. An
+  `async def` `presented` is refused when the spec is built, as an
+  `async def` `present` is.
 
 ### Changed
 - **`ModelT` is a pinned import path.** The type variable `ChangeResult` is
