@@ -22,8 +22,8 @@ from django.test import override_settings
 
 from django_service_specs.checks import check_unguarded_specs
 from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_reason import UnguardedReason
 from django_service_specs.commands.unguarded_spec import UnguardedSpec
+from django_service_specs.types.unguarded_reason import UnguardedReason
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 APP = "tests.commands_app"

@@ -233,7 +233,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.parsed_arguments.parsed_arguments
 ::: django_service_specs.commands.unguarded_specs.unguarded_specs
 ::: django_service_specs.commands.unguarded_spec.UnguardedSpec
-::: django_service_specs.commands.unguarded_reason.UnguardedReason
 ::: django_service_specs.commands.unguarded_message.unguarded_message
 
 ## Filters
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.value_formatter.ValueFormatter
 ::: django_service_specs.types.no_input.NoInput
 ::: django_service_specs.types.exit_code.ExitCode
+::: django_service_specs.types.unguarded_reason.UnguardedReason

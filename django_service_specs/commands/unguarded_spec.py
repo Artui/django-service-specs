@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django_service_specs.commands.unguarded_reason import UnguardedReason
+from django_service_specs.types.unguarded_reason import UnguardedReason
 
 
 @dataclass(frozen=True)
@@ -16,7 +16,7 @@ class UnguardedSpec:
     - **``name``** - the name the spec is registered under, which is the
       subcommand an operator types.
     - **``reason``** - the
-      [`UnguardedReason`][django_service_specs.commands.unguarded_reason.UnguardedReason]
+      [`UnguardedReason`][django_service_specs.types.unguarded_reason.UnguardedReason]
       its declaration falls under.
     """
 

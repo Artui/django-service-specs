@@ -31,7 +31,6 @@ from django_service_specs.commands.render_result import render_result
 from django_service_specs.commands.render_table import render_table
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_reason import UnguardedReason
 from django_service_specs.commands.unguarded_spec import UnguardedSpec
 from django_service_specs.commands.unguarded_specs import unguarded_specs
 from django_service_specs.commands.wants_table import wants_table
@@ -153,6 +152,7 @@ from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
+from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.unknown_arguments import UnknownArguments
