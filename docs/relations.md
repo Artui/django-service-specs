@@ -126,7 +126,7 @@ Each spec takes its required fields positionally and every option by keyword:
 The order is a property of the kind, not of how the `relations=` mapping is
 spelled: a forward target has to exist before the parent is saved, and a
 membership needs both rows saved.
-[`RelationPhase`][django_service_specs.relations.relation_phase.RelationPhase]
+[`RelationPhase`][django_service_specs.types.relation_phase.RelationPhase]
 names the sequence. Within one phase, relations are written in the order they
 are declared.
 

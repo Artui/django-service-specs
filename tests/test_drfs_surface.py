@@ -371,7 +371,7 @@ SURFACE: dict[str, Pin] = {
         "types.relation_orphan", {"AUTO": "auto", "UNLINK": "unlink", "DELETE": "delete"}, str
     ),
     "RelationPhase": _enum(
-        "relations.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
+        "types.relation_phase", {"FORWARD": 0, "REVERSE": 1, "GENERIC": 2, "M2M": 3}, int
     ),
     # --- schema -------------------------------------------------------------------------------
     "can_present_nothing": _fn("schema.can_present_nothing", "spec"),

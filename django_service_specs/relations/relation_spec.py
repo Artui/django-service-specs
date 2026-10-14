@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-from django_service_specs.relations.relation_phase import RelationPhase
+from django_service_specs.types.relation_phase import RelationPhase
 
 
 class RelationSpec:
@@ -21,7 +21,7 @@ class RelationSpec:
 
     So each concrete spec declares ``write_phase`` as a class attribute and the driver
     orders by it (see
-    [`RelationPhase`][django_service_specs.relations.relation_phase.RelationPhase] for
+    [`RelationPhase`][django_service_specs.types.relation_phase.RelationPhase] for
     the sequence). A spec author never sets it per-instance, and the mapping's insertion
     order cannot reorder the phases — only the relations *within* one.
 

@@ -30,7 +30,6 @@ from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
-from django_service_specs.relations.relation_phase import RelationPhase
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
@@ -39,6 +38,7 @@ from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.types.relation_orphan import RelationOrphan
+from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.unset import UNSET
 
 # The kinds whose row the parent owns through a link stored on that row. "Child"
