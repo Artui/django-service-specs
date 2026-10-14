@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-10-14
+
 ### Added
 - **`OutputField` takes `any` as its type**, as `Parameter` does, for a value
   whose JSON type is open: a computed field, a JSON column. `output_schema`
@@ -35,11 +37,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which dispatch reports after the rows and beside the shape check's
   refusals, in index order whatever order they were raised in. Where that
   node carries the list's own message it mixes `int` keys with a string one,
-  so `json.dumps(..., sort_keys=True)` over it raises `TypeError`. The default is the per-row loop dispatch ran before, so every
-  existing Validator behaves as it did, and a value one row binds is still
-  refused. A Validator whose library validates a list as one overrides it.
-  An override returning values under any other name is refused, and one
-  declared `async def` is refused when the spec is built.
+  so `json.dumps(..., sort_keys=True)` over it raises `TypeError`. The
+  default is the per-row loop dispatch ran before, so every existing
+  Validator behaves as it did, and a value one row binds is still refused. A
+  Validator whose library validates a list as one overrides it. An override
+  returning values under any other name is refused, and one declared
+  `async def` is refused when the spec is built.
 - **`ValidationContext.ambient`**: the call's resolved seeds, as a mapping
   read-only at its top level, whose values are the call's own live objects
   and must not be mutated - `user`, `progress` and every seed registered through
@@ -56,8 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carry a `PresentationContext` on the `DispatchResult` as `context` - the
   principal, the target a service spec resolved (`None` for a create and
   for a selector spec), and the call's resolved seeds as `ambient`,
-  read-only at its top level, its values the call's own live objects - and `present`, `apresent` and `present_for_audience` hand it
-  to `presented()` with each value. `presented()` is `present(value)` by
+  read-only at its top level, its values the call's own live objects - and
+  `present`, `apresent` and `present_for_audience` hand it to `presented()`
+  with each value. `presented()` is `present(value)` by
   default, so every existing Presenter is unchanged; one whose library
   renders under a context overrides it. A method of its own rather than a
   keyword on `present()`, so no Presenter written against `present(value)`
@@ -88,9 +92,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `has_permission`, `has_object_permission` or `has_scope_permission` - is
   handed the call's shape-checked arguments at that question, as a read-only
   mapping whose values are the call's own objects, which a check must not
-  mutate: what an HTTP permission class reads off the view's captured kwargs. The
-  base methods do not declare it, so every existing check keeps its
-  signature, stays a valid override under a type checker, and is asked
+  mutate: what an HTTP permission class reads off the view's captured
+  kwargs. The base methods do not declare it, so every existing check keeps
+  its signature, stays a valid override under a type checker, and is asked
   exactly as before; opt-in is by name. The callable dispatch calls is the
   one read, so a callable set on the instance or a mock patched over the
   method answers for its own signature. Behind decorators the
@@ -98,10 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `**kwargs` passes the keyword on, so it is handed only where a layer names
   it before any layer without `**kwargs`, and a forwarding decorator keeps an
   opted-in check opted in. A callable with no signature to read, such as a
-  builtin behind `functools.partial`, is asked as one that never opted in. A check
-  that needs the arguments decides for itself what `None` - a transport
-  calling `authorize()` without them - means. A `many` call's rows are not among them,
-  since they are validated after every check. `dispatch`, `adispatch`,
+  builtin behind `functools.partial`, is asked as one that never opted in. A
+  check that needs the arguments decides for itself what `None` - a transport
+  calling `authorize()` without them - means. A `many` call's rows are not
+  among them, since they are validated after every check. `dispatch`, `adispatch`,
   `check_call` and `resolve_target` hand them over, and `authorize`,
   `authorize_target` and `authorize_scope` take them as `arguments=` for a
   transport that calls them itself.
@@ -123,8 +127,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   owned relations now live in one private module,
   `django_service_specs.mutations.nested_writes`, and the four entry points
   are thin callers of it. No public import path or signature changed, and no
-  call returns or raises differently. Private helpers moved from `mutations/utils.py` to that module, and
-  five that both modules read lost their leading underscore. A nested row no
+  call returns or raises differently. Private helpers moved from
+  `mutations/utils.py` to that module, and five that both modules read lost
+  their leading underscore. A nested row no
   longer looks up the entry point on its module at call time, so a patch of
   `django_service_specs.mutations.create_from_input.create_from_input` or a
   sibling now sees the top-level call only. The test of the import graph now
@@ -1436,7 +1441,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Artui/django-service-specs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Artui/django-service-specs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Artui/django-service-specs/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/Artui/django-service-specs/compare/v0.5.0...v0.5.1
