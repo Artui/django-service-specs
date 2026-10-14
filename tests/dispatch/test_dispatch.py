@@ -3961,6 +3961,20 @@ class TestOverlays:
                     extra_kwargs={key: 1},
                 )
 
+    def test_a_many_spec_s_list_is_a_declared_parameter_too(self, ada: Any) -> None:
+        """The rows are the call's argument under ``many_argument``, so an
+        overlay may not stand in for the list either."""
+        service = Record()
+        spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Titled())
+        with pytest.raises(ImproperlyConfigured, match=r"\['items'\]"):
+            dispatch(
+                spec,
+                principal=ada,
+                arguments={"items": [{"title": "a"}]},
+                extra_kwargs={"items": []},
+            )
+        assert service.calls == []
+
     def test_an_unset_entry_naming_a_declared_parameter_is_dropped_not_refused(
         self, ada: Any
     ) -> None:

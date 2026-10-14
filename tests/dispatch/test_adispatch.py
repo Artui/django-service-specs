@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import threading
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -19,9 +20,11 @@ from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
+from django_service_specs.authorization import utils as authorization_utils
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.dispatch import utils as dispatch_utils
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -1154,6 +1157,108 @@ async def test_extra_kwargs_reach_the_run_beneath_the_provider_on_every_path(
     )
 
     assert result.value == ["spec", 1]
+
+
+# The two paths that hand ``adispatch``'s own overlay into their hop, rather
+# than calling ``dispatch``, which copies the overlay again on its entry.
+_OVERLAID_IN_THE_HOP: dict[str, Callable[[PermissionCheck], Any]] = {
+    "_prepare": lambda check: ServiceSpec(
+        service=_async_tagged, atomic=False, permissions=(check,), kwargs=_tagged
+    ),
+    "_open_selector": lambda check: SelectorSpec(
+        kind=LIST, selector=_async_tagged_selector, permissions=(check,), kwargs=_tagged
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_OVERLAID_IN_THE_HOP))
+async def test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing(
+    path: str, ada: Any
+) -> None:
+    """The caller's dict is changed while the call sits in its hop, here by a
+    check run there; the run still sees the overlay as it was on entry."""
+    extra = {"tag": "view", "extra": 1}
+
+    class Changing(PermissionCheck):
+        def has_permission(self, principal: Any, spec: Any) -> bool:
+            extra["extra"] = 2
+            return True
+
+    spec = _OVERLAID_IN_THE_HOP[path](Changing())
+    result = await adispatch(spec, principal=ada, arguments={}, extra_kwargs=extra)
+
+    assert extra["extra"] == 2
+    assert result.value == ["spec", 1]
+
+
+async def _async_tagged_by_pk(*, pk: int) -> Any:
+    return Note.objects.filter(pk=pk)
+
+
+async def _async_service_with_pk(*, pk: int) -> None:
+    return None
+
+
+def _sync_service_with_pk(*, pk: int) -> None:
+    return None
+
+
+# Each path a check is asked on, so the reads it costs are seen off the loop on all four.
+_OFF_THE_LOOP: dict[str, Callable[[PermissionCheck], Any]] = {
+    "_dispatch-selector": lambda check: SelectorSpec(
+        kind=RETRIEVE, selector=note_by_pk, reads=PK, permissions=(check,)
+    ),
+    "_await_selector": lambda check: SelectorSpec(
+        kind=RETRIEVE, selector=_async_tagged_by_pk, reads=PK, permissions=(check,)
+    ),
+    "_dispatch-service": lambda check: ServiceSpec(
+        service=_sync_service_with_pk, reads=PK, permissions=(check,)
+    ),
+    "_prepare": lambda check: ServiceSpec(
+        service=_async_service_with_pk, atomic=False, reads=PK, permissions=(check,)
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(_OFF_THE_LOOP))
+async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop(
+    path: str, ada: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both read the spec's declaration and the check's method, which may be
+    a lazily built property or a descriptor that queries, so neither runs on
+    the event loop's thread."""
+    loop = threading.get_ident()
+    on_the_loop: list[tuple[str, bool]] = []
+
+    def recorded(name: str, read: Callable[..., Any]) -> Callable[..., Any]:
+        def reading(*args: Any) -> Any:
+            on_the_loop.append((name, threading.get_ident() == loop))
+            return read(*args)
+
+        return reading
+
+    authorization_utils._function_declares_arguments.cache_clear()
+    monkeypatch.setattr(
+        dispatch_utils,
+        "refuse_overlaid_parameters",
+        recorded("refusal", dispatch_utils.refuse_overlaid_parameters),
+    )
+    monkeypatch.setattr(
+        authorization_utils,
+        "_names_arguments",
+        recorded("signature", authorization_utils._names_arguments),
+    )
+    note = await _create(owner=ada, title="mine")
+
+    await adispatch(
+        _OFF_THE_LOOP[path](Arguing()),
+        principal=ada,
+        arguments={"pk": note.pk},
+        extra_kwargs={"other": 1},
+    )
+
+    assert {name for name, _ in on_the_loop} == {"refusal", "signature"}
+    assert not any(on for _, on in on_the_loop)
 
 
 async def test_there_is_no_input_data_overlay(ada: Any, hops: list[str]) -> None:

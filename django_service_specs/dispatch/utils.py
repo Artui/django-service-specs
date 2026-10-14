@@ -1327,9 +1327,10 @@ def prepare_service(
     # providers and the service alike. Its ``progress`` is the transport's: the
     # spec's own sink is the run's alone, and joins the run's keywords last.
     base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
-    # A copy behind a proxy, so neither the Validator nor the presenter can
-    # change the pool the service is called from, or see a later change to it.
-    ambient = MappingProxyType(dict(base))
+    # Behind a proxy, so neither the Validator nor the presenter can change the
+    # pool the service is called from. No copy: nothing writes to ``base`` once
+    # it is built, and every pool made from it is a dict of its own.
+    ambient = MappingProxyType(base)
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**base, **reads, **resolved}

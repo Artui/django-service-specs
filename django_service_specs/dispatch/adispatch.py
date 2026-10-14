@@ -109,9 +109,11 @@ async def adispatch(
     refuse it before any hop, and a selector spec's row or list is checked
     whatever the grant says, as ``dispatch``'s is.
 
-    ``extra_kwargs`` is ``dispatch``'s overlay, merged beneath the spec's
-    ``kwargs`` provider inside the hop, on every path, and refused there
-    where it names a declared parameter.
+    ``extra_kwargs`` is ``dispatch``'s overlay, copied on entry, merged
+    beneath the spec's ``kwargs`` provider inside the hop, on every path, and
+    refused there where it names a declared parameter; that refusal and the
+    read of whether a check declares ``arguments`` both run off the loop
+    (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).
 
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.
@@ -133,6 +135,9 @@ async def adispatch(
     # Compiled on the loop, before the branch that reads which kind of spec it is.
     spec = kernel_spec(spec)
     refuse_target(spec, target)
+    # Copied here, on the loop, so a caller changing its dict while the call
+    # is in a hop changes nothing the run sees
+    # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
     overlay = Overlay(dict(extra_kwargs or {}))
     rest = (
         principal,
