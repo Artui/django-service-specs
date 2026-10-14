@@ -51,6 +51,7 @@ from django_service_specs import (
     ServiceValidationError,
     SpecRegistry,
     ValidationContext,
+    authorize,
     check_arguments,
     coerce_flat,
     dispatch,
@@ -321,6 +322,12 @@ class TestDispatching:
         # Refused before the lookup, so a locked pk is refused whether or not it exists.
         with pytest.raises(NotPermitted, match="That note is locked."):
             dispatch(spec, principal=ada, arguments={"pk": 7})
+
+    def test_the_lock_check_refuses_a_call_it_is_handed_no_arguments_for(self, ada: Any) -> None:
+        """``None`` is a transport calling ``authorize()`` without them; the
+        example decides that is a refusal, never an allow."""
+        with pytest.raises(NotPermitted, match="That note is locked."):
+            authorize(dispatching.lockable_note_spec, ada)
 
     def test_an_overlay_sits_beneath_the_spec_s_provider(self, ada: Any) -> None:
         result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})

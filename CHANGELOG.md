@@ -88,10 +88,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mutate: what an HTTP permission class reads off the view's captured kwargs. The
   base methods do not declare it, so every existing check keeps its
   signature, stays a valid override under a type checker, and is asked
-  exactly as before; opt-in is by the name alone, so a method spreading
-  `**kwargs` is not handed it. The callable dispatch calls is the one read,
-  so a callable set on the instance, a mock patched over the method and a
-  `functools.wraps` wrapper each answer for their own signature. A `many` call's rows are not among them,
+  exactly as before; opt-in is by name. The callable dispatch calls is the
+  one read, so a callable set on the instance or a mock patched over the
+  method answers for its own signature; one spreading `**kwargs` is handed
+  the keyword only where the method it wraps through `functools.wraps` names
+  it, so a forwarding decorator keeps an opted-in check opted in. A check
+  that needs the arguments decides for itself what `None` - a transport
+  calling `authorize()` without them - means. A `many` call's rows are not among them,
   since they are validated after every check. `dispatch`, `adispatch`,
   `check_call` and `resolve_target` hand them over, and `authorize`,
   `authorize_target` and `authorize_scope` take them as `arguments=` for a

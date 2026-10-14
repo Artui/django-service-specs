@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import gc
 import weakref
 from types import SimpleNamespace
@@ -119,3 +120,20 @@ def test_a_callable_set_on_the_instance_is_not_kept_once_asked() -> None:
     del check, shadow
     gc.collect()
     assert held() is None
+
+
+def _forwarding(method: Any) -> Any:
+    @functools.wraps(method)
+    def forwarded(*args: Any, **kwargs: Any) -> Any:
+        return method(*args, **kwargs)
+
+    return forwarded
+
+
+def test_a_forwarding_wrapper_answers_for_the_method_it_wraps() -> None:
+    class Wrapped(_Shapes):
+        keyword_only = _forwarding(_Shapes.keyword_only)
+        undeclared = _forwarding(_Shapes.undeclared)
+
+    assert asked_with(Wrapped(), "keyword_only", {"pk": 1}) == {"arguments": {"pk": 1}}
+    assert asked_with(Wrapped(), "undeclared", {"pk": 1}) == {}

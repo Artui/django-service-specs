@@ -82,7 +82,11 @@ class NotLocked(PermissionCheck):
     def has_permission(
         self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
     ) -> bool:
-        return arguments is None or arguments.get("pk") not in self.locked
+        if arguments is None:
+            # A transport called ``authorize()`` without ``arguments=``: there
+            # is no pk to judge, so this check refuses rather than allowing.
+            return False
+        return arguments.get("pk") not in self.locked
 
 
 lockable_note_spec = SelectorSpec(

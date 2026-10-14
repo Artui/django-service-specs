@@ -4348,11 +4348,12 @@ class TestArgumentsChannel:
         dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
         assert check.questions()[0] == ("has_permission", {"pinned": True})
 
-    def test_a_wrapper_spreading_its_keywords_is_handed_nothing_whatever_it_wraps(
+    def test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them(
         self, ada: Any
     ) -> None:
-        """The wrapper's own ``**kwargs`` decides, as for any method spreading
-        them, even where the method it wraps declares ``arguments``."""
+        """An ordinary ``functools.wraps`` decorator spreading ``*args,
+        **kwargs`` forwards the keyword to the method it wraps, so a check
+        that opted in stays opted in behind one."""
 
         def spreading(method: Callable[..., bool]) -> Callable[..., bool]:
             @functools.wraps(method)
@@ -4366,7 +4367,56 @@ class TestArgumentsChannel:
 
         check = Spread()
         dispatch(ServiceSpec(service=Record(), permissions=(check,)), principal=ada, arguments={})
-        assert check.questions()[0] == ("has_permission", None)
+        assert check.questions()[0] == ("has_permission", {})
+
+    def test_a_decorated_check_refusing_by_an_argument_still_refuses(self, ada: Any) -> None:
+        """Handed nothing, the check below would read the absent mapping and
+        decide without the ``x`` it guards; it must be handed the call's."""
+
+        def forwarding(method: Callable[..., bool]) -> Callable[..., bool]:
+            @functools.wraps(method)
+            def wrapper(*args: Any, **kwargs: Any) -> bool:
+                return method(*args, **kwargs)
+
+            return wrapper
+
+        class Locked(PermissionCheck):
+            @forwarding
+            def has_permission(
+                self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+            ) -> bool:
+                return arguments is not None and arguments.get("x") != 7
+
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(Locked(),),
+            reads=Parameters.of(Parameter("x", "integer")),
+        )
+        dispatch(spec, principal=ada, arguments={"x": 1})
+        with pytest.raises(NotPermitted):
+            dispatch(spec, principal=ada, arguments={"x": 7})
+
+    def test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing(
+        self, ada: Any
+    ) -> None:
+        """``**kwargs`` alone opts nothing in: the method it forwards to never
+        asked, and would refuse the keyword."""
+        seen: list[tuple[Any, ...]] = []
+
+        def plain(self: Any, principal: Any, spec: Any) -> bool:
+            seen.append((principal, spec))
+            return True
+
+        @functools.wraps(plain)
+        def spreading(self: Any, *args: Any, **kwargs: Any) -> bool:
+            return plain(self, *args, **kwargs)
+
+        class Spread(PermissionCheck):
+            has_permission = spreading
+
+        spec = ServiceSpec(service=Record(), permissions=(Spread(),))
+        dispatch(spec, principal=ada, arguments={})
+        assert seen == [(ada, spec)]
 
     def test_a_caller_s_value_for_a_key_the_server_fills_is_never_a_check_s(self, ada: Any) -> None:
         """The caller's value for a read the ``kwargs`` provider is annotated

@@ -93,7 +93,9 @@ def asked_with(check: Any, method: str, arguments: Mapping[str, Any] | None) -> 
     callable set on the instance answers for itself
     (test_a_method_shadowed_on_the_instance_is_read_as_the_shadow), a mock
     patched over the method is asked as a check that never opted in
-    (test_a_mock_patched_over_a_method_is_asked_as_before), a method replaced
+    (test_a_mock_patched_over_a_method_is_asked_as_before), a forwarding
+    decorator as the method it wraps
+    (test_a_forwarding_wrapper_answers_for_the_method_it_wraps), a method replaced
     after the class was defined is read as it now is
     (test_a_method_replaced_on_its_class_is_read_as_it_now_is), and an
     inherited one as its declaring class wrote it
@@ -133,31 +135,45 @@ def _function_declares_arguments(function: FunctionType) -> bool:
 
 
 def _names_arguments(asked: Callable[..., Any]) -> bool:
-    """Whether ``asked`` names a parameter ``arguments`` that can be passed by keyword.
+    """Whether ``asked`` takes ``arguments`` by keyword, itself or by forwarding it.
 
-    By name alone: a method spreading ``**kwargs`` is not handed it, since a
-    wrapper forwarding them to a method that never declared ``arguments``
-    would pass on a keyword that method refuses
-    (test_a_method_taking_only_keywords_is_handed_nothing). Nor is a
-    parameter of that name that is positional-only or variadic, which no
-    keyword reaches as the mapping itself
-    (test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing).
-
-    The callable's own signature, not the one ``functools.wraps`` points
+    Its own signature first, not the one ``functools.wraps`` points
     ``__wrapped__`` at: the wrapper is what is called, so a wrapper narrower
     than the method it wraps is not handed a keyword it would refuse
-    (test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper),
-    and one spreading ``**kwargs`` is handed nothing, as any method spreading
-    them is (test_a_wrapper_spreading_its_keywords_is_handed_nothing_whatever_it_wraps).
+    (test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper).
+
+    A callable spreading ``**kwargs`` is handed it only where what it wraps
+    names it: an ordinary forwarding decorator keeps an opted-in check opted
+    in (test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them,
+    test_a_decorated_check_refusing_by_an_argument_still_refuses), while a
+    method spreading them over nothing that asked, or a wrapper over a method
+    that never declared ``arguments``, is not handed a keyword it would pass
+    on to a call that refuses it
+    (test_a_method_taking_only_keywords_is_handed_nothing,
+    test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing).
+    The wrapped chain is read only behind ``**kwargs``: without that guard
+    the narrower wrapper's test fails, and without the chain the forwarding
+    tests do.
+    """
+    own = inspect.signature(asked, follow_wrapped=False).parameters
+    if _reached_by_keyword(own.get("arguments")):
+        return True
+    if not any(parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in own.values()):
+        return False
+    return _reached_by_keyword(inspect.signature(asked).parameters.get("arguments"))
+
+
+def _reached_by_keyword(parameter: inspect.Parameter | None) -> bool:
+    """Whether ``parameter`` is one a keyword ``arguments=`` reaches as the mapping itself.
 
     One branch to coverage, so each conjunct is held by its own test in
     ``tests/authorization/test_utils.py``:
     ``test_a_method_that_names_no_arguments_is_handed_nothing`` fails without
     the first, and
     ``test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing``
-    without the second.
+    without the second: a parameter of that name that is positional-only or
+    variadic is not reached.
     """
-    parameter = inspect.signature(asked, follow_wrapped=False).parameters.get("arguments")
     return parameter is not None and parameter.kind in (
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         inspect.Parameter.KEYWORD_ONLY,

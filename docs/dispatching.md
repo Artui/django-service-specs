@@ -235,11 +235,16 @@ docs/examples/dispatching.py:arguments_channel
 A method that does not declare the keyword is asked exactly as before, so no
 existing check changes. The base methods do not declare it, which keeps every
 check written without it a valid override under a type checker. Opt-in is by
-name: a method spreading `**kwargs` is not handed it, since a wrapper would
-pass it on to a method that never asked. What is read is what dispatch
-calls, `getattr(check, method)`: a callable set on the instance, or a mock
-patched over the method, answers for its own signature, and a
-`functools.wraps` wrapper for its own rather than the one it wraps. A [`many`](declaring.md#many-rows-in-one-call)
+name. What is read is what dispatch calls, `getattr(check, method)`: a
+callable set on the instance, or a mock patched over the method, answers for
+its own signature. A method spreading `**kwargs` is handed the keyword only
+where the method it wraps through `functools.wraps` names it, so an ordinary
+forwarding decorator keeps an opted-in check opted in, while `**kwargs` over
+nothing that asked is handed nothing it would pass on to a call that refuses
+it; a wrapper with a narrower signature and no `**kwargs` answers for itself.
+`arguments` is `None` where a transport calls `authorize()` without
+`arguments=`, and a check that needs them decides for itself what that means:
+the example above refuses. A [`many`](declaring.md#many-rows-in-one-call)
 call's rows are not among the arguments: they are validated after every
 check, so a check sees the call's `reads` alone. The
 [`authorize`][django_service_specs.dispatch.authorize.authorize] functions
