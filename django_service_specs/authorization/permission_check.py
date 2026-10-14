@@ -28,12 +28,14 @@ class PermissionCheck(abc.ABC):
 
     **A method may ask for the call's arguments** by declaring a keyword
     ``arguments``: dispatch then hands it the call's shape-checked arguments,
-    read-only, at each of the three questions - a route's captured ``pk``, a
+    as a read-only mapping, at each of the three questions - a route's captured ``pk``, a
     filter the caller sent - and a method that does not declare it is asked
     exactly as before. The base methods do not declare it, so every check
     written without it stays a valid override; a ``many`` call's rows are
     not among them, as they are validated after every check. Opt-in is by
-    name: a method spreading ``**kwargs`` is not handed it.
+    name: a method spreading ``**kwargs`` is not handed it. Only the mapping
+    is read-only: its values are the call's own objects, the ones the run
+    receives, so a check must not mutate them.
 
     ``message`` is what [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     says when this check refuses; ``None`` keeps the generic wording.

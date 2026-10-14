@@ -78,8 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A permission check can read the call's arguments.** A
   `PermissionCheck` method that declares a keyword `arguments` - on
   `has_permission`, `has_object_permission` or `has_scope_permission` - is
-  handed the call's shape-checked arguments, read-only, at that question:
-  what an HTTP permission class reads off the view's captured kwargs. The
+  handed the call's shape-checked arguments at that question, as a read-only
+  mapping whose values are the call's own objects, which a check must not
+  mutate: what an HTTP permission class reads off the view's captured kwargs. The
   base methods do not declare it, so every existing check keeps its
   signature, stays a valid override under a type checker, and is asked
   exactly as before; opt-in is by the name alone, so a method spreading

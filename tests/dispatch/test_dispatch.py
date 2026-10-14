@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType, SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django import forms
@@ -4062,6 +4062,25 @@ class TestArgumentsChannel:
         [(_, handed), _] = arguing.asked
         assert handed is not None
         assert isinstance(handed, MappingProxyType)
+
+    def test_the_mapping_is_read_only_at_its_top_level_and_its_values_are_the_call_s(
+        self, ada: Any
+    ) -> None:
+        """No key can be set or removed, and that is all the proxy promises:
+        a value is the call's own object, the one the run receives, so a
+        check must not mutate it. No copy is made to make it otherwise."""
+        arguing, service = Arguing(), Record()
+        spec = ServiceSpec(
+            service=service,
+            permissions=(arguing,),
+            reads=Parameters.of(Parameter("tags", "array", items="string")),
+        )
+        dispatch(spec, principal=ada, arguments={"tags": ["a"]})
+        [(_, handed), _] = arguing.asked
+        assert handed is not None
+        with pytest.raises(TypeError):
+            cast(Any, handed)["tags"] = []
+        assert handed["tags"] is service.calls[0]["tags"]
 
     def test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows(self, ada: Any) -> None:
         """The rows are refused or validated in step five, after every

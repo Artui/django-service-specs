@@ -208,8 +208,10 @@ says when the check refuses.
 
 **A check can read the call's arguments** by declaring a keyword `arguments`
 on any of its three methods. Dispatch then hands that method the call's
-shape-checked arguments, read-only - a route's captured `pk`, a filter the
-caller sent - as an HTTP permission class reads the view's captured kwargs:
+shape-checked arguments as a read-only mapping - a route's captured `pk`, a
+filter the caller sent - as an HTTP permission class reads the view's captured
+kwargs. Only the mapping is read-only: its values are the call's own objects,
+the ones the run receives, so a check must not mutate them.
 
 ```python
 --8<--

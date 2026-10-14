@@ -49,7 +49,8 @@ def authorize_target(
     ``arguments`` is handed to each check's method that declares a keyword
     of that name, and to no other, so a check written before the keyword
     existed is asked as it always was. Dispatch passes the call's
-    shape-checked arguments, read-only; ``None`` when the caller has none to
+    shape-checked arguments as a read-only mapping, whose values are the
+    call's own and must not be mutated; ``None`` when the caller has none to
     hand.
     """
     spec = kernel_spec(spec)

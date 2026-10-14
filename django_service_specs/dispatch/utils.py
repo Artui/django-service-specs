@@ -201,15 +201,17 @@ class _CheckedRows:
 
 
 def checks_arguments(checked: Mapping[str, Any]) -> Mapping[str, Any]:
-    """What a permission check that declares ``arguments`` is handed: ``checked``, read-only.
+    """What a permission check that declares ``arguments`` is handed: ``checked``, as a read-only mapping.
 
     The shape-checked arguments the call carries, less a ``many`` call's
     rows: they are refused or validated in step five, after every check, so
     a check would be deciding on rows nobody has validated, and the carrier
     they travel in is dispatch's own
     (test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows). A
-    copy behind a proxy, so a check can neither change what the call runs
-    with nor see a later change to it.
+    copy of the top level behind a proxy, so a check can neither add nor
+    remove an argument; the values are the call's own objects, not copies,
+    so a check must not mutate them
+    (test_the_mapping_is_read_only_at_its_top_level_and_its_values_are_the_call_s).
     """
     return MappingProxyType(
         {name: value for name, value in checked.items() if not isinstance(value, _CheckedRows)}
