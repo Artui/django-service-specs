@@ -407,7 +407,7 @@ SURFACE: dict[str, Pin] = {
     "UpdateService": _protocol("services.update_service", "(*, instance, data, **extras)"),
     "DeleteService": _protocol("services.delete_service", "(*, instance, data=, **extras)"),
     "implements": _fn("services.implements", "proto"),
-    "is_async": _fn("services.is_async", "fn"),
+    "is_async": _fn("types.is_async", "fn"),
     "run_service": _fn("services.run_service", "fn, kwargs, *, atomic"),
     "arun_service": _fn("services.arun_service", "fn, kwargs, *, atomic"),
     "create_model": _fn(

@@ -13,7 +13,7 @@ from django.test.utils import CaptureQueriesContext
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.services.aupdate_model import aupdate_model
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 from tests.relations_app.models import Catalog, Post, Section, Tag
 from tests.services.utils import savepoints_during
 

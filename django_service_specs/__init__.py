@@ -126,7 +126,6 @@ from django_service_specs.services.delete_collection import delete_collection
 from django_service_specs.services.delete_model import delete_model
 from django_service_specs.services.delete_service import DeleteService
 from django_service_specs.services.implements import implements
-from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
@@ -143,6 +142,7 @@ from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.exit_code import ExitCode
 from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.is_async import is_async
 from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter

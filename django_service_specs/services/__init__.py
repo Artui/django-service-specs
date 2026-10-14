@@ -13,7 +13,6 @@ from django_service_specs.services.delete_collection import delete_collection
 from django_service_specs.services.delete_model import delete_model
 from django_service_specs.services.delete_service import DeleteService
 from django_service_specs.services.implements import implements
-from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_conflict import ServiceConflict
 from django_service_specs.services.service_error import ServiceError
@@ -41,7 +40,6 @@ __all__ = [
     "delete_collection",
     "delete_model",
     "implements",
-    "is_async",
     "run_service",
     "update_model",
 ]

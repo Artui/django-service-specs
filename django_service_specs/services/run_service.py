@@ -13,7 +13,7 @@ from asgiref.sync import async_to_sync
 from django.db import transaction
 
 from django_service_specs.services.arun_service import arun_service
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 
 
 def run_service(

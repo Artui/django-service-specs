@@ -8,7 +8,7 @@ import pytest
 from asgiref.sync import async_to_sync
 
 from django_service_specs.services.adelete_collection import adelete_collection
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 from tests.relations_app.models import Author
 from tests.services.utils import savepoints_during
 

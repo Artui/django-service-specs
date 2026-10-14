@@ -138,7 +138,6 @@ Installed with the `pydantic` extra and imported from
 
 ::: django_service_specs.services.run_service.run_service
 ::: django_service_specs.services.arun_service.arun_service
-::: django_service_specs.services.is_async.is_async
 ::: django_service_specs.services.service_error.ServiceError
 ::: django_service_specs.services.service_validation_error.ServiceValidationError
 ::: django_service_specs.services.service_conflict.ServiceConflict
@@ -252,3 +251,4 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.relation_orphan.RelationOrphan
 ::: django_service_specs.types.relation_phase.RelationPhase
 ::: django_service_specs.types.relation_outcome.RelationOutcome
+::: django_service_specs.types.is_async.is_async

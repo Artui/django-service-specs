@@ -12,7 +12,7 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 
 # The methods dispatch reads a permission check's answer from.
 _CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")

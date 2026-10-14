@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import functools
 
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 
 
 class _AsyncCallable:

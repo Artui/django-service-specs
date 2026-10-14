@@ -7,7 +7,7 @@ from typing import Any
 
 from asgiref.sync import async_to_sync
 
-from django_service_specs.services.is_async import is_async
+from django_service_specs.types.is_async import is_async
 
 
 def run_selector(fn: Callable[..., Any], kwargs: Mapping[str, Any]) -> Any:

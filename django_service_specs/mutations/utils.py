@@ -33,9 +33,9 @@ from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
 from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
 from django_service_specs.services.arun_service import arun_service
-from django_service_specs.services.is_async import is_async
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.types.is_async import is_async
 from django_service_specs.types.relation_orphan import RelationOrphan
 from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
