@@ -263,7 +263,7 @@ def _open_selector(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
-) -> tuple[Any, Grant, dict[str, Any], dict[str, Any]]:
+) -> tuple[Any, Grant, dict[str, Any], dict[str, Any], dict[str, Any]]:
     """Steps one and two, the selector's pool, and its keywords, in the one sync hop.
 
     The keywords are bound here, a read the caller left out refused as on
@@ -294,7 +294,7 @@ def _open_selector(
         reserved=pool_seeds.reserved,
         transport=progress,
     )
-    return who, granted, pool, kwargs
+    return who, granted, pool, kwargs, checked
 
 
 def _settle_and_conclude(
@@ -304,12 +304,13 @@ def _settle_and_conclude(
     who: Any,
     granted: Grant,
     reserved: frozenset[str],
+    checked: dict[str, Any],
 ) -> DispatchResult:
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
     return conclude_selector(
-        spec, value, principal=who, grant=granted, pool=pool, reserved=reserved
+        spec, value, principal=who, grant=granted, pool=pool, reserved=reserved, checked=checked
     )
 
 
@@ -334,7 +335,9 @@ async def _await_selector(
     """
     # Bound before the await and outside the ``try``: a read the caller left
     # out is refused as a missing argument, as on every other path.
-    who, granted, pool, kwargs = await sync_to_async(_open_selector, thread_sensitive=True)(
+    who, granted, pool, kwargs, checked = await sync_to_async(
+        _open_selector, thread_sensitive=True
+    )(
         spec,
         principal,
         principal_id,
@@ -352,8 +355,14 @@ async def _await_selector(
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.
         return conclude_selector(
-            spec, None, principal=who, grant=granted, pool=pool, reserved=pool_seeds.reserved
+            spec,
+            None,
+            principal=who,
+            grant=granted,
+            pool=pool,
+            reserved=pool_seeds.reserved,
+            checked=checked,
         )
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
-        spec, raw, pool, who, granted, pool_seeds.reserved
+        spec, raw, pool, who, granted, pool_seeds.reserved, checked
     )

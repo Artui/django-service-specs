@@ -247,6 +247,7 @@ def dispatch(
             grant=granted,
             pool=pool,
             reserved=pool_seeds.reserved,
+            checked=checked,
         )
     prepared = prepare_service(
         spec,

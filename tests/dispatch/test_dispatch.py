@@ -4,7 +4,7 @@ import functools
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from types import SimpleNamespace
+from types import MappingProxyType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -51,6 +51,7 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
+    Arguing,
     Listed,
     OwnerOnly,
     Record,
@@ -4005,3 +4006,148 @@ class TestOverlays:
         spec = retrieve()
         with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
             dispatch(spec, principal=ada, arguments={"pk": 1}, extra_input_data={"x": 1})
+
+
+class TestArgumentsChannel:
+    """A check that declares ``arguments`` is handed the call's checked arguments."""
+
+    def test_a_read_s_checks_are_handed_the_arguments_at_both_questions(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="mine")
+        arguing, scoped = Arguing(), Scoped()
+        dispatch(retrieve(permissions=(arguing, scoped)), principal=ada, arguments={"pk": note.pk})
+        assert arguing.questions() == [
+            ("has_permission", {"pk": note.pk}),
+            ("has_object_permission", {"pk": note.pk}),
+        ]
+        # A check declaring no ``arguments`` is asked as it always was.
+        assert scoped.rows == [note]
+
+    def test_a_list_s_scope_check_is_handed_them(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=(arguing,))
+        dispatch(spec, principal=ada, arguments={})
+        assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]
+
+    def test_an_update_s_checks_are_handed_the_target_s_reads_and_the_fields(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="old")
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing, Scoped()),
+            validator=Titled(),
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "new"})
+        handed = {"pk": note.pk, "title": "new"}
+        assert arguing.questions() == [
+            ("has_permission", handed),
+            ("has_object_permission", handed),
+        ]
+
+    def test_a_create_s_scope_check_is_handed_them(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(arguing,), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        assert arguing.questions() == [
+            ("has_permission", {"title": "t"}),
+            ("has_scope_permission", {"title": "t"}),
+        ]
+
+    def test_the_mapping_is_read_only(self, ada: Any) -> None:
+        arguing = Arguing()
+        spec = ServiceSpec(service=Record(), permissions=(arguing,), validator=Titled())
+        dispatch(spec, principal=ada, arguments={"title": "t"})
+        [(_, handed), _] = arguing.asked
+        assert handed is not None
+        assert isinstance(handed, MappingProxyType)
+
+    def test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows(self, ada: Any) -> None:
+        """The rows are refused or validated in step five, after every
+        check, so they are not the checks' to read."""
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing,),
+            many=True,
+            validator=Titled(),
+            reads=Parameters.of(Parameter("project", "integer", required=True)),
+        )
+        dispatch(spec, principal=ada, arguments={"project": 7, "items": [{"title": "a"}]})
+        assert arguing.questions() == [
+            ("has_permission", {"project": 7}),
+            ("has_scope_permission", {"project": 7}),
+        ]
+
+    def test_a_method_taking_only_keywords_is_handed_nothing(self, ada: Any) -> None:
+        """Opt-in is by name: a method spreading ``**kwargs`` - a wrapper
+        forwarding to one that never declared ``arguments`` - is not handed
+        a keyword it might pass on to a call that refuses it."""
+        seen: list[dict[str, Any]] = []
+
+        class Spreading(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, **extra: Any) -> bool:
+                seen.append(extra)
+                return True
+
+        dispatch(retrieve(permissions=(Spreading(),)), principal=ada, arguments={"pk": 1})
+        assert seen == [{}]
+
+    def test_a_subclass_inherits_the_declaration(self, ada: Any) -> None:
+        class Inheriting(Arguing):
+            pass
+
+        note = Note.objects.create(owner=ada, title="mine")
+        check = Inheriting()
+        dispatch(retrieve(permissions=(check,)), principal=ada, arguments={"pk": note.pk})
+        assert check.questions()[0] == ("has_permission", {"pk": note.pk})
+
+    def test_a_method_replaced_on_its_class_is_read_as_it_now_is(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Read from the method dispatch is about to call, not from a
+        snapshot taken when the class was defined, so patching the method
+        in or out of the keyword is followed."""
+        seen: list[str] = []
+
+        class Plain(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any) -> bool:
+                seen.append("plain")
+                return True
+
+        def declaring(
+            self: Any, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+        ) -> bool:
+            seen.append(f"declaring {dict(arguments or {})}")
+            return True
+
+        spec = retrieve(permissions=(Plain(),))
+        dispatch(spec, principal=ada, arguments={"pk": 1})
+        monkeypatch.setattr(Plain, "has_permission", declaring)
+        dispatch(spec, principal=ada, arguments={"pk": 1})
+        assert seen == ["plain", "declaring {'pk': 1}"]
+
+    def test_a_caller_s_value_for_a_key_the_server_fills_is_never_a_check_s(self, ada: Any) -> None:
+        """The caller's value for a read the ``kwargs`` provider is annotated
+        to fill, or a field the ``input_data`` provider is, is checked and then
+        dropped, so it is not the call's argument for a check to decide on."""
+        provider, _ = _project_provider()
+
+        class _ServerTitle(TypedDict):
+            title: str
+
+        def server_title() -> _ServerTitle:
+            return {"title": "server"}
+
+        arguing = Arguing()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=(arguing,),
+            validator=Titled(),
+            reads=PROJECT,
+            kwargs=provider,
+            input_data=server_title,
+        )
+        dispatch(spec, principal=ada, arguments={"project_pk": 99, "title": "caller"})
+        assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]

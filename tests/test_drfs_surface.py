@@ -173,9 +173,13 @@ SURFACE: dict[str, Pin] = {
         "dispatch.dispatch_result",
         signature="kind, value=, service_result=, instance=, data=, context=",
     ),
-    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant="),
-    "authorize_scope": _fn("dispatch.authorize_scope", "spec, principal, scope, *, grant"),
-    "authorize_target": _fn("dispatch.authorize_target", "spec, principal, target, *, grant"),
+    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant=, arguments="),
+    "authorize_scope": _fn(
+        "dispatch.authorize_scope", "spec, principal, scope, *, grant, arguments="
+    ),
+    "authorize_target": _fn(
+        "dispatch.authorize_target", "spec, principal, target, *, grant, arguments="
+    ),
     "Grant": Pin(
         "dispatch.grant",
         signature="spec, principal, target_checked=",

@@ -99,6 +99,41 @@ class Scoped(PermissionCheck):
         return not self.refuse_scope
 
 
+class Arguing(PermissionCheck):
+    """Admits everything; records each question with the arguments it was handed.
+
+    Each method declares the keyword, so dispatch hands it the call's
+    arguments; the mapping itself is kept too, so a test can see it is
+    read-only.
+    """
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, Mapping[str, Any] | None]] = []
+
+    def _record(self, question: str, arguments: Mapping[str, Any] | None) -> bool:
+        self.asked.append((question, arguments))
+        return True
+
+    def has_permission(
+        self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+    ) -> bool:
+        return self._record("has_permission", arguments)
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, arguments: Mapping[str, Any] | None = None
+    ) -> bool:
+        return self._record("has_object_permission", arguments)
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, arguments: Mapping[str, Any] | None = None
+    ) -> bool:
+        return self._record("has_scope_permission", arguments)
+
+    def questions(self) -> list[tuple[str, dict[str, Any] | None]]:
+        """What was asked, each mapping copied to a plain dict to compare."""
+        return [(q, None if a is None else dict(a)) for q, a in self.asked]
+
+
 class Titled(Validator):
     """Declares a required title and strips it; records every call.
 

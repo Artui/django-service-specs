@@ -9,7 +9,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 
-from django_service_specs.authorization.utils import is_deactivated
+from django_service_specs.authorization.utils import asked_with, is_deactivated
 
 
 def _user(*, is_active: bool) -> Any:
@@ -47,3 +47,46 @@ def test_a_principal_missing_either_attribute_reads_by_its_default(
     principal: Any, expected: bool
 ) -> None:
     assert is_deactivated(principal) is expected
+
+
+class _Shapes:
+    """One method per way a parameter named ``arguments`` can be declared, or not."""
+
+    def keyword_only(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
+        return True
+
+    def positional_or_keyword(self, principal: Any, spec: Any, arguments: Any = None) -> bool:
+        return True
+
+    def positional_only(self, principal: Any, spec: Any, arguments: Any = None, /) -> bool:
+        return True
+
+    def variadic(self, principal: Any, spec: Any, *arguments: Any) -> bool:
+        return True
+
+    def spread_under_the_name(self, principal: Any, spec: Any, **arguments: Any) -> bool:
+        return True
+
+    def spread(self, principal: Any, spec: Any, **kwargs: Any) -> bool:
+        return True
+
+    def undeclared(self, principal: Any, spec: Any) -> bool:
+        return True
+
+
+@pytest.mark.parametrize("method", ["keyword_only", "positional_or_keyword"])
+def test_a_parameter_a_keyword_reaches_is_handed_the_arguments(method: str) -> None:
+    handed = {"pk": 1}
+    assert asked_with(_Shapes(), method, handed) == {"arguments": handed}
+
+
+@pytest.mark.parametrize("method", ["spread", "undeclared"])
+def test_a_method_that_names_no_arguments_is_handed_nothing(method: str) -> None:
+    assert asked_with(_Shapes(), method, {"pk": 1}) == {}
+
+
+@pytest.mark.parametrize("method", ["positional_only", "variadic", "spread_under_the_name"])
+def test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing(
+    method: str,
+) -> None:
+    assert asked_with(_Shapes(), method, {"pk": 1}) == {}

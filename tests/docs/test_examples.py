@@ -314,6 +314,14 @@ class TestDispatching:
         with pytest.raises(NotPermitted):
             dispatching.rename_from_a_view(bob, {"pk": note.pk, "title": "Mine now"})
 
+    def test_a_check_declaring_arguments_refuses_by_what_the_call_names(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Mine")
+        spec = dispatching.lockable_note_spec
+        assert dispatch(spec, principal=ada, arguments={"pk": note.pk}).value == note
+        # Refused before the lookup, so a locked pk is refused whether or not it exists.
+        with pytest.raises(NotPermitted, match="That note is locked."):
+            dispatch(spec, principal=ada, arguments={"pk": 7})
+
     def test_overlays_sit_beneath_the_spec_s_providers_and_over_the_caller(self, ada: Any) -> None:
         result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})
         assert result.value == "From the hook via web on api"

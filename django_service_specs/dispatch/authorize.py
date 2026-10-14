@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import sync_answer
+from django_service_specs.authorization.utils import asked_with, sync_answer
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -20,6 +21,7 @@ def authorize(
     principal: Any,
     *,
     grant: Grant | None = None,
+    arguments: Mapping[str, Any] | None = None,
 ) -> Grant:
     """Run ``spec``'s class-level permission checks for ``principal``.
 
@@ -48,6 +50,12 @@ def authorize(
     An answer still to be awaited - a coroutine from a check that is not
     sync - raises ``ImproperlyConfigured`` rather than being read as a pass.
 
+    ``arguments`` is handed to each check's method that declares a keyword
+    of that name, and to no other, so a check written before the keyword
+    existed is asked as it always was. Dispatch passes the call's
+    shape-checked arguments, read-only; ``None`` when the caller has none to
+    hand.
+
     Returns:
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
@@ -67,7 +75,9 @@ def authorize(
             "no permissions. Pass permissions=[Unrestricted()] to mean that anyone may run it."
         )
     for check in spec.permissions:
-        answer = check.has_permission(principal, spec)
+        answer = check.has_permission(
+            principal, spec, **asked_with(check, "has_permission", arguments)
+        )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_permission"):
             raise NotPermitted(check.message)
     return Grant(spec, principal)

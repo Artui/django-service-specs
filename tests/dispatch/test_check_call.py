@@ -20,7 +20,17 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
-from tests.dispatch.utils import OPEN, PK, TENANT_SEEDS, Record, Refuse, Scoped, Titled, make_user
+from tests.dispatch.utils import (
+    OPEN,
+    PK,
+    TENANT_SEEDS,
+    Arguing,
+    Record,
+    Refuse,
+    Scoped,
+    Titled,
+    make_user,
+)
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign
 
@@ -251,3 +261,15 @@ def test_a_scope_check_is_left_to_dispatch(ada: Any) -> None:
     assert check.scopes == []
     with pytest.raises(NotPermitted, match="Not within your scope."):
         dispatch(spec, principal=ada, arguments={})
+
+
+def test_a_check_declaring_arguments_is_handed_what_dispatch_hands_it(ada: Any) -> None:
+    arguing = Arguing()
+    check_call(_searching(arguing), principal=ada, arguments={"search": "x"})
+    assert arguing.questions() == [("has_permission", {"search": "x"})]
+
+
+def test_a_many_spec_s_check_is_handed_no_rows_as_under_dispatch(ada: Any) -> None:
+    arguing = Arguing()
+    check_call(_rows(arguing), principal=ada, arguments={"items": [{"title": "a"}]})
+    assert arguing.questions() == [("has_permission", {})]

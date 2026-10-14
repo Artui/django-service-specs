@@ -183,6 +183,22 @@ class _CheckedRows:
     errors: dict[int, Any]
 
 
+def checks_arguments(checked: Mapping[str, Any]) -> Mapping[str, Any]:
+    """What a permission check that declares ``arguments`` is handed: ``checked``, read-only.
+
+    The shape-checked arguments the call carries, less a ``many`` call's
+    rows: they are refused or validated in step five, after every check, so
+    a check would be deciding on rows nobody has validated, and the carrier
+    they travel in is dispatch's own
+    (test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows). A
+    copy behind a proxy, so a check can neither change what the call runs
+    with nor see a later change to it.
+    """
+    return MappingProxyType(
+        {name: value for name, value in checked.items() if not isinstance(value, _CheckedRows)}
+    )
+
+
 def open_call(
     spec: ServiceSpec | SelectorSpec,
     principal: Any,
@@ -249,7 +265,7 @@ def open_call(
             "the parameter."
         )
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    granted = authorize(spec, principal, grant=grant)
+    granted = authorize(spec, principal, grant=grant, arguments=checks_arguments(checked))
     if settle_rows:
         # Only a ``many`` spec's list is ever carried as ``_CheckedRows``: a
         # refused row raises as step five raises it
@@ -947,6 +963,7 @@ def conclude_selector(
     grant: Grant,
     pool: Mapping[str, Any],
     reserved: frozenset[str],
+    checked: Mapping[str, Any],
 ) -> DispatchResult:
     """Step four for a selector spec, its ``preconditions``, and its result.
 
@@ -982,19 +999,23 @@ def conclude_selector(
     ``kwargs`` provider's keys, which are arguments rather than the call's
     surroundings
     (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context).
+
+    ``checked`` is the call's shape-checked arguments, handed to a check that
+    declares ``arguments`` as step two handed them.
     """
     grant = replace(grant, target_checked=False)
+    handed = checks_arguments(checked)
     fillable = spec.reads.names()
     context = PresentationContext(
         principal,
         ambient=MappingProxyType({name: entry for name, entry in pool.items() if name in reserved}),
     )
     if spec.kind is SelectorKind.LIST:
-        authorize_scope(spec, principal, value, grant=grant)
+        authorize_scope(spec, principal, value, grant=grant, arguments=handed)
         run_preconditions(spec, {**pool, "collection": value}, fillable=fillable)
         return DispatchResult(kind="list", value=value, context=context)
     if value is not None:
-        authorize_target(spec, principal, value, grant=grant)
+        authorize_target(spec, principal, value, grant=grant, arguments=handed)
         run_preconditions(spec, {**pool, "instance": value}, fillable=fillable)
     elif not spec.allow_none:
         return NOT_FOUND
@@ -1026,6 +1047,9 @@ def walk_target(
     - **A collection**, empty or not: ``authorize_scope`` of the set.
     - **A create**, which resolves nothing: ``authorize_scope`` of ``None``.
 
+    Each is handed ``checked`` for a check that declares ``arguments``, as
+    step two was.
+
     ``target``, when given, is the target a caller resolved itself, and stands
     in for the lookup alone: the checks above still run on it, unless
     ``grant.target_checked`` says they ran already. A create takes ``None``
@@ -1042,6 +1066,7 @@ def walk_target(
     """
     if target is UNSET:
         grant = replace(grant, target_checked=False)
+    handed = checks_arguments(checked)
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector
@@ -1053,11 +1078,11 @@ def walk_target(
                 instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
             )
         if target is not None:
-            authorize_target(spec, principal, target, grant=grant)
+            authorize_target(spec, principal, target, grant=grant, arguments=handed)
         elif not instance_spec.allow_none:
             return NOT_FOUND
         else:
-            authorize_scope(spec, principal, None, grant=grant)
+            authorize_scope(spec, principal, None, grant=grant, arguments=handed)
         return {"instance": target}
     if collection_spec is not None:
         if target is UNSET:
@@ -1067,7 +1092,7 @@ def walk_target(
             target = lookup(
                 collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
             )
-        authorize_scope(spec, principal, target, grant=grant)
+        authorize_scope(spec, principal, target, grant=grant, arguments=handed)
         return {"collection": target}
     # One arc to coverage, so each conjunct is held by its own test: a create
     # dispatched with no ``target=`` (test_a_create_asks_the_scope_check_of_nothing)
@@ -1077,7 +1102,7 @@ def walk_target(
             "dispatch() was handed a target= for a ServiceSpec that declares no target "
             "selector. A create acts on no existing row; pass target=None or nothing."
         )
-    authorize_scope(spec, principal, None, grant=grant)
+    authorize_scope(spec, principal, None, grant=grant, arguments=handed)
     return {}
 
 

@@ -2,7 +2,8 @@
 
 ``sync_answer`` is read by the three ``authorize`` functions, so the
 class-level, object-level and scope-level checks cannot disagree about an
-answer that is not one. The deactivated rule is read in three places: dispatch, refusing the principal
+answer that is not one, and so is ``asked_with``, so they cannot disagree
+about which check is handed the call's arguments. The deactivated rule is read in three places: dispatch, refusing the principal
 it was handed; ``resolve_principal``, refusing the row an identifier named; and
 the HTTP entry points, refusing ``request.user`` before the request is read.
 It is written once here so the three cannot disagree about who is refused.
@@ -12,7 +13,9 @@ read it without a cycle.
 
 from __future__ import annotations
 
+import functools
 import inspect
+from collections.abc import Callable, Mapping
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -76,3 +79,47 @@ def sync_answer(answer: Any, *, asked: str) -> Any:
             "is refused rather than allowed; declare the method with def."
         )
     return answer
+
+
+def asked_with(check: Any, method: str, arguments: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The keywords to ask ``check``'s ``method`` with: ``arguments``, if it declares them.
+
+    The base ``PermissionCheck`` methods declare no ``arguments``, so every
+    check written before the channel existed keeps its signature and stays a
+    valid override; a method that wants the call's arguments declares the
+    keyword, and only a method that does is handed it. Read off the method
+    dispatch is about to call, on the check's class, so a method replaced
+    after the class was defined is read as it now is
+    (test_a_method_replaced_on_its_class_is_read_as_it_now_is), and an
+    inherited one as its declaring class wrote it
+    (test_a_subclass_inherits_the_declaration).
+    """
+    return {"arguments": arguments} if _declares_arguments(getattr(type(check), method)) else {}
+
+
+@functools.cache
+def _declares_arguments(function: Callable[..., Any]) -> bool:
+    """Whether ``function`` names a parameter ``arguments`` that can be passed by keyword.
+
+    By name alone: a method spreading ``**kwargs`` is not handed it, since a
+    wrapper forwarding them to a method that never declared ``arguments``
+    would pass on a keyword that method refuses
+    (test_a_method_taking_only_keywords_is_handed_nothing). Nor is a
+    parameter of that name that is positional-only or variadic, which no
+    keyword reaches as the mapping itself
+    (test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing).
+    Inspected once per function: a call asks each check up to twice, and a
+    signature does not change while its function lives.
+
+    One branch to coverage, so each conjunct is held by its own test in
+    ``tests/authorization/test_utils.py``:
+    ``test_a_method_that_names_no_arguments_is_handed_nothing`` fails without
+    the first, and
+    ``test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing``
+    without the second.
+    """
+    parameter = inspect.signature(function).parameters.get("arguments")
+    return parameter is not None and parameter.kind in (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        inspect.Parameter.KEYWORD_ONLY,
+    )

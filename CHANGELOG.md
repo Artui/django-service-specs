@@ -72,6 +72,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Validator, on every row of a `many` call, and a selector spec refuses it
   with a `TypeError`. Neither relaxes the shape check: a required parameter
   only an overlay supplies is still the caller's to send.
+- **A permission check can read the call's arguments.** A
+  `PermissionCheck` method that declares a keyword `arguments` - on
+  `has_permission`, `has_object_permission` or `has_scope_permission` - is
+  handed the call's shape-checked arguments, read-only, at that question:
+  what an HTTP permission class reads off the view's captured kwargs. The
+  base methods do not declare it, so every existing check keeps its
+  signature, stays a valid override under a type checker, and is asked
+  exactly as before; opt-in is by the name alone, so a method spreading
+  `**kwargs` is not handed it. A `many` call's rows are not among them,
+  since they are validated after every check. `dispatch`, `adispatch`,
+  `check_call` and `resolve_target` hand them over, and `authorize`,
+  `authorize_target` and `authorize_scope` take them as `arguments=` for a
+  transport that calls them itself.
 
 ### Changed
 - **`ModelT` is a pinned import path.** The type variable `ChangeResult` is

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs import (
@@ -12,6 +13,7 @@ from django_service_specs import (
     Grant,
     Parameter,
     Parameters,
+    PermissionCheck,
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
@@ -66,6 +68,32 @@ def rename_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
 
 
 # --8<-- [end:grant]
+
+
+# --8<-- [start:arguments_channel]
+class NotLocked(PermissionCheck):
+    message = "That note is locked."
+
+    def __init__(self, *locked: int) -> None:
+        self.locked = frozenset(locked)
+
+    # Declaring ``arguments`` asks for the call's shape-checked arguments; a
+    # check that does not declare it is asked as it always was.
+    def has_permission(
+        self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
+    ) -> bool:
+        return arguments is None or arguments.get("pk") not in self.locked
+
+
+lockable_note_spec = SelectorSpec(
+    kind=SelectorKind.RETRIEVE,
+    selector=lambda *, user, pk: Note.objects.filter(owner=user, pk=pk),
+    permissions=[IsSignedIn(), NotLocked(7)],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+# --8<-- [end:arguments_channel]
 
 
 # --8<-- [start:overlays]

@@ -20,6 +20,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -39,6 +40,7 @@ from tests.dispatch.utils import (
     PK,
     RENAME,
     TENANT_SEEDS,
+    Arguing,
     Listed,
     OwnerOnly,
     Record,
@@ -1176,3 +1178,62 @@ async def test_extra_input_data_on_a_selector_spec_is_refused_before_any_hop(
     with pytest.raises(TypeError, match="extra_input_data= is a ServiceSpec's"):
         await adispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
     assert hops == []
+
+
+# --- the arguments channel -----------------------------------------------------------------
+
+
+async def _async_by_pk(*, pk: int) -> Any:
+    return Note.objects.filter(pk=pk)
+
+
+async def _async_with_pk(*, pk: int) -> None:
+    return None
+
+
+# The paths on which a check is asked: a sync spec's one hop, a non-atomic
+# async service's prelude, and an async selector's two hops either side of
+# its await.
+_ARGUED: dict[str, Callable[[PermissionCheck], Any]] = {
+    "_dispatch": lambda check: SelectorSpec(
+        kind=RETRIEVE, selector=note_by_pk, reads=PK, permissions=(check,)
+    ),
+    "_prepare": lambda check: ServiceSpec(
+        service=_async_with_pk,
+        atomic=False,
+        permissions=(check,),
+        reads=PK,
+    ),
+    "_await_selector": lambda check: SelectorSpec(
+        kind=RETRIEVE, selector=_async_by_pk, reads=PK, permissions=(check,)
+    ),
+}
+_ARGUED_QUESTIONS = {
+    "_dispatch": ["has_permission", "has_object_permission"],
+    "_prepare": ["has_permission", "has_scope_permission"],
+    "_await_selector": ["has_permission", "has_object_permission"],
+}
+
+
+@pytest.mark.parametrize("path", sorted(_ARGUED))
+async def test_a_check_declaring_arguments_is_handed_them_on_every_path(
+    path: str, ada: Any
+) -> None:
+    note = await _create(owner=ada, title="mine")
+    arguing = Arguing()
+
+    await adispatch(_ARGUED[path](arguing), principal=ada, arguments={"pk": note.pk})
+
+    assert arguing.questions() == [
+        (question, {"pk": note.pk}) for question in _ARGUED_QUESTIONS[path]
+    ]
+
+
+async def test_a_check_declaring_no_arguments_is_asked_as_before(ada: Any) -> None:
+    note = await _create(owner=ada, title="mine")
+    scoped = Scoped()
+    spec = SelectorSpec(kind=RETRIEVE, selector=_async_by_pk, reads=PK, permissions=(scoped,))
+
+    await adispatch(spec, principal=ada, arguments={"pk": note.pk})
+
+    assert [row.pk for row in scoped.rows] == [note.pk]

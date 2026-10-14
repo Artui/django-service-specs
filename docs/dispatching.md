@@ -198,6 +198,27 @@ row reads an attribute off it and would fail on either. `message` is what
 [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
 says when the check refuses.
 
+**A check can read the call's arguments** by declaring a keyword `arguments`
+on any of its three methods. Dispatch then hands that method the call's
+shape-checked arguments, read-only - a route's captured `pk`, a filter the
+caller sent - as an HTTP permission class reads the view's captured kwargs:
+
+```python
+--8<--
+docs/examples/dispatching.py:arguments_channel
+--8<--
+```
+
+A method that does not declare the keyword is asked exactly as before, so no
+existing check changes. The base methods do not declare it, which keeps every
+check written without it a valid override under a type checker. Opt-in is by
+name: a method spreading `**kwargs` is not handed it, since a wrapper would
+pass it on to a method that never asked. A [`many`](declaring.md#many-rows-in-one-call)
+call's rows are not among the arguments: they are validated after every
+check, so a check sees the call's `reads` alone. The
+[`authorize`][django_service_specs.dispatch.authorize.authorize] functions
+take the same mapping as `arguments=` for a transport that calls them itself.
+
 **A check is sync-only**: it may query, so the async entry point runs it in
 the executor. An `async def` method would answer with a coroutine, which is
 truthy and would allow every call, so a spec refuses a check declaring one

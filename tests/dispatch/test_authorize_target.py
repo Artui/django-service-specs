@@ -12,6 +12,7 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses
+from tests.dispatch.utils import Arguing
 from tests.specs.utils import Foreign
 
 
@@ -110,3 +111,11 @@ def test_a_source_s_grant_that_checked_the_target_skips_the_checks() -> None:
     )
 
     assert check.object_level_calls == 0
+
+
+def test_a_check_declaring_arguments_is_handed_them_as_given_and_none_without() -> None:
+    arguing, legacy = Arguing(), Allow()
+    spec, principal, arguments = _spec([arguing, legacy]), object(), {"pk": 1}
+    authorize_target(spec, principal, object(), grant=Grant(spec, principal), arguments=arguments)
+    authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+    assert arguing.asked == [("has_object_permission", arguments), ("has_object_permission", None)]
