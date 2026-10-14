@@ -36,6 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused. A Validator whose library validates a list as one overrides it.
   An override returning values under any other name is refused, and one
   declared `async def` is refused when the spec is built.
+- **`ValidationContext.ambient`**: the call's resolved seeds, as a read-only
+  mapping - `user`, `progress` and every seed registered through
+  `PoolSeeds`, such as an HTTP adapter's `request` - so a library whose
+  validation reads what its caller registered, as a serializer reads its
+  context, finds it there. `dispatch` and `adispatch` fill it, on a single
+  call and on every row of a `many` call alike; it holds no argument, no
+  validated value and not the target. It trails the other fields with an
+  empty default and takes no part in equality, so a context built by hand,
+  and the one `bind_arguments` builds, which is handed no seeds, are as
+  they were.
 
 ### Changed
 - **`ModelT` is a pinned import path.** The type variable `ChangeResult` is

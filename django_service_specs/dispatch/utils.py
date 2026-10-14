@@ -15,6 +15,7 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
+from types import MappingProxyType
 from typing import Any, Literal, cast
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
@@ -999,6 +1000,7 @@ def validate_arguments(
     principal: Any,
     target: Any,
     server_input: Mapping[str, Any],
+    ambient: Mapping[str, Any] | None = None,
 ) -> Validated:
     """Step five: the Validator's whole result, on only the arguments its own ``parameters()`` declare.
 
@@ -1010,7 +1012,9 @@ def validate_arguments(
     for. The caller's arguments have been through the shape check, and the
     server's are the author's own values, which the Validator checks.
 
-    ``ValidationContext.partial`` is the spec's ``partial``. A spec with no
+    ``ValidationContext.partial`` is the spec's ``partial``, and its
+    ``ambient`` a read-only view of ``ambient``, the call's base pool, or
+    empty for a caller with no seeds (``bind_arguments``). A spec with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
 
@@ -1028,14 +1032,18 @@ def validate_arguments(
     if validator is None:
         return Validated(values={}, data={})
     declared = validator.parameters().names()
+    # A copy behind a proxy, so the Validator can neither change the pool the
+    # service is called from nor see a later change to it.
+    context = ValidationContext(
+        principal, target, partial=spec.partial, ambient=MappingProxyType(dict(ambient or {}))
+    )
     if spec.many:
-        context = ValidationContext(principal, target, partial=spec.partial)
         return _validate_rows(
             validator, checked[spec.many_argument], spec.many_argument, context, server_input
         )
     merged = {**checked, **server_input}
     own = {name: value for name, value in merged.items() if name in declared}
-    return validator.validated(own, ValidationContext(principal, target, partial=spec.partial))
+    return validator.validated(own, context)
 
 
 def _validate_rows(
@@ -1160,7 +1168,7 @@ def prepare_service(
     providers_pool = {**base, **reads, **resolved}
     server_input = resolve_provider(spec.input_data, providers_pool, label="ServiceSpec.input_data")
     validated = validate_arguments(
-        spec, checked, principal=principal, target=target, server_input=server_input
+        spec, checked, principal=principal, target=target, server_input=server_input, ambient=base
     )
     values = validated.values
     # A Validator returning ``user`` is a bug, and letting its value outrank the

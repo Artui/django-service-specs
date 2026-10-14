@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import Any
 
 
 @dataclass(frozen=True)
 class ValidationContext:
-    """The principal, the target the operation acts on, and whether the call is partial.
+    """The principal, the target the operation acts on, whether the call is partial, and its seeds.
 
     ``target`` is here, rather than a constructor keyword the way DRF takes
     ``instance=``, because the kernel is what resolves it: target resolution
@@ -23,8 +25,20 @@ class ValidationContext:
     the caller sent, or refuses the call with ``ImproperlyConfigured`` if it
     cannot. It trails the other two with a default, so a context built from a
     principal and a target is a whole call, as it always was.
+
+    ``ambient`` is the call's base pool as dispatch resolved it: ``user``,
+    ``progress`` and every registered seed - an HTTP adapter's ``request``,
+    a view it registers, a tenant - read-only. A library whose validation
+    reads what its caller registered, as a serializer reads its context's
+    ``request``, finds it here rather than in an argument. It never holds an
+    argument, a validated value or the target, which have seats of their
+    own. Empty for a context built by hand, and in ``bind_arguments``, which
+    is handed no seeds; it trails the others, so neither changes.
     """
 
     principal: Any
     target: Any = None
     partial: bool = False
+    # Excluded from equality: two contexts of one call are one context whatever
+    # the seeds resolved to, and a mapping proxy cannot be hashed.
+    ambient: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)

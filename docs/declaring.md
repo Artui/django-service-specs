@@ -488,7 +488,10 @@ methods, and a third method and an attribute with defaults:
   carrying the principal and the resolved target. It may query - a uniqueness
   check does - and the target is there so that an update's check can exclude
   the row being updated. The context also says whether the call is
-  [`partial`](#partial-updates).
+  [`partial`](#partial-updates), and carries the call's resolved seeds as
+  `ambient`: `user`, `progress` and every seed registered through
+  `PoolSeeds`, such as an HTTP adapter's `request`, read-only, for a library
+  whose validation reads what its caller registered.
 - `validated(arguments, context)` is what dispatch calls: a
   [`Validated`][django_service_specs.validation.validated.Validated] carrying
   the `values` the service is spread with, the call's `data`, and a `pool` of

@@ -509,7 +509,7 @@ SURFACE: dict[str, Pin] = {
         },
     ),
     "ValidationContext": Pin(
-        "validation.validation_context", signature="principal, target=, partial="
+        "validation.validation_context", signature="principal, target=, partial=, ambient="
     ),
     "Validated": Pin("validation.validated", signature="values, data, pool="),
     # --- http: the two helpers a non-DRF HTTP transport reaches for ----------------------------

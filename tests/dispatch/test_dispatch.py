@@ -3840,3 +3840,33 @@ def test_a_check_is_asked_about_the_compiled_spec_on_either_route(ada: Any) -> N
 
     assert len(check.asked) == 2
     assert all(asked is kernel_spec(source) for asked in check.asked)
+
+
+class TestAmbient:
+    """The Validator's context carries the call's resolved seeds, read-only."""
+
+    def test_the_validator_reads_the_registered_seeds_and_the_user(self, ada: Any) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+        dispatch(spec, principal=ada, arguments={"title": "a"}, pool_seeds=TENANT_SEEDS)
+        [(_, context)] = validator.calls
+        assert context.ambient["tenant"] == "tenant-of-ada"
+        assert context.ambient["user"] is ada
+        # Nothing the caller sent, and nothing the Validator has yet to return.
+        assert "title" not in context.ambient
+        with pytest.raises(TypeError):
+            context.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
+
+    def test_each_row_of_a_many_call_reads_them_too(self, ada: Any) -> None:
+        validator = Titled()
+        spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
+        dispatch(
+            spec,
+            principal=ada,
+            arguments={"items": [{"title": "a"}, {"title": "b"}]},
+            pool_seeds=TENANT_SEEDS,
+        )
+        assert [context.ambient["tenant"] for _, context in validator.calls] == [
+            "tenant-of-ada",
+            "tenant-of-ada",
+        ]

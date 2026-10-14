@@ -1056,6 +1056,16 @@ async def test_a_many_spec_validates_its_list_as_one_inside_the_hop(
     assert len(hops) == 1
 
 
+async def test_the_validator_reads_the_call_s_seeds_on_the_async_path(
+    ada: Any, hops: list[str]
+) -> None:
+    validator = Titled()
+    spec = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
+    await adispatch(spec, principal=ada, arguments={"title": "a"}, pool_seeds=TENANT_SEEDS)
+    [(_, context)] = validator.calls
+    assert (context.ambient["tenant"], context.ambient["user"]) == ("tenant-of-ada", ada)
+
+
 async def test_a_many_spec_refuses_its_rows_by_index(ada: Any, hops: list[str]) -> None:
     spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
     with pytest.raises(InvalidArguments) as refused:
