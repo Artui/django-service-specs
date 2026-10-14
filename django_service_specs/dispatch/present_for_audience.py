@@ -9,9 +9,10 @@ from django_service_specs.dispatch.present import present
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.project_payload import project_payload
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def present_for_audience(

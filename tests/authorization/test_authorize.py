@@ -12,10 +12,10 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import kernel_spec
 from tests.authorization.utils import (
     Allow,
     AnswersWith,

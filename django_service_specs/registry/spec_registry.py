@@ -7,9 +7,10 @@ from collections.abc import Iterable, Iterator
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.registry.registered_spec import RegisteredSpec
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 class SpecRegistry:

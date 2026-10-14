@@ -8,8 +8,9 @@ from asgiref.sync import sync_to_async
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 async def aenforce_affordances(

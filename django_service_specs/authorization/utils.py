@@ -104,6 +104,6 @@ def compiled_spec(spec: ServiceSpec | SelectorSpec | SpecSource) -> ServiceSpec 
     # those fails with ``SelectorSpec`` half-initialized. By the time a grant
     # or a check is asked anything, every spec module has finished loading, so
     # this resolves from ``sys.modules`` and runs nothing.
-    from django_service_specs.specs.spec_source import kernel_spec
+    from django_service_specs.specs.kernel_spec import kernel_spec
 
     return kernel_spec(spec)

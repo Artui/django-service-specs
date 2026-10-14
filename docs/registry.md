@@ -37,7 +37,7 @@ wrapper, and kept as registered, so `entry.spec` and `specs()` hand back the
 object itself. `dispatch`, `adispatch`, `check_call`, `present`, `apresent`,
 `resolve_target`, the three affordance functions, `spec_input_schema` and
 `audience_projection_for_spec` take it as they take a spec, and
-[`kernel_spec`][django_service_specs.specs.spec_source.kernel_spec] is how a
+[`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] is how a
 transport reads the spec it compiles to anywhere else. It is compiled the
 first time anything reads it, and that compiled spec answers every later call
 for the same object.

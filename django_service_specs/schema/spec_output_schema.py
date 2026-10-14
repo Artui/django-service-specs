@@ -14,10 +14,11 @@ from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.utils import allow_null
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_kind import SelectorKind
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 
 
 def spec_output_schema(

@@ -26,7 +26,7 @@ One Django setting, read at the call rather than at import, so
 ::: django_service_specs.specs.selector_spec.SelectorSpec
 ::: django_service_specs.specs.selector_kind.SelectorKind
 ::: django_service_specs.specs.spec_source.SpecSource
-::: django_service_specs.specs.spec_source.kernel_spec
+::: django_service_specs.specs.kernel_spec.kernel_spec
 
 ## Parameters
 

@@ -15,8 +15,9 @@ from django_service_specs.affordances.utils import (
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.service_not_found import ServiceNotFound
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.spec_source import SpecSource, kernel_spec
+from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.utils import is_row_condition
 
