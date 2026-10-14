@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeps admitting the null it passes through unformatted.
 
 ### Changed
+- **`ModelT` is a pinned import path.** The type variable `ChangeResult` is
+  generic over, `django_service_specs.mutations.change_result.ModelT`, is
+  read by a downstream subclass that parameterizes `ChangeResult` with it,
+  so its module, name, bound (`Model`) and place as `ChangeResult`'s only
+  type parameter are now held by the surface test. It stays importable from
+  that module alone, not from the package root.
 - **No module imports another back, at any depth.** A nested write persists
   each related row through the same create or update that is writing its
   parent, and that recursion was the one import ring the package still had:

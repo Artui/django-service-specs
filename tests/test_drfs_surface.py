@@ -22,6 +22,12 @@ release may widen without breaking anyone:
   the abstract methods a subclass must provide, its public base classes, an
   enum's members and a constant's value.
 
+A row marked ``leaf_only`` pins a name importable from its leaf module and
+from nowhere else, because exporting it would put it in the root's namespace
+for no reader: a type variable a downstream generic subclass parameterizes
+with, read as ``from <leaf> import ModelT``. Its row says what it is bound to
+and whose type parameter it is.
+
 A few rows are read directly by transports that reach this package without
 going through djangorestframework-services, and are pinned for the same
 reason. The test is pure Python and Django: it imports neither DRF nor
@@ -35,10 +41,11 @@ import importlib
 import inspect
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, TypeVar
 
 import pytest
 from django.contrib.auth.models import AnonymousUser
+from django.db.models import Model
 
 import django_service_specs
 from django_service_specs import (
@@ -71,6 +78,9 @@ class Pin:
     members: Mapping[str, object] | None = None
     value: object = _UNPINNED
     instance_of: str | None = None
+    leaf_only: bool = False
+    bound: type | None = None
+    parameter_of: str | None = None
 
 
 def _fn(leaf: str, signature: str) -> Pin:
@@ -209,6 +219,11 @@ SURFACE: dict[str, Pin] = {
     "ChildCollectionChange": Pin(
         "mutations.child_collection_change",
         signature="relation, created=, updated=, deleted=, unlinked=, removed=",
+    ),
+    # The adapter's own generic subclass of ChangeResult is parameterized with
+    # this one, so a rename, a new bound or a second TypeVar breaks it.
+    "ModelT": Pin(
+        "mutations.change_result", leaf_only=True, bound=Model, parameter_of="ChangeResult"
     ),
     "FieldChange": Pin("mutations.field_change", signature="field, old, new"),
     "RelatedObjectChange": Pin(
@@ -610,7 +625,11 @@ def _rows(facet: str) -> list[str]:
 # --- the table holds ----------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("name", list(SURFACE))
+def _leaf_value(name: str) -> Any:
+    return getattr(importlib.import_module(f"{_PACKAGE}.{SURFACE[name].leaf}"), name)
+
+
+@pytest.mark.parametrize("name", [name for name, pin in SURFACE.items() if not pin.leaf_only])
 def test_importable_from_the_root_its_subpackage_and_its_leaf(name: str) -> None:
     leaf = SURFACE[name].leaf
     subpackage = importlib.import_module(f"{_PACKAGE}.{leaf.rpartition('.')[0]}")
@@ -623,6 +642,25 @@ def test_importable_from_the_root_its_subpackage_and_its_leaf(name: str) -> None
     assert name in subpackage.__all__
     assert getattr(subpackage, name) is exported
     assert getattr(module, name) is exported
+
+
+@pytest.mark.parametrize("name", _rows("leaf_only"))
+def test_a_leaf_only_name_is_importable_from_its_leaf_alone(name: str) -> None:
+    subpackage = importlib.import_module(f"{_PACKAGE}.{SURFACE[name].leaf.rpartition('.')[0]}")
+    _leaf_value(name)
+    assert name not in django_service_specs.__all__
+    assert name not in subpackage.__all__
+
+
+@pytest.mark.parametrize("name", _rows("bound"))
+def test_a_type_variable_as_pinned(name: str) -> None:
+    pin = SURFACE[name]
+    type_var = _leaf_value(name)
+    assert isinstance(type_var, TypeVar)
+    assert type_var.__name__ == name
+    assert type_var.__bound__ is pin.bound
+    assert pin.parameter_of is not None
+    assert getattr(django_service_specs, pin.parameter_of).__parameters__ == (type_var,)
 
 
 @pytest.mark.parametrize("name", _rows("signature"))
