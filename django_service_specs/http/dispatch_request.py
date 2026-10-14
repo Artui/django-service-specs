@@ -12,11 +12,8 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.http.error_response import error_response
 from django_service_specs.http.request_arguments import request_arguments
-from django_service_specs.http.utils import (
-    not_found_response,
-    request_principal,
-    success_response,
-)
+from django_service_specs.http.request_principal import request_principal
+from django_service_specs.http.utils import not_found_response, success_response
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.specs.selector_spec import SelectorSpec

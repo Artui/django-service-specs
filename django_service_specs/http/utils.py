@@ -1,14 +1,13 @@
-"""What the HTTP entry points share: the principal, the route, the answer, the view's half.
+"""What the HTTP entry points share: the answer, and the view's half.
 
 ``dispatch_request`` and ``adispatch_request`` differ only in how they reach
-the kernel, so everything either does to a request before dispatch and to a
-result after it is written once here. The async one reads the request in an
-executor hop and builds its responses on the loop, which is why the two
-halves are separate functions: the read may query, and the answer never does.
-
-Nothing here imports ``request_arguments``, which reads the route through
-``route_arguments``: a shared helper that did would make the two import each
-other.
+the kernel, so everything either does to a result after dispatch is written
+once here. What either reads off a request before dispatch - the principal,
+the route, the arguments - is public, each in its own module, since a host's
+own view reads them by the same rules. The async one reads the request in an
+executor hop and builds its responses on the loop, which is why the read and
+the answer are separate functions: the read may query, and the answer never
+does.
 
 ``SpecView`` and ``AsyncSpecView`` likewise differ only in their handlers, so
 everything else about them is ``SpecViewBase``.
@@ -16,7 +15,7 @@ everything else about them is ``SpecViewBase``.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from typing import Any, Final, cast
 
 from django.core.exceptions import ImproperlyConfigured
@@ -25,9 +24,6 @@ from django.utils.decorators import classonlymethod
 from django.utils.translation import gettext
 from django.views import View
 
-from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.authorization.utils import is_deactivated
-from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -39,63 +35,6 @@ ANSWERABLE: Final = ("get", "head", "post", "put", "patch", "delete")
 OPTIONS is not one: Django's ``View`` answers it from the methods served, and a
 spec has nothing to add to that answer. TRACE is not one either, since
 nothing about an operation is a loop-back of the request."""
-
-
-def request_principal(request: HttpRequest) -> Any:
-    """``request.user``, anonymous included, unless it is a deactivated account.
-
-    Anonymous is passed through because a permission check is what decides
-    whether anonymous may act, and the spec declares that check; refusing it
-    here would make every spec's policy stricter than the one it states.
-
-    A deactivated account is refused, by the rule dispatch itself applies and
-    ``resolve_principal`` applies off HTTP: ``ModelBackend`` never logs one in,
-    but ``AllowAllUsersModelBackend`` and a project's own backend may. The rule
-    asks about authenticated users alone, since ``AnonymousUser.is_active`` is
-    ``False``, and a custom user model with no ``is_active`` reads as active.
-    Dispatch would refuse the same user; refusing here as well is what keeps
-    the request unread for one, as ``adispatch`` resolves a ``principal_id``
-    before looking at its arguments.
-
-    Touching ``request.user`` evaluates the lazy object AuthenticationMiddleware
-    leaves there, which is a session query, so the async entry point calls this
-    off the event loop.
-
-    Raises:
-        PrincipalUnavailable: an authenticated user whose ``is_active`` is false.
-    """
-    user = request.user
-    if is_deactivated(user):
-        raise PrincipalUnavailable()
-    return user
-
-
-def route_arguments(parameters: Parameters, url_kwargs: Mapping[str, Any] | None) -> dict[str, Any]:
-    """The kwargs a route captured, as arguments, each one a parameter the spec declares.
-
-    Every URL kwarg is an argument, so a route capturing one its spec does not
-    declare is the host's configuration, wrong for every request the route
-    serves, rather than anything a client sent. It is refused as one - Django
-    answers it 500 and shows it under ``DEBUG`` - where a client's own
-    undeclared argument is a 400. The ``unknown_arguments`` policy does not
-    reach it: that policy is about what a client sends, and no client can send
-    a route kwarg or stop sending one.
-
-    Returned as a plain copy and uncoerced, so each caller merges it last,
-    where the route wins a clash, and coerces it beside what the client sent.
-
-    Raises:
-        ImproperlyConfigured: naming every undeclared kwarg.
-    """
-    route = dict(url_kwargs or {})
-    undeclared = sorted(set(route) - parameters.names())
-    if undeclared:
-        raise ImproperlyConfigured(
-            f"The route captures {', '.join(undeclared)}, which the spec does not declare. "
-            "Every URL kwarg is an argument: declare each one as a parameter, or leave it "
-            "out of url_kwargs."
-        )
-    return route
 
 
 def not_found_response() -> JsonResponse:
