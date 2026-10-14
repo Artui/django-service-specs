@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from django_service_specs.authorization.permission_check import PermissionCheck
-
-if TYPE_CHECKING:
-    # Annotation-only, for the reason permission_check.py gives.
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
 
 
 class Unrestricted(PermissionCheck):
@@ -25,5 +20,5 @@ class Unrestricted(PermissionCheck):
     read as a decision: a spec handed one is refused when it is built.
     """
 
-    def has_permission(self, principal: Any, spec: ServiceSpec | SelectorSpec) -> bool:
+    def has_permission(self, principal: Any, spec: Any) -> bool:
         return True

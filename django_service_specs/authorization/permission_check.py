@@ -3,13 +3,7 @@
 from __future__ import annotations
 
 import abc
-from typing import TYPE_CHECKING, Any
-
-if TYPE_CHECKING:
-    # Annotation-only: the spec modules import this one to declare their
-    # ``permissions`` field, so a runtime import here would be circular.
-    from django_service_specs.specs.selector_spec import SelectorSpec
-    from django_service_specs.specs.service_spec import ServiceSpec
+from typing import Any
 
 
 class PermissionCheck(abc.ABC):
@@ -41,25 +35,34 @@ class PermissionCheck(abc.ABC):
     declaring one when it is built, with ``ImproperlyConfigured`` naming the
     method; and an answer that is still to be awaited - from a plain ``def``
     wrapping an ``async def`` - is refused where it is read, failing closed.
+
+    ``spec`` is typed ``Any`` in each method, and is always the ``ServiceSpec``
+    or ``SelectorSpec`` being run. The spec modules import this one to declare
+    their ``permissions`` field, so naming either class here would make the
+    package that declares specs and the one that judges them import each
+    other. A subclass may annotate it ``ServiceSpec | SelectorSpec``.
     """
 
     message: str | None = None
 
     @abc.abstractmethod
-    def has_permission(self, principal: Any, spec: ServiceSpec | SelectorSpec) -> bool:
-        """Whether ``principal`` may run ``spec`` at all."""
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        """Whether ``principal`` may run ``spec`` at all.
 
-    def has_object_permission(
-        self, principal: Any, spec: ServiceSpec | SelectorSpec, target: Any
-    ) -> bool:
-        """Whether ``principal`` may act on ``target``. Allows unless overridden."""
+        ``spec`` is the ``ServiceSpec`` or ``SelectorSpec`` being run.
+        """
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        """Whether ``principal`` may act on ``target``. Allows unless overridden.
+
+        ``spec`` is the ``ServiceSpec`` or ``SelectorSpec`` being run.
+        """
         return True
 
-    def has_scope_permission(
-        self, principal: Any, spec: ServiceSpec | SelectorSpec, scope: Any
-    ) -> bool:
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
         """Whether ``principal`` may act on ``scope``. Allows unless overridden.
 
+        ``spec`` is the ``ServiceSpec`` or ``SelectorSpec`` being run.
         ``scope`` is the resolved set of a bulk or collection call, or ``None``
         for a call that acts on no existing row.
         """
