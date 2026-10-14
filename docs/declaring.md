@@ -487,10 +487,13 @@ methods, and a third method and an attribute with defaults:
   `data` and nothing bound, so a Validator overrides it only where its `data`
   is not that mapping. A bound value named after a seed, a validated value or
   a parameter is refused.
-- `supports_partial`, a class attribute, says whether `validate()` can honour
-  a [`partial`](#partial-updates) call by returning only what was sent. It is
+- `supports_partial` says whether `validate()` can honour a
+  [`partial`](#partial-updates) call by returning only what was sent. It is
   `True` by default. A Validator that builds every field sets it `False`, and
-  a partial spec over it is then refused when the spec is built.
+  a partial spec over it is then refused when the spec is built. A class sets
+  it as a class attribute; an adapter whose answer depends on what it was
+  built over sets it on the instance in `__init__`, and the spec reads the
+  instance.
 
 Three things a newcomer may look for are absent on purpose:
 

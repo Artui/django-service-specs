@@ -159,6 +159,13 @@ class _WholeOnly(Titled):
 def _a_service() -> None: ...
 
 
+class _DecidedWhenBuilt(Titled):
+    """A Validator whose answer depends on what it is built over, so it is set per instance."""
+
+    def __init__(self, *, binds_part: bool) -> None:
+        self.supports_partial = binds_part
+
+
 class TestPartialNeedsAValidatorThatCanBindPart:
     """``partial`` is refused when the spec is declared wherever no call could honour it."""
 
@@ -195,6 +202,21 @@ class TestPartialNeedsAValidatorThatCanBindPart:
         assert Titled.supports_partial is True
         spec = ServiceSpec(service=_a_service, validator=Titled(), partial=True)
         assert spec.partial is True
+
+    def test_an_instance_level_false_is_refused_at_construction(self) -> None:
+        """Read off the instance, so an answer decided in ``__init__`` refuses
+        the spec where it is declared rather than on its first call."""
+        with pytest.raises(ImproperlyConfigured, match="which cannot validate a partial call"):
+            ServiceSpec(
+                service=_a_service, validator=_DecidedWhenBuilt(binds_part=False), partial=True
+            )
+
+    def test_an_instance_level_true_over_a_class_level_false_is_accepted(self) -> None:
+        validator = _WholeOnly()
+        validator.supports_partial = True
+        assert ServiceSpec(service=_a_service, validator=validator, partial=True).partial is True
+        built = _DecidedWhenBuilt(binds_part=True)
+        assert ServiceSpec(service=_a_service, validator=built, partial=True).partial is True
 
     def test_a_validator_class_is_refused_as_not_an_instance_first(self) -> None:
         # A class has the attribute too, so the instance check must answer

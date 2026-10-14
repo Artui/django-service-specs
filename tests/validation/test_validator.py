@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, ClassVar, get_origin, get_type_hints
 
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.validation.validation_context import ValidationContext
@@ -35,3 +35,19 @@ def test_by_default_the_validated_mapping_is_the_call_s_data_and_nothing_is_boun
     assert dict(validated.pool) == {}
     # ``validate()`` runs once, handed the arguments and the context as they came.
     assert validator.calls == [({"title": " Dune "}, context)]
+
+
+def test_supports_partial_is_an_ordinary_attribute_an_instance_may_set() -> None:
+    """Declared as a plain ``bool``, never a ``ClassVar``: an adapter whose
+    answer depends on what it was built over sets it in ``__init__``, which a
+    type checker refuses for a ``ClassVar``."""
+    assert get_origin(get_type_hints(Validator)["supports_partial"]) is not ClassVar
+    assert Validator.supports_partial is True
+
+
+def test_an_instance_s_answer_outranks_its_class_s() -> None:
+    validator = _Counting()
+    validator.supports_partial = False
+
+    assert validator.supports_partial is False
+    assert _Counting().supports_partial is True
