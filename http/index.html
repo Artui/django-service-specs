@@ -435,6 +435,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Arguments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-route-on-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The route on its own
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -471,30 +488,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#forms" class="md-nav__link">
+  <a href="#a-refusal-placed-on-a-form" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Forms
+        A refusal, placed on a form
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Forms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#a-refusal-placed-on-the-form" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A refusal, placed on the form
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -806,6 +806,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Arguments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-route-on-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The route on its own
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -842,30 +859,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#forms" class="md-nav__link">
+  <a href="#a-refusal-placed-on-a-form" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Forms
+        A refusal, placed on a form
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Forms">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#a-refusal-placed-on-the-form" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        A refusal, placed on the form
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -903,8 +903,12 @@ as JSON.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">AsyncSpecView</span><span class="p">,</span> <span class="n">SpecView</span><span class="p">,</span> <span class="n">adispatch_request</span><span class="p">,</span> <span class="n">dispatch_request</span>
 </span></code></pre></div>
 <p>It is the plumbing, not the pages: a view here answers JSON to a script, a
-<code>fetch()</code> or an htmx request. The one page it serves is a spec's own form, from
-<a href="#forms"><code>SpecFormView</code></a>, for a spec a Django form validates.</p>
+<code>fetch()</code> or an htmx request. A page a person reads, such as a spec's own form
+rendered and re-rendered with its refusal, is a host's own view. The pieces
+the entry points are built from are public so that such a view reads a request
+by the same rules: <a href="#the-principal"><code>request_principal</code></a>,
+<a href="#the-route-on-its-own"><code>route_arguments</code></a> and
+<a href="#a-refusal-placed-on-a-form"><code>add_argument_errors</code></a>.</p>
 <h2 id="a-function-view">A function view<a class="headerlink" href="#a-function-view" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="dispatch_request" href="../reference/#django_service_specs.http.dispatch_request.dispatch_request"><code>dispatch_request</code></a>
 is the whole of what a hand-written view calls:</p>
@@ -969,7 +973,11 @@ own 405, with an <code>Allow</code> header listing exactly the methods served, a
 OPTIONS is Django's own answer.</p>
 <p><code>as_view()</code> checks the spec and the methods when the view is built, so a view
 with no spec, or one naming a method it cannot serve, fails when the URLconf is
-imported rather than on its first request.</p>
+imported rather than on its first request. The <code>spec</code> may be a declaration of
+another library's, a
+<a class="autorefs autorefs-internal" title="SpecSource" href="../reference/#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a>: it is
+compiled there too, a declaration that does not compile is refused there, and
+its methods follow the spec it compiles to.</p>
 <p><a class="autorefs autorefs-internal" title="AsyncSpecView" href="../reference/#django_service_specs.http.async_spec_view.AsyncSpecView"><code>AsyncSpecView</code></a> is
 the same view with every handler async, through <code>adispatch_request</code>. Django
 serves a class async only when all of its handlers are, which is why it is a
@@ -1091,6 +1099,19 @@ something wrong. A host scoping by a kwarg its spec does not take (an <code>org<
 read by middleware, say) calls
 <a class="autorefs autorefs-internal" title="dispatch_request" href="../reference/#django_service_specs.http.dispatch_request.dispatch_request"><code>dispatch_request</code></a>
 from its own view and passes the <code>url_kwargs</code> the spec declares.</p>
+<h3 id="the-route-on-its-own">The route on its own<a class="headerlink" href="#the-route-on-its-own" title="Permanent link">&para;</a></h3>
+<p><a class="autorefs autorefs-internal" title="route_arguments" href="../reference/#django_service_specs.http.route_arguments.route_arguments"><code>route_arguments</code></a>
+is that rule on its own, for a view that reads the rest of its arguments some
+other way, such as through a bound form's widgets. It returns the kwargs as a
+plain, uncoerced copy, or raises <code>ImproperlyConfigured</code> naming every one the
+spec does not declare, so the caller merges it last and types it in the same
+call as everything else, and one refusal carries every problem:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">form_arguments</span><span class="p">(</span><span class="n">posted</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">url_kwargs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="c1"># A view reading its fields some other way merges the route last, so the</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="c1"># route wins a clash, and types everything in one call.</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">parameters</span> <span class="o">=</span> <span class="n">rename_note_spec</span><span class="o">.</span><span class="n">parameters</span><span class="p">()</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="k">return</span> <span class="n">coerce_flat</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="p">{</span><span class="o">**</span><span class="n">posted</span><span class="p">,</span> <span class="o">**</span><span class="n">route_arguments</span><span class="p">(</span><span class="n">parameters</span><span class="p">,</span> <span class="n">url_kwargs</span><span class="p">)})</span>
+</span></code></pre></div>
 <h2 id="the-principal">The principal<a class="headerlink" href="#the-principal" title="Permanent link">&para;</a></h2>
 <p>The principal is <code>request.user</code>, <strong>anonymous included</strong>: the spec's permission
 check is what decides whether anonymous may act, so it is handed the anonymous
@@ -1101,6 +1122,12 @@ anything else is read. Django's <code>ModelBackend</code> never logs one in, but
 principal never acts, on HTTP or off it. <code>dispatch</code> refuses one by the same
 rule, so a hand-written view handing <code>request.user</code> to it is covered too; the
 entry points refuse first so that the request is never read.</p>
+<p><a class="autorefs autorefs-internal" title="request_principal" href="../reference/#django_service_specs.http.request_principal.request_principal"><code>request_principal</code></a>
+is that reading, public, so a host's own view refuses by the same rule and
+before it reads anything else. It raises <code>PrincipalUnavailable</code> for a
+deactivated account and returns <code>request.user</code> otherwise. Reading
+<code>request.user</code> is a session query, so an async view calls it off the event
+loop, as <code>adispatch_request</code> does.</p>
 <h2 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
 answers both <a href="../arguments/#two-families-of-error">families</a>, with the statuses
@@ -1177,6 +1204,13 @@ matched before its base. <strong>Every 400 body is a field map</strong>: a
 <code>non_field_errors</code>, where a message about the input as a whole sits in the
 tree too, and the tree's integer row keys are strings on the wire. Messages
 render in the active language, lazy ones included.</p>
+<p><strong>A schema no route could hear answered is not a 422.</strong> <code>dispatch_request</code> and
+<code>adispatch_request</code> pass an <code>AdditionalInputRequired</code> schema through
+<a class="autorefs autorefs-internal" title="check_requested_input" href="../reference/#django_service_specs.dispatch.check_requested_input.check_requested_input"><code>check_requested_input</code></a>
+before writing it: a schema naming a key the spec does not declare, or a shape
+an MCP elicitation form cannot render, raises <code>ImproperlyConfigured</code> naming the
+key, as it does on every other route. <code>error_response</code> alone has no spec in
+hand and writes whatever it is given.</p>
 <p><strong>Never 401.</strong> A session has no challenge to answer, and a 401 tells a client
 to start an authentication flow it has no way to finish. An anonymous caller
 a permission check refuses is a 403, like any other refused principal.</p>
@@ -1186,237 +1220,18 @@ package is exempted: a POST from a session-authenticated browser carries the
 token, in the <code>X-CSRFToken</code> header for a <code>fetch()</code> or in the form for an HTML
 form, and <code>CsrfViewMiddleware</code> refuses one that does not. A route that needs no
 token is the host's decision, and one line:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># A route a script calls, authenticated by the host's own middleware rather than</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># a session cookie, so it has no CSRF token to send. Exempting it is the host's</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># decision, and one line.</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">urlpatterns</span> <span class="o">+=</span> <span class="p">[</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">path</span><span class="p">(</span><span class="s2">"hooks/notes/&lt;int:pk&gt;/rename/"</span><span class="p">,</span> <span class="n">csrf_exempt</span><span class="p">(</span><span class="n">SpecView</span><span class="o">.</span><span class="n">as_view</span><span class="p">(</span><span class="n">spec</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="p">))),</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># A route a script calls, authenticated by the host's own middleware rather than</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># a session cookie, so it has no CSRF token to send. Exempting it is the host's</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># decision, and one line.</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">urlpatterns</span> <span class="o">+=</span> <span class="p">[</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">path</span><span class="p">(</span><span class="s2">"hooks/notes/&lt;int:pk&gt;/rename/"</span><span class="p">,</span> <span class="n">csrf_exempt</span><span class="p">(</span><span class="n">SpecView</span><span class="o">.</span><span class="n">as_view</span><span class="p">(</span><span class="n">spec</span><span class="o">=</span><span class="n">rename_note_spec</span><span class="p">))),</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="p">]</span>
 </span></code></pre></div>
-<h2 id="forms">Forms<a class="headerlink" href="#forms" title="Permanent link">&para;</a></h2>
-<p><a class="autorefs autorefs-internal" title="SpecFormView" href="../reference/#django_service_specs.http.spec_form_view.SpecFormView"><code>SpecFormView</code></a> serves
-a spec whose Validator is a <a href="../forms/"><code>FormValidator</code></a> as the page a person
-fills that form in on: the form that validates the arguments is the form the
-page renders.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">IsSignedIn</span><span class="p">(</span><span class="n">PermissionCheck</span><span class="p">):</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">message</span> <span class="o">=</span> <span class="s2">"Sign in to add a book."</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>        <span class="k">return</span> <span class="n">principal</span><span class="o">.</span><span class="n">is_authenticated</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="k">def</span><span class="w"> </span><span class="nf">add_book</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Book</span><span class="p">:</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="c1"># ``data`` is the form's cleaned_data: a Decimal price, a date, the Author</span>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="c1"># row. ``shelves`` is the form's own, and no column of the book's.</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">columns</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"price"</span><span class="p">,</span> <span class="s2">"status"</span><span class="p">,</span> <span class="s2">"published_on"</span><span class="p">,</span> <span class="s2">"author"</span><span class="p">)</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">return</span> <span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">data</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">columns</span><span class="p">})</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1"># BookForm, from the forms adapter's page, is the Validator and the page's form.</span>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="n">add_book_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span><span class="n">service</span><span class="o">=</span><span class="n">add_book</span><span class="p">,</span> <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span> <span class="n">validator</span><span class="o">=</span><span class="n">book_validator</span><span class="p">)</span>
-</span></code></pre></div>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">AddBookThenShowIt</span><span class="p">(</span><span class="n">SpecFormView</span><span class="p">):</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">spec</span> <span class="o">=</span> <span class="n">add_book_spec</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">template_name</span> <span class="o">=</span> <span class="s2">"spec_form.html"</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_success_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">result</span><span class="p">:</span> <span class="n">DispatchResult</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="c1"># The row the service created, which no static success_url can name.</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>        <span class="k">return</span> <span class="n">reverse</span><span class="p">(</span><span class="s2">"book"</span><span class="p">,</span> <span class="n">kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">value</span><span class="o">.</span><span class="n">pk</span><span class="p">})</span>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">urlpatterns</span> <span class="o">=</span> <span class="p">[</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">path</span><span class="p">(</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>        <span class="s2">"books/new/"</span><span class="p">,</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>        <span class="n">SpecFormView</span><span class="o">.</span><span class="n">as_view</span><span class="p">(</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            <span class="n">spec</span><span class="o">=</span><span class="n">add_book_spec</span><span class="p">,</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>            <span class="n">template_name</span><span class="o">=</span><span class="s2">"spec_form.html"</span><span class="p">,</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>            <span class="n">success_url</span><span class="o">=</span><span class="n">reverse_lazy</span><span class="p">(</span><span class="s2">"books"</span><span class="p">),</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>        <span class="p">),</span>
-</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="p">),</span>
-</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="n">path</span><span class="p">(</span><span class="s2">"books/add/"</span><span class="p">,</span> <span class="n">AddBookThenShowIt</span><span class="o">.</span><span class="n">as_view</span><span class="p">()),</span>
-</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    <span class="n">path</span><span class="p">(</span>
-</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>        <span class="s2">"books/&lt;int:pk&gt;/edit/"</span><span class="p">,</span>
-</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a>        <span class="n">SpecFormView</span><span class="o">.</span><span class="n">as_view</span><span class="p">(</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a>            <span class="n">spec</span><span class="o">=</span><span class="n">edit_book_spec</span><span class="p">,</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>            <span class="n">template_name</span><span class="o">=</span><span class="s2">"spec_form.html"</span><span class="p">,</span>
-</span><span id="__span-5-25"><a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>            <span class="n">success_url</span><span class="o">=</span><span class="n">reverse_lazy</span><span class="p">(</span><span class="s2">"books"</span><span class="p">),</span>
-</span><span id="__span-5-26"><a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>        <span class="p">),</span>
-</span><span id="__span-5-27"><a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    <span class="p">),</span>
-</span><span id="__span-5-28"><a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>    <span class="n">path</span><span class="p">(</span><span class="s2">"books/"</span><span class="p">,</span> <span class="n">books</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"books"</span><span class="p">),</span>
-</span><span id="__span-5-29"><a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>    <span class="n">path</span><span class="p">(</span><span class="s2">"books/&lt;int:pk&gt;/"</span><span class="p">,</span> <span class="n">book</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">"book"</span><span class="p">),</span>
-</span><span id="__span-5-30"><a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a><span class="p">]</span>
-</span></code></pre></div>
-<p>The template is any template that renders the form inside a POST form with
-its token. The one above is as small as that:</p>
-<div class="language-html highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">&lt;</span><span class="nt">form</span> <span class="na">method</span><span class="o">=</span><span class="s">"post"</span><span class="p">&gt;</span>{% csrf_token %}{{ form }}<span class="p">&lt;</span><span class="nt">button</span> <span class="na">name</span><span class="o">=</span><span class="s">"save"</span><span class="p">&gt;</span>Save<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;&lt;/</span><span class="nt">form</span><span class="p">&gt;</span>
-</span></code></pre></div>
-<p><strong>GET</strong> renders <code>template_name</code> with an unbound form under <code>form</code>, and <code>view</code>
-and <code>spec</code> beside it: the names Django's <code>FormView</code> uses, with
-<code>extra_context</code> merged in as Django's <code>ContextMixin</code> does. The spec's
-class-level permission check runs first, so the page is never offered to a
-principal the post would refuse: an anonymous visitor above gets Django's own
-<code>PermissionDenied</code>, which the host's 403 page answers.</p>
-<p><strong>An update's page shows the row it updates.</strong> Every GET then finds its
-target as dispatch would, through
-<a class="autorefs autorefs-internal" title="resolve_target" href="../reference/#django_service_specs.dispatch.resolve_target.resolve_target"><code>resolve_target</code></a>
-on the route's kwargs, coerced as a post's are: the row or set a target
-selector resolves, or <code>None</code> for a create.</p>
-<ul>
-<li>A check refusing it - the object-level check on a row, the scope check on a
-  set or on <code>None</code> - raises <code>PermissionDenied</code>, as the post would be refused;
-  a missing row, or a selector's <code>ServiceNotFound</code>, is <code>Http404</code>; and a route
-  value the spec's parameters refuse is Django's <code>BadRequest</code>, which the
-  host's 400 page answers.</li>
-<li>The form stays unbound, and shows the row's values for its own fields. A
-  <code>ModelForm</code> of the row's model is built on a copy of the row, as the
-  <a class="autorefs autorefs-internal" title="FormValidator" href="../reference/#django_service_specs.adapters.forms.form_validator.FormValidator"><code>FormValidator</code></a>
-  binds it, so its own <code>__init__</code> sees the row it edits. Any other form takes
-  the row's values for the fields it names as its <code>initial</code>, and a field no
-  model field matches keeps its own, as does a disabled one, which the post
-  cleans from that initial rather than reading.</li>
-<li>So a file the row holds is shown, linked, with the
-  <a href="../forms/#clearing-a-file">clear checkbox</a> an optional file's
-  <code>ClearableFileInput</code> offers beside it.</li>
-<li>A create, a collection target and a missing row the instance selector's
-  <code>allow_none</code> lets through show an empty form.</li>
-</ul>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">book_by_pk</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuerySet</span><span class="p">[</span><span class="n">Book</span><span class="p">]:</span>
-</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="k">return</span> <span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">)</span>
-</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
-</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">edit_book</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Book</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ChangeResult</span><span class="p">[</span><span class="n">Book</span><span class="p">]:</span>
-</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>    <span class="k">return</span> <span class="n">update_from_input</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">exclude_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"shelves"</span><span class="p">])</span>
-</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>
-</span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="c1"># The same form behind an update: GET finds the book the route names, and the</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="c1"># page shows its values for the form's fields.</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="n">edit_book_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="n">service</span><span class="o">=</span><span class="n">edit_book</span><span class="p">,</span>
-</span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">book_validator</span><span class="p">,</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">SelectorSpec</span><span class="p">(</span>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a>        <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
-</span><span id="__span-7-17"><a id="__codelineno-7-17" name="__codelineno-7-17" href="#__codelineno-7-17"></a>        <span class="n">selector</span><span class="o">=</span><span class="n">book_by_pk</span><span class="p">,</span>
-</span><span id="__span-7-18"><a id="__codelineno-7-18" name="__codelineno-7-18" href="#__codelineno-7-18"></a>        <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
-</span><span id="__span-7-19"><a id="__codelineno-7-19" name="__codelineno-7-19" href="#__codelineno-7-19"></a>    <span class="p">),</span>
-</span><span id="__span-7-20"><a id="__codelineno-7-20" name="__codelineno-7-20" href="#__codelineno-7-20"></a><span class="p">)</span>
-</span></code></pre></div>
-<p>The URLconf above routes it as <code>books/&lt;int:pk&gt;/edit/</code>.</p>
-<p><strong>POST starts as GET does</strong>: the route first, then the same check, and only
-then is the form built from the post. A refused post is answered with the
-page again, and dispatch's shape check comes before its own permission check,
-so without it a principal the spec refuses would be shown the page - every
-row a choice field lists, and <code>extra_context</code> - by posting a malformed form,
-and a form whose constructor reads rows would read them for that principal.
-The <code>Grant</code> the check returns goes to dispatch, so it runs once.</p>
-<p><strong>Then the post finds its target, as the page does</strong>, before the form is
-built or read. So the form a refused post re-renders is built on the row as
-the page's was, and shows its held file and the clear checkbox beside it. And
-the target answers <strong>before the shape check</strong>: a principal the object-level or
-scope check refuses is <code>PermissionDenied</code>, and a missing row <code>Http404</code>, even
-for a post that is malformed, where dispatch's own order would refuse the
-malformed post first and re-render the page for them. Dispatch is handed the
-target and the grant <code>resolve_target</code> returns, so it looks nothing up again and
-asks no check twice. One case is left to dispatch: a route value the target's
-reads refuse, which comes back in dispatch's one refusal beside the form's
-own, as a non-field error. A create resolves <code>None</code> and a collection target
-its set, each handed on the same way.</p>
-<p><strong>POST</strong> then binds the form to the post and reads the arguments <strong>through
-the form's own widgets</strong>, which is how Django reads a form:</p>
-<ul>
-<li>A checkbox is <code>True</code> or <code>False</code> and a multi-select a list, where a flat
-  reading would refuse a checkbox's <code>"on"</code>. Only the form's fields are read,
-  so the CSRF token and a named submit button never become arguments, and a
-  disabled field is not read at all, since the form ignores what is posted
-  for it.</li>
-<li><strong>A field left blank is absent</strong>, for every field, as it is to the form. An
-  optional date, number or choice left empty is simply not sent, and a
-  required field left empty is refused with <code>"This field is required."</code>,
-  once.</li>
-<li><strong>A number, a date or a date-time in one of the field's input formats</strong> -
-  <code>10/25/1974</code>, a localized <code>12,50</code>, <code>5.0</code> for an integer - is read by the
-  field's own <code>to_python</code> and sent on in the form the shape check reads: an
-  ISO date, an ISO date-time with its offset, a decimal string, a number. So
-  the shape check never refuses what the form accepts. A value the field
-  refuses is sent on as it came, and refused in the kernel's words, which are
-  the field's own.</li>
-<li><strong>A ticked <a href="../forms/#clearing-a-file">clear checkbox</a></strong> is read by its
-  file's widget, which answers <code>False</code>, and is sent on as the argument the
-  Validator declares for it, <code>attachment-clear</code>, so the file is cleared.
-  Ticked beside an upload, both are sent, and the form refuses the pair in
-  its own words.</li>
-<li>The URL kwargs are merged last, so the route wins a clash, and typed with
-  <a href="../arguments/#flat-transports"><code>coerce_flat</code></a> in the same call as
-  everything else: one refusal carries every problem. Each is an argument,
-  so the spec declares each one. A kwarg the route captures and the spec does
-  not declare is the host's misconfiguration, wrong for every caller, so it
-  raises <code>ImproperlyConfigured</code> under either <code>unknown_arguments</code> policy - the
-  policy governs what a client sends - rather than blaming the client with a
-  refused post.</li>
-</ul>
-<p>Then <a href="../dispatching/"><code>dispatch</code></a>. <strong>A success redirects</strong> to
-<code>get_success_url(result)</code>, which resolves <code>success_url</code> as Django's
-<code>redirect()</code> does, so a path, a <code>reverse_lazy</code> or a URL name all work. Override
-it to read the result, as <code>AddBookThenShowIt</code> does to reach the book it
-created. A refusal:</p>
-<table>
-<thead>
-<tr>
-<th>Refusal</th>
-<th>The form view answers</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>InvalidArguments</code>, <code>ServiceValidationError</code></td>
-<td>400, the form re-rendered</td>
-</tr>
-<tr>
-<td><code>ServiceConflict</code></td>
-<td>409, the form re-rendered</td>
-</tr>
-<tr>
-<td><code>ServiceError</code></td>
-<td>422, the form re-rendered</td>
-</tr>
-<tr>
-<td><code>DispatchError</code></td>
-<td>400, the form re-rendered</td>
-</tr>
-<tr>
-<td><code>NotPermitted</code>, <code>PrincipalUnavailable</code></td>
-<td><code>PermissionDenied</code></td>
-</tr>
-<tr>
-<td><code>ServiceNotFound</code>, a not-found result</td>
-<td><code>Http404</code></td>
-</tr>
-</tbody>
-</table>
-<p>The first two rows place the refusal on the form, and a service's string or
-list detail is about the whole form. Every other re-rendered refusal is its
-message, among the form's non-field errors. <strong>The re-rendered form carries
-the refusal and nothing else</strong>, so the page says what dispatch decided. The
-page's own form is never validated: its errors start empty and the refusal is
-placed on it, so nothing the Validator did not decide reaches it, and a value
-the Validator refused because no column holds it - a key past 64 bits - never
-reaches the database through the page's own checks. So after a shape-check
-refusal - a required field left blank, a date that does not parse - the
-form's further checks, such as a length, <code>clean()</code> or uniqueness, answer the
-next post rather than this one. The statuses are
-<a href="#refusals"><code>error_response</code></a>'s, so a client reading a refused post - htmx,
-or Turbo, which will not render a failed post answered 200 - reads it the
-same way it reads the JSON views.</p>
-<p><code>as_view()</code> refuses, when the URLconf is imported, a view with no
-<code>ServiceSpec</code>, a spec whose Validator is not a <code>FormValidator</code>, a <code>many</code>
-spec, whose list of rows no form posts, and a view with neither a
-<code>success_url</code> nor its own <code>get_success_url</code>. The view is <strong>sync
-only</strong> in this release.</p>
-<h3 id="a-refusal-placed-on-the-form">A refusal, placed on the form<a class="headerlink" href="#a-refusal-placed-on-the-form" title="Permanent link">&para;</a></h3>
+<h2 id="a-refusal-placed-on-a-form">A refusal, placed on a form<a class="headerlink" href="#a-refusal-placed-on-a-form" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="add_argument_errors" href="../reference/#django_service_specs.http.add_argument_errors.add_argument_errors"><code>add_argument_errors</code></a>
-is how the view places a refusal, on a form whose errors it has started empty,
-and a hand-written view with its own bound form can call it the same way. It
-uses Django's public <code>form.add_error</code>, beside whatever errors the form carries:</p>
+places a refusal on a host's own bound form, for a page that re-renders the
+form it posted with what dispatch refused. It uses Django's public
+<code>form.add_error</code>, beside whatever errors the form carries:</p>
 <ul>
 <li><strong>A key naming one of the form's fields</strong> puts its messages on that field.</li>
 <li><code>non_field_errors</code>, and Django's own <code>"__all__"</code>, go to the form's non-field

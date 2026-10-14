@@ -1245,6 +1245,11 @@ on its presenter:</p>
 </tr>
 </tbody>
 </table>
+<p>Where the table says <code>"null"</code> is
+<a class="autorefs autorefs-internal" title="can_present_nothing" href="../reference/#django_service_specs.schema.can_present_nothing.can_present_nothing"><code>can_present_nothing</code></a>'s
+answer, exported for a transport that writes an output schema of its own, so
+the two cannot disagree. It does not read <code>many</code>: a <code>many</code> service's list may
+be <code>None</code> exactly where any service's return may.</p>
 <p>A <code>RETRIEVE</code> selector spec without <code>allow_none</code> answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
 its item is not nullable. A service spec's <code>RETRIEVE</code> output selector is

@@ -577,6 +577,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Errors from a nested write">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-refusal-from-another-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A refusal from another library
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -867,6 +884,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Errors from a nested write">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-refusal-from-another-library" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A refusal from another library
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
     </ul>
@@ -937,6 +971,24 @@ runs, and the helpers own persistence only.</p>
       async
   " href="../reference/#django_service_specs.mutations.adelete_relations.adelete_relations"><code>adelete_relations</code></a>
   are the async forms, for an <code>async def</code> service.</li>
+<li><a class="autorefs autorefs-internal" title="create_model" href="../reference/#django_service_specs.services.create_model.create_model"><code>create_model</code></a>,
+  <a class="autorefs autorefs-internal" title="update_model" href="../reference/#django_service_specs.services.update_model.update_model"><code>update_model</code></a> and
+  <a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.services.delete_model.delete_model"><code>delete_model</code></a>
+  build the service itself, for an operation whose service would be nothing
+  but one helper call: <code>create_model(Author, relations=BOOKS)</code> is a service
+  taking <code>data</code>, writing the author and its books, and returning the author.
+  <code>update_model</code> takes <code>instance</code> as well, and <code>delete_model</code> takes <code>instance</code>
+  alone, runs <code>delete_relations</code> first when given a map, and returns <code>None</code>.
+  <a class="autorefs autorefs-internal" title="delete_collection" href="../reference/#django_service_specs.services.delete_collection.delete_collection"><code>delete_collection</code></a>
+  deletes the rows a spec's <code>collection_selector_spec</code> resolved. Each takes the
+  rest of the pool as <code>**kwargs</code>, which the three model services hand on as
+  the helper's <code>context</code>, opens no transaction of its own, since dispatch runs
+  the service inside one, and has an async form:
+  <a class="autorefs autorefs-internal" title="acreate_model" href="../reference/#django_service_specs.services.acreate_model.acreate_model"><code>acreate_model</code></a>,
+  <a class="autorefs autorefs-internal" title="aupdate_model" href="../reference/#django_service_specs.services.aupdate_model.aupdate_model"><code>aupdate_model</code></a>,
+  <a class="autorefs autorefs-internal" title="adelete_model" href="../reference/#django_service_specs.services.adelete_model.adelete_model"><code>adelete_model</code></a>
+  and
+  <a class="autorefs autorefs-internal" title="adelete_collection" href="../reference/#django_service_specs.services.adelete_collection.adelete_collection"><code>adelete_collection</code></a>.</li>
 </ul>
 <p><code>data</code> is a dataclass, a mapping, or an object with a <code>__dict__</code> - usually the
 validated values dispatch passes the service as <code>data</code>. A dataclass gives its
@@ -1259,31 +1311,32 @@ service must be <code>async def</code>.</p>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
 </span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
 </span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">delete_relations</span><span class="p">,</span>
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="p">)</span>
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span>
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">BOOKS</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="n">delete_model</span><span class="p">,</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">delete_relations</span><span class="p">,</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">BOOKS</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span>
 </span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Author</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="c1"># The database would take the books with the author and say nothing about</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="c1"># them. Cascading first, through the map the writes use, names each one.</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="n">cascade</span> <span class="o">=</span> <span class="n">delete_relations</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">)</span>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">instance</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">books</span> <span class="o">=</span> <span class="n">cascade</span><span class="o">.</span><span class="n">get_child_change</span><span class="p">(</span><span class="s2">"books"</span><span class="p">)</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="k">return</span> <span class="n">books</span><span class="o">.</span><span class="n">deleted</span> <span class="k">if</span> <span class="n">books</span> <span class="k">else</span> <span class="p">()</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">delete_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">instance</span><span class="p">:</span> <span class="n">Author</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="c1"># The database would take the books with the author and say nothing about</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>    <span class="c1"># them. Cascading first, through the map the writes use, names each one.</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>    <span class="n">cascade</span> <span class="o">=</span> <span class="n">delete_relations</span><span class="p">(</span><span class="n">instance</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">)</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>    <span class="n">instance</span><span class="o">.</span><span class="n">delete</span><span class="p">()</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">books</span> <span class="o">=</span> <span class="n">cascade</span><span class="o">.</span><span class="n">get_child_change</span><span class="p">(</span><span class="s2">"books"</span><span class="p">)</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="k">return</span> <span class="n">books</span><span class="o">.</span><span class="n">deleted</span> <span class="k">if</span> <span class="n">books</span> <span class="k">else</span> <span class="p">()</span>
 </span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="n">delete_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">service</span><span class="o">=</span><span class="n">delete_author</span><span class="p">,</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">SelectorSpec</span><span class="p">(</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>        <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        <span class="n">selector</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">),</span>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>    <span class="p">),</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a><span class="p">)</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a><span class="n">delete_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">service</span><span class="o">=</span><span class="n">delete_author</span><span class="p">,</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">RETRIEVE</span><span class="p">,</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>        <span class="n">selector</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">),</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>        <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    <span class="p">),</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>The database's own cascade would remove these books as well, and report
 nothing. The helper matters where the database will not cascade, or should
@@ -1307,6 +1360,19 @@ and each is deleted, unlinked or handed to its <code>delete_service</code> by th
 survive. A forward relation is reported <code>untouched</code>: the row it points at is
 not the instance's, and refusing it would make a map that is right for writing
 impossible to cascade.</p>
+<p>Where the service is nothing but that cascade and the delete,
+<a class="autorefs autorefs-internal" title="delete_model" href="../reference/#django_service_specs.services.delete_model.delete_model"><code>delete_model</code></a>
+builds it. It returns <code>None</code> rather than the report, and refuses a value that
+is not a relation spec when it is built rather than on its first call:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">retire_author_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># The books go first, through the map the writes use, then the author.</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">service</span><span class="o">=</span><span class="n">delete_model</span><span class="p">(</span><span class="n">Author</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">BOOKS</span><span class="p">),</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">instance_selector_spec</span><span class="o">=</span><span class="n">delete_author_spec</span><span class="o">.</span><span class="n">instance_selector_spec</span><span class="p">,</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>soft_delete=</code> calls a function with the row in place of <code>delete()</code>, after the
+cascade, which is the case Django never cascades through.</p>
 <h2 id="errors-from-a-nested-write">Errors from a nested write<a class="headerlink" href="#errors-from-a-nested-write" title="Permanent link">&para;</a></h2>
 <p>A refusal inside a row is <strong>re-rooted under the row's address</strong>, in the tree
 <a href="../arguments/#the-refusal-tree">Arguments and refusals</a> describes, and keeps
@@ -1328,6 +1394,49 @@ any depth: reading its <code>TypeError</code> as a refusal of the arguments woul
 the caller's own bug as the client's mistake. An <code>IntegrityError</code> is left alone
 too: a constraint is a conflict with rows that exist rather than a shape, and
 the backend's message can quote another row's values.</p>
+<h3 id="a-refusal-from-another-library">A refusal from another library<a class="headerlink" href="#a-refusal-from-another-library" title="Permanent link">&para;</a></h3>
+<p>A row service written for another library may raise that library's own
+validation error, which this package cannot name: the one
+<code>djangorestframework-services</code> registers is DRF's <code>ValidationError</code>. Register
+the class with a function reading its detail, and a relation write re-roots it
+as it does its own two:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">ChildSpec</span><span class="p">,</span> <span class="n">create_from_input</span><span class="p">,</span> <span class="n">register_row_error</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span><span class="p">,</span> <span class="n">Book</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">class</span><span class="w"> </span><span class="nc">CatalogueRefusal</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="sd">"""A validation error from another library, which a row service written for it raises."""</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">detail</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">detail</span><span class="p">)</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">detail</span> <span class="o">=</span> <span class="n">detail</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_refusal</span><span class="p">(</span><span class="n">exc</span><span class="p">:</span> <span class="n">CatalogueRefusal</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>    <span class="k">return</span> <span class="n">exc</span><span class="o">.</span><span class="n">detail</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="k">def</span><span class="w"> </span><span class="nf">ready</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># an AppConfig.ready(), or the adapter's own import</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="n">register_row_error</span><span class="p">(</span><span class="n">CatalogueRefusal</span><span class="p">,</span> <span class="n">read_refusal</span><span class="p">)</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>
+</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_book</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Book</span><span class="p">:</span>
+</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="k">if</span> <span class="n">data</span><span class="p">[</span><span class="s2">"title"</span><span class="p">]</span><span class="o">.</span><span class="n">isupper</span><span class="p">():</span>
+</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>        <span class="k">raise</span> <span class="n">CatalogueRefusal</span><span class="p">({</span><span class="s2">"title"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"No titles in capitals."</span><span class="p">]})</span>
+</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="k">return</span> <span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="o">**</span><span class="n">data</span><span class="p">)</span>
+</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>
+</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a>
+</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Author</span><span class="p">:</span>
+</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a>    <span class="n">books</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"books"</span><span class="p">:</span> <span class="n">ChildSpec</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Book</span><span class="p">,</span> <span class="n">fk</span><span class="o">=</span><span class="s2">"author"</span><span class="p">,</span> <span class="n">create_service</span><span class="o">=</span><span class="n">create_book</span><span class="p">)}</span>
+</span><span id="__span-3-29"><a id="__codelineno-3-29" name="__codelineno-3-29" href="#__codelineno-3-29"></a>    <span class="k">return</span> <span class="n">create_from_input</span><span class="p">(</span><span class="n">Author</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="n">books</span><span class="p">)</span><span class="o">.</span><span class="n">instance</span>
+</span></code></pre></div>
+<p>The detail is placed at the row's address by the same rule, a list or a string
+under <code>non_field_errors</code> inside the row, and the class is rebuilt from the
+re-rooted tree, so a caller catching <code>CatalogueRefusal</code> here reads
+<code>{"books": {1: {"title": ["No titles in capitals."]}}}</code>. Registering the same
+pair again does nothing; a second reader for one class, or a class overlapping
+one the kernel re-roots already, is refused with <code>ImproperlyConfigured</code>. See
+<a class="autorefs autorefs-internal" title="register_row_error" href="../reference/#django_service_specs.mutations.register_row_error.register_row_error"><code>register_row_error</code></a>.</p>
 
 
 

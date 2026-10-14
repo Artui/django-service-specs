@@ -524,6 +524,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-declaration-of-another-librarys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A declaration of another library's
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#registering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -737,6 +748,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-declaration-of-another-librarys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A declaration of another library's
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#registering" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -802,21 +824,16 @@ and they drift.
 <a class="autorefs autorefs-internal" title="SpecRegistry" href="../reference/#django_service_specs.registry.spec_registry.SpecRegistry"><code>SpecRegistry</code></a> is
 that place: a <code>name -&gt; spec</code> map with tags, in registration order, from which
 each transport takes the view it exposes.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="n">SpecRegistry</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">list_notes_spec</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.quickstart</span><span class="w"> </span><span class="kn">import</span> <span class="n">rename_note_spec</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">update_author_spec</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">SpecRegistry</span><span class="p">()</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">list_notes_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"read"</span><span class="p">))</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"rename_note"</span><span class="p">,</span> <span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"create_author"</span><span class="p">,</span> <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"catalogue"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"update_author"</span><span class="p">,</span> <span class="n">update_author_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"catalogue"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Each transport takes the view it exposes. Every derivation is a new registry,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># a snapshot sharing the spec objects, so neither view can change the other.</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">agent_tools</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">by_tag</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">)</span>  <span class="c1"># list_notes, rename_note</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">command_line</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span><span class="s2">"create_author"</span><span class="p">,</span> <span class="s2">"list_notes"</span><span class="p">)</span>  <span class="c1"># in the order named</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">registry</span> <span class="o">=</span> <span class="n">SpecRegistry</span><span class="p">()</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">list_notes_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"read"</span><span class="p">))</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"rename_note"</span><span class="p">,</span> <span class="n">rename_note_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"create_author"</span><span class="p">,</span> <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"catalogue"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">registry</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"update_author"</span><span class="p">,</span> <span class="n">update_author_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"catalogue"</span><span class="p">,</span> <span class="s2">"write"</span><span class="p">))</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Each transport takes the view it exposes. Every derivation is a new registry,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># a snapshot sharing the spec objects, so neither view can change the other.</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">agent_tools</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">by_tag</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">)</span>  <span class="c1"># list_notes, rename_note</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">command_line</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span><span class="s2">"create_author"</span><span class="p">,</span> <span class="s2">"list_notes"</span><span class="p">)</span>  <span class="c1"># in the order named</span>
 </span></code></pre></div>
 <h2 id="what-an-entry-holds">What an entry holds<a class="headerlink" href="#what-an-entry-holds" title="Permanent link">&para;</a></h2>
 <p>Each entry is a
@@ -834,15 +851,71 @@ the binding that configures them.</p>
 vocabulary: <code>"read"</code>, <code>"admin"</code>, <code>"destructive"</code>. Whether an entry is a read or
 a write is not a tag and not a field; it is read off the spec itself, so a
 stored label can never disagree with the object it describes.</p>
+<h2 id="a-declaration-of-another-librarys">A declaration of another library's<a class="headerlink" href="#a-declaration-of-another-librarys" title="Permanent link">&para;</a></h2>
+<p>The <code>spec</code> may also be any object with an <code>as_kernel_spec()</code> method, a
+<a class="autorefs autorefs-internal" title="SpecSource" href="../reference/#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a>:
+djangorestframework-services' spec is one, and so is every <code>ServiceSpec</code> and
+<code>SelectorSpec</code>, each compiling to itself. It is registered as it is, with no
+wrapper, and kept as registered, so <code>entry.spec</code> and <code>specs()</code> hand back the
+object itself. <code>dispatch</code>, <code>adispatch</code>, <code>check_call</code>, <code>bind_arguments</code>,
+<code>present</code>, <code>apresent</code>, <code>present_for_audience</code>, <code>resolve_target</code>, the three
+<code>authorize</code> functions, the affordance functions and their async twins,
+<code>server_owned_keys</code>, <code>check_requested_input</code>, <code>shape_queryset</code>,
+<code>spec_input_schema</code>, <code>spec_output_schema</code>, <code>can_present_nothing</code>,
+<code>audience_projection_for_spec</code>, <code>dispatch_request</code> and <code>adispatch_request</code> take
+it as they take a spec, <code>SpecView</code> and <code>AsyncSpecView</code> serve it as their
+<code>spec</code>, and
+<a class="autorefs autorefs-internal" title="kernel_spec" href="../reference/#django_service_specs.specs.kernel_spec.kernel_spec"><code>kernel_spec</code></a> is how a
+transport reads the spec it compiles to anywhere else. It is compiled the
+first time anything reads it, and that compiled spec answers every later call
+for the same object.</p>
+<p>A <a class="autorefs autorefs-internal" title="Grant
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.authorization.grant.Grant"><code>Grant</code></a> compares specs as
+compiled, so a transport that authorizes the object it holds and mints a grant
+from it can dispatch that object or the spec it compiles to under the same
+grant. Each permission check is asked about the compiled spec, the same object
+<code>dispatch</code> hands it for that declaration.</p>
+<p>The entry answers a read-only <code>agent_contract</code>: the registered object's own
+<code>agent_contract()</code> when it has one, and <code>None</code> otherwise, which is every
+<code>ServiceSpec</code> and <code>SelectorSpec</code>. It is asked, never passed: <code>register()</code> takes
+no <code>agent_contract=</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclass</span><span class="p">(</span><span class="n">frozen</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">OtherLibrarysListing</span><span class="p">:</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">    </span><span class="sd">"""A read declared in another library's vocabulary, compiled on demand."""</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>    <span class="n">ordering</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"title"</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">as_kernel_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SelectorSpec</span><span class="p">:</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>        <span class="k">return</span> <span class="n">SelectorSpec</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span> <span class="n">selector</span><span class="o">=</span><span class="n">notes_of</span><span class="p">,</span> <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()])</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">agent_contract</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"ordering"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">ordering</span><span class="p">}</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="n">listing</span> <span class="o">=</span> <span class="n">OtherLibrarysListing</span><span class="p">()</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="n">mixed</span> <span class="o">=</span> <span class="n">SpecRegistry</span><span class="p">()</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="n">mixed</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"legacy_notes"</span><span class="p">,</span> <span class="n">listing</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"read"</span><span class="p">))</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="n">mixed</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">list_notes_spec</span><span class="p">,</span> <span class="n">tags</span><span class="o">=</span><span class="p">(</span><span class="s2">"notes"</span><span class="p">,</span> <span class="s2">"read"</span><span class="p">))</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="n">entry</span> <span class="o">=</span> <span class="n">mixed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"legacy_notes"</span><span class="p">)</span>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a><span class="k">assert</span> <span class="n">entry</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">entry</span><span class="o">.</span><span class="n">spec</span> <span class="ow">is</span> <span class="n">listing</span>  <span class="c1"># kept as registered</span>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="n">compiled</span> <span class="o">=</span> <span class="n">kernel_spec</span><span class="p">(</span><span class="n">listing</span><span class="p">)</span>  <span class="c1"># compiled once; the same object every time</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a><span class="n">contracts</span> <span class="o">=</span> <span class="p">[</span><span class="n">e</span><span class="o">.</span><span class="n">agent_contract</span> <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">mixed</span><span class="p">]</span>  <span class="c1"># [{"ordering": "title"}, None]</span>
+</span></code></pre></div>
 <h2 id="registering">Registering<a class="headerlink" href="#registering" title="Permanent link">&para;</a></h2>
 <p><code>register(name, spec, tags=...)</code> adds one entry, and refuses three mistakes
 where they are written, at import time:</p>
 <ul>
 <li><strong>A name already in this registry</strong> raises <code>ValueError</code>, so a copy-pasted
   declaration fails instead of shadowing an operation.</li>
-<li><strong>Something that is not a <code>ServiceSpec</code> or a <code>SelectorSpec</code></strong> raises
-  <code>TypeError</code>.</li>
-<li><strong>A spec with no permission check</strong> raises <code>ImproperlyConfigured</code>. Dispatch
+<li><strong>Something that is not a <code>ServiceSpec</code> or a <code>SelectorSpec</code>, nor compiles
+  to one,</strong> raises <code>TypeError</code>, naming the registration.</li>
+<li><strong>A spec with no permission check</strong>, whether declared here or compiled from
+  another library's declaration, raises <code>ImproperlyConfigured</code>. Dispatch
   would refuse it on every call, and finding out at the first call is later
   than finding out at startup. An operation that is open says so with
   <code>permissions=[Unrestricted()]</code>.</li>

@@ -976,7 +976,14 @@ above:</p>
 <li><code>price</code> and <code>published_on</code> are described as what their formatters produce,
   and nothing they said about the value before survives: the <code>"format"</code> of a
   decimal and a date is gone, since <code>"EUR 9.99"</code> is neither. <code>"null"</code> stays
-  in <code>published_on</code>'s type, because a null is never formatted.</li>
+  in <code>published_on</code>'s type, because a null is never formatted. It stays
+  however the property stated it - in a type list, as a <code>{"type": "null"}</code>
+  member of an <code>anyOf</code> (how a dataclass field typed <code>X | None</code> is described),
+  as <code>None</code> among an <code>enum</code>'s values (a nullable choice), or as a
+  <code>{"const": null}</code> entry of a <code>oneOf</code> (a labelled one) - and is always written
+  as the formatter's type followed by <code>"null"</code>; an <code>enum</code> in the formatter's
+  own fragment lists <code>None</code> too, and a <code>const</code> becomes an <code>enum</code> of that value
+  and <code>None</code>, so the two never disagree.</li>
 <li><code>id</code> keeps its values on both sides - a handle is passed to other tools,
   which take the stored value - and carries <code>handle_description</code>, the
   transport's sentence for a handle whose marking declares no description of
@@ -1016,7 +1023,10 @@ rendered from that same format. A date-time is converted to Django's active
 time zone, which is the only zone it can be rendered in: the projection is
 built once, before any request, so a zone chosen per call would describe one
 payload and serve another. A date, like <code>published_on</code>, is read as midnight,
-which is why its format names no time.</p>
+which is why its format names no time. A string that is not a date-time, and
+one shaped like a date-time that names no real moment (the thirtieth of
+February), is served as stored: one row's bad data does not fail the page it is
+on.</p>
 <p>Both sides of the projection read one formatter, so the payload and the
 schema change together, and a formatter decides over the rest of the field's
 declaration:</p>

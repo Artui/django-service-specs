@@ -1027,8 +1027,12 @@ instead, at every level:</p>
 <p>There is no third policy that passes an undeclared argument through. Reaching a
 callable is exactly what the closed set prevents: on a read, with no Validator
 in front of it, it would let a caller supply a keyword the operation's author
-never offered.</p>
-<p><code>dispatch</code>, <code>adispatch</code> and <code>bind_arguments</code> each take <code>unknown_arguments=</code>.</p>
+never offered. The enum does carry a third member, <code>PASSTHROUGH</code>, kept as a
+name for the transports of the current djangorestframework-services release,
+which compare a policy against it. It is not a policy: every function that
+takes one raises <code>ValueError</code> for it rather than running it as <code>IGNORE</code>.</p>
+<p><code>dispatch</code>, <code>adispatch</code>, <code>check_call</code> and <code>bind_arguments</code> each take
+<code>unknown_arguments=</code>.</p>
 <h2 id="the-refusal-tree">The refusal tree<a class="headerlink" href="#the-refusal-tree" title="Permanent link">&para;</a></h2>
 <p>Every refusal of arguments is
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>,
