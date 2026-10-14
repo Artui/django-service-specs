@@ -16,7 +16,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.filters.utils import NoteFilters, TitleFilter, UserFilters
+from tests.adapters.filters.utils import NoteFilters, TitleFilter, UserFilters
 from tests.specs.utils import PK, Named, Nobody
 
 

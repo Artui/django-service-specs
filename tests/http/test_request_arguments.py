@@ -23,8 +23,8 @@ from django.http.request import RawPostDataException
 from django.test import RequestFactory, override_settings
 from django.test.client import encode_multipart
 
+from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.adapters.forms.form_validator import FormValidator
-from django_service_specs.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.parameters.check_arguments import check_arguments

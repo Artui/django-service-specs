@@ -168,7 +168,7 @@ SURFACE: dict[str, Pin] = {
         "dispatch.dispatch_result", signature="kind, value=, service_result=, instance=, data="
     ),
     # --- filters ------------------------------------------------------------------------------
-    "filter_set_parameters": _fn("filters.filter_set_parameters", "filter_set"),
+    "filter_set_parameters": _fn("adapters.filters.filter_set_parameters", "filter_set"),
     # --- mutations ----------------------------------------------------------------------------
     "apply_input": _fn("mutations.apply_input", "instance, data, *, field_map=, exclude_fields="),
     "create_from_input": _fn(

@@ -152,7 +152,7 @@ filter. A duck-typed stand-in taking `(data, queryset)` declares its filters
 in `base_filters`, and a step narrowing the queryset by no argument belongs
 in `extend_queryset`. A real `FilterSet` declaring no filters is accepted,
 and narrows nothing. Its filters are reads: each is read as a Parameter by
-[`filter_set_parameters`][django_service_specs.filters.filter_set_parameters.filter_set_parameters]
+[`filter_set_parameters`][django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters]
 and joins `reads` after the author's own, named as django-filter reads it -
 `price_min` and `price_max` for a range - so the schema, the closed argument
 set and the shape check cover every filter, and a filter named like a read

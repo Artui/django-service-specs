@@ -5,7 +5,7 @@ import sys
 import django_filters
 import pytest
 
-from django_service_specs.filters.utils import import_django_filters, range_suffixes
+from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 
 
 def test_it_is_django_filter_when_installed() -> None:

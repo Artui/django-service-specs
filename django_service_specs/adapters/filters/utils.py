@@ -1,4 +1,4 @@
-"""Helpers shared across ``filters/`` and the selector that applies a FilterSet."""
+"""Helpers shared across ``adapters/filters/`` and the selector that applies a FilterSet."""
 
 from __future__ import annotations
 

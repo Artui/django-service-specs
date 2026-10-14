@@ -30,9 +30,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.adapter_app.models import Author as BookAuthor
 from tests.adapter_app.models import Book, Edition, Placement
-from tests.dispatch.utils import make_user
-from tests.dispatch_app.models import Note
-from tests.filters.utils import (
+from tests.adapters.filters.utils import (
     EditionNumberFilters,
     NoteFilters,
     NoteKeyFilters,
@@ -40,6 +38,8 @@ from tests.filters.utils import (
     TitleFilter,
     UserKeyFilters,
 )
+from tests.dispatch.utils import make_user
+from tests.dispatch_app.models import Note
 from tests.parameters.utils import coded
 from tests.specs.utils import Foreign
 

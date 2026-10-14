@@ -78,6 +78,10 @@ Two Django settings, each read at the call rather than at import, so
 
 ::: django_service_specs.adapters.forms.form_validator.FormValidator
 
+## Filters adapter
+
+::: django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters
+
 ## Pydantic adapters
 
 Installed with the `pydantic` extra and imported from
@@ -226,10 +230,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.report.unguarded_specs.unguarded_specs
 ::: django_service_specs.commands.report.unguarded_spec.UnguardedSpec
 ::: django_service_specs.commands.report.unguarded_message.unguarded_message
-
-## Filters
-
-::: django_service_specs.filters.filter_set_parameters.filter_set_parameters
 
 ## Types
 

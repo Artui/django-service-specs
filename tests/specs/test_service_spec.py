@@ -21,7 +21,7 @@ from django_service_specs.types.unset import UnsetType
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
-from tests.filters.utils import TitleFilter
+from tests.adapters.filters.utils import TitleFilter
 from tests.specs.utils import PK, Bare, Named, Titled
 
 RETRIEVE = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK)
