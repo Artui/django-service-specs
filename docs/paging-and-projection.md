@@ -105,7 +105,8 @@ Each change to the item is the mirror of one the payload undergoes:
   member of an `anyOf` (how a dataclass field typed `X | None` is described),
   as `None` among an `enum`'s values (a nullable choice), or as a
   `{"const": null}` entry of a `oneOf` (a labelled one) - and is always written
-  as the formatter's type followed by `"null"`.
+  as the formatter's type followed by `"null"`; an `enum` in the formatter's
+  own fragment lists `None` too, so the two never disagree.
 - `id` keeps its values on both sides - a handle is passed to other tools,
   which take the stored value - and carries `handle_description`, the
   transport's sentence for a handle whose marking declares no description of

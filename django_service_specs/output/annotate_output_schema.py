@@ -60,7 +60,8 @@ def annotate_output_schema(
       as a type, an ``anyOf`` member, ``None`` in an ``enum`` or a ``oneOf``
       entry for a labelled choice - since a null is never formatted. The type is written from ``produces`` rather than
       taken from the fragment, so a renderer cannot contradict its own
-      advertisement. Not on a ``HANDLE`` either.
+      advertisement, and a fragment's ``enum`` lists the null too where the
+      property admitted one. Not on a ``HANDLE`` either.
 
     Generating both sides from one declaration is the point: a schema that
     advertises a field the payload no longer carries is worse than either
@@ -156,7 +157,8 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
     choice, a ``oneOf`` entry - so the formatter's type is always written as
     ``[produces, "null"]`` and nothing of the spelling is carried over: the
     ``anyOf`` and ``enum`` it came in are discarded with everything else the
-    property said.
+    property said. A formatter's own ``enum`` gains the ``None`` as well, so
+    the type and the values it lists never disagree about the null.
     """
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
@@ -164,6 +166,19 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
     # each spelling it reads.
     if _admits_null(schema):
         formatted["type"] = [formatted["type"], "null"]
+        # The formatter's own fragment merges over the type, and one listing
+        # an ``enum`` would refuse the null the type now admits, so the null
+        # is listed there too, in a new list: the declaration is shared and
+        # frozen. Two conditions in one branch, each held by its own test:
+        # test_a_nullable_field_stays_nullable (the first: without it a
+        # fragment with no enum gains a key) and
+        # test_a_formatters_enum_already_listing_none_is_left_as_declared (the
+        # second: without it None is listed twice). The list itself is held by
+        # test_a_formatters_own_enum_admits_the_null_its_field_does, and the
+        # outer guard by
+        # test_a_formatters_enum_on_a_field_admitting_no_null_is_left_as_declared.
+        if "enum" in formatted and None not in formatted["enum"]:
+            formatted["enum"] = [*formatted["enum"], None]
     return formatted
 
 
