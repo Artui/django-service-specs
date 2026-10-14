@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import threading
+import weakref
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -1237,7 +1238,7 @@ async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop
 
         return reading
 
-    authorization_utils._function_declares_arguments.cache_clear()
+    monkeypatch.setattr(authorization_utils, "_DECLARES", weakref.WeakKeyDictionary())
     monkeypatch.setattr(
         dispatch_utils,
         "refuse_overlaid_parameters",

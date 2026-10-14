@@ -13,11 +13,11 @@ read it without a cycle.
 
 from __future__ import annotations
 
-import functools
 import inspect
+import weakref
 from collections.abc import Callable, Mapping
 from types import FunctionType
-from typing import Any
+from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -122,16 +122,27 @@ def _declares_arguments(asked: Callable[..., Any]) -> bool:
     return _names_arguments(asked)
 
 
-@functools.cache
+# Keyed weakly on the function, so the entry goes with it: a check class a
+# factory builds per call is freed with its last instance, and the cache does
+# not grow with every class ever asked
+# (test_a_class_built_at_runtime_is_not_kept_once_asked).
+_DECLARES: Final[weakref.WeakKeyDictionary[FunctionType, bool]] = weakref.WeakKeyDictionary()
+
+
 def _function_declares_arguments(function: FunctionType) -> bool:
     """``_names_arguments`` over a function a class defines, inspected once.
 
-    A call asks each check up to twice, and a signature does not change while
-    its function lives; replacing the method on the class binds a different
-    function, which is read afresh
+    A call asks each check up to twice, and checks share a class, so the
+    signature is read once per function
+    (test_a_class_defined_function_s_signature_is_inspected_once); it does not
+    change while its function lives, and replacing the method on the class
+    binds a different function, which is read afresh
     (test_a_method_replaced_on_its_class_is_read_as_it_now_is).
     """
-    return _names_arguments(function)
+    declares = _DECLARES.get(function)
+    if declares is None:
+        declares = _DECLARES[function] = _names_arguments(function)
+    return declares
 
 
 def _names_arguments(asked: Callable[..., Any]) -> bool:

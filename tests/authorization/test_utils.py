@@ -12,6 +12,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 
+from django_service_specs.authorization import utils
 from django_service_specs.authorization.utils import asked_with, is_deactivated
 
 
@@ -137,3 +138,43 @@ def test_a_forwarding_wrapper_answers_for_the_method_it_wraps() -> None:
 
     assert asked_with(Wrapped(), "keyword_only", {"pk": 1}) == {"arguments": {"pk": 1}}
     assert asked_with(Wrapped(), "undeclared", {"pk": 1}) == {}
+
+
+def test_a_class_defined_function_s_signature_is_inspected_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A call asks each check up to twice, and many checks share a class, so
+    the signature is read once per function rather than once per question."""
+    read: list[Any] = []
+
+    def counted(asked: Any) -> bool:
+        read.append(asked)
+        return True
+
+    class Asking(_Shapes):
+        def keyword_only(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
+            return True
+
+    monkeypatch.setattr(utils, "_names_arguments", counted)
+    for check in (Asking(), Asking()):
+        asked_with(check, "keyword_only", {"pk": 1})
+    assert read == [Asking.keyword_only]
+
+
+def test_a_class_built_at_runtime_is_not_kept_once_asked() -> None:
+    """A check class a factory builds per call is freed with its last
+    instance, so the cache does not grow with every class ever asked."""
+
+    def build() -> Any:
+        class Built(_Shapes):
+            def keyword_only(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
+                return True
+
+        return Built()
+
+    check = build()
+    held = weakref.ref(type(check).keyword_only)
+    assert asked_with(check, "keyword_only", {"pk": 1}) == {"arguments": {"pk": 1}}
+    del check
+    gc.collect()
+    assert held() is None
