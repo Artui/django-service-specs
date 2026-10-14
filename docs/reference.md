@@ -220,6 +220,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.parameter_descriptor.ParameterDescriptor
 ::: django_service_specs.commands.add_spec_arguments.add_spec_arguments
 ::: django_service_specs.commands.parsed_arguments.parsed_arguments
+::: django_service_specs.commands.unguarded_specs.unguarded_specs
+::: django_service_specs.commands.unguarded_spec.UnguardedSpec
+::: django_service_specs.commands.unguarded_reason.UnguardedReason
+::: django_service_specs.commands.unguarded_message.unguarded_message
 
 ## Filters
 

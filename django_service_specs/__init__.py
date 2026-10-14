@@ -26,6 +26,10 @@ from django_service_specs.commands.describe_parameters import describe_parameter
 from django_service_specs.commands.parameter_descriptor import ParameterDescriptor
 from django_service_specs.commands.parsed_arguments import parsed_arguments
 from django_service_specs.commands.spec_command import SpecCommand
+from django_service_specs.commands.unguarded_message import unguarded_message
+from django_service_specs.commands.unguarded_reason import UnguardedReason
+from django_service_specs.commands.unguarded_spec import UnguardedSpec
+from django_service_specs.commands.unguarded_specs import unguarded_specs
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.bind_arguments import bind_arguments
@@ -218,6 +222,8 @@ __all__ = [
     "SpecRegistry",
     "SpecSource",
     "SpecView",
+    "UnguardedReason",
+    "UnguardedSpec",
     "UnknownArguments",
     "Unrestricted",
     "UnsetType",
@@ -298,6 +304,8 @@ __all__ = [
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
+    "unguarded_message",
+    "unguarded_specs",
     "unmet_operation_affordance",
     "update_from_input",
     "update_model",

@@ -518,6 +518,12 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "describe_parameters",
         "add_spec_arguments",
         "parsed_arguments",
+        # The report of a registry's open specs, read by that command and by the
+        # system check its app registers; drfs serves no management command.
+        "UnguardedReason",
+        "UnguardedSpec",
+        "unguarded_message",
+        "unguarded_specs",
         "UnsupportedMediaType",
         "dispatch_request",
         "adispatch_request",

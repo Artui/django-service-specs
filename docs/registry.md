@@ -80,6 +80,52 @@ where they are written, at import time:
   than finding out at startup. An operation that is open says so with
   `permissions=[Unrestricted()]`.
 
+## Open specs, reported
+
+A registry refuses a spec that declares no check, and a spec refuses an empty
+`permissions`, so every registered spec declares at least one. What still
+reaches a registry open to every principal is a spec whose checks are all
+`Unrestricted`, a subclass of it included. One real check beside an
+`Unrestricted()` guards the spec, because every check must pass.
+
+`unguarded_specs(registry)` lists those entries, in registry order, each as an
+`UnguardedSpec` carrying its name and an `UnguardedReason`. An entry is judged
+by the spec it compiles to, the one dispatch runs, so a declaration of
+another library's is read through what it compiles to rather than through
+checks of its own. `unguarded_message(spec, command_label)` is the sentence
+that reports one, naming the command an operator types:
+
+```text
+'refund_order' in manage.py svc authorizes nothing: every permission check it declares is Unrestricted, so any active user named by --as-user may run it.
+```
+
+Listing `"django_service_specs"` in `INSTALLED_APPS` registers a system check
+that prints that sentence for every `SpecCommand` in the project. It loads
+each command the installed apps serve, Django's own excepted, and keeps the
+`SpecCommand` ones; with an app label, `manage.py check <app_label>` loads
+only that app's commands.
+
+| Id | Level | For |
+| --- | --- | --- |
+| `django_service_specs.W001` | Warning | One spec that authorizes nothing, with the command class as `obj` |
+| `django_service_specs.W003` | Warning | A command that could not be imported or constructed, or names no registry: its specs were not checked |
+
+Both are warnings, never errors: an open spec is a decision or an accident
+the check cannot tell apart, and an error would stop `migrate` on a project
+working as intended. A command that does not load is reported and skipped
+rather than failing the check, because without the app nothing loads it until
+somebody runs it. `SILENCED_SYSTEM_CHECKS` silences by id, so silencing
+`W001` silences it for every spec in the project.
+
+The check runs wherever Django runs system checks: `manage.py check`, and
+every `manage.py` command that keeps `requires_system_checks`. `call_command`
+skips them for every command but `check`.
+
+Reporting is the whole of it: the check refuses nothing, and neither it nor
+the command is an authorization boundary, since an operator who could be
+refused there has `manage.py shell`. It makes the declaration visible to
+whoever reads `check`.
+
 ## Reading it
 
 | Call | Returns |
