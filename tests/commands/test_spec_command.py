@@ -24,7 +24,7 @@ from django.test import override_settings
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
-from django_service_specs.commands.render_json_lines import render_json_lines
+from django_service_specs.commands.render.render_json_lines import render_json_lines
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.commands.unguarded_message import unguarded_message
 from django_service_specs.commands.unguarded_spec import UnguardedSpec

@@ -11,7 +11,7 @@ import pytest
 from pydantic import BaseModel, Field
 
 from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPresenter
-from django_service_specs.commands.render_result import render_result
+from django_service_specs.commands.render.render_result import render_result
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output
 from django_service_specs.output.output_field import OutputField

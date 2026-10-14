@@ -19,10 +19,10 @@ from django_service_specs.commands.argv.describe_parameters import describe_para
 from django_service_specs.commands.argv.parsed_arguments import parsed_arguments
 from django_service_specs.commands.argv.utils import option_string
 from django_service_specs.commands.exit_code_for import exit_code_for
-from django_service_specs.commands.render_result import render_result
+from django_service_specs.commands.render.render_result import render_result
+from django_service_specs.commands.render.wants_table import wants_table
 from django_service_specs.commands.unguarded_message import unguarded_message
 from django_service_specs.commands.unguarded_specs import unguarded_specs
-from django_service_specs.commands.wants_table import wants_table
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.utils import relax_partial
@@ -85,7 +85,7 @@ class SpecCommand(BaseCommand):
     - The result goes through the spec's presenter and is written as a table
       or as JSON Lines: ``--table`` and ``--json`` choose, then the
       ``SERVICE_SPECS_COMMAND_OUTPUT`` setting, then whether stdout is a
-      terminal ([`wants_table`][django_service_specs.commands.wants_table.wants_table]).
+      terminal ([`wants_table`][django_service_specs.commands.render.wants_table.wants_table]).
     - A refusal ends the run with a ``CommandError`` carrying its message and
       an [`ExitCode`][django_service_specs.types.exit_code.ExitCode].
     - ``--explain`` runs no spec: it lists the ones that authorize nothing,

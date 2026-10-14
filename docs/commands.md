@@ -151,7 +151,7 @@ id  title
 ```
 
 The table's columns come from the spec's `Output`, never from the first row;
-see [`render_table`][django_service_specs.commands.render_table.render_table]
+see [`render_table`][django_service_specs.commands.render.render_table.render_table]
 for what a field's marking does to them. JSON Lines are written one row at a
 time, but `present` builds a list result whole before the first row is
 written, so a large read is held in memory once, as an HTTP response holds

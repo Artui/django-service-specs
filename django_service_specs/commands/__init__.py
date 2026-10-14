@@ -5,14 +5,14 @@ from django_service_specs.commands.argv.describe_parameters import describe_para
 from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
 from django_service_specs.commands.argv.parsed_arguments import parsed_arguments
 from django_service_specs.commands.exit_code_for import exit_code_for
-from django_service_specs.commands.render_json_lines import render_json_lines
-from django_service_specs.commands.render_result import render_result
-from django_service_specs.commands.render_table import render_table
+from django_service_specs.commands.render.render_json_lines import render_json_lines
+from django_service_specs.commands.render.render_result import render_result
+from django_service_specs.commands.render.render_table import render_table
+from django_service_specs.commands.render.wants_table import wants_table
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.commands.unguarded_message import unguarded_message
 from django_service_specs.commands.unguarded_spec import UnguardedSpec
 from django_service_specs.commands.unguarded_specs import unguarded_specs
-from django_service_specs.commands.wants_table import wants_table
 
 __all__ = [
     "ParameterDescriptor",

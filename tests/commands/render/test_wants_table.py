@@ -9,7 +9,7 @@ import pytest
 from django.core.management.base import OutputWrapper
 from django.test import override_settings
 
-from django_service_specs.commands.wants_table import wants_table
+from django_service_specs.commands.render.wants_table import wants_table
 
 
 class _Terminal(io.StringIO):

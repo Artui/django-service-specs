@@ -16,7 +16,7 @@ from django.core.management.base import OutputWrapper
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
-from django_service_specs.commands.render_json_lines import render_json_lines
+from django_service_specs.commands.render.render_json_lines import render_json_lines
 from django_service_specs.types.unset import UNSET, UnsetType
 
 
