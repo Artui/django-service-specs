@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Collection
 
-from django_service_specs.commands.add_spec_arguments import add_spec_arguments
+from django_service_specs.commands.argv.add_spec_arguments import add_spec_arguments
 from django_service_specs.parameters.parameter import Parameter
 from django_service_specs.parameters.parameters import Parameters
 

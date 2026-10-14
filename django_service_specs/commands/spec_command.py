@@ -14,16 +14,15 @@ from django.utils.translation import gettext
 
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
-from django_service_specs.commands.add_spec_arguments import add_spec_arguments
-from django_service_specs.commands.describe_parameters import describe_parameters
-from django_service_specs.commands.exit_code import ExitCode
+from django_service_specs.commands.argv.add_spec_arguments import add_spec_arguments
+from django_service_specs.commands.argv.describe_parameters import describe_parameters
+from django_service_specs.commands.argv.parsed_arguments import parsed_arguments
+from django_service_specs.commands.argv.utils import option_string
 from django_service_specs.commands.exit_code_for import exit_code_for
-from django_service_specs.commands.parsed_arguments import parsed_arguments
-from django_service_specs.commands.render_result import render_result
-from django_service_specs.commands.unguarded_message import unguarded_message
-from django_service_specs.commands.unguarded_specs import unguarded_specs
-from django_service_specs.commands.utils import option_string
-from django_service_specs.commands.wants_table import wants_table
+from django_service_specs.commands.render.render_result import render_result
+from django_service_specs.commands.render.wants_table import wants_table
+from django_service_specs.commands.report.unguarded_message import unguarded_message
+from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.utils import relax_partial
@@ -43,6 +42,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.exit_code import ExitCode
 
 _OWN_OPTIONS = frozenset({"--as-user", "--json", "--table"})
 """The options every subcommand owns, which no spec parameter may map to."""
@@ -72,7 +72,7 @@ class SpecCommand(BaseCommand):
 
     - **One subcommand per registry entry**, named after the entry with each
       ``_`` shown as ``-``. Its options are the spec's parameters, as
-      [`add_spec_arguments`][django_service_specs.commands.add_spec_arguments.add_spec_arguments]
+      [`add_spec_arguments`][django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments]
       spells them, less any key the server fills
       ([`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]).
       No option is matched by a prefix: an abbreviation is refused rather
@@ -85,9 +85,9 @@ class SpecCommand(BaseCommand):
     - The result goes through the spec's presenter and is written as a table
       or as JSON Lines: ``--table`` and ``--json`` choose, then the
       ``SERVICE_SPECS_COMMAND_OUTPUT`` setting, then whether stdout is a
-      terminal ([`wants_table`][django_service_specs.commands.wants_table.wants_table]).
+      terminal ([`wants_table`][django_service_specs.commands.render.wants_table.wants_table]).
     - A refusal ends the run with a ``CommandError`` carrying its message and
-      an [`ExitCode`][django_service_specs.commands.exit_code.ExitCode].
+      an [`ExitCode`][django_service_specs.types.exit_code.ExitCode].
     - ``--explain`` runs no spec: it lists the ones that authorize nothing,
       as the system check does.
 

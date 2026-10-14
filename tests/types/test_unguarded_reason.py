@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from django_service_specs.commands.unguarded_reason import UnguardedReason
+from django_service_specs.types.unguarded_reason import UnguardedReason
 
 
 def test_the_one_reason_a_registered_spec_can_be_open() -> None:

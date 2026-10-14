@@ -61,7 +61,7 @@ it adds the [system check](#open-specs-explain).
 Each registry entry is a subcommand named after it, with each `_` shown as
 `-`: `rename_note` is `rename-note`. Its options are the spec's
 [parameters](arguments.md), spelled by
-[`add_spec_arguments`][django_service_specs.commands.add_spec_arguments.add_spec_arguments]:
+[`add_spec_arguments`][django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments]:
 `--due-at` for `due_at`, a `--flag`/`--no-flag` pair for a boolean, and an
 array as a repeated option, `--tag a --tag b`. Every value reaches
 [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat] as
@@ -151,7 +151,7 @@ id  title
 ```
 
 The table's columns come from the spec's `Output`, never from the first row;
-see [`render_table`][django_service_specs.commands.render_table.render_table]
+see [`render_table`][django_service_specs.commands.render.render_table.render_table]
 for what a field's marking does to them. JSON Lines are written one row at a
 time, but `present` builds a list result whole before the first row is
 written, so a large read is held in memory once, as an HTTP response holds
@@ -161,7 +161,7 @@ it. A service that returns nothing writes nothing.
 
 A refusal ends the run with a `CommandError` whose message goes to stderr and
 whose
-[`ExitCode`][django_service_specs.commands.exit_code.ExitCode] is the
+[`ExitCode`][django_service_specs.types.exit_code.ExitCode] is the
 process's exit status. The codes are a public contract, for a script to
 branch on:
 

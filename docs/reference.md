@@ -24,7 +24,7 @@ Two Django settings, each read at the call rather than at import, so
   anything else; `"table"` or `"json"` pins one project-wide, and a
   command's own `--table` or `--json` still wins. Anything else, a
   different case included, is refused as `ImproperlyConfigured` where it is
-  read. See [`wants_table`][django_service_specs.commands.wants_table.wants_table].
+  read. See [`wants_table`][django_service_specs.commands.render.wants_table.wants_table].
 
 ## Specs
 
@@ -222,20 +222,18 @@ Installed with the `pydantic` extra and imported from
 ## Commands
 
 ::: django_service_specs.commands.spec_command.SpecCommand
-::: django_service_specs.commands.exit_code.ExitCode
 ::: django_service_specs.commands.exit_code_for.exit_code_for
-::: django_service_specs.commands.render_result.render_result
-::: django_service_specs.commands.render_table.render_table
-::: django_service_specs.commands.render_json_lines.render_json_lines
-::: django_service_specs.commands.wants_table.wants_table
-::: django_service_specs.commands.describe_parameters.describe_parameters
-::: django_service_specs.commands.parameter_descriptor.ParameterDescriptor
-::: django_service_specs.commands.add_spec_arguments.add_spec_arguments
-::: django_service_specs.commands.parsed_arguments.parsed_arguments
-::: django_service_specs.commands.unguarded_specs.unguarded_specs
-::: django_service_specs.commands.unguarded_spec.UnguardedSpec
-::: django_service_specs.commands.unguarded_reason.UnguardedReason
-::: django_service_specs.commands.unguarded_message.unguarded_message
+::: django_service_specs.commands.render.render_result.render_result
+::: django_service_specs.commands.render.render_table.render_table
+::: django_service_specs.commands.render.render_json_lines.render_json_lines
+::: django_service_specs.commands.render.wants_table.wants_table
+::: django_service_specs.commands.argv.describe_parameters.describe_parameters
+::: django_service_specs.commands.argv.parameter_descriptor.ParameterDescriptor
+::: django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments
+::: django_service_specs.commands.argv.parsed_arguments.parsed_arguments
+::: django_service_specs.commands.report.unguarded_specs.unguarded_specs
+::: django_service_specs.commands.report.unguarded_spec.UnguardedSpec
+::: django_service_specs.commands.report.unguarded_message.unguarded_message
 
 ## Filters
 
@@ -252,3 +250,5 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
 ::: django_service_specs.types.no_input.NoInput
+::: django_service_specs.types.exit_code.ExitCode
+::: django_service_specs.types.unguarded_reason.UnguardedReason

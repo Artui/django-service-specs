@@ -9,9 +9,9 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.commands.describe_parameters import describe_parameters
-from django_service_specs.commands.parameter_descriptor import ParameterDescriptor
-from django_service_specs.commands.utils import destination, option_string
+from django_service_specs.commands.argv.describe_parameters import describe_parameters
+from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
+from django_service_specs.commands.argv.utils import destination, option_string
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET
 
@@ -44,11 +44,11 @@ def add_spec_arguments(
     - Each value lands under a namespaced destination rather than the
       parameter's name, so a parameter named ``verbosity`` or ``settings``
       cannot overwrite ``BaseCommand``'s own. Read the namespace back with
-      [`parsed_arguments`][django_service_specs.commands.parsed_arguments.parsed_arguments].
+      [`parsed_arguments`][django_service_specs.commands.argv.parsed_arguments.parsed_arguments].
 
     A parameter with no honest flat spelling - an object, an array of objects,
     a file - gets no option: see
-    [`ParameterDescriptor`][django_service_specs.commands.parameter_descriptor.ParameterDescriptor].
+    [`ParameterDescriptor`][django_service_specs.commands.argv.parameter_descriptor.ParameterDescriptor].
 
     ``reserved`` is the option strings the command owns itself, such as
     ``--as-user`` and Django's ``--verbosity``; ``--help`` is always reserved,
