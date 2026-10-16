@@ -15,7 +15,7 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.parameters.parameters import FORMATS, JSON_TYPES
+from django_service_specs.parameters.parameters import FORMATS, JSON_TYPES, canonical_choices
 
 _OUTPUT_TYPES = JSON_TYPES | {"any"}
 
@@ -110,7 +110,13 @@ class OutputField:
                     f"{where}: an untyped value is matched by no list; declare its type to list "
                     "choices."
                 )
-            object.__setattr__(self, "choices", pairs)
+            # As on Parameter, two spellings of one id collapsing into the
+            # first with its display, and the spelling ``str()`` gives a model's UUID,
+            # so a row presenting that spelling finds its display; an output
+            # value itself is not canonicalised, so another spelling passes
+            # through unspoken. Held by
+            # test_a_uuid_choice_is_spoken_for_the_spelling_a_model_presents.
+            object.__setattr__(self, "choices", canonical_choices(self.format, pairs))
 
 
 @dataclass(frozen=True)

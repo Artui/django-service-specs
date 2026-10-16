@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-10-16
+
+### Added
+- **`ServerArguments`: declared parameters a transport answers for itself.**
+  A frozen value of `values`, which outrank whatever the caller sends under
+  those names, and `withheld` names, which are taken from no one, so the
+  parameter is absent and the callable's own default answers. `names()`
+  returns both together. `values` is copied into a read-only mapping of its
+  own when the value is built, so nothing added after the check reaches a
+  call, and the value still copies, deep-copies and pickles; `withheld` is
+  held as a `frozenset`, and a bare string for it is refused with
+  `TypeError`.
+- **`check_server_arguments(spec, server, *, pool_seeds=...)`**, for a
+  transport to call once when it is built. It raises `ImproperlyConfigured`,
+  naming the spec's callable, for a name that is no top-level declared
+  parameter (so a field inside a `many` spec's rows cannot be bound), a name
+  both bound and withheld, a name a pool seed occupies, a name a typed
+  provider fills or may decline (the spec's `kwargs`, a service spec's
+  `input_data` and its target selector's `kwargs`, whose answer dispatch
+  keeps over the bound value on any call where it gives one), a withheld
+  name no call could then do without, and a bound value its own parameter
+  refuses. A withheld name cannot be done without when the shape check
+  demands it, read as dispatch relaxes a `partial` spec, or when it is a
+  read the callable receiving it declares with no default of its own:
+  dispatch applies no declared default, so the callable's is the one that
+  answers. Bound values take the wire's spelling, so a `uuid.UUID`, a `date`
+  or a `Decimal` for a string parameter fails here, at startup.
+- **`apply_server_arguments(spec, arguments, server)`**, for a transport to
+  call on every call before `dispatch` or `adispatch`. It returns a new dict:
+  the caller's value for every bound or withheld name is dropped first, so a
+  value sent for a name the caller was never offered cannot refuse the call,
+  and then the bound values are laid over the rest, as the shape check hands
+  them on. A bound value that fails its own parameter is raised as
+  `ImproperlyConfigured` with the shape check's refusal as its cause, never
+  as `InvalidArguments`, since no caller can correct it. Neither `dispatch`
+  nor `spec_input_schema` takes a binding: a transport applies the helpers,
+  and subtracts `names()` from the input schema it builds, beside
+  `server_owned_keys`.
+- **`format="uuid"` on a string parameter or output field.** The shape check
+  refuses a string that spells no UUID - `"null"`, `"undefined"`, the
+  parameter's own name, a value padded with whitespace - with `"Enter a
+  valid UUID."` and the code `invalid`, on every route, where a lookup
+  handed one raised Django's `ValidationError` from inside the ORM. The
+  reference is `models.UUIDField.to_python`, the parse a lookup on a UUID
+  column runs, so hyphenless, braced, upper-case and `urn:uuid:` spellings
+  pass. A UUID that passes is handed on in its canonical spelling,
+  `str(uuid.UUID(value))`, so every reader sees one; it is still a string,
+  as a date's is, and a `uuid.UUID` object is refused as not a string.
+  A `Parameter`'s declared `choices`, and the keys of its `choice_labels`,
+  are held in the same spelling, so a listed id matches its value in any
+  spelling and the schema advertises the canonical one; a choice that spells
+  no UUID is kept as listed. Two spellings of one id become one choice, in
+  the first one's place and with its label, so the schema lists the id once;
+  no other repeat is collapsed. An `OutputField`'s choices are held and
+  collapsed the same way, the first display winning, so its schema and the
+  display a row is spoken with are keyed by the spelling `str()` gives a
+  model's UUID; an output value is not canonicalised. The
+  schema states it as `{"type": "string", "format": "uuid"}`. An array's
+  element takes no `uuid` format; `decimal` stays the one an element takes.
+
 ## [0.8.0] — 2026-10-14
 
 ### Added
@@ -1441,7 +1501,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/Artui/django-service-specs/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Artui/django-service-specs/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Artui/django-service-specs/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Artui/django-service-specs/compare/v0.5.1...v0.6.0

@@ -37,9 +37,10 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
     Validator sees an argv call exactly as it would see typed JSON. It is
     directed by the declaration: an ``integer`` or a ``number`` is parsed, a
     ``boolean`` is parsed from exactly four spellings, and everything else is
-    left as the string it arrived as. **A decimal, a date-time and a date stay
-    strings**, for the Validator to decode, exactly as they would arrive off a
-    JSON wire.
+    left as the string it arrived as. **A decimal, a date-time, a date and a
+    UUID stay strings**, for the Validator to decode, exactly as they would
+    arrive off a JSON wire, and the shape check reads each format after this:
+    ``"null"`` for a ``uuid`` is refused there, on every route alike.
     **So does an** ``any``: it declares no type to read the string as, so a
     query string's ``"3"`` reaches the shape check and the Validator as
     ``"3"``.

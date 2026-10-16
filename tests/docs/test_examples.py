@@ -44,6 +44,7 @@ from django_service_specs import (
     PrincipalUnavailable,
     SelectorKind,
     SelectorSpec,
+    ServerArguments,
     ServiceConflict,
     ServiceError,
     ServiceNotFound,
@@ -53,6 +54,7 @@ from django_service_specs import (
     ValidationContext,
     authorize,
     check_arguments,
+    check_server_arguments,
     coerce_flat,
     dispatch,
     error_response,
@@ -382,6 +384,33 @@ class TestDispatching:
         with pytest.raises(NotPermitted):
             dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
         assert len(queue) == 1
+
+    def test_a_server_argument_outranks_the_caller_and_a_withheld_one_is_never_read(
+        self, ada: Any, bob: Any
+    ) -> None:
+        beta = Note.objects.create(owner=ada, title="Beta")
+        alpha = Note.objects.create(owner=ada, title="Alpha")
+        Note.objects.create(owner=bob, title="Bob's")
+        tool = dispatching.notes_tool(ada)
+        # Bob's pk and a descending order are both dropped; so is a value the
+        # caller could never have been shown, which would fail the choices.
+        assert list(tool({"author_pk": bob.pk, "ordering": "-title"}).value) == [alpha, beta]
+        assert list(tool({"ordering": "null", "search": "be"}).value) == [beta]
+        with pytest.raises(InvalidArguments) as refused:
+            tool({"rogue": 1})
+        assert refused.value.detail == {"rogue": ["Unknown argument."]}
+
+    def test_the_caller_is_offered_only_what_the_server_does_not_answer(self, ada: Any) -> None:
+        server = ServerArguments(values={"author_pk": ada.pk}, withheld=frozenset({"ordering"}))
+        schema = spec_input_schema(dispatching.notes_by_spec)
+        assert sorted(schema["properties"]) == ["author_pk", "ordering", "search"]
+        assert dispatching.offered(schema, server) == ["search"]
+
+    def test_a_binding_nobody_could_satisfy_fails_where_the_tool_is_built(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="which no call could then do without"):
+            check_server_arguments(
+                dispatching.notes_by_spec, ServerArguments(withheld=frozenset({"author_pk"}))
+            )
 
     def test_a_seed_reaches_the_service_and_no_caller_can_supply_it(self, ada: Any) -> None:
         result = dispatching.create_signed_note(ada, "Hello")

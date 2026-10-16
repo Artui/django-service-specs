@@ -81,7 +81,7 @@ def test_a_default_still_tells_two_parameters_apart() -> None:
     ("kwargs", "message"),
     [
         ({"type": "str"}, "is not a JSON type"),
-        ({"type": "string", "format": "uuid"}, "format 'uuid' is not one of"),
+        ({"type": "string", "format": "email"}, "format 'email' is not one of"),
         ({"type": "integer", "format": "decimal"}, "a format describes a string"),
         ({"type": "string", "items": "string"}, "items describes an array's element"),
         ({"type": "array", "items": "str"}, "items 'str' is not a JSON type"),
@@ -107,6 +107,24 @@ def test_nested_is_an_objects_fields_or_an_arrays_rows() -> None:
 
 def test_a_format_on_a_string_is_kept() -> None:
     assert Parameter("price", "string", format="decimal").format == "decimal"
+
+
+def test_an_identifier_format_on_a_string_is_kept() -> None:
+    assert Parameter("project_pk", "string", format="uuid").format == "uuid"
+
+
+def test_an_identifier_format_describes_a_string_alone() -> None:
+    with pytest.raises(ImproperlyConfigured, match="a format describes a string"):
+        Parameter("project_pk", "integer", format="uuid")
+
+
+def test_an_array_s_element_takes_no_identifier_format() -> None:
+    # A list of identifiers is a list of strings: only a decimal is read per
+    # element, so the refusal names the one an element takes.
+    with pytest.raises(
+        ImproperlyConfigured, match="an array's element takes no format but 'decimal'"
+    ):
+        Parameter("pks", "array", items="string", format="uuid")
 
 
 def test_an_arrays_declared_element_may_be_nullable() -> None:

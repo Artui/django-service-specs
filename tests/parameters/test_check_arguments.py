@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import json
 import sys
+import uuid
 from decimal import Decimal
 from types import MappingProxyType
 from typing import Any
@@ -12,6 +13,7 @@ from django import forms
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import models
 from django.test import override_settings
 from django.utils import translation
 
@@ -552,6 +554,176 @@ def test_a_date_is_what_djangos_parser_reads() -> None:
 
 def test_a_formatted_string_is_type_checked_before_it_is_parsed() -> None:
     assert refusal(DATE, {"on": 20240131}) == {"on": ["Expected a string."]}
+
+
+# --- an identifier --------------------------------------------------------------------
+
+# Built inside each test rather than at import, so a declaration this package
+# once refused fails the test that names it rather than the whole module.
+
+
+def project_pk() -> Parameters:
+    return one(Parameter("project_pk", "string", format="uuid"))
+
+
+CANONICAL_UUID = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+# Every spelling the model field's parse takes, full-width digits included,
+# since ``int`` reads any Unicode decimal digit as hex.
+VALID_UUIDS = [
+    CANONICAL_UUID,
+    "0B8A3C1E-5D2F-4E6A-9B7C-1D2E3F4A5B6C",
+    "0b8a3c1e5d2f4e6a9b7c1d2e3f4a5b6c",
+    "{0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c}",
+    "urn:uuid:0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c",
+    CANONICAL_UUID.translate(
+        str.maketrans("0123456789", "\uff10\uff11\uff12\uff13\uff14\uff15\uff16\uff17\uff18\uff19")
+    ),
+]
+# What a model sends for a capture it does not know, or echoes back from the
+# schema, and what a URL template leaves behind: each a string, so only the
+# format can refuse it before the ORM raises a ValidationError nobody maps.
+INVALID_UUIDS = ["null", "undefined", "project_pk", "", "1234", "0b8a3c1e-5d2f-4e6a-9b7c"]
+# Padded: Django's form field strips these and its model field refuses them.
+PADDED_UUIDS = [f" {CANONICAL_UUID}", f"{CANONICAL_UUID} ", f"{CANONICAL_UUID}\n"]
+
+
+@pytest.mark.parametrize("value", VALID_UUIDS)
+def test_a_uuid_is_handed_on_in_its_canonical_spelling(value: str) -> None:
+    checked = check_arguments(project_pk(), {"project_pk": value})
+    # One spelling for every reader - the permission check, the selector, a
+    # cache key - and still a string, never a ``uuid.UUID``, as a date stays
+    # the string the Validator or the lookup decodes.
+    assert checked == {"project_pk": CANONICAL_UUID}
+    assert type(checked["project_pk"]) is str
+
+
+@pytest.mark.parametrize("value", INVALID_UUIDS + PADDED_UUIDS)
+def test_a_uuid_that_does_not_parse_is_refused(value: str) -> None:
+    assert refusal(project_pk(), {"project_pk": value}) == {"project_pk": ["Enter a valid UUID."]}
+
+
+def _django_reads(read: Any, value: str) -> bool:
+    try:
+        read(value)
+    except ValidationError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("value", VALID_UUIDS + INVALID_UUIDS + PADDED_UUIDS)
+def test_a_uuid_is_refused_exactly_when_the_model_field_refuses_it(value: str) -> None:
+    # ``models.UUIDField.to_python`` is what a lookup on a UUID column runs, so
+    # the shape check cannot pass what the ORM then raises on, nor refuse what
+    # it accepts.
+    try:
+        check_arguments(project_pk(), {"project_pk": value})
+    except InvalidArguments:
+        shape_check_reads = False
+    else:
+        shape_check_reads = True
+    assert shape_check_reads == _django_reads(models.UUIDField().to_python, value)
+
+
+@pytest.mark.parametrize("value", PADDED_UUIDS)
+def test_the_form_field_strips_what_the_model_field_refuses(value: str) -> None:
+    # Why the model field is the reference and the form field is not: the two
+    # disagree on surrounding whitespace, and the lookup is what raises.
+    assert _django_reads(forms.UUIDField().clean, value)
+    assert not _django_reads(models.UUIDField().to_python, value)
+
+
+def test_a_uuid_object_is_refused_as_a_date_object_is() -> None:
+    # A Python caller holding ``row.pk`` sends its string, as one holding a
+    # ``date`` does: the declaration is a string's, on every route.
+    value = uuid.UUID(VALID_UUIDS[0])
+    assert refusal(project_pk(), {"project_pk": value}) == {"project_pk": ["Expected a string."]}
+
+
+def test_a_refused_uuid_carries_the_code_a_drf_field_gives_the_same_mistake() -> None:
+    assert coded(refusal(project_pk(), {"project_pk": "null"})) == {
+        "project_pk": [("Enter a valid UUID.", "invalid")]
+    }
+
+
+UPPER_UUID = VALID_UUIDS[1]
+BRACED_UUID = VALID_UUIDS[3]
+OTHER_UUID = "9f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b"
+
+
+def listed(*choices: Any, **kwargs: Any) -> Parameter:
+    return Parameter("project_pk", "string", format="uuid", choices=choices, **kwargs)
+
+
+class TestUuidChoices:
+    """A listed id matches in every spelling, since the value is compared canonical."""
+
+    @pytest.mark.parametrize("declared", [UPPER_UUID, BRACED_UUID])
+    @pytest.mark.parametrize("value", VALID_UUIDS)
+    def test_a_choice_declared_in_another_spelling_accepts_its_own_value(
+        self, declared: str, value: str
+    ) -> None:
+        checked = check_arguments(Parameters.of(listed(declared)), {"project_pk": value})
+        assert checked == {"project_pk": CANONICAL_UUID}
+
+    @pytest.mark.parametrize("value", VALID_UUIDS)
+    def test_a_canonical_choice_still_matches(self, value: str) -> None:
+        checked = check_arguments(Parameters.of(listed(CANONICAL_UUID)), {"project_pk": value})
+        assert checked == {"project_pk": CANONICAL_UUID}
+
+    def test_a_value_not_in_the_list_is_still_refused(self) -> None:
+        assert refusal(Parameters.of(listed(UPPER_UUID)), {"project_pk": OTHER_UUID}) == {
+            "project_pk": [
+                f"Select a valid choice. {OTHER_UUID} is not one of the available choices."
+            ]
+        }
+
+    def test_the_declared_choices_are_held_canonical(self) -> None:
+        assert listed(UPPER_UUID, OTHER_UUID).choices == (CANONICAL_UUID, OTHER_UUID)
+
+    def test_a_label_follows_its_choice_into_the_canonical_spelling(self) -> None:
+        # Labelled in the spelling it was listed in, and never refused as a
+        # label for a choice the list no longer spells that way.
+        param = listed(UPPER_UUID, choice_labels={UPPER_UUID: "Ada"})
+        assert param.choice_labels == ((CANONICAL_UUID, "Ada"),)
+
+    def test_two_spellings_of_one_id_leave_one_choice_where_the_first_stood(self) -> None:
+        assert listed(UPPER_UUID, OTHER_UUID, BRACED_UUID).choices == (CANONICAL_UUID, OTHER_UUID)
+
+    def test_two_spellings_of_one_id_keep_the_first_label(self) -> None:
+        labels = {UPPER_UUID: "First", OTHER_UUID: "Other", BRACED_UUID: "Second"}
+        param = listed(UPPER_UUID, OTHER_UUID, BRACED_UUID, choice_labels=labels)
+        assert param.choice_labels == ((CANONICAL_UUID, "First"), (OTHER_UUID, "Other"))
+
+    def test_distinct_ids_keep_their_order(self) -> None:
+        assert listed(OTHER_UUID, UPPER_UUID).choices == (OTHER_UUID, CANONICAL_UUID)
+
+    def test_repeats_nothing_canonicalised_are_kept(self) -> None:
+        # Only a spelling the format reads is collapsed; nothing else is deduped.
+        assert listed("legacy", "legacy").choices == ("legacy", "legacy")
+        assert Parameter("ref", "string", choices=["a", "a"]).choices == ("a", "a")
+
+    def test_a_choice_no_uuid_spells_is_kept_as_listed(self) -> None:
+        # No new refusal: such a choice matches nothing, as before, since the
+        # format refuses the value first.
+        assert listed("legacy").choices == ("legacy",)
+
+    def test_a_choice_that_is_no_string_is_kept_as_listed(self) -> None:
+        value = uuid.UUID(CANONICAL_UUID)
+        assert listed(value).choices == (value,)
+
+    def test_choices_under_no_uuid_format_are_kept_as_listed(self) -> None:
+        param = Parameter("ref", "string", choices=[UPPER_UUID])
+        assert param.choices == (UPPER_UUID,)
+
+
+def test_a_refused_uuid_is_translated_by_djangos_own_catalog() -> None:
+    # Spelled as Django's ``forms.UUIDField`` spells it, so the catalog that
+    # translates that field translates this.
+    with translation.override("de"):
+        detail = refusal(project_pk(), {"project_pk": "null"})
+        expected = translation.gettext("Enter a valid UUID.")
+    assert expected != "Enter a valid UUID."
+    assert detail == {"project_pk": [expected]}
 
 
 # --- choices ---------------------------------------------------------------------------

@@ -8,6 +8,8 @@ import pytest
 from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.output import Output, OutputField
+from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.field_audience import FieldAudience
@@ -154,3 +156,30 @@ class TestFormatters:
         )
 
         assert project_payload({"etag": "w/1"}, projection) == {}
+
+
+CANONICAL_UUID = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+
+
+class ProjectPresenter(Presenter):
+    """Declares a UUID choice listed upper case, and presents a mapping as it is."""
+
+    def output(self) -> Output:
+        choices = [(CANONICAL_UUID.upper(), "Ada")]
+        return Output((OutputField("project", "string", format="uuid", choices=choices),))
+
+    def present(self, value: Any) -> Any:
+        return dict(value)
+
+
+def test_a_uuid_choice_is_spoken_for_the_spelling_a_model_presents() -> None:
+    # The choice is held canonical, the spelling ``str()`` gives a model's UUID,
+    # so a row presenting that spelling finds its display. Output values are not
+    # canonicalised, so a row presenting another spelling passes through.
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=ProjectPresenter()
+    )
+    projection = audience_projection_for_spec(spec)
+    assert project_payload({"project": CANONICAL_UUID}, projection) == {"project": "Ada"}
+    upper = CANONICAL_UUID.upper()
+    assert project_payload({"project": upper}, projection) == {"project": upper}

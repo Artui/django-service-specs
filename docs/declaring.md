@@ -390,10 +390,30 @@ the same declaration.
   `"type"` for it. It takes no `choices`, `format`, `fields`, `items` or
   bound, and an array's `items` never name it: an array with no `items` takes
   any element already.
-- **`format`** is `decimal`, `date-time` or `date`, on a `string`: a value JSON
-  cannot carry, which travels as a string for the Validator to decode. On an
-  array it describes each element, as `choices` do, and is `decimal` on
-  `items="string"` alone: a number element is read as a float on the way and
+- **`format`** is `decimal`, `date-time`, `date` or `uuid`, on a `string`: a
+  value JSON cannot carry, which travels as a string for the Validator to
+  decode. A `uuid` is an identifier's: the shape check refuses a string that
+  spells none - `"null"`, `"undefined"`, the parameter's own name - with
+  `"Enter a valid UUID."`, read as `models.UUIDField.to_python` reads one, so
+  a lookup on a UUID column is never handed a value it would raise Django's
+  `ValidationError` for. That includes a value padded with whitespace, which
+  `forms.UUIDField` would strip first and the model field refuses. A UUID
+  that parses reaches the callable in its canonical spelling,
+  `str(uuid.UUID(value))` - lowercase and hyphenated, whether it was sent
+  braced, as a `urn:uuid:`, without hyphens or in upper case - and still as a
+  string, never a `uuid.UUID`. Declared `choices` are held in that spelling
+  too, with the keys of their `choice_labels`, so a listed id matches its
+  value sent in any spelling and the schema advertises the canonical one. A
+  choice that spells no UUID is kept as listed. Two spellings of one id are
+  then one choice: the first keeps its place and its label, a later one is
+  dropped, and the schema lists the id once. Only a choice the format
+  rewrites is collapsed; any other repeat stays as listed. An
+  `OutputField`'s choices are held and collapsed the same way, the first
+  display winning, so its schema and the display a row is spoken with are
+  keyed by the spelling `str()` gives a model's UUID; an output value is not
+  canonicalised, so a row presenting another spelling passes through
+  unspoken. On an array it describes each element, as `choices` do, and is
+  `decimal` on `items="string"` alone: a number element is read as a float on the way and
   loses a fraction's digits past a float's precision, where a decimal string
   is handed on as it was sent.
 - **`items`** is an array's element: a JSON type name for a flat list, or the

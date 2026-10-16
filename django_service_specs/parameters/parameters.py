@@ -9,6 +9,7 @@ for its annotations.
 from __future__ import annotations
 
 import math
+import uuid
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
@@ -34,9 +35,68 @@ operation is still one of the JSON types.
 takes, a key that may be ``3`` or ``"abc"``. It is a parameter's alone too, and
 no array's element, since an array with no ``items`` takes any element already."""
 
-FORMATS = frozenset({"decimal", "date-time", "date"})
+FORMATS = frozenset({"decimal", "date-time", "date", "uuid"})
 """The Python values a string argument decodes into. Each is a value JSON cannot
-carry, so it travels as a string and the Validator decodes it."""
+carry, so it travels as a string and the Validator decodes it.
+
+``uuid`` is an identifier's: the shape check refuses a string that spells no
+UUID - ``"null"``, ``"undefined"``, the parameter's own name - as an ordinary
+refusal of the arguments, where a lookup handed one would raise Django's
+``ValidationError`` from inside the ORM, which no transport maps. A UUID
+that passes is handed on in its canonical spelling, and a declared choice is
+held in it too, so a listed id matches in any spelling it is sent in."""
+
+
+def canonical_choices(
+    fmt: str | None, pairs: Iterable[tuple[Any, Any]]
+) -> tuple[tuple[Any, Any], ...]:
+    """``pairs`` of a choice and what goes with it, each choice in the spelling the shape check hands a value of ``fmt`` on in.
+
+    A ``uuid`` string's is ``str(uuid.UUID(choice))``, as the shape check's for
+    the value, so a choice listed upper case or braced matches its own value
+    sent in any spelling, and a schema advertises the one spelling a call
+    receives. ``Parameter`` holds its choices and the keys of its labels
+    through this, and ``OutputField`` its (value, display) pairs, when they
+    are built.
+
+    Two spellings of one id would then be one choice listed twice, so the
+    first keeps its place and what goes with it - its label, its display -
+    and a later one is dropped: test_two_spellings_of_one_id_leave_one_choice_where_the_first_stood
+    and test_two_spellings_of_one_id_keep_the_first_label. Only a choice this
+    canonicalises is collapsed; any other repeat is kept as listed
+    (test_repeats_nothing_canonicalised_are_kept).
+
+    Nothing is refused: a choice that is no string, or a string spelling no
+    UUID, is kept as listed and matches nothing, as before, since the format
+    refuses every value it could match first.
+    """
+    kept: list[tuple[Any, Any]] = []
+    seen: set[str] = set()
+    for choice, paired in pairs:
+        canonical = _uuid_spelling(fmt, choice)
+        if canonical is None:
+            kept.append((choice, paired))
+        elif canonical not in seen:
+            seen.add(canonical)
+            kept.append((canonical, paired))
+    return tuple(kept)
+
+
+def _uuid_spelling(fmt: str | None, choice: Any) -> str | None:
+    """The canonical spelling of a ``uuid`` choice, or ``None`` for one this leaves as listed.
+
+    One branch arc of two conditions:
+    test_choices_under_no_uuid_format_are_kept_as_listed fails without the
+    first and test_a_choice_that_is_no_string_is_kept_as_listed without the
+    second.
+    """
+    if fmt != "uuid" or not isinstance(choice, str):
+        return None
+    try:
+        return str(uuid.UUID(choice))
+    except ValueError:
+        # Held by test_a_choice_no_uuid_spells_is_kept_as_listed.
+        return None
 
 
 @dataclass(frozen=True)
@@ -200,7 +260,11 @@ class Parameter:
         if self.choices is not None:
             # Normalized rather than refused, so a list reads as naturally as a
             # tuple and the frozen declaration stays hashable.
-            object.__setattr__(self, "choices", tuple(self.choices))
+            # Held in the spelling the shape check compares a value in, so a
+            # listed id matches however it is sent: test_the_declared_choices_are_held_canonical.
+            pairs = canonical_choices(self.format, ((choice, None) for choice in self.choices))
+            choices = tuple(choice for choice, _ in pairs)
+            object.__setattr__(self, "choices", choices)
             # The element's type for an array, since its choices constrain each
             # element. One branch to coverage, so each operand is held by its
             # own test: test_a_file_has_no_choices[file] and [array-of-files].
@@ -328,8 +392,15 @@ class Parameter:
         self, where: str, labels: Mapping[Any, str] | Iterable[tuple[Any, str]]
     ) -> None:
         """Store ``choice_labels`` as pairs, refusing a label for no declared choice."""
-        pairs = tuple(
-            labels.items() if isinstance(labels, Mapping) else ((v, lb) for v, lb in labels)
+        # Keyed as the choices are held, so a label written against the
+        # spelling a choice was listed in still names it:
+        # test_a_label_follows_its_choice_into_the_canonical_spelling.
+        pairs = canonical_choices(
+            self.format,
+            (
+                (value, label)
+                for value, label in (labels.items() if isinstance(labels, Mapping) else labels)
+            ),
         )
         if self.choices is None:
             raise ImproperlyConfigured(

@@ -54,6 +54,9 @@ def parameters_schema(
       A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
       form every decimal validator reads without a binary float's rounding.
       The shape check also accepts a JSON number, which this does not advertise.
+      An identifier is ``{"type": "string", "format": "uuid"}``, JSON
+      Schema's own format name, and the shape check refuses a string that
+      spells no UUID.
     - **An array's length** is ``"minItems"`` as declared, and ``"maxItems"``
       as in force: the declared ``max_length``, or where none is declared the
       ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's, 1000 unless the project

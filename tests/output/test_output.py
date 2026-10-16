@@ -33,7 +33,7 @@ def test_choices_are_value_and_display_pairs() -> None:
     ("kwargs", "message"),
     [
         ({"type": "str"}, "is not a JSON type"),
-        ({"type": "string", "format": "uuid"}, "format 'uuid' is not one of"),
+        ({"type": "string", "format": "email"}, "format 'email' is not one of"),
         # A schema states the format beside the type, so one on a number would
         # publish a decimal no JSON number is.
         ({"type": "number", "format": "decimal"}, "a format describes a string"),
@@ -68,6 +68,35 @@ def test_any_declares_a_value_whose_json_type_is_open() -> None:
 
 def test_a_format_on_a_string_is_kept() -> None:
     assert OutputField("price", "string", format="decimal").format == "decimal"
+
+
+def test_an_identifier_format_on_a_string_is_kept() -> None:
+    # Output shares the formats with Parameter, so an identifier field is a
+    # string in the ``uuid`` format, which output_schema states beside its type.
+    assert OutputField("pk", "string", format="uuid").format == "uuid"
+
+
+def test_uuid_choices_are_held_in_their_canonical_spelling() -> None:
+    # The spelling ``str()`` gives a model's UUID: held by
+    # test_a_uuid_choice_is_spoken_for_the_spelling_a_model_presents.
+    canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+    field = OutputField(
+        "project", "string", format="uuid", choices=[("{" + canonical.upper() + "}", "Ada")]
+    )
+    assert field.choices == ((canonical, "Ada"),)
+
+
+def test_two_spellings_of_one_uuid_leave_one_choice_with_the_first_display() -> None:
+    canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+    other = "9f1e2d3c-4b5a-4987-8a6b-5c4d3e2f1a0b"
+    choices = [(canonical.upper(), "First"), (other, "Other"), ("{" + canonical + "}", "Second")]
+    field = OutputField("project", "string", format="uuid", choices=choices)
+    assert field.choices == ((canonical, "First"), (other, "Other"))
+
+
+def test_repeated_choices_nothing_canonicalised_are_kept() -> None:
+    field = OutputField("status", "string", choices=[("a", "A"), ("a", "B")])
+    assert field.choices == (("a", "A"), ("a", "B"))
 
 
 def test_an_arrays_declared_element_may_be_nullable() -> None:
