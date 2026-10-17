@@ -1192,7 +1192,15 @@ check relaxes a partial call with, so the two cannot drift. A read a <code>kwarg
 provider fills is still listed as declared;
 <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
 is how a transport finds those, and the schema's <code>required</code> less that set is
-exactly what dispatch refuses when it is absent.</p>
+exactly what dispatch refuses when it is absent. A transport that binds or
+withholds parameters of its own subtracts its
+<a class="autorefs autorefs-internal" title="ServerArguments
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>'
+<code>names()</code> too: see <a href="../dispatching/#arguments-the-server-supplies">arguments the server supplies</a>.</p>
 <h3 id="the-decimal-convention">The decimal convention<a class="headerlink" href="#the-decimal-convention" title="Permanent link">&para;</a></h3>
 <p>A decimal is <code>{"type": "string", "format": "decimal"}</code>. The shape check also
 accepts a JSON number for one, because every decimal validator does, and the

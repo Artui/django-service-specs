@@ -1190,7 +1190,7 @@ unchanged, and a client of both reads one <code>get_codes()</code>.</p>
 <td>the shape check</td>
 </tr>
 <tr>
-<td>A value of the wrong type, a malformed date or date-time, a decimal or number that is not finite, a row that is not an object</td>
+<td>A value of the wrong type, a malformed date, date-time or UUID, a decimal or number that is not finite, a row that is not an object</td>
 <td><code>invalid</code></td>
 <td>the shape check</td>
 </tr>
@@ -1349,8 +1349,10 @@ directed by the declaration.</p>
   <code>"Enter true, false, 1 or 0."</code>. Libraries disagree about every other
   spelling (a Django <code>BooleanField</code> reads <code>"no"</code> as true), so refusing is the
   one answer that cannot set a flag the caller meant to clear.</li>
-<li>A decimal, a date-time and a date <strong>stay strings</strong>, for the Validator to
-  decode, exactly as they would arrive off a JSON wire. So does each element
+<li>A decimal, a date-time, a date and a UUID <strong>stay strings</strong>, for the
+  Validator to decode, exactly as they would arrive off a JSON wire; the
+  shape check then refuses one that does not parse, <code>?project=null</code> included,
+  and hands a UUID on in its canonical spelling. So does each element
   of an array of decimal strings, which the shape check then reads and
   bounds as a decimal, at its index.</li>
 <li><strong>An <code>any</code> stays the string it arrived as</strong>: it declares no type to read the

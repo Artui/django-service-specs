@@ -1924,6 +1924,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.check_server_arguments.check_server_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_server_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.apply_server_arguments.apply_server_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_server_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affordances" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3531,6 +3553,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.server_arguments.ServerArguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ServerArguments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ServerArguments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.server_arguments.ServerArguments.names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -5313,6 +5363,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.check_server_arguments.check_server_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_server_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.apply_server_arguments.apply_server_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        apply_server_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#affordances" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6920,6 +6992,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.server_arguments.ServerArguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ServerArguments
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="ServerArguments">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.types.server_arguments.ServerArguments.names" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        names
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -9066,9 +9166,10 @@ libraries read strings differently from one another, and after this every
 Validator sees an argv call exactly as it would see typed JSON. It is
 directed by the declaration: an <code>integer</code> or a <code>number</code> is parsed, a
 <code>boolean</code> is parsed from exactly four spellings, and everything else is
-left as the string it arrived as. <strong>A decimal, a date-time and a date stay
-strings</strong>, for the Validator to decode, exactly as they would arrive off a
-JSON wire.
+left as the string it arrived as. <strong>A decimal, a date-time, a date and a
+UUID stay strings</strong>, for the Validator to decode, exactly as they would
+arrive off a JSON wire, and the shape check reads each format after this:
+<code>"null"</code> for a <code>uuid</code> is refused there, on every route alike.
 <strong>So does an</strong> <code>any</code>: it declares no type to read the string as, so a
 query string's <code>"3"</code> reaches the shape check and the Validator as
 <code>"3"</code>.</p>
@@ -10853,7 +10954,10 @@ them, so the schema still says which row a partial update names. On a
 <code>many</code> spec the list stays required and its rows' fields are not.
 <code>parameters()</code> itself is unchanged and still says what a whole call
 needs. Nothing else is relaxed: a read a <code>kwargs</code> provider fills is
-listed as declared, and <code>server_owned_keys</code> is how a transport finds it.</p>
+listed as declared, and <code>server_owned_keys</code> is how a transport finds it.
+Nor is anything a transport binds or withholds: this takes no
+<code>ServerArguments</code>, and a transport subtracts its <code>names()</code> in the
+schema it builds, as it subtracts <code>server_owned_keys</code>.</p>
 <p>Read on every call, as <code>parameters()</code> is, so a Validator reading a
 model-backed declaration is asked only once the app registry is ready.</p>
 
@@ -10994,7 +11098,10 @@ Parameter does not carry.</p>
 <li><strong>A scalar</strong> is <code>{"type": t}</code> with its <code>"format"</code> when it declares one.
   A decimal is therefore <code>{"type": "string", "format": "decimal"}</code>: the
   form every decimal validator reads without a binary float's rounding.
-  The shape check also accepts a JSON number, which this does not advertise.</li>
+  The shape check also accepts a JSON number, which this does not advertise.
+  An identifier is <code>{"type": "string", "format": "uuid"}</code>, JSON
+  Schema's own format name, and the shape check refuses a string that
+  spells no UUID.</li>
 <li><strong>An array's length</strong> is <code>"minItems"</code> as declared, and <code>"maxItems"</code>
   as in force: the declared <code>max_length</code>, or where none is declared the
   <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting's, 1000 unless the project
@@ -13524,6 +13631,201 @@ permissions.</p>
               <div class="doc-md-description">
                 <p><code>unknown_arguments</code> is no policy, <code>PASSTHROUGH</code>
 included.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.dispatch.check_server_arguments.check_server_arguments" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_server_arguments</span>
+
+
+<a href="#django_service_specs.dispatch.check_server_arguments.check_server_arguments" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">check_server_arguments</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">server</span><span class="p">:</span> <span class="n">ServerArguments</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Refuse a <a class="autorefs autorefs-internal" title="ServerArguments
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a> that cannot mean what it says for <code>spec</code>.</p>
+<p>For a transport to call once, when it is built, with the <code>pool_seeds</code> it
+dispatches with, so a binding that would do nothing or break every call
+fails at startup rather than on the first call that reaches it. Pure and
+synchronous, and it runs no query. The checks run in this order, and the
+first that finds anything raises, naming the spec's kind and callable and
+every name it found, in order:</p>
+<ol>
+<li><strong>A name that is no top-level parameter of the spec</strong>, read as
+   <a class="autorefs autorefs-internal" title="route_arguments" href="#django_service_specs.http.route_arguments.route_arguments"><code>route_arguments</code></a>
+   reads a route's kwargs: <code>spec.parameters().names()</code>. So a field
+   inside a <code>many</code> spec's rows cannot be bound; a read beside the list
+   can. Held by test_every_undeclared_name_is_refused_in_order and
+   test_a_field_inside_a_many_row_is_not_a_top_level_parameter.</li>
+<li><strong>A name both bound and withheld</strong>, which asks for a value and for
+   none. Held by test_a_name_both_bound_and_withheld_is_refused.</li>
+<li><strong>A name a pool seed occupies</strong>, the dispatcher's own or one
+   <code>pool_seeds</code> registers: dispatch refuses a parameter declared under
+   one. Only a registered seed can reach here, since <code>parameters()</code>
+   refuses the dispatcher's names as it assembles. Held by
+   test_a_parameter_a_registered_seed_occupies_is_refused.</li>
+<li><strong>A name a typed provider fills or may fill</strong>: the spec's <code>kwargs</code>
+   and, on a service spec, its <code>input_data</code> and its target selector's
+   <code>kwargs</code>, the providers
+   <a class="autorefs autorefs-internal" title="server_owned_keys" href="#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
+   walks. A key a provider fills is dropped from the caller's arguments
+   and answered by the provider alone, so a binding would do nothing; one
+   it may decline with <code>UNSET</code> is the provider's on every call where it
+   answers, so a binding would hold only when the provider happens not
+   to. Each half is held by its own test:
+   test_a_name_a_typed_provider_fills_is_refused (the filled keys) and
+   test_a_name_a_provider_may_decline_is_refused_too (the declinable ones),
+   and each provider past the spec's own <code>kwargs</code> too:
+   test_a_validator_field_input_data_fills_is_refused (<code>input_data</code>) and
+   test_a_read_the_target_selector_s_provider_fills_is_refused (the
+   target's <code>kwargs</code>). A provider whose return names no keys may fill
+   any name and so names none, as for <code>server_owned_keys</code>.</li>
+<li><strong>A withheld name no call could then do without.</strong> Withheld, the
+   parameter is absent, so it is refused if the shape check demands it -
+   required and declaring no default, read as dispatch relaxes a
+   <code>partial</code> spec, whose Validator parameters it never demands - or, for
+   a read, if the callable that receives it declares it with no default of
+   its own: the selector of a selector spec or of a service spec's target,
+   and the service for a service spec's <code>reads</code>. Dispatch applies no
+   declared default, so the callable's is the only one that answers, and
+   a call without one is refused as missing, a client error no caller can
+   fix. A Validator parameter is the shape check's alone. Each conjunct
+   is held by its own test, named beside the guard.</li>
+<li><strong>A bound value its parameter refuses</strong>, checked as the shape check
+   checks it, so a server value in its Python form - a <code>uuid.UUID</code>, a
+   <code>date</code>, a <code>Decimal</code> - for a parameter that takes the wire's string
+   fails here rather than on every call. Held by
+   test_a_bound_value_its_parameter_refuses_fails_at_construction.</li>
+</ol>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="django.core.exceptions.ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>the first check that finds anything.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.dispatch.apply_server_arguments.apply_server_arguments" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">apply_server_arguments</span>
+
+
+<a href="#django_service_specs.dispatch.apply_server_arguments.apply_server_arguments" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">apply_server_arguments</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">server</span><span class="p">:</span> <span class="n">ServerArguments</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p><code>arguments</code> as dispatch should receive them under <code>server</code>: a new dict, the input untouched.</p>
+<p>For a transport to call on every call, before
+<a class="autorefs autorefs-internal" title="dispatch" href="#django_service_specs.dispatch.dispatch.dispatch"><code>dispatch</code></a> or
+<a class="autorefs autorefs-internal" title="adispatch
+
+
+  
+      async
+  " href="#django_service_specs.dispatch.adispatch.adispatch"><code>adispatch</code></a>, which
+take the result as their <code>arguments</code>; both run the same prelude over
+it, so one applied mapping answers the same through either. Dispatch
+takes no binding of its own: this is the whole of the rule, and a
+transport path that does not call it is unbound.</p>
+<ol>
+<li><strong>The caller's value for every bound or withheld name is dropped</strong>,
+   before anything reads it. A value the caller sends for a name it was
+   never offered - <code>"null"</code> for an integer it could not see - therefore
+   never reaches the shape check and cannot refuse the call. Held by
+   test_a_malformed_value_for_a_withheld_name_never_reaches_the_shape_check.</li>
+<li><strong>The bound values are laid over what is left</strong>, so a bound name
+   holds the server's value whatever the caller sent, and a withheld one
+   is absent. Held by test_a_bound_value_outranks_the_caller_s, which
+   fails if the two steps swap.</li>
+</ol>
+<p>Every other key is left as sent, for the shape check to read under the
+transport's <code>unknown_arguments</code>, so a name nobody declared is still
+refused under <code>REJECT</code>.</p>
+<p>The bound values are checked against their own parameters, as
+<code>check_server_arguments</code> checked them when the transport was built, and
+handed on as the shape check reads them: a <code>uuid</code> in its canonical
+spelling, an integral float declared an integer as the int. <strong>One that fails is the server's mistake</strong>,
+raised as <code>ImproperlyConfigured</code> with the refusal as its cause, never
+as <code>InvalidArguments</code>: a client refusal would ask the caller to fix a
+value it neither sent nor can see. This is where the rule parts from
+<a class="autorefs autorefs-internal" title="route_arguments" href="#django_service_specs.http.route_arguments.route_arguments"><code>route_arguments</code></a>,
+whose bad value is a client's 400, because a client chose the URL and
+nobody but the server chose a bound value. A bound name the spec does not
+declare, which
+<a class="autorefs autorefs-internal" title="check_server_arguments" href="#django_service_specs.dispatch.check_server_arguments.check_server_arguments"><code>check_server_arguments</code></a>
+refuses when the transport is built, is refused here the same way.</p>
+<p>Every refusal names the spec's kind and its callable, so a transport
+binding many tools can say which one is misconfigured.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ImproperlyConfigured">ImproperlyConfigured</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>a bound value that fails its declaration, or a
+bound name the spec does not declare.</p>
               </div>
             </td>
           </tr>
@@ -16781,6 +17083,16 @@ alone.</p>
 value is the one the callable receives when it does. Nor is any key of a
 provider whose return says nothing about its keys, which may fill any name
 and so names none.</p>
+<p><strong>Static per spec.</strong> A transport that also answers some declared
+parameters itself, per mount or per toolset, describes them with a
+<a class="autorefs autorefs-internal" title="ServerArguments
+
+
+  
+      dataclass
+  " href="#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>
+and subtracts its <code>names()</code> beside this set: those are parameters the
+spec declares and the caller is still not asked for.</p>
 <p>A <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> owns
 what the spec it compiles to owns. djangorestframework-services' own
 reading adds the keys its reflected
@@ -21739,6 +22051,111 @@ anywhere else is refused.</p>
 
 
 
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.server_arguments.ServerArguments" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">ServerArguments</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>
+
+<a href="#django_service_specs.types.server_arguments.ServerArguments" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+
+
+
+        <p>Values a transport supplies for a spec's declared parameters, and names it takes from no one.</p>
+<p>For a mount or a toolset that knows something the caller must not choose:
+the project an agent's run is scoped to, a sibling capture the caller may
+not reach for instead. Each name is a parameter the spec declares, so every
+reader of the call - the permission check, the selector, a <code>kwargs</code>
+provider - sees one value, the server's.</p>
+<ul>
+<li><code>values</code> are supplied for the call and outrank the caller: whatever
+  the caller sent under one of these names is dropped and the value here
+  takes its place. A bound value satisfies a <code>required</code> parameter and
+  replaces a declared default.</li>
+<li><code>withheld</code> names are neither offered nor taken: the caller's value is
+  dropped and nothing takes its place, so the parameter is absent and the
+  callable's own default answers, as for any argument nobody sent.</li>
+</ul>
+<p>It is a value and does nothing on its own. A transport calls
+<a class="autorefs autorefs-internal" title="check_server_arguments" href="#django_service_specs.dispatch.check_server_arguments.check_server_arguments"><code>check_server_arguments</code></a>
+once, when it is built, so a binding that cannot mean what it says fails
+at startup;
+<a class="autorefs autorefs-internal" title="apply_server_arguments" href="#django_service_specs.dispatch.apply_server_arguments.apply_server_arguments"><code>apply_server_arguments</code></a>
+on each call, before dispatch; and subtracts
+<a class="autorefs autorefs-internal" title="names" href="#django_service_specs.types.server_arguments.ServerArguments.names"><code>names</code></a>
+from the input schema it builds, beside
+<a class="autorefs autorefs-internal" title="server_owned_keys" href="#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>,
+so the caller is never asked for a name the server answers.</p>
+<p><code>values</code> is copied into a read-only mapping of its own when the value is
+built, because the check runs once and the binding is applied on every
+call after: a key added later, to the mapping a caller passed in or to the
+binding's own, would reach the call unchecked. It still copies and pickles
+like any other value a transport holds, rebuilt through the constructor.
+It takes no part in the hash, as <code>Parameter.default</code> does not, so a binding is hashable whatever its values are while equality
+still compares them. <code>withheld</code> is held as a <code>frozenset</code>, a <code>set</code>
+included, and a bare <code>str</code> is refused, since <code>frozenset("pk")</code> is a set
+of characters rather than one name.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.types.server_arguments.ServerArguments.names" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">names</span>
+
+
+<a href="#django_service_specs.types.server_arguments.ServerArguments.names" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">names</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Every name the binding takes from the caller: the bound and the withheld together.</p>
+<p>What a transport subtracts from the <code>properties</code> and the <code>required</code>
+of the input schema it advertises, so the caller is offered none of them.</p>
+
+
+    </div>
+
+</div>
 
 
 

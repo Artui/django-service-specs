@@ -1542,10 +1542,30 @@ the same declaration.</p>
   <code>"type"</code> for it. It takes no <code>choices</code>, <code>format</code>, <code>fields</code>, <code>items</code> or
   bound, and an array's <code>items</code> never name it: an array with no <code>items</code> takes
   any element already.</li>
-<li><strong><code>format</code></strong> is <code>decimal</code>, <code>date-time</code> or <code>date</code>, on a <code>string</code>: a value JSON
-  cannot carry, which travels as a string for the Validator to decode. On an
-  array it describes each element, as <code>choices</code> do, and is <code>decimal</code> on
-  <code>items="string"</code> alone: a number element is read as a float on the way and
+<li><strong><code>format</code></strong> is <code>decimal</code>, <code>date-time</code>, <code>date</code> or <code>uuid</code>, on a <code>string</code>: a
+  value JSON cannot carry, which travels as a string for the Validator to
+  decode. A <code>uuid</code> is an identifier's: the shape check refuses a string that
+  spells none - <code>"null"</code>, <code>"undefined"</code>, the parameter's own name - with
+  <code>"Enter a valid UUID."</code>, read as <code>models.UUIDField.to_python</code> reads one, so
+  a lookup on a UUID column is never handed a value it would raise Django's
+  <code>ValidationError</code> for. That includes a value padded with whitespace, which
+  <code>forms.UUIDField</code> would strip first and the model field refuses. A UUID
+  that parses reaches the callable in its canonical spelling,
+  <code>str(uuid.UUID(value))</code> - lowercase and hyphenated, whether it was sent
+  braced, as a <code>urn:uuid:</code>, without hyphens or in upper case - and still as a
+  string, never a <code>uuid.UUID</code>. Declared <code>choices</code> are held in that spelling
+  too, with the keys of their <code>choice_labels</code>, so a listed id matches its
+  value sent in any spelling and the schema advertises the canonical one. A
+  choice that spells no UUID is kept as listed. Two spellings of one id are
+  then one choice: the first keeps its place and its label, a later one is
+  dropped, and the schema lists the id once. Only a choice the format
+  rewrites is collapsed; any other repeat stays as listed. An
+  <code>OutputField</code>'s choices are held and collapsed the same way, the first
+  display winning, so its schema and the display a row is spoken with are
+  keyed by the spelling <code>str()</code> gives a model's UUID; an output value is not
+  canonicalised, so a row presenting another spelling passes through
+  unspoken. On an array it describes each element, as <code>choices</code> do, and is
+  <code>decimal</code> on <code>items="string"</code> alone: a number element is read as a float on the way and
   loses a fraction's digits past a float's precision, where a decimal string
   is handed on as it was sent.</li>
 <li><strong><code>items</code></strong> is an array's element: a JSON type name for a flat list, or the
