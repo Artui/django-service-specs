@@ -141,6 +141,17 @@ def test_a_decimal_a_date_time_and_a_date_stay_strings_for_the_validator() -> No
     assert coerce_flat(FLAT, raw) == raw
 
 
+def test_a_uuid_stays_a_string_and_the_shape_check_refuses_a_nullish_one() -> None:
+    # Argv and a query string reach the same refusal a JSON body does: the
+    # flat reading leaves the string alone, and the shape check reads it.
+    flat = Parameters.of(Parameter("project_pk", "string", format="uuid"))
+    for raw in ("null", "undefined", "project_pk"):
+        assert coerce_flat(flat, {"project_pk": raw}) == {"project_pk": raw}
+        with pytest.raises(InvalidArguments) as refused:
+            check_arguments(flat, coerce_flat(flat, {"project_pk": raw}))
+        assert refused.value.detail == {"project_pk": ["Enter a valid UUID."]}
+
+
 def test_an_array_coerces_each_element_and_wraps_a_single_value() -> None:
     assert coerce_flat(FLAT, {"ids": ["1", "2"], "flags": ("true", "0")}) == {
         "ids": [1, 2],

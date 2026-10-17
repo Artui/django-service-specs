@@ -242,7 +242,10 @@ check relaxes a partial call with, so the two cannot drift. A read a `kwargs`
 provider fills is still listed as declared;
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 is how a transport finds those, and the schema's `required` less that set is
-exactly what dispatch refuses when it is absent.
+exactly what dispatch refuses when it is absent. A transport that binds or
+withholds parameters of its own subtracts its
+[`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]'
+`names()` too: see [arguments the server supplies](dispatching.md#arguments-the-server-supplies).
 
 ### The decimal convention
 

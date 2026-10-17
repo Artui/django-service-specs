@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
+
+from django.db.models import QuerySet
 
 from django_service_specs import (
     DEFAULT_POOL_SEEDS,
@@ -17,9 +19,12 @@ from django_service_specs import (
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
+    ServerArguments,
     ServiceSpec,
+    apply_server_arguments,
     bind_arguments,
     check_call,
+    check_server_arguments,
     dispatch,
     present,
     resolve_target,
@@ -148,6 +153,45 @@ def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> No
 
 
 # --8<-- [end:check_call]
+
+
+# --8<-- [start:server_arguments]
+def notes_by(*, author_pk: int, search: str = "", ordering: str = "title") -> QuerySet[Note]:
+    return Note.objects.filter(owner_id=author_pk, title__icontains=search).order_by(ordering)
+
+
+notes_by_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_by,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(
+        Parameter("author_pk", "integer", required=True),
+        Parameter("search", "string"),
+        Parameter("ordering", "string", choices=["title", "-title"], default="title"),
+    ),
+)
+
+
+def notes_tool(user: Any) -> Callable[[Mapping[str, Any]], DispatchResult]:
+    # The signed-in user's own notes, in the server's order: the caller is
+    # offered neither name, and whatever it sends for either is dropped.
+    server = ServerArguments(values={"author_pk": user.pk}, withheld=frozenset({"ordering"}))
+    # Once, where the tool is built, so a binding that cannot work fails here.
+    check_server_arguments(notes_by_spec, server)
+
+    def call(arguments: Mapping[str, Any]) -> DispatchResult:
+        applied = apply_server_arguments(notes_by_spec, arguments, server)
+        return dispatch(notes_by_spec, principal=user, arguments=applied)
+
+    return call
+
+
+def offered(schema: Mapping[str, Any], server: ServerArguments) -> list[str]:
+    # What a transport's own schema builder lists, less the server's names.
+    return sorted(set(schema["properties"]) - server.names())
+
+
+# --8<-- [end:server_arguments]
 
 
 # --8<-- [start:resolve_target]

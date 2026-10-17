@@ -37,6 +37,9 @@ def spec_input_schema(
     ``parameters()`` itself is unchanged and still says what a whole call
     needs. Nothing else is relaxed: a read a ``kwargs`` provider fills is
     listed as declared, and ``server_owned_keys`` is how a transport finds it.
+    Nor is anything a transport binds or withholds: this takes no
+    ``ServerArguments``, and a transport subtracts its ``names()`` in the
+    schema it builds, as it subtracts ``server_owned_keys``.
 
     Read on every call, as ``parameters()`` is, so a Validator reading a
     model-backed declaration is asked only once the app registry is ready.

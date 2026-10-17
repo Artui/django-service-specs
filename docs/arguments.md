@@ -238,7 +238,7 @@ docs/examples/arguments.py:codes
 | A required argument is absent | `required` | the shape check |
 | A null where none is allowed | `null` | the shape check |
 | A key nobody declared, under `REJECT` | `unknown` | the shape check |
-| A value of the wrong type, a malformed date or date-time, a decimal or number that is not finite, a row that is not an object | `invalid` | the shape check |
+| A value of the wrong type, a malformed date, date-time or UUID, a decimal or number that is not finite, a row that is not an object | `invalid` | the shape check |
 | A value that is not an array where one is declared | `not_a_list` | the shape check |
 | A number past its `maximum`, or short of its `minimum`, an array's element at its index | `max_value`, `min_value` | the shape check |
 | A value outside its `choices` | `invalid_choice` | the shape check |
@@ -323,8 +323,10 @@ docs/examples/arguments.py:flat
   `"Enter true, false, 1 or 0."`. Libraries disagree about every other
   spelling (a Django `BooleanField` reads `"no"` as true), so refusing is the
   one answer that cannot set a flag the caller meant to clear.
-- A decimal, a date-time and a date **stay strings**, for the Validator to
-  decode, exactly as they would arrive off a JSON wire. So does each element
+- A decimal, a date-time, a date and a UUID **stay strings**, for the
+  Validator to decode, exactly as they would arrive off a JSON wire; the
+  shape check then refuses one that does not parse, `?project=null` included,
+  and hands a UUID on in its canonical spelling. So does each element
   of an array of decimal strings, which the shape check then reads and
   bounds as a decimal, at its index.
 - **An `any` stays the string it arrived as**: it declares no type to read the

@@ -570,6 +570,13 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "DataclassPresenter",
         "DataclassValidator",
         "FormValidator",
+        # A transport's binding of declared parameters to server values: the
+        # transports that bind call these from this package, and
+        # djangorestframework-services neither wraps nor re-exports them. A
+        # drfs release that starts to take them moves them into the pinned table.
+        "ServerArguments",
+        "check_server_arguments",
+        "apply_server_arguments",
         # This package's version, which no importer reads as an API.
         "__version__",
     }

@@ -105,6 +105,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 ::: django_service_specs.dispatch.check_requested_input.check_requested_input
 ::: django_service_specs.dispatch.check_call.check_call
+::: django_service_specs.dispatch.check_server_arguments.check_server_arguments
+::: django_service_specs.dispatch.apply_server_arguments.apply_server_arguments
 
 ## Affordances
 
@@ -240,6 +242,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
 ::: django_service_specs.types.provider_keys.ProviderKeys
+::: django_service_specs.types.server_arguments.ServerArguments
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
 ::: django_service_specs.types.no_input.NoInput

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import uuid
 from collections.abc import Callable, Mapping
 from dataclasses import KW_ONLY, dataclass
 from decimal import Decimal, InvalidOperation
@@ -324,6 +325,7 @@ def _check_one(
     problem = _type_problem(json_type, fmt, value) or _bound_problem(value, minimum, maximum)
     if problem is not None:
         return None, [problem]
+    value = _canonical(fmt, value)
     if fields is not None:
         value, errors = _check_object(fields, value, walk)
         if errors:
@@ -333,6 +335,18 @@ def _check_one(
         message = gettext("Select a valid choice. %(value)s is not one of the available choices.")
         return None, [CodedMessage(message % {"value": value}, "invalid_choice")]
     return value, None
+
+
+def _canonical(fmt: str | None, value: Any) -> Any:
+    """``value`` in the one spelling its format reads, once the type check has passed it.
+
+    A UUID's is ``str(uuid.UUID(value))``, so every reader - a permission
+    check, the callable, a cache key - sees one spelling
+    whichever of those a UUID column takes was sent: still a string, as the
+    declaration is, never a ``uuid.UUID``. Every other value is unchanged.
+    Held by test_a_uuid_is_handed_on_in_its_canonical_spelling.
+    """
+    return str(uuid.UUID(value)) if fmt == "uuid" else value
 
 
 def _bound_problem(value: Any, minimum: float | None, maximum: float | None) -> CodedMessage | None:
@@ -431,6 +445,8 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> CodedMe
         return CodedMessage(gettext("Enter a number."), "invalid")
     if fmt is None:
         return None
+    if fmt == "uuid":
+        return _uuid_problem(value)
     try:
         parsed = _DATE_PARSERS[fmt](value)
     except ValueError:
@@ -446,6 +462,32 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> CodedMe
         else gettext("Enter a valid date."),
         "invalid",
     )
+
+
+def _uuid_problem(value: str) -> CodedMessage | None:
+    """Whether ``value`` spells a UUID, read as ``models.UUIDField.to_python`` reads one.
+
+    The model field's parse is the reference because it is what a lookup on a
+    UUID column runs: ``uuid.UUID`` over the string as sent. So the shape check
+    refuses exactly what that lookup would raise ``ValidationError`` for -
+    ``"null"``, ``"undefined"``, a parameter's own name echoed back, a value
+    padded with whitespace - and passes every spelling the column takes:
+    hyphenated or not, braced, ``urn:uuid:``, either case. ``forms.UUIDField``
+    strips the padding first, so it passes what the model refuses. Held by
+    test_a_uuid_is_refused_exactly_when_the_model_field_refuses_it and
+    test_the_form_field_strips_what_the_model_field_refuses.
+
+    A value that passes is handed on in its canonical spelling,
+    ``str(uuid.UUID(value))``, so every reader sees one: still a string, as the
+    declaration is on every route and a JSON wire has no other spelling for
+    it, never a ``uuid.UUID``.
+    """
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        # The message ``forms.UUIDField`` gives, so Django's catalog translates it.
+        return CodedMessage(gettext("Enter a valid UUID."), "invalid")
+    return None
 
 
 def _is_json_type(json_type: str, value: Any) -> bool:

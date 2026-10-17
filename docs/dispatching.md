@@ -423,6 +423,83 @@ so it never crosses a queue. The kernel's own steps run no query. It is
 target. A `many` call's refused rows are raised by it, after the permission
 check, in the tree dispatch raises them in.
 
+## Arguments the server supplies
+
+A transport sometimes knows a declared parameter's value better than its
+caller does: an agent's toolset scoped to one project, a mount that serves
+one account. The caller must not choose it, and should not be asked for it.
+[`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
+says so for one spec, in two parts:
+
+- **`values`** are the server's, and outrank the caller's. A bound value
+  satisfies a `required` parameter and replaces a declared default. It takes
+  the wire's spelling, as a caller's value would: a UUID's, a date's or a
+  decimal's string rather than a `uuid.UUID`, a `date` or a `Decimal`.
+- **`withheld`** names are taken from no one. The parameter is absent, so
+  the callable's own default answers, as for any argument nobody sent.
+
+Each name is a parameter the spec declares, so every reader of the call sees
+the one value: the permission checks, the selector or service, and a `kwargs`
+provider. The binding is a value, and a transport puts it to work at three points:
+
+```python
+--8<--
+docs/examples/dispatching.py:server_arguments
+--8<--
+```
+
+1. **Where the transport is built**,
+   [`check_server_arguments`][django_service_specs.dispatch.check_server_arguments.check_server_arguments]
+   refuses a binding that cannot mean what it says, with
+   `ImproperlyConfigured`, naming the spec's callable: a name that is no
+   top-level parameter, so not a field inside a `many` spec's rows; one both
+   bound and withheld; one a pool seed occupies; one a typed provider fills
+   or may fill, whose answer dispatch would keep over the bound value on any
+   call where it gives one; a withheld name no call could then do without;
+   and a bound value its own parameter refuses, such as a `uuid.UUID` for a
+   `format="uuid"` string. A withheld name cannot be done without when the
+   shape check demands it (required, with no declared default, its
+   Validator parameters relaxed on a `partial` spec as dispatch relaxes
+   them) or when it is a read the callable receiving it declares with no default
+   of its own. Dispatch applies no declared default, so the callable's is the
+   one that answers, and a call without one would be refused as missing.
+   Two limits of what it can see. The callable it reads a default off is the
+   one the read is handed to - the selector, the service, or the target's
+   selector - and not any other callable that also declares the read, such as
+   a `kwargs` provider; a Validator parameter is judged by the shape check
+   alone. And a provider whose return annotation names no keys may fill any
+   name, so, as for `server_owned_keys`, it names none and a binding beside it
+   is not refused.
+2. **On each call**,
+   [`apply_server_arguments`][django_service_specs.dispatch.apply_server_arguments.apply_server_arguments]
+   returns a new mapping for `dispatch` or `adispatch`. It first drops the
+   caller's value for every bound or withheld name, before anything reads
+   it, so a value the caller sends for a name it was never offered cannot
+   refuse the call, `"null"` for an integer included. It then lays the bound
+   values over the rest, as the shape check hands them on: a UUID in its
+   canonical spelling. Every other key is left for the shape check, so
+   `REJECT` still refuses a name nobody declared.
+3. **In the input schema the transport advertises**, it subtracts
+   `names()` - the bound and the withheld together - from the properties
+   and from `required`, beside
+   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
+   The kernel's own
+   [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema]
+   takes no binding: the transports build their schemas themselves, and the
+   subtraction belongs where the schema is built.
+
+Dispatch itself takes no binding. The helpers are synchronous and pure, and
+the applied mapping is ordinary arguments, so `dispatch` and `adispatch`
+answer it alike and the permission checks read the bound values from the
+first step. A transport path that skips `apply_server_arguments` is unbound.
+
+**A bound value that fails its own declaration is the server's mistake**, so
+`apply_server_arguments` raises it as `ImproperlyConfigured`, with the shape
+check's refusal as its cause, never as `InvalidArguments`. A client refusal
+would ask the caller to fix a value it neither sent nor can see. That is
+where this parts from a route's captured kwargs, which are a client's 400:
+the client chose the URL, and nobody but the server chose a bound value.
+
 ## The async entry point
 
 [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] takes the same
