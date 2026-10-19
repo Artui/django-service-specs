@@ -48,6 +48,12 @@ def server_owned_keys(
     provider whose return says nothing about its keys, which may fill any name
     and so names none.
 
+    **Static per spec.** A transport that also answers some declared
+    parameters itself, per mount or per toolset, describes them with a
+    [`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
+    and subtracts its ``names()`` beside this set: those are parameters the
+    spec declares and the caller is still not asked for.
+
     A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] owns
     what the spec it compiles to owns. djangorestframework-services' own
     reading adds the keys its reflected

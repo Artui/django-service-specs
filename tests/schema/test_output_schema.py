@@ -96,7 +96,7 @@ class TestFields:
         """``{}`` admits a null already, so there is no type to widen; a label is still a title."""
         assert one(OutputField("extra", "any", nullable=True, label="Extra")) == {"title": "Extra"}
 
-    @pytest.mark.parametrize("fmt", ["decimal", "date-time", "date"])
+    @pytest.mark.parametrize("fmt", ["decimal", "date-time", "date", "uuid"])
     def test_a_format_is_stated_beside_its_type(self, fmt: str) -> None:
         assert one(OutputField("value", "string", format=fmt)) == {"type": "string", "format": fmt}
 
@@ -171,6 +171,32 @@ class TestChoices:
             "type": "string",
             "oneOf": [{"const": "draft", "title": "Draft"}, {"const": "x", "title": "x"}],
         }
+
+    def test_uuid_choices_are_advertised_in_their_canonical_spelling(self) -> None:
+        canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+        field = OutputField(
+            "project", "string", format="uuid", choices=[(canonical.upper(), "Ada")]
+        )
+        assert one(field) == {
+            "type": "string",
+            "format": "uuid",
+            "oneOf": [{"const": canonical, "title": "Ada"}],
+        }
+
+    def test_two_spellings_of_one_uuid_are_advertised_once(self) -> None:
+        canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+        spellings = [canonical.upper(), "{" + canonical + "}"]
+        bare = OutputField(
+            "project", "string", format="uuid", choices=[(s, canonical) for s in spellings]
+        )
+        assert one(bare)["enum"] == [canonical]
+        labelled = OutputField(
+            "project",
+            "string",
+            format="uuid",
+            choices=list(zip(spellings, ["First", "Second"], strict=True)),
+        )
+        assert one(labelled)["oneOf"] == [{"const": canonical, "title": "First"}]
 
     def test_a_nullable_enum_adds_null(self) -> None:
         assert one(OutputField("size", "integer", choices=[(1, "1")], nullable=True)) == {

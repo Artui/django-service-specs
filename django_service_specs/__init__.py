@@ -32,6 +32,7 @@ from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
 from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.authorize import authorize
@@ -40,6 +41,7 @@ from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
+from django_service_specs.dispatch.check_server_arguments import check_server_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -151,6 +153,7 @@ from django_service_specs.types.relation_orphan import RelationOrphan
 from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
@@ -219,6 +222,7 @@ __all__ = [
     "Selector",
     "SelectorKind",
     "SelectorSpec",
+    "ServerArguments",
     "ServiceConflict",
     "ServiceError",
     "ServiceNotFound",
@@ -259,6 +263,7 @@ __all__ = [
     "amaterialize_retrieve",
     "annotate_output_schema",
     "apply_input",
+    "apply_server_arguments",
     "apresent",
     "arun_selector",
     "arun_service",
@@ -275,6 +280,7 @@ __all__ = [
     "check_arguments",
     "check_call",
     "check_requested_input",
+    "check_server_arguments",
     "coerce_flat",
     "combine_progress",
     "create_from_input",

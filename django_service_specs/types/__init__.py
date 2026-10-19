@@ -16,6 +16,7 @@ from django_service_specs.types.relation_orphan import RelationOrphan
 from django_service_specs.types.relation_outcome import RelationOutcome
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
@@ -36,6 +37,7 @@ __all__ = [
     "RelationOutcome",
     "RelationPhase",
     "SelectorKind",
+    "ServerArguments",
     "UnguardedReason",
     "UnknownArguments",
     "UnsetType",

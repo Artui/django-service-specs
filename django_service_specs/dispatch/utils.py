@@ -51,6 +51,7 @@ from django_service_specs.selectors.run_selector import run_selector
 from django_service_specs.selectors.utils import apply_shaping, call_keywords
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.specs.utils import callable_name
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
@@ -1518,3 +1519,40 @@ def finish_service(
         data=prepared.data,
         context=PresentationContext(prepared.principal, prepared.target, prepared.ambient),
     )
+
+
+def server_arguments_label(spec: ServiceSpec | SelectorSpec) -> str:
+    """``spec`` as a ``ServerArguments`` refusal names it: its kind and its callable.
+
+    For ``check_server_arguments`` and ``apply_server_arguments`` alike, so a
+    transport binding many tools reads which one is misconfigured.
+    """
+    fn = spec.service if isinstance(spec, ServiceSpec) else spec.selector
+    return f"{type(spec).__name__} for {callable_name(fn)}"
+
+
+def checked_server_values(
+    spec: ServiceSpec | SelectorSpec, parameters: Parameters, values: Mapping[str, Any]
+) -> dict[str, Any]:
+    """A binding's ``values``, each checked against its own parameter, as the shape check hands it on.
+
+    One rule for ``check_server_arguments``, which runs it where a transport
+    is built, and ``apply_server_arguments``, which runs it on each call, so
+    the value a call receives is the one the construction-time check passed.
+    Only the bound parameters are checked, so a bound value is never refused
+    for a parameter the caller fills. A refusal is the server's mistake,
+    raised as ``ImproperlyConfigured`` with the shape check's refusal as its
+    cause, never as ``InvalidArguments``: no caller can correct a value it
+    neither sent nor sees. A bound name no parameter declares is refused the
+    same way, as the closed argument set refuses it.
+    """
+    own = Parameters.of(*(parameter for parameter in parameters if parameter.name in values))
+    try:
+        return check_arguments(own, values)
+    except InvalidArguments as refused:
+        raise ImproperlyConfigured(
+            f"{server_arguments_label(spec)}: ServerArguments binds a value its parameter "
+            f"refuses: {refused.detail}. A bound value is the server's, so no caller can "
+            "correct it; bind the spelling the declaration takes, such as a UUID's or a "
+            "date's string."
+        ) from refused

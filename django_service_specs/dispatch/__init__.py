@@ -1,6 +1,7 @@
 """Running one operation, from any transport, and the authorization checks it runs."""
 
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
 from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.authorize import authorize
@@ -9,6 +10,7 @@ from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
+from django_service_specs.dispatch.check_server_arguments import check_server_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -22,6 +24,7 @@ __all__ = [
     "DispatchResult",
     "Grant",
     "adispatch",
+    "apply_server_arguments",
     "apresent",
     "audience_projection_for_spec",
     "authorize",
@@ -30,6 +33,7 @@ __all__ = [
     "bind_arguments",
     "check_call",
     "check_requested_input",
+    "check_server_arguments",
     "dispatch",
     "paginate_output",
     "present",

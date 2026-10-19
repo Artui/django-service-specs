@@ -202,7 +202,7 @@ class TestTypes:
     def test_a_scalar_states_its_type(self, json_type: str) -> None:
         assert one(Parameter("value", json_type)) == {"type": json_type}
 
-    @pytest.mark.parametrize("fmt", ["decimal", "date-time", "date"])
+    @pytest.mark.parametrize("fmt", ["decimal", "date-time", "date", "uuid"])
     def test_a_format_is_stated_beside_its_string_type(self, fmt: str) -> None:
         assert one(Parameter("value", "string", format=fmt)) == {"type": "string", "format": fmt}
 
@@ -277,6 +277,22 @@ class TestChoices:
             "type": "string",
             "enum": ["title", "-title"],
         }
+
+    def test_uuid_choices_are_advertised_in_their_canonical_spelling(self) -> None:
+        canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+        listed = Parameter("project_pk", "string", format="uuid", choices=[canonical.upper()])
+        assert one(listed) == {"type": "string", "format": "uuid", "enum": [canonical]}
+
+    def test_two_spellings_of_one_uuid_are_advertised_once(self) -> None:
+        canonical = "0b8a3c1e-5d2f-4e6a-9b7c-1d2e3f4a5b6c"
+        spellings = [canonical.upper(), "{" + canonical + "}"]
+        bare = Parameter("project_pk", "string", format="uuid", choices=spellings)
+        assert one(bare)["enum"] == [canonical]
+        labels = dict(zip(spellings, ["First", "Second"], strict=True))
+        labelled = Parameter(
+            "project_pk", "string", format="uuid", choices=spellings, choice_labels=labels
+        )
+        assert one(labelled)["anyOf"] == [{"const": canonical, "title": "First"}]
 
     def test_a_nullable_parameter_with_choices_adds_null_to_its_enum(self) -> None:
         status = Parameter("status", "string", choices=["draft", "published"], nullable=True)

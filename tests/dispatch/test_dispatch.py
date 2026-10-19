@@ -117,6 +117,31 @@ def test_a_list_returns_the_principals_rows_as_a_list(ada: Any, bob: Any) -> Non
     assert list(result.value) == [mine]
 
 
+@pytest.mark.parametrize("value", ["null", "undefined", "project_pk"])
+def test_a_nullish_identifier_is_refused_before_the_selector_runs(
+    ada: Any, value: str, django_assert_num_queries: Any
+) -> None:
+    # A UUID lookup handed one of these raises Django's ValidationError from
+    # inside the ORM, which no transport maps; the format answers first, as
+    # the ordinary refusal of the arguments.
+    ran: list[str] = []
+
+    def notes_in(*, user: Any, project_pk: str) -> Any:
+        ran.append(project_pk)
+        return Note.objects.none()
+
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=notes_in,
+        reads=Parameters.of(Parameter("project_pk", "string", format="uuid", required=True)),
+        permissions=OPEN,
+    )
+    with django_assert_num_queries(0), pytest.raises(InvalidArguments) as refused:
+        dispatch(spec, principal=ada, arguments={"project_pk": value})
+    assert refused.value.detail == {"project_pk": ["Enter a valid UUID."]}
+    assert ran == []
+
+
 def test_a_retrieve_returns_its_row(ada: Any) -> None:
     note = Note.objects.create(owner=ada, title="mine")
 
