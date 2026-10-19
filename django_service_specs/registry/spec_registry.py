@@ -35,8 +35,9 @@ class SpecRegistry:
     **There is no global registry**: a consumer holds as many of its own
     instances as it likes, with no shared state between them. Registries are
     mutable - ``register`` adds - but every derivation (``by_tag``,
-    ``subset``, ``merge``) returns a **new** registry holding a snapshot of
-    the selected entries, sharing the spec objects rather than copying them.
+    ``subset``, ``merge``, ``replace``) returns a **new** registry holding a
+    snapshot of the selected entries, sharing the spec objects rather than
+    copying them.
     A derived view never mutates its source, and a later ``register()`` on the
     source does **not** appear in a view derived earlier.
     """
@@ -135,6 +136,29 @@ class SpecRegistry:
         """
         return SpecRegistry(
             entry for source in (self, *others) for entry in source._entries.values()
+        )
+
+    def replace(self, name: str, spec: ServiceSpec | SelectorSpec | SpecSource) -> SpecRegistry:
+        """A new registry with ``spec`` under ``name`` in place of the spec registered there.
+
+        The entry keeps its tags and its place in the order, and every other
+        entry is shared, as in any view. The usual replacement is the
+        registered spec's own ``derive(...)``: a variant shaped for one
+        transport goes to the registry that transport is handed, while the
+        source keeps serving the base. The replacement is checked as
+        ``register`` checks a spec.
+
+        Raises:
+            KeyError: ``name`` is not registered here - a replacement for an
+                operation nobody registered is a typo, not a registration.
+            TypeError: ``spec`` is neither a ``ServiceSpec`` nor a
+                ``SelectorSpec``, nor an object compiling to one.
+            ImproperlyConfigured: ``spec``, or what it compiles to, has
+                ``permissions is None``.
+        """
+        swapped = RegisteredSpec(name=name, spec=spec, tags=self._require(name).tags)
+        return SpecRegistry(
+            swapped if entry.name == name else entry for entry in self._entries.values()
         )
 
     def specs(self) -> dict[str, ServiceSpec | SelectorSpec | SpecSource]:

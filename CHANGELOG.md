@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ServiceSpec.derive(**changes)` and `SelectorSpec.derive(**changes)`: a
+  variant of a spec without restating it.** Returns a new spec of the same
+  class with the named fields replaced and every other field the base's own
+  object, built through the constructor, so every check a fresh declaration
+  passes runs again on the result, the combinations included. The base is
+  never changed. A field is replaced, never extended: `reads=` is the
+  variant's whole `reads`, and a read's `filter_set` filters follow whichever
+  `reads` it declares. A name that is not one of the spec's own fields - a
+  misspelling, a method's name, a private field the constructor writes for
+  itself - is refused with `TypeError` naming it.
+- **`SpecRegistry.replace(name, spec)`**, a view like `by_tag`, `subset` and
+  `merge`: a new registry with `spec` under `name` in place of the spec
+  registered there, keeping the entry's tags and its place in the order and
+  sharing every other entry. The source registry is unchanged. The
+  replacement is checked as `register` checks a spec, and a name that is not
+  registered raises `KeyError`. With `derive`, it is how one transport serves
+  a variant of an operation under the operation's own name.
+
 ## [0.9.0] — 2026-10-16
 
 ### Added

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 import sys
 
 import django_filters
@@ -380,3 +381,60 @@ def test_a_selector_spec_compiles_to_itself() -> None:
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list)
 
     assert spec.as_kernel_spec() is spec
+
+
+class TestDerive:
+    """``derive`` builds a new spec through the constructor, changing only what it names."""
+
+    def test_a_derived_permission_replaces_the_base_s(self) -> None:
+        base = listing(permissions=[Unrestricted()], reads=PK)
+        derived = base.derive(permissions=[Nobody()])
+
+        assert [type(check) for check in derived.permissions or ()] == [Nobody]
+        assert [type(check) for check in base.permissions or ()] == [Unrestricted]
+        assert derived.reads is base.reads
+
+    def test_derived_reads_replace_the_author_s_own_and_the_filters_rejoin_after_them(
+        self,
+    ) -> None:
+        # ``reads`` replaces rather than extends, and what the filter set adds
+        # is still the filter set's: it follows the new reads, once.
+        base = listing(reads=Parameters.of(Parameter("limit", "integer")), filter_set=TitleFilter)
+        offset = Parameter("offset", "integer")
+        derived = base.derive(reads=Parameters.of(offset))
+
+        assert derived.reads == Parameters.of(offset, Parameter("title", "string"))
+        assert derived == listing(reads=Parameters.of(offset), filter_set=TitleFilter)
+
+    def test_deriving_away_the_filter_set_leaves_the_author_s_own_reads(self) -> None:
+        own = Parameter("limit", "integer")
+        base = listing(reads=Parameters.of(own), filter_set=TitleFilter)
+
+        assert base.derive(filter_set=None).reads == Parameters.of(own)
+
+    def test_a_derived_spec_is_checked_as_a_fresh_declaration_is(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="SelectorSpec.kind is 'many'"):
+            listing().derive(kind="many")
+
+    def test_no_changes_is_an_equal_new_spec(self) -> None:
+        base = listing(filter_set=TitleFilter)
+        derived = base.derive()
+
+        assert derived == base
+        assert derived is not base
+
+    @pytest.mark.parametrize(
+        ("changes", "named"),
+        [
+            # An init field ``dataclasses.replace`` would accept and carry
+            # silently: the constructor's own record of what the filter set
+            # added, which no author writes.
+            ({"_filter_reads": PK}, "'_filter_reads'"),
+            ({"parameters": PK}, "'parameters'"),
+            ({"read": PK}, "'read'"),
+        ],
+    )
+    def test_a_name_that_is_not_a_field_is_refused(self, changes: dict, named: str) -> None:
+        message = f"SelectorSpec.derive() takes the spec's own fields, and not {named}."
+        with pytest.raises(TypeError, match=re.escape(message)):
+            listing().derive(**changes)

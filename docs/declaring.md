@@ -669,3 +669,49 @@ A read's presenter is its own `presenter`. A write's is its own, or its output
 selector's when it declares none, and declaring both is refused. A presenter on
 an instance or collection selector is never read, because the service consumes
 those rows rather than returning them.
+
+## A variant of a spec
+
+A spec is frozen, so a variant of one is a new spec.
+[`derive(**changes)`][django_service_specs.specs.service_spec.ServiceSpec.derive]
+returns it: the same class, with the named fields replaced and every other one
+the base's own object.
+
+```python
+refund = ServiceSpec(
+    service=refund_order,
+    permissions=[IsStaff()],
+    validator=DataclassValidator(RefundInput),
+    instance_selector_spec=order,
+)
+
+# Stricter, and for one transport: the same operation, other permissions.
+supervised_refund = refund.derive(permissions=[IsStaff(), IsSupervisor()])
+```
+
+The variant is built through the constructor, so every check a fresh
+declaration passes runs again on it, the combinations included: a change that
+is valid alone and refused beside the fields it keeps raises
+`ImproperlyConfigured`, as writing the variant out in full would. The base is
+never changed.
+
+A field is **replaced, never extended**. `reads=` is the variant's whole
+`reads`, so keeping the base's and adding one is said in so many words:
+
+```python
+scoped = listing.derive(reads=listing.reads + Parameters.of(Parameter("project", "integer")))
+```
+
+A read's `filter_set` filters are the filter set's rather than the author's, so
+they follow whichever `reads` the variant declares, once, and a variant with
+`filter_set=None` keeps only the author's own.
+
+A name that is not one of the spec's own fields is refused with `TypeError`:
+a misspelling, a method such as `parameters`, or a private field the
+constructor writes for itself.
+
+A variant is another spec, by identity, so a
+[`Grant`][django_service_specs.dispatch.grant.Grant] minted for the base does
+not cover it. To serve a variant in place of the base, hand the transport a
+registry that holds it: see
+[replacing an entry](registry.md#views).

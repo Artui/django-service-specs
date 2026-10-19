@@ -142,7 +142,7 @@ screen - comes out the same on every start.
 
 ## Views
 
-Three calls derive a new registry from an existing one:
+Four calls derive a new registry from an existing one:
 
 - **`by_tag(*tags)`** keeps the entries carrying **any** of the tags. It is a
   union; chain the calls for an intersection:
@@ -153,6 +153,24 @@ Three calls derive a new registry from an existing one:
 - **`merge(*others)`** combines registries, in order. Names are unique within
   one registry, so two independent registries may each use a name; merging is
   where that becomes a conflict, and it raises `ValueError`.
+- **`replace(name, spec)`** puts `spec` under `name` in place of the spec
+  registered there. The entry keeps its tags and its place in the order, and
+  the replacement is checked as `register` checks a spec. A name that is not
+  registered raises `KeyError`, since a replacement for an operation nobody
+  registered is a typo rather than a registration.
+
+`replace` is how a transport serves a variant of an operation without a second
+name for it. The registry holds what every transport shares; a variant shaped
+for one transport is the registered spec's own
+[`derive(...)`](declaring.md#a-variant-of-a-spec), in the registry that
+transport is handed:
+
+```python
+mcp_registry = registry.replace(
+    "refund_order",
+    registry.get("refund_order").spec.derive(permissions=[IsStaff(), IsSupervisor()]),
+)
+```
 
 Every view is a **snapshot**. It shares the spec objects rather than copying
 them, it never changes its source, and a `register()` on the source afterwards

@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from dataclasses import Field
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -16,6 +17,25 @@ from django_service_specs.types.is_async import is_async
 
 # The methods dispatch reads a permission check's answer from.
 _CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
+
+
+def check_changes(declared: tuple[Field[Any], ...], changes: Iterable[str], *, label: str) -> None:
+    """Refuse a ``derive`` change naming anything but a field an author declares.
+
+    ``dataclasses.replace``, which builds the derived spec, already refuses a
+    name that is no constructor keyword, but in words that name neither the
+    spec nor ``derive``, and it accepts a private field without a word:
+    ``SelectorSpec._filter_reads`` is the constructor's own record of what a
+    filter set added, and one handed in from outside would take the author's
+    reads out. One arc to coverage: the ``'_filter_reads'`` case of
+    ``SelectorSpec``'s test_a_name_that_is_not_a_field_is_refused holds the
+    second disjunct, its ``'parameters'`` case the first.
+    """
+    own = {declared_field.name for declared_field in declared}
+    unknown = sorted(name for name in changes if name not in own or name.startswith("_"))
+    if unknown:
+        named = ", ".join(repr(name) for name in unknown)
+        raise TypeError(f"{label}.derive() takes the spec's own fields, and not {named}.")
 
 
 def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
