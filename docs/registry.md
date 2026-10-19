@@ -166,11 +166,13 @@ for one transport is the registered spec's own
 transport is handed:
 
 ```python
-mcp_registry = registry.replace(
-    "refund_order",
-    registry.get("refund_order").spec.derive(permissions=[IsStaff(), IsSupervisor()]),
-)
+--8<--
+docs/examples/registry.py:replace
+--8<--
 ```
+
+`search_only` is the variant
+[derived from `list_notes_spec`](declaring.md#a-variant-of-a-spec).
 
 Every view is a **snapshot**. It shares the spec objects rather than copying
 them, it never changes its source, and a `register()` on the source afterwards

@@ -406,6 +406,30 @@ class TestDerive:
         assert derived.reads == Parameters.of(offset, Parameter("title", "string"))
         assert derived == listing(reads=Parameters.of(offset), filter_set=TitleFilter)
 
+    def test_every_field_it_does_not_name_is_the_base_s_own(self) -> None:
+        # With no filter set the constructor rebuilds nothing, so each field
+        # the variant does not name is the base's very object, not a copy.
+        base = listing(
+            permissions=[Unrestricted()],
+            reads=PK,
+            presenter=Named(),
+            select_related=["owner"],
+            prefetch_related=["tags"],
+            annotations={"n": 1},
+            extend_queryset=lambda queryset: queryset,
+            kwargs=lambda: {},
+            preconditions=[print],
+            metadata={"owner": "notes"},
+        )
+        derived = base.derive(allow_none=True)
+
+        assert derived.allow_none is True
+        for spec_field in dataclasses.fields(SelectorSpec):
+            if spec_field.name != "allow_none":
+                assert getattr(derived, spec_field.name) is getattr(base, spec_field.name), (
+                    spec_field.name
+                )
+
     def test_a_field_it_does_not_name_is_equal_to_the_base_s_even_when_rebuilt(self) -> None:
         # With a filter set, the constructor assembles ``reads`` afresh, so the
         # variant's is equal to the base's and not the same object.

@@ -680,15 +680,9 @@ rebuilds it, as it rebuilds a read's `reads` when the read has a
 `filter_set`.
 
 ```python
-refund = ServiceSpec(
-    service=refund_order,
-    permissions=[IsStaff()],
-    validator=DataclassValidator(RefundInput),
-    instance_selector_spec=order,
-)
-
-# Stricter, and for one transport: the same operation, other permissions.
-supervised_refund = refund.derive(permissions=[IsStaff(), IsSupervisor()])
+--8<--
+docs/examples/registry.py:derive
+--8<--
 ```
 
 The variant is built through the constructor, so every check a fresh
@@ -698,11 +692,8 @@ is valid alone and refused beside the fields it keeps raises
 never changed.
 
 A field is **replaced, never extended**. `reads=` is the variant's whole
-`reads`, so keeping the base's and adding one is said in so many words:
-
-```python
-scoped = listing.derive(reads=listing.reads + Parameters.of(Parameter("project", "integer")))
-```
+`reads`, as `search_only` shows, so keeping the base's and adding one is said
+in so many words: `reads=base.reads + Parameters.of(...)`.
 
 A read's `filter_set` filters are the filter set's rather than the author's, so
 they follow whichever `reads` the variant declares, once, and a variant with

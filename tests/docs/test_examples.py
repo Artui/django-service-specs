@@ -869,6 +869,34 @@ class TestRegistry:
         assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
         assert registry.contracts == [{"ordering": "title"}, None]
 
+    def test_a_variant_replaces_the_base_s_reads_and_leaves_the_base_alone(self) -> None:
+        assert registry.search_only.parameters().names() == {"search"}
+        assert declaring.list_notes_spec.parameters().names() == {"search", "ordering"}
+        assert registry.search_only.selector is declaring.list_notes_spec.selector
+
+    def test_the_variant_serves_under_the_operation_s_own_name_in_its_own_registry(self) -> None:
+        swapped = registry.command_line_registry.get("list_notes")
+        assert swapped is not None
+        assert swapped.spec is registry.search_only
+        assert swapped.tags == {"notes", "read"}
+        assert [e.name for e in registry.command_line_registry] == [
+            e.name for e in registry.registry
+        ]
+        source = registry.registry.get("list_notes")
+        assert source is not None and source.spec is declaring.list_notes_spec
+
+    @pytest.mark.django_db
+    def test_the_variant_runs_and_refuses_the_argument_it_no_longer_takes(self, ada: Any) -> None:
+        Note.objects.create(title="Apples", owner=ada)
+        result = dispatch(registry.search_only, principal=ada, arguments={"search": "app"})
+        assert [note.title for note in result.value] == ["Apples"]
+        with pytest.raises(InvalidArguments):
+            dispatch(registry.search_only, principal=ada, arguments={"ordering": "-title"})
+
+    def test_replace_refuses_a_name_that_is_not_registered(self) -> None:
+        with pytest.raises(KeyError, match="not registered"):
+            registry.registry.replace("list_notez", registry.search_only)
+
     def test_a_name_is_registered_once(self) -> None:
         with pytest.raises(ValueError, match="already registered"):
             SpecRegistry(registry.registry.all()).register("list_notes", declaring.list_notes_spec)
