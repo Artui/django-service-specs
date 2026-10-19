@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections.abc import Mapping
 from typing import Any
@@ -21,7 +22,7 @@ from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.adapters.filters.utils import TitleFilter
-from tests.specs.utils import PK, Bare, Named, Titled
+from tests.specs.utils import PK, Bare, Named, Nobody, Titled
 
 RETRIEVE = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK)
 LIST = SelectorSpec(kind=SelectorKind.LIST, selector=list)
@@ -788,3 +789,108 @@ def test_a_service_spec_compiles_to_itself() -> None:
     spec = ServiceSpec(service=print)
 
     assert spec.as_kernel_spec() is spec
+
+
+class TestDerive:
+    """``derive`` builds a new spec through the constructor, changing only what it names."""
+
+    def _base(self) -> ServiceSpec:
+        return ServiceSpec(
+            service=print,
+            permissions=[Unrestricted()],
+            reads=PROJECT,
+            validator=Titled(),
+            instance_selector_spec=RETRIEVE,
+            presenter=Named(),
+            affordances=[ON_NOTHING],
+            preconditions=[print],
+            metadata={"owner": "billing"},
+        )
+
+    def test_a_derived_permission_replaces_the_base_s(self) -> None:
+        base = self._base()
+        derived = base.derive(permissions=[Nobody()])
+
+        assert [type(check) for check in derived.permissions or ()] == [Nobody]
+        assert [type(check) for check in base.permissions or ()] == [Unrestricted]
+
+    def test_derived_reads_replace_the_base_s_rather_than_extending_them(self) -> None:
+        base = self._base()
+        limit = Parameters.of(Parameter("limit", "integer"))
+        derived = base.derive(reads=limit)
+
+        assert derived.reads == limit
+        assert derived.parameters().names() == {"pk", "limit", "title"}
+        assert base.parameters().names() == {"pk", "project", "title"}
+
+    def test_a_derived_validator_changes_the_parameters_the_spec_takes(self) -> None:
+        derived = self._base().derive(validator=Titled("title", "body"))
+
+        assert derived.parameters().names() == {"pk", "project", "title", "body"}
+
+    def test_every_field_it_does_not_name_is_the_base_s_own(self) -> None:
+        base = self._base()
+        derived = base.derive(permissions=[Nobody()])
+
+        for spec_field in dataclasses.fields(ServiceSpec):
+            if spec_field.name != "permissions":
+                assert getattr(derived, spec_field.name) is getattr(base, spec_field.name), (
+                    spec_field.name
+                )
+
+    def test_it_never_mutates_the_base(self) -> None:
+        base = self._base()
+        before = {f.name: getattr(base, f.name) for f in dataclasses.fields(ServiceSpec)}
+        base.derive(permissions=[Nobody()], reads=Parameters(), atomic=False)
+
+        assert {f.name: getattr(base, f.name) for f in dataclasses.fields(ServiceSpec)} == before
+
+    def test_no_changes_is_an_equal_new_spec(self) -> None:
+        base = self._base()
+        derived = base.derive()
+
+        assert derived == base
+        assert derived is not base
+
+    def test_a_subclass_derives_its_own_class(self) -> None:
+        @dataclasses.dataclass(frozen=True, kw_only=True)
+        class Audited(ServiceSpec):
+            audit_label: str = "default"
+
+        base = Audited(service=print, permissions=[Unrestricted()], audit_label="refunds")
+        derived = base.derive(atomic=False)
+
+        assert type(derived) is Audited
+        assert derived.audit_label == "refunds"
+        assert base.derive(audit_label="other").audit_label == "other"
+
+    def test_a_derived_spec_is_checked_as_a_fresh_declaration_is(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"ServiceSpec\.permissions is empty"):
+            self._base().derive(permissions=[])
+
+    def test_a_combination_the_constructor_refuses_is_refused(self) -> None:
+        # Each field valid alone; together the constructor refuses them, so
+        # the check that answers is the combination's, not a per-field one.
+        base = ServiceSpec(service=print, validator=Bare(), input_data=lambda: {})
+        with pytest.raises(ImproperlyConfigured, match=r"ServiceSpec\.input_data merges over"):
+            base.derive(validator=None)
+
+    @pytest.mark.parametrize(
+        ("changes", "named"),
+        [
+            # A misspelt field, which ``dataclasses.replace`` would also refuse
+            # but in its own words.
+            ({"permission": [Nobody()]}, "'permission'"),
+            # A method rather than a field.
+            ({"parameters": PK}, "'parameters'"),
+            # Only the unknown names are listed, beside a known one.
+            ({"atomic": False, "nope": 1, "also_nope": 2}, "'also_nope', 'nope'"),
+            # What a transport answers for itself at the mount, never a spec
+            # field, so it is not one a variant can carry either.
+            ({"server_arguments": None}, "'server_arguments'"),
+        ],
+    )
+    def test_a_name_that_is_not_a_field_is_refused(self, changes: dict, named: str) -> None:
+        message = f"ServiceSpec.derive() takes the spec's own fields, and not {named}."
+        with pytest.raises(TypeError, match=re.escape(message)):
+            self._base().derive(**changes)

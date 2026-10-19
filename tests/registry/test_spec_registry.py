@@ -9,7 +9,7 @@ from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.specs.utils import Foreign, ForeignWithContract
+from tests.specs.utils import Foreign, ForeignWithContract, Nobody
 
 
 def _noop() -> None:
@@ -291,6 +291,85 @@ class TestMerge:
         assert "c" not in a
         assert "c" not in b
         assert len(a) == len(b) == 1
+
+
+class TestReplace:
+    """``replace`` is a view: a new registry with one entry's spec swapped, the source untouched."""
+
+    def _registry(self) -> SpecRegistry:
+        registry = SpecRegistry()
+        registry.register("list_orders", _selector(), tags=("read",))
+        registry.register("refund_order", _service(), tags=("write", "admin"))
+        registry.register("purge", _service())
+        return registry
+
+    def test_swaps_the_spec_under_the_name(self) -> None:
+        registry = self._registry()
+        stricter = _service(permissions=[Nobody()])
+
+        replaced = registry.replace("refund_order", stricter)
+
+        entry = replaced.get("refund_order")
+        assert entry is not None
+        assert entry.spec is stricter
+
+    def test_keeps_the_entry_s_tags_and_its_place_in_the_order(self) -> None:
+        replaced = self._registry().replace("refund_order", _service())
+
+        assert [e.name for e in replaced.all()] == ["list_orders", "refund_order", "purge"]
+        entry = replaced.get("refund_order")
+        assert entry is not None
+        assert entry.tags == {"write", "admin"}
+
+    def test_shares_every_other_entry(self) -> None:
+        registry = self._registry()
+        replaced = registry.replace("refund_order", _service())
+
+        for name in ("list_orders", "purge"):
+            assert replaced.get(name) is registry.get(name)
+
+    def test_leaves_the_source_untouched(self) -> None:
+        registry = self._registry()
+        original = registry.get("refund_order")
+
+        registry.replace("refund_order", _service(permissions=[Nobody()]))
+
+        assert registry.get("refund_order") is original
+
+    def test_a_derived_spec_is_the_usual_replacement(self) -> None:
+        registry = self._registry()
+        entry = registry.get("refund_order")
+        assert entry is not None
+        assert isinstance(entry.spec, ServiceSpec)
+
+        replaced = registry.replace("refund_order", entry.spec.derive(permissions=[Nobody()]))
+
+        swapped = replaced.get("refund_order")
+        assert swapped is not None
+        assert isinstance(swapped.spec, ServiceSpec)
+        assert [type(check) for check in swapped.spec.permissions or ()] == [Nobody]
+
+    def test_a_name_not_registered_raises(self) -> None:
+        # A replacement for an operation nobody registered is a typo, as a
+        # ``subset`` naming one is, not a quiet registration.
+        with pytest.raises(KeyError, match="'refund' is not registered"):
+            self._registry().replace("refund", _service())
+
+    def test_the_replacement_is_checked_as_a_registration_is(self) -> None:
+        # A derived spec with its permissions taken away builds, since a spec
+        # may be registered with them declared elsewhere; the registry refuses
+        # it as ``register`` would.
+        entry = self._registry().get("refund_order")
+        assert entry is not None
+        assert isinstance(entry.spec, ServiceSpec)
+        undeclared = entry.spec.derive(permissions=None)
+
+        with pytest.raises(ImproperlyConfigured, match="'refund_order' declares no permissions"):
+            self._registry().replace("refund_order", undeclared)
+
+    def test_a_replacement_that_is_no_spec_raises(self) -> None:
+        with pytest.raises(TypeError, match="'purge'"):
+            self._registry().replace("purge", object())  # type: ignore[arg-type]
 
 
 class TestSpecsDict:
