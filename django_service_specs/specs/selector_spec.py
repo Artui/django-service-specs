@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -18,6 +18,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.specs.utils import (
     check_callable,
+    check_changes,
     check_metadata,
     check_permissions,
     check_preconditions,
@@ -238,6 +239,35 @@ class SelectorSpec:
             self, "preconditions", check_preconditions(self.preconditions, label=label)
         )
         check_metadata(self.metadata, label=label)
+
+    def derive(self, **changes: object) -> Self:
+        """A new spec of this class with the named fields replaced, and every other one this spec's.
+
+        Built through the constructor, so every check a fresh declaration
+        passes runs again on the result, the combinations included: a change
+        that is valid alone and refused beside the fields it keeps is refused
+        here. The spec it is called on is never changed. The fields not named
+        are equal to its own, and the same objects except where the
+        constructor rebuilds one: a spec with a ``filter_set`` has its
+        ``reads`` assembled afresh, author's own and then the filters'.
+
+        A field is replaced, never extended: ``reads=`` is the new spec's whole
+        ``reads``, and a ``filter_set``'s filters join after it as they join
+        after a declared one. Name the base's value to keep it and add to it,
+        ``reads=base.reads + Parameters.of(...)``.
+
+        The result is another spec, by identity: a
+        [`Grant`][django_service_specs.dispatch.grant.Grant] minted for this
+        one does not cover it.
+
+        Raises:
+            TypeError: a name in ``changes`` is not one of the spec's own
+                fields, such as a method's name or a private field's.
+            ImproperlyConfigured: the result is refused as a fresh declaration
+                with the same fields would be.
+        """
+        check_changes(fields(self), changes, label=type(self).__name__)
+        return replace(self, **changes)
 
     def as_kernel_spec(self) -> Self:
         """This spec, as its own compiled form.
