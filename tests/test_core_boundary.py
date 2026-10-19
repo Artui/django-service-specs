@@ -1,11 +1,13 @@
 """A bare import of the package loads the core, and nothing a project has not asked for.
 
 The core is ``dispatch``, ``registry`` and ``authorization``, with everything
-they import. Authorization is in it rather than beside it because dispatch
+they load. Authorization is in it rather than beside it because dispatch
 always authorizes, and the registry because every transport registers specs.
-Everything else - the writes and relations, the schemas, the HTTP views, the
-management command, the validator adapters - is loaded by a project that asks
-for it.
+The boundary is whatever those load today, which includes all of
+``relations/`` and the filters adapter: moving either out is other work, and
+this test does not hold it. What it holds is that nothing beyond them - the
+writes, the schemas, the HTTP views, the management command, the other
+validator adapters - loads unless a project asks for it.
 
 Measured by what loads rather than read from the import graph, because what
 loads is the question, and it is larger than what the code names: importing

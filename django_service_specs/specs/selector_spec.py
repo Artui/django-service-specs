@@ -246,8 +246,10 @@ class SelectorSpec:
         Built through the constructor, so every check a fresh declaration
         passes runs again on the result, the combinations included: a change
         that is valid alone and refused beside the fields it keeps is refused
-        here. The spec it is called on is never changed, and the fields not
-        named are the same objects, not copies.
+        here. The spec it is called on is never changed. The fields not named
+        are equal to its own, and the same objects except where the
+        constructor rebuilds one: a spec with a ``filter_set`` has its
+        ``reads`` assembled afresh, author's own and then the filters'.
 
         A field is replaced, never extended: ``reads=`` is the new spec's whole
         ``reads``, and a ``filter_set``'s filters join after it as they join

@@ -675,7 +675,9 @@ those rows rather than returning them.
 A spec is frozen, so a variant of one is a new spec.
 [`derive(**changes)`][django_service_specs.specs.service_spec.ServiceSpec.derive]
 returns it: the same class, with the named fields replaced and every other one
-the base's own object.
+equal to the base's. A field is the base's very object unless the constructor
+rebuilds it, as it rebuilds a read's `reads` when the read has a
+`filter_set`.
 
 ```python
 refund = ServiceSpec(

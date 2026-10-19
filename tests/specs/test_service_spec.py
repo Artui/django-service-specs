@@ -802,6 +802,8 @@ class TestDerive:
             validator=Titled(),
             instance_selector_spec=RETRIEVE,
             presenter=Named(),
+            affordances=[ON_NOTHING],
+            preconditions=[print],
             metadata={"owner": "billing"},
         )
 
@@ -883,6 +885,9 @@ class TestDerive:
             ({"parameters": PK}, "'parameters'"),
             # Only the unknown names are listed, beside a known one.
             ({"atomic": False, "nope": 1, "also_nope": 2}, "'also_nope', 'nope'"),
+            # What a transport answers for itself at the mount, never a spec
+            # field, so it is not one a variant can carry either.
+            ({"server_arguments": None}, "'server_arguments'"),
         ],
     )
     def test_a_name_that_is_not_a_field_is_refused(self, changes: dict, named: str) -> None:

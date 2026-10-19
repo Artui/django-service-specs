@@ -406,6 +406,16 @@ class TestDerive:
         assert derived.reads == Parameters.of(offset, Parameter("title", "string"))
         assert derived == listing(reads=Parameters.of(offset), filter_set=TitleFilter)
 
+    def test_a_field_it_does_not_name_is_equal_to_the_base_s_even_when_rebuilt(self) -> None:
+        # With a filter set, the constructor assembles ``reads`` afresh, so the
+        # variant's is equal to the base's and not the same object.
+        base = listing(reads=PK, filter_set=TitleFilter)
+        derived = base.derive(allow_none=True)
+
+        assert derived.reads == base.reads
+        assert derived.filter_set is base.filter_set
+        assert derived.allow_none is True
+
     def test_deriving_away_the_filter_set_leaves_the_author_s_own_reads(self) -> None:
         own = Parameter("limit", "integer")
         base = listing(reads=Parameters.of(own), filter_set=TitleFilter)

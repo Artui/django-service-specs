@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **`ServiceSpec.derive(**changes)` and `SelectorSpec.derive(**changes)`: a
   variant of a spec without restating it.** Returns a new spec of the same
-  class with the named fields replaced and every other field the base's own
-  object, built through the constructor, so every check a fresh declaration
+  class with the named fields replaced and every other field equal to the
+  base's (the same object, except a read's `reads`, which the constructor
+  rebuilds when it has a `filter_set`), built through the constructor, so every check a fresh declaration
   passes runs again on the result, the combinations included. The base is
   never changed. A field is replaced, never extended: `reads=` is the
   variant's whole `reads`, and a read's `filter_set` filters follow whichever
