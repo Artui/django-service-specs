@@ -18,9 +18,10 @@ its column one way (``path_column``), and refuses a number in one set of
 words. A key is held to the range its column states
 (``integer_column_range``), since past it no row holds the key on any
 version; a filter's value, which a comparison reads, is held to
-``WIDEST_INTEGER``, what any driver binds. They are here rather than with
-the relations, which read them too, because dispatch reaches them through
-principal resolution and the selector, and dispatch imports no model write."""
+``WIDEST_INTEGER``, what any driver binds. They are here rather than beside
+the model writes, whose scoped match reads ``key_past_its_column`` too,
+because dispatch reaches them through principal resolution and the selector,
+and model writes are meant to stay a module dispatch does not import."""
 
 from __future__ import annotations
 

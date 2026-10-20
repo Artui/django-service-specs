@@ -24,12 +24,14 @@ def clean_held_to_their_columns(form: forms.BaseForm) -> None:
     checks and constraints querying with a value. Each is answered first, in
     the words of the check Django would have made:
 
-    - a model choice field sent a key its column cannot hold, which
-      ``choices_past_their_columns`` reads, is taken off the form while it
-      validates and given that refusal after, so the form's ``clean()`` and
-      its other errors are found as Django finds them with the field refused;
-    - a ``ModelForm``'s value its integer column cannot hold is judged by
-      ``_hold_to_the_columns`` as the model's step starts.
+    - a model choice field sent a key its column cannot hold is taken off the
+      form while it validates and given the field's own ``invalid_choice``
+      refusal after, so the form's ``clean()`` and its other errors are found
+      as Django finds them with the field refused;
+    - a ``ModelForm``'s value its integer column cannot hold is refused as the
+      model's validation step starts, before its uniqueness checks and
+      constraints query with it, with the ``min_value`` or ``max_value``
+      refusal of Django's model integer field.
 
     Shared by ``FormValidator``, which validates its form so, and by
     ``add_argument_errors``, which finds a form's own errors so before it

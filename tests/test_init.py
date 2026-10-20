@@ -124,9 +124,9 @@ def test_the_form_page_view_is_not_served_from_this_package() -> None:
 
 # A name a separate distribution imports is public at the root, and it is the
 # one object the kernel's own readers call: a second copy at the root would
-# let a transport's rule drift from dispatch's. Each name is paired with every
-# module inside the kernel that reads it, so moving a reader onto a copy of its
-# own fails here.
+# let a transport's rule drift from the kernel's. Each name is paired with
+# every module inside the kernel that reads it, so moving a reader onto a copy
+# of its own fails here.
 SHARED_WITH_THE_KERNEL = {
     "relax_partial": (
         "django_service_specs.commands.spec_command",
