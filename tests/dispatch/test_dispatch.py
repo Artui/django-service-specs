@@ -34,9 +34,9 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.present import present
+from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
-from django_service_specs.parameters.utils import expected_type
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -3384,9 +3384,12 @@ class TestMany:
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments={"items": rows})
         assert refused.value.detail == {
-            "items": {0: {"title": ["Not this one."]}, 2: {"title": [expected_type("string")]}}
+            "items": {
+                0: {"title": ["Not this one."]},
+                2: {"title": [expected_type_refusal("string")]},
+            }
         }
-        assert refused.value.detail["items"][0]["title"] != [expected_type("string")]
+        assert refused.value.detail["items"][0]["title"] != [expected_type_refusal("string")]
         # Every row the shape check let through was validated, and none ran.
         assert [args for args, _ in validator.calls] == [{"title": "bad"}, {"title": "fine"}]
         assert service.calls == []
@@ -3397,7 +3400,7 @@ class TestMany:
             dispatch(spec, principal=ada, arguments={"items": ["not a row", {"title": "own"}]})
         assert refused.value.detail == {
             "items": {
-                0: {"non_field_errors": [expected_type("object")]},
+                0: {"non_field_errors": [expected_type_refusal("object")]},
                 1: {"non_field_errors": ["Not this row."]},
             }
         }
@@ -3405,7 +3408,7 @@ class TestMany:
     @pytest.mark.parametrize(
         ("arguments", "message"),
         [
-            ({"items": "nope"}, expected_type("array")),
+            ({"items": "nope"}, expected_type_refusal("array")),
             ({"items": None}, "This field cannot be null."),
             ({}, "This field is required."),
         ],
@@ -3615,7 +3618,7 @@ class TestMany:
             dispatch(spec, principal=ada, arguments={"items": rows})
         detail = refused.value.detail["items"]
         assert detail == {
-            0: {"title": [expected_type("string")]},
+            0: {"title": [expected_type_refusal("string")]},
             2: {"title": ["Not this one."]},
             "non_field_errors": ["At most 1 rows."],
         }
@@ -3658,7 +3661,7 @@ class TestMany:
         spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Listed())
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": 3}]})
-        assert refused.value.detail == {"items": {1: {"title": [expected_type("string")]}}}
+        assert refused.value.detail == {"items": {1: {"title": [expected_type_refusal("string")]}}}
         assert service.calls == []
 
     def test_values_spread_beside_the_list_are_refused(self, ada: Any) -> None:
@@ -3724,7 +3727,7 @@ class TestMany:
         arguments: Any = [{"title": "a"}]
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments=arguments)
-        assert refused.value.detail == {"non_field_errors": [expected_type("object")]}
+        assert refused.value.detail == {"non_field_errors": [expected_type_refusal("object")]}
 
     def test_a_tuple_of_rows_is_a_list(self, ada: Any) -> None:
         service = Record()

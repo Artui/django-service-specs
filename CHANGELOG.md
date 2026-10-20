@@ -43,8 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a refusal nothing answers; `BARE_BASE`, a base answered nowhere while every
   refusal under it is, since either base may be raised bare; and
   `SHADOWED_ROW`, for a table, a row below a row of its own base or a repeat of
-  an earlier row, which never answers. Each transport keeps its own vocabulary: an exit code, a status and
-  a run state stay its own.
+  an earlier row, which never answers. Each transport keeps its own
+  vocabulary: an exit code, a status and a run state stay its own.
+- **Seven readings the kernel's transports share are public, so a
+  transport outside this package makes them the same way**, each exported
+  from the root and from its subpackage: `is_deactivated`, the one rule for
+  a principal that may not act; `relax_partial`, what a partial call may
+  leave out; `refusal_messages(value)` and `NON_FIELD_KEYS`, how a refusal
+  of arguments is read as paths to messages; `expected_type_refusal(kind)`,
+  the refusal of a value of the wrong kind, over a closed set of eight keys;
+  `max_length_in_force`, the most elements an array takes; and
+  `clean_held_to_their_columns`, a bound form validated as its `full_clean()`
+  does, with a number no integer column holds refused in Django's words
+  rather than handed to the database driver. Each is the one object the
+  kernel's own readers call, so a transport reading it cannot drift from
+  them.
 
 ### Changed
 - **A selector raising Django's `Http404`, as `get_object_or_404` does, is a
@@ -63,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `None`, as its `DoesNotExist` is. Only the selector's
   own raise counts: an `Http404` from its `extend_queryset` passes through on
   both entry points, as before.
+
+### Fixed
+- **`clean_held_to_their_columns` leaves the form as it found it.** It took
+  a model choice field sent a key past its column off the form while the
+  form validated, and put it back only if validation returned, so a
+  `clean()` raising anything but a `ValidationError` left the form without
+  that field. It also left its column check wrapped round the form's
+  `_post_clean` for good. Both are now restored whether validation returned
+  or raised: the form keeps every field it had, in its order, and its own
+  `_post_clean`.
 
 ## [0.9.0] — 2026-10-16
 

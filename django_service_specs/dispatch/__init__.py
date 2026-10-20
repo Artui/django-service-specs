@@ -18,6 +18,7 @@ from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, pag
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.dispatch.refusals import REFUSALS
+from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 
@@ -41,6 +42,7 @@ __all__ = [
     "paginate_output",
     "present",
     "present_for_audience",
+    "relax_partial",
     "resolve_target",
     "unanswered_refusals",
 ]

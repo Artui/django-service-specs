@@ -3,9 +3,9 @@
 The core is ``dispatch``, ``registry`` and ``authorization``, with everything
 they load. Authorization is in it rather than beside it because dispatch
 always authorizes, and the registry because every transport registers specs.
-The boundary is whatever those load today, which includes all of
-``relations/`` and the filters adapter: moving either out is other work, and
-this test does not hold it. What it holds is that nothing beyond them - the
+The boundary is whatever those load today, which includes the filters
+adapter and none of ``relations/``, since the column checks core reads live
+in ``parameters/``; this test holds neither fact. What it holds is that nothing beyond them - the
 writes, the schemas, the HTTP views, the management command, the other
 validator adapters - loads unless a project asks for it.
 

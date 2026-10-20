@@ -1,33 +1,12 @@
 from __future__ import annotations
 
 import pytest
-from django.utils.translation import gettext_lazy
 
-from django_service_specs.parameters.parameters import JSON_TYPES
 from django_service_specs.parameters.utils import (
-    expected_type,
     parse_number,
-    refusal_messages,
     unknown_arguments_policy,
 )
 from django_service_specs.types.unknown_arguments import UnknownArguments
-
-
-@pytest.mark.parametrize("json_type", sorted(JSON_TYPES))
-def test_every_json_type_has_its_own_sentence(json_type: str) -> None:
-    # A whole sentence per type, with the type named in it, so a translator
-    # sees each one entire rather than a template with a code word dropped in.
-    assert json_type in expected_type(json_type)
-
-
-def test_the_decimal_format_names_both_the_forms_it_accepts() -> None:
-    assert expected_type("decimal") == "Expected a decimal string or a number."
-
-
-def test_a_file_has_its_own_sentence() -> None:
-    # Not a JSON type, and refused as one all the same: a string or a mapping
-    # sent where a file is declared.
-    assert expected_type("file") == "Expected a file."
 
 
 @pytest.mark.parametrize(
@@ -83,29 +62,6 @@ def test_an_exponent_in_either_case_spells_a_float(text: str, number: float) -> 
 @pytest.mark.parametrize("text", ["1E400", "-1E400"])
 def test_an_exponent_past_a_float_s_range_in_either_case_spells_none(text: str) -> None:
     assert parse_number("number", text) is None
-
-
-def test_a_refusal_tree_is_read_as_paths_to_messages() -> None:
-    tree = {
-        "non_field_errors": ["Check the shelf."],
-        "title": ["Too long.", gettext_lazy("Twice.")],
-        "books": {"1": {"__all__": ["Missing."], "isbn": ["Malformed."]}},
-    }
-    assert list(refusal_messages(tree)) == [
-        ((), "Check the shelf."),
-        (("title",), "Too long."),
-        (("title",), "Twice."),
-        (("books", "1"), "Missing."),
-        (("books", "1", "isbn"), "Malformed."),
-    ]
-
-
-def test_a_message_that_is_no_list_is_one_message_not_its_characters() -> None:
-    ((path, text),) = refusal_messages(gettext_lazy("Whole."))
-    # A lazy proxy equals its string, so only the type shows it was rendered:
-    # a join over the messages raises on a proxy.
-    assert (path, type(text)) == ((), str)
-    assert text == "Whole."
 
 
 @pytest.mark.parametrize("policy", [UnknownArguments.REJECT, UnknownArguments.IGNORE])

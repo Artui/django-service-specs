@@ -39,9 +39,14 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.parameters.parameters.Parameters
 ::: django_service_specs.parameters.check_arguments.check_arguments
 ::: django_service_specs.parameters.non_field_errors.NON_FIELD_ERRORS
+::: django_service_specs.parameters.non_field_keys.NON_FIELD_KEYS
 ::: django_service_specs.parameters.coerce_flat.coerce_flat
 ::: django_service_specs.parameters.invalid_arguments.InvalidArguments
 ::: django_service_specs.parameters.coded_message.CodedMessage
+::: django_service_specs.parameters.refusal_messages.refusal_messages
+::: django_service_specs.parameters.expected_type_refusal.expected_type_refusal
+::: django_service_specs.parameters.max_length_in_force.max_length_in_force
+::: django_service_specs.parameters.clean_held_to_their_columns.clean_held_to_their_columns
 
 ## Validation
 
@@ -109,6 +114,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.apply_server_arguments.apply_server_arguments
 ::: django_service_specs.dispatch.refusals.REFUSALS
 ::: django_service_specs.dispatch.unanswered_refusals.unanswered_refusals
+::: django_service_specs.dispatch.relax_partial.relax_partial
 
 ## Affordances
 
@@ -140,6 +146,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope
 ::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
+::: django_service_specs.authorization.is_deactivated.is_deactivated
 ::: django_service_specs.authorization.not_permitted.NotPermitted
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
 
