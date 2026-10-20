@@ -61,7 +61,7 @@ from django_service_specs.mutations.utils import (
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
-from django_service_specs.parameters.utils import coded_messages
+from django_service_specs.parameters.utils import coded_messages, key_past_its_column
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -69,7 +69,7 @@ from django_service_specs.relations.generic_relation_spec import GenericRelation
 from django_service_specs.relations.many_to_many_spec import ManyToManySpec
 from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToOneSpec
-from django_service_specs.relations.utils import key_past_its_column, pk_input_targets
+from django_service_specs.relations.utils import pk_input_targets
 from django_service_specs.services.arun_service import arun_service
 from django_service_specs.services.run_service import run_service
 from django_service_specs.services.service_validation_error import ServiceValidationError

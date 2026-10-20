@@ -20,14 +20,14 @@ from django_service_specs.adapters.filters.filter_set_parameters import filter_s
 from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.utils import coded_messages
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
-from django_service_specs.relations.utils import (
+from django_service_specs.parameters.utils import (
     WIDEST_INTEGER,
     choices_past_their_columns,
+    coded_messages,
     integer_range_refusal,
     path_column,
 )
+from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
 
