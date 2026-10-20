@@ -29,7 +29,7 @@ What loads is what an import statement runs at import time, so the probe
 cannot see an import inside a function body, which loads the module the first
 time the function is called. The same table is therefore held against the
 source as well: no module classified as core names a module of another layer
-in any import, at any depth.
+in any import, at any depth, a dynamic import by literal name included.
 """
 
 from __future__ import annotations
@@ -156,7 +156,9 @@ def _subpackages() -> frozenset[str]:
 def _imported(tree: ast.AST) -> frozenset[str]:
     # Every kernel module an import names, at every depth. ``from a import b``
     # counts as both ``a`` and ``a.b``, since ``b`` may be a submodule; an
-    # attribute read as a module resolves to the module that holds it.
+    # attribute read as a module resolves to the module that holds it. A
+    # dynamic import counts when its name is a literal: a computed one cannot
+    # be read, and none is written in the package.
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -164,11 +166,28 @@ def _imported(tree: ast.AST) -> frozenset[str]:
         elif isinstance(node, ast.ImportFrom) and node.module:
             names.add(node.module)
             names.update(f"{node.module}.{alias.name}" for alias in node.names)
+        elif (
+            isinstance(node, ast.Call)
+            and _called(node.func) in {"import_module", "__import__"}
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            names.add(node.args[0].value)
     return frozenset(
         name
         for name in names
         if name == "django_service_specs" or name.startswith("django_service_specs.")
     )
+
+
+def _called(func: ast.expr) -> str | None:
+    # ``import_module(...)`` and ``importlib.import_module(...)`` alike.
+    if isinstance(func, ast.Name):
+        return func.id
+    if isinstance(func, ast.Attribute):
+        return func.attr
+    return None
 
 
 @pytest.fixture(scope="module")
@@ -190,6 +209,9 @@ def test_every_subpackage_is_classified() -> None:
         for child in _subpackages() | _modules().keys()
         if child.rpartition(".")[0] in CONTAINERS
     }
+    # A flat module is a child too, and ``adapters/utils.py`` is the one
+    # standing case of it.
+    assert "adapters.utils" in contained
     assert sorted((top | contained) - LAYERS.keys()) == []
 
 
@@ -255,16 +277,27 @@ def test_the_import_reader_sees_every_depth_and_spelling() -> None:
     source = (
         "import django_service_specs.relations.utils\n"
         "from django_service_specs.schema import thing\n"
+        "import django_service_specs.http as h\n"
+        "from django_service_specs.commands import report as r\n"
         "import os\n"
         "def f():\n"
         "    from django_service_specs.mutations.create import create\n"
         "    import django_service_specs\n"
+        "    importlib.import_module('django_service_specs.adapters.forms')\n"
+        "    __import__('django_service_specs.adapters.pydantic')\n"
+        "    import_module(name)\n"
+        "    print('django_service_specs.output')\n"
     )
     assert _imported(ast.parse(source)) == {
         "django_service_specs",
         "django_service_specs.relations.utils",
         "django_service_specs.schema",
         "django_service_specs.schema.thing",
+        "django_service_specs.http",
+        "django_service_specs.commands",
+        "django_service_specs.commands.report",
         "django_service_specs.mutations.create",
         "django_service_specs.mutations.create.create",
+        "django_service_specs.adapters.forms",
+        "django_service_specs.adapters.pydantic",
     }
