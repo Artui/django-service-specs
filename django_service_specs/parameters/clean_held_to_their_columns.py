@@ -35,17 +35,37 @@ def clean_held_to_their_columns(form: forms.BaseForm) -> None:
 
     Shared by ``FormValidator``, which validates its form so, and by
     ``add_argument_errors``, which finds a form's own errors so before it
-    places a refusal beside them. The form keeps every field, in its order.
+    places a refusal beside them.
+
+    The form is left as it was found, whether its validation returned or
+    raised: every field it had, in its order, and its own ``_post_clean``,
+    the class's or one the form carried itself. Only its errors and what it
+    cleaned are new.
 
     Public so that a transport in a distribution of its own, validating a
     project's form, holds it to the same columns with the same words.
     """
     beyond = choices_past_their_columns(form)
     fields = form.fields
+    # A ``_post_clean`` the form carries itself, rather than its class's, which
+    # ``_hold_to_the_columns`` shadows on the instance: none, on almost every
+    # form, and then the empty dict.
+    own = {name: value for name, value in vars(form).items() if name == "_post_clean"}
     form.fields = {name: field for name, field in fields.items() if name not in beyond}
     _hold_to_the_columns(form)
-    form.full_clean()
-    form.fields = fields
+    try:
+        form.full_clean()
+    finally:
+        # Each restore held by its own test:
+        # test_a_clean_that_raises_leaves_the_form_every_field_it_had (the
+        # fields), test_a_clean_that_raises_leaves_the_form_its_own_post_clean
+        # and test_a_validated_form_keeps_the_class_s_own_post_clean (the
+        # wrapper dropped), and
+        # test_a_post_clean_the_form_carried_itself_is_run_and_put_back (the
+        # form's own put back).
+        form.fields = fields
+        vars(form).pop("_post_clean", None)
+        vars(form).update(own)
     for name, refusals in beyond.items():
         form.add_error(name, refusals)
 
@@ -62,7 +82,8 @@ def _hold_to_the_columns(form: forms.BaseForm) -> None:
     refusal is added to the form as a field's own error, which takes the value
     out of ``cleaned_data``: the instance keeps what it held, and Django leaves
     a field with an error out of every check on the instance. Wrapped on the
-    bound form. A plain form has no model to read a column from
+    bound form, and unwrapped by ``clean_held_to_their_columns`` once the form
+    has validated. A plain form has no model to read a column from
     (test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number).
     """
     if not isinstance(form, forms.BaseModelForm):

@@ -58,6 +58,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own raise counts: an `Http404` from its `extend_queryset` passes through on
   both entry points, as before.
 
+### Fixed
+- **`clean_held_to_their_columns` leaves the form as it found it.** It took
+  a model choice field sent a key past its column off the form while the
+  form validated, and put it back only if validation returned, so a
+  `clean()` raising anything but a `ValidationError` left the form without
+  that field. It also left its column check wrapped round the form's
+  `_post_clean` for good. Both are now restored whether validation returned
+  or raised: the form keeps every field it had, in its order, and its own
+  `_post_clean`.
+
 ## [0.9.0] — 2026-10-16
 
 ### Added
