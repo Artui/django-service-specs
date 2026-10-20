@@ -141,8 +141,8 @@ def parse_number(json_type: str, text: str) -> int | float | None:
     **A number spelling an integer is that exact** ``int``, and a ``float``
     only where a point or an exponent is spelled: what a JSON decoder makes
     of the same literal, so ``"3"`` reaches the Validator as the JSON ``3``
-    does. Through ``float`` alone, every integer past 2**53 was rounded to a
-    neighbour, and a key sent for a ``number`` named the neighbour's row
+    does. Through ``float`` alone, every integer past 2**53 would be rounded to a
+    neighbour, and a key sent for a ``number`` would name the neighbour's row
     (test_a_number_spelling_an_integer_is_that_exact_int). The ``float``
     reading still decides what is a number. Digits alone that ``int`` refuses
     - past the 4300 digits it reads from Python 3.10.7 on, which zeros in

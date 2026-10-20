@@ -50,7 +50,7 @@ def asked_with(check: Any, method: str, arguments: Mapping[str, Any] | None) -> 
     """The keywords to ask ``check``'s ``method`` with: ``arguments``, if it declares them.
 
     The base ``PermissionCheck`` methods declare no ``arguments``, so every
-    check written before the channel existed keeps its signature and stays a
+    check written without them keeps its signature and stays a
     valid override; a method that wants the call's arguments declares the
     keyword, and only a method that does is handed it. Read off
     ``getattr(check, method)``, the callable dispatch is about to call, so a
@@ -166,7 +166,7 @@ def _own_parameters(layer: Any) -> Mapping[str, inspect.Parameter] | None:
     ``__wrapped__`` that cannot be called (``TypeError``:
     test_a_wrapped_layer_that_is_not_callable_is_handed_nothing). Such a
     layer never declared ``arguments``, so it is read as not having opted
-    in, and a check that never did is asked as it always was.
+    in, and a check that never did is asked without them.
     """
     try:
         return inspect.signature(layer, follow_wrapped=False).parameters
