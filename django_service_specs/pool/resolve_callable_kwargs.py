@@ -22,22 +22,12 @@ def resolve_callable_kwargs(
     If ``fn`` declares ``**kwargs``, the entire pool is passed.
     Otherwise only parameters present in the signature are forwarded.
     """
-    signature: inspect.Signature = inspect.signature(fn)
-    params: dict[str, inspect.Parameter] = dict(signature.parameters)
-
-    accepts_var_keyword: bool = any(
-        param.kind == inspect.Parameter.VAR_KEYWORD for param in params.values()
-    )
-    if accepts_var_keyword:
+    params = inspect.signature(fn).parameters.values()
+    if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in params):
         return dict(pool)
-
-    declared_names: set[str] = {
-        name
-        for name, param in params.items()
-        if param.kind
-        in (
-            inspect.Parameter.POSITIONAL_OR_KEYWORD,
-            inspect.Parameter.KEYWORD_ONLY,
-        )
-    }
-    return {name: pool[name] for name in declared_names if name in pool}
+    named = (
+        param.name
+        for param in params
+        if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    )
+    return {name: pool[name] for name in named if name in pool}

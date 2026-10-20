@@ -63,7 +63,7 @@ def deferred_progress(
 
     Each report goes to the transport's reporter first, then to the spec's
     sink. A failure in either propagates to the caller of the report, the
-    service, as a transport's reporter failing does today; and a provider that
+    service, as a transport's reporter failing does; and a provider that
     raises does so there too, inside the run's transaction rather than before
     it.
 
