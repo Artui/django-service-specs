@@ -202,8 +202,8 @@ class TestASingularRelationSaysItsName:
         assert excinfo.value.detail == {"profile": {"bio": ["Too long."]}}
 
     def test_the_parents_own_field_is_told_apart_from_the_rows(self) -> None:
-        # The collision this exists to end: a service refusing a section's
-        # ``title`` used to arrive looking exactly like the catalog's own.
+        # Without the relation's name, a service refusing a section's ``title``
+        # would arrive looking exactly like the catalog's own.
         with pytest.raises(ServiceValidationError) as excinfo:
             create_from_input(
                 Catalog,
@@ -671,8 +671,9 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         assert "bogus" in message
 
     def test_a_value_the_field_cannot_coerce_is_named_by_its_message(self) -> None:
-        # A ``ValidationError`` from the field's ``to_python``, read for its
-        # messages rather than for the repr of the list ``str()`` would give.
+        # A ``ValidationError`` with no field, from the field's ``to_python``,
+        # read for its messages rather than for the repr of the list ``str()``
+        # would give, and keeping Django's code.
         with pytest.raises(InvalidArguments) as excinfo:
             create_from_input(
                 Author,
@@ -682,6 +683,8 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
 
         [message] = excinfo.value.detail["posts"][0]["non_field_errors"]
         assert message.startswith("“maybe”")
+        [(_, code)] = coded(excinfo.value.detail)["posts"][0]["non_field_errors"]
+        assert code == "invalid"
 
     def test_a_field_keyed_validation_error_keeps_its_fields(self) -> None:
         # A model whose ``save()`` runs ``full_clean()`` names the field, and the
@@ -700,18 +703,25 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
 
         assert excinfo.value.detail == {"sections": {0: {"title": ["Not this one."]}}}
 
-    def test_a_validation_error_keeps_each_message_s_own_code(self) -> None:
+    @pytest.mark.parametrize(
+        "field",
+        [
+            pytest.param("title", id="keyed-by-field"),
+            # Built from a list, as ``Model.clean()`` raises one: the row's own
+            # complaint.
+            pytest.param("non_field_errors", id="with-no-field"),
+        ],
+    )
+    def test_a_validation_error_keeps_each_message_s_own_code(self, field: str) -> None:
         # Django's code, which is DRF's for the same mistake; a message
-        # raised with none is ``invalid``, as DRF's ValidationError's is.
-        refusal = ValidationError(
-            {
-                "title": [
-                    ValidationError("Too long.", code="max_length"),
-                    ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
-                    "No code.",
-                ]
-            }
-        )
+        # raised with none is ``invalid``, as DRF's ValidationError's is. Each
+        # message is rendered with its params.
+        messages: list[Any] = [
+            ValidationError("Too long.", code="max_length"),
+            ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
+            "No code.",
+        ]
+        refusal = ValidationError(messages if field == "non_field_errors" else {field: messages})
 
         with (
             patch.object(Section, "save", side_effect=refusal),
@@ -726,7 +736,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         assert coded(excinfo.value.detail) == {
             "sections": {
                 0: {
-                    "title": [
+                    field: [
                         ("Too long.", "max_length"),
                         ("Not this.", "blocked"),
                         ("No code.", "invalid"),
@@ -734,51 +744,6 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
                 }
             }
         }
-
-    def test_a_validation_error_with_no_field_keeps_each_message_s_own_code(self) -> None:
-        # Built from a list, as ``Model.clean()`` raises one: the row's own
-        # complaint, each message rendered with its params and its code kept.
-        refusal = ValidationError(
-            [
-                ValidationError("Too long.", code="max_length"),
-                ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
-                "No code.",
-            ]
-        )
-
-        with (
-            patch.object(Section, "save", side_effect=refusal),
-            pytest.raises(InvalidArguments) as excinfo,
-        ):
-            create_from_input(
-                Catalog,
-                {"name": "c", "sections": [{"title": "t"}]},
-                relations={"sections": ChildSpec(model=Section, fk="catalog")},
-            )
-
-        assert coded(excinfo.value.detail) == {
-            "sections": {
-                0: {
-                    "non_field_errors": [
-                        ("Too long.", "max_length"),
-                        ("Not this.", "blocked"),
-                        ("No code.", "invalid"),
-                    ]
-                }
-            }
-        }
-
-    def test_a_coerced_value_s_refusal_keeps_django_s_code(self) -> None:
-        # A ``ValidationError`` with no field, from the field's ``to_python``.
-        with pytest.raises(InvalidArguments) as excinfo:
-            create_from_input(
-                Author,
-                {"name": "a", "posts": [{"title": "t", "published": "maybe"}]},
-                relations={"posts": ChildSpec(model=Post, fk="author")},
-            )
-
-        [(_, code)] = coded(excinfo.value.detail)["posts"][0]["non_field_errors"]
-        assert code == "invalid"
 
     def test_a_key_the_model_has_no_field_for_is_invalid(self) -> None:
         with pytest.raises(InvalidArguments) as excinfo:

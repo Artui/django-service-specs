@@ -32,11 +32,15 @@ class _RaisingFK:
 
 
 class TestCoerceToDict:
-    def test_none(self) -> None:
-        assert coerce_to_dict(None) == {}
-
-    def test_dict(self) -> None:
-        assert coerce_to_dict({"a": 1}) == {"a": 1}
+    @pytest.mark.parametrize(
+        ("data", "expected"),
+        [
+            pytest.param(None, {}, id="none-is-empty"),
+            pytest.param({"a": 1}, {"a": 1}, id="dict"),
+        ],
+    )
+    def test_a_mapping_or_nothing(self, data: Any, expected: dict[str, Any]) -> None:
+        assert coerce_to_dict(data) == expected
 
     def test_a_field_declared_init_false_is_left_out(self) -> None:
         # The dataclass computes it rather than taking it, so it is no input:
@@ -63,25 +67,29 @@ class TestCoerceToDict:
             coerce_to_dict(123)
 
 
-class TestFilterInput:
-    def test_drops_unset(self) -> None:
-        assert filter_input({"a": UNSET, "b": 1}, field_map=None, exclude_fields=None) == {"b": 1}
-
-    def test_applies_field_map(self) -> None:
-        result = filter_input(
+@pytest.mark.parametrize(
+    ("raw", "field_map", "exclude_fields", "expected"),
+    [
+        pytest.param({"a": UNSET, "b": 1}, None, None, {"b": 1}, id="drops-unset"),
+        pytest.param(
             {"input_name": 1, "passthrough": 2},
-            field_map={"input_name": "model_attr"},
-            exclude_fields=None,
-        )
-        assert result == {"model_attr": 1, "passthrough": 2}
-
-    def test_excludes_against_input_names(self) -> None:
-        result = filter_input(
-            {"a": 1, "b": 2},
-            field_map={"a": "x"},
-            exclude_fields=["a"],
-        )
-        assert result == {"b": 2}
+            {"input_name": "model_attr"},
+            None,
+            {"model_attr": 1, "passthrough": 2},
+            id="applies-field-map",
+        ),
+        pytest.param(
+            {"a": 1, "b": 2}, {"a": "x"}, ["a"], {"b": 2}, id="excludes-against-input-names"
+        ),
+    ],
+)
+def test_filter_input(
+    raw: dict[str, Any],
+    field_map: dict[str, str] | None,
+    exclude_fields: list[str] | None,
+    expected: dict[str, Any],
+) -> None:
+    assert filter_input(raw, field_map=field_map, exclude_fields=exclude_fields) == expected
 
 
 class TestSafeGetattr:
@@ -113,62 +121,74 @@ class TestDiffAttrs:
         assert changes[0].old == 2
 
 
-class TestM2mTargetPks:
-    def test_none(self) -> None:
-        assert m2m_target_pks(None) == []
-
-    def test_pks_passthrough(self) -> None:
-        assert m2m_target_pks([1, 2, 3]) == [1, 2, 3]
-
-
-class TestAutoNowFieldNames:
-    def test_returns_auto_now_fields(self) -> None:
-        assert auto_now_field_names(Timestamped()) == ("updated_at",)
-
-    def test_excludes_auto_now_add(self) -> None:
-        assert "created_at" not in auto_now_field_names(Timestamped())
-
-    def test_model_without_auto_now(self) -> None:
-        assert auto_now_field_names(Author()) == ()
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        pytest.param(None, [], id="none"),
+        pytest.param([1, 2, 3], [1, 2, 3], id="pks-pass-through"),
+    ],
+)
+def test_m2m_target_pks(value: Any, expected: list[Any]) -> None:
+    assert m2m_target_pks(value) == expected
 
 
-class TestDimensionFieldNames:
-    def test_a_changed_image_names_its_dimension_fields(self) -> None:
-        assert dimension_field_names(Photo(), ("book", "image")) == ("w", "h")
+@pytest.mark.parametrize(
+    ("instance", "expected"),
+    [
+        # ``Timestamped`` declares ``created_at`` with ``auto_now_add``, which is
+        # left out: only ``auto_now`` is refreshed on an update.
+        pytest.param(Timestamped(), ("updated_at",), id="auto-now-not-auto-now-add"),
+        pytest.param(Author(), (), id="model-without-auto-now"),
+    ],
+)
+def test_auto_now_field_names(instance: Any, expected: tuple[str, ...]) -> None:
+    assert auto_now_field_names(instance) == expected
 
-    def test_an_image_declaring_none_names_nothing(self) -> None:
-        assert dimension_field_names(Photo(), ("thumbnail",)) == ()
 
-    def test_a_file_field_that_is_not_an_image_names_nothing(self) -> None:
-        assert dimension_field_names(Document(), ("attachment", "title")) == ()
+@pytest.mark.parametrize(
+    ("instance", "changed", "expected"),
+    [
+        pytest.param(Photo(), ("book", "image"), ("w", "h"), id="a-changed-image-names-its-own"),
+        pytest.param(Photo(), ("thumbnail",), (), id="an-image-declaring-none-names-nothing"),
+        pytest.param(
+            Document(), ("attachment", "title"), (), id="a-file-that-is-not-an-image-names-nothing"
+        ),
+    ],
+)
+def test_dimension_field_names(
+    instance: Any, changed: tuple[str, ...], expected: tuple[str, ...]
+) -> None:
+    assert dimension_field_names(instance, changed) == expected
 
 
-class TestResolveUpdateFields:
-    def test_true_with_changes(self) -> None:
-        assert resolve_update_fields(True, ("a", "b")) == ["a", "b"]
-
-    def test_true_without_changes(self) -> None:
-        assert resolve_update_fields(True, ()) is None
-
-    def test_false(self) -> None:
-        assert resolve_update_fields(False, ("a",)) is None
-
-    def test_explicit_list(self) -> None:
-        assert resolve_update_fields(["x", "y"], ("a",)) == ["x", "y"]
-
-    def test_auto_now_fields_appended(self) -> None:
-        result = resolve_update_fields(True, ("title",), ("updated_at",))
-        assert result == ["title", "updated_at"]
-
-    def test_auto_now_fields_not_appended_when_no_changes(self) -> None:
-        assert resolve_update_fields(True, (), ("updated_at",)) is None
-
-    def test_auto_now_fields_not_appended_when_false(self) -> None:
-        assert resolve_update_fields(False, ("title",), ("updated_at",)) is None
-
-    def test_auto_now_fields_not_appended_for_explicit_list(self) -> None:
-        assert resolve_update_fields(["title"], ("x",), ("updated_at",)) == ["title"]
-
-    def test_auto_now_field_already_in_changed_no_dup(self) -> None:
-        result = resolve_update_fields(True, ("updated_at", "title"), ("updated_at",))
-        assert result == ["updated_at", "title"]
+@pytest.mark.parametrize(
+    ("update_fields", "changed", "derived", "expected"),
+    [
+        pytest.param(True, ("a", "b"), (), ["a", "b"], id="true-with-changes"),
+        pytest.param(True, (), (), None, id="true-without-changes"),
+        pytest.param(False, ("a",), (), None, id="false"),
+        pytest.param(["x", "y"], ("a",), (), ["x", "y"], id="explicit-list"),
+        pytest.param(
+            True, ("title",), ("updated_at",), ["title", "updated_at"], id="derived-appended"
+        ),
+        pytest.param(True, (), ("updated_at",), None, id="derived-not-appended-with-no-changes"),
+        pytest.param(False, ("title",), ("updated_at",), None, id="derived-not-appended-for-false"),
+        pytest.param(
+            ["title"], ("x",), ("updated_at",), ["title"], id="derived-not-appended-to-a-list"
+        ),
+        pytest.param(
+            True,
+            ("updated_at", "title"),
+            ("updated_at",),
+            ["updated_at", "title"],
+            id="derived-already-changed-is-not-repeated",
+        ),
+    ],
+)
+def test_resolve_update_fields(
+    update_fields: bool | list[str],
+    changed: tuple[str, ...],
+    derived: tuple[str, ...],
+    expected: list[str] | None,
+) -> None:
+    assert resolve_update_fields(update_fields, changed, derived) == expected
