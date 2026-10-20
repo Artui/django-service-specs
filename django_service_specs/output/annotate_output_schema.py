@@ -269,15 +269,16 @@ def _member_admits_null(member: Any) -> bool:
     """Whether one entry of an ``anyOf`` or ``oneOf`` admits a ``null``.
 
     A schema may be a boolean, and ``true`` or ``{}`` admits anything, the
-    null included, where ``false`` admits nothing. Anything else that is not an
-    object is no schema to read. Each of the three is a case of
+    null included, where ``false`` admits nothing; ``{}`` needs no case of its
+    own, as ``_admits_null`` reads it as a schema stating nothing. Anything
+    else that is not an object is no schema to read. Each of the three is a case of
     test_a_null_the_property_admits_stays_admitted (``any-of-true``,
     ``any-of-empty``) or of
     test_a_property_admitting_no_null_admits_none_after_formatting
     (``any-of-false``).
     """
     if isinstance(member, dict):
-        return not member or _admits_null(member)
+        return _admits_null(member)
     return member is True
 
 
