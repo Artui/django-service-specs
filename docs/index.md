@@ -11,30 +11,48 @@ command, and a permission check in whichever of them remembered one. Declared
 once, the operation carries all of that itself, and a transport reads the
 declaration rather than repeating it.
 
-## Two positions
+## Two positions, three layers
 
 Everything else follows from two decisions, and both read as limitations.
 
 **Django is the base, and the only one.** There is no pure-Python protocol
 layer beneath the kernel and no Django-free subpackage inside it. A principal
-is a Django user, a target is a model row, a transaction is Django's. The
-package depends on Django and nothing else.
+is a Django user, a target is a model row, a transaction is Django's. Django
+is the only framework the package depends on, and `typing_extensions` its only
+other dependency.
 
 **DRF is an adapter, never a dependency.** The package exists so a Django
 project with business logic and no API framework can hand its operations to an
 agent, a command or a queue. Nothing in `django_service_specs` imports
 `rest_framework`, and the test suite runs without it installed.
-[`djangorestframework-services`](https://github.com/Artui/djangorestframework-services)
-will depend on this package, never the reverse, with its own `ServiceSpec`
-becoming the DRF adapter over this kernel.
 
-**No agent transport reads a spec without DRF yet.** The family's MCP server and
-Pydantic AI toolset both require DRF and `djangorestframework-services` today.
-What they read off a spec besides dispatch is here - see
-[affordances](affordances.md) and [paging and projection](paging-and-projection.md) -
-and they are planned to read kernel specs through it, with DRF behind an extra,
-once `djangorestframework-services` is this package's DRF adapter. Until then a
-project without DRF dispatches its specs from its own views, commands, tasks
+On that base the package is in three layers. Every subpackage is classified
+into one, and a test fails if core imports anything classified outside it:
+
+- **Core** is what every transport needs to run a spec: the declaration, the
+  [registry](registry.md) and [dispatch](dispatching.md), with authorization
+  always on, because dispatch always authorizes. It is what dispatch and the
+  registry import, and nothing more.
+- **Opt-in modules** are subpackages core never imports: model writes,
+  [relation writes](relations.md) and the [schema](schema.md) projection.
+  Opt-in is a classification, not a switch. No setting turns a module on or
+  off; a spec that uses none of them dispatches without them. The validator
+  adapters for dataclasses, [forms](forms.md) and [pydantic](pydantic.md) sit
+  outside core the same way, as libraries a project writes against.
+- **A transport only wires** a protocol onto specs and dispatch, and belongs in
+  a distribution of its own. The [HTTP views](http.md) and the
+  [management command](commands.md) ship here today and are planned to move
+  out.
+
+**Where the transports stand.**
+[`djangorestframework-services`](https://github.com/Artui/djangorestframework-services)
+depends on this package, never the reverse: its `ServiceSpec` is the DRF
+adapter over this kernel. The family's MCP server and Pydantic AI toolset reach
+specs through it today, so both still require DRF. What they read off a spec
+besides dispatch is here - see [affordances](affordances.md) and
+[paging and projection](paging-and-projection.md) - and transport
+distributions that read kernel specs with no DRF at all are planned. Until then
+a project without DRF dispatches its specs from its own views, commands, tasks
 and agent tools.
 
 ## Install

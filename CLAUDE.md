@@ -19,9 +19,9 @@ Two positions shape everything else, and both read as limitations:
   an agent, a command or a queue. Nothing in `django_service_specs` imports
   `rest_framework`, and nothing in the test environment installs it.
 
-`djangorestframework-services` will depend on this package rather than the
-other way round, with its own `ServiceSpec` becoming the DRF adapter over this
-kernel. Until that release, the two share concepts and no code.
+`djangorestframework-services` depends on this package rather than the other
+way round: its `ServiceSpec` is the DRF adapter over this kernel, and every call
+it serves runs through this package's `dispatch`.
 
 ## Commands
 
@@ -227,7 +227,7 @@ Django's generated migrations.
 | Python | 3.10 | 3.10 through 3.14 |
 | Django | 4.2 | 4.2, 5.0, 5.1, 5.2, 6.0, 6.1 |
 
-Both floors match `djangorestframework-services`, which will depend on this
+Both floors match `djangorestframework-services`, which depends on this
 package. Raising either here raises it there, so a floor change is a decision
 about both packages rather than a tidy-up of one.
 

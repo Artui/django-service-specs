@@ -86,6 +86,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `commands.report`, are gone, though the API reference has listed them
   there since 0.7.0: import them from the root or from `registry`.
   `unguarded_message` stays under `commands`.
+- The docs index states the package's three layers: core, the import
+  closure of dispatch and the registry with authorization always on; opt-in
+  modules, which core never imports and no setting switches; and transports,
+  which only wire. It names `typing_extensions` beside Django as a
+  dependency, says `djangorestframework-services` is the DRF adapter over
+  this kernel, and that the MCP server and Pydantic AI toolset reach specs
+  through it today.
 
 ### Fixed
 - **`clean_held_to_their_columns` leaves the form as it found it.** It took
