@@ -1,8 +1,7 @@
 """Tests for ``paginate_output``.
 
-Ported from the shaper's tests where it was first written, so each case pins
-something that implementation had already learned: the clamps at both ends,
-the count before the slice, and the ``.count`` that is not a count.
+Each case pins a rule a page has to hold: the clamps at both ends, the count
+before the slice, and the ``.count`` that is not a count.
 """
 
 from __future__ import annotations
@@ -33,48 +32,45 @@ def test_the_default_size_is_a_hundred_rows() -> None:
     assert DEFAULT_PAGE_SIZE == 100
 
 
-def test_a_limit_over_the_ceiling_is_clamped_down() -> None:
-    page = paginate_output(ROWS, limit=500, max_page_size=100)
+@pytest.mark.parametrize(
+    ("asked", "expected"),
+    [
+        pytest.param({"limit": 500, "max_page_size": 100}, 100, id="over-the-ceiling-clamps-down"),
+        pytest.param({"limit": 25, "max_page_size": 100}, 25, id="under-the-ceiling-untouched"),
+        pytest.param({"limit": 500}, 500, id="no-ceiling-leaves-a-large-limit-alone"),
+        pytest.param({"max_page_size": 10}, 10, id="the-ceiling-bounds-the-default-size"),
+        # Not refused: a page of no rows is a page nobody can page through.
+        pytest.param({"limit": 0}, 1, id="zero-clamps-up"),
+        pytest.param({"limit": -5}, 1, id="negative-clamps-up"),
+    ],
+)
+def test_the_limit_served(asked: dict[str, int], expected: int) -> None:
+    page = paginate_output(ROWS, **asked)
 
-    assert page.limit == 100
-    assert len(page.items) == 100
-
-
-def test_a_limit_under_the_ceiling_is_untouched() -> None:
-    assert paginate_output(ROWS, limit=25, max_page_size=100).limit == 25
-
-
-def test_no_ceiling_leaves_a_large_limit_alone() -> None:
-    assert paginate_output(ROWS, limit=500).limit == 500
-
-
-def test_the_ceiling_also_bounds_the_default_size() -> None:
-    assert paginate_output(ROWS, max_page_size=10).limit == 10
-
-
-@pytest.mark.parametrize("limit", [0, -5])
-def test_a_limit_below_one_is_clamped_up(limit: int) -> None:
-    """Not refused: a page of no rows is a page nobody can page through."""
-    assert paginate_output(ROWS, limit=limit).limit == 1
+    assert page.limit == expected
+    assert len(page.items) == min(expected, len(ROWS))
 
 
-@pytest.mark.parametrize("page", [0, -3])
-def test_a_page_below_one_is_clamped_up(page: int) -> None:
-    assert paginate_output(ROWS, page=page, limit=10).page == 1
+@pytest.mark.parametrize(
+    ("asked", "expected"),
+    [
+        pytest.param(
+            {"page": 99, "limit": 100},
+            (3, 3, False, ROWS[200:]),
+            id="past-the-end-clamps-to-the-last-that-exists",
+        ),
+        pytest.param({"page": 2, "limit": 100}, (2, 3, True, ROWS[100:200]), id="inside-the-range"),
+        pytest.param(
+            {"page": 3, "limit": 100}, (3, 3, False, ROWS[200:]), id="a-partial-last-page"
+        ),
+        pytest.param({"page": 0, "limit": 10}, (1, 25, True, ROWS[:10]), id="zero-clamps-up"),
+        pytest.param({"page": -3, "limit": 10}, (1, 25, True, ROWS[:10]), id="negative-clamps-up"),
+    ],
+)
+def test_the_page_served(asked: dict[str, int], expected: tuple[Any, ...]) -> None:
+    page = paginate_output(ROWS, **asked)
 
-
-def test_a_page_past_the_end_clamps_to_the_last_one_that_exists() -> None:
-    page = paginate_output(ROWS, page=99, limit=100)
-
-    assert (page.page, page.total_pages, page.has_next) == (3, 3, False)
-    assert page.items == ROWS[200:]
-
-
-def test_a_page_inside_the_range_is_untouched() -> None:
-    page = paginate_output(ROWS, page=2, limit=100)
-
-    assert (page.page, page.has_next) == (2, True)
-    assert page.items == ROWS[100:200]
+    assert (page.page, page.total_pages, page.has_next, page.items) == expected
 
 
 def test_an_empty_result_is_one_empty_page() -> None:
@@ -84,12 +80,6 @@ def test_an_empty_result_is_one_empty_page() -> None:
 
     assert (page.page, page.total, page.total_pages, page.has_next) == (1, 0, 1, False)
     assert list(page.items) == []
-
-
-def test_a_partial_last_page_is_still_the_last_page() -> None:
-    page = paginate_output(ROWS, page=3, limit=100)
-
-    assert (page.total_pages, page.has_next, len(page.items)) == (3, False, 50)
 
 
 @pytest.mark.django_db
@@ -164,7 +154,7 @@ def test_a_manager_is_paged_as_its_queryset() -> None:
 def test_a_manager_built_on_base_manager_is_paged_too() -> None:
     """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
     and ``is_queryset`` counts it like one, so it is paged as its ``.all()`` as
-    well. Testing ``Manager`` counted it and then refused it at the slice."""
+    well."""
     ada = make_user("ada")
     for title in ("a", "b", "c"):
         Note.objects.create(owner=ada, title=title)
@@ -185,8 +175,8 @@ def _five_notes() -> None:
 @pytest.mark.django_db
 @pytest.mark.parametrize("limit", [2**63, 2**70])
 def test_a_limit_past_any_integer_column_serves_every_row(limit: int) -> None:
-    # With no ceiling, the slice's end was the limit itself, and a ``LIMIT``
-    # past 64 bits is refused by the database as ``datatype mismatch``. The
+    # With no ceiling, a slice ending at the limit itself would be a ``LIMIT``
+    # past 64 bits, which the database refuses as ``datatype mismatch``. The
     # page served ends at the rows counted, and the limit reported is the one
     # asked for.
     _five_notes()

@@ -46,14 +46,15 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     is not a row and carries none. The answers are read off the rows as the
     selector's dispatch left them - annotations on a queryset's rows, or the
     answers it attached to rows a selector returned directly - so presenting
-    them costs no query. A spec declaring none presents exactly as before.
+    them costs no query. A spec declaring none presents what its presenter
+    answers, untouched.
 
     **The call's context.** Each value is handed to the presenter's
     ``presented()`` with ``result.context``, the
     [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
-    dispatch built for the call, or ``None`` on a result it did not build. A
-    Presenter that reads nothing of the call is unchanged, since
-    ``presented()`` is ``present()`` unless overridden.
+    dispatch built for the call, or ``None`` on a result it did not build.
+    ``presented()`` is ``present()`` unless overridden, so a Presenter that
+    reads nothing of the call needs only ``present()``.
 
     Raises:
         ValueError: ``kind="not_found"``. Presenting nothing as a success is the
