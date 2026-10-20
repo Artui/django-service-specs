@@ -183,35 +183,37 @@ class TestExtendQueryset:
         assert list(result) == []
 
 
-@pytest.mark.django_db
-class TestNonQuerysetReturn:
-    def test_raises_when_declarative_shaping_is_configured(self) -> None:
-        spec = SelectorSpec(
-            kind=SelectorKind.LIST,
-            selector=_bare_selector,
-            select_related=["content_type"],
-        )
-        with pytest.raises(ImproperlyConfigured, match="not a Django QuerySet"):
-            shape_queryset([{"id": 1}], spec, {}, source_label="ServiceSpec.output_selector_spec")
+def _unchanged(*, queryset: QuerySet[Any]) -> QuerySet[Any]:
+    return queryset
 
-    def test_raises_when_extend_queryset_is_the_only_shaping_declared(self) -> None:
-        """Covers the branch where extend_queryset alone triggers the guard."""
 
-        def extend(*, queryset: QuerySet[Any]) -> QuerySet[Any]:
-            return queryset
-
-        spec = SelectorSpec(kind=SelectorKind.LIST, selector=_bare_selector, extend_queryset=extend)
-        with pytest.raises(ImproperlyConfigured, match="not a Django QuerySet"):
-            shape_queryset("not-a-queryset", spec, {}, source_label="SelectorSpec.selector")
-
-    def test_error_names_the_source_label(self) -> None:
-        spec = SelectorSpec(
-            kind=SelectorKind.LIST,
-            selector=_bare_selector,
-            annotations={"n": Count("id")},
-        )
-        with pytest.raises(ImproperlyConfigured, match="SelectorSpec.selector"):
-            shape_queryset(object(), spec, {}, source_label="SelectorSpec.selector")
+@pytest.mark.parametrize(
+    ("shaping", "returned", "source_label"),
+    [
+        pytest.param(
+            {"select_related": ["content_type"]},
+            [{"id": 1}],
+            "ServiceSpec.output_selector_spec",
+            id="declarative-shaping",
+        ),
+        pytest.param(
+            {"extend_queryset": _unchanged},
+            "not-a-queryset",
+            "SelectorSpec.selector",
+            id="extend-queryset-alone",
+        ),
+        pytest.param(
+            {"annotations": {"n": Count("id")}}, object(), "SelectorSpec.selector", id="annotations"
+        ),
+    ],
+)
+def test_shaping_a_return_that_is_not_a_queryset_is_refused_naming_its_source(
+    shaping: dict[str, Any], returned: Any, source_label: str
+) -> None:
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=_bare_selector, **shaping)
+    with pytest.raises(ImproperlyConfigured, match="not a Django QuerySet") as refused:
+        shape_queryset(returned, spec, {}, source_label=source_label)
+    assert f"{source_label} returned" in str(refused.value)
 
 
 def _titles(rows: Any) -> list[str]:
@@ -225,18 +227,29 @@ def _three_notes() -> Any:
     return ada
 
 
-def _filtered(filter_set: Any, **kwargs: Any) -> SelectorSpec:
+def _notes() -> QuerySet[Note]:
+    return Note.objects.all()
+
+
+async def _async_notes() -> QuerySet[Note]:
+    return Note.objects.all()
+
+
+def _filtered(
+    filter_set: Any,
+    *,
+    selector: Any = _notes,
+    kind: SelectorKind = SelectorKind.LIST,
+    **kwargs: Any,
+) -> SelectorSpec:
+    """An open selector spec of ``kind`` filtered by ``filter_set``, over notes by default."""
     return SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=_notes,
+        kind=kind,
+        selector=selector,
         permissions=[Unrestricted()],
         filter_set=filter_set,
         **kwargs,
     )
-
-
-def _notes() -> QuerySet[Note]:
-    return Note.objects.all()
 
 
 @pytest.mark.django_db
@@ -403,13 +416,7 @@ class TestFilterSetThroughDispatch:
 
     def test_a_retrieve_is_filtered_before_it_collapses_to_its_row(self) -> None:
         ada = _three_notes()
-        spec = SelectorSpec(
-            kind=SelectorKind.RETRIEVE,
-            selector=_notes,
-            permissions=[Unrestricted()],
-            filter_set=TitleFilter,
-            allow_none=True,
-        )
+        spec = _filtered(TitleFilter, kind=SelectorKind.RETRIEVE, allow_none=True)
         result = dispatch(spec, principal=ada, arguments={"title": "other"})
         assert result.value.title == "other"
 
@@ -439,23 +446,15 @@ def test_a_csv_filter_takes_its_values_as_repeated_keys_over_http() -> None:
 
 @pytest.mark.django_db(transaction=True)
 async def test_adispatch_filters_an_async_selector_s_rows() -> None:
-    async def notes() -> QuerySet[Note]:
-        return Note.objects.all()
-
     ada = await sync_to_async(_three_notes)()
-    spec = SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=notes,
-        permissions=[Unrestricted()],
-        filter_set=NoteFilters,
-    )
+    spec = _filtered(NoteFilters, selector=_async_notes)
     result = await adispatch(spec, principal=ada, arguments={"archived": True})
     assert await sync_to_async(_titles)(result.value) == ["final"]
 
 
 @pytest.mark.django_db
 def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http() -> None:
-    # Read through ``float``, 2**53 + 1 became 2**53 and matched the
+    # Read through ``float``, 2**53 + 1 would become 2**53 and match the
     # neighbour's row. A CSV filter's numbers are decimal strings, handed on
     # with every digit they were sent with.
     ada = make_user("ada")
@@ -482,12 +481,7 @@ class _Shelved(django_filters.FilterSet):
 
 
 def _shelved() -> SelectorSpec:
-    return SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=Placement.objects.all,
-        permissions=[Unrestricted()],
-        filter_set=_Shelved,
-    )
+    return _filtered(_Shelved, selector=Placement.objects.all)
 
 
 def _outcome(call: Any) -> Any:
@@ -660,12 +654,7 @@ class TestAFilterValuePastItsColumn:
 
         ada = make_user("ada")
         Book.objects.create(author=BookAuthor.objects.create(name="Ada"), title="t", price=1)
-        spec = SelectorSpec(
-            kind=SelectorKind.LIST,
-            selector=Book.objects.all,
-            permissions=[Unrestricted()],
-            filter_set=Prices,
-        )
+        spec = _filtered(Prices, selector=Book.objects.all)
         rows = dispatch(spec, principal=ada, arguments={"max_price": _PAST_TOP}).value
         assert [book.title for book in rows] == ["t"]
 
@@ -703,16 +692,8 @@ class TestAFilterValuePastItsColumn:
 async def test_adispatch_refuses_a_filter_value_past_its_column(
     filter_set: Any, arguments: dict[str, Any], detail: dict[str, Any]
 ) -> None:
-    async def notes() -> QuerySet[Note]:
-        return Note.objects.all()
-
     ada = await sync_to_async(_three_notes)()
-    spec = SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=notes,
-        permissions=[Unrestricted()],
-        filter_set=filter_set,
-    )
+    spec = _filtered(filter_set, selector=_async_notes)
     with pytest.raises(InvalidArguments) as caught:
         result = await adispatch(spec, principal=ada, arguments=arguments)
         await sync_to_async(list)(result.value)
@@ -720,12 +701,7 @@ async def test_adispatch_refuses_a_filter_value_past_its_column(
 
 
 def _users_filtered(filter_set: Any) -> SelectorSpec:
-    return SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=User.objects.all,
-        permissions=[Unrestricted()],
-        filter_set=filter_set,
-    )
+    return _filtered(filter_set, selector=User.objects.all)
 
 
 @pytest.mark.django_db
@@ -784,7 +760,7 @@ class TestARelatedRowsKeyPastItsColumn:
     """A model choice filter's key past the range of the column its rows are matched on.
 
     Its form field matches the key with a query before the FilterSet has
-    cleaned anything, which handed the key to the driver: ``OverflowError``
+    cleaned anything, which would hand the key to the driver: ``OverflowError``
     for a list on every Django version, and for one key where the backend
     states no range, as Django 4.2's SQLite does. No row holds such a key, so
     it is no choice, refused in the form field's own words.
@@ -851,12 +827,7 @@ async def test_adispatch_refuses_a_related_row_s_key_past_its_column(
         return User.objects.all()
 
     ada = await sync_to_async(make_user)("ada")
-    spec = SelectorSpec(
-        kind=SelectorKind.LIST,
-        selector=users,
-        permissions=[Unrestricted()],
-        filter_set=UserKeyFilters,
-    )
+    spec = _filtered(UserKeyFilters, selector=users)
     with pytest.raises(InvalidArguments) as caught:
         result = await adispatch(spec, principal=ada, arguments=arguments)
         await sync_to_async(list)(result.value)
@@ -910,12 +881,7 @@ class TestANumberInsideSixtyFourBitsIsTheDatabases:
     )
     def test_it_is_answered(self, arguments: dict[str, Any], numbers: list[int]) -> None:
         ada = _two_editions()
-        spec = SelectorSpec(
-            kind=SelectorKind.LIST,
-            selector=_editions,
-            permissions=[Unrestricted()],
-            filter_set=EditionNumberFilters,
-        )
+        spec = _filtered(EditionNumberFilters, selector=_editions)
         assert _numbers(dispatch(spec, principal=ada, arguments=arguments).value) == numbers
 
     @pytest.mark.usefixtures("ranges")
@@ -930,12 +896,7 @@ class TestANumberInsideSixtyFourBitsIsTheDatabases:
         self, arguments: dict[str, Any], detail: dict[str, Any]
     ) -> None:
         ada = _two_editions()
-        spec = SelectorSpec(
-            kind=SelectorKind.LIST,
-            selector=_editions,
-            permissions=[Unrestricted()],
-            filter_set=EditionNumberFilters,
-        )
+        spec = _filtered(EditionNumberFilters, selector=_editions)
         with pytest.raises(InvalidArguments) as caught:
             list(dispatch(spec, principal=ada, arguments=arguments).value)
         assert coded(caught.value.detail) == detail

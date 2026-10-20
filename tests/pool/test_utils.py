@@ -55,12 +55,14 @@ class TestResolveProvider:
         )
 
 
-class TestDeferredProgress:
-    def test_no_provider_leaves_the_transport_s_reporter_as_it_is(self) -> None:
-        transport = Recorder()
-        assert deferred_progress(None, {}, transport=transport) is transport
-        assert deferred_progress(None, {}, transport=None) is None
+@pytest.mark.parametrize("resolve", [deferred_progress, resolve_progress])
+def test_no_provider_leaves_the_transport_s_reporter_as_it_is(resolve: Any) -> None:
+    transport = Recorder()
+    assert resolve(None, {}, transport=transport) is transport
+    assert resolve(None, {}, transport=None) is None
 
+
+class TestDeferredProgress:
     def test_the_provider_is_not_called_until_the_first_report(self) -> None:
         # A call refused before its run never reports, so it never resolves
         # the provider - a task record is not created for a call that was not made.
@@ -113,11 +115,6 @@ class TestDeferredProgress:
 
 
 class TestResolveProgress:
-    def test_no_provider_leaves_the_transport_s_reporter_as_it_is(self) -> None:
-        transport = Recorder()
-        assert resolve_progress(None, {}, transport=transport) is transport
-        assert resolve_progress(None, {}, transport=None) is None
-
     def test_the_provider_is_called_at_once_from_the_pool_and_both_sinks_hear(self) -> None:
         transport, own = Recorder(), Recorder()
         calls: list[Any] = []

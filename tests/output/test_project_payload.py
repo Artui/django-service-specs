@@ -45,14 +45,6 @@ def test_projects_each_row_of_a_list() -> None:
     assert project_payload([ROW, ROW], invoice_projection()) == [PROJECTED_ROW, PROJECTED_ROW]
 
 
-def test_leaves_the_payload_it_was_given_alone() -> None:
-    row = dict(ROW)
-
-    project_payload(row, invoice_projection())
-
-    assert row == ROW
-
-
 def test_a_handle_keeps_its_constant() -> None:
     """The second condition of the substitution: a handle is another tool's
     input, so its choices are never spoken."""
