@@ -20,7 +20,7 @@ from django_service_specs.mutations.utils import (
 )
 from django_service_specs.types.unset import UNSET
 from tests.adapter_app.models import Document, Photo
-from tests.relations_app.models import Author, Timestamped
+from tests.relations_app.models import Author, Tag, Timestamped
 
 
 class _RaisingFK:
@@ -126,6 +126,7 @@ class TestDiffAttrs:
     [
         pytest.param(None, [], id="none"),
         pytest.param([1, 2, 3], [1, 2, 3], id="pks-pass-through"),
+        pytest.param([Tag(pk=5), 6], [5, 6], id="a-row-is-read-as-its-pk"),
     ],
 )
 def test_m2m_target_pks(value: Any, expected: list[Any]) -> None:

@@ -1637,8 +1637,7 @@ def _read_input(
 ) -> tuple[dict[str, RelationSpec], dict[str, Any], dict[str, Any]]:
     """A write's input as its relation specs, each relation's payload, and the row's own values.
 
-    In this order: the declaration is refused before the payload is read, and
-    each relation's payload is popped out of the row before ``filter_input``
+    Each relation's payload is popped out of the row before ``filter_input``
     reads it, so a nested payload never reaches the row's own fields.
     """
     relation_specs = relation_map(relations)
