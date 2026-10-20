@@ -979,49 +979,18 @@ reaches a registry open to every principal is a spec whose checks are all
 <code>UnguardedSpec</code> carrying its name and an <code>UnguardedReason</code>. An entry is judged
 by the spec it compiles to, the one dispatch runs, so a declaration of
 another library's is read through what it compiles to rather than through
-checks of its own. <code>unguarded_message(spec, command_label)</code> is the sentence
-that reports one, naming the command an operator types:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>'refund_order' in manage.py svc authorizes nothing: every permission check it declares is Unrestricted, so any active user named by --as-user may run it.
-</span></code></pre></div>
-<p>Listing <code>"django_service_specs"</code> in <code>INSTALLED_APPS</code> registers a system check
-that prints that sentence for every <code>SpecCommand</code> in the project. It loads
-each command the installed apps serve, Django's own excepted, and keeps the
-<code>SpecCommand</code> ones; with an app label, <code>manage.py check &lt;app_label&gt;</code> loads
-only that app's commands.</p>
-<table>
-<thead>
-<tr>
-<th>Id</th>
-<th>Level</th>
-<th>For</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>django_service_specs.W001</code></td>
-<td>Warning</td>
-<td>One spec that authorizes nothing, with the command class as <code>obj</code></td>
-</tr>
-<tr>
-<td><code>django_service_specs.W003</code></td>
-<td>Warning</td>
-<td>A command that could not be imported or constructed, names no registry, or whose parser could not be built: its specs were not checked</td>
-</tr>
-</tbody>
-</table>
-<p>Both are warnings, never errors: an open spec is a decision or an accident
-the check cannot tell apart, and an error would stop <code>migrate</code> on a project
-working as intended. A command that does not load is reported and skipped
-rather than failing the check, because without the app nothing loads it until
-somebody runs it. <code>SILENCED_SYSTEM_CHECKS</code> silences by id, so silencing
-<code>W001</code> silences it for every spec in the project.</p>
-<p>The check runs wherever Django runs system checks: <code>manage.py check</code>, and
-every <code>manage.py</code> command that keeps <code>requires_system_checks</code>. <code>call_command</code>
-skips them for every command but <code>check</code>.</p>
-<p>Reporting is the whole of it: the check refuses nothing, and neither it nor
-the command is an authorization boundary, since an operator who could be
-refused there has <code>manage.py shell</code>. It makes the declaration visible to
-whoever reads <code>check</code>.</p>
+checks of its own.</p>
+<p>The fact is the registry's, and the sentence reporting it is a transport's,
+since it names the command an operator types, which the registry does not
+know. The management command's <code>--explain</code> and the system check that warns
+once per open spec a command serves, <code>django_spec_cli.W001</code>, are
+<a href="https://artui.github.io/django-spec-cli/#open-specs-explain">django-spec-cli's</a>;
+its check runs when <code>"django_spec_cli"</code> is in <code>INSTALLED_APPS</code>. This package
+registers no system check, so listing <code>"django_service_specs"</code> reports
+nothing.</p>
+<p>Reporting is the whole of it: <code>unguarded_specs</code> refuses nothing, and is no
+authorization boundary. It makes the declaration visible to whoever reads
+the report.</p>
 <h2 id="reading-it">Reading it<a class="headerlink" href="#reading-it" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1082,9 +1051,9 @@ name for it. The registry holds what every transport shares; a variant shaped
 for one transport is the registered spec's own
 <a href="../declaring/#a-variant-of-a-spec"><code>derive(...)</code></a>, in the registry that
 transport is handed:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The command line is handed a registry with the variant under the operation's</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># own name; every other transport keeps reading ``registry``, and the base.</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">command_line_registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">search_only</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># The command line is handed a registry with the variant under the operation's</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># own name; every other transport keeps reading ``registry``, and the base.</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">command_line_registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">search_only</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>search_only</code> is the variant
 <a href="../declaring/#a-variant-of-a-spec">derived from <code>list_notes_spec</code></a>.</p>

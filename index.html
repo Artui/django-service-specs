@@ -854,9 +854,9 @@ into one, and a test fails if core imports anything classified outside it:</p>
   adapters for dataclasses, <a href="forms/">forms</a> and <a href="pydantic/">pydantic</a> sit
   outside core the same way, as libraries a project writes against.</li>
 <li><strong>A transport only wires</strong> a protocol onto specs and dispatch, and belongs in
-  a distribution of its own. The <a href="http/">HTTP views</a> and the
-  <a href="commands/">management command</a> ship here today and are planned to move
-  out.</li>
+  a distribution of its own. The <a href="http/">HTTP views</a> ship here today and are
+  planned to move out; the <a href="commands/">management command</a> has moved to
+  <a href="https://artui.github.io/django-spec-cli/">django-spec-cli</a>.</li>
 </ul>
 <p><strong>Where the transports stand.</strong>
 <a href="https://github.com/Artui/djangorestframework-services"><code>djangorestframework-services</code></a>
@@ -874,9 +874,9 @@ and agent tools.</p>
 <p>The package has no models and needs no entry in <code>INSTALLED_APPS</code>. A principal
 is a user of <code>django.contrib.auth</code>, and a generic-relation write needs
 <code>django.contrib.contenttypes</code>. Listing <code>"django_service_specs"</code> there is
-optional, and adds one system check: every spec a management command serves
-that authorizes nothing is <a href="registry/#open-specs-reported">reported</a> by
-<code>manage.py check</code>.</p>
+optional and adds nothing: the system check reporting every spec a management
+command serves that <a href="registry/#open-specs-reported">authorizes nothing</a> is
+django-spec-cli's.</p>
 <table>
 <thead>
 <tr>
