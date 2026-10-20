@@ -18,6 +18,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.affordances.utils import books_closed
 from tests.dispatch.utils import TENANT_SEEDS, make_user
 from tests.specs.utils import Foreign
 
@@ -106,13 +107,8 @@ class TestTheSeedsAConditionSees:
         assert seen == {"user": ada, "progress": null_progress}
 
 
-async def _books_closed() -> bool:
-    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
-    return False
-
-
 def test_a_condition_answering_with_a_coroutine_is_refused_not_offered() -> None:
-    answer = _books_closed()
+    answer = books_closed()
     spec = ServiceSpec(
         service=print,
         affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
