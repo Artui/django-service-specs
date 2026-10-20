@@ -290,23 +290,32 @@ class TestChoices:
         # The form cleans with ``str``: the string is what it takes and returns.
         assert FormValidator(form_class).validate({"stars": "2"}, CONTEXT) == {"stars": "2"}
 
-    def test_an_option_group_given_as_a_tuple_is_flattened_too(self) -> None:
-        # Django 5.0 and later normalise every group to a list; 4.2 keeps the
-        # tuple it was given, which is the case this holds.
-        form_class = _form(
-            "Shade",
-            shade=forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
-        )
-        assert _declared(form_class) == [
-            ("shade", "string", None, None, ("red", "amber"), True, False)
-        ]
-
-    def test_none_is_dropped_as_the_empty_choice_too(self) -> None:
-        form_class = _form(
-            "Level",
-            level=forms.TypedChoiceField(choices=[(None, "Unknown"), (1, "Low")], coerce=int),
-        )
-        assert _declared(form_class) == [("level", "integer", None, None, (1,), True, False)]
+    @pytest.mark.parametrize(
+        ("field", "declared"),
+        [
+            # Django 5.0 and later normalise every group to a list; 4.2 keeps the
+            # tuple it was given, which is the case this holds.
+            pytest.param(
+                forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
+                ("string", None, None, ("red", "amber"), True, False),
+                id="an-option-group-given-as-a-tuple-is-flattened",
+            ),
+            pytest.param(
+                forms.TypedChoiceField(choices=[(None, "Unknown"), (1, "Low")], coerce=int),
+                ("integer", None, None, (1,), True, False),
+                id="none-is-dropped-as-the-empty-choice",
+            ),
+            pytest.param(
+                forms.TypedChoiceField(choices=[("", "---------")]),
+                ("string", None, None, (), True, False),
+                id="only-the-empty-choice-takes-a-string",
+            ),
+        ],
+    )
+    def test_a_choice_field_s_choices_are_read_as_the_form_reads_them(
+        self, field: forms.Field, declared: tuple[Any, ...]
+    ) -> None:
+        assert _declared(_form("Pick", value=field)) == [("value", *declared)]
 
     @pytest.mark.parametrize(
         ("choices", "json_type"),
@@ -343,10 +352,6 @@ class TestChoices:
             ),
         ):
             FormValidator(_form("Pick", value=forms.TypedChoiceField(choices=choices)))
-
-    def test_a_typed_choice_field_with_only_the_empty_choice_takes_a_string(self) -> None:
-        form_class = _form("Pick", value=forms.TypedChoiceField(choices=[("", "---------")]))
-        assert _declared(form_class) == [("value", "string", None, None, (), True, False)]
 
     @pytest.mark.parametrize("field_class", [forms.ChoiceField, forms.TypedChoiceField])
     def test_a_callable_choice_set_is_not_read(self, field_class: type[forms.Field]) -> None:
@@ -1160,20 +1165,28 @@ class TestChoiceLabels:
         assert labels["author"] is None
         assert labels["name"] is None
 
-    def test_a_plain_choice_field_labels_the_strings_it_compares(self) -> None:
-        form_class = _form("Rating", stars=forms.ChoiceField(choices=[(1, "One"), (2, "Two")]))
-        assert _labels(form_class) == {"stars": (("1", "One"), ("2", "Two"))}
-
-    def test_an_option_group_given_as_a_tuple_is_labelled_too(self) -> None:
-        form_class = _form(
-            "Shade",
-            shade=forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
-        )
-        assert _labels(form_class) == {"shade": (("red", "Red"), ("amber", "Amber"))}
-
-    def test_a_callable_choice_set_has_no_labels_either(self) -> None:
-        form_class = _form("Paint", colour=forms.ChoiceField(choices=lambda: [("red", "Red")]))
-        assert _labels(form_class) == {"colour": None}
+    @pytest.mark.parametrize(
+        ("field", "expected"),
+        [
+            pytest.param(
+                forms.ChoiceField(choices=[(1, "One"), (2, "Two")]),
+                (("1", "One"), ("2", "Two")),
+                id="a-plain-choice-field-labels-the-strings-it-compares",
+            ),
+            pytest.param(
+                forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
+                (("red", "Red"), ("amber", "Amber")),
+                id="an-option-group-given-as-a-tuple",
+            ),
+            pytest.param(
+                forms.ChoiceField(choices=lambda: [("red", "Red")]),
+                None,
+                id="a-callable-choice-set-has-none",
+            ),
+        ],
+    )
+    def test_a_choice_field_s_labels(self, field: forms.Field, expected: Any) -> None:
+        assert _labels(_form("Pick", value=field)) == {"value": expected}
 
     def test_a_label_stays_lazy_until_a_reader_renders_it(self) -> None:
         form_class = _form(
@@ -1611,24 +1624,38 @@ class _CodedForm(forms.Form):
 class TestRefusalCodes:
     """Django's own code on each message, which ``form.errors`` read as strings drops."""
 
-    def test_a_field_s_refusal_keeps_its_code(self) -> None:
-        assert coded(_refusal(_CodedForm, {"count": "x"})) == {
-            "title": [("This field is required.", "required")],
-            "count": [("Enter a whole number.", "invalid")],
-        }
-
-    def test_a_rendered_message_keeps_its_code(self) -> None:
-        # ``max_length``'s message is rendered from its params, as Django renders it.
-        assert coded(_refusal(_CodedForm, {"title": "long"})) == {
-            "title": [
-                ("Ensure this value has at most 3 characters (it has 4).", "max_length"),
-            ]
-        }
-
-    def test_a_form_wide_refusal_keeps_its_code_or_says_invalid(self) -> None:
-        assert coded(_refusal(_CodedForm, {"title": "ok", "count": 13})) == {
-            "non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]
-        }
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            pytest.param(
+                {"count": "x"},
+                {
+                    "title": [("This field is required.", "required")],
+                    "count": [("Enter a whole number.", "invalid")],
+                },
+                id="a-field-s-refusal",
+            ),
+            # ``max_length``'s message is rendered from its params, as Django renders it.
+            pytest.param(
+                {"title": "long"},
+                {
+                    "title": [
+                        ("Ensure this value has at most 3 characters (it has 4).", "max_length")
+                    ]
+                },
+                id="a-rendered-message",
+            ),
+            pytest.param(
+                {"title": "ok", "count": 13},
+                {"non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]},
+                id="a-form-wide-refusal-or-invalid",
+            ),
+        ],
+    )
+    def test_a_refusal_keeps_its_code(
+        self, arguments: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        assert coded(_refusal(_CodedForm, arguments)) == expected
 
     @pytest.mark.django_db
     def test_a_unique_pair_s_refusal_keeps_django_s_code_whole_and_partial(self) -> None:
