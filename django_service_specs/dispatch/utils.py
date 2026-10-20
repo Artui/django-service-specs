@@ -445,7 +445,7 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
     (test_a_declinable_key_stays_required_of_the_caller,
     test_a_declinable_key_stays_the_caller_s). And a
     provider whose return says nothing about its keys relaxes nothing
-    (test_an_untyped_kwargs_provider_relaxes_no_read).
+    (test_a_read_no_typed_provider_fills_stays_required[an-untyped-provider]).
     """
     if isinstance(spec, SelectorSpec):
         return _filled(spec.kwargs, spec.reads)
@@ -939,12 +939,12 @@ def lookup(
     try:
         raw = run_selector(fn, kwargs)
     except (ObjectDoesNotExist, Http404) as error:
-        # Each member and conjunct is held by its own test:
-        # test_a_retrieve_raising_does_not_exist_is_not_found
-        # (``ObjectDoesNotExist``), test_a_retrieve_raising_http404_is_not_found
-        # (``Http404``), test_a_list_raising_does_not_exist_is_a_fault_and_passes_through
-        # (the ``isinstance``), test_a_retrieve_raising_http404_under_allow_none_is_none
-        # (the kind) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
+        # Each member and conjunct is held by its own test. Three are cases of
+        # test_a_retrieve_s_missing_row_is_not_found_or_none_under_allow_none:
+        # ``does-not-exist`` (``ObjectDoesNotExist``), ``http404`` (``Http404``)
+        # and ``http404-allow-none`` (the kind). The others are
+        # test_a_list_raising_does_not_exist_is_a_fault_and_passes_through (the
+        # ``isinstance``) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
         # (``after_the_run``: the write has run, so it is never reported not found).
         if isinstance(error, Http404) and selector_spec.kind is SelectorKind.LIST:
             if after_the_run:

@@ -414,22 +414,23 @@ async def _note_or_404(*, pk: int) -> Note:
     return await sync_to_async(get_object_or_404)(Note, pk=pk)
 
 
-async def test_an_async_retrieve_raising_http404_is_not_found(ada: Any) -> None:
-    spec = SelectorSpec(kind=RETRIEVE, selector=_note_or_404, reads=PK, permissions=OPEN)
-
-    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
-
-    assert result == DispatchResult(kind="not_found")
-
-
-async def test_an_async_retrieve_raising_http404_under_allow_none_is_none(ada: Any) -> None:
+@pytest.mark.parametrize(
+    ("allow_none", "expected"),
+    [
+        pytest.param(False, DispatchResult(kind="not_found"), id="required"),
+        pytest.param(True, DispatchResult(kind="instance", value=None), id="allow-none"),
+    ],
+)
+async def test_an_async_retrieve_raising_http404_is_not_found_or_none_under_allow_none(
+    ada: Any, allow_none: bool, expected: DispatchResult
+) -> None:
     spec = SelectorSpec(
-        kind=RETRIEVE, selector=_note_or_404, reads=PK, permissions=OPEN, allow_none=True
+        kind=RETRIEVE, selector=_note_or_404, reads=PK, permissions=OPEN, allow_none=allow_none
     )
 
     result = await adispatch(spec, principal=ada, arguments={"pk": 404})
 
-    assert (result.kind, result.value) == ("instance", None)
+    assert result == expected
 
 
 @pytest.mark.parametrize("kind", [RETRIEVE, LIST])
