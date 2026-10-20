@@ -83,7 +83,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `django_service_specs` itself, so a root import is unchanged; the module
   paths `django_service_specs.commands.report.unguarded_specs` and
   `...unguarded_spec`, and the two names on `django_service_specs.commands`
-  and `commands.report`, are gone. `unguarded_message` stays under `commands`.
+  and `commands.report`, are gone, though the API reference has listed them
+  there since 0.7.0: import them from the root or from `registry`.
+  `unguarded_message` stays under `commands`.
 
 ### Fixed
 - **`clean_held_to_their_columns` leaves the form as it found it.** It took
