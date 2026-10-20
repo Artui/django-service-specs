@@ -9,6 +9,7 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.types.is_async import is_async
 from django_service_specs.types.utils import PER_CALL_POOL_NAMES, is_row_condition
 
 
@@ -95,9 +96,10 @@ class Affordance:
     def __post_init__(self) -> None:
         for field_name in ("code", "reason"):
             value: Any = getattr(self, field_name)
-            # Two disjuncts, each held in tests/types/test_affordance.py:
-            # ``test_a_non_string_is_refused`` fails without the first, and
-            # ``test_an_empty_string_is_refused`` without the second.
+            # Two disjuncts, each held in tests/types/test_affordance.py's
+            # ``test_anything_but_a_non_empty_string_is_refused``: its
+            # ``non-string`` cases fail without the first, and its
+            # ``empty-string`` cases without the second.
             if not isinstance(value, str) or not value:
                 raise ImproperlyConfigured(
                     f"Affordance.{field_name} must be a non-empty string; got {value!r}."
@@ -130,27 +132,21 @@ def _refuse_async(code: str, when: Callable[..., Any]) -> None:
     answer is read, ``affordances/utils.py`` refuses it at every call; here it
     is refused once, when the operation is declared, naming the affordance.
 
-    Inline rather than through ``types/is_async.py``: that predicate answers
-    whether a call produces a coroutine, and an async generator function's
-    call does not, so it would let one through. What this cannot see - a
-    plain ``def`` that hands back a coroutine, a decorated ``async def`` - is
-    still refused where the answer is read.
+    ``is_async`` answers whether a call produces a coroutine, and an async
+    generator function's call does not, so the generator is asked about on
+    its own. What this cannot see - a plain ``def`` that hands back a
+    coroutine, a decorated ``async def`` - is still refused where the answer
+    is read.
 
     Three disjuncts, each held in ``tests/types/test_affordance.py``'s
     ``TestAnAsyncCondition``: ``test_an_async_def_is_refused`` fails without
-    the first, ``test_an_object_whose_call_is_async_is_refused`` without the
-    second, and ``test_an_async_generator_function_is_refused`` without the
-    third, since an async generator's answer is not awaitable and is truthy
-    too.
+    ``is_async``'s coroutine-function check,
+    ``test_an_object_whose_call_is_async_is_refused`` without its class-level
+    ``__call__`` one, and ``test_an_async_generator_function_is_refused``
+    without the generator check here, since an async generator's answer is
+    not awaitable and is truthy too.
     """
-    # ``B004`` does not apply: this reads the class-level ``__call__`` to find
-    # one that is ``async def``, not to test callability.
-    type_call: Any = getattr(type(when), "__call__", None)  # noqa: B004
-    if (
-        inspect.iscoroutinefunction(when)
-        or inspect.iscoroutinefunction(type_call)
-        or inspect.isasyncgenfunction(when)
-    ):
+    if is_async(when) or inspect.isasyncgenfunction(when):
         name = getattr(when, "__qualname__", None) or type(when).__name__
         raise ImproperlyConfigured(
             f"Affordance {code!r}: `when` is an async callable ({name}). A condition is "
