@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instance of each refusal, with `unanswered=` naming its fallback - and
   returns one sentence per finding, so a transport asserts `== ()` from its
   own suite. Three findings: a refusal nothing answers; a base answered
-  nowhere while every refusal under it is, since both bases are raised bare;
+  nowhere while every refusal under it is, since either base may be raised bare;
   and, for a table, a row below a row of its own base, which never answers.
   Each transport keeps its own vocabulary: an exit code, a status and a run
   state stay its own.

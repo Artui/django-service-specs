@@ -63,7 +63,8 @@ def unanswered_refusals(
       call, answers.
     - ``nothing in the map answers DispatchError itself, though it answers
       every refusal under it, and DispatchError may be raised bare``: the map
-      looks complete and is not. Both family bases are raised bare, and
+      looks complete and is not. Either family base may be raised bare: the
+      kernel raises neither itself, but a project's own code may, and
       ``ServiceConflict`` is a base too.
     - ``the row for ServiceConflict never answers: the row for ServiceError
       above it answers every ServiceConflict first``: the precedence trap of

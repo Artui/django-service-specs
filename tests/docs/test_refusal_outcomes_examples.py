@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from django_service_specs import (
     ActionUnavailable,
     DispatchError,
@@ -14,6 +16,8 @@ from django_service_specs import (
     unanswered_refusals,
 )
 from docs.examples import refusal_outcomes
+
+PAGE = (Path(__file__).resolve().parents[2] / "docs" / "dispatching.md").read_text()
 
 
 def test_the_example_s_own_test_passes() -> None:
@@ -30,10 +34,12 @@ def test_each_refusal_takes_its_nearest_listed_base_s_outcome() -> None:
 
 def test_the_bare_base_finding_the_page_quotes() -> None:
     rows = tuple(row for row in refusal_outcomes.OUTCOMES if row[0] is not DispatchError)
-    assert unanswered_refusals((*rows, (InvalidArguments, "invalid"))) == (
+    (found,) = unanswered_refusals((*rows, (InvalidArguments, "invalid")))
+    assert found == (
         "nothing in the map answers DispatchError itself, though it answers every refusal "
-        "under it, and DispatchError may be raised bare",
+        "under it, and DispatchError may be raised bare"
     )
+    assert f"\n{found}\n" in PAGE
 
 
 def test_the_precedence_finding_the_page_quotes() -> None:
@@ -44,7 +50,9 @@ def test_the_precedence_finding_the_page_quotes() -> None:
         (ServiceError, "refused"),
         (ServiceConflict, "conflict"),
     )
-    assert unanswered_refusals(rows) == (
+    (found,) = unanswered_refusals(rows)
+    assert found == (
         "the row for ServiceConflict never answers: the row for ServiceError above it "
-        "answers every ServiceConflict first",
+        "answers every ServiceConflict first"
     )
+    assert f"\n{found}\n" in PAGE

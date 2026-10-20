@@ -663,9 +663,10 @@ its keys as ordered rows would let a base answer for a subclass the lookup
 never reaches.
 
 Two traps make a map look complete when it is not, and each has its own
-finding. **Both bases are raised bare**: a `DispatchError` or a `ServiceError`
-that is neither subclass reaches a transport too, so a map with a row for every
-refusal under a base and none for the base leaves it unanswered:
+finding. **Either base may be raised bare**: the kernel raises neither a plain
+`DispatchError` nor a plain `ServiceError` itself, but both are public classes a
+project's own code may raise, so a map with a row for every refusal under a
+base and none for the base leaves it unanswered:
 
 ```text
 nothing in the map answers DispatchError itself, though it answers every refusal under it, and DispatchError may be raised bare
