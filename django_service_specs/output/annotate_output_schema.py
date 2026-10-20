@@ -375,9 +375,9 @@ def _is_listed(value: Any, listed: list[Any]) -> bool:
     served it.
     """
     # One branch to coverage, so each condition is held by its own test:
-    # test_an_enum_is_restated_in_its_display_values (the first: two displays
-    # that differ) and test_a_boolean_is_not_the_number_python_says_it_equals
-    # (the second).
+    # test_a_choice_schema_is_restated_in_its_displays[enum] (the first: two
+    # displays that differ) and
+    # test_a_boolean_is_not_the_number_python_says_it_equals (the second).
     return any(
         value == seen and isinstance(value, bool) is isinstance(seen, bool) for seen in listed
     )

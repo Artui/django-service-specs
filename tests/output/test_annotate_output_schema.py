@@ -27,6 +27,13 @@ def annotate(schema: dict[str, Any], projection: AudienceProjection, **kwargs: A
     return annotate_output_schema(schema, projection, **kwargs)
 
 
+def spoken(subschema: dict[str, Any], labels: dict[Any, str] = LABELS) -> Any:
+    """``subschema`` as a property whose choices ``labels`` speaks, annotated."""
+    schema = {"type": "object", "properties": {"p": subschema}}
+    projection = AudienceProjection(choice_labels={"p": labels})
+    return annotate(schema, projection)["properties"]["p"]
+
+
 def test_mirrors_the_payload_projection_at_every_depth() -> None:
     schema = output_schema(INVOICE)
 
@@ -142,17 +149,38 @@ class TestDescriptions:
 
 
 class TestChoices:
-    def test_an_enum_is_restated_in_its_display_values(self) -> None:
-        schema = {
-            "type": "object",
-            "properties": {"s": {"type": "string", "enum": ["PENDING_REVIEW", "X"]}},
-        }
-        projection = AudienceProjection(choice_labels={"s": LABELS})
-
-        assert annotate(schema, projection)["properties"]["s"] == {
-            "type": "string",
-            "enum": ["Awaiting review", "X"],
-        }
+    @pytest.mark.parametrize(
+        ("subschema", "expected"),
+        [
+            pytest.param(
+                {"type": "string", "enum": ["PENDING_REVIEW", "X"]},
+                {"type": "string", "enum": ["Awaiting review", "X"]},
+                id="enum",
+            ),
+            # The shape an ``X | None`` reaches a schema in from elsewhere: each
+            # member is rewritten, and the null one passes through.
+            pytest.param(
+                {"anyOf": [{"enum": ["PENDING_REVIEW"]}, {"type": "null"}]},
+                {"anyOf": [{"enum": ["Awaiting review"]}, {"type": "null"}]},
+                id="union-member-by-member",
+            ),
+            pytest.param(
+                {"oneOf": [{"const": "PENDING_REVIEW", "title": "x"}, {"type": "null"}]},
+                {"oneOf": [{"const": "Awaiting review"}, {"type": "null"}]},
+                id="one-of-member-with-no-constant-passes-through",
+            ),
+            pytest.param(
+                {"oneOf": [{"type": "null"}, {"const": "PENDING_REVIEW", "title": "x"}]},
+                {"oneOf": [{"type": "null"}, {"const": "Awaiting review"}]},
+                id="one-of-member-with-no-constant-keeps-its-place",
+            ),
+            pytest.param({"type": "string"}, {"type": "string"}, id="no-choice-keyword"),
+        ],
+    )
+    def test_a_choice_schema_is_restated_in_its_displays(
+        self, subschema: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        assert spoken(subschema) == expected
 
     def test_a_handle_keeps_its_constants(self) -> None:
         """The first condition of the substitution."""
@@ -172,42 +200,6 @@ class TestChoices:
 
         assert annotate(schema, projection)["properties"]["t"] == subschema
 
-    def test_a_union_is_restated_member_by_member(self) -> None:
-        """The shape an ``X | None`` reaches a schema in from elsewhere: each
-        member is rewritten, and the null one passes through."""
-        subschema = {"anyOf": [{"enum": ["PENDING_REVIEW"]}, {"type": "null"}]}
-        schema = {"type": "object", "properties": {"s": subschema}}
-        projection = AudienceProjection(choice_labels={"s": LABELS})
-
-        assert annotate(schema, projection)["properties"]["s"] == {
-            "anyOf": [{"enum": ["Awaiting review"]}, {"type": "null"}]
-        }
-
-    def test_a_one_of_member_with_no_constant_passes_through(self) -> None:
-        subschema = {"oneOf": [{"const": "PENDING_REVIEW", "title": "x"}, {"type": "null"}]}
-        schema = {"type": "object", "properties": {"s": subschema}}
-        projection = AudienceProjection(choice_labels={"s": LABELS})
-
-        assert annotate(schema, projection)["properties"]["s"] == {
-            "oneOf": [{"const": "Awaiting review"}, {"type": "null"}]
-        }
-
-    def test_a_one_of_member_with_no_constant_keeps_its_place(self) -> None:
-        subschema = {"oneOf": [{"type": "null"}, {"const": "PENDING_REVIEW", "title": "x"}]}
-        schema = {"type": "object", "properties": {"s": subschema}}
-        projection = AudienceProjection(choice_labels={"s": LABELS})
-
-        assert annotate(schema, projection)["properties"]["s"] == {
-            "oneOf": [{"type": "null"}, {"const": "Awaiting review"}]
-        }
-
-    def test_a_schema_with_no_choice_keyword_is_left_alone(self) -> None:
-        subschema = {"type": "string"}
-        schema = {"type": "object", "properties": {"s": subschema}}
-        projection = AudienceProjection(choice_labels={"s": LABELS})
-
-        assert annotate(schema, projection)["properties"]["s"] == subschema
-
 
 class TestRestatedType:
     """A display is a string, so a stated type follows the values it now describes.
@@ -216,14 +208,8 @@ class TestRestatedType:
     integer, and the projected payload fails the projected schema.
     """
 
-    @staticmethod
-    def spoken(subschema: dict[str, Any], labels: dict[Any, str] = LABELS) -> Any:
-        schema = {"type": "object", "properties": {"p": subschema}}
-        projection = AudienceProjection(choice_labels={"p": labels})
-        return annotate(schema, projection)["properties"]["p"]
-
     def test_an_integer_spoken_whole_is_a_string(self) -> None:
-        assert self.spoken({"type": "integer", "oneOf": [{"const": 1, "title": "Low"}]}) == {
+        assert spoken({"type": "integer", "oneOf": [{"const": 1, "title": "Low"}]}) == {
             "type": "string",
             "oneOf": [{"const": "Low"}],
         }
@@ -231,7 +217,7 @@ class TestRestatedType:
     def test_a_nullable_integer_keeps_its_null(self) -> None:
         subschema = {"type": ["integer", "null"], "oneOf": [{"const": 1}, {"const": None}]}
 
-        assert self.spoken(subschema) == {
+        assert spoken(subschema) == {
             "type": ["string", "null"],
             "oneOf": [{"const": "Low"}, {"const": None}],
         }
@@ -239,7 +225,7 @@ class TestRestatedType:
     def test_null_is_stated_last_wherever_it_was_listed(self) -> None:
         subschema = {"type": ["null", "integer"], "enum": [None, 1]}
 
-        assert self.spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
+        assert spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
 
     def test_null_is_kept_where_the_stated_type_admitted_it(self) -> None:
         """Here the null is admitted by an entry with no constant rather than
@@ -250,7 +236,7 @@ class TestRestatedType:
             "oneOf": [{"const": 1, "title": "Low"}, {"type": "null"}],
         }
 
-        assert self.spoken(subschema)["type"] == ["string", "null"]
+        assert spoken(subschema)["type"] == ["string", "null"]
 
     def test_a_null_spoken_as_a_label_is_not_named(self) -> None:
         """Django's ``(None, "Unknown")``: the stated type admitted a null, and
@@ -261,7 +247,7 @@ class TestRestatedType:
             "oneOf": [{"const": 1, "title": "Low"}, {"const": None, "title": "Unknown"}],
         }
 
-        assert self.spoken(subschema, {**LABELS, None: "Unknown"}) == {
+        assert spoken(subschema, {**LABELS, None: "Unknown"}) == {
             "type": "string",
             "oneOf": [{"const": "Low"}, {"const": "Unknown"}],
         }
@@ -271,19 +257,19 @@ class TestRestatedType:
         naming it is."""
         subschema = {"type": "null", "enum": [None, 1]}
 
-        assert self.spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
+        assert spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
 
     def test_a_type_that_refused_null_still_refuses_it(self) -> None:
         """The restated type admits what the stated one did, in display terms,
         and nothing more: a ``None`` the type refused was never served."""
         subschema = {"type": "integer", "enum": [1, None]}
 
-        assert self.spoken(subschema) == {"type": "string", "enum": ["Low", None]}
+        assert spoken(subschema) == {"type": "string", "enum": ["Low", None]}
 
     def test_a_value_left_unspoken_keeps_its_type_beside_the_string(self) -> None:
         subschema = {"type": "integer", "enum": [1, 2]}
 
-        assert self.spoken(subschema) == {"type": ["string", "integer"], "enum": ["Low", 2]}
+        assert spoken(subschema) == {"type": ["string", "integer"], "enum": ["Low", 2]}
 
     @pytest.mark.parametrize(
         ("value", "expected"),
@@ -292,32 +278,32 @@ class TestRestatedType:
     def test_each_json_type_is_named_as_json_names_it(self, value: Any, expected: str) -> None:
         subschema = {"type": "string", "enum": [value]}
 
-        assert self.spoken(subschema, {"other": "Other"})["type"] == expected
+        assert spoken(subschema, {"other": "Other"})["type"] == expected
 
     def test_a_value_json_has_no_scalar_type_for_leaves_the_type_as_stated(self) -> None:
         """Only a type it can name is restated; anything else is left as written."""
         subschema = {"type": "array", "enum": [(1, 2)]}
 
-        assert self.spoken(subschema) == subschema
+        assert spoken(subschema) == subschema
 
     def test_only_a_null_left_to_type_leaves_the_type_as_stated(self) -> None:
         """Nothing but ``None`` is listed and the stated type refused it, so
         there is no type to restate it as."""
         subschema = {"type": "integer", "enum": [None]}
 
-        assert self.spoken(subschema) == subschema
+        assert spoken(subschema) == subschema
 
     def test_a_one_of_with_no_constant_keeps_its_type(self) -> None:
         subschema = {"type": ["string", "null"], "oneOf": [{"pattern": "^a"}]}
 
-        assert self.spoken(subschema) == subschema
+        assert spoken(subschema) == subschema
 
     def test_a_choice_listing_nothing_keeps_its_type(self) -> None:
         """Nothing listed to restate the type from. Nullable, so that restating
         it from nothing would leave ``"null"`` alone in place of the type."""
         subschema = {"type": ["string", "null"], "enum": []}
 
-        assert self.spoken(subschema) == subschema
+        assert spoken(subschema) == subschema
 
     def test_an_entry_admitting_more_than_its_constants_keeps_the_type(self) -> None:
         """An entry with no ``const`` admits values the displays say nothing
@@ -332,14 +318,14 @@ class TestRestatedType:
             "oneOf": [{"const": 1, "title": "Low"}, {"minimum": 5}],
         }
 
-        assert self.spoken(subschema) == {
+        assert spoken(subschema) == {
             "type": ["integer", "null"],
             "oneOf": [{"const": "Low"}, {"minimum": 5}],
         }
 
     def test_an_untyped_choice_states_no_type(self) -> None:
         """Nothing was claimed, so there is nothing to contradict."""
-        assert self.spoken({"enum": [1]}) == {"enum": ["Low"]}
+        assert spoken({"enum": [1]}) == {"enum": ["Low"]}
 
 
 class TestServedNull:
