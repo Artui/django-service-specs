@@ -3,11 +3,11 @@
 ``UNSET`` means "field omitted from input" everywhere else in the library, and
 :func:`filter_input` drops it before anything is assigned. The match-key reads
 happen *before* that, so a partial-input dataclass -- a documented input shape,
-and the whole reason the sentinel exists -- used to have its sentinel read as if
-it were a key. Every kind that matches by key is covered here, because the same
-omission was fatal for most combinations and accidentally harmless for one: a
-non-pk ``match_key`` on an owned collection missed the ``existing_by_key`` lookup
-and fell through to the create branch, arriving at the right answer for the
+and the whole reason the sentinel exists -- must not have its sentinel read as if
+it were a key. Every kind that matches by key is covered here, because reading it
+as one is fatal for most combinations and accidentally harmless for one: a
+non-pk ``match_key`` on an owned collection misses the ``existing_by_key`` lookup
+and falls through to the create branch, arriving at the right answer for the
 wrong reason.
 """
 
@@ -59,6 +59,11 @@ class AttachmentIn:
 @pytest.mark.django_db
 class TestAnOwnedCollectionCreatesTheRow:
     def test_a_child_with_an_unset_pk_is_created(self) -> None:
+        """The primary-key guard reads the sentinel as absent and lets the row through.
+
+        Its own message says "omit the identifier to create a new one", which
+        is exactly what the caller has done.
+        """
         catalog = Catalog.objects.create(name="c")
 
         result = update_from_input(
@@ -89,7 +94,7 @@ class TestAnOwnedCollectionCreatesTheRow:
         ]
 
     def test_a_non_pk_match_key_is_created_for_the_right_reason(self) -> None:
-        """Row 5 of the report: right before the fix, but by falling through."""
+        """The combination a misread sentinel leaves harmless, by falling through."""
         catalog = Catalog.objects.create(name="c")
 
         @dataclass
@@ -134,7 +139,7 @@ class TestAnOwnedCollectionCreatesTheRow:
 @pytest.mark.django_db
 class TestAScopedTargetCreatesTheRow:
     def test_a_scoped_forward_target_is_created(self) -> None:
-        """Row 2: the sentinel used to reach the queryset as an integer lookup."""
+        """The sentinel must not reach the queryset as an integer lookup."""
         result = create_from_input(
             Post,
             {"title": "t", "author": AuthorIn(name="a")},
@@ -145,10 +150,10 @@ class TestAScopedTargetCreatesTheRow:
         assert Author.objects.get().name == "a"
 
     def test_an_unscoped_forward_target_is_created(self) -> None:
-        """Row 3: a payload carrying no key must not read as one that does.
+        """A payload carrying no key must not read as one that does.
 
         The unscoped guard exists for a row that *names* a target. A sentinel
-        naming nothing used to trip it, so an omitted optional key raised
+        naming nothing that tripped it would make an omitted optional key raise
         ``ImproperlyConfigured`` -- an unhandled error telling the author to declare a
         ``scope=`` their create-only spec does not need.
         """
@@ -161,7 +166,7 @@ class TestAScopedTargetCreatesTheRow:
         assert result.instance.author == Author.objects.get()
 
     def test_a_natural_match_key_is_created(self) -> None:
-        """Row 4: a ``CharField`` key coerced the sentinel to the string "UNSET"."""
+        """A ``CharField`` key must not coerce the sentinel to the string "UNSET"."""
 
         @dataclass
         class ByName:
@@ -199,25 +204,9 @@ class TestAScopedTargetCreatesTheRow:
 
 
 @pytest.mark.django_db
-class TestThePrimaryKeyGuardReadsTheSentinelAsAbsent:
-    def test_an_unset_pk_does_not_trip_the_guard(self) -> None:
-        """Row 1: the guard refused a payload that carried no primary key.
-
-        Its own message said "omit the identifier to create a new one", which
-        is exactly what the caller had done.
-        """
-        catalog = Catalog.objects.create(name="c")
-
-        result = update_from_input(
-            catalog,
-            {"sections": [SectionIn(title="s")]},
-            relations={"sections": ChildSpec(model=Section, fk="catalog")},
-        )
-
-        assert [change.created for change in result.children] == [(Section.objects.get().pk,)]
-
+class TestThePrimaryKeyGuardStillRefusesARealKey:
     def test_a_real_unmatched_pk_is_still_refused(self) -> None:
-        """The guard's actual job is untouched."""
+        """A real key that matched nothing is what the guard refuses."""
         catalog = Catalog.objects.create(name="c")
         stranger = Section.objects.create(catalog=Catalog.objects.create(name="other"), title="s")
 

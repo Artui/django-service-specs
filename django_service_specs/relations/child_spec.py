@@ -167,19 +167,7 @@ class ChildSpec(RelationSpec):
         )
         validate_relation_mode(self.mode, label="ChildSpec")
         validate_relation_orphan(self.orphan, delete_service=self.delete_service, label="ChildSpec")
-        validate_relation_services(
-            label="ChildSpec",
-            services={
-                "create_service": self.create_service,
-                "update_service": self.update_service,
-            },
-            shaping={
-                "field_map": self.field_map,
-                "exclude_fields": self.exclude_fields,
-                "m2m": self.m2m,
-                "relations": self.relations,
-            },
-        )
+        validate_relation_services(self, label="ChildSpec")
 
 
 __all__ = ["ChildSpec"]
