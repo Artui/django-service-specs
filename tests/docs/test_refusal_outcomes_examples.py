@@ -6,6 +6,7 @@ from pathlib import Path
 
 from django_service_specs import (
     ActionUnavailable,
+    AdditionalInputRequired,
     DispatchError,
     InvalidArguments,
     NotPermitted,
@@ -20,8 +21,18 @@ from docs.examples import refusal_outcomes
 PAGE = (Path(__file__).resolve().parents[2] / "docs" / "dispatching.md").read_text()
 
 
-def test_the_example_s_own_test_passes() -> None:
+def test_the_example_s_own_tests_pass() -> None:
     refusal_outcomes.test_every_refusal_has_an_outcome()
+    refusal_outcomes.test_the_queue_leaves_one_refusal_unanswered_on_purpose()
+
+
+def test_the_gap_left_on_purpose_is_the_one_found() -> None:
+    # So the example's filter has something to remove: a row whose outcome is
+    # the unanswered value answers nothing, though a later row's base would.
+    found = unanswered_refusals(refusal_outcomes.NO_QUESTIONS, unanswered="failed")
+    assert [(finding.refusal, finding.kind) for finding in found] == [
+        (AdditionalInputRequired, "unanswered")
+    ]
 
 
 def test_each_refusal_takes_its_nearest_listed_base_s_outcome() -> None:
@@ -35,7 +46,7 @@ def test_each_refusal_takes_its_nearest_listed_base_s_outcome() -> None:
 def test_the_bare_base_finding_the_page_quotes() -> None:
     rows = tuple(row for row in refusal_outcomes.OUTCOMES if row[0] is not DispatchError)
     (found,) = unanswered_refusals((*rows, (InvalidArguments, "invalid")))
-    assert found == (
+    assert str(found) == (
         "nothing in the map answers DispatchError itself, though it answers every refusal "
         "under it, and DispatchError may be raised bare"
     )
@@ -51,7 +62,7 @@ def test_the_precedence_finding_the_page_quotes() -> None:
         (ServiceConflict, "conflict"),
     )
     (found,) = unanswered_refusals(rows)
-    assert found == (
+    assert str(found) == (
         "the row for ServiceConflict never answers: the row for ServiceError above it "
         "answers every ServiceConflict first"
     )

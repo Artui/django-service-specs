@@ -150,6 +150,8 @@ from django_service_specs.types.no_input import NoInput
 from django_service_specs.types.output_page import OutputPage
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.provider_keys import ProviderKeys
+from django_service_specs.types.refusal_finding import RefusalFinding
+from django_service_specs.types.refusal_finding_kind import RefusalFindingKind
 from django_service_specs.types.relation_mode import RelationMode
 from django_service_specs.types.relation_orphan import RelationOrphan
 from django_service_specs.types.relation_outcome import RelationOutcome
@@ -213,6 +215,8 @@ __all__ = [
     "PrincipalUnavailable",
     "ProgressReporter",
     "ProviderKeys",
+    "RefusalFinding",
+    "RefusalFindingKind",
     "RegisteredSpec",
     "RelatedObjectChange",
     "RelationMode",

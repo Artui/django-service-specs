@@ -1,9 +1,13 @@
-"""Each message names the input that produced it, and only that one.
+"""Each finding names the input that produced it, and only that one.
 
 Three findings can answer one map, so every test here is sized to raise
 exactly one kind, asserts the whole tuple that came back, and asserts the
-other kinds' wording is absent: a bare base and a whole family missing both
-leave the base unanswered, and only one of them is the bare-base trap.
+other kinds are absent: a bare base and a whole family missing both leave the
+base unanswered, and only one of them is the bare-base trap.
+
+No name this module's subject returns is imported, so each test runs against a
+tree that returned sentences and fails at the field it reads rather than at
+import.
 """
 
 from __future__ import annotations
@@ -33,35 +37,39 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.exit_code import ExitCode
 
-# Each kind's own words, for the negative assertions.
-BARE = "may be raised bare"
-SHADOWED = "never answers"
-UNANSWERED = "nothing in the map answers"
+# Each kind's value, for the negative assertions. A plain string compares
+# equal to its ``RefusalFindingKind`` member, which ``str`` subclasses.
+BARE = "bare_base"
+SHADOWED = "shadowed_row"
+UNANSWERED = "unanswered"
+
+Fact = tuple[type[BaseException], str, type[BaseException] | None]
 
 
-def _unanswered(name: str) -> str:
-    return f"nothing in the map answers {name}"
+def _unanswered(kind: type[BaseException]) -> Fact:
+    return (kind, UNANSWERED, None)
 
 
-def _bare(name: str) -> str:
-    return (
-        f"nothing in the map answers {name} itself, though it answers every refusal "
-        f"under it, and {name} may be raised bare"
-    )
+def _bare(kind: type[BaseException]) -> Fact:
+    return (kind, BARE, None)
 
 
-def _shadowed(row: str, above: str) -> str:
-    return (
-        f"the row for {row} never answers: the row for {above} above it answers every {row} first"
-    )
+def _shadowed(row: type[BaseException], above: type[BaseException]) -> Fact:
+    return (row, SHADOWED, above)
+
+
+def _facts(found: tuple[Any, ...]) -> tuple[Fact, ...]:
+    # Read through the finding's fields, so the comparison is with what a
+    # transport filters by and never with the words.
+    return tuple((finding.refusal, finding.kind, finding.shadowed_by) for finding in found)
 
 
 def _rows(*kinds: type[BaseException]) -> tuple[tuple[type[BaseException], str], ...]:
     return tuple((kind, kind.__name__) for kind in kinds)
 
 
-def _without(found: tuple[str, ...], *words: str) -> bool:
-    return not any(word in message for message in found for word in words)
+def _without(found: tuple[Any, ...], *kinds: str) -> bool:
+    return not any(finding.kind in kinds for finding in found)
 
 
 class TestAnOrderedMap:
@@ -82,13 +90,13 @@ class TestAnOrderedMap:
         # refusals under each are missing too, so the map does not look
         # complete. Holds the second conjunct of the bare-base guard.
         found = unanswered_refusals(_rows(DispatchError))
-        assert found == (
-            _unanswered("ServiceError"),
-            _unanswered("ServiceNotFound"),
-            _unanswered("ServiceConflict"),
-            _unanswered("ActionUnavailable"),
-            _unanswered("AdditionalInputRequired"),
-            _unanswered("ServiceValidationError"),
+        assert _facts(found) == (
+            _unanswered(ServiceError),
+            _unanswered(ServiceNotFound),
+            _unanswered(ServiceConflict),
+            _unanswered(ActionUnavailable),
+            _unanswered(AdditionalInputRequired),
+            _unanswered(ServiceValidationError),
         )
         assert _without(found, BARE, SHADOWED)
 
@@ -106,9 +114,7 @@ class TestAnOrderedMap:
         def answer(error: DispatchError | ServiceError) -> object:
             return next((outcome for kind, outcome in rows if isinstance(error, kind)), None)
 
-        assert [str(finding) for finding in unanswered_refusals(rows)] == [
-            _unanswered("NotPermitted")
-        ]
+        assert _facts(unanswered_refusals(rows)) == (_unanswered(NotPermitted),)
         assert unanswered_refusals(rows) == unanswered_refusals(answer)
 
     def test_the_first_matching_row_answers_even_when_it_answers_unanswered(self) -> None:
@@ -122,15 +128,15 @@ class TestAnOrderedMap:
             (ServiceConflict, "conflict"),
         )
         found = unanswered_refusals(rows, unanswered="unanswered")
-        assert [str(finding) for finding in found] == [
-            _unanswered("ServiceError"),
-            _unanswered("ServiceNotFound"),
-            _unanswered("ServiceConflict"),
-            _unanswered("ActionUnavailable"),
-            _unanswered("AdditionalInputRequired"),
-            _unanswered("ServiceValidationError"),
-            _shadowed("ServiceConflict", "ServiceError"),
-        ]
+        assert _facts(found) == (
+            _unanswered(ServiceError),
+            _unanswered(ServiceNotFound),
+            _unanswered(ServiceConflict),
+            _unanswered(ActionUnavailable),
+            _unanswered(AdditionalInputRequired),
+            _unanswered(ServiceValidationError),
+            _shadowed(ServiceConflict, ServiceError),
+        )
 
 
 class TestTheBareBaseTrap:
@@ -138,7 +144,7 @@ class TestTheBareBaseTrap:
         found = unanswered_refusals(
             _rows(InvalidArguments, NotPermitted, PrincipalUnavailable, ServiceError)
         )
-        assert found == (_bare("DispatchError"),)
+        assert _facts(found) == (_bare(DispatchError),)
         assert _without(found, SHADOWED)
 
     def test_a_map_answering_every_service_refusal_but_the_base_is_told_so(self) -> None:
@@ -150,7 +156,7 @@ class TestTheBareBaseTrap:
             ServiceValidationError,
         )
         found = unanswered_refusals(rows)
-        assert found == (_bare("ServiceError"),)
+        assert _facts(found) == (_bare(ServiceError),)
         assert _without(found, SHADOWED)
 
     def test_it_holds_at_a_base_below_the_top_of_its_family(self) -> None:
@@ -164,7 +170,7 @@ class TestTheBareBaseTrap:
             ServiceValidationError,
         )
         found = unanswered_refusals(rows)
-        assert found == (_unanswered("ServiceError"), _bare("ServiceConflict"))
+        assert _facts(found) == (_unanswered(ServiceError), _bare(ServiceConflict))
         assert _without(found, SHADOWED)
 
     def test_a_refusal_with_nothing_under_it_is_never_called_a_base(self) -> None:
@@ -173,28 +179,28 @@ class TestTheBareBaseTrap:
         found = unanswered_refusals(
             lambda error: None if type(error) is NotPermitted else "answered"
         )
-        assert found == (_unanswered("NotPermitted"),)
+        assert _facts(found) == (_unanswered(NotPermitted),)
         assert _without(found, BARE, SHADOWED)
 
 
 class TestThePrecedenceTrap:
     def test_a_row_below_its_base_is_told_it_never_answers(self) -> None:
         found = unanswered_refusals(_rows(DispatchError, ServiceError, ServiceConflict))
-        assert found == (_shadowed("ServiceConflict", "ServiceError"),)
+        assert _facts(found) == (_shadowed(ServiceConflict, ServiceError),)
         assert _without(found, BARE, UNANSWERED)
 
     def test_the_row_named_is_the_first_one_that_catches_it(self) -> None:
         found = unanswered_refusals(
             _rows(DispatchError, ServiceError, ServiceConflict, ActionUnavailable)
         )
-        assert found == (
-            _shadowed("ServiceConflict", "ServiceError"),
-            _shadowed("ActionUnavailable", "ServiceError"),
+        assert _facts(found) == (
+            _shadowed(ServiceConflict, ServiceError),
+            _shadowed(ActionUnavailable, ServiceError),
         )
 
     def test_a_repeated_row_never_answers(self) -> None:
         found = unanswered_refusals(_rows(DispatchError, ServiceError, DispatchError))
-        assert found == (_shadowed("DispatchError", "DispatchError"),)
+        assert _facts(found) == (_shadowed(DispatchError, DispatchError),)
 
     def test_a_row_a_subclass_sits_above_is_not_reported(self) -> None:
         assert (
@@ -208,15 +214,15 @@ class TestThePrecedenceTrap:
         # The check covers the kernel's refusals, but a row that can never be
         # reached is dead whoever's refusal it names.
         found = unanswered_refusals(_rows(DispatchError, UnsupportedMediaType, ServiceError))
-        assert found == (_shadowed("UnsupportedMediaType", "DispatchError"),)
+        assert _facts(found) == (_shadowed(UnsupportedMediaType, DispatchError),)
 
     def test_both_traps_in_one_map_are_both_reported(self) -> None:
         rows = _rows(
             InvalidArguments, NotPermitted, PrincipalUnavailable, ServiceError, ServiceConflict
         )
-        assert unanswered_refusals(rows) == (
-            _bare("DispatchError"),
-            _shadowed("ServiceConflict", "ServiceError"),
+        assert _facts(unanswered_refusals(rows)) == (
+            _bare(DispatchError),
+            _shadowed(ServiceConflict, ServiceError),
         )
 
 
@@ -236,21 +242,23 @@ class TestACallable:
             lambda error: "failed" if type(error) is ServiceError else "refused",
             unanswered="failed",
         )
-        assert found == (_bare("ServiceError"),)
+        assert _facts(found) == (_bare(ServiceError),)
 
     def test_a_table_looked_up_by_exact_class_is_passed_as_a_callable(self) -> None:
         # Its keys read as ordered rows would let ServiceConflict answer for
         # ActionUnavailable, which ``table.get(type(error))`` never does.
         table = {kind: kind.__name__ for kind in REFUSALS if kind is not ActionUnavailable}
-        assert _unanswered("ActionUnavailable") not in unanswered_refusals(tuple(table.items()))
-        assert unanswered_refusals(lambda error: table.get(type(error))) == (
-            _unanswered("ActionUnavailable"),
+        assert _unanswered(ActionUnavailable) not in _facts(
+            unanswered_refusals(tuple(table.items()))
+        )
+        assert _facts(unanswered_refusals(lambda error: table.get(type(error)))) == (
+            _unanswered(ActionUnavailable),
         )
 
     def test_only_the_unanswered_value_is_unanswered_not_any_falsy_one(self) -> None:
         assert unanswered_refusals(lambda error: 0) == ()
-        assert unanswered_refusals(lambda error: None) == tuple(
-            _unanswered(kind.__name__) for kind in REFUSALS
+        assert _facts(unanswered_refusals(lambda error: None)) == tuple(
+            _unanswered(kind) for kind in REFUSALS
         )
 
     def test_what_the_callable_raises_propagates(self) -> None:
@@ -287,6 +295,29 @@ class TestACallable:
                 (type(m), m, getattr(m, "code", None)) for m in real
             ]
         assert built.detail["title"][0].code == "required"
+
+
+class TestTheWords:
+    # ``str()`` of each kind, as the docs page and the docstring quote it.
+    def test_an_unanswered_refusal(self) -> None:
+        (found,) = unanswered_refusals(lambda error: None if type(error) is NotPermitted else 1)
+        assert str(found) == "nothing in the map answers NotPermitted"
+
+    def test_a_bare_base(self) -> None:
+        (found,) = unanswered_refusals(
+            _rows(NotPermitted, InvalidArguments, PrincipalUnavailable, ServiceError)
+        )
+        assert str(found) == (
+            "nothing in the map answers DispatchError itself, though it answers every "
+            "refusal under it, and DispatchError may be raised bare"
+        )
+
+    def test_a_shadowed_row(self) -> None:
+        (found,) = unanswered_refusals(_rows(DispatchError, ServiceError, ServiceConflict))
+        assert str(found) == (
+            "the row for ServiceConflict never answers: the row for ServiceError above it "
+            "answers every ServiceConflict first"
+        )
 
 
 class TestTheKernelsOwnMaps:

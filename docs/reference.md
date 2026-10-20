@@ -250,6 +250,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.no_input.NoInput
 ::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
+::: django_service_specs.types.refusal_finding.RefusalFinding
+::: django_service_specs.types.refusal_finding_kind.RefusalFindingKind
 ::: django_service_specs.types.selector_kind.SelectorKind
 ::: django_service_specs.types.field_audience.FieldAudience
 ::: django_service_specs.types.unknown_arguments.UnknownArguments

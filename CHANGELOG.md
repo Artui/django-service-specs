@@ -35,12 +35,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isinstance` with the first match winning, or a callable given one
   instance of each refusal - with `unanswered=` naming the outcome that is no
   answer, so a table row holding it answers nothing below it either - and
-  returns one sentence per finding, so a transport asserts `== ()` from its
-  own suite. Three findings: a refusal nothing answers; a base answered
-  nowhere while every refusal under it is, since either base may be raised bare;
-  and, for a table, a row below a row of its own base, which never answers.
-  Each transport keeps its own vocabulary: an exit code, a status and a run
-  state stay its own.
+  returns a tuple of findings, so a transport asserts `== ()` from its own
+  suite. Each is a frozen `RefusalFinding`: the refusal it is about, its
+  `RefusalFindingKind`, and for a shadowed row the row above it, with `str()`
+  giving the finding in a sentence. A transport allowing a gap on purpose
+  filters by refusal or kind, never by the words. Three kinds: `UNANSWERED`,
+  a refusal nothing answers; `BARE_BASE`, a base answered nowhere while every
+  refusal under it is, since either base may be raised bare; and
+  `SHADOWED_ROW`, for a table, a row below a row of its own base, which never
+  answers. Each transport keeps its own vocabulary: an exit code, a status and
+  a run state stay its own.
 
 ## [0.9.0] — 2026-10-16
 

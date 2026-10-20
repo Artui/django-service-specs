@@ -656,12 +656,22 @@ docs/examples/refusal_outcomes.py:outcomes
 It takes the map as it is written. An ordered table of `(refusal class,
 outcome)` rows is read the way an `isinstance` ladder reads it, top to bottom
 with the first match winning, so a row for a base answers every refusal under
-it, and a row whose outcome is the `unanswered=` value answers nothing, a
-refusal it catches first included. A map written as code is passed as the callable it is, with `unanswered=`
-naming the value it falls back to; a mapping looked up by an error's exact
-class is a callable too, `lambda error: table.get(type(error))`, since reading
-its keys as ordered rows would let a base answer for a subclass the lookup
-never reaches.
+it. A row whose outcome is the `unanswered=` value is no answer: a refusal it
+catches first stays unanswered whatever a later row says. A callable written
+as branches is passed as it is, with `unanswered=` naming the value it falls
+back to; a mapping looked up by an error's exact class is a callable too,
+`lambda error: table.get(type(error))`, since reading its keys as ordered rows
+would let a base answer for a subclass the lookup never reaches.
+
+Each finding is a
+[`RefusalFinding`][django_service_specs.types.refusal_finding.RefusalFinding]:
+the refusal it is about, its
+[`RefusalFindingKind`][django_service_specs.types.refusal_finding_kind.RefusalFindingKind]
+(`UNANSWERED`, `BARE_BASE` or `SHADOWED_ROW`), and for a shadowed row the row
+above it. A transport that leaves a gap on purpose filters the findings by
+refusal or kind, as the queue above does with `NO_QUESTIONS`, and never by
+their words: `str()` of a finding is the sentence quoted below, and the
+wording is free to change.
 
 Two traps make a map look complete when it is not, and each has its own
 finding. **Either base may be raised bare**: the kernel raises neither a plain
@@ -681,9 +691,9 @@ the base's outcome:
 the row for ServiceConflict never answers: the row for ServiceError above it answers every ServiceConflict first
 ```
 
-The second is reported for a table only. A callable's order is code, and a
-branch for a subclass below its base's is a body that never runs, which the
-transport's own branch coverage reports; a table's order is data, which
+The second is reported for a table only. A callable written as branches
+orders them in code, and a branch for a subclass below its base's is a body
+that never runs, which the transport's own branch coverage reports; a table's order is data, which
 coverage reads as one expression.
 
 A refusal a transport defines itself, such as the HTTP views'
