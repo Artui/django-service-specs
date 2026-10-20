@@ -489,6 +489,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-variant-of-a-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A variant of a spec
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -986,6 +997,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#a-variant-of-a-spec" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A variant of a spec
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1267,6 +1289,17 @@ scope check and <code>preconditions</code> are asked of that empty set as they a
 empty queryset, and the shaping is skipped, since there is nothing to shape.
 Without it, a list selector's <code>None</code> is passed on as it came, and presenting it
 fails as the author's error.</p>
+<p>A selector may also raise Django's <code>Http404</code>, as <code>get_object_or_404</code> does. On a
+retrieve that is the same missing row a <code>DoesNotExist</code> is: not-found, or <code>None</code>
+under <code>allow_none=True</code>. On a list it is the selector saying "not found",
+usually of a parent row it looked up before listing that parent's children, and
+the result is not-found whatever <code>allow_none</code> says. A <code>DoesNotExist</code> escaping a
+list is different: a list has no missing row, so it is a fault inside the
+selector and raises. An output selector runs after the write, so a list one
+raising <code>Http404</code> raises a <code>RuntimeError</code> chained from it, rather than report a
+write that happened as not found: a bare <code>Http404</code> would be answered 404 by
+Django's handler and by DRF's. Only the selector's own raise is read this way: an <code>Http404</code> from its
+<code>extend_queryset</code> passes through.</p>
 <p><code>reads</code> is the selector's whole input. There is no Validator in front of a
 read, so these Parameters are what the closed argument set and the shape check
 hold the caller to: an argument the spec does not declare is refused before
@@ -1901,6 +1934,44 @@ A <code>Decimal</code> is rendered as its string, a date or date-time in ISO 860
 selector's when it declares none, and declaring both is refused. A presenter on
 an instance or collection selector is never read, because the service consumes
 those rows rather than returning them.</p>
+<h2 id="a-variant-of-a-spec">A variant of a spec<a class="headerlink" href="#a-variant-of-a-spec" title="Permanent link">&para;</a></h2>
+<p>A spec is frozen, so a variant of one is a new spec.
+<a class="autorefs autorefs-internal" title="derive" href="../reference/#django_service_specs.specs.service_spec.ServiceSpec.derive"><code>derive(**changes)</code></a>
+returns it: the same class, with the named fields replaced and every other one
+equal to the base's. A field is the base's very object unless the constructor
+rebuilds it, as it rebuilds a read's <code>reads</code> when the read has a
+<code>filter_set</code>.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># The same listing for the command line, which offers a search and no choice</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># of ordering: ``reads=`` is the variant's whole ``reads``, so ``ordering`` is</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># no longer an argument and the selector's own default answers for it.</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">search_only</span> <span class="o">=</span> <span class="n">list_notes_spec</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">)),</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The variant is built through the constructor, so every check a fresh
+declaration passes runs again on it, the combinations included: a change that
+is valid alone and refused beside the fields it keeps raises
+<code>ImproperlyConfigured</code>, as writing the variant out in full would. The base is
+never changed.</p>
+<p>A field is <strong>replaced, never extended</strong>. <code>reads=</code> is the variant's whole
+<code>reads</code>, as <code>search_only</code> shows, so keeping the base's and adding one is said
+in so many words: <code>reads=base.reads + Parameters.of(...)</code>.</p>
+<p>A read's <code>filter_set</code> filters are the filter set's rather than the author's, so
+they follow whichever <code>reads</code> the variant declares, once, and a variant with
+<code>filter_set=None</code> keeps only the author's own.</p>
+<p>A name that is not one of the spec's own fields is refused with <code>TypeError</code>:
+a misspelling, a method such as <code>parameters</code>, or a private field the
+constructor writes for itself.</p>
+<p>A variant is another spec, by identity, so a
+<a class="autorefs autorefs-internal" title="Grant
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.dispatch.grant.Grant"><code>Grant</code></a> minted for the base does
+not cover it. To serve a variant in place of the base, hand the transport a
+registry that holds it: see
+<a href="../registry/#views">replacing an entry</a>.</p>
 
 
 

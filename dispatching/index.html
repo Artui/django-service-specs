@@ -543,6 +543,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#answering-every-refusal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answering every refusal
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1040,6 +1051,17 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#answering-every-refusal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Answering every refusal
+      
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1097,7 +1119,10 @@ the async entry point:</p>
 <li><strong>Target resolution</strong>: a read's own selector, or a write's instance or
    collection selector, called with the arguments its <code>reads</code> declare and
    what its <code>kwargs</code> provider returns, then shaped. A retrieve that finds
-   nothing is <code>kind="not_found"</code>, unless the selector allows <code>None</code>. A
+   nothing is <code>kind="not_found"</code>, unless the selector allows <code>None</code>; a
+   selector raising <code>Http404</code>, as <code>get_object_or_404</code> does, is that missing
+   row on a retrieve, and <code>kind="not_found"</code> on a list or a collection,
+   whatever <code>allow_none</code> says (see <a href="../declaring/">Declaring</a>). A
    <a href="#a-target-resolved-ahead-of-the-call"><code>target=</code></a> the caller passed stands
    in for this step.</li>
 <li><strong>Object-level authorization</strong>: every check's <code>has_object_permission</code> on a
@@ -1276,7 +1301,9 @@ found rather than refused: it does not exist for them.</p>
 <p>One case is not reported as not-found: <strong>a retrieve output selector that finds
 nothing</strong>. The service has already run and, under <code>atomic</code>, committed, so
 reporting not-found would tell the caller the write did not happen. The value
-is <code>None</code> under <code>kind="instance"</code> instead.</p>
+is <code>None</code> under <code>kind="instance"</code> instead, whether the re-read returned <code>None</code>
+or raised <code>DoesNotExist</code> or <code>Http404</code>. A list output selector raising <code>Http404</code>
+is a fault for the same reason, and raises a <code>RuntimeError</code> chained from it.</p>
 <p>The output selector is called from the base pool plus the service's return,
 under two names: <code>result</code>, and <code>instance</code>, as djangorestframework-services
 binds it. They are one value, whatever the service returned, <code>None</code> included,
@@ -1465,7 +1492,8 @@ object-level or scope check again. The grant is honoured only with the
 target it was resolved for: handed on without <code>target=</code>, dispatch looks the
 row up itself and runs the checks on it. A missing row that <code>allow_none</code> does not
 let through comes back as <code>DispatchResult(kind="not_found")</code>, so it is never
-mistaken for the <code>None</code> it lets through. A read, whose selector is its run,
+mistaken for the <code>None</code> it lets through, and so does a collection selector
+raising <code>Http404</code>. A read, whose selector is its run,
 raises <code>TypeError</code>, and a <code>many</code> write, which has no target,
 <code>ImproperlyConfigured</code>. It is sync; an async caller hops once with
 <code>sync_to_async</code>.</p>
@@ -1838,6 +1866,105 @@ have called it. The selector spec's affordance conditions, <code>extend_queryset
 and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets <code>null_progress</code>: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.</p>
+<h2 id="answering-every-refusal">Answering every refusal<a class="headerlink" href="#answering-every-refusal" title="Permanent link">&para;</a></h2>
+<p>Dispatch refuses in two families, and a transport answers each refusal in its
+own vocabulary: an exit code, an HTTP status, the state a background run ends
+in. Those vocabularies stay the transport's, and one check is shared:
+<a class="autorefs autorefs-internal" title="unanswered_refusals" href="../reference/#django_service_specs.dispatch.unanswered_refusals.unanswered_refusals"><code>unanswered_refusals</code></a>
+says what a map leaves unanswered of
+<a class="autorefs autorefs-internal" title="REFUSALS
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.dispatch.refusals.REFUSALS"><code>REFUSALS</code></a>, every refusal the
+kernel defines, so a transport holds its map total from its own test suite:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">AdditionalInputRequired</span><span class="p">,</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">DispatchError</span><span class="p">,</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">NotPermitted</span><span class="p">,</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">ServiceError</span><span class="p">,</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">unanswered_refusals</span><span class="p">,</span>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="p">)</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="n">OUTCOMES</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="p">(</span><span class="n">NotPermitted</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="p">(</span><span class="n">PrincipalUnavailable</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="p">(</span><span class="n">DispatchError</span><span class="p">,</span> <span class="s2">"invalid"</span><span class="p">),</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="p">(</span><span class="n">ServiceNotFound</span><span class="p">,</span> <span class="s2">"gone"</span><span class="p">),</span>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>    <span class="p">(</span><span class="n">ServiceConflict</span><span class="p">,</span> <span class="s2">"conflict"</span><span class="p">),</span>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>    <span class="p">(</span><span class="n">ServiceError</span><span class="p">,</span> <span class="s2">"refused"</span><span class="p">),</span>
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="p">)</span>
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="sd">"""Read top to bottom, first match wins, so each subclass sits above its base."""</span>
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>
+</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>
+</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">outcome_for</span><span class="p">(</span><span class="n">error</span><span class="p">:</span> <span class="ne">BaseException</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="w">    </span><span class="sd">"""The outcome a run that raised ``error`` ends in: ``failed`` for anything undeclared."""</span>
+</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>    <span class="k">return</span> <span class="nb">next</span><span class="p">((</span><span class="n">outcome</span> <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">outcome</span> <span class="ow">in</span> <span class="n">OUTCOMES</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">kind</span><span class="p">)),</span> <span class="s2">"failed"</span><span class="p">)</span>
+</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>
+</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>
+</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a><span class="n">NO_QUESTIONS</span> <span class="o">=</span> <span class="p">((</span><span class="n">AdditionalInputRequired</span><span class="p">,</span> <span class="s2">"failed"</span><span class="p">),</span> <span class="o">*</span><span class="n">OUTCOMES</span><span class="p">)</span>
+</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a><span class="sd">"""For a queue with nobody to ask: a run that needs more input fails like a bug."""</span>
+</span><span id="__span-13-30"><a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>
+</span><span id="__span-13-31"><a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>
+</span><span id="__span-13-32"><a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a><span class="c1"># In the transport's own test suite:</span>
+</span><span id="__span-13-33"><a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_every_refusal_has_an_outcome</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-13-34"><a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">OUTCOMES</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
+</span><span id="__span-13-35"><a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">outcome_for</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
+</span><span id="__span-13-36"><a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>
+</span><span id="__span-13-37"><a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>
+</span><span id="__span-13-38"><a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_queue_leaves_one_refusal_unanswered_on_purpose</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-13-39"><a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>    <span class="c1"># Filtered by class, never by the finding's words.</span>
+</span><span id="__span-13-40"><a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>    <span class="n">found</span> <span class="o">=</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">NO_QUESTIONS</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span>
+</span><span id="__span-13-41"><a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">finding</span> <span class="k">for</span> <span class="n">finding</span> <span class="ow">in</span> <span class="n">found</span> <span class="k">if</span> <span class="n">finding</span><span class="o">.</span><span class="n">refusal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">AdditionalInputRequired</span><span class="p">]</span> <span class="o">==</span> <span class="p">[]</span>
+</span></code></pre></div>
+<p>It takes the map as it is written. An ordered table of <code>(refusal class,
+outcome)</code> rows is read the way an <code>isinstance</code> ladder reads it, top to bottom
+with the first match winning, so a row for a base answers every refusal under
+it. A row whose outcome is the <code>unanswered=</code> value is no answer: a refusal it
+catches first stays unanswered whatever a later row says. A callable written
+as branches is passed as it is, with <code>unanswered=</code> naming the value it falls
+back to; a mapping looked up by an error's exact class is a callable too,
+<code>lambda error: table.get(type(error))</code>, since reading its keys as ordered rows
+would let a base answer for a subclass the lookup never reaches.</p>
+<p>Each finding is a
+<a class="autorefs autorefs-internal" title="RefusalFinding
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.refusal_finding.RefusalFinding"><code>RefusalFinding</code></a>:
+the refusal it is about, its
+<a class="autorefs autorefs-internal" title="RefusalFindingKind" href="../reference/#django_service_specs.types.refusal_finding_kind.RefusalFindingKind"><code>RefusalFindingKind</code></a>
+(<code>UNANSWERED</code>, <code>BARE_BASE</code> or <code>SHADOWED_ROW</code>), and for a shadowed row the row
+above it. A transport that leaves a gap on purpose filters the findings by
+refusal or kind, as the queue above does with <code>NO_QUESTIONS</code>, and never by
+their words: <code>str()</code> of a finding is the sentence quoted below, and the
+wording is free to change.</p>
+<p>Two traps make a map look complete when it is not, and each has its own
+finding. <strong>Either base may be raised bare</strong>: the kernel raises neither a plain
+<code>DispatchError</code> nor a plain <code>ServiceError</code> itself, but both are public classes a
+project's own code may raise, so a map with a row for every refusal under a
+base and none for the base leaves it unanswered:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>nothing in the map answers DispatchError itself, though it answers every refusal under it, and DispatchError may be raised bare
+</span></code></pre></div>
+<p><strong>A subclass below its base never answers</strong>: in an ordered table, the base's
+row catches it first, so the subclass's row is dead and the subclass takes
+the base's outcome:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>the row for ServiceConflict never answers: the row for ServiceError above it answers every ServiceConflict first
+</span></code></pre></div>
+<p>The second is reported for a table only. A callable written as branches
+orders them in code, and a branch for a subclass below its base's is a body
+that never runs, which the transport's own branch coverage reports; a table's order is data, which
+coverage reads as one expression.</p>
+<p>A refusal a transport defines itself, such as the HTTP views'
+<a class="autorefs autorefs-internal" title="UnsupportedMediaType" href="../reference/#django_service_specs.http.unsupported_media_type.UnsupportedMediaType"><code>UnsupportedMediaType</code></a>,
+is not in <code>REFUSALS</code>: that transport maps it and tests it. Its row is still
+read for the precedence trap, since a row nothing reaches is dead whoever's
+refusal it names.</p>
 
 
 

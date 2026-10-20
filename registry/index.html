@@ -1060,7 +1060,7 @@ whoever reads <code>check</code>.</p>
 <p>Registration order is kept so that a transport's listing - a tool list, a help
 screen - comes out the same on every start.</p>
 <h2 id="views">Views<a class="headerlink" href="#views" title="Permanent link">&para;</a></h2>
-<p>Three calls derive a new registry from an existing one:</p>
+<p>Four calls derive a new registry from an existing one:</p>
 <ul>
 <li><strong><code>by_tag(*tags)</code></strong> keeps the entries carrying <strong>any</strong> of the tags. It is a
   union; chain the calls for an intersection:
@@ -1071,7 +1071,23 @@ screen - comes out the same on every start.</p>
 <li><strong><code>merge(*others)</code></strong> combines registries, in order. Names are unique within
   one registry, so two independent registries may each use a name; merging is
   where that becomes a conflict, and it raises <code>ValueError</code>.</li>
+<li><strong><code>replace(name, spec)</code></strong> puts <code>spec</code> under <code>name</code> in place of the spec
+  registered there. The entry keeps its tags and its place in the order, and
+  the replacement is checked as <code>register</code> checks a spec. A name that is not
+  registered raises <code>KeyError</code>, since a replacement for an operation nobody
+  registered is a typo rather than a registration.</li>
 </ul>
+<p><code>replace</code> is how a transport serves a variant of an operation without a second
+name for it. The registry holds what every transport shares; a variant shaped
+for one transport is the registered spec's own
+<a href="../declaring/#a-variant-of-a-spec"><code>derive(...)</code></a>, in the registry that
+transport is handed:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The command line is handed a registry with the variant under the operation's</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># own name; every other transport keeps reading ``registry``, and the base.</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">command_line_registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">search_only</span><span class="p">)</span>
+</span></code></pre></div>
+<p><code>search_only</code> is the variant
+<a href="../declaring/#a-variant-of-a-spec">derived from <code>list_notes_spec</code></a>.</p>
 <p>Every view is a <strong>snapshot</strong>. It shares the spec objects rather than copying
 them, it never changes its source, and a <code>register()</code> on the source afterwards
 does not appear in a view taken before it. A transport reads its view once, at
