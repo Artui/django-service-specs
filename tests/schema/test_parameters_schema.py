@@ -521,11 +521,11 @@ class TestDefaults:
         "default",
         [
             pytest.param(UNSET, id="undeclared"),
-            Decimal("9.99"),
-            dt.date(2026, 1, 1),
-            dt.datetime.now,
-            [Decimal("1")],
-            {1: "x"},
+            pytest.param(Decimal("9.99"), id="decimal"),
+            pytest.param(dt.date(2026, 1, 1), id="date"),
+            pytest.param(dt.datetime.now, id="callable"),
+            pytest.param([Decimal("1")], id="list-holding-a-decimal"),
+            pytest.param({1: "x"}, id="int-key"),
         ],
     )
     def test_a_default_json_cannot_carry_is_left_out(self, default: Any) -> None:
