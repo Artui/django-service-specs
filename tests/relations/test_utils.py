@@ -18,18 +18,19 @@ def _service(**_: object) -> None: ...
 
 
 class TestValidateRelationOrphan:
-    def test_every_member_is_accepted_as_a_member_or_a_string(self) -> None:
-        for orphan in RelationOrphan:
-            validate_relation_orphan(orphan, delete_service=None, label="ChildSpec")
-            validate_relation_orphan(orphan.value, delete_service=None, label="ChildSpec")
+    @pytest.mark.parametrize("orphan", list(RelationOrphan), ids=lambda orphan: orphan.value)
+    def test_every_member_is_accepted_as_a_member_or_a_string(self, orphan: RelationOrphan) -> None:
+        validate_relation_orphan(orphan, delete_service=None, label="ChildSpec")
+        validate_relation_orphan(orphan.value, delete_service=None, label="ChildSpec")
 
     def test_an_unknown_value_raises(self) -> None:
         with pytest.raises(ValueError, match="ChildSpec.orphan must be one of"):
             validate_relation_orphan("archive", delete_service=None, label="ChildSpec")
 
     def test_the_default_composes_with_a_delete_service(self) -> None:
-        # Every spec written before the field existed says ``AUTO``, so it is
-        # not a second answer to the question the service already answers.
+        # ``AUTO`` is the default every spec that never mentions ``orphan``
+        # carries, so it is not a second answer to the question the service
+        # already answers.
         validate_relation_orphan(RelationOrphan.AUTO, delete_service=_service, label="ChildSpec")
 
     def test_stating_it_beside_a_delete_service_is_refused(self) -> None:

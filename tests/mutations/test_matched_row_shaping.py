@@ -167,9 +167,9 @@ class TestOnlyTheKeyIsDropped:
         assert section.title == "original"
         assert Section.objects.filter(catalog=catalog).count() == 2
 
-    def test_the_idiom_it_retires_is_still_harmless(self) -> None:
-        # ``exclude_fields=[match_key]`` is what a consumer wrote by hand before
-        # the write dropped the key itself. Saying it twice changes nothing.
+    def test_excluding_the_key_by_hand_is_harmless(self) -> None:
+        # ``exclude_fields=[match_key]`` names a key the write drops anyway, so
+        # saying it twice changes nothing.
         author = Author.objects.create(name="Ursula")
         post = Post.objects.create(title="t")
 
@@ -188,7 +188,7 @@ class TestOnlyTheKeyIsDropped:
 
     def test_an_unmatched_key_is_still_refused_rather_than_dropped(self) -> None:
         # Dropping it on the *create* path would write a row under a key the
-        # caller never chose, so the guard that refuses it is untouched. An
+        # caller never chose, so the guard still refuses it. An
         # owned kind is where that guard shows: a miss there falls through to
         # create, where a scoped kind fails earlier in the scope lookup.
         catalog = Catalog.objects.create(name="c")

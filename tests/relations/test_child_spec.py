@@ -71,15 +71,20 @@ class TestServiceReplacesTheHelper:
             )
         assert "update_service declared alongside field_map, m2m" in str(excinfo.value)
 
-    def test_every_shaping_knob_is_covered(self) -> None:
-        for knob in (
-            {"field_map": {"heading": "title"}},
-            {"exclude_fields": ["title"]},
-            {"m2m": lambda row: {}},
-            {"relations": {"items": ChildSpec(model=Item, fk="section")}},
-        ):
-            with pytest.raises(ImproperlyConfigured):
-                ChildSpec(model=Section, fk="catalog", create_service=_service, **knob)
+    @pytest.mark.parametrize(
+        "knob",
+        [
+            pytest.param({"field_map": {"heading": "title"}}, id="field_map"),
+            pytest.param({"exclude_fields": ["title"]}, id="exclude_fields"),
+            pytest.param({"m2m": lambda row: {}}, id="m2m"),
+            pytest.param(
+                {"relations": {"items": ChildSpec(model=Item, fk="section")}}, id="relations"
+            ),
+        ],
+    )
+    def test_every_shaping_knob_is_covered(self, knob: dict[str, Any]) -> None:
+        with pytest.raises(ImproperlyConfigured):
+            ChildSpec(model=Section, fk="catalog", create_service=_service, **knob)
 
     def test_reconciliation_knobs_stay_valid_next_to_a_service(self) -> None:
         spec = ChildSpec(
