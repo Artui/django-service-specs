@@ -29,8 +29,6 @@ from django_service_specs.commands.render.render_result import render_result
 from django_service_specs.commands.render.render_table import render_table
 from django_service_specs.commands.render.wants_table import wants_table
 from django_service_specs.commands.report.unguarded_message import unguarded_message
-from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
-from django_service_specs.commands.report.unguarded_specs import unguarded_specs
 from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
@@ -112,6 +110,8 @@ from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.registry.spec_registry import SpecRegistry
+from django_service_specs.registry.unguarded_spec import UnguardedSpec
+from django_service_specs.registry.unguarded_specs import unguarded_specs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec

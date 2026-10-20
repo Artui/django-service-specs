@@ -213,6 +213,8 @@ Installed with the `pydantic` extra and imported from
 
 ::: django_service_specs.registry.spec_registry.SpecRegistry
 ::: django_service_specs.registry.registered_spec.RegisteredSpec
+::: django_service_specs.registry.unguarded_specs.unguarded_specs
+::: django_service_specs.registry.unguarded_spec.UnguardedSpec
 
 ## Selectors
 
@@ -239,8 +241,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.commands.argv.parameter_descriptor.ParameterDescriptor
 ::: django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments
 ::: django_service_specs.commands.argv.parsed_arguments.parsed_arguments
-::: django_service_specs.commands.report.unguarded_specs.unguarded_specs
-::: django_service_specs.commands.report.unguarded_spec.UnguardedSpec
 ::: django_service_specs.commands.report.unguarded_message.unguarded_message
 
 ## Types

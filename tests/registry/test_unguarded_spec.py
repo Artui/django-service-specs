@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from django_service_specs.commands.report.unguarded_spec import UnguardedSpec
+from django_service_specs.registry.unguarded_spec import UnguardedSpec
 from django_service_specs.types.unguarded_reason import UnguardedReason
 
 
