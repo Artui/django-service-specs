@@ -5,8 +5,6 @@ from __future__ import annotations
 from functools import cached_property
 from typing import Any
 
-from django.db.models import Choices
-
 from django_service_specs.adapters.dataclass.utils import (
     FieldShape,
     Shape,
@@ -14,6 +12,7 @@ from django_service_specs.adapters.dataclass.utils import (
     encode_fields,
     read_fields,
 )
+from django_service_specs.adapters.utils import choice_pairs
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 
@@ -76,13 +75,14 @@ def _output(fields: tuple[FieldShape, ...]) -> Output:
 
 def _output_field(fs: FieldShape) -> OutputField:
     shape = fs.shape
+    # A list's choices are its element's, as on the Parameter side.
+    element = shape if shape.items is None else shape.items
     return OutputField(
         fs.name,
         shape.type,
         format=shape.format,
         nullable=shape.nullable,
-        # A list's choices are its element's, as on the Parameter side.
-        choices=_choice_pairs(shape if shape.items is None else shape.items),
+        choices=choice_pairs(element.choices, element.enum),
         always_present=not fs.omittable,
         marking=fs.marking,
         fields=None if shape.fields is None else _output(shape.fields),
@@ -99,14 +99,3 @@ def _items(items: Shape | None) -> str | Output | None:
     if items.fields is not None:
         return _output(items.fields)
     return items.type
-
-
-def _choice_pairs(shape: Shape) -> tuple[tuple[Any, str], ...] | None:
-    if shape.choices is None:
-        return None
-    enum_cls = shape.enum
-    if enum_cls is not None and issubclass(enum_cls, Choices):
-        # Read per call rather than once, so the display is in the language
-        # active for the reader, as Django's own choices are.
-        return tuple((member.value, str(member.label)) for member in enum_cls)
-    return tuple((value, str(value)) for value in shape.choices)

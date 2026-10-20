@@ -13,14 +13,20 @@ validation library, so the dataclass adapter uses it without importing
 pydantic.
 
 The forms adapter reads field instances rather than annotations and shares
-``scalar_type``, since a typed choice field's values take their JSON type from
+``shared_scalar_type``, since a typed choice field's values take their JSON type from
 it exactly as a ``Literal``'s do, and ``element_format``, since a
 ``ModelMultipleChoiceField`` keyed on a decimal column is a list of decimals as
 ``list[Decimal]`` is.
 
 ``choice_labels`` reads Django's own vocabulary rather than an annotation's,
 and both annotation adapters label an enum's choices through it, so a
-``TextChoices`` field is labelled alike whichever library declared it.
+``TextChoices`` field is labelled alike whichever library declared it; their
+presenters render the same labels through ``choice_pairs``.
+
+The rest is what the dataclass and pydantic adapters each did alike once
+an annotation was unwrapped: refusing one with no JSON type, finding the one
+JSON type a choice set shares, reading a field's ``FieldMarking``, and reading
+a list that may be a related manager.
 """
 
 from __future__ import annotations
@@ -32,8 +38,11 @@ from decimal import Decimal
 from enum import Enum
 from typing import Any
 
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Choices
+from django.db.models.manager import BaseManager
 
+from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.types.unset import UnsetType
 
 SCALARS: dict[type, tuple[str, str | None]] = {
@@ -87,6 +96,69 @@ def scalar_type(value: Any) -> str | None:
     return None
 
 
+def shared_scalar_type(values: tuple[Any, ...]) -> str | None:
+    """The one JSON type every value has, or ``None`` when they have none or several.
+
+    ``None`` for no values too, so each caller decides what an empty set is.
+    """
+    found = {scalar_type(value) for value in values}
+    return found.pop() if len(found) == 1 else None
+
+
+def choice_type(values: tuple[Any, ...], annotation: Any, *, where: str, supported: str) -> str:
+    """The one JSON type every choice has, or ``ImproperlyConfigured``.
+
+    A choice set of mixed types has no single JSON type to declare, and a
+    member whose value is not a JSON scalar cannot be sent at all.
+    """
+    json_type = shared_scalar_type(values)
+    if json_type is None:
+        raise unmappable(annotation, where=where, supported=supported)
+    return json_type
+
+
+def unmappable(annotation: Any, *, where: str, supported: str) -> ImproperlyConfigured:
+    """The refusal of an annotation with no JSON type, naming the field and what is read."""
+    # A class by its name, and anything else - a parametrized generic included,
+    # which Python 3.10 also counts as a ``type`` - as it was written. The
+    # second condition decides only there, where the ``set[int]`` row of
+    # test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation
+    # holds it.
+    plain = isinstance(annotation, type) and typing.get_origin(annotation) is None
+    name = annotation.__qualname__ if plain else repr(annotation)
+    return ImproperlyConfigured(
+        f"{where}: {name} has no JSON type this adapter can declare. Use {supported}."
+    )
+
+
+def enum_class(python: Any) -> type[Enum] | None:
+    """``python`` when it is an ``Enum`` class, which a choice decodes into, else ``None``."""
+    if isinstance(python, type) and issubclass(python, Enum):
+        return python
+    return None
+
+
+def marking(extras: tuple[Any, ...], *, where: str) -> FieldMarking | None:
+    """The one ``FieldMarking`` among a field's ``Annotated`` extras, if any."""
+    markings = [extra for extra in extras if isinstance(extra, FieldMarking)]
+    if len(markings) > 1:
+        raise ImproperlyConfigured(
+            f"{where}: declares {len(markings)} FieldMarkings; a field has one audience."
+        )
+    return markings[0] if markings else None
+
+
+def rows_of(value: Any) -> Any:
+    """A list field's value, read through ``.all()`` when it is a related manager.
+
+    So a prefetch is used when there is one. ``BaseManager``, so a related
+    manager built on a model's ``BaseManager.from_queryset`` default manager,
+    which is no ``Manager``, is read too:
+    test_a_manager_built_on_base_manager_is_read_through_all_too.
+    """
+    return value.all() if isinstance(value, BaseManager) else value
+
+
 def choice_labels(enum_cls: type[Enum] | None) -> tuple[tuple[Any, str], ...] | None:
     """Each value of a Django ``Choices`` enum with its label, or ``None``.
 
@@ -102,6 +174,22 @@ def choice_labels(enum_cls: type[Enum] | None) -> tuple[tuple[Any, str], ...] | 
     if enum_cls is None or not issubclass(enum_cls, Choices):
         return None
     return tuple((member.value, member.label) for member in enum_cls)
+
+
+def choice_pairs(
+    choices: tuple[Any, ...] | None, enum_cls: type[Enum] | None
+) -> tuple[tuple[Any, str], ...] | None:
+    """An output field's (value, display) pairs: a ``Choices`` label, else the value's ``str``.
+
+    Rendered per call rather than once, so the display is in the language
+    active for the reader, as Django's own choices are.
+    """
+    if choices is None:
+        return None
+    labels = choice_labels(enum_cls)
+    if labels is not None:
+        return tuple((value, str(label)) for value, label in labels)
+    return tuple((value, str(value)) for value in choices)
 
 
 def strip(annotation: Any) -> tuple[Any, bool, bool, tuple[Any, ...]]:

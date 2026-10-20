@@ -15,7 +15,6 @@ from django_service_specs.adapters.dataclass.utils import (
     check_dataclass,
     encode,
     read_fields,
-    scalar_type,
 )
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.types.unset import UNSET, UnsetType
@@ -213,7 +212,7 @@ def test_annotated_metadata_that_is_not_a_marking_is_looked_through() -> None:
     assert (fs.shape.type, fs.marking) == ("integer", None)
 
 
-# --- encode and scalar_type -----------------------------------------------------------------
+# --- encode -----------------------------------------------------------------
 
 
 def test_encode_passes_none_and_unset_through_whatever_the_shape() -> None:
@@ -224,11 +223,3 @@ def test_encode_passes_none_and_unset_through_whatever_the_shape() -> None:
 
 def test_encode_reads_an_enum_by_value_even_where_a_str_is_declared() -> None:
     assert encode(Shape("string", python=str), Colour.BLUE) == "blue"
-
-
-@pytest.mark.parametrize(
-    ("value", "json_type"),
-    [(True, "boolean"), (1, "integer"), (1.5, "number"), ("1", "string"), (None, None), ([], None)],
-)
-def test_scalar_type(value: Any, json_type: str | None) -> None:
-    assert scalar_type(value) == json_type

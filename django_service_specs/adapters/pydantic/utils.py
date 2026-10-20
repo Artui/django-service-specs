@@ -30,7 +30,14 @@ from pydantic.errors import PydanticUndefinedAnnotation
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 from pydantic_core import PydanticUndefined
 
-from django_service_specs.adapters.utils import SCALARS, scalar_type, strip
+from django_service_specs.adapters.utils import (
+    SCALARS,
+    choice_type,
+    enum_class,
+    marking,
+    strip,
+    unmappable,
+)
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.types.unset import UNSET
 
@@ -88,10 +95,7 @@ class Shape:
     @property
     def enum(self) -> type[Enum] | None:
         """The ``Enum`` class a choice validates into, or ``None`` for a ``Literal``."""
-        python = self.python
-        if isinstance(python, type) and issubclass(python, Enum):
-            return python
-        return None
+        return enum_class(self.python)
 
     @property
     def model(self) -> type[BaseModel] | None:
@@ -184,7 +188,7 @@ def read_fields(
                 help=info.description,
                 label=info.title,
                 always_present=_always_present(info),
-                marking=_marking(metadata, where=where),
+                marking=marking(metadata, where=where),
                 min_length=min_length,
                 max_length=max_length,
             )
@@ -204,7 +208,7 @@ def read_fields(
                 help=computed.description,
                 label=computed.title,
                 always_present=_always_present(computed),
-                marking=_marking(extras, where=where),
+                marking=marking(extras, where=where),
             )
         )
     return tuple(out)
@@ -360,15 +364,6 @@ def _flatten(metadata: Iterable[Any]) -> Iterator[Any]:
             yield item
 
 
-def _marking(extras: tuple[Any, ...], *, where: str) -> FieldMarking | None:
-    markings = [extra for extra in extras if isinstance(extra, FieldMarking)]
-    if len(markings) > 1:
-        raise ImproperlyConfigured(
-            f"{where}: declares {len(markings)} FieldMarkings; a field has one audience."
-        )
-    return markings[0] if markings else None
-
-
 def _read(
     annotation: Any, *, where: str, stack: tuple[type[BaseModel], ...]
 ) -> tuple[Shape, tuple[Any, ...]]:
@@ -383,14 +378,14 @@ def _read(
         # ``UnsetType`` is the dataclass adapter's way to leave an argument
         # out. pydantic has its own (a default) and cannot dump the marker, so
         # here it is one more type with no JSON type.
-        raise _unmappable(annotation, where=where)
+        raise unmappable(annotation, where=where, supported=_SUPPORTED)
     origin = typing.get_origin(base)
     args = typing.get_args(base)
     if origin is typing.Literal:
         # ``Literal["a", None]`` is Python's own spelling of a nullable choice.
         values = tuple(v for v in args if v is not None)
         shape = Shape(
-            _choice_type(values, base, where=where),
+            choice_type(values, base, where=where, supported=_SUPPORTED),
             nullable=nullable or len(values) != len(args),
             choices=values,
         )
@@ -408,7 +403,7 @@ def _read(
     elif isinstance(base, type) and issubclass(base, Enum):
         values = tuple(member.value for member in base)
         shape = Shape(
-            _choice_type(values, base, where=where),
+            choice_type(values, base, where=where, supported=_SUPPORTED),
             python=base,
             nullable=nullable,
             choices=values,
@@ -420,28 +415,5 @@ def _read(
         json_type, fmt = SCALARS[base]
         shape = Shape(json_type, python=base, format=fmt, nullable=nullable)
     else:
-        raise _unmappable(base, where=where)
+        raise unmappable(base, where=where, supported=_SUPPORTED)
     return shape, extras
-
-
-def _choice_type(values: tuple[Any, ...], annotation: Any, *, where: str) -> str:
-    """The one JSON type every choice has, or ``ImproperlyConfigured``.
-
-    A choice set of mixed types has no single JSON type to declare, and a
-    member whose value is not a JSON scalar cannot be sent at all.
-    """
-    found = {scalar_type(v) for v in values}
-    json_type = found.pop() if len(found) == 1 else None
-    if json_type is None:
-        raise _unmappable(annotation, where=where)
-    return json_type
-
-
-def _unmappable(annotation: Any, *, where: str) -> ImproperlyConfigured:
-    # A class by its name, and anything else - a parametrized generic included,
-    # which Python 3.10 also counts as a ``type`` - as it was written.
-    plain = isinstance(annotation, type) and typing.get_origin(annotation) is None
-    name = annotation.__qualname__ if plain else repr(annotation)
-    return ImproperlyConfigured(
-        f"{where}: {name} has no JSON type this adapter can declare. Use {_SUPPORTED}."
-    )

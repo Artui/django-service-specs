@@ -21,9 +21,8 @@ from django_service_specs.adapters.dataclass.utils import (
     check_dataclass,
     encode,
     read_fields,
-    scalar_type,
 )
-from django_service_specs.adapters.utils import choice_labels, element_format
+from django_service_specs.adapters.utils import choice_labels, element_format, scalar_type
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -146,9 +145,9 @@ class DataclassValidator(Validator):
         """The built instance as the call's ``data``, and its ``__init__`` fields as the values.
 
         A service declaring ``data`` receives the instance, typed as the
-        dataclass, where 0.4 handed it the fields as a dict; one declaring the
-        fields by name receives them as before. The values are the instance's
-        own attributes, so ``data.title`` and ``title`` are one object.
+        dataclass; one declaring the fields by name receives them. The values
+        are the instance's own attributes, so ``data.title`` and ``title`` are
+        one object.
 
         **A partial call is refused** with ``ImproperlyConfigured``, because a
         dataclass instance holds every field and a partial call may leave any

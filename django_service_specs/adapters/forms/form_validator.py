@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.db import models
 from django.utils.datastructures import MultiValueDict
 
-from django_service_specs.adapters.utils import element_format, scalar_type
+from django_service_specs.adapters.utils import element_format, shared_scalar_type
 from django_service_specs.parameters.clean_held_to_their_columns import (
     clean_held_to_their_columns,
 )
@@ -619,8 +619,7 @@ def _choices(
         )
     # With no values left the form refuses every non-empty value, and a string
     # is what every choice field takes.
-    found = {scalar_type(value) for value in values} or {"string"}
-    json_type = found.pop() if len(found) == 1 else None
+    json_type = shared_scalar_type(values) if values else "string"
     if json_type is None:
         raise ImproperlyConfigured(
             f"{where}: a {type(field).__name__} whose values {list(values)!r} share no "
