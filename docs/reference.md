@@ -112,6 +112,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.check_call.check_call
 ::: django_service_specs.dispatch.check_server_arguments.check_server_arguments
 ::: django_service_specs.dispatch.apply_server_arguments.apply_server_arguments
+::: django_service_specs.dispatch.refusals.REFUSALS
+::: django_service_specs.dispatch.unanswered_refusals.unanswered_refusals
 ::: django_service_specs.dispatch.relax_partial.relax_partial
 
 ## Affordances
@@ -255,6 +257,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.no_input.NoInput
 ::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
+::: django_service_specs.types.refusal_finding.RefusalFinding
+::: django_service_specs.types.refusal_finding_kind.RefusalFindingKind
 ::: django_service_specs.types.selector_kind.SelectorKind
 ::: django_service_specs.types.field_audience.FieldAudience
 ::: django_service_specs.types.unknown_arguments.UnknownArguments

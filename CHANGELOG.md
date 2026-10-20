@@ -26,6 +26,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replacement is checked as `register` checks a spec, and a name that is not
   registered raises `KeyError`. With `derive`, it is how one transport serves
   a variant of an operation under the operation's own name.
+- **`REFUSALS` and `unanswered_refusals(answers, *, unanswered=None)`: one
+  check that a transport's refusal-to-outcome map is total.** `REFUSALS` is
+  every refusal the kernel defines, both family bases and `ServiceConflict`
+  included, and not a refusal a transport defines itself, such as
+  `UnsupportedMediaType`. `unanswered_refusals` takes the map as it is
+  written - an ordered table of `(refusal class, outcome)` rows read by
+  `isinstance` with the first match winning, or a callable given one
+  instance of each refusal - with `unanswered=` naming the outcome that is no
+  answer, so a table row holding it answers nothing below it either - and
+  returns a tuple of findings, so a transport asserts `== ()` from its own
+  suite. Each is a frozen `RefusalFinding`: the refusal it is about, its
+  `RefusalFindingKind`, and for a shadowed row the row above it, with `str()`
+  giving the finding in a sentence. A transport allowing a gap on purpose
+  filters by refusal or kind, never by the words. Three kinds: `UNANSWERED`,
+  a refusal nothing answers; `BARE_BASE`, a base answered nowhere while every
+  refusal under it is, since either base may be raised bare; and
+  `SHADOWED_ROW`, for a table, a row below a row of its own base or a repeat of
+  an earlier row, which never answers. Each transport keeps its own
+  vocabulary: an exit code, a status and a run state stay its own.
 - **Seven readings the kernel's transports share are public, so a
   transport outside this package makes them the same way**, each exported
   from the root and from its subpackage: `is_deactivated`, the one rule for
