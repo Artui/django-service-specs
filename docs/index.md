@@ -26,8 +26,8 @@ project with business logic and no API framework can hand its operations to an
 agent, a command or a queue. Nothing in `django_service_specs` imports
 `rest_framework`, and the test suite runs without it installed.
 
-On that base the package is in three layers, and a test of what core imports
-holds every subpackage to its layer:
+On that base the package is in three layers. Every subpackage is classified
+into one, and a test fails if core imports anything classified outside it:
 
 - **Core** is what every transport needs to run a spec: the declaration, the
   [registry](registry.md) and [dispatch](dispatching.md), with authorization

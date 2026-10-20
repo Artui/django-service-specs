@@ -10,9 +10,10 @@ project writes against, such as a validator adapter; a transport only wires.
 Opt-in is a classification and not a switch: no setting turns a module on, so
 the only thing that keeps one out of core is this test. It holds the
 classification in one table, fails on a subpackage the table does not name,
-and fails when the closure loads any module whose subpackage is not core. The
-table runs both ways: a subpackage classified as core that the closure does
-not reach is classified wrongly, since core is the closure by definition.
+and fails when the closure loads any module whose subpackage is not core. It
+also holds that the closure reaches every subpackage classified as core, so a
+core entry that stops being reached has to be classified again rather than
+kept on its old layer by the table alone.
 
 Measured by what loads rather than read from the import graph, because what
 loads is the question, and it is larger than what the code names: importing
