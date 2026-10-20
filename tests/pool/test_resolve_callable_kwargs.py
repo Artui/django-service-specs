@@ -32,3 +32,10 @@ def test_forwards_what_the_callable_declares(
     fn: Callable[..., Any], pool: dict[str, Any], expected: dict[str, Any]
 ) -> None:
     assert resolve_callable_kwargs(fn, pool) == expected
+
+
+def test_forwards_in_the_order_the_callable_declares() -> None:
+    # The pool's own order is not the one kept: a caller reading the result as
+    # a sequence sees the signature's.
+    resolved = resolve_callable_kwargs(lambda *, b, a, c: None, {"a": 1, "c": 3, "b": 2})
+    assert list(resolved) == ["b", "a", "c"]

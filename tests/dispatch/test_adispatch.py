@@ -496,6 +496,58 @@ async def test_an_async_list_whose_parent_lookup_raises_http404_is_not_found(
     assert (result, check.scopes) == (DispatchResult(kind="not_found"), [])
 
 
+async def test_an_async_write_whose_instance_selector_raises_http404_is_not_found(
+    ada: Any,
+) -> None:
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=_note_or_404, reads=PK),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert (result, service.calls) == (DispatchResult(kind="not_found"), [])
+
+
+async def test_an_async_write_whose_collection_selector_raises_http404_is_not_found(
+    ada: Any,
+) -> None:
+    service = Record()
+    check = Scoped()
+
+    async def notes(*, pk: int) -> Any:
+        parent = await sync_to_async(get_object_or_404)(Note, pk=pk)
+        return Note.objects.filter(owner=parent.owner)
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        collection_selector_spec=SelectorSpec(kind=LIST, selector=notes, reads=PK),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
+
+    # Not found before the scope check: there is no set to ask it of.
+    assert (result, service.calls, check.scopes) == (DispatchResult(kind="not_found"), [], [])
+
+
+async def test_an_async_retrieve_output_selector_raising_http404_is_none(ada: Any) -> None:
+    async def gone(*, result: Any) -> Any:
+        return await sync_to_async(get_object_or_404)(Note, pk=404)
+
+    spec = ServiceSpec(
+        service=Record(returns="done"),
+        permissions=OPEN,
+        output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=gone),
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={})
+
+    assert result == DispatchResult(kind="instance", value=None, service_result="done", data={})
+
+
 async def test_an_async_list_is_shaped_in_the_second_hop(ada: Any, bob: Any) -> None:
     await _create(owner=ada, title="mine")
     await _create(owner=bob, title="theirs")
