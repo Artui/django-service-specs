@@ -168,6 +168,12 @@ def test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation(
     assert message.startswith("Probe.x: ")
     assert named in message
     assert "has no JSON type this adapter can declare" in message
+    # Every row's refusal names what the adapter does read, whichever of the
+    # three refusals in ``_read`` raised it.
+    assert message.endswith(
+        "Use str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
+        "a dataclass, or a list of any of these, each optionally '| None'."
+    )
 
 
 def test_an_unmappable_element_is_refused_under_its_field() -> None:

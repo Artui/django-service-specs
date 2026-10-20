@@ -193,3 +193,7 @@ def test_resolve_update_fields(
     expected: list[str] | None,
 ) -> None:
     assert resolve_update_fields(update_fields, changed, derived) == expected
+
+
+def test_resolve_update_fields_appends_nothing_by_default() -> None:
+    assert resolve_update_fields(True, ("a", "b")) == ["a", "b"]

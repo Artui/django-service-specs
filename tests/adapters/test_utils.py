@@ -10,7 +10,13 @@ from django.db import models
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 
-from django_service_specs.adapters.utils import SCALARS, choice_labels, scalar_type, strip
+from django_service_specs.adapters.utils import (
+    SCALARS,
+    choice_labels,
+    choice_pairs,
+    scalar_type,
+    strip,
+)
 from django_service_specs.types.unset import UnsetType
 
 
@@ -103,3 +109,17 @@ def test_a_django_choices_enum_labels_each_value_and_keeps_a_lazy_label_lazy() -
     assert labels == (("l", "Light"), ("d", "Dark"))
     assert labels is not None
     assert isinstance(labels[1][1], Promise)
+
+
+def test_the_pairs_an_output_field_presents_render_a_lazy_label() -> None:
+    # The pairs are the display a payload carries, so a lazy label is rendered
+    # here, in the language active for this call, and a plain ``str`` leaves.
+    pairs = choice_pairs(("l", "d"), _Shade)
+    assert pairs == (("l", "Light"), ("d", "Dark"))
+    assert pairs is not None
+    assert all(type(display) is str for _, display in pairs)
+
+
+def test_the_pairs_of_choices_with_no_labels_are_each_value_s_str() -> None:
+    assert choice_pairs((1, 2), None) == ((1, "1"), (2, "2"))
+    assert choice_pairs(None, None) is None
