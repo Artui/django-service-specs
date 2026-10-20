@@ -14,6 +14,8 @@ from types import ModuleType
 import pytest
 
 import django_service_specs
+import django_service_specs.settings
+import django_service_specs.types
 
 # An adapter whose library is an optional extra rather than a dependency is
 # public from its own subpackage alone. Re-exported at the root, it would import
@@ -120,6 +122,50 @@ def test_the_form_page_view_is_not_served_from_this_package() -> None:
     assert "SpecFormView" not in django_service_specs.__all__
 
 
+# The management command, its exit statuses, its renderers, its argv layer and
+# the sentence its system check prints, all served by django-spec-cli now. The
+# kernel re-exports none of them, since that package imports this one.
+COMMAND_LINE_NAMES = (
+    "SpecCommand",
+    "ExitCode",
+    "exit_code_for",
+    "render_result",
+    "render_table",
+    "render_json_lines",
+    "wants_table",
+    "ParameterDescriptor",
+    "describe_parameters",
+    "add_spec_arguments",
+    "parsed_arguments",
+    "unguarded_message",
+)
+
+
+@pytest.mark.parametrize(
+    "module",
+    [
+        "django_service_specs.commands",
+        "django_service_specs.checks",
+        "django_service_specs.types.exit_code",
+    ],
+)
+def test_the_command_line_modules_are_not_served_from_this_package(module: str) -> None:
+    assert importlib.util.find_spec(module) is None
+
+
+@pytest.mark.parametrize("name", COMMAND_LINE_NAMES)
+def test_no_command_line_name_is_exported_at_the_root(name: str) -> None:
+    assert name not in django_service_specs.__all__
+    assert not hasattr(django_service_specs, name)
+
+
+def test_the_command_line_leaves_no_type_and_no_setting_behind() -> None:
+    # ``ExitCode`` was the one value type the command owned, and the output
+    # format the one setting only it read.
+    assert "ExitCode" not in django_service_specs.types.__all__
+    assert not hasattr(django_service_specs.settings, "command_output")
+
+
 # A name a separate distribution imports is public at the root, and it is the
 # one object the kernel's own readers call: a second copy at the root would
 # let a transport's rule drift from the kernel's. Each name is paired with
@@ -127,15 +173,11 @@ def test_the_form_page_view_is_not_served_from_this_package() -> None:
 # of its own fails here.
 SHARED_WITH_THE_KERNEL = {
     "relax_partial": (
-        "django_service_specs.commands.spec_command",
         "django_service_specs.dispatch.check_server_arguments",
         "django_service_specs.dispatch.utils",
         "django_service_specs.schema.spec_input_schema",
     ),
-    "refusal_messages": (
-        "django_service_specs.commands.spec_command",
-        "django_service_specs.http.add_argument_errors",
-    ),
+    "refusal_messages": ("django_service_specs.http.add_argument_errors",),
     "NON_FIELD_KEYS": (
         "django_service_specs.http.add_argument_errors",
         "django_service_specs.parameters.refusal_messages",

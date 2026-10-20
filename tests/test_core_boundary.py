@@ -56,8 +56,8 @@ TRANSPORT = "transport"
 
 # Every subpackage's layer, keyed by its path below the root, plus the one
 # root module core reads. A module takes the layer of its nearest entry, so
-# ``commands/argv/`` is a transport with ``commands/``, and the table names a
-# nested subpackage only where it sits on a different layer from its parent.
+# ``http/error_response.py`` is a transport with ``http/``, and the table names
+# a nested subpackage only where it sits on a different layer from its parent.
 LAYERS: dict[str, str] = {
     "affordances": CORE,
     "authorization": CORE,
@@ -89,7 +89,6 @@ LAYERS: dict[str, str] = {
     "relations": OPT_IN,
     "schema": OPT_IN,
     "http": TRANSPORT,
-    "commands": TRANSPORT,
 }
 
 # Packages whose children sit on different layers, so each child, a
@@ -278,7 +277,7 @@ def test_the_import_reader_sees_every_depth_and_spelling() -> None:
         "import django_service_specs.relations.utils\n"
         "from django_service_specs.schema import thing\n"
         "import django_service_specs.http as h\n"
-        "from django_service_specs.commands import report as r\n"
+        "from django_service_specs.registry import spec_registry as r\n"
         "import os\n"
         "def f():\n"
         "    from django_service_specs.mutations.create import create\n"
@@ -294,8 +293,8 @@ def test_the_import_reader_sees_every_depth_and_spelling() -> None:
         "django_service_specs.schema",
         "django_service_specs.schema.thing",
         "django_service_specs.http",
-        "django_service_specs.commands",
-        "django_service_specs.commands.report",
+        "django_service_specs.registry",
+        "django_service_specs.registry.spec_registry",
         "django_service_specs.mutations.create",
         "django_service_specs.mutations.create.create",
         "django_service_specs.adapters.forms",

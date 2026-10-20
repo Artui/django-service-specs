@@ -33,6 +33,11 @@ Until then a project without DRF can dispatch its specs from its own views,
 commands, tasks and agent tools, and no ready-made MCP server or agent toolset
 serves them.
 
+A spec as a management command is
+[`django-spec-cli`](https://github.com/Artui/django-spec-cli), a distribution
+of its own that depends on this one: one command per registry, one subcommand
+per spec, run through `dispatch` as a named user.
+
 **Status:** early. The public API may still change between minor releases,
 and every change is recorded in the [changelog](CHANGELOG.md).
 

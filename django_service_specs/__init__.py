@@ -19,17 +19,6 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.authorization.unrestricted import Unrestricted
-from django_service_specs.commands.argv.add_spec_arguments import add_spec_arguments
-from django_service_specs.commands.argv.describe_parameters import describe_parameters
-from django_service_specs.commands.argv.parameter_descriptor import ParameterDescriptor
-from django_service_specs.commands.argv.parsed_arguments import parsed_arguments
-from django_service_specs.commands.exit_code_for import exit_code_for
-from django_service_specs.commands.render.render_json_lines import render_json_lines
-from django_service_specs.commands.render.render_result import render_result
-from django_service_specs.commands.render.render_table import render_table
-from django_service_specs.commands.render.wants_table import wants_table
-from django_service_specs.commands.report.unguarded_message import unguarded_message
-from django_service_specs.commands.spec_command import SpecCommand
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
 from django_service_specs.dispatch.apresent import apresent
@@ -152,7 +141,6 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
-from django_service_specs.types.exit_code import ExitCode
 from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.no_input import NoInput
@@ -216,7 +204,6 @@ __all__ = [
     "OutputField",
     "OutputPage",
     "Parameter",
-    "ParameterDescriptor",
     "Parameters",
     "PermissionCheck",
     "PoolSeeds",
@@ -245,13 +232,6 @@ __all__ = [
     "ServiceNotFound",
     "ServiceSpec",
     "ServiceValidationError",
-    "SpecCommand",
-    "ExitCode",
-    "exit_code_for",
-    "render_json_lines",
-    "render_result",
-    "render_table",
-    "wants_table",
     "SpecRegistry",
     "SpecSource",
     "SpecView",
@@ -270,7 +250,6 @@ __all__ = [
     "acreate_from_input",
     "acreate_model",
     "add_argument_errors",
-    "add_spec_arguments",
     "adelete_collection",
     "adelete_model",
     "adelete_relations",
@@ -306,7 +285,6 @@ __all__ = [
     "delete_collection",
     "delete_model",
     "delete_relations",
-    "describe_parameters",
     "dispatch",
     "dispatch_request",
     "enforce_affordances",
@@ -325,7 +303,6 @@ __all__ = [
     "output_schema",
     "paginate_output",
     "parameters_schema",
-    "parsed_arguments",
     "present",
     "present_for_audience",
     "project_payload",
@@ -346,7 +323,6 @@ __all__ = [
     "spec_input_schema",
     "spec_output_schema",
     "unanswered_refusals",
-    "unguarded_message",
     "unguarded_specs",
     "unmet_operation_affordance",
     "update_from_input",

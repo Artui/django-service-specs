@@ -62,8 +62,8 @@ Non-negotiable. They keep the package navigable.
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
 7. **The package root is a table of contents, not a drawer.** It holds
-   `__init__.py`, `version.py`, `settings.py`, `apps.py`, `checks.py` and nothing
-   else; everything the package does lives in a subpackage. A subpackage is named
+   `__init__.py`, `version.py`, `settings.py`, `apps.py` and nothing else;
+   everything the package does lives in a subpackage. A subpackage is named
    for a **concern** (`parameters/`, `dispatch/`, `authorization/`) and never for
    a kind of thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and
    become a flat root one level down. Three modules on one concern earn a

@@ -29,13 +29,11 @@ from django_service_specs import (
     ServiceValidationError,
     UnsupportedMediaType,
 )
-from django_service_specs.commands.exit_code_for import _CODES, exit_code_for
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.http.error_response import _STATUSES, error_response
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
-from django_service_specs.types.exit_code import ExitCode
 
 # Each kind's value, for the negative assertions. A plain string compares
 # equal to its ``RefusalFindingKind`` member, which ``str`` subclasses.
@@ -298,10 +296,6 @@ class TestACallable:
 
 
 class TestTheKernelsOwnMaps:
-    def test_the_exit_codes_answer_every_refusal(self) -> None:
-        assert unanswered_refusals(_CODES) == ()
-        assert unanswered_refusals(exit_code_for, unanswered=ExitCode.ERROR) == ()
-
     def test_the_http_statuses_answer_every_refusal(self) -> None:
         # The ladder only: error_response's four arms above it are code, and
         # its own tests' branch coverage holds their order.
