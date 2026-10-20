@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 import pytest
@@ -592,76 +593,76 @@ class TestFormatters:
 
         assert self.formatted(subschema, marking) == subschema
 
-    def test_a_nullable_field_stays_nullable(self) -> None:
-        """A null is never formatted, so the projected payload still carries
-        one where the field allowed it."""
-        subschema = {"type": ["string", "null"], "format": "date-time"}
-
+    @pytest.mark.parametrize(
+        "subschema",
+        [
+            # A null is never formatted, so the projected payload still carries
+            # one where the field allowed it.
+            pytest.param({"type": ["string", "null"], "format": "date-time"}, id="type-list"),
+            pytest.param({"type": "null"}, id="null-alone"),
+            # The shape a dataclass field typed ``datetime | None`` is described
+            # as: the null is a member of a union, not a word in a type.
+            pytest.param(
+                {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
+                id="any-of-member",
+            ),
+            # The shape ``ChoiceField(allow_null=True)`` is described as: untyped,
+            # because its values are of two types, with the null among them.
+            pytest.param({"enum": ["a", "b", None]}, id="enum"),
+            # The enum lists the null the server serves, so it is read even
+            # beside a type that does not name one.
+            pytest.param({"type": "string", "enum": ["a", None]}, id="enum-beside-a-type"),
+            pytest.param({"const": None}, id="const"),
+            # A labelled nullable choice: the null is an entry of its own, as a
+            # constant or as a type.
+            pytest.param(
+                {"oneOf": [{"const": "a", "title": "Alpha"}, {"const": None}]},
+                id="one-of-const",
+            ),
+            pytest.param(
+                {"oneOf": [{"const": "a", "title": "Alpha"}, {"type": "null"}]},
+                id="one-of-type",
+            ),
+            # A member is read as a property is: its own type list, its own enum.
+            pytest.param(
+                {"anyOf": [{"type": ["string", "null"]}, {"type": "integer"}]},
+                id="inside-an-any-of-member-type",
+            ),
+            pytest.param(
+                {"anyOf": [{"enum": ["a", None]}, {"type": "integer"}]},
+                id="inside-an-any-of-member-enum",
+            ),
+            # ``true`` and ``{}`` admit anything, null included.
+            pytest.param({"anyOf": [{"type": "string"}, True]}, id="any-of-true"),
+            pytest.param({"anyOf": [{"type": "string"}, {}]}, id="any-of-empty"),
+            pytest.param({"oneOf": [{"type": "string"}, True]}, id="one-of-true"),
+            pytest.param({"oneOf": [{"type": "string"}, {}]}, id="one-of-empty"),
+        ],
+    )
+    def test_a_null_the_property_admits_stays_admitted(self, subschema: dict[str, Any]) -> None:
         assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
 
-    def test_a_field_stated_only_as_null_still_admits_it(self) -> None:
-        assert self.formatted({"type": "null"}) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_null_stated_as_an_any_of_member_stays_admitted(self) -> None:
-        """The shape a dataclass field typed ``datetime | None`` is described
-        as: the null is a member of a union, not a word in a type."""
-        subschema = {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]}
-
-        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_null_listed_in_an_enum_stays_admitted(self) -> None:
-        """The shape ``ChoiceField(allow_null=True)`` is described as: untyped,
-        because its values are of two types, with the null among them."""
-        subschema = {"enum": ["a", "b", None]}
-
-        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_null_listed_in_an_enum_stays_admitted_whatever_type_is_stated(self) -> None:
-        """The enum lists the null the server serves, so it is read even
-        beside a type that does not name one."""
-        subschema = {"type": "string", "enum": ["a", None]}
-
-        assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_null_stated_as_a_one_of_entry_stays_admitted(self) -> None:
-        """A labelled nullable choice: the null is an entry of its own, as a
-        constant or as a type."""
-        for entry in ({"const": None}, {"type": "null"}):
-            subschema = {"oneOf": [{"const": "a", "title": "Alpha"}, entry]}
-
-            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_null_inside_an_any_of_member_stays_admitted(self) -> None:
-        """A member is read as a property is: its own type list, its own
-        enum."""
-        for member in ({"type": ["string", "null"]}, {"enum": ["a", None]}):
-            subschema = {"anyOf": [member, {"type": "integer"}]}
-
-            assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-
-    def test_a_boolean_or_empty_union_member_is_read_as_a_schema_is(self) -> None:
-        """``true`` and ``{}`` admit anything, null included; ``false`` admits
-        nothing, and an entry that is no schema at all is not read."""
-        for union in ("anyOf", "oneOf"):
-            for admitting in (True, {}):
-                subschema = {union: [{"type": "string"}, admitting]}
-
-                assert self.formatted(subschema) == {**LOCAL_TIME, "type": ["string", "null"]}
-            for admitting_nothing in (False, "string"):
-                subschema = {union: [{"type": "string"}, admitting_nothing]}
-
-                assert self.formatted(subschema) == LOCAL_TIME
-
-    def test_a_union_naming_no_null_admits_none_after_formatting(self) -> None:
-        """The condition of the null kept, per spelling: a union with no null
-        member, a ``oneOf`` with no null entry and an enum without ``None``."""
-        for subschema in (
-            {"anyOf": [{"type": "string"}, {"type": "integer"}]},
-            {"oneOf": [{"const": "a"}, {"const": "b"}]},
-            {"enum": ["a", "b"]},
-            {"type": "string", "const": "a"},
-        ):
-            assert self.formatted(subschema) == LOCAL_TIME
+    @pytest.mark.parametrize(
+        "subschema",
+        [
+            # The negative of each spelling above.
+            pytest.param({"type": ["string", "integer"]}, id="type-list"),
+            pytest.param({"anyOf": [{"type": "string"}, {"type": "integer"}]}, id="any-of"),
+            pytest.param({"oneOf": [{"const": "a"}, {"const": "b"}]}, id="one-of"),
+            pytest.param({"enum": ["a", "b"]}, id="enum"),
+            pytest.param({"type": "string", "const": "a"}, id="const"),
+            # ``false`` admits nothing, and an entry that is no schema at all is
+            # not read.
+            pytest.param({"anyOf": [{"type": "string"}, False]}, id="any-of-false"),
+            pytest.param({"anyOf": [{"type": "string"}, "string"]}, id="any-of-no-schema"),
+            pytest.param({"oneOf": [{"type": "string"}, False]}, id="one-of-false"),
+            pytest.param({"oneOf": [{"type": "string"}, "string"]}, id="one-of-no-schema"),
+        ],
+    )
+    def test_a_property_admitting_no_null_admits_none_after_formatting(
+        self, subschema: dict[str, Any]
+    ) -> None:
+        assert self.formatted(subschema) == LOCAL_TIME
 
     def test_a_schema_stating_nothing_about_its_value_still_admits_null(self) -> None:
         """An ``any`` field is described as ``{}``, which admits every value and
@@ -709,76 +710,68 @@ class TestFormatters:
         over one serves a string, as it did before ``any`` existed."""
         assert self.formatted(subschema)["type"] == "string"
 
-    def test_a_null_constant_stays_admitted(self) -> None:
-        assert self.formatted({"const": None}) == {**LOCAL_TIME, "type": ["string", "null"]}
+    @pytest.mark.parametrize(
+        ("declared", "subschema", "expected"),
+        [
+            # The type now admits a null, so an ``enum`` the formatter lists
+            # beside it must too, or the schema would refuse the null it just
+            # admitted.
+            pytest.param(
+                {"enum": ("a", "b")},
+                {"type": ["string", "null"]},
+                {"enum": ["a", "b", None], "type": ["string", "null"]},
+                id="enum",
+            ),
+            pytest.param(
+                {"enum": ["a", None]},
+                {"type": ["string", "null"]},
+                {"enum": ["a", None], "type": ["string", "null"]},
+                id="enum-already-listing-none",
+            ),
+            pytest.param(
+                {"enum": ["a", "b"]},
+                {"type": "string"},
+                {"enum": ["a", "b"], "type": "string"},
+                id="enum-on-a-field-admitting-no-null",
+            ),
+            # A ``const`` is a one-value ``enum``: restated as the ``enum`` of
+            # that value and a null, the smallest statement that still admits
+            # both.
+            pytest.param(
+                {"const": "n/a"},
+                {"type": ["string", "null"]},
+                {"enum": ["n/a", None], "type": ["string", "null"]},
+                id="const",
+            ),
+            # Both must hold, so the values left are the constant alone.
+            pytest.param(
+                {"const": "a", "enum": ["a", "b"]},
+                {"type": ["string", "null"]},
+                {"enum": ["a", None], "type": ["string", "null"]},
+                id="const-and-enum",
+            ),
+            pytest.param(
+                {"const": None},
+                {"type": ["string", "null"]},
+                {"const": None, "type": ["string", "null"]},
+                id="const-none",
+            ),
+            pytest.param(
+                {"const": "a"},
+                {"type": "string"},
+                {"const": "a", "type": "string"},
+                id="const-on-a-field-admitting-no-null",
+            ),
+        ],
+    )
+    def test_a_formatters_own_values_admit_the_null_its_field_does(
+        self, declared: dict[str, Any], subschema: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        produced = ValueFormatter(str, produces="string", schema=deepcopy(declared))
 
-    def test_a_formatters_own_enum_admits_the_null_its_field_does(self) -> None:
-        """The type now admits a null, so an ``enum`` the formatter lists beside
-        it must too, or the schema would refuse the null it just admitted."""
-        produced = ValueFormatter(str, produces="string", schema={"enum": ("a", "b")})
-        marking = FieldMarking.formatted(produced)
-
-        assert self.formatted({"type": ["string", "null"]}, marking) == {
-            "enum": ["a", "b", None],
-            "type": ["string", "null"],
-        }
+        assert self.formatted(subschema, FieldMarking.formatted(produced)) == expected
         # The declaration itself is never modified.
-        assert produced.schema == {"enum": ("a", "b")}
-
-    def test_a_formatters_enum_already_listing_none_is_left_as_declared(self) -> None:
-        produced = ValueFormatter(str, produces="string", schema={"enum": ["a", None]})
-
-        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
-            "enum": ["a", None],
-            "type": ["string", "null"],
-        }
-
-    def test_a_formatters_enum_on_a_field_admitting_no_null_is_left_as_declared(self) -> None:
-        produced = ValueFormatter(str, produces="string", schema={"enum": ["a", "b"]})
-
-        assert self.formatted({"type": "string"}, FieldMarking.formatted(produced)) == {
-            "enum": ["a", "b"],
-            "type": "string",
-        }
-
-    def test_a_formatters_own_const_admits_the_null_its_field_does(self) -> None:
-        """A ``const`` is a one-value ``enum``: restated as the ``enum`` of that
-        value and a null, the smallest statement that still admits both."""
-        produced = ValueFormatter(str, produces="string", schema={"const": "n/a"})
-
-        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
-            "enum": ["n/a", None],
-            "type": ["string", "null"],
-        }
-
-    def test_a_formatters_const_and_enum_together_are_one_value_and_a_null(self) -> None:
-        """Both must hold, so the values left are the constant alone."""
-        produced = ValueFormatter(str, produces="string", schema={"const": "a", "enum": ["a", "b"]})
-
-        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
-            "enum": ["a", None],
-            "type": ["string", "null"],
-        }
-
-    def test_a_formatters_const_none_is_left_as_declared(self) -> None:
-        produced = ValueFormatter(str, produces="string", schema={"const": None})
-
-        assert self.formatted({"type": ["string", "null"]}, FieldMarking.formatted(produced)) == {
-            "const": None,
-            "type": ["string", "null"],
-        }
-
-    def test_a_formatters_const_on_a_field_admitting_no_null_is_left_as_declared(self) -> None:
-        produced = ValueFormatter(str, produces="string", schema={"const": "a"})
-
-        assert self.formatted({"type": "string"}, FieldMarking.formatted(produced)) == {
-            "const": "a",
-            "type": "string",
-        }
-
-    def test_a_type_admitting_no_null_admits_none_after_formatting(self) -> None:
-        """The condition of the null kept: only a stated ``"null"`` is."""
-        assert self.formatted({"type": ["string", "integer"]}) == LOCAL_TIME
+        assert produced.schema == declared
 
     def test_every_projected_row_meets_the_projected_schema(self) -> None:
         field = OutputField(

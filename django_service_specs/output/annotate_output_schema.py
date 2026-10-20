@@ -194,21 +194,22 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
         # The formatter's own fragment merges over the type, and one listing
         # an ``enum`` would refuse the null the type now admits, so the null
         # is listed there too, in a new list: the declaration is shared and
-        # frozen. Two conditions in one branch, each held by its own test:
-        # test_a_nullable_field_stays_nullable (the first: without it a
-        # fragment with no enum gains a key) and
-        # test_a_formatters_enum_already_listing_none_is_left_as_declared (the
-        # second: without it None is listed twice). The list itself is held by
-        # test_a_formatters_own_enum_admits_the_null_its_field_does, and the
-        # outer guard by
-        # test_a_formatters_enum_on_a_field_admitting_no_null_is_left_as_declared.
+        # frozen. Two conditions in one branch, each held by its own test,
+        # the cases named being those of
+        # test_a_formatters_own_values_admit_the_null_its_field_does unless
+        # another test is named: the first by
+        # test_a_null_the_property_admits_stays_admitted[type-list] (without
+        # it a fragment with no enum gains a key) and the second by
+        # ``enum-already-listing-none`` (without it None is listed twice). The
+        # list itself is held by ``enum``, and the outer guard by
+        # ``enum-on-a-field-admitting-no-null``.
         #
         # A ``const`` refuses it the same way, and is restated as the ``enum``
         # of that value, which then gains the null as above. Where both are
         # declared both must hold, so the constant alone is what is left of
         # the ``enum``. A ``const`` of ``None`` already is the null, and is
-        # left as declared: test_a_formatters_const_none_is_left_as_declared.
-        # No const at all is test_a_nullable_field_stays_nullable.
+        # left as declared: ``const-none``. No const at all is
+        # test_a_null_the_property_admits_stays_admitted[type-list].
         if formatted.get("const") is not None:
             formatted["enum"] = [formatted.pop("const")]
         if "enum" in formatted and None not in formatted["enum"]:
@@ -239,18 +240,16 @@ def _admits_null(schema: dict[str, Any]) -> bool:
     One boolean, so one branch to coverage; each spelling has a test that
     fails without it:
     test_a_schema_stating_nothing_about_its_value_still_admits_null (nothing
-    stated), test_a_nullable_field_stays_nullable (a type list),
-    test_a_field_stated_only_as_null_still_admits_it (``"null"`` alone),
-    test_a_null_listed_in_an_enum_stays_admitted, test_a_null_constant_stays_admitted,
-    test_a_null_stated_as_an_any_of_member_stays_admitted,
-    test_a_null_stated_as_a_one_of_entry_stays_admitted (both entries) and
-    test_a_null_inside_an_any_of_member_stays_admitted (the recursion). The
-    negative of each is test_a_union_naming_no_null_admits_none_after_formatting.
+    stated), and the cases of test_a_null_the_property_admits_stays_admitted:
+    ``type-list``, ``null-alone``, ``enum``, ``const``, ``any-of-member``,
+    ``one-of-const`` and ``one-of-type`` (both entries), and
+    ``inside-an-any-of-member-type`` (the recursion). The negative of each is
+    a case of test_a_property_admitting_no_null_admits_none_after_formatting.
     """
     stated = schema.get("type")
     return (
         schema.keys() <= _ANNOTATIONS
-        or "null" in (stated if isinstance(stated, list) else [stated])
+        or _states_null(stated)
         or None in schema.get("enum", ())
         or schema.get("const", ...) is None
         or any(
@@ -261,13 +260,21 @@ def _admits_null(schema: dict[str, Any]) -> bool:
     )
 
 
+def _states_null(stated: Any) -> bool:
+    """Whether a ``"type"`` names ``"null"``: in a list of types, or as the type alone."""
+    return "null" in (stated if isinstance(stated, list) else [stated])
+
+
 def _member_admits_null(member: Any) -> bool:
     """Whether one entry of an ``anyOf`` or ``oneOf`` admits a ``null``.
 
     A schema may be a boolean, and ``true`` or ``{}`` admits anything, the
     null included, where ``false`` admits nothing. Anything else that is not an
     object is no schema to read. Each of the three is a case of
-    test_a_boolean_or_empty_union_member_is_read_as_a_schema_is.
+    test_a_null_the_property_admits_stays_admitted (``any-of-true``,
+    ``any-of-empty``) or of
+    test_a_property_admitting_no_null_admits_none_after_formatting
+    (``any-of-false``).
     """
     if isinstance(member, dict):
         return not member or _admits_null(member)
@@ -425,7 +432,7 @@ def _retyped(schema: dict[str, Any], values: list[Any]) -> dict[str, Any]:
     # (the second: a null is listed and the type refused it). Both spellings of
     # a stated null: test_a_nullable_integer_keeps_its_null (a list naming it)
     # and test_a_type_stated_as_null_alone_still_admits_it (``"null"`` alone).
-    if None in values and "null" in (stated if isinstance(stated, list) else [stated]):
+    if None in values and _states_null(stated):
         names.append("null")
     # test_only_a_null_left_to_type_leaves_the_type_as_stated.
     if not names:
