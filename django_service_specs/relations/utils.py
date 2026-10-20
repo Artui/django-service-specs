@@ -6,12 +6,10 @@ down once rather than agreed between two modules."""
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Any
+from collections.abc import Callable, Mapping, Sequence
+from typing import Any, Protocol
 
-from django.core.exceptions import (
-    ImproperlyConfigured,
-)
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Model
 
 from django_service_specs.types.relation_mode import RelationMode
@@ -53,26 +51,52 @@ def validate_relation_orphan(orphan: str, *, delete_service: Any, label: str) ->
     )
 
 
-def validate_relation_services(
-    *,
-    label: str,
-    services: Mapping[str, Any],
-    shaping: Mapping[str, Any],
-) -> None:
+class _RowWriteSpec(Protocol):
+    """The six fields of a relation spec that say who writes its rows, and how.
+
+    Read-only properties, so a frozen dataclass declaring them as fields
+    satisfies it.
+    """
+
+    @property
+    def create_service(self) -> Callable[..., Any] | None: ...
+    @property
+    def update_service(self) -> Callable[..., Any] | None: ...
+    @property
+    def field_map(self) -> Mapping[str, str] | None: ...
+    @property
+    def exclude_fields(self) -> Sequence[str] | None: ...
+    @property
+    def m2m(self) -> Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None: ...
+    @property
+    def relations(self) -> Mapping[str, Any] | None: ...
+
+
+def validate_relation_services(spec: _RowWriteSpec, *, label: str) -> None:
     """Refuse a relation spec that declares a row service *and* row shaping.
 
     A ``create_service`` / ``update_service`` stands in for the mutation-helper
     call, so every knob configuring that call is bypassed for the row — silently,
     unless caught here.
 
-    Callers must keep reconciliation fields (``fk`` / ``match_key`` / ``mode`` /
-    ``scope`` / orphan handling) out of both mappings, and must not pass
-    ``delete_service`` in ``services``: it replaces the unlink-or-delete rule
-    rather than the helper call, so it composes with row shaping.
+    Reconciliation fields (``fk`` / ``match_key`` / ``mode`` / ``scope`` /
+    orphan handling) are read on neither side, and neither is
+    ``delete_service``: it replaces the unlink-or-delete rule rather than the
+    helper call, so it composes with row shaping.
     """
+    services: dict[str, Any] = {
+        "create_service": spec.create_service,
+        "update_service": spec.update_service,
+    }
     declared_services: list[str] = sorted(name for name, value in services.items() if value)
     if not declared_services:
         return
+    shaping: dict[str, Any] = {
+        "field_map": spec.field_map,
+        "exclude_fields": spec.exclude_fields,
+        "m2m": spec.m2m,
+        "relations": spec.relations,
+    }
     declared_shaping: list[str] = sorted(name for name, value in shaping.items() if value)
     if not declared_shaping:
         return
