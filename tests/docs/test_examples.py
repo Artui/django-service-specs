@@ -633,6 +633,8 @@ class TestTransport:
             ServiceNotFound("No such shelf."),
             ServiceConflict("Taken."),
             ServiceError("Not today."),
+            # A base may be raised bare, so the ladder answers it below its subclasses.
+            DispatchError("Not dispatched."),
         ],
         ids=lambda refusal: f"{type(refusal).__name__}-{refusal}",
     )

@@ -560,6 +560,11 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "unguarded_specs",
         "UnsupportedMediaType",
         "dispatch_request",
+        # The shared check that a transport's refusal map answers every kernel
+        # refusal: a transport's own suite reads these from the kernel, and a
+        # drfs consumer writes no refusal map.
+        "REFUSALS",
+        "unanswered_refusals",
         "adispatch_request",
         "error_response",
         "add_argument_errors",

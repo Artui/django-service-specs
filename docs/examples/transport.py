@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from django_service_specs import (
+    DispatchError,
     InvalidArguments,
     NotPermitted,
     PrincipalUnavailable,
@@ -28,6 +29,9 @@ def answer(spec: ServiceSpec, principal: Any, arguments: dict[str, Any]) -> tupl
         return 400, refused.detail
     except (NotPermitted, PrincipalUnavailable) as refused:
         return 403, {"detail": refused.message}
+    # The base may be raised bare, so it is answered below its subclasses.
+    except DispatchError as refused:
+        return 400, {"detail": refused.message}
     # The operation refused. The subclasses first: each is also a ServiceError.
     except ServiceValidationError as refused:
         return 400, field_map(refused.detail)
