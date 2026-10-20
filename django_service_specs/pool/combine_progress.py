@@ -26,7 +26,7 @@ def combine_progress(*reporters: ProgressReporter | None) -> ProgressReporter:
 
     This is not how dispatch joins a spec's own ``progress_reporter`` to the
     transport's reporter: there, a sink's failure reaches the service, as the
-    transport's own reporter failing always has.
+    transport's own reporter failing does.
 
     Args:
         *reporters: The sinks, in call order. ``None`` is dropped, so an

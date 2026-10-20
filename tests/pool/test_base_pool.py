@@ -92,10 +92,7 @@ def test_a_seed_colliding_with_a_spread_entry_is_refused() -> None:
         base_pool(user="u", seeds=seeds, tenant="spread")
 
 
-def test_a_supplied_reporter_is_seeded_as_it_is() -> None:
-    def reporter(progress: float, **_: Any) -> None: ...
-
-    assert base_pool(user="u", progress=reporter)["progress"] is reporter
+def _reporter(progress: float, **_: Any) -> None: ...
 
 
 class _Recorder(list[float]):
@@ -105,17 +102,17 @@ class _Recorder(list[float]):
         self.append(progress)
 
 
-def test_a_falsy_reporter_is_seeded_as_it_is() -> None:
-    recorder = _Recorder()
-
-    assert base_pool(user="u", progress=recorder)["progress"] is recorder
+@pytest.mark.parametrize(
+    "reporter",
+    [pytest.param(_reporter, id="a-function"), pytest.param(_Recorder(), id="falsy")],
+)
+def test_a_supplied_reporter_is_seeded_as_it_is(reporter: Any) -> None:
+    assert base_pool(user="u", progress=reporter)["progress"] is reporter
 
 
 def test_a_resolver_sees_the_caller_s_reporter() -> None:
-    def reporter(progress: float, **_: Any) -> None: ...
-
     seeds = DEFAULT_POOL_SEEDS.extend(sink=lambda *, progress: progress)
-    assert base_pool(user="u", progress=reporter, seeds=seeds)["sink"] is reporter
+    assert base_pool(user="u", progress=_reporter, seeds=seeds)["sink"] is _reporter
 
 
 async def _books_open() -> bool:

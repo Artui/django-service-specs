@@ -51,8 +51,8 @@ def _spec(extend: Any) -> SelectorSpec:
 class TestAnExtendQuerysetAnsweringWithAnAwaitable:
     """``extend_queryset`` is called from sync code and never awaited.
 
-    What it hands back stood in for the queryset, so dispatch returned an
-    unawaited coroutine as a list's value.
+    What it hands back would stand in for the queryset, so dispatch would
+    return an unawaited coroutine as a list's value.
     """
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:

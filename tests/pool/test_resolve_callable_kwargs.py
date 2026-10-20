@@ -2,45 +2,33 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
+import pytest
+
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 
 
-def test_passes_only_declared_params() -> None:
-    def fn(*, a: int, b: int) -> int:
-        return a + b
-
-    pool = {"a": 1, "b": 2, "c": 3}
-    assert resolve_callable_kwargs(fn, pool) == {"a": 1, "b": 2}
-
-
-def test_passes_everything_when_var_keyword_present() -> None:
-    def fn(**kwargs: object) -> dict[str, object]:
-        return kwargs
-
-    pool = {"a": 1, "b": 2}
-    assert resolve_callable_kwargs(fn, pool) == pool
-
-
-def test_pool_missing_keys_simply_omits() -> None:
-    def fn(*, a: int, b: int = 0) -> int:
-        return a + b
-
-    pool = {"a": 1}
-    assert resolve_callable_kwargs(fn, pool) == {"a": 1}
-
-
-def test_positional_or_keyword_params_resolved() -> None:
-    def fn(a: int, b: int) -> int:
-        return a + b
-
-    pool = {"a": 1, "b": 2, "c": 3}
-    assert resolve_callable_kwargs(fn, pool) == {"a": 1, "b": 2}
-
-
-def test_var_positional_ignored() -> None:
-    def fn(*args: int, b: int) -> int:
-        return b + sum(args)
-
-    pool = {"args": (1, 2), "b": 3}
-    # *args is VAR_POSITIONAL, not collected as a kwarg.
-    assert resolve_callable_kwargs(fn, pool) == {"b": 3}
+@pytest.mark.parametrize(
+    ("fn", "pool", "expected"),
+    [
+        pytest.param(
+            lambda *, a, b: a + b, {"a": 1, "b": 2, "c": 3}, {"a": 1, "b": 2}, id="keyword-only"
+        ),
+        pytest.param(lambda **kwargs: kwargs, {"a": 1, "b": 2}, {"a": 1, "b": 2}, id="var-keyword"),
+        pytest.param(lambda *, a, b=0: a + b, {"a": 1}, {"a": 1}, id="a-key-the-pool-lacks"),
+        pytest.param(
+            lambda a, b: a + b,
+            {"a": 1, "b": 2, "c": 3},
+            {"a": 1, "b": 2},
+            id="positional-or-keyword",
+        ),
+        # *args is VAR_POSITIONAL, not collected as a kwarg.
+        pytest.param(lambda *args, b: b, {"args": (1, 2), "b": 3}, {"b": 3}, id="var-positional"),
+    ],
+)
+def test_forwards_what_the_callable_declares(
+    fn: Callable[..., Any], pool: dict[str, Any], expected: dict[str, Any]
+) -> None:
+    assert resolve_callable_kwargs(fn, pool) == expected
