@@ -66,6 +66,20 @@ NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
 
 
+class ListNotFound(Exception):
+    """A LIST selector's own ``Http404``, raised by ``lookup`` for its caller to answer.
+
+    A LIST has no ``None`` to hand back for a missing row, so ``lookup`` says
+    "not found" by raising this, from the selector's ``Http404``. Its own, so
+    the caller's ``except`` cannot catch an ``Http404`` from anywhere else in
+    the call - ``extend_queryset``, an affordance condition - which passes
+    through as it does on ``adispatch``
+    (test_an_http404_from_extend_queryset_is_not_the_selector_s_not_found).
+    Never raised past dispatch: the selector spec's own run and a write's
+    collection selector answer it as ``NOT_FOUND``.
+    """
+
+
 @dataclass(frozen=True)
 class Overlay:
     """A call's own keywords beneath the spec's ``kwargs`` provider: ``extra_kwargs``.
@@ -984,14 +998,22 @@ def lookup(
         kwargs = with_run_progress(
             selector_spec, kwargs, pool, reserved=reserved, transport=transport
         )
-    # One arc to coverage for both members:
-    # test_a_retrieve_raising_does_not_exist_is_not_found holds the first,
-    # test_a_retrieve_raising_http404_under_allow_none_is_none the second (a
-    # RETRIEVE's not-found alone would pass without it, answered by
-    # ``dispatch``'s own ``except Http404``).
     try:
         raw = run_selector(fn, kwargs)
     except (ObjectDoesNotExist, Http404) as error:
+        # Each member and conjunct is held by its own test:
+        # test_a_retrieve_raising_does_not_exist_is_not_found
+        # (``ObjectDoesNotExist``), test_a_retrieve_raising_http404_is_not_found
+        # (``Http404``), test_a_list_raising_does_not_exist_is_a_fault_and_passes_through
+        # (the ``isinstance``), test_a_retrieve_raising_http404_under_allow_none_is_none
+        # (the kind) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
+        # (``after_the_run``: the write has run, so it is never reported not found).
+        if (
+            isinstance(error, Http404)
+            and selector_spec.kind is SelectorKind.LIST
+            and not after_the_run
+        ):
+            raise ListNotFound from error
         reraise_unless_retrieve(selector_spec, error)
         return None
     return settle(selector_spec, raw, pool, source=source, reserved=reserved, fillable=fillable)
@@ -1139,7 +1161,7 @@ def walk_target(
                 target = lookup(
                     collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
                 )
-            except Http404:
+            except ListNotFound:
                 # The collection selector's own "not found", of a parent it
                 # looked up: there is no set to scope-check, so nothing is.
                 return NOT_FOUND

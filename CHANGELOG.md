@@ -39,7 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DoesNotExist` escaping a LIST is still a fault inside the selector and
   raises. An output selector runs after the write, so a LIST one raising
   `Http404` still raises rather than report the write as not found, and a
-  RETRIEVE one's is its `None`, as its `DoesNotExist` is.
+  RETRIEVE one's is its `None`, as its `DoesNotExist` is. Only the selector's
+  own raise counts: an `Http404` from its `extend_queryset` passes through on
+  both entry points, as before.
 
 ## [0.9.0] — 2026-10-16
 

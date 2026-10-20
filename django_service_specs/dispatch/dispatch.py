@@ -5,13 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django.http import Http404
-
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     NOT_FOUND,
     SELECTOR_SOURCE,
+    ListNotFound,
     Overlay,
     conclude_selector,
     finish_service,
@@ -261,10 +260,9 @@ def dispatch(
                 run=True,
                 transport=progress,
             )
-        except Http404:
-            # Only a LIST's reaches here, ``lookup`` having made a RETRIEVE's
-            # its missing row: the selector said "not found", of a parent it
-            # looked up, which ``allow_none`` does not turn into rows.
+        except ListNotFound:
+            # The LIST selector said "not found", of a parent it looked up,
+            # which ``allow_none`` does not turn into rows.
             return NOT_FOUND
         return conclude_selector(
             spec,

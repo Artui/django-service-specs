@@ -20,6 +20,7 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 
 from django_service_specs.authorization import utils as authorization_utils
@@ -429,6 +430,28 @@ async def test_an_async_retrieve_raising_http404_under_allow_none_is_none(ada: A
     result = await adispatch(spec, principal=ada, arguments={"pk": 404})
 
     assert (result.kind, result.value) == ("instance", None)
+
+
+@pytest.mark.parametrize("kind", [RETRIEVE, LIST])
+async def test_an_async_http404_from_extend_queryset_is_not_the_selector_s_not_found(
+    ada: Any, kind: SelectorKind
+) -> None:
+    def refuse(*, queryset: Any) -> Any:
+        raise Http404("shaping")
+
+    async def every_note() -> Any:
+        return Note.objects.all()
+
+    spec = SelectorSpec(
+        kind=kind,
+        selector=every_note,
+        permissions=OPEN,
+        allow_none=True,
+        extend_queryset=refuse,
+    )
+
+    with pytest.raises(Http404, match="shaping"):
+        await adispatch(spec, principal=ada, arguments={})
 
 
 @pytest.mark.parametrize("allow_none", [False, True])

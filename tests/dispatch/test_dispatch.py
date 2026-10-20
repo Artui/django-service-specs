@@ -230,6 +230,27 @@ def test_a_list_whose_parent_lookup_raises_http404_is_not_found(ada: Any, allow_
     assert result == DispatchResult(kind="not_found")
 
 
+@pytest.mark.parametrize("kind", [RETRIEVE, LIST])
+def test_an_http404_from_extend_queryset_is_not_the_selector_s_not_found(
+    ada: Any, kind: SelectorKind
+) -> None:
+    # Only the selector's own raise is its "not found": shaping runs after it,
+    # and an ``Http404`` there passes through, as it does on ``adispatch``.
+    def refuse(*, queryset: Any) -> Any:
+        raise Http404("shaping")
+
+    spec = SelectorSpec(
+        kind=kind,
+        selector=lambda: Note.objects.all(),
+        permissions=OPEN,
+        allow_none=True,
+        extend_queryset=refuse,
+    )
+
+    with pytest.raises(Http404, match="shaping"):
+        dispatch(spec, principal=ada, arguments={})
+
+
 def test_a_list_whose_parent_lookup_raises_does_not_exist_is_still_a_fault(ada: Any) -> None:
     spec = SelectorSpec(kind=LIST, selector=_notes_of_owner("get"), reads=OWNER, permissions=OPEN)
 
