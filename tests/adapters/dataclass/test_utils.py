@@ -44,14 +44,10 @@ class _Pong:
     ping: _Ping | None = None
 
 
-def _one(annotation: Any) -> tuple[str, Any]:
-    """The shape of a single field annotated ``annotation``, read by ``read_fields``."""
-    (fs,) = read_fields(dataclasses.make_dataclass("Probe", [("x", annotation)]))
-    return fs.name, fs
-
-
 def _read(annotation: Any) -> Any:
-    return _one(annotation)[1]
+    """The single field annotated ``annotation``, read by ``read_fields``."""
+    (fs,) = read_fields(dataclasses.make_dataclass("Probe", [("x", annotation)]))
+    return fs
 
 
 # --- check_dataclass -------------------------------------------------------------------
