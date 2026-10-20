@@ -95,6 +95,15 @@ class _NoModel(forms.ModelForm):
 _BEYOND_THE_COLUMN = 2**63
 """One past the largest key SQLite's integer column holds, and so past every backend's."""
 
+_PAST_THE_COLUMN = [(f"Ensure this value is less than or equal to {2**63 - 1}.", "max_value")]
+"""The refusal, with its code, of ``_BEYOND_THE_COLUMN`` for a value of an integer column."""
+
+
+def _book() -> Book:
+    return Book.objects.create(
+        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+    )
+
 
 def _many_books() -> forms.ModelMultipleChoiceField:
     return forms.ModelMultipleChoiceField(queryset=Book.objects.all())
@@ -567,26 +576,28 @@ class TestModelChoices:
             "rows": [("Ensure this field has no more than 2 elements.", "max_length")]
         }
 
-    def test_a_key_with_no_json_type_is_refused(self) -> None:
-        field = forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published")
-        with pytest.raises(
-            ImproperlyConfigured,
-            match=re.escape(
+    @pytest.mark.parametrize(
+        ("field", "message"),
+        [
+            pytest.param(
+                forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published"),
                 "Pick.post: matches rows on relations_app.Post.published, a BooleanField, "
-                "which has no JSON type this adapter can declare."
+                "which has no JSON type this adapter can declare.",
+                id="a-key-with-no-json-type",
             ),
-        ):
-            FormValidator(_form("Pick", post=field))
-
-    def test_a_model_choice_field_with_no_queryset_is_refused(self) -> None:
-        with pytest.raises(
-            ImproperlyConfigured,
-            match=re.escape(
+            pytest.param(
+                forms.ModelMultipleChoiceField(queryset=None),
                 "Pick.post: a ModelMultipleChoiceField with no queryset has no model to "
-                "read its key from;"
+                "read its key from;",
+                id="no-queryset",
             ),
-        ):
-            FormValidator(_form("Pick", post=forms.ModelMultipleChoiceField(queryset=None)))
+        ],
+    )
+    def test_a_model_choice_field_with_no_key_to_declare_is_refused(
+        self, field: forms.Field, message: str
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured, match=re.escape(message)):
+            FormValidator(_form("Pick", post=field))
 
 
 class TestPresence:
@@ -922,24 +933,15 @@ class TestANumberPastItsRange:
     ) -> None:
         # The constraint's check queries with the value, and SQLite's driver
         # raised OverflowError for it.
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(_EditionForm, {"book": book.pk, "number": 2**63})
-        assert coded(detail) == {
-            "number": [
-                (
-                    "Ensure this value is less than or equal to %s." % (2**63 - 1),
-                    "max_value",
-                )
-            ]
-        }
+        assert coded(detail) == {"number": _PAST_THE_COLUMN}
 
     @pytest.mark.django_db
     def test_a_value_past_the_column_s_stated_range_is_refused_in_the_same_words(self) -> None:
         # Where the backend states the range, the kernel reads that one.
         assert coded(_refusal(_Viewed, {"title": "Hi", "views": 2**63})) == {
-            "views": [("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")]
+            "views": _PAST_THE_COLUMN
         }
 
     @pytest.mark.django_db
@@ -1028,9 +1030,7 @@ class TestANumberPastItsRange:
             def clean_number(self) -> int:
                 return min(self.cleaned_data["number"], 10)
 
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         cleaned = FormValidator(Clamped).validate({"book": book.pk, "number": 2**63}, CONTEXT)
         assert cleaned["number"] == 10
 
@@ -1041,9 +1041,7 @@ class TestANumberPastItsRange:
             def clean_number(self) -> int:
                 raise forms.ValidationError("Too many editions.", code="too_many")
 
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(Capped, {"book": book.pk, "number": 2**63})
         assert coded(detail) == {"number": [("Too many editions.", "too_many")]}
 
@@ -1053,15 +1051,9 @@ class TestANumberPastItsRange:
         # The model reads the digits as the integer they spell, and the
         # constraint's check queried with it.
         form_class = type("Spelled", (_EditionForm,), {"number": forms.CharField()})
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(form_class, {"book": book.pk, "number": str(2**63)})
-        assert coded(detail) == {
-            "number": [
-                ("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")
-            ]
-        }
+        assert coded(detail) == {"number": _PAST_THE_COLUMN}
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
@@ -1347,21 +1339,22 @@ class TestClearingAFile:
         assert refused.value.detail == {"attachment": [contradiction]}
 
     @pytest.mark.django_db
-    def test_a_partial_call_sending_only_the_checkbox_clears_the_file(self, media: str) -> None:
-        row = _stored()
+    @pytest.mark.parametrize(
+        ("checked", "expected"),
+        [
+            pytest.param(True, {"attachment": False}, id="checked-clears-the-file"),
+            # Unchecked is what absent is on a whole call, so it is on a partial
+            # one too: nothing about the file was sent.
+            pytest.param(False, {}, id="unchecked-leaves-the-file-out"),
+        ],
+    )
+    def test_a_partial_call_sending_only_the_checkbox(
+        self, media: str, checked: bool, expected: dict[str, Any]
+    ) -> None:
         cleaned = FormValidator(_DocumentForm).validate(
-            {"attachment-clear": True}, ValidationContext(None, row, partial=True)
+            {"attachment-clear": checked}, _partial(_stored())
         )
-        assert cleaned == {"attachment": False}
-
-    @pytest.mark.django_db
-    def test_a_partial_call_sending_the_box_unchecked_leaves_the_file_out(self, media: str) -> None:
-        # Unchecked is what absent is on a whole call, so it is on a partial
-        # one too: nothing about the file was sent.
-        cleaned = FormValidator(_DocumentForm).validate(
-            {"attachment-clear": False}, ValidationContext(None, _stored(), partial=True)
-        )
-        assert cleaned == {}
+        assert cleaned == expected
 
     @pytest.mark.django_db
     def test_dispatch_takes_the_checkbox_and_the_service_clears_the_row(self, media: str) -> None:
@@ -1443,9 +1436,7 @@ def _a_pair_and_its_collision(pair: str) -> tuple[Any, Any, dict[str, Any]]:
         target = Permission.objects.create(name="Mine", content_type=kind, codename="mine")
         whole = {"name": "Mine", "content_type": str(kind.pk), "codename": "taken"}
         return "taken", target, whole
-    book = Book.objects.create(
-        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-    )
+    book = _book()
     Edition.objects.create(book=book, number=1)
     target = Edition.objects.create(book=book, number=2)
     return 1, target, {"book": str(book.pk), "number": 1}
@@ -1509,7 +1500,7 @@ class TestPartial:
         book = Book.objects.create(author=author, title="Notes", price=Decimal("9.99"))
         validator = FormValidator(BookForm)
 
-        cleaned = validator.validate({"price": "5.00"}, ValidationContext(None, book, partial=True))
+        cleaned = validator.validate({"price": "5.00"}, _partial(book))
 
         assert cleaned == {"price": Decimal("5.00")}
         result = update_from_input(book, cleaned)
@@ -1550,7 +1541,7 @@ class TestPartial:
         refused = _refusal(form_class, whole, target)
         assert list(refused) == ["non_field_errors"]
         with pytest.raises(InvalidArguments) as caught:
-            FormValidator(form_class).validate(sent, ValidationContext(None, target, partial=True))
+            FormValidator(form_class).validate(sent, _partial(target))
         assert caught.value.detail == refused
 
     @pytest.mark.django_db
@@ -1567,7 +1558,7 @@ class TestPartial:
         # every field not sent, which nothing will write: checked, an empty
         # username that a row already holds refused a call that never sent one.
         User.objects.create(username="")
-        context = ValidationContext(None, None, partial=True)
+        context = _partial()
         assert FormValidator(Username).validate({}, context) == {}
 
     @pytest.mark.django_db
@@ -1576,7 +1567,7 @@ class TestPartial:
         # as Django excludes any model field a form does not have, and a
         # partial one is no stricter.
         taken, target, _ = _a_pair_and_its_collision("permission")
-        context = ValidationContext(None, target, partial=True)
+        context = _partial(target)
         assert FormValidator(_PermissionName).validate({"codename": taken}, context) == {
             "codename": taken
         }
@@ -1584,7 +1575,7 @@ class TestPartial:
     @pytest.mark.django_db
     def test_a_partial_update_that_collides_with_nothing_passes(self) -> None:
         _, target, _ = _a_pair_and_its_collision("permission")
-        context = ValidationContext(None, target, partial=True)
+        context = _partial(target)
         assert FormValidator(_PermissionForm).validate({"codename": "free"}, context) == {
             "codename": "free"
         }
@@ -1644,8 +1635,6 @@ class TestRefusalCodes:
         taken, target, whole = _a_pair_and_its_collision("edition")
         refused = coded(_refusal(_EditionForm, whole, target))
         with pytest.raises(InvalidArguments) as caught:
-            FormValidator(_EditionForm).validate(
-                {"number": taken}, ValidationContext(None, target, partial=True)
-            )
+            FormValidator(_EditionForm).validate({"number": taken}, _partial(target))
         assert coded(caught.value.detail) == refused
         assert [code for _, code in refused["non_field_errors"]] == ["unique_together"]
