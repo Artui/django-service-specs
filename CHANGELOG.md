@@ -33,7 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UnsupportedMediaType`. `unanswered_refusals` takes the map as it is
   written - an ordered table of `(refusal class, outcome)` rows read by
   `isinstance` with the first match winning, or a callable given one
-  instance of each refusal, with `unanswered=` naming its fallback - and
+  instance of each refusal - with `unanswered=` naming the outcome that is no
+  answer, so a table row holding it answers nothing below it either - and
   returns one sentence per finding, so a transport asserts `== ()` from its
   own suite. Three findings: a refusal nothing answers; a base answered
   nowhere while every refusal under it is, since either base may be raised bare;

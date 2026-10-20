@@ -43,10 +43,12 @@ def unanswered_refusals(
 
     - **An ordered table of ``(refusal class, outcome)`` rows**, read top to
       bottom by ``isinstance`` with the first match winning, which is how the
-      kernel's own maps are written. A refusal is answered by the first row
-      whose class it is an instance of, so a row for a base answers every
-      refusal under it, and a catch-all row of ``Exception`` answers them all.
-      Pass the table itself.
+      kernel's own maps are written. A refusal is answered with the outcome
+      of the first row whose class it is an instance of, so a row for a base
+      answers every refusal under it, and a catch-all row of ``Exception``
+      answers them all. A row whose outcome is ``unanswered`` answers
+      nothing, and a refusal it catches first is unanswered whatever a later
+      row says, as for the callable below. Pass the table itself.
     - **A callable**, given one instance of each refusal and answering with its
       outcome, for a map written as code. A refusal is unanswered when the
       callable returns ``unanswered`` (compared with ``==``, so a falsy
@@ -81,7 +83,18 @@ def unanswered_refusals(
         answered = {kind for kind in REFUSALS if answers(_BUILDERS.get(kind, kind)()) != unanswered}
         shadowed: list[str] = []
     else:
-        answered = {kind for kind in REFUSALS if any(issubclass(kind, row) for row, _ in answers)}
+        # The first matching row's outcome, read as the ladder reads it. Held
+        # in tests/dispatch/test_unanswered_refusals.py:
+        # ``test_the_first_matching_row_answers_even_when_it_answers_unanswered``
+        # fails if any matching row may answer instead of the first, and
+        # ``test_a_table_and_the_callable_reading_it_find_the_same`` fails both
+        # for that and if the outcome is not read at all.
+        answered = {
+            kind
+            for kind in REFUSALS
+            if next((outcome for row, outcome in answers if issubclass(kind, row)), unanswered)
+            != unanswered
+        }
         shadowed = _shadowed_rows([row for row, _ in answers])
     return (*(_unanswered(kind, answered) for kind in REFUSALS if kind not in answered), *shadowed)
 

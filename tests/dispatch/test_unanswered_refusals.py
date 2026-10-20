@@ -90,6 +90,46 @@ class TestAnOrderedMap:
         )
         assert _without(found, BARE, SHADOWED)
 
+    def test_a_table_and_the_callable_reading_it_find_the_same(self) -> None:
+        # The table carries a row whose outcome is the unanswered value and no
+        # row below its own base, so the only thing that can tell the two
+        # shapes apart is whether the table reads that outcome. Holds the
+        # ``!= unanswered`` comparison of the table form.
+        rows: tuple[tuple[type[BaseException], object], ...] = (
+            (NotPermitted, None),
+            (DispatchError, "invalid"),
+            (ServiceError, "refused"),
+        )
+
+        def answer(error: DispatchError | ServiceError) -> object:
+            return next((outcome for kind, outcome in rows if isinstance(error, kind)), None)
+
+        assert [str(finding) for finding in unanswered_refusals(rows)] == [
+            _unanswered("NotPermitted")
+        ]
+        assert unanswered_refusals(rows) == unanswered_refusals(answer)
+
+    def test_the_first_matching_row_answers_even_when_it_answers_unanswered(self) -> None:
+        # The base's row reads as no answer, and a subclass row below it with
+        # a real outcome is never reached: first match wins, and the refusal
+        # takes the base's outcome. Holds first-match against a reading that
+        # takes any matching row's outcome.
+        rows = (
+            (DispatchError, "invalid"),
+            (ServiceError, "unanswered"),
+            (ServiceConflict, "conflict"),
+        )
+        found = unanswered_refusals(rows, unanswered="unanswered")
+        assert [str(finding) for finding in found] == [
+            _unanswered("ServiceError"),
+            _unanswered("ServiceNotFound"),
+            _unanswered("ServiceConflict"),
+            _unanswered("ActionUnavailable"),
+            _unanswered("AdditionalInputRequired"),
+            _unanswered("ServiceValidationError"),
+            _shadowed("ServiceConflict", "ServiceError"),
+        ]
+
 
 class TestTheBareBaseTrap:
     def test_a_map_answering_every_dispatch_refusal_but_the_base_is_told_so(self) -> None:

@@ -656,7 +656,8 @@ docs/examples/refusal_outcomes.py:outcomes
 It takes the map as it is written. An ordered table of `(refusal class,
 outcome)` rows is read the way an `isinstance` ladder reads it, top to bottom
 with the first match winning, so a row for a base answers every refusal under
-it. A map written as code is passed as the callable it is, with `unanswered=`
+it, and a row whose outcome is the `unanswered=` value answers nothing, a
+refusal it catches first included. A map written as code is passed as the callable it is, with `unanswered=`
 naming the value it falls back to; a mapping looked up by an error's exact
 class is a callable too, `lambda error: table.get(type(error))`, since reading
 its keys as ordered rows would let a base answer for a subclass the lookup
