@@ -375,9 +375,8 @@ class TestAffordances:
             "ServiceSpec.affordances declares the code 'note_archived' twice."
         )
 
-    # The guard is ``is_row_condition(when) and collection_selector_spec is not
-    # None``. The refusal holds the pair; the next two tests hold one half each:
-    # delete either half and that test's spec is refused.
+    # The guard is ``is_row_condition(when) and (collection_selector_spec is not
+    # None or many)``; service_spec.py names the test holding each operand.
     def test_a_row_condition_on_a_collection_operation_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
             ServiceSpec(
@@ -441,49 +440,44 @@ class TestMany:
             f"ServiceSpec.many_argument must be an ASCII identifier; got {name!r}."
         )
 
-    def test_a_declared_name_without_many_is_refused(self) -> None:
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("many_argument", "rows"), ("many_min_length", 1), ("many_max_length", 1)],
+    )
+    def test_a_declaration_without_many_is_refused(self, field: str, value: object) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
-            ServiceSpec(service=print, many_argument="rows")
+            ServiceSpec(service=print, **{field: value})
         assert str(refused.value).startswith(
-            "ServiceSpec declares many_argument='rows' without many=True."
+            f"ServiceSpec declares {field}={value!r} without many=True."
         )
 
-    def test_the_default_name_written_out_without_many_is_not_a_declaration(self) -> None:
-        # The other half of the guard above: the field carries its default on
-        # every spec, so the default alone refuses nothing.
-        assert ServiceSpec(service=print, many_argument="items").many is False
-
-    def test_the_list_carries_its_declared_lengths(self) -> None:
-        spec = ServiceSpec(
-            service=print,
-            many=True,
-            validator=Titled("title"),
-            many_min_length=1,
-            many_max_length=50,
-        )
-        the_list = spec.parameters().get("items")
-        assert the_list is not None
-        assert (the_list.min_length, the_list.max_length) == (1, 50)
-
-    def test_no_length_is_declared_by_default(self) -> None:
-        # So an empty list runs, as it always has, and the setting's maximum
-        # bounds the list as it bounds every array.
-        spec = ServiceSpec(service=print, many=True, validator=Titled())
-        the_list = spec.parameters().get("items")
-        assert the_list is not None
-        assert (the_list.min_length, the_list.max_length) == (None, None)
-
-    @pytest.mark.parametrize("field", ["many_min_length", "many_max_length"])
-    def test_a_length_without_many_is_refused(self, field: str) -> None:
-        with pytest.raises(ImproperlyConfigured) as refused:
-            ServiceSpec(service=print, **{field: 1})
-        assert str(refused.value).startswith(f"ServiceSpec declares {field}=1 without many=True.")
-
-    @pytest.mark.parametrize("field", ["many_min_length", "many_max_length"])
-    def test_a_length_of_none_written_out_without_many_is_not_a_declaration(
-        self, field: str
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("many_argument", "items"), ("many_min_length", None), ("many_max_length", None)],
+    )
+    def test_a_default_written_out_without_many_is_not_a_declaration(
+        self, field: str, value: object
     ) -> None:
-        assert ServiceSpec(service=print, **{field: None}).many is False
+        # The other half of each guard above: every field carries its default
+        # on every spec, so the default alone refuses nothing.
+        assert ServiceSpec(service=print, **{field: value}).many is False
+
+    @pytest.mark.parametrize(
+        ("lengths", "carried"),
+        [
+            pytest.param({"many_min_length": 1, "many_max_length": 50}, (1, 50), id="declared"),
+            # So an empty list runs, and the setting's maximum bounds the list
+            # as it bounds every array.
+            pytest.param({}, (None, None), id="none-by-default"),
+        ],
+    )
+    def test_the_list_carries_its_declared_lengths(
+        self, lengths: dict[str, int], carried: tuple[int | None, int | None]
+    ) -> None:
+        spec = ServiceSpec(service=print, many=True, validator=Titled("title"), **lengths)
+        the_list = spec.parameters().get("items")
+        assert the_list is not None
+        assert (the_list.min_length, the_list.max_length) == carried
 
     @pytest.mark.parametrize(
         ("kwargs", "message"),
@@ -751,16 +745,17 @@ class TestProviderReach:
         )
         assert spec.parameters().names() == {"pk", "project", "title"}
 
-    def test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
-        spec = ServiceSpec(
-            service=print, reads=PROJECT, validator=Bare(), input_data=_maybe_project
-        )
-        assert spec.parameters().names() == {"project"}
-
-    def test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted(self) -> None:
-        spec = ServiceSpec(
-            service=print, reads=PROJECT, validator=Bare(), input_data=lambda: {"project": 1}
-        )
+    @pytest.mark.parametrize(
+        "provider",
+        [
+            pytest.param(_maybe_project, id="declinable"),
+            pytest.param(lambda: {"project": 1}, id="untyped"),
+        ],
+    )
+    def test_a_key_it_does_not_fill_naming_a_parameter_it_never_reaches_is_accepted(
+        self, provider: Any
+    ) -> None:
+        spec = ServiceSpec(service=print, reads=PROJECT, validator=Bare(), input_data=provider)
         assert spec.parameters().names() == {"project"}
 
     def test_a_key_no_parameter_declares_is_accepted(self) -> None:

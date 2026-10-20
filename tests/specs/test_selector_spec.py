@@ -187,6 +187,9 @@ class TestAffordances:
         )
 
 
+_MISSING = object()
+
+
 class TestFilterSet:
     """A FilterSet's filters are reads: declared, described and checked as any other."""
 
@@ -255,43 +258,31 @@ class TestFilterSet:
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):
             listing(filter_set=3)
 
-    def test_one_with_no_base_filters_is_refused_naming_it(self) -> None:
+    @pytest.mark.parametrize("declared", [_MISSING, {}, None], ids=["missing", "empty", "none"])
+    def test_one_declaring_no_filters_is_refused_unless_it_is_a_filterset(
+        self, declared: object
+    ) -> None:
         # A duck-typed object takes ``(data, queryset)`` and declares no
-        # filters, so it would be handed no data and never filter: the
-        # caller's argument was dropped under IGNORE and refused as unknown
-        # under REJECT. Refused where it is declared instead.
+        # filters, whether ``base_filters`` is missing or declares nothing, so
+        # it would be handed no data and never filter: the caller's argument
+        # was dropped under IGNORE and refused as unknown under REJECT. Refused
+        # where it is declared instead. A real FilterSet declaring nothing is
+        # still accepted, below.
         class Duck:
             def __init__(self, data: object = None, queryset: object = None) -> None:
                 self.qs = queryset
 
+        if declared is not _MISSING:
+            Duck.base_filters = declared  # type: ignore[attr-defined]
         with pytest.raises(ImproperlyConfigured) as refused:
             listing(filter_set=Duck)
         message = str(refused.value)
         assert "SelectorSpec.filter_set is Duck" in message
         assert "must be a django-filter FilterSet" in message
         assert "base_filters" in message
+        assert "extend_queryset" in message
         # Not the callable check's wording: this one is callable.
         assert "must be callable" not in message
-
-    @pytest.mark.parametrize("declared", [{}, None], ids=["empty", "none"])
-    def test_one_declaring_no_filters_is_refused_unless_it_is_a_filterset(
-        self, declared: object
-    ) -> None:
-        # The attribute is there and declares nothing, so the object is
-        # handed none of the caller's data exactly as one without it is. A
-        # real FilterSet declaring nothing is still accepted, below.
-        class Duck:
-            base_filters = declared
-
-            def __init__(self, data: object = None, queryset: object = None) -> None:
-                self.qs = queryset
-
-        with pytest.raises(ImproperlyConfigured) as refused:
-            listing(filter_set=Duck)
-        message = str(refused.value)
-        assert "SelectorSpec.filter_set is Duck" in message
-        assert "must be a django-filter FilterSet" in message
-        assert "extend_queryset" in message
 
     def test_a_callable_object_declaring_no_filters_is_refused_as_one(self) -> None:
         # Not a class, so it is asked no ``issubclass``, which would raise

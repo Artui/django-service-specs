@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import functools
+from typing import Any
+
+import pytest
 
 from django_service_specs.types.is_async import is_async
 
@@ -17,6 +20,9 @@ class _SyncCallable:
         return "sync-callable"
 
 
+class _NoCall: ...
+
+
 async def _async_fn() -> int:
     return 1
 
@@ -25,32 +31,19 @@ def _sync_fn() -> int:
     return 1
 
 
-class TestIsAsync:
-    def test_async_def(self) -> None:
-        assert is_async(_async_fn) is True
-
-    def test_sync_def(self) -> None:
-        assert is_async(_sync_fn) is False
-
-    def test_async_callable_class(self) -> None:
-        assert is_async(_AsyncCallable()) is True
-
-    def test_sync_callable_class(self) -> None:
-        assert is_async(_SyncCallable()) is False
-
-    def test_partial_of_async(self) -> None:
-        partial = functools.partial(_async_fn)
-        assert is_async(partial) is True
-
-    def test_partial_of_sync(self) -> None:
-        partial = functools.partial(_sync_fn)
-        assert is_async(partial) is False
-
-    def test_lambda(self) -> None:
-        assert is_async(lambda: 1) is False
-
-    def test_object_without_call(self) -> None:
-        class _NoCall: ...
-
-        # `_NoCall` instances are not callable, but is_async should still return False.
-        assert is_async(_NoCall()) is False
+@pytest.mark.parametrize(
+    ("fn", "expected"),
+    [
+        pytest.param(_async_fn, True, id="async-def"),
+        pytest.param(_sync_fn, False, id="sync-def"),
+        pytest.param(_AsyncCallable(), True, id="async-callable-class"),
+        pytest.param(_SyncCallable(), False, id="sync-callable-class"),
+        pytest.param(functools.partial(_async_fn), True, id="partial-of-async"),
+        pytest.param(functools.partial(_sync_fn), False, id="partial-of-sync"),
+        pytest.param(lambda: 1, False, id="lambda"),
+        # Not callable at all, and still answered rather than raised on.
+        pytest.param(_NoCall(), False, id="object-without-call"),
+    ],
+)
+def test_is_async(fn: Any, expected: bool) -> None:
+    assert is_async(fn) is expected

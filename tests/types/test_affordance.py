@@ -59,18 +59,16 @@ class TestCodeAndReason:
     # The guard is ``not isinstance(value, str) or not value``: each of its two
     # halves is held by its own case here, for each of the two fields.
     @pytest.mark.parametrize("field_name", ["code", "reason"])
-    def test_a_non_string_is_refused(self, field_name: str) -> None:
-        values: dict[str, Any] = {"code": "c", "reason": "r", field_name: 7}
+    @pytest.mark.parametrize(
+        "value", [pytest.param(7, id="non-string"), pytest.param("", id="empty-string")]
+    )
+    def test_anything_but_a_non_empty_string_is_refused(self, field_name: str, value: Any) -> None:
+        values: dict[str, Any] = {"code": "c", "reason": "r", field_name: value}
         with pytest.raises(ImproperlyConfigured) as refused:
             Affordance(**values, when=Q(archived=False))
-        assert str(refused.value) == f"Affordance.{field_name} must be a non-empty string; got 7."
-
-    @pytest.mark.parametrize("field_name", ["code", "reason"])
-    def test_an_empty_string_is_refused(self, field_name: str) -> None:
-        values: dict[str, Any] = {"code": "c", "reason": "r", field_name: ""}
-        with pytest.raises(ImproperlyConfigured) as refused:
-            Affordance(**values, when=Q(archived=False))
-        assert str(refused.value) == f"Affordance.{field_name} must be a non-empty string; got ''."
+        assert str(refused.value) == (
+            f"Affordance.{field_name} must be a non-empty string; got {value!r}."
+        )
 
 
 class TestWhen:
