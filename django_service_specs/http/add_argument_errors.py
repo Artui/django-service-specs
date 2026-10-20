@@ -8,7 +8,8 @@ from typing import Any
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.forms import BaseForm
 
-from django_service_specs.parameters.utils import NON_FIELD_KEYS, refusal_messages
+from django_service_specs.parameters.non_field_keys import NON_FIELD_KEYS
+from django_service_specs.parameters.refusal_messages import refusal_messages
 from django_service_specs.relations.utils import clean_held_to_their_columns
 
 

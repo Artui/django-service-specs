@@ -1,4 +1,4 @@
-"""The spellings every refusal of arguments shares: a node's own message key, a wrong type, a length.
+"""The spellings every refusal of arguments shares, and the readings behind them.
 
 [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
 documents the tree these go into. They live here so that everything producing
@@ -13,86 +13,15 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Iterable, Iterator, Mapping
-from typing import Any, Final
+from collections.abc import Iterable
 
-from django.core.exceptions import NON_FIELD_ERRORS as DJANGO_NON_FIELD_ERRORS
-from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.exceptions import ValidationError
 from django.utils.translation import gettext
 
 from django_service_specs.parameters.coded_message import CodedMessage
-from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
+from django_service_specs.parameters.max_length_in_force import max_length_in_force
 from django_service_specs.parameters.parameters import Parameter
-from django_service_specs.settings import max_array_length
 from django_service_specs.types.unknown_arguments import UnknownArguments
-
-NON_FIELD_KEYS: Final = (NON_FIELD_ERRORS, DJANGO_NON_FIELD_ERRORS)
-"""The keys a message about the whole input sits under: the kernel's, and Django's.
-
-Django's is here because a service re-raising a model's ``message_dict`` as a
-``ServiceValidationError`` carries its form-wide messages under ``"__all__"``.
-Neither adds a step to the path a message is placed or printed with. Each is
-held by its own test: test_non_field_errors_go_to_the_forms_own and
-test_djangos_own_non_field_key_is_read_the_same."""
-
-
-def refusal_messages(
-    value: Any, path: tuple[str, ...] = ()
-) -> Iterator[tuple[tuple[str, ...], str]]:
-    """Every message below ``value``, each with its path from where the walk began: ``books.1.title``.
-
-    The tree ``InvalidArguments`` carries: a row's index is a step of the path,
-    and a ``NON_FIELD_KEYS`` key adds none. A list is the tree's leaf, so its
-    messages share the path, and only a list: anything else is one message
-    whatever its type, a lazy translation (which is not a ``str``) included, so
-    it is never taken apart into characters. Read by every transport that
-    prints or places a refusal, so each reads one tree one way.
-    """
-    if isinstance(value, Mapping):
-        for key, inner in value.items():
-            yield from refusal_messages(inner, path if key in NON_FIELD_KEYS else (*path, str(key)))
-    elif isinstance(value, list):
-        for inner in value:
-            yield from refusal_messages(inner, path)
-    else:
-        yield path, str(value)
-
-
-def expected_type(json_type: str) -> CodedMessage:
-    """The refusal of a value that is not ``json_type``, as one sentence a translator sees whole.
-
-    ``"decimal"`` and ``"file"`` are the two keys that are not JSON types: the
-    format arrives as a string or a number, so its refusal names both, and a
-    file is a parameter's type that no JSON value is.
-
-    One sentence per type rather than ``"Expected %(type)s"``, because an
-    interpolated JSON type name would reach a translated sentence
-    untranslated. The shape check and the Validators the adapters build share
-    this one table, so a caller reads the same refusal whichever of them
-    answered. Built on each call, because a translation looked up at import
-    time needs configured settings before the package can be imported at all.
-
-    Its code is the one DRF gives the same mistake: ``"not_a_list"`` for an
-    array, as its ``ListField`` and ``ListSerializer`` both do, and
-    ``"invalid"`` for everything else, as each of its scalar fields, its
-    ``FileField`` and a nested ``Serializer`` handed something other than a
-    mapping do. A free-form ``object`` is ``"invalid"`` too, where DRF's
-    ``DictField`` would say ``"not_a_dict"``: one type here stands for both of
-    its fields, and the nested serializer is the one a declared object becomes.
-    """
-    message = {
-        "string": gettext("Expected a string."),
-        "integer": gettext("Expected an integer."),
-        "number": gettext("Expected a number."),
-        "boolean": gettext("Expected a boolean."),
-        "array": gettext("Expected an array."),
-        "object": gettext("Expected an object."),
-        "decimal": gettext("Expected a decimal string or a number."),
-        "file": gettext("Expected a file."),
-    }[json_type]
-    # test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake[not-a-list]
-    # holds the array's code, its [type] case everything else's.
-    return CodedMessage(message, "not_a_list" if json_type == "array" else "invalid")
 
 
 def coded_messages(errors: Iterable[ValidationError]) -> list[CodedMessage]:
@@ -133,42 +62,6 @@ def _rendered(leaf: ValidationError) -> str:
     if leaf.params:
         message %= leaf.params
     return str(message)
-
-
-def max_length_in_force(param: Parameter) -> int | None:
-    """The most elements the array ``param`` takes: its own ``max_length``, or the setting's.
-
-    One reading for every place that bounds or describes a list - the shape
-    check, ``coerce_flat``, the split of a flat value, a ``many`` call's rows
-    and the schema - so the bound a client is told is the bound it meets.
-    ``None`` where the setting is ``None`` and nothing is declared.
-
-    Raises:
-        ImproperlyConfigured: a ``min_length`` past the setting's maximum on a
-            parameter that declares no maximum of its own, which no call could
-            meet: at the call, and when the parameter's schema is built, so a
-            transport listing every schema fails on it too. Found here because
-            the setting is read only then, so the declaration cannot be
-            refused where it is written.
-    """
-    if param.max_length is not None:
-        return param.max_length
-    default = max_array_length()
-    # One branch to coverage, each condition held by its own test:
-    # test_a_minimum_is_compared_with_no_default_when_the_setting_is_none (the
-    # default: without it, a minimum is compared with ``None`` and raises),
-    # test_an_array_takes_a_thousand_elements_and_no_more_by_default (the
-    # minimum, likewise) and test_a_declared_minimum_is_inclusive (the
-    # comparison: without it, every declared minimum is refused), whose
-    # strictness test_a_minimum_at_the_default_maximum_is_met_by_a_list_of_exactly_that_many
-    # holds: a minimum equal to the default is met by that many.
-    if default is not None and param.min_length is not None and param.min_length > default:
-        raise ImproperlyConfigured(
-            f"Parameter {param.name!r}: min_length {param.min_length} is past the default maximum "
-            f"{default} (SERVICE_SPECS_MAX_ARRAY_LENGTH), so no list could meet both; declare "
-            "a max_length."
-        )
-    return default
 
 
 def length_problem(param: Parameter, count: int) -> CodedMessage | None:

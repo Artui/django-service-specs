@@ -577,6 +577,15 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "ServerArguments",
         "check_server_arguments",
         "apply_server_arguments",
+        # The readings a transport in a distribution of its own shares with
+        # dispatch, so that it refuses, relaxes and prints as dispatch does:
+        # djangorestframework-services reaches each through dispatch alone.
+        "NON_FIELD_KEYS",
+        "expected_type",
+        "is_deactivated",
+        "max_length_in_force",
+        "refusal_messages",
+        "relax_partial",
         # This package's version, which no importer reads as an API.
         "__version__",
     }

@@ -8,11 +8,8 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.dispatch.utils import (
-    checked_server_values,
-    relax_partial,
-    server_arguments_label,
-)
+from django_service_specs.dispatch.relax_partial import relax_partial
+from django_service_specs.dispatch.utils import checked_server_values, server_arguments_label
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.kernel_spec import kernel_spec
