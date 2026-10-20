@@ -67,8 +67,8 @@ def canonical_choices(
     (test_repeats_nothing_canonicalised_are_kept).
 
     Nothing is refused: a choice that is no string, or a string spelling no
-    UUID, is kept as listed and matches nothing, as before, since the format
-    refuses every value it could match first.
+    UUID, is kept as listed and matches nothing, since the format refuses
+    every value it could match first.
     """
     kept: list[tuple[Any, Any]] = []
     seen: set[str] = set()
@@ -396,11 +396,7 @@ class Parameter:
         # spelling a choice was listed in still names it:
         # test_a_label_follows_its_choice_into_the_canonical_spelling.
         pairs = canonical_choices(
-            self.format,
-            (
-                (value, label)
-                for value, label in (labels.items() if isinstance(labels, Mapping) else labels)
-            ),
+            self.format, labels.items() if isinstance(labels, Mapping) else labels
         )
         if self.choices is None:
             raise ImproperlyConfigured(

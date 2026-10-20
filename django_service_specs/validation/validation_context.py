@@ -24,7 +24,7 @@ class ValidationContext:
     refused an absent required one. A Validator then returns only the fields
     the caller sent, or refuses the call with ``ImproperlyConfigured`` if it
     cannot. It trails the other two with a default, so a context built from a
-    principal and a target is a whole call, as it always was.
+    principal and a target is a whole call.
 
     ``ambient`` is the call's base pool as dispatch resolved it: ``user``,
     ``progress`` and every registered seed - an HTTP adapter's ``request``,

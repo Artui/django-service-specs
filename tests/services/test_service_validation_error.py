@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import copy
+from typing import Any
+
 import pytest
 from django.utils.translation import gettext_lazy
 
@@ -25,15 +28,11 @@ def test_lazy_detail() -> None:
     assert str(err) == "Pick another day."
 
 
-def test_dict_detail() -> None:
-    err = ServiceValidationError({"name": ["required"]})
-    assert err.detail == {"name": ["required"]}
-    assert err.message == ServiceValidationError.default_message
-
-
-def test_list_detail() -> None:
-    err = ServiceValidationError(["a", "b"])
-    assert err.detail == ["a", "b"]
+@pytest.mark.parametrize("detail", [{"name": ["required"]}, ["a", "b"]], ids=["dict", "list"])
+def test_structured_detail(detail: Any) -> None:
+    # A copy, so a detail the error rewrote in place would not compare equal.
+    err = ServiceValidationError(copy.deepcopy(detail))
+    assert err.detail == detail
     assert err.message == ServiceValidationError.default_message
 
 

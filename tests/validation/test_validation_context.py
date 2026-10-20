@@ -14,8 +14,8 @@ def test_a_call_is_whole_unless_it_says_otherwise() -> None:
 
 
 def test_partial_follows_the_two_positional_fields() -> None:
-    # Dispatch builds the context positionally, so the new field is trailing
-    # and defaulted, and a caller written against principal and target alone
+    # Dispatch builds the context positionally, so ``partial`` trails and is
+    # defaulted, and a caller written against principal and target alone
     # keeps working.
     context = ValidationContext("ada", "row", partial=True)
     assert (context.principal, context.target, context.partial) == ("ada", "row", True)
