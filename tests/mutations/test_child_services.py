@@ -225,14 +225,9 @@ class TestDeleteService:
 
         deltas, _ = cascade_owned(
             catalog,
-            {
-                "sections": ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    delete_service=archive,
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-            },
+            _sections(
+                delete_service=archive, relations={"items": ChildSpec(model=Item, fk="section")}
+            ),
             context={"user": _USER},
         )
         # Grandchildren are still the spec's business — removed before the row.
