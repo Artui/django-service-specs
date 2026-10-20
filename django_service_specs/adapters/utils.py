@@ -130,7 +130,12 @@ def unmappable(annotation: Any, *, where: str, supported: str) -> ImproperlyConf
 
 
 def enum_class(python: Any) -> type[Enum] | None:
-    """``python`` when it is an ``Enum`` class, which a choice decodes into, else ``None``."""
+    """``python`` when it is an ``Enum`` class, which a choice decodes into, else ``None``.
+
+    One branch to coverage, so each condition is held by a row of
+    test_shape_enum_is_the_enum_class_and_nothing_else: its ``Literal``, whose
+    ``python`` is ``None``, which ``issubclass`` raises on, and its ``str``.
+    """
     if isinstance(python, type) and issubclass(python, Enum):
         return python
     return None
