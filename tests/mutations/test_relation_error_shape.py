@@ -61,31 +61,46 @@ class TestTheTreeIsTheKernelsOwn:
         assert json.loads(json.dumps(self._refused())) == {"sections": {"1": _RUDE}}
 
 
-class TestWhereARowsErrorLands:
+# What a grandchild's failure looks like one level up: the inner relation's
+# tree is a field of this row, not a message about it.
+_INNER = {"items": {0: {"non_field_errors": ["No."]}}}
+
+
+@pytest.mark.parametrize(
+    ("path", "detail", "expected"),
+    [
+        pytest.param(
+            _RowPath("sections", 1),
+            _RUDE,
+            {"sections": {1: _RUDE}},
+            id="a-field-map-lands-at-the-rows-index",
+        ),
+        pytest.param(
+            _RowPath("profile"), _RUDE, {"profile": _RUDE}, id="a-single-row-has-no-position"
+        ),
+        pytest.param(
+            _RowPath("sections", 2),
+            "Too rude.",
+            {"sections": {2: {"non_field_errors": ["Too rude."]}}},
+            id="a-string-is-the-rows-own-message",
+        ),
+        pytest.param(
+            _RowPath("profile"),
+            ["Too long.", "Too loud."],
+            {"profile": {"non_field_errors": ["Too long.", "Too loud."]}},
+            id="a-list-is-the-rows-own-messages",
+        ),
+        pytest.param(
+            _RowPath("sections", 3),
+            _INNER,
+            {"sections": {3: _INNER}},
+            id="a-nested-tree-is-a-field-map-and-lands-as-it-is",
+        ),
+    ],
+)
+def test_where_a_row_s_error_lands(path: _RowPath, detail: Any, expected: dict[Any, Any]) -> None:
     """``_RowPath`` alone, so each arm is pinned without a write."""
-
-    def test_a_field_map_lands_at_the_rows_index(self) -> None:
-        assert _RowPath("sections", 1).namespace(_RUDE) == {"sections": {1: _RUDE}}
-
-    def test_a_single_row_has_no_position(self) -> None:
-        assert _RowPath("profile").namespace(_RUDE) == {"profile": _RUDE}
-
-    def test_a_string_is_the_rows_own_message(self) -> None:
-        assert _RowPath("sections", 2).namespace("Too rude.") == {
-            "sections": {2: {"non_field_errors": ["Too rude."]}}
-        }
-
-    def test_a_list_is_the_rows_own_messages(self) -> None:
-        assert _RowPath("profile").namespace(["Too long.", "Too loud."]) == {
-            "profile": {"non_field_errors": ["Too long.", "Too loud."]}
-        }
-
-    def test_a_nested_tree_is_a_field_map_and_lands_as_it_is(self) -> None:
-        # What a grandchild's failure looks like one level up: the inner
-        # relation's tree is a field of this row, not a message about it.
-        inner = {"items": {0: {"non_field_errors": ["No."]}}}
-
-        assert _RowPath("sections", 3).namespace(inner) == {"sections": {3: inner}}
+    assert path.namespace(detail) == expected
 
 
 _NULL: dict[str, Any] = {"non_field_errors": ["This field cannot be null."]}

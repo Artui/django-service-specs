@@ -42,10 +42,10 @@ def call_keywords(
 
     ``resolve_callable_kwargs`` forwards only what the pool has, so a
     parameter with no default that the call left out - an optional read the
-    caller did not send, a Validator parameter the caller left out - reached
-    the callable as a ``TypeError``. It is refused before the call instead, as
-    ``InvalidArguments`` keyed by the parameter, in the shape check's own
-    wording for an argument left out.
+    caller did not send, a Validator parameter the caller left out - would
+    reach the callable as a ``TypeError``. It is refused before the call
+    instead, as ``InvalidArguments`` keyed by the parameter, in the shape
+    check's own wording for an argument left out.
 
     **Only where a caller could have filled it.** ``fillable`` is the names
     this call site lets a caller send: a selector's ``reads``, for the

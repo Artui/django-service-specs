@@ -118,19 +118,7 @@ class GenericRelationSpec(RelationSpec):
         validate_relation_orphan(
             self.orphan, delete_service=self.delete_service, label="GenericRelationSpec"
         )
-        validate_relation_services(
-            label="GenericRelationSpec",
-            services={
-                "create_service": self.create_service,
-                "update_service": self.update_service,
-            },
-            shaping={
-                "field_map": self.field_map,
-                "exclude_fields": self.exclude_fields,
-                "m2m": self.m2m,
-                "relations": self.relations,
-            },
-        )
+        validate_relation_services(self, label="GenericRelationSpec")
 
 
 __all__ = ["GenericRelationSpec"]

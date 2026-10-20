@@ -101,19 +101,7 @@ class ReverseOneToOneSpec(RelationSpec):
         validate_relation_orphan(
             self.orphan, delete_service=self.delete_service, label="ReverseOneToOneSpec"
         )
-        validate_relation_services(
-            label="ReverseOneToOneSpec",
-            services={
-                "create_service": self.create_service,
-                "update_service": self.update_service,
-            },
-            shaping={
-                "field_map": self.field_map,
-                "exclude_fields": self.exclude_fields,
-                "m2m": self.m2m,
-                "relations": self.relations,
-            },
-        )
+        validate_relation_services(self, label="ReverseOneToOneSpec")
 
 
 __all__ = ["ReverseOneToOneSpec"]

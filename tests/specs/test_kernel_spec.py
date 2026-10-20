@@ -111,20 +111,21 @@ def test_a_source_that_cannot_be_weakly_referenced_is_refused_naming_the_fix() -
         kernel_spec(_Slotted())
 
 
-@pytest.mark.parametrize("value", [object(), "a spec", None])
+class _Attribute:
+    """A compile that is an attribute, not a callable."""
+
+    as_kernel_spec = LISTING
+
+
+@pytest.mark.parametrize(
+    "value",
+    [object(), "a spec", None, _Attribute()],
+    ids=["object", "string", "none", "attribute-not-callable"],
+)
 def test_an_object_with_no_compile_is_refused(value: Any) -> None:
-    with pytest.raises(TypeError, match=r"SelectorSpec, or an object with as_kernel_spec\(\); got"):
+    named = rf"SelectorSpec, or an object with as_kernel_spec\(\); got {type(value).__name__}\."
+    with pytest.raises(TypeError, match=named):
         kernel_spec(value)
-
-
-def test_a_compile_attribute_that_is_not_callable_is_refused() -> None:
-    class Attribute:
-        as_kernel_spec = LISTING
-
-    with pytest.raises(
-        TypeError, match=r"SelectorSpec, or an object with as_kernel_spec\(\); got Attribute"
-    ):
-        kernel_spec(Attribute())
 
 
 @pytest.mark.parametrize(

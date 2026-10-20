@@ -343,7 +343,8 @@ def _canonical(fmt: str | None, value: Any) -> Any:
     A UUID's is ``str(uuid.UUID(value))``, so every reader - a permission
     check, the callable, a cache key - sees one spelling
     whichever of those a UUID column takes was sent: still a string, as the
-    declaration is, never a ``uuid.UUID``. Every other value is unchanged.
+    declaration is on every route and a JSON wire has no other spelling for
+    it, never a ``uuid.UUID``. Every other value is unchanged.
     Held by test_a_uuid_is_handed_on_in_its_canonical_spelling.
     """
     return str(uuid.UUID(value)) if fmt == "uuid" else value
@@ -476,11 +477,6 @@ def _uuid_problem(value: str) -> CodedMessage | None:
     strips the padding first, so it passes what the model refuses. Held by
     test_a_uuid_is_refused_exactly_when_the_model_field_refuses_it and
     test_the_form_field_strips_what_the_model_field_refuses.
-
-    A value that passes is handed on in its canonical spelling,
-    ``str(uuid.UUID(value))``, so every reader sees one: still a string, as the
-    declaration is on every route and a JSON wire has no other spelling for
-    it, never a ``uuid.UUID``.
     """
     try:
         uuid.UUID(value)

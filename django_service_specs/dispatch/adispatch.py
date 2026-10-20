@@ -361,10 +361,10 @@ async def _await_selector(
         # As ``lookup`` maps them, with a LIST's ``Http404`` answered here as
         # sync ``dispatch`` answers it. Each member and conjunct is held by its
         # own test: test_an_async_selector_spec_raising_does_not_exist_runs_no_precondition
-        # (``ObjectDoesNotExist``), test_an_async_retrieve_raising_http404_is_not_found
+        # (``ObjectDoesNotExist``), the ``required`` case of
+        # test_an_async_retrieve_raising_http404_is_not_found_or_none_under_allow_none
         # (``Http404``), test_an_async_list_raising_does_not_exist_passes_through
-        # (the ``isinstance``) and
-        # test_an_async_retrieve_raising_http404_under_allow_none_is_none (the kind).
+        # (the ``isinstance``) and that test's ``allow-none`` case (the kind).
         if isinstance(error, Http404) and spec.kind is SelectorKind.LIST:
             return NOT_FOUND
         reraise_unless_retrieve(spec, error)

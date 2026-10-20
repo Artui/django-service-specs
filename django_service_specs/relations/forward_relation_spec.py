@@ -122,19 +122,7 @@ class ForwardRelationSpec(RelationSpec):
             match_key=self.match_key,
             field_map=self.field_map,
         )
-        validate_relation_services(
-            label="ForwardRelationSpec",
-            services={
-                "create_service": self.create_service,
-                "update_service": self.update_service,
-            },
-            shaping={
-                "field_map": self.field_map,
-                "exclude_fields": self.exclude_fields,
-                "m2m": self.m2m,
-                "relations": self.relations,
-            },
-        )
+        validate_relation_services(self, label="ForwardRelationSpec")
 
 
 __all__ = ["ForwardRelationSpec"]

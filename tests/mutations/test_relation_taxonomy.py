@@ -45,6 +45,23 @@ class _ForwardKind(RelationSpec):
 _SECTIONS = ChildSpec(model=Section, fk="catalog")
 _NOTES = ChildSpec(model=Note, fk="catalog")
 
+# A post-save kind with no writer is refused when its phase runs, and so is a
+# forward one, in its own pre-save phase.
+_UNWRITABLE = pytest.mark.parametrize(
+    ("relation", "spec", "expected"),
+    [
+        pytest.param(
+            "tags", _M2MKind(), "relations['tags']: _M2MKind is not a relation kind", id="post-save"
+        ),
+        pytest.param(
+            "owner",
+            _ForwardKind(),
+            "relations['owner']: _ForwardKind is not a relation kind",
+            id="forward",
+        ),
+    ],
+)
+
 
 class TestWriteOrderComesOffTheClass:
     def test_phases_run_in_the_taxonomy_order_not_the_mappings(self) -> None:
@@ -84,11 +101,16 @@ class TestOneMap:
     def test_no_map_is_no_relations(self) -> None:
         assert relation_map(None) == {}
 
-    def test_a_non_spec_value_is_refused_naming_the_relation(self) -> None:
-        with pytest.raises(ImproperlyConfigured, match=r"relations\['sections'\] is a dict"):
-            relation_map({"sections": {"model": Section}})  # type: ignore[arg-type]
-        with pytest.raises(ImproperlyConfigured, match=r"relations\['sections'\] is a str"):
-            relation_map({"sections": "Section"})  # type: ignore[arg-type]
+    @pytest.mark.parametrize(
+        ("value", "kind"),
+        [
+            pytest.param({"model": Section}, "dict", id="a-mapping"),
+            pytest.param("Section", "str", id="a-model-name"),
+        ],
+    )
+    def test_a_non_spec_value_is_refused_naming_the_relation(self, value: Any, kind: str) -> None:
+        with pytest.raises(ImproperlyConfigured, match=rf"relations\['sections'\] is a {kind}"):
+            relation_map({"sections": value})
 
 
 @pytest.mark.django_db
@@ -119,15 +141,13 @@ class TestTheDriverIsTheSameOnEveryPath:
         assert result.instance.sections.count() == 1
         assert result.instance.notes.count() == 1
 
-    def test_an_unwritable_kind_names_the_relation(self) -> None:
+    @_UNWRITABLE
+    def test_an_unwritable_kind_names_the_relation(
+        self, relation: str, spec: RelationSpec, expected: str
+    ) -> None:
         with pytest.raises(ImproperlyConfigured) as excinfo:
-            create_from_input(Catalog, {"name": "c"}, relations={"tags": _M2MKind()})
-        message = str(excinfo.value)
-        assert "relations['tags']: _M2MKind is not a relation kind" in message
-
-    def test_an_unwritable_forward_kind_is_refused_in_its_own_phase(self) -> None:
-        with pytest.raises(ImproperlyConfigured, match=r"relations\['owner'\]: _ForwardKind"):
-            create_from_input(Catalog, {"name": "c"}, relations={"owner": _ForwardKind()})
+            create_from_input(Catalog, {"name": "c"}, relations={relation: spec})
+        assert expected in str(excinfo.value)
 
     def test_a_grandchild_is_declared_in_the_childs_relations(self) -> None:
         result = create_from_input(
@@ -165,10 +185,10 @@ class TestTheDriverIsTheSameOnTheAsyncPath:
         )
         assert result.get_child_change("sections").updated == (section.pk,)
 
-    async def test_an_unwritable_kind_names_the_relation(self) -> None:
-        with pytest.raises(ImproperlyConfigured, match=r"relations\['tags'\]: _M2MKind"):
-            await acreate_from_input(Catalog, {"name": "c"}, relations={"tags": _M2MKind()})
-
-    async def test_an_unwritable_forward_kind_is_refused_in_its_own_phase(self) -> None:
-        with pytest.raises(ImproperlyConfigured, match=r"relations\['owner'\]: _ForwardKind"):
-            await acreate_from_input(Catalog, {"name": "c"}, relations={"owner": _ForwardKind()})
+    @_UNWRITABLE
+    async def test_an_unwritable_kind_names_the_relation(
+        self, relation: str, spec: RelationSpec, expected: str
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured) as excinfo:
+            await acreate_from_input(Catalog, {"name": "c"}, relations={relation: spec})
+        assert expected in str(excinfo.value)

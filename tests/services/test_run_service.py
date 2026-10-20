@@ -19,23 +19,15 @@ class TestRunServiceSync:
 
         assert run_service(fn, {"x": 2, "y": 3}, atomic=False) == 5
 
-    def test_no_atomic_no_transaction(self) -> None:
+    @pytest.mark.parametrize("atomic", [False, True])
+    def test_atomic_wraps_the_call_in_a_transaction(self, atomic: bool) -> None:
         captured: dict[str, bool] = {}
 
         def fn() -> None:
             captured["in_atomic"] = transaction.get_connection().in_atomic_block
 
-        run_service(fn, {}, atomic=False)
-        assert captured["in_atomic"] is False
-
-    def test_atomic_wraps(self) -> None:
-        captured: dict[str, bool] = {}
-
-        def fn() -> None:
-            captured["in_atomic"] = transaction.get_connection().in_atomic_block
-
-        run_service(fn, {}, atomic=True)
-        assert captured["in_atomic"] is True
+        run_service(fn, {}, atomic=atomic)
+        assert captured["in_atomic"] is atomic
 
     def test_atomic_rollback_on_exception(self) -> None:
         User.objects.create(username="seed")

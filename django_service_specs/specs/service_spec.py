@@ -26,6 +26,7 @@ from django_service_specs.specs.utils import (
     check_presenter,
     check_providers,
     check_reserved,
+    describe,
 )
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
@@ -264,14 +265,9 @@ class ServiceSpec(AffordanceDeclarer):
         check_callable(self.service, label=f"{label}.service")
         object.__setattr__(self, "permissions", check_permissions(self.permissions, label=label))
         if self.validator is not None and not isinstance(self.validator, Validator):
-            what = (
-                f"the class {self.validator.__name__}"
-                if isinstance(self.validator, type)
-                else type(self.validator).__name__
-            )
             raise ImproperlyConfigured(
-                f"{label}.validator is {what}, which is not a Validator instance. "
-                "Wrap the declaration in an adapter, such as DataclassValidator(...)."
+                f"{label}.validator is {describe(self.validator)}, which is not a Validator "
+                "instance. Wrap the declaration in an adapter, such as DataclassValidator(...)."
             )
         if self.validator is not None:
             # Called from sync code on both entry points and never awaited, so
@@ -456,17 +452,17 @@ def _check_many(spec: ServiceSpec) -> None:
     if not spec.many:
         # Only a name other than the default: the field carries its default on
         # every spec, so writing it out declares nothing
-        # (test_the_default_name_written_out_without_many_is_not_a_declaration).
+        # (test_a_default_written_out_without_many_is_not_a_declaration[many_argument-items]).
         if name != _DEFAULT_MANY_ARGUMENT:
             raise ImproperlyConfigured(
                 f"ServiceSpec declares many_argument={name!r} without many=True. It names "
                 "the argument a list of rows travels under, and this spec takes no list; "
                 "set many=True or remove it."
             )
-        # Each name held by its own case of test_a_length_without_many_is_refused,
+        # Each name held by its own case of test_a_declaration_without_many_is_refused,
         # since coverage cannot see one dropped from the tuple; a ``None``
-        # written out declares nothing
-        # (test_a_length_of_none_written_out_without_many_is_not_a_declaration).
+        # written out declares nothing, held by the matching cases of
+        # test_a_default_written_out_without_many_is_not_a_declaration.
         for field_name in ("many_min_length", "many_max_length"):
             length = getattr(spec, field_name)
             if length is not None:
@@ -597,10 +593,9 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
     the spec, unreadable at the build, is read and refused.
 
     Only a ``filled`` key of a provider whose return names its keys: a
-    ``declinable`` one stays the caller's
-    (test_a_declinable_key_naming_a_parameter_it_never_reaches_is_accepted),
-    an untyped provider names none
-    (test_an_untyped_provider_naming_a_parameter_it_never_reaches_is_accepted),
+    ``declinable`` one stays the caller's, and an untyped provider names none
+    (test_a_key_it_does_not_fill_naming_a_parameter_it_never_reaches_is_accepted,
+    its ``declinable`` and ``untyped`` cases),
     and a key no parameter declares is the callable's to take by name
     (test_a_key_no_parameter_declares_is_accepted). The provider that reaches
     a seat is the one that relaxes it, never refused there

@@ -19,9 +19,16 @@ from enum import Enum
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models.manager import BaseManager
 
-from django_service_specs.adapters.utils import SCALARS, scalar_type, strip
+from django_service_specs.adapters.utils import (
+    SCALARS,
+    choice_type,
+    enum_class,
+    marking,
+    rows_of,
+    strip,
+    unmappable,
+)
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.types.unset import UNSET
 
@@ -51,10 +58,7 @@ class Shape:
     @property
     def enum(self) -> type[Enum] | None:
         """The ``Enum`` class a choice decodes into, or ``None`` for a ``Literal``."""
-        python = self.python
-        if isinstance(python, type) and issubclass(python, Enum):
-            return python
-        return None
+        return enum_class(self.python)
 
 
 @dataclass(frozen=True)
@@ -121,18 +125,13 @@ def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[Fiel
     for f in dataclasses.fields(cls):
         where = f"{cls.__qualname__}.{f.name}"
         shape, omittable, extras = _read(hints[f.name], where=where, stack=below)
-        markings = [extra for extra in extras if isinstance(extra, FieldMarking)]
-        if len(markings) > 1:
-            raise ImproperlyConfigured(
-                f"{where}: declares {len(markings)} FieldMarkings; a field has one audience."
-            )
         out.append(
             FieldShape(
                 name=f.name,
                 shape=shape,
                 field=f,
                 omittable=omittable,
-                marking=markings[0] if markings else None,
+                marking=marking(extras, where=where),
             )
         )
     return tuple(out)
@@ -159,11 +158,7 @@ def encode(shape: Shape, value: Any) -> Any:
     if shape.fields is not None:
         return encode_fields(shape.fields, value)
     if shape.items is not None:
-        # ``BaseManager``, so a related manager built on a model's
-        # ``BaseManager.from_queryset`` default manager, which is no ``Manager``,
-        # is read too: test_a_manager_built_on_base_manager_is_read_through_all_too.
-        rows = value.all() if isinstance(value, BaseManager) else value
-        return [encode(shape.items, row) for row in rows]
+        return [encode(shape.items, row) for row in rows_of(value)]
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Decimal):
@@ -202,7 +197,7 @@ def _read(
         # ``Literal["a", None]`` is Python's own spelling of a nullable choice.
         values = tuple(v for v in args if v is not None)
         shape = Shape(
-            _choice_type(values, base, where=where),
+            choice_type(values, base, where=where, supported=_SUPPORTED),
             nullable=nullable or len(values) != len(args),
             choices=values,
         )
@@ -216,7 +211,7 @@ def _read(
     elif isinstance(base, type) and issubclass(base, Enum):
         values = tuple(member.value for member in base)
         shape = Shape(
-            _choice_type(values, base, where=where),
+            choice_type(values, base, where=where, supported=_SUPPORTED),
             python=base,
             nullable=nullable,
             choices=values,
@@ -227,31 +222,5 @@ def _read(
         json_type, fmt = SCALARS[base]
         shape = Shape(json_type, python=base, format=fmt, nullable=nullable)
     else:
-        raise _unmappable(base, where=where)
+        raise unmappable(base, where=where, supported=_SUPPORTED)
     return shape, omittable, extras
-
-
-def _choice_type(values: tuple[Any, ...], annotation: Any, *, where: str) -> str:
-    """The one JSON type every choice has, or ``ImproperlyConfigured``.
-
-    A choice set of mixed types has no single JSON type to declare, and a
-    member whose value is not a JSON scalar cannot be sent at all.
-    """
-    found = {scalar_type(v) for v in values}
-    json_type = found.pop() if len(found) == 1 else None
-    if json_type is None:
-        raise _unmappable(annotation, where=where)
-    return json_type
-
-
-def _unmappable(annotation: Any, *, where: str) -> ImproperlyConfigured:
-    # A class by its name, and anything else - a parametrized generic included,
-    # which Python 3.10 also counts as a ``type`` - as it was written. The
-    # second condition decides only there, where the ``set[int]`` row of
-    # test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation
-    # holds it.
-    plain = isinstance(annotation, type) and typing.get_origin(annotation) is None
-    name = annotation.__qualname__ if plain else repr(annotation)
-    return ImproperlyConfigured(
-        f"{where}: {name} has no JSON type this adapter can declare. Use {_SUPPORTED}."
-    )

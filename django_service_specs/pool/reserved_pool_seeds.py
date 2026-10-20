@@ -21,9 +21,7 @@ written for it runs under this kernel unchanged.
 a service's run, and a selector spec's own selector. In a target or output
 selector's pool it is ``null_progress``, because a lookup has nothing to
 report, and one reporting after the service finished would read to a watching
-client as the work restarting. It was reserved before it carried a value, so
-that seeding it was additive rather than a break for a spec that had declared
-a parameter by it.
+client as the work restarting.
 
 A parameter declaring one of these names is refused, because a spread argument
 must never be able to outrank the value dispatch seeded - a caller naming

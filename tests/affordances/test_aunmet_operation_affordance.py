@@ -21,13 +21,12 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.affordances.utils import count_hops
 from tests.dispatch.utils import OPEN as OPEN_PERMISSIONS
 from tests.dispatch.utils import make_user, notes_of
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign
 
-# The submodule rather than the function the package re-exports under the same
-# name: the hop is looked up in this module's namespace, so it is counted there.
 aunmet_module = importlib.import_module(
     "django_service_specs.affordances.aunmet_operation_affordance"
 )
@@ -44,15 +43,7 @@ def _pool() -> dict[str, Any]:
 
 @pytest.fixture
 def hops(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """The name of every function this module sends to the executor."""
-    sent: list[str] = []
-
-    def counting(fn: Any, *, thread_sensitive: bool) -> Any:
-        sent.append(fn.__name__)
-        return sync_to_async(fn, thread_sensitive=thread_sensitive)
-
-    monkeypatch.setattr(aunmet_module, "sync_to_async", counting)
-    return sent
+    return count_hops(monkeypatch, aunmet_module)
 
 
 def test_the_signature_is_the_sync_one() -> None:

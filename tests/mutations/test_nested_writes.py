@@ -30,6 +30,10 @@ class _ComputedItemRow:
     label: str = field(init=False, default="computed")
 
 
+_ITEMS = {"items": ChildSpec(model=Item, fk="section")}
+_NOTES = {"notes": ChildSpec(model=Note, fk="catalog")}
+
+
 def _spec(**kw: Any) -> dict[str, ChildSpec]:
     return {_SECTIONS: ChildSpec(model=Section, fk="catalog", **kw)}
 
@@ -45,13 +49,7 @@ class TestCreateChildren:
                     {"title": "s1", "items": [{"label": "i1"}, {"label": "i2"}]},
                 ],
             },
-            relations={
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-            },
+            relations=_spec(relations=_ITEMS),
         )
         catalog = result.instance
         section = catalog.sections.get()
@@ -76,13 +74,7 @@ class TestCreateChildren:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s1", "items": [_ComputedItemRow()]}]},
-            relations={
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-            },
+            relations=_spec(relations=_ITEMS),
         )
         item = Item.objects.get(section__catalog=result.instance)
         assert item.label == ""
@@ -92,14 +84,7 @@ class TestCreateChildren:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s", "tags": [tag.pk]}]},
-            relations={
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    exclude_fields=["tags"],
-                    m2m=lambda row: {"tags": row.get("tags", [])},
-                ),
-            },
+            relations=_spec(exclude_fields=["tags"], m2m=lambda row: {"tags": row.get("tags", [])}),
         )
         assert list(result.instance.sections.get().tags.all()) == [tag]
 
@@ -111,9 +96,7 @@ class TestCreateChildren:
         result = create_from_input(
             Catalog,
             {"name": "c", "sections": [{"title": "s"}]},
-            relations={
-                _SECTIONS: ChildSpec(model=Section, fk="catalog", m2m={"tags": [tag]}),
-            },
+            relations=_spec(m2m={"tags": [tag]}),
         )
         assert list(result.instance.sections.get().tags.all()) == [tag]
 
@@ -125,9 +108,7 @@ class TestCreateChildren:
         update_from_input(
             catalog,
             {"sections": [{"pk": section.pk, "title": "renamed"}]},
-            relations={
-                _SECTIONS: ChildSpec(model=Section, fk="catalog", m2m={"tags": [tag]}),
-            },
+            relations=_spec(m2m={"tags": [tag]}),
         )
 
         assert list(section.tags.all()) == [tag]
@@ -166,7 +147,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"notes": [{"pk": keep.pk, "body": "keep"}]},
-            relations={"notes": ChildSpec(model=Note, fk="catalog")},
+            relations=_NOTES,
         )
         orphan.refresh_from_db()
         assert orphan.catalog_id is None  # nullable → unlinked
@@ -217,10 +198,7 @@ class TestUpdateReplace:
         result = update_from_input(
             catalog,
             {"sections": [], "notes": []},
-            relations={
-                "sections": ChildSpec(model=Section, fk="catalog"),
-                "notes": ChildSpec(model=Note, fk="catalog"),
-            },
+            relations={**_spec(), **_NOTES},
         )
         # "notes" is the second collection — the lookup loop skips "sections".
         assert result.get_child_change("notes") is not None
@@ -252,14 +230,7 @@ class TestDeleteChildren:
         note = Note.objects.create(catalog=catalog, body="n")
         deltas, _ = cascade_owned(
             catalog,
-            {
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-                "notes": ChildSpec(model=Note, fk="catalog"),
-            },
+            {**_spec(relations=_ITEMS), **_NOTES},
         )
         assert not Section.objects.filter(pk=section.pk).exists()
         assert not Item.objects.filter(pk=item.pk).exists()  # grandchild removed first
@@ -403,15 +374,11 @@ class TestAsyncChildren:
                     {"title": "s", "tags": [tag.pk], "items": [{"label": "i"}]},
                 ],
             },
-            relations={
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    exclude_fields=["tags"],
-                    m2m=lambda row: {"tags": row.get("tags", [])},
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-            },
+            relations=_spec(
+                exclude_fields=["tags"],
+                m2m=lambda row: {"tags": row.get("tags", [])},
+                relations=_ITEMS,
+            ),
         )
         assert await result.instance.sections.acount() == 1
         assert await Item.objects.acount() == 1
@@ -429,10 +396,7 @@ class TestAsyncChildren:
                 "sections": [{"pk": keep.pk, "title": "kept"}, {"title": "new"}],
                 "notes": [],
             },
-            relations={
-                _SECTIONS: ChildSpec(model=Section, fk="catalog"),
-                "notes": ChildSpec(model=Note, fk="catalog"),
-            },
+            relations={**_spec(), **_NOTES},
         )
         assert not await Section.objects.filter(pk=section_orphan.pk).aexists()
         await note_orphan.arefresh_from_db()
@@ -486,14 +450,7 @@ class TestAsyncChildren:
         note = await Note.objects.acreate(catalog=catalog, body="n")
         deltas, _ = await acascade_owned(
             catalog,
-            {
-                _SECTIONS: ChildSpec(
-                    model=Section,
-                    fk="catalog",
-                    relations={"items": ChildSpec(model=Item, fk="section")},
-                ),
-                "notes": ChildSpec(model=Note, fk="catalog"),
-            },
+            {**_spec(relations=_ITEMS), **_NOTES},
         )
         assert not await Section.objects.aexists()
         assert not await Item.objects.aexists()

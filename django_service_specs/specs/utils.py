@@ -173,7 +173,7 @@ def check_presenter(presenter: Presenter | None, *, label: str) -> None:
         return
     if not isinstance(presenter, Presenter):
         raise ImproperlyConfigured(
-            f"{label}.presenter is {_describe(presenter)}, which is not a Presenter instance."
+            f"{label}.presenter is {describe(presenter)}, which is not a Presenter instance."
         )
     # Each method by name, held by its own case in TestAnAsyncPresenterIsRefused:
     # test_on_a_service_spec and test_an_async_presented_is_refused_too.
@@ -204,5 +204,6 @@ def callable_name(value: Any) -> str:
     return getattr(value, "__qualname__", None) or type(value).__name__
 
 
-def _describe(value: Any) -> str:
+def describe(value: Any) -> str:
+    """A refusal's name for what was declared: ``the class X`` for a class, else its type's name."""
     return f"the class {value.__name__}" if isinstance(value, type) else type(value).__name__

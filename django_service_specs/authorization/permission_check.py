@@ -30,7 +30,7 @@ class PermissionCheck(abc.ABC):
     ``arguments``: dispatch then hands it the call's shape-checked arguments,
     as a read-only mapping, at each of the three questions - a route's captured ``pk``, a
     filter the caller sent - and a method that does not declare it is asked
-    exactly as before. The base methods do not declare it, so every check
+    without them. The base methods do not declare it, so every check
     written without it stays a valid override; a ``many`` call's rows are
     not among them, as they are validated after every check. Opt-in is by
     name, read layer by layer down the ``__wrapped__`` chain

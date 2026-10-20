@@ -141,15 +141,15 @@ def test_a_decimal_a_date_time_and_a_date_stay_strings_for_the_validator() -> No
     assert coerce_flat(FLAT, raw) == raw
 
 
-def test_a_uuid_stays_a_string_and_the_shape_check_refuses_a_nullish_one() -> None:
+@pytest.mark.parametrize("raw", ["null", "undefined", "project_pk"])
+def test_a_uuid_stays_a_string_and_the_shape_check_refuses_a_nullish_one(raw: str) -> None:
     # Argv and a query string reach the same refusal a JSON body does: the
     # flat reading leaves the string alone, and the shape check reads it.
     flat = Parameters.of(Parameter("project_pk", "string", format="uuid"))
-    for raw in ("null", "undefined", "project_pk"):
-        assert coerce_flat(flat, {"project_pk": raw}) == {"project_pk": raw}
-        with pytest.raises(InvalidArguments) as refused:
-            check_arguments(flat, coerce_flat(flat, {"project_pk": raw}))
-        assert refused.value.detail == {"project_pk": ["Enter a valid UUID."]}
+    assert coerce_flat(flat, {"project_pk": raw}) == {"project_pk": raw}
+    with pytest.raises(InvalidArguments) as refused:
+        check_arguments(flat, coerce_flat(flat, {"project_pk": raw}))
+    assert refused.value.detail == {"project_pk": ["Enter a valid UUID."]}
 
 
 def test_an_array_coerces_each_element_and_wraps_a_single_value() -> None:
@@ -191,21 +191,21 @@ def test_an_undeclared_key_passes_through_for_the_closed_set_to_refuse() -> None
 
 
 @pytest.mark.parametrize(
-    "parameter",
+    ("parameter", "value"),
     [
-        Parameter("books", "array", items=BOOK),
-        Parameter("author", "object", fields=BOOK),
+        pytest.param(Parameter("books", "array", items=BOOK), "Lathe", id="rows"),
+        pytest.param(Parameter("author", "object", fields=BOOK), "Lathe", id="object"),
+        # A flat transport cannot have produced it, so there is no value to trust.
+        pytest.param(
+            Parameter("books", "array", items=BOOK), [{"title": "Lathe"}], id="whatever-its-value"
+        ),
     ],
 )
-def test_a_parameter_with_nested_parameters_is_refused_by_name(parameter: Parameter) -> None:
-    detail = refusal(Parameters.of(parameter), {parameter.name: "Lathe"})
+def test_a_parameter_with_nested_parameters_is_refused_by_name(
+    parameter: Parameter, value: Any
+) -> None:
+    detail = refusal(Parameters.of(parameter), {parameter.name: value})
     assert detail == {parameter.name: [NESTED]}
-
-
-def test_a_nested_parameter_is_refused_whatever_its_value() -> None:
-    # A flat transport cannot have produced it, so there is no value to trust.
-    books = Parameters.of(Parameter("books", "array", items=BOOK))
-    assert refusal(books, {"books": [{"title": "Lathe"}]}) == {"books": [NESTED]}
 
 
 def test_every_refusal_is_reported_at_once() -> None:
@@ -235,16 +235,13 @@ def test_an_any_parameter_keeps_the_string_it_arrived_as() -> None:
 def test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read() -> None:
     # Every element is malformed and none is addressed: the length is read
     # first, so a long flat list costs no per-element parse.
-    ids = Parameters.of(Parameter("ids", "array", items="integer"))
-    with pytest.raises(InvalidArguments) as refused:
-        coerce_flat(ids, {"ids": ["x"] * 1001})
-    assert refused.value.detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
-    assert "Enter a whole number." not in str(refused.value.detail)
+    detail = refusal(FLAT, {"ids": ["x"] * 1001})
+    assert detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
+    assert "Enter a whole number." not in str(detail)
 
 
 def test_an_array_at_its_maximum_is_read_element_by_element() -> None:
-    ids = Parameters.of(Parameter("ids", "array", items="integer"))
-    assert coerce_flat(ids, {"ids": ["1"] * 1000}) == {"ids": [1] * 1000}
+    assert coerce_flat(FLAT, {"ids": ["1"] * 1000}) == {"ids": [1] * 1000}
 
 
 def test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake() -> None:

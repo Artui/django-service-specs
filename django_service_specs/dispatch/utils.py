@@ -130,8 +130,7 @@ def refuse_overlaid_parameters(
     is known from the spec alone, so the same overlay is refused on every
     call, never on some requests and not others.
     """
-    keys = provider_keys(spec.kwargs)
-    owned = keys.filled if keys is not None else frozenset()
+    owned = _owned(spec.kwargs)
     supplied = {name for name, value in overlay.kwargs.items() if value is not UNSET}
     taken = sorted((supplied & declared.names()) - owned)
     if taken:
@@ -167,14 +166,8 @@ def overlaid(
     one that may decline it lets the overlay's through
     (test_a_key_the_provider_may_decline_falls_to_the_overlay).
     """
-    taken = sorted(overlay.keys() & reserved)
-    if taken:
-        raise ImproperlyConfigured(
-            f"{label} returned the key(s) {taken}, which dispatch seeds itself. A "
-            "provider's value must never outrank a seeded one; rename the key."
-        )
-    keys = provider_keys(provider)
-    owned = keys.filled if keys is not None else frozenset()
+    _refuse_seeded(overlay, label=label, reserved=reserved)
+    owned = _owned(provider)
     kept = {key: value for key, value in overlay.items() if value is not UNSET and key not in owned}
     return {**kept, **provided}
 
@@ -452,7 +445,7 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
     (test_a_declinable_key_stays_required_of_the_caller,
     test_a_declinable_key_stays_the_caller_s). And a
     provider whose return says nothing about its keys relaxes nothing
-    (test_an_untyped_kwargs_provider_relaxes_no_read).
+    (test_a_read_no_typed_provider_fills_stays_required[an-untyped-provider]).
     """
     if isinstance(spec, SelectorSpec):
         return _filled(spec.kwargs, spec.reads)
@@ -463,8 +456,13 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
 
 def _filled(provider: Callable[..., Any] | None, parameters: Parameters) -> frozenset[str]:
     """The names in ``parameters`` that ``provider`` is annotated to fill; none if it does not say."""
+    return parameters.names() & _owned(provider)
+
+
+def _owned(provider: Callable[..., Any] | None) -> frozenset[str]:
+    """The keys ``provider`` is annotated to fill and may not decline; none if it does not say."""
     keys = provider_keys(provider)
-    return parameters.names() & keys.filled if keys is not None else frozenset()
+    return keys.filled if keys is not None else frozenset()
 
 
 def _check_bulk(
@@ -646,13 +644,18 @@ def provide(
     Validator returning one is, so the bug is found.
     """
     provided = resolve_provider(provider, pool, label=label)
+    _refuse_seeded(provided, label=label, reserved=reserved)
+    return provided
+
+
+def _refuse_seeded(provided: Mapping[str, Any], *, label: str, reserved: frozenset[str]) -> None:
+    """Refuse a provider's key that names a seed: ``provide``'s rule, and the overlay's."""
     taken = sorted(provided.keys() & reserved)
     if taken:
         raise ImproperlyConfigured(
             f"{label} returned the key(s) {taken}, which dispatch seeds itself. A "
             "provider's value must never outrank a seeded one; rename the key."
         )
-    return provided
 
 
 def run_progress(
@@ -703,7 +706,7 @@ def run_preconditions(
     for precondition in spec.preconditions or ():
         sync_result(
             precondition(**call_keywords(precondition, pool, fillable=fillable)),
-            asked=f"The precondition {_name(precondition)}",
+            asked=f"The precondition {callable_name(precondition)}",
             seat="A precondition",
         )
 
@@ -735,11 +738,6 @@ def sync_result(answer: Any, *, asked: str, seat: str) -> Any:
             "declare it with def."
         )
     return answer
-
-
-def _name(value: Any) -> str:
-    """A callable's qualified name for a message, or its type's name when it has none."""
-    return getattr(value, "__qualname__", None) or type(value).__name__
 
 
 def call_pool(
@@ -941,12 +939,12 @@ def lookup(
     try:
         raw = run_selector(fn, kwargs)
     except (ObjectDoesNotExist, Http404) as error:
-        # Each member and conjunct is held by its own test:
-        # test_a_retrieve_raising_does_not_exist_is_not_found
-        # (``ObjectDoesNotExist``), test_a_retrieve_raising_http404_is_not_found
-        # (``Http404``), test_a_list_raising_does_not_exist_is_a_fault_and_passes_through
-        # (the ``isinstance``), test_a_retrieve_raising_http404_under_allow_none_is_none
-        # (the kind) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
+        # Each member and conjunct is held by its own test. Three are cases of
+        # test_a_retrieve_s_missing_row_is_not_found_or_none_under_allow_none:
+        # ``does-not-exist`` (``ObjectDoesNotExist``), ``http404`` (``Http404``)
+        # and ``http404-allow-none`` (the kind). The others are
+        # test_a_list_raising_does_not_exist_is_a_fault_and_passes_through (the
+        # ``isinstance``) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
         # (``after_the_run``: the write has run, so it is never reported not found).
         if isinstance(error, Http404) and selector_spec.kind is SelectorKind.LIST:
             if after_the_run:

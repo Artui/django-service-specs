@@ -6,6 +6,7 @@ from dataclasses import MISSING, fields
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
@@ -62,3 +63,19 @@ class TestKeywordOnlyOptions:
             for f in declared
             if f.kw_only
         )
+
+
+def _service(**_: Any) -> None: ...
+
+
+@pytest.mark.parametrize(("kind", "required"), _REQUIRED)
+def test_every_kind_refuses_a_row_service_beside_row_shaping(
+    kind: type[RelationSpec], required: tuple[Any, ...]
+) -> None:
+    # The refusal is one helper each kind calls with its own label, so a kind
+    # that stopped calling it would take the service and drop the shaping.
+    with pytest.raises(ImproperlyConfigured) as excinfo:
+        kind(*required, create_service=_service, exclude_fields=["notes"])
+    assert f"{kind.__name__}: create_service declared alongside exclude_fields" in str(
+        excinfo.value
+    )

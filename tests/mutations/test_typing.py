@@ -12,7 +12,10 @@ parametrised by the same TypeVar declared in :mod:`change_result` — using
 
 from __future__ import annotations
 
-from typing import get_args, get_origin, get_type_hints
+from collections.abc import Callable
+from typing import Any, get_args, get_origin, get_type_hints
+
+import pytest
 
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
@@ -23,44 +26,43 @@ from tests.relations_app.models import Author
 
 
 class TestMutationHelperReturnTypes:
-    def test_create_from_input_returns_change_result_of_model_t(self) -> None:
-        return_hint = get_type_hints(create_from_input)["return"]
-        assert get_origin(return_hint) is ChangeResult
-        assert get_args(return_hint) == (ModelT,)
-
-    def test_update_from_input_returns_change_result_of_model_t(self) -> None:
-        return_hint = get_type_hints(update_from_input)["return"]
-        assert get_origin(return_hint) is ChangeResult
-        assert get_args(return_hint) == (ModelT,)
-
-    def test_acreate_from_input_returns_change_result_of_model_t(self) -> None:
-        return_hint = get_type_hints(acreate_from_input)["return"]
-        assert get_origin(return_hint) is ChangeResult
-        assert get_args(return_hint) == (ModelT,)
-
-    def test_aupdate_from_input_returns_change_result_of_model_t(self) -> None:
-        return_hint = get_type_hints(aupdate_from_input)["return"]
+    @pytest.mark.parametrize(
+        "helper",
+        [
+            pytest.param(create_from_input, id="create_from_input"),
+            pytest.param(update_from_input, id="update_from_input"),
+            pytest.param(acreate_from_input, id="acreate_from_input"),
+            pytest.param(aupdate_from_input, id="aupdate_from_input"),
+        ],
+    )
+    def test_returns_change_result_of_model_t(self, helper: Callable[..., Any]) -> None:
+        return_hint = get_type_hints(helper)["return"]
         assert get_origin(return_hint) is ChangeResult
         assert get_args(return_hint) == (ModelT,)
 
 
 class TestMutationHelperModelParameter:
-    def test_create_from_input_model_is_type_of_model_t(self) -> None:
-        model_hint = get_type_hints(create_from_input)["model"]
+    @pytest.mark.parametrize(
+        "helper",
+        [
+            pytest.param(create_from_input, id="create_from_input"),
+            pytest.param(acreate_from_input, id="acreate_from_input"),
+        ],
+    )
+    def test_model_is_type_of_model_t(self, helper: Callable[..., Any]) -> None:
+        model_hint = get_type_hints(helper)["model"]
         assert get_origin(model_hint) is type
         assert get_args(model_hint) == (ModelT,)
 
-    def test_acreate_from_input_model_is_type_of_model_t(self) -> None:
-        model_hint = get_type_hints(acreate_from_input)["model"]
-        assert get_origin(model_hint) is type
-        assert get_args(model_hint) == (ModelT,)
-
-    def test_update_from_input_instance_is_model_t(self) -> None:
-        instance_hint = get_type_hints(update_from_input)["instance"]
-        assert instance_hint is ModelT
-
-    def test_aupdate_from_input_instance_is_model_t(self) -> None:
-        instance_hint = get_type_hints(aupdate_from_input)["instance"]
+    @pytest.mark.parametrize(
+        "helper",
+        [
+            pytest.param(update_from_input, id="update_from_input"),
+            pytest.param(aupdate_from_input, id="aupdate_from_input"),
+        ],
+    )
+    def test_instance_is_model_t(self, helper: Callable[..., Any]) -> None:
+        instance_hint = get_type_hints(helper)["instance"]
         assert instance_hint is ModelT
 
 

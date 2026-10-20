@@ -14,18 +14,24 @@ User = get_user_model()
 
 
 @pytest.mark.django_db
-def test_missing_identifier_raises() -> None:
+@pytest.mark.parametrize(
+    "identifier",
+    [
+        pytest.param(999999, id="missing"),
+        # A non-integer string against an integer primary key raises ValueError
+        # from the field's own coercion, not DoesNotExist; both become the same
+        # refusal, because the caller cannot act on either outcome differently.
+        pytest.param("abc", id="malformed"),
+        # A list reaches the integer field's own coercion as ``int([])``, which is a
+        # TypeError rather than a ValueError - a queue payload that decoded a
+        # structure where it expected a key.
+        pytest.param([1], id="wrong-kind"),
+        pytest.param(None, id="none"),
+    ],
+)
+def test_an_identifier_naming_no_row_raises(identifier: object) -> None:
     with pytest.raises(PrincipalUnavailable, match="No principal"):
-        resolve_principal(999999)
-
-
-@pytest.mark.django_db
-def test_malformed_identifier_raises() -> None:
-    # A non-integer string against an integer primary key raises ValueError
-    # from the field's own coercion, not DoesNotExist; both become the same
-    # refusal, because the caller cannot act on either outcome differently.
-    with pytest.raises(PrincipalUnavailable, match="No principal"):
-        resolve_principal("abc")
+        resolve_principal(identifier)
 
 
 @pytest.mark.django_db
@@ -37,15 +43,6 @@ def test_an_identifier_past_the_key_s_column_raises(identifier: object) -> None:
     # which raised OverflowError.
     with pytest.raises(PrincipalUnavailable, match="No principal"):
         resolve_principal(identifier)
-
-
-@pytest.mark.django_db
-def test_an_identifier_of_the_wrong_kind_raises() -> None:
-    # A list reaches the integer field's own coercion as ``int([])``, which is a
-    # TypeError rather than a ValueError - a queue payload that decoded a
-    # structure where it expected a key.
-    with pytest.raises(PrincipalUnavailable, match="No principal"):
-        resolve_principal([1])
 
 
 @pytest.mark.django_db
@@ -79,12 +76,6 @@ def test_an_infinite_identifier_is_no_principal(identifier: float) -> None:
     # OverflowError for an infinity: past every column, so no row.
     with pytest.raises(PrincipalUnavailable, match="No principal with identifier"):
         resolve_principal(identifier)
-
-
-@pytest.mark.django_db
-def test_none_identifier_raises() -> None:
-    with pytest.raises(PrincipalUnavailable, match="No principal"):
-        resolve_principal(None)
 
 
 @pytest.mark.django_db

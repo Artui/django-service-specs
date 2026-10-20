@@ -94,15 +94,14 @@ def test_an_optional_parameter_may_be_absent_and_stays_absent() -> None:
     assert check_arguments(one(Parameter("pk", "integer")), {}) == {}
 
 
-def test_a_required_parameter_with_a_default_is_not_refused_when_absent() -> None:
+@pytest.mark.parametrize(
+    "default",
+    [pytest.param("draft", id="a-string"), pytest.param(None, id="none-is-a-real-default")],
+)
+def test_a_required_parameter_with_a_default_is_not_refused_when_absent(default: Any) -> None:
     # Holds the ``default is UNSET`` condition. The default is not applied
     # either: that is the Validator's library's behaviour to report.
-    params = one(Parameter("status", "string", required=True, default="draft"))
-    assert check_arguments(params, {}) == {}
-
-
-def test_a_default_of_none_is_a_real_default() -> None:
-    params = one(Parameter("note", "string", required=True, default=None))
+    params = one(Parameter("status", "string", required=True, default=default))
     assert check_arguments(params, {}) == {}
 
 
@@ -225,7 +224,7 @@ def test_a_float_nothing_declares_an_integer_stays_a_float(
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_a_non_finite_float_is_still_no_integer(value: float) -> None:
     # Neither is integral, so neither is converted, and the type check
-    # answers as it did before an integral float was an integer.
+    # refuses it as no integer.
     assert refusal(one(Parameter("count", "integer")), {"count": value}) == {
         "count": ["Expected an integer."]
     }
@@ -277,9 +276,9 @@ def test_a_numeric_string_is_read_and_the_number_handed_on(
     json_type: str, value: str, number: float
 ) -> None:
     # Django's forms read every one of these strings as the number, and
-    # pydantic's lax mode all but the integer "-4.", so refusing them was
-    # stricter than every library behind the check. The parsed number is what goes on: a dataclass Validator refuses
-    # the string "3" for an ``int``.
+    # pydantic's lax mode all but the integer "-4.", so refusing them would be
+    # stricter than every library behind the check. The parsed number is what
+    # goes on: a dataclass Validator refuses the string "3" for an ``int``.
     cleaned = check_arguments(one(Parameter("x", json_type)), {"x": value})
     assert cleaned == {"x": number}
     assert type(cleaned["x"]) is type(number)
@@ -299,7 +298,7 @@ def test_a_numeric_string_is_read_and_the_number_handed_on(
 def test_a_string_that_is_no_number_is_refused_as_its_type(
     json_type: str, value: str, message: str
 ) -> None:
-    # The refusal is the type's, as before: a string that does not read as the
+    # The refusal is the type's: a string that does not read as the
     # number is a string, which is not the declared type. "1e3" is no integer
     # to Django's forms or pydantic, although both read it as a number.
     assert refusal(one(Parameter("x", json_type)), {"x": value}) == {"x": [message]}
@@ -485,13 +484,11 @@ def test_a_decimal_refuses_what_is_neither_a_string_nor_a_number(value: Any) -> 
     assert message != NOT_A_NUMBER
 
 
-@pytest.mark.parametrize("value", ["abc", "", "NaN", "Infinity", "-inf"])
-def test_a_decimal_string_must_parse_to_a_finite_number(value: str) -> None:
+@pytest.mark.parametrize(
+    "value", ["abc", "", "NaN", "Infinity", "-inf", pytest.param(float("nan"), id="float-nan")]
+)
+def test_a_decimal_must_spell_a_finite_number(value: Any) -> None:
     assert refusal(DECIMAL, {"price": value}) == {"price": [NOT_A_NUMBER]}
-
-
-def test_a_decimal_float_must_be_finite() -> None:
-    assert refusal(DECIMAL, {"price": float("nan")}) == {"price": [NOT_A_NUMBER]}
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
@@ -521,39 +518,41 @@ def test_a_non_finite_value_inside_a_free_form_object_is_its_validators() -> Non
     assert check_arguments(nested, {"xs": [row]})["xs"][0] is row
 
 
-DATE_TIME = one(Parameter("at", "string", format="date-time"))
-DATE = one(Parameter("on", "string", format="date"))
-
-
-@pytest.mark.parametrize("value", ["2024-01-31T10:00:00Z", "2024-01-31 10:00", "2024-01-31"])
-def test_a_date_time_is_what_djangos_parser_reads(value: str) -> None:
-    assert check_arguments(DATE_TIME, {"at": value}) == {"at": value}
+@pytest.mark.parametrize(
+    ("fmt", "value"),
+    [
+        ("date-time", "2024-01-31T10:00:00Z"),
+        ("date-time", "2024-01-31 10:00"),
+        ("date-time", "2024-01-31"),
+        ("date", "2024-01-31"),
+    ],
+)
+def test_a_date_or_a_date_time_is_what_djangos_parser_reads(fmt: str, value: str) -> None:
+    params = one(Parameter("on", "string", format=fmt))
+    assert check_arguments(params, {"on": value}) == {"on": value}
 
 
 @pytest.mark.parametrize(
-    "value",
+    ("fmt", "value", "message"),
     [
-        "yesterday",
+        ("date-time", "yesterday", "Enter a valid date/time."),
         # Well-formed and impossible: Django raises ValueError for this one
         # rather than returning None, and it must be a refusal, not a crash.
-        "2024-02-30T10:00:00",
+        ("date-time", "2024-02-30T10:00:00", "Enter a valid date/time."),
+        ("date", "soon", "Enter a valid date."),
+        ("date", "2024-02-30", "Enter a valid date."),
     ],
 )
-def test_a_date_time_that_does_not_parse_is_refused(value: str) -> None:
-    assert refusal(DATE_TIME, {"at": value}) == {"at": ["Enter a valid date/time."]}
-
-
-@pytest.mark.parametrize("value", ["soon", "2024-02-30"])
-def test_a_date_that_does_not_parse_is_refused(value: str) -> None:
-    assert refusal(DATE, {"on": value}) == {"on": ["Enter a valid date."]}
-
-
-def test_a_date_is_what_djangos_parser_reads() -> None:
-    assert check_arguments(DATE, {"on": "2024-01-31"}) == {"on": "2024-01-31"}
+def test_a_date_or_a_date_time_that_does_not_parse_is_refused(
+    fmt: str, value: str, message: str
+) -> None:
+    params = one(Parameter("on", "string", format=fmt))
+    assert refusal(params, {"on": value}) == {"on": [message]}
 
 
 def test_a_formatted_string_is_type_checked_before_it_is_parsed() -> None:
-    assert refusal(DATE, {"on": 20240131}) == {"on": ["Expected a string."]}
+    params = one(Parameter("on", "string", format="date"))
+    assert refusal(params, {"on": 20240131}) == {"on": ["Expected a string."]}
 
 
 # --- an identifier --------------------------------------------------------------------
@@ -703,8 +702,8 @@ class TestUuidChoices:
         assert Parameter("ref", "string", choices=["a", "a"]).choices == ("a", "a")
 
     def test_a_choice_no_uuid_spells_is_kept_as_listed(self) -> None:
-        # No new refusal: such a choice matches nothing, as before, since the
-        # format refuses the value first.
+        # Not refused: such a choice matches nothing, since the format
+        # refuses the value first.
         assert listed("legacy").choices == ("legacy",)
 
     def test_a_choice_that_is_no_string_is_kept_as_listed(self) -> None:
@@ -1260,23 +1259,15 @@ class TestAny:
         }
 
     def test_null_is_refused_unless_nullable(self) -> None:
-        strict = Parameters.of(Parameter("pk", "any"))
-        loose = Parameters.of(Parameter("pk", "any", nullable=True))
-
-        with pytest.raises(InvalidArguments) as refused:
-            check_arguments(strict, {"pk": None})
-        assert refused.value.detail == {"pk": ["This field cannot be null."]}
+        assert refusal(one(Parameter("pk", "any")), {"pk": None}) == {"pk": [NULL]}
+        loose = one(Parameter("pk", "any", nullable=True))
         assert check_arguments(loose, {"pk": None}) == {"pk": None}
 
     def test_a_required_any_is_refused_when_absent(self) -> None:
-        with pytest.raises(InvalidArguments) as refused:
-            check_arguments(Parameters.of(Parameter("pk", "any", required=True)), {})
-        assert refused.value.detail == {"pk": ["This field is required."]}
+        assert refusal(one(Parameter("pk", "any", required=True)), {}) == {"pk": [REQUIRED]}
 
     def test_nan_is_no_json_value_and_is_refused(self) -> None:
-        with pytest.raises(InvalidArguments) as refused:
-            check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": float("nan")})
-        assert refused.value.detail == {"pk": ["Enter a number."]}
+        assert refusal(one(Parameter("pk", "any")), {"pk": float("nan")}) == {"pk": [NOT_A_NUMBER]}
 
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)

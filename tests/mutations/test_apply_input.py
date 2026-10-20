@@ -102,7 +102,6 @@ class TestApplyInput:
     def test_no_save_called(self) -> None:
         author = Author.objects.create(name="orig")
         apply_input(author, {"name": "new"})
-        # Reload from DB; persisted value is unchanged.
         author.refresh_from_db()
         assert author.name == "orig"
 

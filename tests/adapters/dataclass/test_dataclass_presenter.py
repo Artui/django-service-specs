@@ -16,7 +16,6 @@ from django_service_specs.adapters.dataclass.dataclass_presenter import Dataclas
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
-from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
@@ -30,6 +29,7 @@ from tests.adapters.dataclass.utils import (
     Marked,
     Priority,
 )
+from tests.adapters.utils import agree
 
 
 @dataclass
@@ -271,33 +271,11 @@ def test_a_manager_built_on_base_manager_is_read_through_all_too() -> None:
 # --- against the validator ----------------------------------------------------------------
 
 
-def _agree(parameters: Parameters, output: Output) -> None:
-    """Each declared parameter has an output field of the same name and type."""
-    for parameter in parameters:
-        field = output.get(parameter.name)
-        assert field is not None, parameter.name
-        assert (field.type, field.format, field.nullable) == (
-            parameter.type,
-            parameter.format,
-            parameter.nullable,
-        ), parameter.name
-        values = None if field.choices is None else tuple(value for value, _ in field.choices)
-        assert parameter.choices == values, parameter.name
-        if parameter.fields is not None:
-            assert isinstance(field.fields, Output), parameter.name
-            _agree(parameter.fields, field.fields)
-        if isinstance(parameter.items, Parameters):
-            assert isinstance(field.items, Output), parameter.name
-            _agree(parameter.items, field.items)
-        else:
-            assert field.items == parameter.items, parameter.name
-
-
 def test_parameters_and_output_agree_field_for_field() -> None:
     parameters = DataclassValidator(Everything).parameters()
     output = DataclassPresenter(Everything).output()
     assert parameters.names() == set(output.names())
-    _agree(parameters, output)
+    agree(parameters, output)
 
 
 def test_they_differ_where_the_dataclass_computes_a_field() -> None:

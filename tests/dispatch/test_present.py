@@ -472,7 +472,7 @@ def test_a_list_selector_returning_a_manager_presents_every_row() -> None:
 def test_a_list_selector_returning_a_manager_built_on_base_manager_presents_every_row() -> None:
     # ``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
     # and ``is_queryset`` counts it like one, so dispatch takes its ``.all()``
-    # as well. Tested as ``Manager``, it reached the presenter unread.
+    # as well.
     ada = make_user("ada")
     Note.objects.create(owner=ada, title="One")
     Note.objects.create(owner=ada, title="Two")

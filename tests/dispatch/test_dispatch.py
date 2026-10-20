@@ -152,19 +152,32 @@ def test_a_retrieve_returns_its_row(ada: Any) -> None:
     assert result == DispatchResult(kind="instance", value=note)
 
 
-def test_a_missing_row_is_not_found_and_returned_rather_than_raised(ada: Any) -> None:
-    assert dispatch(retrieve(), principal=ada, arguments={"pk": 404}) == DispatchResult(
-        kind="not_found"
-    )
+def _by_get(*, pk: int) -> Note:
+    return Note.objects.get(pk=pk)
 
 
-def test_a_retrieve_raising_does_not_exist_is_not_found(ada: Any) -> None:
-    def by_get(*, pk: int) -> Note:
-        return Note.objects.get(pk=pk)
+def _by_404(*, pk: int) -> Note:
+    return get_object_or_404(Note, pk=pk)
 
-    result = dispatch(retrieve(selector=by_get), principal=ada, arguments={"pk": 404})
 
-    assert result == DispatchResult(kind="not_found")
+@pytest.mark.parametrize(
+    ("selector", "allow_none", "expected"),
+    [
+        pytest.param(note_by_pk, False, DispatchResult(kind="not_found"), id="an-empty-queryset"),
+        pytest.param(_by_get, False, DispatchResult(kind="not_found"), id="does-not-exist"),
+        pytest.param(_by_404, False, DispatchResult(kind="not_found"), id="http404"),
+        pytest.param(
+            _by_404, True, DispatchResult(kind="instance", value=None), id="http404-allow-none"
+        ),
+    ],
+)
+def test_a_retrieve_s_missing_row_is_not_found_or_none_under_allow_none(
+    ada: Any, selector: Callable[..., Any], allow_none: bool, expected: DispatchResult
+) -> None:
+    # Returned rather than raised, however the selector says the row is missing.
+    spec = retrieve(selector=selector, allow_none=allow_none)
+
+    assert dispatch(spec, principal=ada, arguments={"pk": 404}) == expected
 
 
 def test_a_list_raising_does_not_exist_is_a_fault_and_passes_through(ada: Any) -> None:
@@ -191,26 +204,6 @@ def _notes_of_owner(how: str) -> Callable[..., Any]:
         return Note.objects.filter(owner=parent)
 
     return notes
-
-
-def test_a_retrieve_raising_http404_is_not_found(ada: Any) -> None:
-    def by_404(*, pk: int) -> Note:
-        return get_object_or_404(Note, pk=pk)
-
-    result = dispatch(retrieve(selector=by_404), principal=ada, arguments={"pk": 404})
-
-    assert result == DispatchResult(kind="not_found")
-
-
-def test_a_retrieve_raising_http404_under_allow_none_is_none(ada: Any) -> None:
-    def by_404(*, pk: int) -> Note:
-        return get_object_or_404(Note, pk=pk)
-
-    spec = retrieve(selector=by_404, allow_none=True)
-
-    result = dispatch(spec, principal=ada, arguments={"pk": 404})
-
-    assert (result.kind, result.value) == ("instance", None)
 
 
 @pytest.mark.parametrize("allow_none", [False, True])
@@ -274,14 +267,10 @@ def test_a_list_whose_parent_is_found_lists_its_rows(ada: Any) -> None:
 
 def test_a_write_whose_instance_selector_raises_http404_is_not_found(ada: Any) -> None:
     service = Record()
-
-    def by_404(*, pk: int) -> Note:
-        return get_object_or_404(Note, pk=pk)
-
     spec = ServiceSpec(
         service=service,
         permissions=OPEN,
-        instance_selector_spec=nested(RETRIEVE, selector=by_404, reads=PK),
+        instance_selector_spec=nested(RETRIEVE, selector=_by_404, reads=PK),
     )
 
     result = dispatch(spec, principal=ada, arguments={"pk": 404})
@@ -853,20 +842,27 @@ def test_an_async_service_is_awaited_by_sync_dispatch(ada: Any) -> None:
 # --- Pool seeds ---------------------------------------------------------------------------
 
 
-def test_a_registered_seed_reaches_a_selector_that_declares_it(ada: Any) -> None:
-    spec = SelectorSpec(kind=LIST, selector=lambda *, tenant: [tenant], permissions=OPEN)
-
+@pytest.mark.parametrize(
+    ("spec", "expected"),
+    [
+        pytest.param(
+            SelectorSpec(kind=LIST, selector=lambda *, tenant: [tenant], permissions=OPEN),
+            ["tenant-of-ada"],
+            id="selector",
+        ),
+        pytest.param(
+            ServiceSpec(service=lambda *, tenant: tenant, permissions=OPEN),
+            "tenant-of-ada",
+            id="service",
+        ),
+    ],
+)
+def test_a_registered_seed_reaches_a_callable_that_declares_it(
+    ada: Any, spec: SelectorSpec | ServiceSpec, expected: Any
+) -> None:
     result = dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
-    assert result.value == ["tenant-of-ada"]
-
-
-def test_a_registered_seed_reaches_a_service_that_declares_it(ada: Any) -> None:
-    spec = ServiceSpec(service=lambda *, tenant: tenant, permissions=OPEN)
-
-    result = dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
-
-    assert result.value == "tenant-of-ada"
+    assert result.value == expected
 
 
 class _TenantValidator(Titled):
@@ -1465,14 +1461,8 @@ def test_an_optional_read_a_selector_requires_is_refused_when_not_sent(ada: Any)
         dispatch(spec, principal=ada, arguments={})
 
     assert caught.value.detail == {"tenant": REQUIRED}
-
-
-def test_a_read_a_selector_asks_for_and_nothing_fills_carries_the_required_code(ada: Any) -> None:
     # The shape check's own code for the same absence, so a caller reads one
     # code whichever of the two refused the read.
-    spec = SelectorSpec(kind=LIST, selector=_by_tenant, reads=TENANT_READ, permissions=OPEN)
-    with pytest.raises(InvalidArguments) as caught:
-        dispatch(spec, principal=ada, arguments={})
     assert coded(caught.value.detail) == {"tenant": [("This field is required.", "required")]}
 
 
@@ -2224,10 +2214,19 @@ def test_a_progress_provider_returning_none_declines(ada: Any) -> None:
     assert transport == [0.5, 1.0]
 
 
-def test_a_call_refused_before_its_run_never_calls_the_progress_provider(ada: Any) -> None:
+async def _areporting(*, progress: Any) -> None:
+    progress(1.0)
+
+
+@pytest.mark.parametrize("run", [_reporting, _areporting], ids=["sync", "async"])
+def test_a_call_refused_before_its_run_never_calls_the_progress_provider(
+    ada: Any, run: Callable[..., Any]
+) -> None:
+    # The provider of an ``async def`` run is resolved before the run, so it
+    # must be resolved after everything that can refuse the call.
     sink = _Sink()
     spec = ServiceSpec(
-        service=_reporting,
+        service=run,
         permissions=OPEN,
         progress_reporter=sink,
         preconditions=[_Precondition(Boom())],
@@ -2468,27 +2467,6 @@ def test_a_bound_value_naming_a_parameter_is_refused(
         dispatch(spec, principal=ada, arguments=arguments)
 
 
-def test_an_async_run_refused_before_it_starts_never_calls_the_progress_provider(
-    ada: Any,
-) -> None:
-    # The provider of an ``async def`` run is resolved before the run, so it
-    # must be resolved after everything that can refuse the call.
-    sink = _Sink()
-
-    async def reporting(*, progress: Any) -> None:
-        progress(1.0)
-
-    spec = ServiceSpec(
-        service=reporting,
-        permissions=OPEN,
-        progress_reporter=sink,
-        preconditions=[_Precondition(Boom())],
-    )
-    with pytest.raises(Boom):
-        dispatch(spec, principal=ada, arguments={})
-    assert sink.resolved == []
-
-
 # --- what the shape check may leave out: under ``partial``, the Validator's
 # fields alone; and a field the spec's ``input_data`` provider fills.
 
@@ -2726,21 +2704,21 @@ def test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_f
     assert ran == []
 
 
-def test_a_read_the_provider_does_not_name_stays_required(ada: Any) -> None:
-    def server() -> _ServerTenant:
-        return {"tenant": "t"}
-
-    spec = ServiceSpec(service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=server)
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+def _names_another_key() -> _ServerTenant:
+    return {"tenant": "t"}
 
 
-def test_an_untyped_kwargs_provider_relaxes_no_read(ada: Any) -> None:
-    spec = ServiceSpec(
-        service=Record(),
-        permissions=[Refuse()],
-        reads=PROJECT,
-        kwargs=lambda: {"project_pk": 7},
-    )
+@pytest.mark.parametrize(
+    "provider",
+    [
+        pytest.param(_names_another_key, id="a-typed-provider-naming-another-key"),
+        pytest.param(lambda: {"project_pk": 7}, id="an-untyped-provider"),
+    ],
+)
+def test_a_read_no_typed_provider_fills_stays_required(
+    ada: Any, provider: Callable[..., Any]
+) -> None:
+    spec = ServiceSpec(service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=provider)
     assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
 
 

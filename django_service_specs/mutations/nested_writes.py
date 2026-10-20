@@ -26,6 +26,7 @@ from django.utils.translation import gettext
 
 from django_service_specs.mutations.change_result import ChangeResult, ModelT
 from django_service_specs.mutations.child_collection_change import ChildCollectionChange
+from django_service_specs.mutations.field_change import FieldChange
 from django_service_specs.mutations.related_object_change import RelatedObjectChange
 from django_service_specs.mutations.utils import (
     CALLER_RAISED,
@@ -37,15 +38,16 @@ from django_service_specs.mutations.utils import (
     am2m_changes,
     am2m_current_pks,
     apply_m2m,
+    assign_changed_values,
     auto_now_field_names,
     changes_for_create,
     coerce_to_dict,
-    diff_attrs,
     dimension_field_names,
     extract_relation_data,
     filter_input,
     form_values,
     m2m_changes,
+    m2m_current_pks,
     mark_caller_raised,
     post_save_relations,
     reject_m2m_overlap,
@@ -1033,7 +1035,7 @@ def _write_m2m_relation(
     if items is UNSET:
         return ChildCollectionChange(relation=relation)
     manager: Any = getattr(parent, relation)
-    before: list[Any] = [] if created else list(manager.values_list("pk", flat=True))
+    before: list[Any] = [] if created else m2m_current_pks(parent, relation)
     created_pks: list[Any] = []
     updated_pks: list[Any] = []
     targets: list[Any] = []
@@ -1609,7 +1611,7 @@ def _clear_m2m_membership(parent: Model, *, relation: str) -> ChildCollectionCha
     The targets survive, so their own relations are not followed either.
     """
     manager: Any = getattr(parent, relation)
-    members: tuple[Any, ...] = tuple(manager.values_list("pk", flat=True))
+    members: tuple[Any, ...] = tuple(m2m_current_pks(parent, relation))
     manager.clear()
     return ChildCollectionChange(relation=relation, unlinked=members)
 
@@ -1623,6 +1625,50 @@ async def _aclear_m2m_membership(parent: Model, *, relation: str) -> ChildCollec
 
 
 # --- the entry points' bodies ----------------------------------------------
+
+
+def _read_input(
+    data: Any,
+    *,
+    field_map: dict[str, str] | None,
+    exclude_fields: list[str] | None,
+    m2m: dict[str, Any] | None,
+    relations: Mapping[str, RelationSpec] | None,
+) -> tuple[dict[str, RelationSpec], dict[str, Any], dict[str, Any]]:
+    """A write's input as its relation specs, each relation's payload, and the row's own values.
+
+    Each relation's payload is popped out of the row before ``filter_input``
+    reads it, so a nested payload never reaches the row's own fields.
+    """
+    relation_specs = relation_map(relations)
+    reject_m2m_overlap(m2m, relation_specs)
+    raw: dict[str, Any] = coerce_to_dict(data)
+    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
+    new_values = filter_input(raw, field_map=field_map, exclude_fields=exclude_fields)
+    return (relation_specs, relation_data, new_values)
+
+
+def _build_instance(model: type[ModelT], values: dict[str, Any]) -> ModelT:
+    """An unsaved ``model`` row, built as ``construct_instance`` builds a ModelForm's.
+
+    The file fields are written last, through ``save_form_data``.
+    """
+    plain_values, file_values = split_file_values(model, values)
+    instance: ModelT = model(**plain_values)
+    write_values(instance, file_values)
+    return instance
+
+
+def _save_fields(
+    instance: Model, field_changes: tuple[FieldChange, ...], update_fields: bool | list[str]
+) -> list[str] | None:
+    """The ``update_fields`` an update's ``save()`` is called with, ``None`` for the whole row."""
+    changed: tuple[str, ...] = tuple(change.field for change in field_changes)
+    return resolve_update_fields(
+        update_fields,
+        changed,
+        auto_now_field_names(instance) + dimension_field_names(instance, changed),
+    )
 
 
 def create_instance(
@@ -1641,25 +1687,15 @@ def create_instance(
     nested row through this very function, so the recursion is a call inside
     this module and nothing here imports an entry point back.
     """
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
-        field_map=field_map,
-        exclude_fields=exclude_fields,
+    relation_specs, relation_data, new_values = _read_input(
+        data, field_map=field_map, exclude_fields=exclude_fields, m2m=m2m, relations=relations
     )
     forward_values, forward_changes = apply_forward_relations(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
     new_values = form_values(model, new_values)
-    # Built as ``construct_instance`` builds a ModelForm's row: the file
-    # fields written last, through ``save_form_data``.
-    plain_values, file_values = split_file_values(model, new_values)
-    instance: ModelT = model(**plain_values)
-    write_values(instance, file_values)
+    instance = _build_instance(model, new_values)
     instance.save()
     field_changes = changes_for_create(new_values)
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=True)
@@ -1693,31 +1729,18 @@ def update_instance(
     nested row through this very function, so the recursion is a call inside
     this module and nothing here imports an entry point back.
     """
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
-        field_map=field_map,
-        exclude_fields=exclude_fields,
+    relation_specs, relation_data, new_values = _read_input(
+        data, field_map=field_map, exclude_fields=exclude_fields, m2m=m2m, relations=relations
     )
     forward_values, forward_changes = apply_forward_relations(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
-    new_values = form_values(type(instance), new_values)
-    field_changes = diff_attrs(instance, new_values)
-    write_values(instance, {change.field: change.new for change in field_changes})
+    field_changes = assign_changed_values(instance, new_values)
     for relation, target in forward_values.items():
         sync_relation_cache(instance, relation, target)
     m2m_field_changes, to_apply = m2m_changes(instance, m2m, created=False)
-    changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
-    save_fields: list[str] | None = resolve_update_fields(
-        update_fields,
-        changed_field_names,
-        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
-    )
+    save_fields = _save_fields(instance, field_changes, update_fields)
     if field_changes or update_fields is False:
         if save_fields is None:
             instance.save()
@@ -1752,25 +1775,15 @@ async def acreate_instance(
     nested row through this very function, so the recursion is a call inside
     this module and nothing here imports an entry point back.
     """
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
-        field_map=field_map,
-        exclude_fields=exclude_fields,
+    relation_specs, relation_data, new_values = _read_input(
+        data, field_map=field_map, exclude_fields=exclude_fields, m2m=m2m, relations=relations
     )
     forward_values, forward_changes = await aapply_forward_relations(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
     new_values = form_values(model, new_values)
-    # Built as ``construct_instance`` builds a ModelForm's row: the file
-    # fields written last, through ``save_form_data``.
-    plain_values, file_values = split_file_values(model, new_values)
-    instance: ModelT = model(**plain_values)
-    write_values(instance, file_values)
+    instance = _build_instance(model, new_values)
     await instance.asave()
     field_changes = changes_for_create(new_values)
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=True)
@@ -1804,31 +1817,18 @@ async def aupdate_instance(
     nested row through this very function, so the recursion is a call inside
     this module and nothing here imports an entry point back.
     """
-    relation_specs = relation_map(relations)
-    reject_m2m_overlap(m2m, relation_specs)
-    raw: dict[str, Any] = coerce_to_dict(data)
-    relation_data: dict[str, Any] = extract_relation_data(raw, relation_specs)
-    new_values: dict[str, Any] = filter_input(
-        raw,
-        field_map=field_map,
-        exclude_fields=exclude_fields,
+    relation_specs, relation_data, new_values = _read_input(
+        data, field_map=field_map, exclude_fields=exclude_fields, m2m=m2m, relations=relations
     )
     forward_values, forward_changes = await aapply_forward_relations(
         relation_data, relation_specs, context=context
     )
     new_values.update(forward_values)
-    new_values = form_values(type(instance), new_values)
-    field_changes = diff_attrs(instance, new_values)
-    write_values(instance, {change.field: change.new for change in field_changes})
+    field_changes = assign_changed_values(instance, new_values)
     for relation, target in forward_values.items():
         sync_relation_cache(instance, relation, target)
     m2m_field_changes, to_apply = await am2m_changes(instance, m2m, created=False)
-    changed_field_names: tuple[str, ...] = tuple(change.field for change in field_changes)
-    save_fields: list[str] | None = resolve_update_fields(
-        update_fields,
-        changed_field_names,
-        auto_now_field_names(instance) + dimension_field_names(instance, changed_field_names),
-    )
+    save_fields = _save_fields(instance, field_changes, update_fields)
     if field_changes or update_fields is False:
         if save_fields is None:
             await instance.asave()

@@ -26,6 +26,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.affordances.utils import books_closed
 from tests.dispatch.utils import PK, TENANT_SEEDS, make_user, note_by_pk
 from tests.dispatch_app.models import LiveNote, Note
 from tests.specs.utils import Foreign
@@ -36,14 +37,9 @@ NOT_ARCHIVED = Affordance(
 TITLED = Affordance(code="untitled", reason="Give it a title first.", when=~Q(title=""))
 
 
-async def _books_closed() -> bool:
-    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
-    return False
-
-
 def _books_closed_answer() -> Any:
     """A plain callable handing back the coroutine, which no declaration can refuse."""
-    return _books_closed()
+    return books_closed()
 
 
 def spec_with(*affordances: Affordance) -> ServiceSpec:
@@ -170,7 +166,7 @@ class TestCallableConditions:
     def test_a_condition_answering_with_a_coroutine_is_refused_not_read_as_met(
         self, ada: Any
     ) -> None:
-        answer = _books_closed()
+        answer = books_closed()
         spec = ServiceSpec(
             service=print,
             affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
@@ -224,7 +220,7 @@ class TestCallableConditions:
         # it exists to dispatch. What a declaration cannot see, a plain ``def``
         # handing back the coroutine, is the test above.
         with pytest.raises(ImproperlyConfigured, match="`when` is an async callable"):
-            Affordance(code="books_closed", reason="r", when=_books_closed)
+            Affordance(code="books_closed", reason="r", when=books_closed)
 
     def test_a_condition_returning_nothing_refuses(self, ada: Any) -> None:
         silent = Affordance(code="silent", reason="r", when=lambda: None)

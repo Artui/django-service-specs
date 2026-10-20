@@ -66,14 +66,11 @@ def test_any_declares_a_value_whose_json_type_is_open() -> None:
     assert (f.type, f.nullable, f.label) == ("any", True, "Extra")
 
 
-def test_a_format_on_a_string_is_kept() -> None:
-    assert OutputField("price", "string", format="decimal").format == "decimal"
-
-
-def test_an_identifier_format_on_a_string_is_kept() -> None:
-    # Output shares the formats with Parameter, so an identifier field is a
-    # string in the ``uuid`` format, which output_schema states beside its type.
-    assert OutputField("pk", "string", format="uuid").format == "uuid"
+# Output shares the formats with Parameter, so an identifier field is a string
+# in the ``uuid`` format, which output_schema states beside its type.
+@pytest.mark.parametrize("fmt", ["decimal", "uuid"])
+def test_a_format_on_a_string_is_kept(fmt: str) -> None:
+    assert OutputField("x", "string", format=fmt).format == fmt
 
 
 def test_uuid_choices_are_held_in_their_canonical_spelling() -> None:
