@@ -15,12 +15,14 @@ from django.db import models
 from django.utils.datastructures import MultiValueDict
 
 from django_service_specs.adapters.utils import element_format, scalar_type
+from django_service_specs.parameters.clean_held_to_their_columns import (
+    clean_held_to_their_columns,
+)
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import coded_messages
-from django_service_specs.relations.utils import clean_held_to_their_columns
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 

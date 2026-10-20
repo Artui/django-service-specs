@@ -26,6 +26,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replacement is checked as `register` checks a spec, and a name that is not
   registered raises `KeyError`. With `derive`, it is how one transport serves
   a variant of an operation under the operation's own name.
+- **Seven readings the kernel's transports share are public, so a
+  transport outside this package makes them the same way**, each exported
+  from the root and from its subpackage: `is_deactivated`, the one rule for
+  a principal that may not act; `relax_partial`, what a partial call may
+  leave out; `refusal_messages(value)` and `NON_FIELD_KEYS`, how a refusal
+  of arguments is read as paths to messages; `expected_type_refusal(kind)`,
+  the refusal of a value of the wrong kind, over a closed set of eight keys;
+  `max_length_in_force`, the most elements an array takes; and
+  `clean_held_to_their_columns`, a bound form validated as its `full_clean()`
+  does, with a number no integer column holds refused in Django's words
+  rather than handed to the database driver. Each is the one object the
+  kernel's own readers call, so a transport reading it cannot drift from
+  them.
+
+### Changed
+- **A selector raising Django's `Http404`, as `get_object_or_404` does, is a
+  missing row**, on `dispatch` and `adispatch` alike, where it used to escape
+  both to the transport. A RETRIEVE's `Http404` is what its `DoesNotExist` is:
+  `DispatchResult(kind="not_found")`, or `None` under `allow_none`, and a
+  write's instance selector raising one is not found before the service runs.
+  A LIST raising `Http404`, usually of a parent row it looked up first, is
+  `not_found` whatever `allow_none` says, and so is a write's collection
+  selector, before its scope check and on `resolve_target` too. A
+  `DoesNotExist` escaping a LIST is still a fault inside the selector and
+  raises. An output selector runs after the write, so a LIST one raising
+  `Http404` now raises a `RuntimeError` chained from it, a fault on every
+  transport, where the bare `Http404` was answered 404 by the kernel's HTTP
+  views and by DRF although the write had happened; a RETRIEVE one's is its
+  `None`, as its `DoesNotExist` is. Only the selector's
+  own raise counts: an `Http404` from its `extend_queryset` passes through on
+  both entry points, as before.
+
+### Fixed
+- **`clean_held_to_their_columns` leaves the form as it found it.** It took
+  a model choice field sent a key past its column off the form while the
+  form validated, and put it back only if validation returned, so a
+  `clean()` raising anything but a `ValidationError` left the form without
+  that field. It also left its column check wrapped round the form's
+  `_post_clean` for good. Both are now restored whether validation returned
+  or raised: the form keeps every field it had, in its order, and its own
+  `_post_clean`.
 
 ## [0.9.0] — 2026-10-16
 

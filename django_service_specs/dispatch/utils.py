@@ -21,6 +21,7 @@ from typing import Any, Literal, cast
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
 from django.db.models.manager import BaseManager
+from django.http import Http404
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -28,17 +29,18 @@ from django_service_specs.affordances.utils import (
     rows_with_affordances,
     split_affordances,
 )
+from django_service_specs.authorization.is_deactivated import is_deactivated
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.authorization.utils import is_deactivated
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
-from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
@@ -63,6 +65,20 @@ from django_service_specs.validation.validator import Validator
 
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
+
+
+class ListNotFound(Exception):
+    """A LIST selector's own ``Http404``, raised by ``lookup`` for its caller to answer.
+
+    A LIST has no ``None`` to hand back for a missing row, so ``lookup`` says
+    "not found" by raising this, from the selector's ``Http404``. Its own, so
+    the caller's ``except`` cannot catch an ``Http404`` from anywhere else in
+    the call - ``extend_queryset``, an affordance condition - which passes
+    through as it does on ``adispatch``
+    (test_an_http404_from_extend_queryset_is_not_the_selector_s_not_found).
+    Never raised past dispatch: the selector spec's own run and a write's
+    collection selector answer it as ``NOT_FOUND``.
+    """
 
 
 @dataclass(frozen=True)
@@ -390,52 +406,6 @@ def shape_check(
     )
 
 
-def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> Parameters:
-    """``parameters`` as a call of ``spec`` is checked under ``partial``: every Validator parameter optional.
-
-    The one reading of what a partial call may leave out, for the shape check
-    and for ``spec_input_schema``'s ``required``, so the schema never asks for
-    a field dispatch would not refuse absent, nor leaves one out that it
-    would. Made optional at every depth - an object's fields and an array's
-    rows included - as djangorestframework-services relaxes only its
-    serializer. The spec's ``reads`` and its target selector's keep their
-    ``required``: a partial update still names the row it updates
-    (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
-    On a ``many`` spec the Validator's parameters are each row's, so the list
-    stays required and only its rows are walked, since a read may share a
-    row field's name
-    (test_a_partial_many_spec_requires_the_list_and_its_reads_and_nothing_in_a_row).
-
-    ``parameters`` as they are for a selector spec, which has no ``partial``,
-    and for a service spec that is not partial. One branch to coverage, so
-    each condition is held by its own test:
-    test_a_selector_specs_schema_is_its_reads (the type: without it, a
-    selector spec's missing attribute raises) and
-    test_a_spec_that_is_not_partial_requires_every_required_parameter (the
-    flag). The Validator's are told apart by what they are not, the spec's
-    reads and its target's, so the Validator is not asked for its parameters
-    again; a read and a Validator parameter of one name are refused when
-    ``parameters()`` is assembled. Of the names kept, the spec's reads are
-    held by test_a_partial_spec_with_no_target_keeps_its_reads_required and
-    the target's by
-    test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth.
-
-    A copy, so the declaration every other reader sees - ``parameters()``
-    itself, which still says what a whole call needs - is untouched.
-    """
-    if not (isinstance(spec, ServiceSpec) and spec.partial):
-        return parameters
-    if spec.many:
-        return Parameters.of(
-            *(_below(param) if param.name == spec.many_argument else param for param in parameters)
-        )
-    target = spec.target_selector_spec()
-    kept = spec.reads.names() | (target.parameters().names() if target is not None else frozenset())
-    return Parameters.of(
-        *(param if param.name in kept else _optional(param) for param in parameters)
-    )
-
-
 def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
     """``checked`` less every key a typed provider fills: the caller's value for one is never used.
 
@@ -570,21 +540,6 @@ def _relaxed(parameters: Parameters, filled: frozenset[str]) -> Parameters:
     """
     return Parameters.of(
         *(replace(param, required=False) if param.name in filled else param for param in parameters)
-    )
-
-
-def _optional(param: Parameter) -> Parameter:
-    """``param`` and everything declared below it made optional, as a partial serializer reads it."""
-    return replace(_below(param), required=False)
-
-
-def _below(param: Parameter) -> Parameter:
-    """``param`` with everything declared below it optional: an object's fields, an array's rows."""
-    items = param.items
-    return replace(
-        param,
-        fields=None if param.fields is None else Parameters.of(*map(_optional, param.fields)),
-        items=Parameters.of(*map(_optional, items)) if isinstance(items, Parameters) else items,
     )
 
 
@@ -822,14 +777,23 @@ def call_pool(
     return pool
 
 
-def reraise_unless_retrieve(selector_spec: SelectorSpec, error: ObjectDoesNotExist) -> None:
-    """Called from an ``except ObjectDoesNotExist``: what that exception means for this selector.
+def reraise_unless_retrieve(
+    selector_spec: SelectorSpec, error: ObjectDoesNotExist | Http404
+) -> None:
+    """Called from an ``except (ObjectDoesNotExist, Http404)``: what it means for this selector.
 
     A RETRIEVE selector written with ``.get()`` says "no such row" by raising,
     and that is the same missing row a ``.filter()`` returning nothing is, so
     it becomes ``None`` and the caller decides between not-found and
-    ``allow_none``. A LIST has no missing row: a ``DoesNotExist`` escaping one
-    is a fault inside the selector, and passes through untouched.
+    ``allow_none``. ``Http404``, which ``get_object_or_404`` raises, is the
+    same missing row said the way a view says it, and becomes ``None`` too.
+
+    A LIST has no missing row, so either passes through untouched, and what
+    it means there is the caller's: a ``DoesNotExist`` escaping a LIST is a
+    fault inside the selector, while an ``Http404`` is the selector saying
+    "not found", usually of a parent it looked up first, and the selector
+    spec's own run and a write's collection selector answer it as
+    ``NOT_FOUND`` (an output selector runs after the write, and never does).
 
     One rule, called from the two places a selector can raise it: the sync
     call, and the await ``adispatch`` makes on the event loop.
@@ -976,7 +940,25 @@ def lookup(
         )
     try:
         raw = run_selector(fn, kwargs)
-    except ObjectDoesNotExist as error:
+    except (ObjectDoesNotExist, Http404) as error:
+        # Each member and conjunct is held by its own test:
+        # test_a_retrieve_raising_does_not_exist_is_not_found
+        # (``ObjectDoesNotExist``), test_a_retrieve_raising_http404_is_not_found
+        # (``Http404``), test_a_list_raising_does_not_exist_is_a_fault_and_passes_through
+        # (the ``isinstance``), test_a_retrieve_raising_http404_under_allow_none_is_none
+        # (the kind) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
+        # (``after_the_run``: the write has run, so it is never reported not found).
+        if isinstance(error, Http404) and selector_spec.kind is SelectorKind.LIST:
+            if after_the_run:
+                # Re-raised as a plain fault, because a bare ``Http404`` is
+                # answered 404 by Django's handler and DRF's alike, which
+                # would tell the caller a write that happened did not
+                # (test_a_list_output_selector_raising_http404_is_a_fault_after_the_run).
+                raise RuntimeError(
+                    "The output selector raised Http404 after the service ran: a list "
+                    "re-read has no missing row to report, and the write has happened."
+                ) from error
+            raise ListNotFound from error
         reraise_unless_retrieve(selector_spec, error)
         return None
     return settle(selector_spec, raw, pool, source=source, reserved=reserved, fillable=fillable)
@@ -1072,7 +1054,10 @@ def walk_target(
       ``allow_none``; then ``authorize_scope`` of ``None``, as
       djangorestframework-services asks its guard of the ``None`` it lets
       through.
-    - **A collection**, empty or not: ``authorize_scope`` of the set.
+    - **A collection**, empty or not: ``authorize_scope`` of the set. A
+      collection selector raising ``Http404`` is ``NOT_FOUND``, with no scope
+      check, since there is no set to ask it of
+      (test_a_write_whose_collection_selector_raises_http404_is_not_found).
     - **A create**, which resolves nothing: ``authorize_scope`` of ``None``.
 
     Each is handed ``checked`` for a check that declares ``arguments``, as
@@ -1117,9 +1102,17 @@ def walk_target(
             pool = selector_pool(
                 collection_spec, checked, principal=principal, pool_seeds=pool_seeds
             )
-            target = lookup(
-                collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
-            )
+            try:
+                target = lookup(
+                    collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
+                )
+            except ListNotFound:
+                # The collection selector's own "not found", of a parent it
+                # looked up: there is no set to scope-check, so nothing is.
+                # Only ListNotFound: an Http404 from shaping passes through
+                # (test_a_collection_selector_s_extend_queryset_http404_passes_through,
+                # in test_dispatch.py and test_resolve_target.py).
+                return NOT_FOUND
         authorize_scope(spec, principal, target, grant=grant, arguments=handed)
         return {"collection": target}
     # One arc to coverage, so each conjunct is held by its own test: a create
