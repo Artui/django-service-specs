@@ -8,7 +8,7 @@ reached rather than named as a root. An opt-in module is a feature the
 transports share and core never imports; an authoring library is code a
 project writes against, such as a validator adapter; a transport only wires.
 Opt-in is a classification and not a switch: no setting turns a module on, so
-the only thing that keeps one out of core is this test. It holds the
+the only thing that keeps one out of core is this file. It holds the
 classification in one table, fails on a subpackage the table does not name,
 and fails when the closure loads any module whose subpackage is not core. It
 also holds that the closure reaches every subpackage classified as core, so a
@@ -24,10 +24,17 @@ subpackage and would make the closure everything; Django is set up without
 this app installed, so nothing reaches the real root first. What a bare
 ``import django_service_specs`` loads is not held here: the root is a table of
 contents over every layer, on purpose.
+
+What loads is what an import statement runs at import time, so the probe
+cannot see an import inside a function body, which loads the module the first
+time the function is called. The same table is therefore held against the
+source as well: no module classified as core names a module of another layer
+in any import, at any depth.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import subprocess
 import sys
@@ -65,11 +72,12 @@ LAYERS: dict[str, str] = {
     "specs": CORE,
     "types": CORE,
     "validation": CORE,
-    # The container's own modules: an ``__init__`` that re-exports nothing,
-    # which importing the filters adapter runs, and ``utils.py``, the
-    # annotation reader the three authoring libraries share. It imports only
-    # ``types/``, so a core module reading it brings no authoring library in.
+    # The container's ``__init__``, which re-exports nothing and which
+    # importing the filters adapter runs.
     "adapters": CORE,
+    # The annotation reader the three validator adapters share, and nothing
+    # in core reads it.
+    "adapters.utils": AUTHORING,
     # Core because a selector declares its filters through it, in
     # ``specs/selector_spec.py`` and ``selectors/utils.py``; django-filter
     # stays an extra, read only inside the function that needs it.
@@ -84,10 +92,10 @@ LAYERS: dict[str, str] = {
     "commands": TRANSPORT,
 }
 
-# Packages whose subpackages sit on different layers, so each child is named
-# on its own rather than inheriting the container's entry: a new adapter is a
-# validator a project picks or a dependency of core, and the table has to say
-# which before it can land.
+# Packages whose children sit on different layers, so each child, a
+# subpackage or a module, is named on its own and never inherits the
+# container's entry: a new adapter is a validator a project picks or a
+# dependency of core, and the table has to say which before it can land.
 CONTAINERS = frozenset({"adapters"})
 
 _CLOSURE_PROBE = f"""
@@ -113,20 +121,53 @@ print(json.dumps(sorted(m for m in sys.modules if m.startswith("django_service_s
 
 def _layer(module: str) -> str | None:
     # The nearest entry wins, so ``adapters.forms.form_validator`` is read as
-    # ``adapters.forms`` and never falls through to the container. A module
-    # under no entry has no layer, which the gate reports rather than skips.
+    # ``adapters.forms``. A child of a container the table does not name has
+    # no layer rather than the container's, and neither has a module under no
+    # entry: the gates report both rather than skip them.
     parts = module.split(".")[1:]
+    if len(parts) > 1 and parts[0] in CONTAINERS and ".".join(parts[:2]) not in LAYERS:
+        return None
     prefixes = (".".join(parts[:n]) for n in range(len(parts), 0, -1))
     return next((LAYERS[p] for p in prefixes if p in LAYERS), None)
 
 
+def _modules() -> dict[str, Path]:
+    # Every source file by its dotted path below the root, the root itself as
+    # the empty path; a package is named by its directory, not its
+    # ``__init__``.
+    modules = {}
+    for path in PACKAGE_ROOT.rglob("*.py"):
+        parts = path.relative_to(PACKAGE_ROOT).with_suffix("").parts
+        modules[".".join(parts[:-1] if parts[-1] == "__init__" else parts)] = path
+    return modules
+
+
 def _subpackages() -> frozenset[str]:
     # Read off the disk rather than ``sys.modules``, which holds only what
-    # some import happened to load.
+    # some import happened to load; and from every directory holding source,
+    # so a namespace package with no ``__init__`` is one too.
     return frozenset(
-        ".".join(init.parent.relative_to(PACKAGE_ROOT).parts)
-        for init in PACKAGE_ROOT.rglob("__init__.py")
-        if init.parent != PACKAGE_ROOT
+        ".".join(path.parent.relative_to(PACKAGE_ROOT).parts)
+        for path in PACKAGE_ROOT.rglob("*.py")
+        if path.parent != PACKAGE_ROOT
+    )
+
+
+def _imported(tree: ast.AST) -> frozenset[str]:
+    # Every kernel module an import names, at every depth. ``from a import b``
+    # counts as both ``a`` and ``a.b``, since ``b`` may be a submodule; an
+    # attribute read as a module resolves to the module that holds it.
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            names.add(node.module)
+            names.update(f"{node.module}.{alias.name}" for alias in node.names)
+    return frozenset(
+        name
+        for name in names
+        if name == "django_service_specs" or name.startswith("django_service_specs.")
     )
 
 
@@ -141,21 +182,32 @@ def closure() -> frozenset[str]:
 
 def test_every_subpackage_is_classified() -> None:
     # A top-level subpackage, or a child of a container, that the table does
-    # not name would take no layer, or the container's, and pass the gate
+    # not name would take no layer, or the container's, and pass the gates
     # below unexamined.
-    named = {
-        package
-        for package in _subpackages()
-        if "." not in package or package.rpartition(".")[0] in CONTAINERS
+    top = {package for package in _subpackages() if "." not in package}
+    contained = {
+        child
+        for child in _subpackages() | _modules().keys()
+        if child.rpartition(".")[0] in CONTAINERS
     }
-    assert sorted(named - LAYERS.keys()) == []
+    assert sorted((top | contained) - LAYERS.keys()) == []
 
 
 def test_every_classification_names_something_real() -> None:
     # An entry for a subpackage that has left the kernel would keep a layer
     # nobody can import, and read as a placement still in force.
-    modules = {path.stem for path in PACKAGE_ROOT.glob("*.py")}
-    assert sorted(LAYERS.keys() - _subpackages() - modules) == []
+    assert sorted(LAYERS.keys() - _subpackages() - _modules().keys()) == []
+
+
+def test_a_container_child_takes_no_layer_unless_named() -> None:
+    # The container rule is what makes a new adapter be classified before it
+    # lands; without it each of these would read as core.
+    assert _layer("django_service_specs.adapters") == CORE
+    assert _layer("django_service_specs.adapters.utils") == AUTHORING
+    assert _layer("django_service_specs.adapters.forms.form_validator") == AUTHORING
+    assert _layer("django_service_specs.adapters.attrs.validator") is None
+    assert _layer("django_service_specs.adapters.attrs_validator") is None
+    assert _layer("django_service_specs.tasks.run") is None
 
 
 def test_the_probe_sees_the_core(closure: frozenset[str]) -> None:
@@ -179,3 +231,40 @@ def test_core_loads_nothing_classified_otherwise(closure: frozenset[str]) -> Non
     # cannot place fails here as surely as one it places outside core.
     outside = {module: _layer(module) for module in closure if _layer(module) != CORE}
     assert outside == {}
+
+
+def test_no_core_module_imports_another_layer() -> None:
+    # The probe sees import time only; this sees an import inside a function
+    # body too, which would load an opt-in module into dispatch at call time
+    # with the probe green. The root counts as another layer, since importing
+    # it loads every one.
+    reached = {}
+    for dotted, path in _modules().items():
+        module = f"django_service_specs.{dotted}" if dotted else "django_service_specs"
+        if _layer(module) != CORE:
+            continue
+        outside = sorted(
+            name for name in _imported(ast.parse(path.read_text())) if _layer(name) != CORE
+        )
+        if outside:
+            reached[module] = outside
+    assert reached == {}
+
+
+def test_the_import_reader_sees_every_depth_and_spelling() -> None:
+    source = (
+        "import django_service_specs.relations.utils\n"
+        "from django_service_specs.schema import thing\n"
+        "import os\n"
+        "def f():\n"
+        "    from django_service_specs.mutations.create import create\n"
+        "    import django_service_specs\n"
+    )
+    assert _imported(ast.parse(source)) == {
+        "django_service_specs",
+        "django_service_specs.relations.utils",
+        "django_service_specs.schema",
+        "django_service_specs.schema.thing",
+        "django_service_specs.mutations.create",
+        "django_service_specs.mutations.create.create",
+    }
