@@ -84,8 +84,6 @@ def test_the_root_imports_no_optional_library_and_each_exempt_adapter_does() -> 
 import importlib, json, sys
 import django
 django.setup()
-import pytest
-
 import django_service_specs
 adapters = {OPTIONAL_LIBRARY_ADAPTERS!r}
 lazy = {LAZY_LIBRARY_ADAPTERS!r}

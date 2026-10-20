@@ -19,8 +19,9 @@ def expected_type(json_type: str) -> CodedMessage:
     untranslated. The shape check and the Validators the adapters build share
     this one table, so a caller reads the same refusal whichever of them
     answered, and a transport refusing a value it read itself, such as a
-    query string's, says it in the same words. Built on each call, because a translation looked up at import
-    time needs configured settings before the package can be imported at all.
+    query string's, says it in the same words. Built on each call, because a
+    translation looked up at import time needs configured settings before the
+    package can be imported at all.
 
     Its code is the one DRF gives the same mistake: ``"not_a_list"`` for an
     array, as its ``ListField`` and ``ListSerializer`` both do, and
