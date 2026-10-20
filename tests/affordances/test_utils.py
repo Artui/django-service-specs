@@ -29,6 +29,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.affordances.utils import books_closed
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
     EDIT,
@@ -110,11 +111,6 @@ class TestAnswerOperationCondition:
         assert answer_operation_condition(lambda: returned, {}, reserved=RESERVED_POOL_SEEDS) is met
 
 
-async def _books_closed() -> bool:
-    """Awaited, unmet. Called sync, a coroutine, which is truthy."""
-    return False
-
-
 class _NotACoroutine:
     """Awaitable through ``__await__`` alone: no ``close()`` to call on it."""
 
@@ -137,7 +133,7 @@ class TestAnAnswerThatIsNotAnAnswer:
     """
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:
-        answer = _books_closed()
+        answer = books_closed()
 
         def when() -> Any:
             return answer
@@ -198,6 +194,14 @@ class TestAffordanceExpression:
 # --- the answers a selector spec's rows carry -------------------------------------
 
 CODES = {"rename": ["note_archived", "books_closed"]}
+
+
+def declaring(*affordances: Affordance) -> ServiceSpec:
+    """An operation declaring ``affordances`` and nothing else, for a selector's mapping to name."""
+    return ServiceSpec(service=lambda: None, permissions=OPEN, affordances=list(affordances))
+
+
+CALLABLE_ONLY = declaring(BOOKS_CLOSED)
 
 
 def listing(selector: Callable[..., Any] = notes_of, **fields: Any) -> SelectorSpec:
@@ -315,12 +319,8 @@ class TestRowsOfAQuerySet:
     def test_a_condition_answering_with_a_coroutine_is_refused_not_projected_as_met(
         self, ada: Any, two_notes: Any
     ) -> None:
-        answer = _books_closed()
-        closed = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[Affordance(code="books_closed", reason="Closed.", when=lambda: answer)],
-        )
+        answer = books_closed()
+        closed = declaring(Affordance(code="books_closed", reason="Closed.", when=lambda: answer))
         with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
             rows_of(listing(affordances={"rename": closed}), ada)
         assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
@@ -334,11 +334,7 @@ class TestRowsOfAQuerySet:
             seen.append(pool)
             return False
 
-        closed = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[Affordance(code="books_closed", reason="Closed.", when=books_open)],
-        )
+        closed = declaring(Affordance(code="books_closed", reason="Closed.", when=books_open))
         spec = listing(
             affordances={"rename": closed},
             reads=Parameters.of(Parameter("search", "string")),
@@ -354,11 +350,7 @@ class TestRowsOfAQuerySet:
         assert [row.affordance__rename__books_closed for row in rows] == [False, False]
 
     def test_a_callable_that_returns_nothing_is_unavailable(self, ada: Any, two_notes: Any) -> None:
-        silent = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[Affordance(code="c", reason="r", when=lambda: None)],
-        )
+        silent = declaring(Affordance(code="c", reason="r", when=lambda: None))
 
         rows = rows_of(listing(affordances={"x": silent}), ada)
 
@@ -367,12 +359,8 @@ class TestRowsOfAQuerySet:
     def test_a_registered_seed_reaches_a_condition_asked_for_every_row(
         self, ada: Any, two_notes: Any
     ) -> None:
-        mine = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[
-                Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
-            ],
+        mine = declaring(
+            Affordance(code="c", reason="r", when=lambda *, tenant: tenant == "tenant-of-ada")
         )
 
         rows = rows_of(listing(affordances={"x": mine}), ada, pool_seeds=TENANT_SEEDS)
@@ -465,12 +453,8 @@ class TestRowsASelectorReturnsDirectly:
 
     def test_only_callable_conditions_spend_no_row_query(self, ada: Any, two_notes: Any) -> None:
         selector = lambda *, user: list(notes_of(user=user))  # noqa: E731
-        callable_only = ServiceSpec(
-            service=lambda: None, permissions=OPEN, affordances=[BOOKS_CLOSED]
-        )
-
         _rows, baseline = self.queries(listing(selector, affordances=None), ada)
-        rows, queries = self.queries(listing(selector, affordances={"a": callable_only}), ada)
+        rows, queries = self.queries(listing(selector, affordances={"a": CALLABLE_ONLY}), ada)
 
         assert queries == baseline
         assert {row.affordance__a__books_closed for row in rows} == {False}
@@ -483,11 +467,7 @@ class TestRowsASelectorReturnsDirectly:
         post = Post.objects.create(title="not a draft")
         other_post = Post.objects.create(title="draft")
         assert {note.pk, other_note.pk} == {post.pk, other_post.pk}
-        titled = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[Affordance(code="not_draft", reason="r", when=Q(title="draft"))],
-        )
+        titled = declaring(Affordance(code="not_draft", reason="r", when=Q(title="draft")))
 
         def mixed() -> list[Any]:
             return [
@@ -534,11 +514,7 @@ class TestRowsASelectorReturnsDirectly:
 
     def test_a_default_manager_that_hides_the_rows_does_not_decide(self, ada: Any) -> None:
         Note.objects.create(owner=ada, title="hidden", archived=True)
-        always = ServiceSpec(
-            service=lambda: None,
-            permissions=OPEN,
-            affordances=[Affordance(code="c", reason="r", when=Q(pk__isnull=False))],
-        )
+        always = declaring(Affordance(code="c", reason="r", when=Q(pk__isnull=False)))
         selector = lambda: list(LiveNote._base_manager.all())  # noqa: E731
 
         rows = rows_of(listing(selector, affordances={"a": always}), ada)
@@ -560,12 +536,8 @@ class TestRowsASelectorReturnsDirectly:
     def test_an_instance_with_no_primary_key_is_fine_with_only_callable_conditions(
         self, ada: Any
     ) -> None:
-        callable_only = ServiceSpec(
-            service=lambda: None, permissions=OPEN, affordances=[BOOKS_CLOSED]
-        )
-
         (row,) = rows_of(
-            listing(lambda: [Note(title="never saved")], affordances={"a": callable_only}), ada
+            listing(lambda: [Note(title="never saved")], affordances={"a": CALLABLE_ONLY}), ada
         )
 
         assert row.affordance__a__books_closed is False
@@ -599,14 +571,11 @@ class TestRowsASelectorReturnsDirectly:
 
     def test_a_retrieve_selector_returning_a_mapping_gets_a_new_one(self, ada: Any) -> None:
         row = {"id": 1, "title": "computed"}
-        callable_only = ServiceSpec(
-            service=lambda: None, permissions=OPEN, affordances=[BOOKS_CLOSED]
-        )
         spec = SelectorSpec(
             kind=SelectorKind.RETRIEVE,
             selector=lambda: row,
             permissions=OPEN,
-            affordances={"a": callable_only},
+            affordances={"a": CALLABLE_ONLY},
         )
 
         answered = rows_of(spec, ada)
@@ -615,12 +584,8 @@ class TestRowsASelectorReturnsDirectly:
         assert row == {"id": 1, "title": "computed"}
 
     def test_mapping_rows_get_new_mappings_with_the_callable_answers(self, ada: Any) -> None:
-        callable_only = ServiceSpec(
-            service=lambda: None, permissions=OPEN, affordances=[BOOKS_CLOSED]
-        )
-
         rows = rows_of(
-            listing(lambda: [{"id": 1}, {"id": 2}], affordances={"a": callable_only}), ada
+            listing(lambda: [{"id": 1}, {"id": 2}], affordances={"a": CALLABLE_ONLY}), ada
         )
 
         assert rows == [
@@ -641,12 +606,9 @@ class TestRowsASelectorReturnsDirectly:
         )
 
     def test_instance_and_mapping_rows_are_each_answered(self, ada: Any, two_notes: Any) -> None:
-        callable_only = ServiceSpec(
-            service=lambda: None, permissions=OPEN, affordances=[BOOKS_CLOSED]
-        )
         live = two_notes[0]
 
-        rows = rows_of(listing(lambda: [live, {"id": 9}], affordances={"a": callable_only}), ada)
+        rows = rows_of(listing(lambda: [live, {"id": 9}], affordances={"a": CALLABLE_ONLY}), ada)
 
         assert rows[0] is live
         assert live.affordance__a__books_closed is False

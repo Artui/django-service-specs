@@ -108,19 +108,17 @@ def spec_output_schema(
             },
             "required": [*item.get("required", []), AFFORDANCES_KEY],
         }
-    # Whether ``"null"`` is admitted is ``can_present_nothing``'s answer, asked
-    # in one place so a transport writing its own schema gives the same one;
-    # what remains here is the shape around the item.
     if isinstance(compiled, SelectorSpec):
         kind = compiled.kind
     elif compiled.output_selector_spec is not None:
         kind = compiled.output_selector_spec.kind
     else:
         # One value, the service's return. A ``many`` service returns the rows
-        # it wrote, which dispatch presents as a list
-        # (test_a_many_service_presents_an_array_of_its_item), never paged; a
-        # ``None`` return is still presented as ``None``, so a ``"null"`` wraps
-        # the array (test_a_many_service_allowing_none_admits_null_for_the_whole_array).
+        # it wrote, which dispatch presents as a list, never paged; a ``None``
+        # return is still presented as ``None``, so a ``"null"`` wraps the array.
+        # Held by test_the_shape_around_the_item's
+        # [a-many-service-presents-an-array-of-its-item] and
+        # [a-many-service-allowing-none-admits-null-for-the-whole-array].
         whole: dict[str, Any] = {"type": "array", "items": item} if compiled.many else item
         return allow_null(whole) if can_present_nothing(compiled) else whole
     if kind is SelectorKind.LIST:

@@ -11,6 +11,7 @@ from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.types.field_audience import FieldAudience
+from tests.schema.utils import walk
 
 PUBLISHER = Output((OutputField("name", "string"),))
 BOOK = Output(
@@ -25,16 +26,6 @@ BOOK = Output(
 def one(field: OutputField) -> dict[str, Any]:
     """The schema of a single field, as it sits among its item's properties."""
     return output_schema(Output((field,)))["properties"][field.name]
-
-
-def walk(schema: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every schema node - the root, each property, each array's items - however deep."""
-    nodes = [schema]
-    for prop in schema.get("properties", {}).values():
-        nodes += walk(prop)
-    if "items" in schema:
-        nodes += walk(schema["items"])
-    return nodes
 
 
 class TestItems:

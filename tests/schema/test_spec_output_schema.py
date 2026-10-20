@@ -8,8 +8,6 @@ from django_service_specs.dispatch.audience_projection_for_spec import audience_
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.output.output import Output, OutputField
-from django_service_specs.output.presenter import Presenter
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.schema.utils import allow_null
@@ -28,27 +26,12 @@ from tests.dispatch.utils import (
 )
 from tests.dispatch_app.models import Note
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA, InvoicePresenter
+from tests.schema.utils import NoteTitle, nothing, write
 from tests.specs.utils import Foreign, Titled
-
-
-class NoteTitle(Presenter):
-    def output(self) -> Output:
-        return Output((OutputField("title", "string"),))
-
-    def present(self, value: Any) -> Any:
-        return {"title": value.title}
-
 
 ITEM = {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}
 NULLABLE_ITEM = {**ITEM, "type": ["object", "null"]}
-
-
-def write(**_: Any) -> None:
-    return None
-
-
-def nothing(**_: Any) -> Any:
-    return Note.objects.none()
+ARRAY = {"type": "array", "items": ITEM}
 
 
 def listing(**kwargs: Any) -> SelectorSpec:
@@ -62,115 +45,99 @@ def retrieve(**kwargs: Any) -> SelectorSpec:
     )
 
 
-class TestSelectorSpecs:
-    def test_a_selector_with_no_presenter_has_no_output_schema(self) -> None:
-        assert spec_output_schema(listing()) is None
-
-    def test_a_list_presents_an_array_of_items(self) -> None:
-        spec = listing(presenter=NoteTitle())
-
-        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
-
-    def test_a_retrieve_presents_the_item(self) -> None:
-        assert spec_output_schema(retrieve(presenter=NoteTitle())) == ITEM
-
-    def test_a_retrieve_allowing_none_admits_null(self) -> None:
-        spec = retrieve(presenter=NoteTitle(), allow_none=True)
-
-        assert spec_output_schema(spec) == NULLABLE_ITEM
+def service(**kwargs: Any) -> ServiceSpec:
+    return ServiceSpec(service=write, permissions=OPEN, **kwargs)
 
 
-class TestServiceSpecs:
-    def test_a_service_with_no_presenter_anywhere_has_no_output_schema(self) -> None:
-        spec = ServiceSpec(
-            service=write,
-            permissions=OPEN,
-            output_selector_spec=listing(selector=nothing),
-        )
+def retrieve_re_read(**kwargs: Any) -> SelectorSpec:
+    return SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing, **kwargs)
 
-        assert spec_output_schema(spec) is None
 
-    def test_a_service_presenting_its_own_return_is_the_item(self) -> None:
-        """Undeclared, a ``None`` is not stated: the item stays strict."""
-        spec = ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle())
+@pytest.mark.parametrize(
+    ("spec", "expected"),
+    [
+        pytest.param(listing(), None, id="a-selector-with-no-presenter-has-no-output-schema"),
+        # A bare array unless paging is asked for: TestPaging is the other half.
+        pytest.param(listing(presenter=NoteTitle()), ARRAY, id="a-list-presents-an-array-of-items"),
+        pytest.param(retrieve(presenter=NoteTitle()), ITEM, id="a-retrieve-presents-the-item"),
+        pytest.param(
+            retrieve(presenter=NoteTitle(), allow_none=True),
+            NULLABLE_ITEM,
+            id="a-retrieve-allowing-none-admits-null",
+        ),
+        # Its selector's ``None`` is presented as the empty list, so ``"null"``
+        # is never stated.
+        pytest.param(
+            listing(selector=nothing, presenter=NoteTitle(), allow_none=True),
+            ARRAY,
+            id="a-list-selector-allowing-none-is-an-array-never-null",
+        ),
+        pytest.param(
+            service(output_selector_spec=listing(selector=nothing)),
+            None,
+            id="a-service-with-no-presenter-anywhere-has-no-output-schema",
+        ),
+        pytest.param(
+            service(presenter=NoteTitle(), many=True, validator=Titled()),
+            ARRAY,
+            id="a-many-service-presents-an-array-of-its-item",
+        ),
+        pytest.param(
+            service(presenter=NoteTitle(), many=True, validator=Titled(), allow_none=True),
+            allow_null(ARRAY),
+            id="a-many-service-allowing-none-admits-null-for-the-whole-array",
+        ),
+        pytest.param(
+            service(presenter=NoteTitle(), allow_none=True),
+            NULLABLE_ITEM,
+            id="a-service-allowing-none-admits-null",
+        ),
+        # The re-read already admits null, declared or not; undeclared is
+        # test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow_none.
+        pytest.param(
+            service(output_selector_spec=retrieve_re_read(presenter=NoteTitle()), allow_none=True),
+            NULLABLE_ITEM,
+            id="allow-none-changes-nothing-beside-a-retrieve-re-read",
+        ),
+        # The re-read's rows are what is presented, never the service's ``None``.
+        pytest.param(
+            service(
+                output_selector_spec=listing(selector=nothing, presenter=NoteTitle()),
+                allow_none=True,
+            ),
+            ARRAY,
+            id="allow-none-changes-nothing-beside-a-list-re-read",
+        ),
+        pytest.param(
+            service(output_selector_spec=listing(selector=nothing, presenter=NoteTitle())),
+            ARRAY,
+            id="a-service-whose-output-selector-is-a-list-presents-an-array",
+        ),
+        pytest.param(
+            service(presenter=NoteTitle(), output_selector_spec=retrieve_re_read()),
+            NULLABLE_ITEM,
+            id="the-services-own-presenter-is-shaped-by-its-output-selectors-kind",
+        ),
+    ],
+)
+def test_the_shape_around_the_item(spec: Any, expected: dict[str, Any] | None) -> None:
+    assert spec_output_schema(spec) == expected
 
-        assert spec.allow_none is False
-        assert spec_output_schema(spec) == ITEM
 
-    def test_a_many_service_presents_an_array_of_its_item(self) -> None:
-        spec = ServiceSpec(
-            service=write, permissions=OPEN, presenter=NoteTitle(), many=True, validator=Titled()
-        )
+def test_a_service_presenting_its_own_return_is_the_item() -> None:
+    """Undeclared, a ``None`` is not stated: the item stays strict."""
+    spec = service(presenter=NoteTitle())
 
-        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
+    assert spec.allow_none is False
+    assert spec_output_schema(spec) == ITEM
 
-    def test_a_many_service_allowing_none_admits_null_for_the_whole_array(self) -> None:
-        spec = ServiceSpec(
-            service=write,
-            permissions=OPEN,
-            presenter=NoteTitle(),
-            many=True,
-            validator=Titled(),
-            allow_none=True,
-        )
 
-        assert spec_output_schema(spec) == allow_null({"type": "array", "items": ITEM})
+def test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow_none() -> None:
+    reread = retrieve_re_read(presenter=NoteTitle())
+    spec = service(output_selector_spec=reread)
 
-    def test_a_service_allowing_none_admits_null(self) -> None:
-        spec = ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle(), allow_none=True)
-
-        assert spec_output_schema(spec) == NULLABLE_ITEM
-
-    def test_allow_none_changes_nothing_beside_a_retrieve_reread(self) -> None:
-        """The re-read already admits null, declared or not."""
-        reread = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing, presenter=NoteTitle())
-
-        for allow_none in (False, True):
-            spec = ServiceSpec(
-                service=write,
-                permissions=OPEN,
-                output_selector_spec=reread,
-                allow_none=allow_none,
-            )
-            assert spec_output_schema(spec) == NULLABLE_ITEM
-
-    def test_allow_none_changes_nothing_beside_a_list_reread(self) -> None:
-        """The re-read's rows are what is presented, never the service's ``None``."""
-        reread = listing(selector=nothing, presenter=NoteTitle())
-        spec = ServiceSpec(
-            service=write, permissions=OPEN, output_selector_spec=reread, allow_none=True
-        )
-
-        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
-
-    def test_a_list_selector_allowing_none_is_an_array_never_null(self) -> None:
-        """Its selector's ``None`` is presented as the empty list, so ``"null"`` is never stated."""
-        spec = listing(selector=nothing, presenter=NoteTitle(), allow_none=True)
-
-        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
-
-    def test_a_service_whose_output_selector_is_a_list_presents_an_array(self) -> None:
-        reread = listing(selector=nothing, presenter=NoteTitle())
-        spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)
-
-        assert spec_output_schema(spec) == {"type": "array", "items": ITEM}
-
-    def test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow_none(
-        self,
-    ) -> None:
-        reread = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing, presenter=NoteTitle())
-        spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)
-
-        assert reread.allow_none is False
-        assert spec_output_schema(spec) == NULLABLE_ITEM
-
-    def test_the_services_own_presenter_is_shaped_by_its_output_selectors_kind(self) -> None:
-        reread = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing)
-        spec = ServiceSpec(
-            service=write, permissions=OPEN, presenter=NoteTitle(), output_selector_spec=reread
-        )
-
-        assert spec_output_schema(spec) == NULLABLE_ITEM
+    assert reread.allow_none is False
+    assert spec_output_schema(spec) == NULLABLE_ITEM
 
 
 @pytest.mark.django_db
@@ -196,8 +163,8 @@ class TestWhatDispatchPresents:
         assert spec_output_schema(spec) == ITEM
 
     def test_a_service_whose_reread_finds_nothing_presents_null(self) -> None:
-        reread = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=nothing, presenter=NoteTitle())
-        spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)
+        reread = retrieve_re_read(presenter=NoteTitle())
+        spec = service(output_selector_spec=reread)
 
         result = dispatch(spec, principal=make_user("ada"), arguments={})
 
@@ -209,9 +176,7 @@ class TestWhatDispatchPresents:
         """Presented as ``None`` either way; only a declared ``allow_none`` says so,
         because whether a service may return nothing is not otherwise in its
         declaration."""
-        spec = ServiceSpec(
-            service=write, permissions=OPEN, presenter=NoteTitle(), allow_none=allow_none
-        )
+        spec = service(presenter=NoteTitle(), allow_none=allow_none)
 
         result = dispatch(spec, principal=make_user("ada"), arguments={})
 
@@ -243,18 +208,12 @@ PAGED = {
 
 
 class TestPaging:
-    def test_a_list_is_a_bare_array_unless_paging_is_asked_for(self) -> None:
-        assert spec_output_schema(listing(presenter=NoteTitle())) == {
-            "type": "array",
-            "items": ITEM,
-        }
-
     def test_a_paged_list_is_the_envelope_around_the_array(self) -> None:
         assert spec_output_schema(listing(presenter=NoteTitle()), paginate=True) == PAGED
 
     def test_a_service_whose_output_selector_is_a_list_is_paged_the_same_way(self) -> None:
         reread = listing(selector=nothing, presenter=NoteTitle())
-        spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)
+        spec = service(output_selector_spec=reread)
 
         assert spec_output_schema(spec, paginate=True) == PAGED
 
@@ -266,7 +225,7 @@ class TestPaging:
                 retrieve(presenter=NoteTitle(), allow_none=True), NULLABLE_ITEM, id="allow-none"
             ),
             pytest.param(
-                ServiceSpec(service=write, permissions=OPEN, presenter=NoteTitle()),
+                service(presenter=NoteTitle()),
                 ITEM,
                 id="service-return",
             ),
@@ -283,6 +242,13 @@ class TestPaging:
         assert spec_output_schema(listing(), paginate=True) is None
 
 
+def projected(spec: ServiceSpec | SelectorSpec) -> dict[str, Any] | None:
+    """``spec``'s output schema for an audience, with the handle wording a transport passes."""
+    return spec_output_schema(
+        spec, projection=audience_projection_for_spec(spec), handle_description=HANDLE_DESCRIPTION
+    )
+
+
 class TestProjection:
     """The schema of what ``present_for_audience`` hands back, for a caller naming an audience."""
 
@@ -295,11 +261,7 @@ class TestProjection:
     def test_the_projection_lands_on_the_item(self) -> None:
         spec = retrieve(presenter=InvoicePresenter())
 
-        schema = spec_output_schema(
-            spec,
-            projection=audience_projection_for_spec(spec),
-            handle_description=HANDLE_DESCRIPTION,
-        )
+        schema = projected(spec)
 
         assert schema == PROJECTED_SCHEMA
 
@@ -313,11 +275,7 @@ class TestProjection:
     def test_the_projection_lands_on_a_lists_items(self) -> None:
         spec = listing(presenter=InvoicePresenter())
 
-        schema = spec_output_schema(
-            spec,
-            projection=audience_projection_for_spec(spec),
-            handle_description=HANDLE_DESCRIPTION,
-        )
+        schema = projected(spec)
 
         assert schema == {"type": "array", "items": PROJECTED_SCHEMA}
 
@@ -342,22 +300,14 @@ class TestProjection:
     def test_a_projected_item_that_may_be_none_admits_null(self) -> None:
         spec = retrieve(presenter=InvoicePresenter(), allow_none=True)
 
-        schema = spec_output_schema(
-            spec,
-            projection=audience_projection_for_spec(spec),
-            handle_description=HANDLE_DESCRIPTION,
-        )
+        schema = projected(spec)
 
         assert schema == {**PROJECTED_SCHEMA, "type": ["object", "null"]}
 
     def test_a_service_presenting_its_own_return_is_projected_as_the_item(self) -> None:
-        spec = ServiceSpec(service=write, permissions=OPEN, presenter=InvoicePresenter())
+        spec = service(presenter=InvoicePresenter())
 
-        schema = spec_output_schema(
-            spec,
-            projection=audience_projection_for_spec(spec),
-            handle_description=HANDLE_DESCRIPTION,
-        )
+        schema = projected(spec)
 
         assert schema == PROJECTED_SCHEMA
 
@@ -425,18 +375,12 @@ class TestAffordances:
         # say about a key no Output declares; an agent reads the reason too.
         spec = retrieve(presenter=InvoicePresenter(), affordances=AFFORDANCES)
 
-        schema = spec_output_schema(
-            spec,
-            projection=audience_projection_for_spec(spec),
-            handle_description=HANDLE_DESCRIPTION,
-        )
+        schema = projected(spec)
 
         assert schema == answered(PROJECTED_SCHEMA)
 
     def test_a_service_spec_declares_its_output_selector_s_answers_not_its_own(self) -> None:
-        spec = ServiceSpec(
-            service=write,
-            permissions=OPEN,
+        spec = service(
             affordances=[BOOKS_OPEN],
             output_selector_spec=SelectorSpec(
                 kind=SelectorKind.RETRIEVE,
@@ -445,9 +389,7 @@ class TestAffordances:
                 affordances={"edit": EDIT},
             ),
         )
-        own_only = ServiceSpec(
-            service=write, permissions=OPEN, presenter=NoteTitle(), affordances=[BOOKS_OPEN]
-        )
+        own_only = service(presenter=NoteTitle(), affordances=[BOOKS_OPEN])
 
         schema = spec_output_schema(spec)
 
@@ -485,9 +427,7 @@ class TestSources:
             pytest.param(listing(presenter=NoteTitle()), id="list"),
             pytest.param(retrieve(presenter=NoteTitle(), allow_none=True), id="retrieve"),
             pytest.param(
-                ServiceSpec(
-                    service=write,
-                    permissions=OPEN,
+                service(
                     output_selector_spec=retrieve(presenter=NoteTitle()),
                 ),
                 id="re-read",
