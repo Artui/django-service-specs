@@ -84,7 +84,6 @@ def bind_arguments(
     checked = shape_check(spec, spec.parameters(), arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
         return checked
-    # The step dispatch takes, the same function: the two cannot drift apart.
     validated = validate_arguments(
         spec, checked, principal=principal, target=target, server_input={}
     )
