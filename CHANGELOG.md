@@ -27,6 +27,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registered raises `KeyError`. With `derive`, it is how one transport serves
   a variant of an operation under the operation's own name.
 
+### Changed
+- **A selector raising Django's `Http404`, as `get_object_or_404` does, is a
+  missing row**, on `dispatch` and `adispatch` alike, where it used to escape
+  both to the transport. A RETRIEVE's `Http404` is what its `DoesNotExist` is:
+  `DispatchResult(kind="not_found")`, or `None` under `allow_none`, and a
+  write's instance selector raising one is not found before the service runs.
+  A LIST raising `Http404`, usually of a parent row it looked up first, is
+  `not_found` whatever `allow_none` says, and so is a write's collection
+  selector, before its scope check and on `resolve_target` too. A
+  `DoesNotExist` escaping a LIST is still a fault inside the selector and
+  raises. An output selector runs after the write, so a LIST one raising
+  `Http404` still raises rather than report the write as not found, and a
+  RETRIEVE one's is its `None`, as its `DoesNotExist` is.
+
 ## [0.9.0] — 2026-10-16
 
 ### Added

@@ -5,9 +5,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django.http import Http404
+
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
+    NOT_FOUND,
     SELECTOR_SOURCE,
     Overlay,
     conclude_selector,
@@ -71,7 +74,11 @@ def dispatch(
        ``reads`` declare and what its ``kwargs`` provider returns, then shaped,
        and a RETRIEVE collapsed to its row. A
        missing row is ``DispatchResult(kind="not_found")``, returned rather than
-       raised, unless the selector says ``allow_none``.
+       raised, unless the selector says ``allow_none``. A RETRIEVE's missing
+       row is ``None``, a ``DoesNotExist`` or an ``Http404`` alike; a LIST
+       raising ``Http404``, as ``get_object_or_404`` does of a parent row, is
+       not found whatever ``allow_none`` says, while a ``DoesNotExist`` escaping
+       a LIST is a fault and raises.
     4. [`authorize_target`][django_service_specs.dispatch.authorize_target.authorize_target]
        on a retrieved row, and
        [`authorize_scope`][django_service_specs.dispatch.authorize_scope.authorize_scope]
@@ -245,14 +252,20 @@ def dispatch(
             progress=progress,
             extra_kwargs=overlay.kwargs,
         )
-        value = lookup(
-            spec,
-            pool,
-            source=SELECTOR_SOURCE,
-            reserved=pool_seeds.reserved,
-            run=True,
-            transport=progress,
-        )
+        try:
+            value = lookup(
+                spec,
+                pool,
+                source=SELECTOR_SOURCE,
+                reserved=pool_seeds.reserved,
+                run=True,
+                transport=progress,
+            )
+        except Http404:
+            # Only a LIST's reaches here, ``lookup`` having made a RETRIEVE's
+            # its missing row: the selector said "not found", of a parent it
+            # looked up, which ``allow_none`` does not turn into rows.
+            return NOT_FOUND
         return conclude_selector(
             spec,
             value,

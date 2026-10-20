@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.shortcuts import get_object_or_404
 from typing_extensions import TypedDict
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
@@ -190,6 +191,23 @@ def test_a_collection_selector_s_none_under_allow_none_resolves_the_empty_list(a
     target, grant = _found(resolve_target(spec, principal=ada, arguments={}))
     assert target == []
     assert check.scopes == [[]]
+
+
+def test_a_collection_selector_raising_http404_resolves_not_found(ada: Any) -> None:
+    check = Scoped()
+
+    def notes(*, pk: int) -> Any:
+        return Note.objects.filter(owner=get_object_or_404(Note, pk=pk).owner)
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[check],
+        collection_selector_spec=SelectorSpec(kind=SelectorKind.LIST, selector=notes, reads=PK),
+    )
+
+    resolved = resolve_target(spec, principal=ada, arguments={"pk": 404})
+
+    assert (resolved, check.scopes) == (DispatchResult(kind="not_found"), [])
 
 
 def test_a_create_resolves_nothing(ada: Any) -> None:

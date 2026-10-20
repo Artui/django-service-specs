@@ -30,7 +30,10 @@ the async entry point:
 3. **Target resolution**: a read's own selector, or a write's instance or
    collection selector, called with the arguments its `reads` declare and
    what its `kwargs` provider returns, then shaped. A retrieve that finds
-   nothing is `kind="not_found"`, unless the selector allows `None`. A
+   nothing is `kind="not_found"`, unless the selector allows `None`; a
+   selector raising `Http404`, as `get_object_or_404` does, is that missing
+   row on a retrieve, and `kind="not_found"` on a list or a collection,
+   whatever `allow_none` says (see [Declaring](declaring.md)). A
    [`target=`](#a-target-resolved-ahead-of-the-call) the caller passed stands
    in for this step.
 4. **Object-level authorization**: every check's `has_object_permission` on a
@@ -340,7 +343,8 @@ object-level or scope check again. The grant is honoured only with the
 target it was resolved for: handed on without `target=`, dispatch looks the
 row up itself and runs the checks on it. A missing row that `allow_none` does not
 let through comes back as `DispatchResult(kind="not_found")`, so it is never
-mistaken for the `None` it lets through. A read, whose selector is its run,
+mistaken for the `None` it lets through, and so does a collection selector
+raising `Http404`. A read, whose selector is its run,
 raises `TypeError`, and a `many` write, which has no target,
 `ImproperlyConfigured`. It is sync; an async caller hops once with
 `sync_to_async`.

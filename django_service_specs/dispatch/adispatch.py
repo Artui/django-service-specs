@@ -7,12 +7,14 @@ from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ObjectDoesNotExist
+from django.http import Http404
 
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
+    NOT_FOUND,
     SELECTOR_SOURCE,
     Overlay,
     Prepared,
@@ -35,6 +37,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.progress_reporter import ProgressReporter
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
 
@@ -354,7 +357,16 @@ async def _await_selector(
     )
     try:
         raw = await spec.selector(**kwargs)
-    except ObjectDoesNotExist as error:
+    except (ObjectDoesNotExist, Http404) as error:
+        # As ``lookup`` maps them, with a LIST's ``Http404`` answered here as
+        # sync ``dispatch`` answers it. Each member and conjunct is held by its
+        # own test: test_an_async_selector_spec_raising_does_not_exist_runs_no_precondition
+        # (``ObjectDoesNotExist``), test_an_async_retrieve_raising_http404_is_not_found
+        # (``Http404``), test_an_async_list_raising_does_not_exist_passes_through
+        # (the ``isinstance``) and
+        # test_an_async_retrieve_raising_http404_under_allow_none_is_none (the kind).
+        if isinstance(error, Http404) and spec.kind is SelectorKind.LIST:
+            return NOT_FOUND
         reraise_unless_retrieve(spec, error)
         # No row, so no object-level check and nothing that queries: the
         # not-found (or ``allow_none``'s ``None``) is decided without a hop.

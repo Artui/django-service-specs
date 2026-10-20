@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
+from django.http import Http404
 
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import (
@@ -63,15 +64,17 @@ def test_a_spec_with_no_validator_validates_to_nothing() -> None:
     assert validated.values == validated.data == {}
 
 
+@pytest.mark.parametrize("error", [ObjectDoesNotExist("gone"), Http404("gone")])
 @pytest.mark.parametrize("kind", [SelectorKind.RETRIEVE, SelectorKind.LIST])
-def test_does_not_exist_is_a_missing_row_only_for_a_retrieve(kind: SelectorKind) -> None:
+def test_does_not_exist_and_http404_are_a_missing_row_only_for_a_retrieve(
+    kind: SelectorKind, error: Exception
+) -> None:
     spec = SelectorSpec(kind=kind, selector=Record())
-    error = ObjectDoesNotExist("gone")
 
     if kind is SelectorKind.RETRIEVE:
         assert reraise_unless_retrieve(spec, error) is None
         return
-    with pytest.raises(ObjectDoesNotExist) as caught:
+    with pytest.raises(type(error)) as caught:
         reraise_unless_retrieve(spec, error)
     assert caught.value is error
 

@@ -17,6 +17,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import F, Q, Value
 from django.db.models.functions import Concat
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.test import override_settings
 from pydantic import BaseModel, Field
 from typing_extensions import TypedDict
@@ -173,6 +175,114 @@ def test_a_list_raising_does_not_exist_is_a_fault_and_passes_through(ada: Any) -
 
     with pytest.raises(Note.DoesNotExist):
         dispatch(spec, principal=ada, arguments={})
+
+
+OWNER = Parameters.of(Parameter("owner", "integer", required=True))
+
+
+def _notes_of_owner(how: str) -> Callable[..., Any]:
+    """A LIST selector that looks its parent up first, the way ``how`` says."""
+
+    def notes(*, owner: int) -> Any:
+        if how == "get_object_or_404":
+            parent = get_object_or_404(get_user_model(), pk=owner)
+        else:
+            parent = get_user_model().objects.get(pk=owner)
+        return Note.objects.filter(owner=parent)
+
+    return notes
+
+
+def test_a_retrieve_raising_http404_is_not_found(ada: Any) -> None:
+    def by_404(*, pk: int) -> Note:
+        return get_object_or_404(Note, pk=pk)
+
+    result = dispatch(retrieve(selector=by_404), principal=ada, arguments={"pk": 404})
+
+    assert result == DispatchResult(kind="not_found")
+
+
+def test_a_retrieve_raising_http404_under_allow_none_is_none(ada: Any) -> None:
+    def by_404(*, pk: int) -> Note:
+        return get_object_or_404(Note, pk=pk)
+
+    spec = retrieve(selector=by_404, allow_none=True)
+
+    result = dispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert (result.kind, result.value) == ("instance", None)
+
+
+@pytest.mark.parametrize("allow_none", [False, True])
+def test_a_list_whose_parent_lookup_raises_http404_is_not_found(ada: Any, allow_none: bool) -> None:
+    # ``allow_none`` lets a LIST's own ``None`` through as the empty list; it
+    # never turns a missing parent into one.
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=_notes_of_owner("get_object_or_404"),
+        reads=OWNER,
+        permissions=OPEN,
+        allow_none=allow_none,
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"owner": 404})
+
+    assert result == DispatchResult(kind="not_found")
+
+
+def test_a_list_whose_parent_lookup_raises_does_not_exist_is_still_a_fault(ada: Any) -> None:
+    spec = SelectorSpec(kind=LIST, selector=_notes_of_owner("get"), reads=OWNER, permissions=OPEN)
+
+    with pytest.raises(get_user_model().DoesNotExist):
+        dispatch(spec, principal=ada, arguments={"owner": 404})
+
+
+def test_a_list_whose_parent_is_found_lists_its_rows(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=_notes_of_owner("get_object_or_404"),
+        reads=OWNER,
+        permissions=OPEN,
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"owner": ada.pk})
+
+    assert (result.kind, list(result.value)) == ("list", [note])
+
+
+def test_a_write_whose_instance_selector_raises_http404_is_not_found(ada: Any) -> None:
+    service = Record()
+
+    def by_404(*, pk: int) -> Note:
+        return get_object_or_404(Note, pk=pk)
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        instance_selector_spec=nested(RETRIEVE, selector=by_404, reads=PK),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert (result, service.calls) == (DispatchResult(kind="not_found"), [])
+
+
+def test_a_write_whose_collection_selector_raises_http404_is_not_found(ada: Any) -> None:
+    service = Record()
+    check = Scoped()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        collection_selector_spec=nested(
+            LIST, selector=_notes_of_owner("get_object_or_404"), reads=OWNER
+        ),
+    )
+
+    result = dispatch(spec, principal=ada, arguments={"owner": 404})
+
+    # Not found before the scope check: there is no set to ask it of.
+    assert (result, service.calls, check.scopes) == (DispatchResult(kind="not_found"), [], [])
 
 
 def test_allow_none_returns_none_and_never_object_checks_it(ada: Any) -> None:
@@ -592,11 +702,13 @@ def test_a_list_output_selector_makes_the_result_a_list(ada: Any) -> None:
     assert list(result.value) == [note]
 
 
-@pytest.mark.parametrize("how", ["returns nothing", "raises DoesNotExist"])
+@pytest.mark.parametrize("how", ["returns nothing", "raises DoesNotExist", "raises Http404"])
 def test_an_output_selector_that_finds_nothing_is_none_not_not_found(ada: Any, how: str) -> None:
     def gone(*, result: Any) -> Any:
         if how == "raises DoesNotExist":
             return Note.objects.get(pk=404)
+        if how == "raises Http404":
+            return get_object_or_404(Note, pk=404)
         return Note.objects.none()
 
     spec = ServiceSpec(
@@ -608,6 +720,24 @@ def test_an_output_selector_that_finds_nothing_is_none_not_not_found(ada: Any, h
     result = dispatch(spec, principal=ada, arguments={})
 
     assert result == DispatchResult(kind="instance", value=None, service_result="done", data={})
+
+
+def test_a_list_output_selector_raising_http404_is_a_fault_after_the_run(ada: Any) -> None:
+    # The write has run, so a not-found would tell the caller it had not.
+    service = Record(returns="done")
+
+    def gone(*, result: Any) -> Any:
+        raise Http404("gone")
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        output_selector_spec=nested(LIST, selector=gone),
+    )
+
+    with pytest.raises(Http404):
+        dispatch(spec, principal=ada, arguments={})
+    assert len(service.calls) == 1
 
 
 def test_an_output_selector_reads_the_service_s_return_as_instance_not_the_target(

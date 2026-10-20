@@ -21,6 +21,7 @@ from typing import Any, Literal, cast
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
 from django.db.models.manager import BaseManager
+from django.http import Http404
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
@@ -822,14 +823,23 @@ def call_pool(
     return pool
 
 
-def reraise_unless_retrieve(selector_spec: SelectorSpec, error: ObjectDoesNotExist) -> None:
-    """Called from an ``except ObjectDoesNotExist``: what that exception means for this selector.
+def reraise_unless_retrieve(
+    selector_spec: SelectorSpec, error: ObjectDoesNotExist | Http404
+) -> None:
+    """Called from an ``except (ObjectDoesNotExist, Http404)``: what it means for this selector.
 
     A RETRIEVE selector written with ``.get()`` says "no such row" by raising,
     and that is the same missing row a ``.filter()`` returning nothing is, so
     it becomes ``None`` and the caller decides between not-found and
-    ``allow_none``. A LIST has no missing row: a ``DoesNotExist`` escaping one
-    is a fault inside the selector, and passes through untouched.
+    ``allow_none``. ``Http404``, which ``get_object_or_404`` raises, is the
+    same missing row said the way a view says it, and becomes ``None`` too.
+
+    A LIST has no missing row, so either passes through untouched, and what
+    it means there is the caller's: a ``DoesNotExist`` escaping a LIST is a
+    fault inside the selector, while an ``Http404`` is the selector saying
+    "not found", usually of a parent it looked up first, and the selector
+    spec's own run and a write's collection selector answer it as
+    ``NOT_FOUND`` (an output selector runs after the write, and never does).
 
     One rule, called from the two places a selector can raise it: the sync
     call, and the await ``adispatch`` makes on the event loop.
@@ -974,9 +984,14 @@ def lookup(
         kwargs = with_run_progress(
             selector_spec, kwargs, pool, reserved=reserved, transport=transport
         )
+    # One arc to coverage for both members:
+    # test_a_retrieve_raising_does_not_exist_is_not_found holds the first,
+    # test_a_retrieve_raising_http404_under_allow_none_is_none the second (a
+    # RETRIEVE's not-found alone would pass without it, answered by
+    # ``dispatch``'s own ``except Http404``).
     try:
         raw = run_selector(fn, kwargs)
-    except ObjectDoesNotExist as error:
+    except (ObjectDoesNotExist, Http404) as error:
         reraise_unless_retrieve(selector_spec, error)
         return None
     return settle(selector_spec, raw, pool, source=source, reserved=reserved, fillable=fillable)
@@ -1072,7 +1087,10 @@ def walk_target(
       ``allow_none``; then ``authorize_scope`` of ``None``, as
       djangorestframework-services asks its guard of the ``None`` it lets
       through.
-    - **A collection**, empty or not: ``authorize_scope`` of the set.
+    - **A collection**, empty or not: ``authorize_scope`` of the set. A
+      collection selector raising ``Http404`` is ``NOT_FOUND``, with no scope
+      check, since there is no set to ask it of
+      (test_a_write_whose_collection_selector_raises_http404_is_not_found).
     - **A create**, which resolves nothing: ``authorize_scope`` of ``None``.
 
     Each is handed ``checked`` for a check that declares ``arguments``, as
@@ -1117,9 +1135,14 @@ def walk_target(
             pool = selector_pool(
                 collection_spec, checked, principal=principal, pool_seeds=pool_seeds
             )
-            target = lookup(
-                collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
-            )
+            try:
+                target = lookup(
+                    collection_spec, pool, source=COLLECTION_SOURCE, reserved=pool_seeds.reserved
+                )
+            except Http404:
+                # The collection selector's own "not found", of a parent it
+                # looked up: there is no set to scope-check, so nothing is.
+                return NOT_FOUND
         authorize_scope(spec, principal, target, grant=grant, arguments=handed)
         return {"collection": target}
     # One arc to coverage, so each conjunct is held by its own test: a create
