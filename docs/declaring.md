@@ -139,8 +139,9 @@ usually of a parent row it looked up before listing that parent's children, and
 the result is not-found whatever `allow_none` says. A `DoesNotExist` escaping a
 list is different: a list has no missing row, so it is a fault inside the
 selector and raises. An output selector runs after the write, so a list one
-raising `Http404` raises too, rather than report a write that happened as not
-found. Only the selector's own raise is read this way: an `Http404` from its
+raising `Http404` raises a `RuntimeError` chained from it, rather than report a
+write that happened as not found: a bare `Http404` would be answered 404 by
+Django's handler and by DRF's. Only the selector's own raise is read this way: an `Http404` from its
 `extend_queryset` passes through.
 
 `reads` is the selector's whole input. There is no Validator in front of a

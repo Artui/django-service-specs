@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.http import Http404
 from django.shortcuts import get_object_or_404
 from typing_extensions import TypedDict
 
@@ -208,6 +209,22 @@ def test_a_collection_selector_raising_http404_resolves_not_found(ada: Any) -> N
     resolved = resolve_target(spec, principal=ada, arguments={"pk": 404})
 
     assert (resolved, check.scopes) == (DispatchResult(kind="not_found"), [])
+
+
+def test_a_collection_selector_s_extend_queryset_http404_passes_through(ada: Any) -> None:
+    def refuse(*, queryset: Any) -> Any:
+        raise Http404("shaping")
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Scoped()],
+        collection_selector_spec=SelectorSpec(
+            kind=SelectorKind.LIST, selector=lambda: Note.objects.all(), extend_queryset=refuse
+        ),
+    )
+
+    with pytest.raises(Http404, match="shaping"):
+        resolve_target(spec, principal=ada, arguments={})
 
 
 def test_a_create_resolves_nothing(ada: Any) -> None:

@@ -306,6 +306,25 @@ def test_a_write_whose_collection_selector_raises_http404_is_not_found(ada: Any)
     assert (result, service.calls, check.scopes) == (DispatchResult(kind="not_found"), [], [])
 
 
+def test_a_collection_selector_s_extend_queryset_http404_passes_through(ada: Any) -> None:
+    # Only the collection selector's own raise is its "not found": an
+    # ``Http404`` from shaping, which runs after it, is not, and reaches the
+    # caller instead of skipping the scope check as a missing parent would.
+    def refuse(*, queryset: Any) -> Any:
+        raise Http404("shaping")
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Scoped()],
+        collection_selector_spec=nested(
+            LIST, selector=lambda: Note.objects.all(), extend_queryset=refuse
+        ),
+    )
+
+    with pytest.raises(Http404, match="shaping"):
+        dispatch(spec, principal=ada, arguments={})
+
+
 def test_allow_none_returns_none_and_never_object_checks_it(ada: Any) -> None:
     check = OwnerOnly()
 
@@ -744,7 +763,9 @@ def test_an_output_selector_that_finds_nothing_is_none_not_not_found(ada: Any, h
 
 
 def test_a_list_output_selector_raising_http404_is_a_fault_after_the_run(ada: Any) -> None:
-    # The write has run, so a not-found would tell the caller it had not.
+    # The write has run, so a not-found would tell the caller it had not; and
+    # a bare ``Http404`` would be answered 404 by any transport that maps it,
+    # so it is re-raised as a fault that is not one.
     service = Record(returns="done")
 
     def gone(*, result: Any) -> Any:
@@ -756,8 +777,10 @@ def test_a_list_output_selector_raising_http404_is_a_fault_after_the_run(ada: An
         output_selector_spec=nested(LIST, selector=gone),
     )
 
-    with pytest.raises(Http404):
+    with pytest.raises(RuntimeError, match="after the service ran") as raised:
         dispatch(spec, principal=ada, arguments={})
+    assert not isinstance(raised.value, Http404)
+    assert isinstance(raised.value.__cause__, Http404)
     assert len(service.calls) == 1
 
 

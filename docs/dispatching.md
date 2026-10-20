@@ -179,7 +179,9 @@ found rather than refused: it does not exist for them.
 One case is not reported as not-found: **a retrieve output selector that finds
 nothing**. The service has already run and, under `atomic`, committed, so
 reporting not-found would tell the caller the write did not happen. The value
-is `None` under `kind="instance"` instead.
+is `None` under `kind="instance"` instead, whether the re-read returned `None`
+or raised `DoesNotExist` or `Http404`. A list output selector raising `Http404`
+is a fault for the same reason, and raises a `RuntimeError` chained from it.
 
 The output selector is called from the base pool plus the service's return,
 under two names: `result`, and `instance`, as djangorestframework-services

@@ -38,8 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selector, before its scope check and on `resolve_target` too. A
   `DoesNotExist` escaping a LIST is still a fault inside the selector and
   raises. An output selector runs after the write, so a LIST one raising
-  `Http404` still raises rather than report the write as not found, and a
-  RETRIEVE one's is its `None`, as its `DoesNotExist` is. Only the selector's
+  `Http404` now raises a `RuntimeError` chained from it, a fault on every
+  transport, where the bare `Http404` was answered 404 by the kernel's HTTP
+  views and by DRF although the write had happened; a RETRIEVE one's is its
+  `None`, as its `DoesNotExist` is. Only the selector's
   own raise counts: an `Http404` from its `extend_queryset` passes through on
   both entry points, as before.
 

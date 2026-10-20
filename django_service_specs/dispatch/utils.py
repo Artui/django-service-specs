@@ -1008,11 +1008,16 @@ def lookup(
         # (the ``isinstance``), test_a_retrieve_raising_http404_under_allow_none_is_none
         # (the kind) and test_a_list_output_selector_raising_http404_is_a_fault_after_the_run
         # (``after_the_run``: the write has run, so it is never reported not found).
-        if (
-            isinstance(error, Http404)
-            and selector_spec.kind is SelectorKind.LIST
-            and not after_the_run
-        ):
+        if isinstance(error, Http404) and selector_spec.kind is SelectorKind.LIST:
+            if after_the_run:
+                # Re-raised as a plain fault, because a bare ``Http404`` is
+                # answered 404 by Django's handler and DRF's alike, which
+                # would tell the caller a write that happened did not
+                # (test_a_list_output_selector_raising_http404_is_a_fault_after_the_run).
+                raise RuntimeError(
+                    "The output selector raised Http404 after the service ran: a list "
+                    "re-read has no missing row to report, and the write has happened."
+                ) from error
             raise ListNotFound from error
         reraise_unless_retrieve(selector_spec, error)
         return None
@@ -1164,6 +1169,9 @@ def walk_target(
             except ListNotFound:
                 # The collection selector's own "not found", of a parent it
                 # looked up: there is no set to scope-check, so nothing is.
+                # Only ListNotFound: an Http404 from shaping passes through
+                # (test_a_collection_selector_s_extend_queryset_http404_passes_through,
+                # in test_dispatch.py and test_resolve_target.py).
                 return NOT_FOUND
         authorize_scope(spec, principal, target, grant=grant, arguments=handed)
         return {"collection": target}

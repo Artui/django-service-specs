@@ -454,6 +454,28 @@ async def test_an_async_http404_from_extend_queryset_is_not_the_selector_s_not_f
         await adispatch(spec, principal=ada, arguments={})
 
 
+async def test_an_async_list_output_selector_raising_http404_is_a_fault_after_the_run(
+    ada: Any,
+) -> None:
+    # The output selector is called through ``lookup`` on a sync hop, so the
+    # re-raise as a fault holds here as on ``dispatch``.
+    service = Record(returns="done")
+
+    async def gone(*, result: Any) -> Any:
+        raise Http404("gone")
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        output_selector_spec=SelectorSpec(kind=SelectorKind.LIST, selector=gone),
+    )
+
+    with pytest.raises(RuntimeError, match="after the service ran") as raised:
+        await adispatch(spec, principal=ada, arguments={})
+    assert isinstance(raised.value.__cause__, Http404)
+    assert len(service.calls) == 1
+
+
 @pytest.mark.parametrize("allow_none", [False, True])
 async def test_an_async_list_whose_parent_lookup_raises_http404_is_not_found(
     ada: Any, allow_none: bool
