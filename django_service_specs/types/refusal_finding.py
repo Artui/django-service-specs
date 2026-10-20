@@ -30,6 +30,19 @@ class RefusalFinding:
     #: The earlier row that answers first, for a shadowed row; otherwise ``None``.
     shadowed_by: type[BaseException] | None = None
 
+    def __post_init__(self) -> None:
+        """Refuse a finding whose row above and kind disagree.
+
+        A shadowed row without the row above it would read "the row for None",
+        and any other kind naming one would carry a class nothing reads, so
+        neither is a finding a transport could be handed.
+        """
+        if (self.kind is RefusalFindingKind.SHADOWED_ROW) != (self.shadowed_by is not None):
+            raise ValueError(
+                "A refusal finding names the row above it exactly when it is a "
+                f"shadowed row; got kind {self.kind.value!r} and row above {self.shadowed_by!r}."
+            )
+
     def __str__(self) -> str:
         """The finding in a sentence, naming the classes it is about."""
         name = self.refusal.__name__
@@ -39,8 +52,8 @@ class RefusalFinding:
                 f"refusal under it, and {name} may be raised bare"
             )
         if self.kind is RefusalFindingKind.SHADOWED_ROW:
-            # Read without a branch: the kind is what says a row shadows it,
-            # and a finding built without one says so as ``None``.
+            # Read without a branch: ``__post_init__`` holds that a shadowed
+            # row names the row above it, which the type cannot say.
             above = getattr(self.shadowed_by, "__name__", None)
             return (
                 f"the row for {name} never answers: the row for {above} "

@@ -306,3 +306,8 @@ class TestTheKernelsOwnMaps:
         # The ladder only: error_response's four arms above it are code, and
         # its own tests' branch coverage holds their order.
         assert unanswered_refusals(_STATUSES) == ()
+
+
+def test_a_table_given_as_a_generator_is_read_as_the_same_table() -> None:
+    rows = ((DispatchError, 1), (ServiceError, 2), (ServiceConflict, 3))
+    assert unanswered_refusals(row for row in rows) == unanswered_refusals(rows)

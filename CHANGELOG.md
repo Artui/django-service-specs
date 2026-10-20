@@ -42,8 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   filters by refusal or kind, never by the words. Three kinds: `UNANSWERED`,
   a refusal nothing answers; `BARE_BASE`, a base answered nowhere while every
   refusal under it is, since either base may be raised bare; and
-  `SHADOWED_ROW`, for a table, a row below a row of its own base, which never
-  answers. Each transport keeps its own vocabulary: an exit code, a status and
+  `SHADOWED_ROW`, for a table, a row below a row of its own base or a repeat of
+  an earlier row, which never answers. Each transport keeps its own vocabulary: an exit code, a status and
   a run state stay its own.
 
 ## [0.9.0] — 2026-10-16

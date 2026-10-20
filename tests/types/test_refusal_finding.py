@@ -66,3 +66,23 @@ def test_it_carries_its_three_fields_and_nothing_else() -> None:
 )
 def test_str_is_the_finding_in_a_sentence(finding: RefusalFinding, words: str) -> None:
     assert str(finding) == words
+
+
+@pytest.mark.parametrize(
+    ("kind", "shadowed_by"),
+    [
+        (RefusalFindingKind.SHADOWED_ROW, None),
+        (RefusalFindingKind.UNANSWERED, ServiceError),
+        (RefusalFindingKind.BARE_BASE, ServiceError),
+    ],
+    ids=[
+        "a shadowed row naming no row",
+        "an unanswered refusal naming one",
+        "a bare base naming one",
+    ],
+)
+def test_a_row_above_is_named_by_a_shadowed_row_and_nothing_else(
+    kind: RefusalFindingKind, shadowed_by: type[BaseException] | None
+) -> None:
+    with pytest.raises(ValueError, match="names the row above it exactly when"):
+        RefusalFinding(NotPermitted, kind, shadowed_by)

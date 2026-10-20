@@ -43,8 +43,8 @@ def unanswered_refusals(
     per finding, and none for a map that answers every one of
     [`REFUSALS`][django_service_specs.dispatch.refusals.REFUSALS], so a transport
     holds its map from its own test suite with
-    ``assert unanswered_refusals(...) == ()``, and the failure lists each
-    finding's refusal and kind. A transport that leaves a gap on purpose
+    ``assert unanswered_refusals(...) == ()``; pytest's failure shows the
+    first finding, and ``-v`` lists them all. A transport that leaves a gap on purpose
     filters the findings by ``refusal`` or ``kind``, never by their words,
     which ``str()`` gives and which are free to change. Each transport keeps
     its own vocabulary - an exit code, a status, a run state - and this checks
@@ -99,6 +99,9 @@ def unanswered_refusals(
         answered = {kind for kind in REFUSALS if answers(_BUILDERS.get(kind, kind)()) != unanswered}
         shadowed: list[RefusalFinding] = []
     else:
+        # Read once into a tuple: every refusal walks the rows, and a generator
+        # would be spent by the first.
+        rows = tuple(answers)
         # The first matching row's outcome, read as the ladder reads it. Held
         # in tests/dispatch/test_unanswered_refusals.py:
         # ``test_the_first_matching_row_answers_even_when_it_answers_unanswered``
@@ -108,10 +111,10 @@ def unanswered_refusals(
         answered = {
             kind
             for kind in REFUSALS
-            if next((outcome for row, outcome in answers if issubclass(kind, row)), unanswered)
+            if next((outcome for row, outcome in rows if issubclass(kind, row)), unanswered)
             != unanswered
         }
-        shadowed = _shadowed_rows([row for row, _ in answers])
+        shadowed = _shadowed_rows([row for row, _ in rows])
     return (*(_unanswered(kind, answered) for kind in REFUSALS if kind not in answered), *shadowed)
 
 
