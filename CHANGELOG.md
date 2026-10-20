@@ -46,6 +46,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an earlier row, which never answers. Each transport keeps its own vocabulary: an exit code, a status and
   a run state stay its own.
 
+### Changed
+- **A selector raising Django's `Http404`, as `get_object_or_404` does, is a
+  missing row**, on `dispatch` and `adispatch` alike, where it used to escape
+  both to the transport. A RETRIEVE's `Http404` is what its `DoesNotExist` is:
+  `DispatchResult(kind="not_found")`, or `None` under `allow_none`, and a
+  write's instance selector raising one is not found before the service runs.
+  A LIST raising `Http404`, usually of a parent row it looked up first, is
+  `not_found` whatever `allow_none` says, and so is a write's collection
+  selector, before its scope check and on `resolve_target` too. A
+  `DoesNotExist` escaping a LIST is still a fault inside the selector and
+  raises. An output selector runs after the write, so a LIST one raising
+  `Http404` now raises a `RuntimeError` chained from it, a fault on every
+  transport, where the bare `Http404` was answered 404 by the kernel's HTTP
+  views and by DRF although the write had happened; a RETRIEVE one's is its
+  `None`, as its `DoesNotExist` is. Only the selector's
+  own raise counts: an `Http404` from its `extend_queryset` passes through on
+  both entry points, as before.
+
 ## [0.9.0] — 2026-10-16
 
 ### Added
