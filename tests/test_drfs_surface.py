@@ -581,6 +581,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # dispatch, so that it refuses, relaxes and prints as dispatch does:
         # djangorestframework-services reaches each through dispatch alone.
         "NON_FIELD_KEYS",
+        "clean_held_to_their_columns",
         "expected_type",
         "is_deactivated",
         "max_length_in_force",

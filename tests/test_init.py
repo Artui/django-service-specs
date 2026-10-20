@@ -160,6 +160,10 @@ SHARED_WITH_THE_KERNEL = {
         "django_service_specs.dispatch.utils",
         "django_service_specs.http.request_principal",
     ),
+    "clean_held_to_their_columns": (
+        "django_service_specs.adapters.forms.form_validator",
+        "django_service_specs.http.add_argument_errors",
+    ),
 }
 
 

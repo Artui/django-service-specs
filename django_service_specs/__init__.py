@@ -89,6 +89,9 @@ from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.clean_held_to_their_columns import (
+    clean_held_to_their_columns,
+)
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.expected_type import expected_type
@@ -288,6 +291,7 @@ __all__ = [
     "check_call",
     "check_requested_input",
     "check_server_arguments",
+    "clean_held_to_their_columns",
     "coerce_flat",
     "combine_progress",
     "create_from_input",

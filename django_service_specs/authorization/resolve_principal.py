@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 
 from django_service_specs.authorization.is_deactivated import is_deactivated
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.relations.utils import key_past_its_column
+from django_service_specs.parameters.utils import key_past_its_column
 
 
 def resolve_principal(identifier: Any) -> Any:
