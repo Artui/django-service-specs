@@ -168,8 +168,8 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
     # ``UNSET``, the declaration of no default, is not a JSON value either, so
     # this one test leaves out both a missing default and one JSON cannot carry.
     # A second ``is not UNSET`` conjunct would change nothing a test could see.
-    # Held by test_a_parameter_with_no_default_states_none and
-    # test_a_default_json_cannot_carry_is_left_out.
+    # Held by test_a_default_json_cannot_carry_is_left_out, whose [undeclared]
+    # case is the missing default.
     if is_json_native(param.default):
         schema["default"] = param.default
     if param.help:

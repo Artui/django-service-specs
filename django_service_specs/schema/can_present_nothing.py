@@ -49,8 +49,8 @@ def can_present_nothing(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool:
     spec = kernel_spec(spec)
     if isinstance(spec, SelectorSpec):
         # One arc to coverage, so each operand is named:
-        # test_a_list_selector_never_presents_nothing holds the kind, and
-        # test_a_retrieve_selector_presents_nothing_only_under_allow_none the flag.
+        # test_the_truth_table[selector-list-allow-none] holds the kind, and
+        # test_the_truth_table[selector-retrieve] the flag.
         return spec.kind is SelectorKind.RETRIEVE and spec.allow_none
     reread = spec.output_selector_spec
     if reread is not None:

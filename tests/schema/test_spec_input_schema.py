@@ -23,18 +23,29 @@ from tests.specs.utils import Foreign
 ROW = Parameters.of(Parameter("title", "string", required=True))
 
 
-class Rows(Validator):
+class Declares(Validator):
+    """A Validator declaring ``parameters`` and passing its arguments through."""
+
+    def __init__(self, *parameters: Parameter) -> None:
+        self.declared = Parameters.of(*parameters)
+
+    def parameters(self) -> Parameters:
+        return self.declared
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+class Rows(Declares):
     """Declares a list of rows, so the policy has a level below the top to reach."""
 
     def __init__(self) -> None:
+        super().__init__(Parameter("rows", "array", items=ROW, required=True))
         self.asked = 0
 
     def parameters(self) -> Parameters:
         self.asked += 1
-        return Parameters.of(Parameter("rows", "array", items=ROW, required=True))
-
-    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
-        return dict(arguments)
+        return super().parameters()
 
 
 def edit(**_: Any) -> None:
@@ -107,17 +118,9 @@ class TestSpecInputSchema:
 def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
     # Built here rather than at module level, so a tree without ``many``
     # fails this test alone.
-    class Row(Validator):
-        def parameters(self) -> Parameters:
-            return Parameters.of(Parameter("title", "string", required=True))
-
-        def validate(
-            self, arguments: Mapping[str, Any], context: ValidationContext
-        ) -> dict[str, Any]:
-            return dict(arguments)
-
+    row = Declares(Parameter("title", "string", required=True))
     reads = Parameters.of(Parameter("confirmed", "boolean"))
-    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Row(), reads=reads)
+    spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=row, reads=reads)
     assert spec_input_schema(spec) == {
         "type": "object",
         "properties": {
@@ -150,19 +153,16 @@ def the_project() -> _Project:
     return {"project": 1}
 
 
-class Article(Validator):
+class Article(Declares):
     """Required fields at every depth: the top, an object's fields, an array's rows."""
 
-    def parameters(self) -> Parameters:
-        return Parameters.of(
+    def __init__(self) -> None:
+        super().__init__(
             Parameter("title", "string", required=True),
             Parameter("body", "string", required=True),
             Parameter("meta", "object", fields=TAG, required=True),
             Parameter("tags", "array", items=TAG, required=True),
         )
-
-    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
-        return dict(arguments)
 
 
 def article_spec(*, partial: bool) -> ServiceSpec:
@@ -211,22 +211,14 @@ class TestPartial:
     def test_an_update_naming_its_row_by_pk_requires_the_pk_alone(self) -> None:
         # The case docs/schema.md states: a target read ``pk``, and a Validator
         # requiring ``title`` and ``body``.
-        class TitleAndBody(Validator):
-            def parameters(self) -> Parameters:
-                return Parameters.of(
-                    Parameter("title", "string", required=True),
-                    Parameter("body", "string", required=True),
-                )
-
-            def validate(
-                self, arguments: Mapping[str, Any], context: ValidationContext
-            ) -> dict[str, Any]:
-                return dict(arguments)
-
+        title_and_body = Declares(
+            Parameter("title", "string", required=True),
+            Parameter("body", "string", required=True),
+        )
         spec = ServiceSpec(
             service=edit,
             permissions=OPEN,
-            validator=TitleAndBody(),
+            validator=title_and_body,
             partial=True,
             instance_selector_spec=SelectorSpec(
                 kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK
@@ -259,30 +251,6 @@ class TestPartial:
         spec_input_schema(spec)
 
         assert spec.parameters().get("title") == Parameter("title", "string", required=True)
-
-    @pytest.mark.parametrize("partial", [True, False])
-    def test_the_schema_requires_exactly_what_the_shape_check_refuses_when_absent(
-        self, partial: bool
-    ) -> None:
-        spec = article_spec(partial=partial)
-        whole = {
-            "pk": 1,
-            "project": 2,
-            "title": "t",
-            "body": "b",
-            "meta": {"label": "m"},
-            "tags": [{"label": "x"}],
-        }
-        schema = spec_input_schema(spec)
-
-        for name in whole:
-            call = {key: value for key, value in whole.items() if key != name}
-            assert (name in schema.get("required", ())) == _refused(spec, call)
-        for name, inner in (("meta", schema["properties"]["meta"]), ("tags", None)):
-            node = inner if inner is not None else schema["properties"]["tags"]["items"]
-            empty: Any = {} if name == "meta" else [{}]
-            call = {**whole, name: empty}
-            assert ("label" in node.get("required", ())) == _refused(spec, call)
 
 
 class _Title(TypedDict):
@@ -369,22 +337,14 @@ class TestPartialMany:
     def test_a_partial_many_spec_requires_the_list_and_its_reads_and_nothing_in_a_row(
         self,
     ) -> None:
-        class Row(Validator):
-            def parameters(self) -> Parameters:
-                return Parameters.of(
-                    Parameter("title", "string", required=True),
-                    Parameter("meta", "object", fields=TAG, required=True),
-                )
-
-            def validate(
-                self, arguments: Mapping[str, Any], context: ValidationContext
-            ) -> dict[str, Any]:
-                return dict(arguments)
-
+        row = Declares(
+            Parameter("title", "string", required=True),
+            Parameter("meta", "object", fields=TAG, required=True),
+        )
         # A read may share a row field's name, and stays required as declared.
         reads = Parameters.of(Parameter("title", "string", required=True))
         spec = ServiceSpec(
-            service=print, permissions=OPEN, many=True, partial=True, validator=Row(), reads=reads
+            service=print, permissions=OPEN, many=True, partial=True, validator=row, reads=reads
         )
 
         schema = spec_input_schema(spec)

@@ -20,6 +20,8 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.types.unknown_arguments import UnknownArguments
+from django_service_specs.types.unset import UNSET
+from tests.schema.utils import walk
 
 PUBLISHER = Parameters.of(Parameter("name", "string", required=True))
 BOOK = Parameters.of(
@@ -46,16 +48,6 @@ def refused(parameters: Parameters, arguments: Any, **kwargs: Any) -> dict[Any, 
     with pytest.raises(InvalidArguments) as caught:
         check_arguments(parameters, arguments, **kwargs)
     return caught.value.detail
-
-
-def walk(schema: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every schema node - the root, each property, each array's items - however deep."""
-    nodes = [schema]
-    for prop in schema.get("properties", {}).values():
-        nodes += walk(prop)
-    if "items" in schema:
-        nodes += walk(schema["items"])
-    return nodes
 
 
 class TestObjects:
@@ -218,6 +210,9 @@ class TestTypes:
         assert one(Parameter("meta", "object")) == {"type": "object"}
 
     def test_an_array_of_a_type_name_states_the_type_of_its_items(self) -> None:
+        # The maximum in force is stated though none is declared: the shape
+        # check refuses past it, so a client that does not learn it sends a
+        # call that cannot run.
         assert one(Parameter("ids", "array", items="integer")) == {
             "type": "array",
             "maxItems": 1000,
@@ -522,12 +517,16 @@ class TestDefaults:
             "default": default,
         }
 
-    def test_a_parameter_with_no_default_states_none(self) -> None:
-        assert one(Parameter("value", "string")) == {"type": "string"}
-
     @pytest.mark.parametrize(
         "default",
-        [Decimal("9.99"), dt.date(2026, 1, 1), dt.datetime.now, [Decimal("1")], {1: "x"}],
+        [
+            pytest.param(UNSET, id="undeclared"),
+            Decimal("9.99"),
+            dt.date(2026, 1, 1),
+            dt.datetime.now,
+            [Decimal("1")],
+            {1: "x"},
+        ],
     )
     def test_a_default_json_cannot_carry_is_left_out(self, default: Any) -> None:
         assert one(Parameter("value", "string", default=default)) == {"type": "string"}
@@ -610,17 +609,6 @@ def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_its
 
 
 # --- array length ------------------------------------------------------------------------------------
-
-
-def test_an_array_states_the_maximum_in_force_when_none_is_declared() -> None:
-    # The shape check refuses past it, so a client that does not learn it
-    # sends a call that cannot run.
-    schema = parameters_schema(Parameters.of(Parameter("ids", "array", items="integer")))
-    assert schema["properties"]["ids"] == {
-        "type": "array",
-        "items": {"type": "integer"},
-        "maxItems": 1000,
-    }
 
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
