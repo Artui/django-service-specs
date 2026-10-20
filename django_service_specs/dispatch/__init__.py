@@ -1,4 +1,4 @@
-"""Running one operation, from any transport, and the authorization checks it runs."""
+"""Running one operation, from any transport, the authorization checks it runs, and the refusals it raises."""
 
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
@@ -17,10 +17,13 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 
 __all__ = [
     "DEFAULT_PAGE_SIZE",
+    "REFUSALS",
     "DispatchResult",
     "Grant",
     "adispatch",
@@ -39,4 +42,5 @@ __all__ = [
     "present",
     "present_for_audience",
     "resolve_target",
+    "unanswered_refusals",
 ]

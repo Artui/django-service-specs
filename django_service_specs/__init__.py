@@ -48,7 +48,9 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.http.add_argument_errors import add_argument_errors
 from django_service_specs.http.adispatch_request import adispatch_request
 from django_service_specs.http.async_spec_view import AsyncSpecView
@@ -167,6 +169,7 @@ __all__ = [
     "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "NON_FIELD_ERRORS",
+    "REFUSALS",
     "RESERVED_POOL_SEEDS",
     "UNSET",
     "ActionUnavailable",
@@ -322,6 +325,7 @@ __all__ = [
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
+    "unanswered_refusals",
     "unguarded_message",
     "unguarded_specs",
     "unmet_operation_affordance",

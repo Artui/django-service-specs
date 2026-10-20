@@ -26,6 +26,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   replacement is checked as `register` checks a spec, and a name that is not
   registered raises `KeyError`. With `derive`, it is how one transport serves
   a variant of an operation under the operation's own name.
+- **`REFUSALS` and `unanswered_refusals(answers, *, unanswered=None)`: one
+  check that a transport's refusal-to-outcome map is total.** `REFUSALS` is
+  every refusal the kernel defines, both family bases and `ServiceConflict`
+  included, and not a refusal a transport defines itself, such as
+  `UnsupportedMediaType`. `unanswered_refusals` takes the map as it is
+  written - an ordered table of `(refusal class, outcome)` rows read by
+  `isinstance` with the first match winning, or a callable given one
+  instance of each refusal, with `unanswered=` naming its fallback - and
+  returns one sentence per finding, so a transport asserts `== ()` from its
+  own suite. Three findings: a refusal nothing answers; a base answered
+  nowhere while every refusal under it is, since both bases are raised bare;
+  and, for a table, a row below a row of its own base, which never answers.
+  Each transport keeps its own vocabulary: an exit code, a status and a run
+  state stay its own.
 
 ## [0.9.0] — 2026-10-16
 

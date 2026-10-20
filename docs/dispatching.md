@@ -636,3 +636,56 @@ have called it. The selector spec's affordance conditions, `extend_queryset`
 and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.
+
+## Answering every refusal
+
+Dispatch refuses in two families, and a transport answers each refusal in its
+own vocabulary: an exit code, an HTTP status, the state a background run ends
+in. Those vocabularies stay the transport's, and one check is shared:
+[`unanswered_refusals`][django_service_specs.dispatch.unanswered_refusals.unanswered_refusals]
+says what a map leaves unanswered of
+[`REFUSALS`][django_service_specs.dispatch.refusals.REFUSALS], every refusal the
+kernel defines, so a transport holds its map total from its own test suite:
+
+```python
+--8<--
+docs/examples/refusal_outcomes.py:outcomes
+--8<--
+```
+
+It takes the map as it is written. An ordered table of `(refusal class,
+outcome)` rows is read the way an `isinstance` ladder reads it, top to bottom
+with the first match winning, so a row for a base answers every refusal under
+it. A map written as code is passed as the callable it is, with `unanswered=`
+naming the value it falls back to; a mapping looked up by an error's exact
+class is a callable too, `lambda error: table.get(type(error))`, since reading
+its keys as ordered rows would let a base answer for a subclass the lookup
+never reaches.
+
+Two traps make a map look complete when it is not, and each has its own
+finding. **Both bases are raised bare**: a `DispatchError` or a `ServiceError`
+that is neither subclass reaches a transport too, so a map with a row for every
+refusal under a base and none for the base leaves it unanswered:
+
+```text
+nothing in the map answers DispatchError itself, though it answers every refusal under it, and DispatchError may be raised bare
+```
+
+**A subclass below its base never answers**: in an ordered table, the base's
+row catches it first, so the subclass's row is dead and the subclass takes
+the base's outcome:
+
+```text
+the row for ServiceConflict never answers: the row for ServiceError above it answers every ServiceConflict first
+```
+
+The second is reported for a table only. A callable's order is code, and a
+branch for a subclass below its base's is a body that never runs, which the
+transport's own branch coverage reports; a table's order is data, which
+coverage reads as one expression.
+
+A refusal a transport defines itself, such as the HTTP views'
+[`UnsupportedMediaType`][django_service_specs.http.unsupported_media_type.UnsupportedMediaType],
+is not in `REFUSALS`: that transport maps it and tests it. Its row is still
+read for the precedence trap, since a row nothing reaches is dead whoever's
+refusal it names.
