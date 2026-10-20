@@ -93,6 +93,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   dependency, says `djangorestframework-services` is the DRF adapter over
   this kernel, and that the MCP server and Pydantic AI toolset reach specs
   through it today.
+- **The package and its suite are simpler, with no behaviour a caller can
+  rely on changed.** Duplicated bodies became shared helpers, comments that
+  restated the code or told its history went, and repeated tests became
+  parametrised ones with every case kept. Three changes reach past a private
+  name: `resolve_callable_kwargs` returns its keyword arguments in the order
+  the callable declares them, where the order was arbitrary;
+  `adapters.dataclass.utils` no longer re-exports `scalar_type`, so import it
+  from `adapters.utils`; and `relations.utils.validate_relation_services`
+  takes the spec and reads its mappings off it, as
+  `validate_relation_services(spec, *, label)`.
 
 ### Fixed
 - **`clean_held_to_their_columns` leaves the form as it found it.** It took
