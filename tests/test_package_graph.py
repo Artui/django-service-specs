@@ -22,7 +22,7 @@ from pathlib import Path
 import django_service_specs
 
 ROOT = Path(django_service_specs.__file__).parent
-ROOT_MODULES = {"settings", "checks", "apps", "version"}
+ROOT_MODULES = {"settings", "apps", "version"}
 
 
 def _package_of(dotted: str) -> str | None:
@@ -76,7 +76,7 @@ def _graph() -> dict[str, set[str]]:
 
 
 def _root_module(dotted: str) -> str | None:
-    """The package root's own modules (``settings``, ``checks``) as nodes of their own."""
+    """The package root's own modules (``settings``, ``apps``) as nodes of their own."""
     parts = dotted.split(".")
     if parts[0] == "django_service_specs" and len(parts) == 2 and parts[1] in ROOT_MODULES:
         return parts[1]

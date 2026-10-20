@@ -535,28 +535,11 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # HTTP through DRF's views, never through these.
         "SpecView",
         "AsyncSpecView",
-        # A management command over a registry: a transport of this package's,
-        # which drfs reaches only by compiling its specs into a registry.
-        "SpecCommand",
-        # Its exit statuses, and the refusal each ends a run with.
-        "ExitCode",
-        "exit_code_for",
-        # How that command writes a presented result to a terminal or a pipe.
-        # drfs presents through DRF's renderers and has no command of its own.
-        "render_result",
-        "render_table",
-        "render_json_lines",
-        "wants_table",
-        # The argv layer that command is built from, which only a command reads.
-        "ParameterDescriptor",
-        "describe_parameters",
-        "add_spec_arguments",
-        "parsed_arguments",
-        # The report of a registry's open specs, read by that command and by the
-        # system check its app registers; drfs serves no management command.
+        # The report of a registry's open specs, which django-spec-cli's
+        # management command and system check read from here; drfs serves no
+        # management command.
         "UnguardedReason",
         "UnguardedSpec",
-        "unguarded_message",
         "unguarded_specs",
         "UnsupportedMediaType",
         "dispatch_request",

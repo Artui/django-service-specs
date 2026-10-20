@@ -10,8 +10,10 @@ importing the package root never imports pydantic.
 
 ## Settings
 
-Two Django settings, each read at the call rather than at import, so
-`override_settings` reaches a spec built before it.
+One Django setting, read at the call rather than at import, so
+`override_settings` reaches a spec built before it. The management command's
+output format is `SPEC_CLI_OUTPUT`, read by
+[django-spec-cli](https://artui.github.io/django-spec-cli/).
 
 - **`SERVICE_SPECS_MAX_ARRAY_LENGTH`**: the most elements an array argument
   takes where its parameter declares no `max_length`, and the most rows a
@@ -19,12 +21,6 @@ Two Django settings, each read at the call rather than at import, so
   when unset; `None` bounds no array. Anything but a non-negative `int` or
   `None` is refused as `ImproperlyConfigured` where it is read. See
   [how long a list may be](arguments.md#how-long-a-list-may-be).
-- **`SERVICE_SPECS_COMMAND_OUTPUT`**: the format a `SpecCommand` writes its
-  result in. `"auto"` when unset, a table on a terminal and JSON Lines on
-  anything else; `"table"` or `"json"` pins one project-wide, and a
-  command's own `--table` or `--json` still wins. Anything else, a
-  different case included, is refused as `ImproperlyConfigured` where it is
-  read. See [`wants_table`][django_service_specs.commands.render.wants_table.wants_table].
 
 ## Specs
 
@@ -229,20 +225,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.selectors.list_selector.ListSelector
 ::: django_service_specs.selectors.retrieve_selector.RetrieveSelector
 
-## Commands
-
-::: django_service_specs.commands.spec_command.SpecCommand
-::: django_service_specs.commands.exit_code_for.exit_code_for
-::: django_service_specs.commands.render.render_result.render_result
-::: django_service_specs.commands.render.render_table.render_table
-::: django_service_specs.commands.render.render_json_lines.render_json_lines
-::: django_service_specs.commands.render.wants_table.wants_table
-::: django_service_specs.commands.argv.describe_parameters.describe_parameters
-::: django_service_specs.commands.argv.parameter_descriptor.ParameterDescriptor
-::: django_service_specs.commands.argv.add_spec_arguments.add_spec_arguments
-::: django_service_specs.commands.argv.parsed_arguments.parsed_arguments
-::: django_service_specs.commands.report.unguarded_message.unguarded_message
-
 ## Types
 
 ::: django_service_specs.types.dispatch_error.DispatchError
@@ -255,7 +237,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.output_page.OutputPage
 ::: django_service_specs.types.value_formatter.ValueFormatter
 ::: django_service_specs.types.no_input.NoInput
-::: django_service_specs.types.exit_code.ExitCode
 ::: django_service_specs.types.unguarded_reason.UnguardedReason
 ::: django_service_specs.types.refusal_finding.RefusalFinding
 ::: django_service_specs.types.refusal_finding_kind.RefusalFindingKind

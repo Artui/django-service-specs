@@ -1,4 +1,4 @@
-"""Registries for the unguarded-spec report, shared by its tests and its command modules.
+"""Specs and registries for the unguarded-spec report's tests.
 
 One spec per shape the report has to tell apart, so a test can name the shape
 it asserts: a real check, one ``Unrestricted``, two of them, and a real check

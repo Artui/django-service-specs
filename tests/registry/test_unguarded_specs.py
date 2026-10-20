@@ -10,7 +10,7 @@ from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.registry.unguarded_spec import UnguardedSpec
 from django_service_specs.registry.unguarded_specs import unguarded_specs
 from django_service_specs.types.unguarded_reason import UnguardedReason
-from tests.commands_app.unguarded_registries import (
+from tests.registry.utils import (
     OpenToAll,
     StaffOnly,
     mixed_registry,

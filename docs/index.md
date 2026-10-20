@@ -40,9 +40,9 @@ into one, and a test fails if core imports anything classified outside it:
   adapters for dataclasses, [forms](forms.md) and [pydantic](pydantic.md) sit
   outside core the same way, as libraries a project writes against.
 - **A transport only wires** a protocol onto specs and dispatch, and belongs in
-  a distribution of its own. The [HTTP views](http.md) and the
-  [management command](commands.md) ship here today and are planned to move
-  out.
+  a distribution of its own. The [HTTP views](http.md) ship here today and are
+  planned to move out; the [management command](commands.md) has moved to
+  [django-spec-cli](https://artui.github.io/django-spec-cli/).
 
 **Where the transports stand.**
 [`djangorestframework-services`](https://github.com/Artui/djangorestframework-services)
@@ -64,9 +64,9 @@ pip install django-service-specs
 The package has no models and needs no entry in `INSTALLED_APPS`. A principal
 is a user of `django.contrib.auth`, and a generic-relation write needs
 `django.contrib.contenttypes`. Listing `"django_service_specs"` there is
-optional, and adds one system check: every spec a management command serves
-that authorizes nothing is [reported](registry.md#open-specs-reported) by
-`manage.py check`.
+optional and adds nothing: the system check reporting every spec a management
+command serves that [authorizes nothing](registry.md#open-specs-reported) is
+django-spec-cli's.
 
 | | Minimum |
 | --- | --- |

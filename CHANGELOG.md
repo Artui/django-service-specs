@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The management command, and everything only it read, now ships as
+  [`django-spec-cli`](https://artui.github.io/django-spec-cli/)**:
+  `pip install django-spec-cli`. Each name below has left the root `__all__`
+  and is imported from `django_spec_cli` instead, under the same name:
+  `SpecCommand`, `ExitCode` (also gone from `django_service_specs.types`),
+  `exit_code_for`, `render_result`, `render_table`, `render_json_lines`,
+  `wants_table`, `ParameterDescriptor`, `describe_parameters`,
+  `add_spec_arguments`, `parsed_arguments` and `unguarded_message`. So
+  `from django_service_specs import SpecCommand` becomes
+  `from django_spec_cli import SpecCommand`. The modules
+  `django_service_specs.commands`, `django_service_specs.types.exit_code` and
+  `django_service_specs.checks` are gone with them. There is no re-export and
+  no deprecation period: the kernel cannot import a package that depends on
+  it.
+- **The setting `SERVICE_SPECS_COMMAND_OUTPUT` is no longer read.** Its
+  replacement is django-spec-cli's `SPEC_CLI_OUTPUT`, which takes the same
+  `"auto"`, `"table"` and `"json"`; a project still setting the old name gets
+  the default format, with nothing raised.
+- **The system checks `django_service_specs.W001` and
+  `django_service_specs.W003` are no longer emitted.** They are
+  `django_spec_cli.W001` and `django_spec_cli.W003` now, registered by listing
+  `"django_spec_cli"` in `INSTALLED_APPS`, so a `SILENCED_SYSTEM_CHECKS`
+  entry naming the old id needs the new one. Listing `"django_service_specs"`,
+  or `"django_service_specs.apps.DjangoServiceSpecsConfig"`, still works and
+  now registers nothing. `unguarded_specs`, `UnguardedSpec` and
+  `UnguardedReason`, the registry fact those checks report, stay here,
+  exported from the root as before.
+
 ## [0.10.0] — 2026-10-20
 
 ### Added

@@ -1,31 +1,20 @@
-"""The app a project lists to have its open specs reported by ``manage.py check``."""
+"""The app a project may list for this package, which adds nothing by being listed."""
 
 from __future__ import annotations
 
 from django.apps import AppConfig
-from django.core.checks import register
-
-from django_service_specs.checks import check_unguarded_specs
 
 
 class DjangoServiceSpecsConfig(AppConfig):
-    """Registers the unguarded-spec system check, and does nothing else.
+    """The package's app, kept so a project listing it keeps starting.
 
-    Optional: the package works unlisted, and a project that does not list it
-    gets no check and no sign that it is missing. It owns no models, so it
-    sets no ``default_auto_field``.
-
-    The check carries no tag, and in particular not ``Tags.security``: a
-    ``SpecCommand`` is a mistake-prevention and attribution surface, not an
-    authorization boundary, and a security tag would say it is one.
-
-    The import of the check is at the top of this module, which Django
-    imports before the app registry is ready. That holds because nothing the
-    package imports reaches a model or ``get_user_model`` at import time
-    (test_importing_the_app_before_setup_loads_no_model).
+    Optional, and listing it does nothing: the package works unlisted, owns no
+    models, so it sets no ``default_auto_field``, and registers no system
+    check. The report of open specs a management command serves belongs to
+    that command, and django-spec-cli registers it when ``"django_spec_cli"``
+    is listed. A project listing ``"django_service_specs"`` or this config
+    from before it moved starts unchanged
+    (test_a_project_listing_the_app_starts_and_its_check_reports_nothing).
     """
 
     name = "django_service_specs"
-
-    def ready(self) -> None:
-        register(check_unguarded_specs)

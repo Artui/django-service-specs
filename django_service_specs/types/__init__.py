@@ -4,7 +4,6 @@ the sync/async predicate every bridge between the two reads.
 
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
-from django_service_specs.types.exit_code import ExitCode
 from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.no_input import NoInput
@@ -28,7 +27,6 @@ __all__ = [
     "UNSET",
     "Affordance",
     "DispatchError",
-    "ExitCode",
     "FieldAudience",
     "NoInput",
     "OutputPage",
