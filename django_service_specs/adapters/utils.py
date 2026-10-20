@@ -13,20 +13,18 @@ validation library, so the dataclass adapter uses it without importing
 pydantic.
 
 The forms adapter reads field instances rather than annotations and shares
-``shared_scalar_type``, since a typed choice field's values take their JSON type from
-it exactly as a ``Literal``'s do, and ``element_format``, since a
-``ModelMultipleChoiceField`` keyed on a decimal column is a list of decimals as
-``list[Decimal]`` is.
+``shared_scalar_type``, since a typed choice field's values take their JSON
+type from it exactly as a ``Literal``'s do, and ``element_format``, since a
+``ModelMultipleChoiceField`` keyed on a decimal column is a list of decimals
+as ``list[Decimal]`` is.
 
 ``choice_labels`` reads Django's own vocabulary rather than an annotation's,
 and both annotation adapters label an enum's choices through it, so a
 ``TextChoices`` field is labelled alike whichever library declared it; their
 presenters render the same labels through ``choice_pairs``.
 
-The rest is what the dataclass and pydantic adapters each did alike once
-an annotation was unwrapped: refusing one with no JSON type, finding the one
-JSON type a choice set shares, reading a field's ``FieldMarking``, and reading
-a list that may be a related manager.
+The rest is what the dataclass and pydantic adapters do alike once an
+annotation is unwrapped, kept here so that the two cannot drift apart.
 """
 
 from __future__ import annotations
