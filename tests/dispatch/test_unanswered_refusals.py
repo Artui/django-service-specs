@@ -29,6 +29,8 @@ from django_service_specs.commands.exit_code_for import _CODES, exit_code_for
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.http.error_response import _STATUSES, error_response
+from django_service_specs.parameters.check_arguments import check_arguments
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.exit_code import ExitCode
 
 # Each kind's own words, for the negative assertions.
@@ -263,6 +265,28 @@ class TestACallable:
         # code and AdditionalInputRequired's schema; it has no unanswered
         # value, so this proves the instances, not the map's coverage.
         assert unanswered_refusals(error_response) == ()
+
+    def test_invalid_arguments_carries_the_tree_the_shape_check_raises(self) -> None:
+        # Compared message by message rather than by tree: a CodedMessage
+        # equals its plain words, so tree equality passes with no code at all.
+        seen: list[InvalidArguments] = []
+
+        def answer(error: DispatchError | ServiceError) -> str:
+            if isinstance(error, InvalidArguments):
+                seen.append(error)
+            return "answered"
+
+        unanswered_refusals(answer)
+        with pytest.raises(InvalidArguments) as raised:
+            check_arguments(Parameters.of(Parameter("title", "string", required=True)), {})
+        (built,) = seen
+        assert built.detail.keys() == raised.value.detail.keys()
+        for key, messages in built.detail.items():
+            real = raised.value.detail[key]
+            assert [(type(m), m, getattr(m, "code", None)) for m in messages] == [
+                (type(m), m, getattr(m, "code", None)) for m in real
+            ]
+        assert built.detail["title"][0].code == "required"
 
 
 class TestTheKernelsOwnMaps:

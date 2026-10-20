@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence, Set
 
 from django_service_specs.dispatch.refusals import REFUSALS
+from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
@@ -13,7 +14,9 @@ from django_service_specs.services.service_validation_error import ServiceValida
 from django_service_specs.types.dispatch_error import DispatchError
 
 _BUILDERS: dict[type[BaseException], Callable[[], DispatchError | ServiceError]] = {
-    InvalidArguments: lambda: InvalidArguments({"title": ["This field is required."]}),
+    InvalidArguments: lambda: InvalidArguments(
+        {"title": [CodedMessage("This field is required.", "required")]}
+    ),
     ServiceValidationError: lambda: ServiceValidationError("This value is invalid."),
     ActionUnavailable: lambda: ActionUnavailable(code="unavailable"),
     AdditionalInputRequired: lambda: AdditionalInputRequired("One more value is needed."),
@@ -21,7 +24,9 @@ _BUILDERS: dict[type[BaseException], Callable[[], DispatchError | ServiceError]]
 """The refusals whose constructor needs an argument; every other one is built bare.
 
 Each built as a dispatch or a service raises it, so a map reading what it
-carries - a tree, a code, a detail - reads a real one."""
+carries - a tree, a code, a detail - reads a real one. The tree is the one the
+shape check raises for a required argument nobody sent, its message a
+``CodedMessage`` carrying ``"required"``."""
 
 
 def unanswered_refusals(
