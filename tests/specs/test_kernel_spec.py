@@ -117,7 +117,11 @@ class _Attribute:
     as_kernel_spec = LISTING
 
 
-@pytest.mark.parametrize("value", [object(), "a spec", None, _Attribute()])
+@pytest.mark.parametrize(
+    "value",
+    [object(), "a spec", None, _Attribute()],
+    ids=["object", "string", "none", "attribute-not-callable"],
+)
 def test_an_object_with_no_compile_is_refused(value: Any) -> None:
     named = rf"SelectorSpec, or an object with as_kernel_spec\(\); got {type(value).__name__}\."
     with pytest.raises(TypeError, match=named):
