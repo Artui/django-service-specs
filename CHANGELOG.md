@@ -76,6 +76,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `None`, as its `DoesNotExist` is. Only the selector's
   own raise counts: an `Http404` from its `extend_queryset` passes through on
   both entry points, as before.
+- **`unguarded_specs` and `UnguardedSpec` now live in
+  `django_service_specs.registry`**, as they read a registry and nothing of the
+  management-command layer, so a transport other than the command can call
+  them without importing it. Both are still exported from
+  `django_service_specs` itself, so a root import is unchanged; the module
+  paths `django_service_specs.commands.report.unguarded_specs` and
+  `...unguarded_spec`, and the two names on `django_service_specs.commands`
+  and `commands.report`, are gone, though the API reference has listed them
+  there since 0.7.0: import them from the root or from `registry`.
+  `unguarded_message` stays under `commands`.
 
 ### Fixed
 - **`clean_held_to_their_columns` leaves the form as it found it.** It took
