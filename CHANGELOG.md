@@ -30,15 +30,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transport outside this package makes them the same way**, each exported
   from the root and from its subpackage: `is_deactivated`, the one rule for
   a principal that may not act; `relax_partial`, what a partial call may
-  leave out;
-  `refusal_messages` and `NON_FIELD_KEYS`, how a refusal of arguments is read
-  as paths to messages; `expected_type`, the refusal of a value of the wrong
-  type; `max_length_in_force`, the most elements an array takes; and
+  leave out; `refusal_messages(value)` and `NON_FIELD_KEYS`, how a refusal
+  of arguments is read as paths to messages; `expected_type_refusal(kind)`,
+  the refusal of a value of the wrong kind, over a closed set of eight keys;
+  `max_length_in_force`, the most elements an array takes; and
   `clean_held_to_their_columns`, a bound form validated as its `full_clean()`
   does, with a number no integer column holds refused in Django's words
   rather than handed to the database driver. Each is the one object the
   kernel's own readers call, so a transport reading it cannot drift from
-  them. Nothing they do has changed.
+  them.
 
 ### Changed
 - **A selector raising Django's `Http404`, as `get_object_or_404` does, is a

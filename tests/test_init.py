@@ -140,7 +140,7 @@ SHARED_WITH_THE_KERNEL = {
         "django_service_specs.http.add_argument_errors",
         "django_service_specs.parameters.refusal_messages",
     ),
-    "expected_type": (
+    "expected_type_refusal": (
         "django_service_specs.adapters.dataclass.dataclass_validator",
         "django_service_specs.http.request_arguments",
         "django_service_specs.parameters.check_arguments",

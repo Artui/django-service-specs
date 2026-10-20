@@ -25,7 +25,7 @@ from django_service_specs.adapters.dataclass.utils import (
 )
 from django_service_specs.adapters.utils import choice_labels, element_format
 from django_service_specs.parameters.coded_message import CodedMessage
-from django_service_specs.parameters.expected_type import expected_type
+from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -282,11 +282,11 @@ def _decode(shape: Shape, value: Any) -> Any:
         raise _Refused(CodedMessage(gettext("This field cannot be null."), "null"))
     if shape.fields is not None:
         if not isinstance(value, Mapping):
-            raise _Refused(expected_type("object"))
+            raise _Refused(expected_type_refusal("object"))
         return _build(shape.python, shape.fields, value)
     if shape.items is not None:
         if not isinstance(value, list):
-            raise _Refused(expected_type("array"))
+            raise _Refused(expected_type_refusal("array"))
         return _decode_rows(shape.items, value)
     if shape.choices is not None:
         return _decode_choice(shape, shape.choices, value)
@@ -318,7 +318,7 @@ def _decode_choice(shape: Shape, choices: tuple[Any, ...], value: Any) -> Any:
     # The JSON type first: ``True == 1`` in Python, so without it ``true``
     # would be accepted as the integer choice ``1``.
     if not _fits(shape.type, value):
-        raise _Refused(expected_type(shape.type))
+        raise _Refused(expected_type_refusal(shape.type))
     if value not in choices:
         raise _Refused(
             CodedMessage(
@@ -340,7 +340,7 @@ def _decode_scalar(shape: Shape, value: Any) -> Any:
     if python is dt.date:
         return _decode_date(value)
     if not _fits(shape.type, value):
-        raise _Refused(expected_type(shape.type))
+        raise _Refused(expected_type_refusal(shape.type))
     if python is not float:
         return value
     try:
@@ -356,7 +356,7 @@ def _decode_scalar(shape: Shape, value: Any) -> Any:
 
 def _decode_decimal(value: Any) -> Decimal:
     if scalar_type(value) not in ("string", "integer", "number"):
-        raise _Refused(expected_type("decimal"))
+        raise _Refused(expected_type_refusal("decimal"))
     try:
         # A float through ``str`` so it gives the digits JSON carried, not its
         # binary expansion: ``Decimal(0.1)`` is not ``Decimal("0.1")``. Anything

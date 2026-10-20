@@ -44,7 +44,7 @@ Two Django settings, each read at the call rather than at import, so
 ::: django_service_specs.parameters.invalid_arguments.InvalidArguments
 ::: django_service_specs.parameters.coded_message.CodedMessage
 ::: django_service_specs.parameters.refusal_messages.refusal_messages
-::: django_service_specs.parameters.expected_type.expected_type
+::: django_service_specs.parameters.expected_type_refusal.expected_type_refusal
 ::: django_service_specs.parameters.max_length_in_force.max_length_in_force
 ::: django_service_specs.parameters.clean_held_to_their_columns.clean_held_to_their_columns
 

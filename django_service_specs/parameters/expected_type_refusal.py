@@ -1,4 +1,4 @@
-"""``expected_type`` - the refusal of a value that is not the type its parameter declares."""
+"""``expected_type_refusal`` - the refusal of a value that is not of the kind its parameter declares."""
 
 from __future__ import annotations
 
@@ -7,12 +7,17 @@ from django.utils.translation import gettext
 from django_service_specs.parameters.coded_message import CodedMessage
 
 
-def expected_type(json_type: str) -> CodedMessage:
-    """The refusal of a value that is not ``json_type``, as one sentence a translator sees whole.
+def expected_type_refusal(kind: str) -> CodedMessage:
+    """The refusal of a value that is not of ``kind``, as one sentence a translator sees whole.
 
-    ``"decimal"`` and ``"file"`` are the two keys that are not JSON types: the
-    format arrives as a string or a number, so its refusal names both, and a
-    file is a parameter's type that no JSON value is.
+    ``kind`` is one of a closed set of eight keys: the six JSON types,
+    ``"string"``, ``"integer"``, ``"number"``, ``"boolean"``, ``"array"`` and
+    ``"object"``, and two that are not JSON types, ``"decimal"`` and
+    ``"file"``. A decimal arrives as a string or a number, so its refusal
+    names both, and a file is a parameter's type that no JSON value is.
+
+    Raises:
+        KeyError: ``kind`` is none of those keys.
 
     One sentence per type rather than ``"Expected %(type)s"``, because an
     interpolated JSON type name would reach a translated sentence
@@ -40,7 +45,7 @@ def expected_type(json_type: str) -> CodedMessage:
         "object": gettext("Expected an object."),
         "decimal": gettext("Expected a decimal string or a number."),
         "file": gettext("Expected a file."),
-    }[json_type]
+    }[kind]
     # test_each_refusal_carries_the_code_a_drf_field_gives_the_same_mistake[not-a-list]
     # holds the array's code, its [type] case everything else's.
-    return CodedMessage(message, "not_a_list" if json_type == "array" else "invalid")
+    return CodedMessage(message, "not_a_list" if kind == "array" else "invalid")

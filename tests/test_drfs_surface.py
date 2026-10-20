@@ -582,7 +582,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # djangorestframework-services neither wraps nor re-exports them.
         "NON_FIELD_KEYS",
         "clean_held_to_their_columns",
-        "expected_type",
+        "expected_type_refusal",
         "is_deactivated",
         "max_length_in_force",
         "refusal_messages",

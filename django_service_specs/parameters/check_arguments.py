@@ -14,7 +14,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from django.utils.translation import gettext
 
 from django_service_specs.parameters.coded_message import CodedMessage
-from django_service_specs.parameters.expected_type import expected_type
+from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -183,7 +183,7 @@ def check_arguments(
     if not isinstance(arguments, Mapping):
         # A JSON-RPC caller controls the whole ``arguments`` value, so a list
         # there is a caller's mistake to refuse, not a crash to raise.
-        raise InvalidArguments({NON_FIELD_ERRORS: [expected_type("object")]})
+        raise InvalidArguments({NON_FIELD_ERRORS: [expected_type_refusal("object")]})
     cleaned, errors = _check_object(parameters, arguments, _Walk(policy, partial=partial))
     if errors:
         raise InvalidArguments(errors)
@@ -251,7 +251,7 @@ def _check_value(param: Parameter, value: Any, walk: _Walk) -> tuple[Any, Any]:
             walk=walk,
         )
     if not _is_json_type("array", value):
-        return None, [expected_type("array")]
+        return None, [expected_type_refusal("array")]
     # The list whole, before any element is read, so one past its maximum
     # costs no per-element work: test_an_array_past_its_maximum_is_refused_before_any_element_is_read.
     problem = length_problem(param, len(value))
@@ -420,7 +420,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> CodedMe
     if fmt == "decimal":
         # A boolean is neither, although Python makes it an int: see _is_json_type.
         if not (_is_json_type("string", value) or _is_json_type("number", value)):
-            return expected_type("decimal")
+            return expected_type_refusal("decimal")
         try:
             finite = Decimal(value).is_finite()
         except InvalidOperation:
@@ -429,7 +429,7 @@ def _type_problem(json_type: str | None, fmt: str | None, value: Any) -> CodedMe
         return None if finite else CodedMessage(gettext("Enter a number."), "invalid")
     # The first condition is held by test_an_array_with_no_items_accepts_any_element.
     if json_type is not None and not _is_json_type(json_type, value):
-        return expected_type(json_type)
+        return expected_type_refusal(json_type)
     # No JSON value is NaN or an infinity, and neither HTTP reading hands one
     # on by name: ``coerce_flat`` refuses ``"nan"``, a JSON body the constants.
     # A decoder still makes one from an overflowing literal - Python's reads
