@@ -18,7 +18,6 @@ from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPr
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
-from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.pydantic.utils import (
@@ -31,6 +30,7 @@ from tests.adapters.pydantic.utils import (
     Node,
     Priced,
 )
+from tests.adapters.utils import agree
 
 
 class _Poll(BaseModel):
@@ -314,34 +314,12 @@ class TestModelRows:
         }
 
 
-def _agree(parameters: Parameters, output: Output) -> None:
-    """Each declared parameter has an output field of the same name and type."""
-    for parameter in parameters:
-        field = output.get(parameter.name)
-        assert field is not None, parameter.name
-        assert (field.type, field.format, field.nullable) == (
-            parameter.type,
-            parameter.format,
-            parameter.nullable,
-        ), parameter.name
-        values = None if field.choices is None else tuple(value for value, _ in field.choices)
-        assert parameter.choices == values, parameter.name
-        if parameter.fields is not None:
-            assert isinstance(field.fields, Output), parameter.name
-            _agree(parameter.fields, field.fields)
-        if isinstance(parameter.items, Parameters):
-            assert isinstance(field.items, Output), parameter.name
-            _agree(parameter.items, field.items)
-        else:
-            assert field.items == parameter.items, parameter.name
-
-
 class TestAgainstTheValidator:
     def test_parameters_and_output_agree_field_for_field(self) -> None:
         parameters = PydanticValidator(Everything).parameters()
         output = PydanticPresenter(Everything).output()
         assert parameters.names() == set(output.names())
-        _agree(parameters, output)
+        agree(parameters, output)
 
     def test_they_differ_where_the_model_computes_or_excludes_a_field(self) -> None:
         assert PydanticValidator(_Invoice).parameters().names() == {"net", "reference", "secret"}

@@ -51,6 +51,7 @@ from tests.adapters.pydantic.utils import (
     Range,
     Schedule,
 )
+from tests.adapters.utils import everything_arguments, line_arguments
 from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
@@ -141,31 +142,6 @@ class _AuthorIn(BaseModel):
     books: list[_BookIn] = []
 
 
-def _line(**overrides: Any) -> dict[str, Any]:
-    return {"sku": "A-1", "quantity": 1, "ship_to": {"city": "Oslo"}, **overrides}
-
-
-def _arguments(**overrides: Any) -> dict[str, Any]:
-    """Arguments for ``Everything`` as a JSON wire would carry them."""
-    return {
-        "name": "Order",
-        "count": 2,
-        "ratio": 0.5,
-        "active": True,
-        "price": "12.50",
-        "at": "2024-06-01T12:00:00+00:00",
-        "on": "2024-06-01",
-        "status": "draft",
-        "priority": 2,
-        "colour": "red",
-        "mode": "fast",
-        "tags": ["a", "b"],
-        "address": {"city": "Oslo", "postcode": "0150"},
-        "lines": [_line()],
-        **overrides,
-    }
-
-
 def _refusal(model: type[BaseModel], arguments: dict[str, Any]) -> dict[Any, Any]:
     with pytest.raises(InvalidArguments) as caught:
         PydanticValidator(model).validate(arguments, CONTEXT)
@@ -202,7 +178,7 @@ class TestParameters:
 
     def test_every_parameter_is_one_the_shape_check_accepts(self) -> None:
         parameters = PydanticValidator(Everything).parameters()
-        assert check_arguments(parameters, _arguments()) == _arguments()
+        assert check_arguments(parameters, everything_arguments()) == everything_arguments()
 
     def test_a_computed_field_is_not_a_parameter(self) -> None:
         assert PydanticValidator(_Computed).parameters().names() == {"base"}
@@ -233,7 +209,7 @@ class TestParameters:
 
 class TestValidate:
     def test_values_are_built_into_the_declared_types(self) -> None:
-        values = PydanticValidator(Everything).validate(_arguments(), CONTEXT)
+        values = PydanticValidator(Everything).validate(everything_arguments(), CONTEXT)
         assert values == {
             "name": "Order",
             "count": 2,
@@ -248,18 +224,14 @@ class TestValidate:
             "mode": "fast",
             "tags": ["a", "b"],
             "address": Address(city="Oslo", postcode="0150"),
+            # A model equals only an instance of its own class, so this also
+            # holds each row, and the model inside it, to the model declared.
             "lines": [Line(sku="A-1", quantity=1, ship_to=Address(city="Oslo"))],
             "note": None,
             "level": 3,
             "extras": [],
         }
         assert values["priority"] is Priority.HIGH
-
-    def test_nested_values_are_model_instances_two_levels_down(self) -> None:
-        values = PydanticValidator(Everything).validate(_arguments(), CONTEXT)
-        (line,) = values["lines"]
-        assert isinstance(line, Line)
-        assert isinstance(line.ship_to, Address)
 
     def test_values_are_keyed_by_field_name_whatever_the_wire_called_them(self) -> None:
         values = PydanticValidator(_Wire).validate({"firstName": "Ada", "memo": "hi"}, CONTEXT)
@@ -275,7 +247,7 @@ class TestValidate:
 
     def test_an_offset_less_date_time_stays_naive_as_pydantic_leaves_it(self) -> None:
         values = PydanticValidator(Everything).validate(
-            _arguments(at="2024-06-01T12:00:00"), CONTEXT
+            everything_arguments(at="2024-06-01T12:00:00"), CONTEXT
         )
         assert values["at"] == dt.datetime(2024, 6, 1, 12)
         assert values["at"].tzinfo is None
@@ -283,14 +255,17 @@ class TestValidate:
 
 class TestRefusals:
     def test_every_failure_is_reported_in_pydantic_s_words(self) -> None:
-        detail = _refusal(Everything, {**_arguments(count="two"), "name": None})
+        detail = _refusal(Everything, {**everything_arguments(count="two"), "name": None})
         assert detail == {
             "name": ["Input should be a valid string"],
             "count": ["Input should be a valid integer, unable to parse string as an integer"],
         }
 
     def test_rows_are_addressed_by_int_index_and_only_the_rows_that_failed(self) -> None:
-        detail = _refusal(Everything, _arguments(lines=[_line(), _line(quantity="many")]))
+        detail = _refusal(
+            Everything,
+            everything_arguments(lines=[line_arguments(), line_arguments(quantity="many")]),
+        )
         assert detail == {
             "lines": {
                 1: {
@@ -361,7 +336,7 @@ class TestAgainstTheShapeCheck:
     def test_a_wrong_json_type_is_refused_by_the_shape_check_in_the_kernel_s_words(self) -> None:
         parameters = PydanticValidator(Everything).parameters()
         with pytest.raises(InvalidArguments) as caught:
-            check_arguments(parameters, _arguments(count="two"))
+            check_arguments(parameters, everything_arguments(count="two"))
         assert caught.value.detail == {"count": ["Expected an integer."]}
         assert "Input should be" not in str(caught.value.detail)
 

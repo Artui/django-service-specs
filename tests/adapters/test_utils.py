@@ -41,8 +41,10 @@ class TestScalarType:
             (1, "integer"),
             (1.5, "number"),
             ("a", "string"),
+            ("1", "string"),
             (None, None),
             (Decimal("1"), None),
+            ([], None),
         ],
     )
     def test_the_json_type_of_a_value_bool_first(self, value: Any, json_type: str | None) -> None:

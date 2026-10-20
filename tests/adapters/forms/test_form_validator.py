@@ -95,6 +95,15 @@ class _NoModel(forms.ModelForm):
 _BEYOND_THE_COLUMN = 2**63
 """One past the largest key SQLite's integer column holds, and so past every backend's."""
 
+_PAST_THE_COLUMN = [(f"Ensure this value is less than or equal to {2**63 - 1}.", "max_value")]
+"""The refusal, with its code, of ``_BEYOND_THE_COLUMN`` for a value of an integer column."""
+
+
+def _book() -> Book:
+    return Book.objects.create(
+        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
+    )
+
 
 def _many_books() -> forms.ModelMultipleChoiceField:
     return forms.ModelMultipleChoiceField(queryset=Book.objects.all())
@@ -281,23 +290,32 @@ class TestChoices:
         # The form cleans with ``str``: the string is what it takes and returns.
         assert FormValidator(form_class).validate({"stars": "2"}, CONTEXT) == {"stars": "2"}
 
-    def test_an_option_group_given_as_a_tuple_is_flattened_too(self) -> None:
-        # Django 5.0 and later normalise every group to a list; 4.2 keeps the
-        # tuple it was given, which is the case this holds.
-        form_class = _form(
-            "Shade",
-            shade=forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
-        )
-        assert _declared(form_class) == [
-            ("shade", "string", None, None, ("red", "amber"), True, False)
-        ]
-
-    def test_none_is_dropped_as_the_empty_choice_too(self) -> None:
-        form_class = _form(
-            "Level",
-            level=forms.TypedChoiceField(choices=[(None, "Unknown"), (1, "Low")], coerce=int),
-        )
-        assert _declared(form_class) == [("level", "integer", None, None, (1,), True, False)]
+    @pytest.mark.parametrize(
+        ("field", "declared"),
+        [
+            # Django 5.0 and later normalise every group to a list; 4.2 keeps the
+            # tuple it was given, which is the case this holds.
+            pytest.param(
+                forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
+                ("string", None, None, ("red", "amber"), True, False),
+                id="an-option-group-given-as-a-tuple-is-flattened",
+            ),
+            pytest.param(
+                forms.TypedChoiceField(choices=[(None, "Unknown"), (1, "Low")], coerce=int),
+                ("integer", None, None, (1,), True, False),
+                id="none-is-dropped-as-the-empty-choice",
+            ),
+            pytest.param(
+                forms.TypedChoiceField(choices=[("", "---------")]),
+                ("string", None, None, (), True, False),
+                id="only-the-empty-choice-takes-a-string",
+            ),
+        ],
+    )
+    def test_a_choice_field_s_choices_are_read_as_the_form_reads_them(
+        self, field: forms.Field, declared: tuple[Any, ...]
+    ) -> None:
+        assert _declared(_form("Pick", value=field)) == [("value", *declared)]
 
     @pytest.mark.parametrize(
         ("choices", "json_type"),
@@ -334,10 +352,6 @@ class TestChoices:
             ),
         ):
             FormValidator(_form("Pick", value=forms.TypedChoiceField(choices=choices)))
-
-    def test_a_typed_choice_field_with_only_the_empty_choice_takes_a_string(self) -> None:
-        form_class = _form("Pick", value=forms.TypedChoiceField(choices=[("", "---------")]))
-        assert _declared(form_class) == [("value", "string", None, None, (), True, False)]
 
     @pytest.mark.parametrize("field_class", [forms.ChoiceField, forms.TypedChoiceField])
     def test_a_callable_choice_set_is_not_read(self, field_class: type[forms.Field]) -> None:
@@ -567,26 +581,28 @@ class TestModelChoices:
             "rows": [("Ensure this field has no more than 2 elements.", "max_length")]
         }
 
-    def test_a_key_with_no_json_type_is_refused(self) -> None:
-        field = forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published")
-        with pytest.raises(
-            ImproperlyConfigured,
-            match=re.escape(
+    @pytest.mark.parametrize(
+        ("field", "message"),
+        [
+            pytest.param(
+                forms.ModelChoiceField(queryset=Post.objects.all(), to_field_name="published"),
                 "Pick.post: matches rows on relations_app.Post.published, a BooleanField, "
-                "which has no JSON type this adapter can declare."
+                "which has no JSON type this adapter can declare.",
+                id="a-key-with-no-json-type",
             ),
-        ):
-            FormValidator(_form("Pick", post=field))
-
-    def test_a_model_choice_field_with_no_queryset_is_refused(self) -> None:
-        with pytest.raises(
-            ImproperlyConfigured,
-            match=re.escape(
+            pytest.param(
+                forms.ModelMultipleChoiceField(queryset=None),
                 "Pick.post: a ModelMultipleChoiceField with no queryset has no model to "
-                "read its key from;"
+                "read its key from;",
+                id="no-queryset",
             ),
-        ):
-            FormValidator(_form("Pick", post=forms.ModelMultipleChoiceField(queryset=None)))
+        ],
+    )
+    def test_a_model_choice_field_with_no_key_to_declare_is_refused(
+        self, field: forms.Field, message: str
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured, match=re.escape(message)):
+            FormValidator(_form("Pick", post=field))
 
 
 class TestPresence:
@@ -922,24 +938,15 @@ class TestANumberPastItsRange:
     ) -> None:
         # The constraint's check queries with the value, and SQLite's driver
         # raised OverflowError for it.
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(_EditionForm, {"book": book.pk, "number": 2**63})
-        assert coded(detail) == {
-            "number": [
-                (
-                    "Ensure this value is less than or equal to %s." % (2**63 - 1),
-                    "max_value",
-                )
-            ]
-        }
+        assert coded(detail) == {"number": _PAST_THE_COLUMN}
 
     @pytest.mark.django_db
     def test_a_value_past_the_column_s_stated_range_is_refused_in_the_same_words(self) -> None:
         # Where the backend states the range, the kernel reads that one.
         assert coded(_refusal(_Viewed, {"title": "Hi", "views": 2**63})) == {
-            "views": [("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")]
+            "views": _PAST_THE_COLUMN
         }
 
     @pytest.mark.django_db
@@ -1028,9 +1035,7 @@ class TestANumberPastItsRange:
             def clean_number(self) -> int:
                 return min(self.cleaned_data["number"], 10)
 
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         cleaned = FormValidator(Clamped).validate({"book": book.pk, "number": 2**63}, CONTEXT)
         assert cleaned["number"] == 10
 
@@ -1041,9 +1046,7 @@ class TestANumberPastItsRange:
             def clean_number(self) -> int:
                 raise forms.ValidationError("Too many editions.", code="too_many")
 
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(Capped, {"book": book.pk, "number": 2**63})
         assert coded(detail) == {"number": [("Too many editions.", "too_many")]}
 
@@ -1053,15 +1056,9 @@ class TestANumberPastItsRange:
         # The model reads the digits as the integer they spell, and the
         # constraint's check queried with it.
         form_class = type("Spelled", (_EditionForm,), {"number": forms.CharField()})
-        book = Book.objects.create(
-            author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-        )
+        book = _book()
         detail = _refusal(form_class, {"book": book.pk, "number": str(2**63)})
-        assert coded(detail) == {
-            "number": [
-                ("Ensure this value is less than or equal to %s." % (2**63 - 1), "max_value")
-            ]
-        }
+        assert coded(detail) == {"number": _PAST_THE_COLUMN}
 
     @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
@@ -1168,20 +1165,28 @@ class TestChoiceLabels:
         assert labels["author"] is None
         assert labels["name"] is None
 
-    def test_a_plain_choice_field_labels_the_strings_it_compares(self) -> None:
-        form_class = _form("Rating", stars=forms.ChoiceField(choices=[(1, "One"), (2, "Two")]))
-        assert _labels(form_class) == {"stars": (("1", "One"), ("2", "Two"))}
-
-    def test_an_option_group_given_as_a_tuple_is_labelled_too(self) -> None:
-        form_class = _form(
-            "Shade",
-            shade=forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
-        )
-        assert _labels(form_class) == {"shade": (("red", "Red"), ("amber", "Amber"))}
-
-    def test_a_callable_choice_set_has_no_labels_either(self) -> None:
-        form_class = _form("Paint", colour=forms.ChoiceField(choices=lambda: [("red", "Red")]))
-        assert _labels(form_class) == {"colour": None}
+    @pytest.mark.parametrize(
+        ("field", "expected"),
+        [
+            pytest.param(
+                forms.ChoiceField(choices=[(1, "One"), (2, "Two")]),
+                (("1", "One"), ("2", "Two")),
+                id="a-plain-choice-field-labels-the-strings-it-compares",
+            ),
+            pytest.param(
+                forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
+                (("red", "Red"), ("amber", "Amber")),
+                id="an-option-group-given-as-a-tuple",
+            ),
+            pytest.param(
+                forms.ChoiceField(choices=lambda: [("red", "Red")]),
+                None,
+                id="a-callable-choice-set-has-none",
+            ),
+        ],
+    )
+    def test_a_choice_field_s_labels(self, field: forms.Field, expected: Any) -> None:
+        assert _labels(_form("Pick", value=field)) == {"value": expected}
 
     def test_a_label_stays_lazy_until_a_reader_renders_it(self) -> None:
         form_class = _form(
@@ -1347,21 +1352,22 @@ class TestClearingAFile:
         assert refused.value.detail == {"attachment": [contradiction]}
 
     @pytest.mark.django_db
-    def test_a_partial_call_sending_only_the_checkbox_clears_the_file(self, media: str) -> None:
-        row = _stored()
+    @pytest.mark.parametrize(
+        ("checked", "expected"),
+        [
+            pytest.param(True, {"attachment": False}, id="checked-clears-the-file"),
+            # Unchecked is what absent is on a whole call, so it is on a partial
+            # one too: nothing about the file was sent.
+            pytest.param(False, {}, id="unchecked-leaves-the-file-out"),
+        ],
+    )
+    def test_a_partial_call_sending_only_the_checkbox(
+        self, media: str, checked: bool, expected: dict[str, Any]
+    ) -> None:
         cleaned = FormValidator(_DocumentForm).validate(
-            {"attachment-clear": True}, ValidationContext(None, row, partial=True)
+            {"attachment-clear": checked}, _partial(_stored())
         )
-        assert cleaned == {"attachment": False}
-
-    @pytest.mark.django_db
-    def test_a_partial_call_sending_the_box_unchecked_leaves_the_file_out(self, media: str) -> None:
-        # Unchecked is what absent is on a whole call, so it is on a partial
-        # one too: nothing about the file was sent.
-        cleaned = FormValidator(_DocumentForm).validate(
-            {"attachment-clear": False}, ValidationContext(None, _stored(), partial=True)
-        )
-        assert cleaned == {}
+        assert cleaned == expected
 
     @pytest.mark.django_db
     def test_dispatch_takes_the_checkbox_and_the_service_clears_the_row(self, media: str) -> None:
@@ -1443,9 +1449,7 @@ def _a_pair_and_its_collision(pair: str) -> tuple[Any, Any, dict[str, Any]]:
         target = Permission.objects.create(name="Mine", content_type=kind, codename="mine")
         whole = {"name": "Mine", "content_type": str(kind.pk), "codename": "taken"}
         return "taken", target, whole
-    book = Book.objects.create(
-        author=Author.objects.create(name="Ada"), title="Notes", price=Decimal("1.00")
-    )
+    book = _book()
     Edition.objects.create(book=book, number=1)
     target = Edition.objects.create(book=book, number=2)
     return 1, target, {"book": str(book.pk), "number": 1}
@@ -1509,7 +1513,7 @@ class TestPartial:
         book = Book.objects.create(author=author, title="Notes", price=Decimal("9.99"))
         validator = FormValidator(BookForm)
 
-        cleaned = validator.validate({"price": "5.00"}, ValidationContext(None, book, partial=True))
+        cleaned = validator.validate({"price": "5.00"}, _partial(book))
 
         assert cleaned == {"price": Decimal("5.00")}
         result = update_from_input(book, cleaned)
@@ -1550,7 +1554,7 @@ class TestPartial:
         refused = _refusal(form_class, whole, target)
         assert list(refused) == ["non_field_errors"]
         with pytest.raises(InvalidArguments) as caught:
-            FormValidator(form_class).validate(sent, ValidationContext(None, target, partial=True))
+            FormValidator(form_class).validate(sent, _partial(target))
         assert caught.value.detail == refused
 
     @pytest.mark.django_db
@@ -1567,7 +1571,7 @@ class TestPartial:
         # every field not sent, which nothing will write: checked, an empty
         # username that a row already holds refused a call that never sent one.
         User.objects.create(username="")
-        context = ValidationContext(None, None, partial=True)
+        context = _partial()
         assert FormValidator(Username).validate({}, context) == {}
 
     @pytest.mark.django_db
@@ -1576,7 +1580,7 @@ class TestPartial:
         # as Django excludes any model field a form does not have, and a
         # partial one is no stricter.
         taken, target, _ = _a_pair_and_its_collision("permission")
-        context = ValidationContext(None, target, partial=True)
+        context = _partial(target)
         assert FormValidator(_PermissionName).validate({"codename": taken}, context) == {
             "codename": taken
         }
@@ -1584,7 +1588,7 @@ class TestPartial:
     @pytest.mark.django_db
     def test_a_partial_update_that_collides_with_nothing_passes(self) -> None:
         _, target, _ = _a_pair_and_its_collision("permission")
-        context = ValidationContext(None, target, partial=True)
+        context = _partial(target)
         assert FormValidator(_PermissionForm).validate({"codename": "free"}, context) == {
             "codename": "free"
         }
@@ -1620,32 +1624,44 @@ class _CodedForm(forms.Form):
 class TestRefusalCodes:
     """Django's own code on each message, which ``form.errors`` read as strings drops."""
 
-    def test_a_field_s_refusal_keeps_its_code(self) -> None:
-        assert coded(_refusal(_CodedForm, {"count": "x"})) == {
-            "title": [("This field is required.", "required")],
-            "count": [("Enter a whole number.", "invalid")],
-        }
-
-    def test_a_rendered_message_keeps_its_code(self) -> None:
-        # ``max_length``'s message is rendered from its params, as Django renders it.
-        assert coded(_refusal(_CodedForm, {"title": "long"})) == {
-            "title": [
-                ("Ensure this value has at most 3 characters (it has 4).", "max_length"),
-            ]
-        }
-
-    def test_a_form_wide_refusal_keeps_its_code_or_says_invalid(self) -> None:
-        assert coded(_refusal(_CodedForm, {"title": "ok", "count": 13})) == {
-            "non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]
-        }
+    @pytest.mark.parametrize(
+        ("arguments", "expected"),
+        [
+            pytest.param(
+                {"count": "x"},
+                {
+                    "title": [("This field is required.", "required")],
+                    "count": [("Enter a whole number.", "invalid")],
+                },
+                id="a-field-s-refusal",
+            ),
+            # ``max_length``'s message is rendered from its params, as Django renders it.
+            pytest.param(
+                {"title": "long"},
+                {
+                    "title": [
+                        ("Ensure this value has at most 3 characters (it has 4).", "max_length")
+                    ]
+                },
+                id="a-rendered-message",
+            ),
+            pytest.param(
+                {"title": "ok", "count": 13},
+                {"non_field_errors": [("Unlucky.", "invalid"), ("Taken.", "taken")]},
+                id="a-form-wide-refusal-or-invalid",
+            ),
+        ],
+    )
+    def test_a_refusal_keeps_its_code(
+        self, arguments: dict[str, Any], expected: dict[str, Any]
+    ) -> None:
+        assert coded(_refusal(_CodedForm, arguments)) == expected
 
     @pytest.mark.django_db
     def test_a_unique_pair_s_refusal_keeps_django_s_code_whole_and_partial(self) -> None:
         taken, target, whole = _a_pair_and_its_collision("edition")
         refused = coded(_refusal(_EditionForm, whole, target))
         with pytest.raises(InvalidArguments) as caught:
-            FormValidator(_EditionForm).validate(
-                {"number": taken}, ValidationContext(None, target, partial=True)
-            )
+            FormValidator(_EditionForm).validate({"number": taken}, _partial(target))
         assert coded(caught.value.detail) == refused
         assert [code for _, code in refused["non_field_errors"]] == ["unique_together"]

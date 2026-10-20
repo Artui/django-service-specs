@@ -5,8 +5,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django.db.models import Choices
-from django.db.models.manager import BaseManager
 from pydantic import BaseModel
 
 from django_service_specs.adapters.pydantic.utils import (
@@ -17,6 +15,7 @@ from django_service_specs.adapters.pydantic.utils import (
     inputs,
     read_fields,
 )
+from django_service_specs.adapters.utils import choice_pairs, rows_of
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 
@@ -109,11 +108,7 @@ def _gather(shape: Shape, value: Any) -> Any:
                 data[fs.input_name] = _gather(fs.shape, found)
         return data
     if shape.items is not None:
-        # ``BaseManager``, so a related manager built on a model's
-        # ``BaseManager.from_queryset`` default manager, which is no ``Manager``,
-        # is read too: test_a_manager_built_on_base_manager_is_read_through_all_too.
-        rows = value.all() if isinstance(value, BaseManager) else value
-        return [_gather(shape.items, row) for row in rows]
+        return [_gather(shape.items, row) for row in rows_of(value)]
     return value
 
 
@@ -134,14 +129,15 @@ def _output(fields: tuple[FieldShape, ...]) -> Output:
 
 def _output_field(name: str, fs: FieldShape) -> OutputField:
     shape = fs.shape
+    # A list's choices are its element's, as on the Parameter side.
+    element = shape if shape.items is None else shape.items
     return OutputField(
         name,
         shape.type,
         format=shape.format,
         nullable=shape.nullable,
         label=fs.label,
-        # A list's choices are its element's, as on the Parameter side.
-        choices=_choice_pairs(shape if shape.items is None else shape.items),
+        choices=choice_pairs(element.choices, element.enum),
         always_present=fs.always_present,
         marking=fs.marking,
         fields=None if shape.fields is None else _output(shape.fields),
@@ -158,14 +154,3 @@ def _items(items: Shape | None) -> str | Output | None:
     if items.fields is not None:
         return _output(items.fields)
     return items.type
-
-
-def _choice_pairs(shape: Shape) -> tuple[tuple[Any, str], ...] | None:
-    if shape.choices is None:
-        return None
-    enum_cls = shape.enum
-    if enum_cls is not None and issubclass(enum_cls, Choices):
-        # Read per call rather than once, so the display is in the language
-        # active for the reader, as Django's own choices are.
-        return tuple((member.value, str(member.label)) for member in enum_cls)
-    return tuple((value, str(value)) for value in shape.choices)

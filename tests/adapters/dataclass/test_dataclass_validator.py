@@ -33,36 +33,12 @@ from tests.adapters.dataclass.utils import (
     Range,
     Schedule,
 )
+from tests.adapters.utils import everything_arguments, line_arguments
 from tests.parameters.utils import coded
 
 CONTEXT = ValidationContext(principal=None)
 
 REQUIRED = "This field is required."
-
-
-def _line(**overrides: Any) -> dict[str, Any]:
-    return {"sku": "A-1", "quantity": 1, "ship_to": {"city": "Oslo"}, **overrides}
-
-
-def _arguments(**overrides: Any) -> dict[str, Any]:
-    """Arguments for ``Everything`` as a JSON wire would carry them."""
-    return {
-        "name": "Order",
-        "count": 2,
-        "ratio": 0.5,
-        "active": True,
-        "price": "12.50",
-        "at": "2024-06-01T12:00:00+00:00",
-        "on": "2024-06-01",
-        "status": "draft",
-        "priority": 2,
-        "colour": "red",
-        "mode": "fast",
-        "tags": ["a", "b"],
-        "address": {"city": "Oslo", "postcode": "0150"},
-        "lines": [_line()],
-        **overrides,
-    }
 
 
 def _refusal(cls: type[Any], arguments: dict[str, Any]) -> dict[Any, Any]:
@@ -197,7 +173,7 @@ def test_a_field_the_dataclass_computes_is_not_a_parameter() -> None:
 
 
 def test_validate_decodes_into_the_declared_types() -> None:
-    values = DataclassValidator(Everything).validate(_arguments(), CONTEXT)
+    values = DataclassValidator(Everything).validate(everything_arguments(), CONTEXT)
     assert values == {
         "name": "Order",
         "count": 2,
@@ -212,6 +188,8 @@ def test_validate_decodes_into_the_declared_types() -> None:
         "mode": "fast",
         "tags": ["a", "b"],
         "address": Address("Oslo", "0150"),
+        # A dataclass equals only an instance of its own class, so this also
+        # holds each row, and the object inside it, to the dataclass declared.
         "lines": [Line(sku="A-1", quantity=1, ship_to=Address("Oslo"))],
         # Omitted: the dataclass fills its defaults, and UnsetType stays UNSET.
         "note": None,
@@ -223,22 +201,15 @@ def test_validate_decodes_into_the_declared_types() -> None:
     assert type(values["status"]) is Status
 
 
-def test_nested_values_are_dataclass_instances_two_levels_down() -> None:
-    values = DataclassValidator(Everything).validate(_arguments(), CONTEXT)
-    (line,) = values["lines"]
-    assert isinstance(line, Line)
-    assert isinstance(line.ship_to, Address)
-
-
 def test_a_row_declaring_its_key_carries_it() -> None:
     values = DataclassValidator(Everything).validate(
-        _arguments(lines=[_line(pk=7), _line()]), CONTEXT
+        everything_arguments(lines=[line_arguments(pk=7), line_arguments()]), CONTEXT
     )
     assert [line.pk for line in values["lines"]] == [7, None]
 
 
 def test_a_number_takes_an_integer_and_holds_a_float() -> None:
-    values = DataclassValidator(Everything).validate(_arguments(ratio=2), CONTEXT)
+    values = DataclassValidator(Everything).validate(everything_arguments(ratio=2), CONTEXT)
     assert values["ratio"] == 2.0
     assert type(values["ratio"]) is float
 
@@ -342,7 +313,7 @@ def test_every_required_field_is_reported_not_the_first() -> None:
     ],
 )
 def test_a_wrong_json_type_is_refused_not_a_crash(overrides: dict, detail: dict) -> None:
-    assert _refusal(Everything, _arguments(**overrides)) == detail
+    assert _refusal(Everything, everything_arguments(**overrides)) == detail
 
 
 @pytest.mark.parametrize(
@@ -367,7 +338,7 @@ def test_a_wrong_json_type_is_refused_not_a_crash(overrides: dict, detail: dict)
     ],
 )
 def test_a_value_outside_the_choices_is_refused(overrides: dict, detail: dict) -> None:
-    assert _refusal(Everything, _arguments(**overrides)) == detail
+    assert _refusal(Everything, everything_arguments(**overrides)) == detail
 
 
 @pytest.mark.parametrize(
@@ -398,7 +369,7 @@ def test_a_decimal_that_is_not_a_finite_number_is_refused(argument: Any) -> None
 def test_an_integer_past_a_float_s_range_is_no_number(argument: int) -> None:
     # JSON's number has no range, so the shape check passes the integer on,
     # and ``float`` raises OverflowError for it rather than refusing it.
-    detail = _refusal(Everything, _arguments(ratio=argument))
+    detail = _refusal(Everything, everything_arguments(ratio=argument))
     assert coded(detail) == {"ratio": [("Enter a number.", "invalid")]}
 
 
@@ -430,7 +401,7 @@ def test_a_date_django_cannot_parse_is_refused(argument: Any) -> None:
 
 
 def test_a_scalar_element_is_refused_at_its_index() -> None:
-    detail = _refusal(Everything, _arguments(tags=["a", 1, "c", None]))
+    detail = _refusal(Everything, everything_arguments(tags=["a", 1, "c", None]))
     assert detail == {
         "tags": {1: ["Expected a string."], 3: ["This field cannot be null."]},
     }
@@ -438,13 +409,13 @@ def test_a_scalar_element_is_refused_at_its_index() -> None:
 
 def test_bad_rows_are_refused_by_index_and_only_the_rows_that_failed() -> None:
     lines = [
-        _line(),
-        _line(quantity="two", tenant="acme"),
+        line_arguments(),
+        line_arguments(quantity="two", tenant="acme"),
         "A-3",
         None,
-        _line(ship_to={"postcode": 150}),
+        line_arguments(ship_to={"postcode": 150}),
     ]
-    detail = _refusal(Everything, _arguments(lines=lines))
+    detail = _refusal(Everything, everything_arguments(lines=lines))
     assert detail == {
         "lines": {
             1: {"quantity": ["Expected an integer."], "tenant": ["Unknown argument."]},
@@ -458,7 +429,9 @@ def test_bad_rows_are_refused_by_index_and_only_the_rows_that_failed() -> None:
 
 
 def test_the_tree_holds_int_row_keys_and_str_messages() -> None:
-    detail = _refusal(Everything, _arguments(name=None, lines=[_line(), _line(sku=1)]))
+    detail = _refusal(
+        Everything, everything_arguments(name=None, lines=[line_arguments(), line_arguments(sku=1)])
+    )
     (row,) = detail["lines"]
     assert type(row) is int
     # A ``str`` each, carrying its code: never a lazy translation.
@@ -467,7 +440,7 @@ def test_the_tree_holds_int_row_keys_and_str_messages() -> None:
 
 
 def test_every_failure_is_collected_across_levels() -> None:
-    detail = _refusal(Everything, _arguments(count="x", address={}, lines=[{}]))
+    detail = _refusal(Everything, everything_arguments(count="x", address={}, lines=[{}]))
     assert set(detail) == {"count", "address", "lines"}
     assert detail["lines"][0] == {
         "sku": [REQUIRED],
@@ -684,9 +657,11 @@ def test_a_label_stays_lazy_until_a_reader_renders_it() -> None:
 
 
 def test_the_call_s_data_is_the_instance_and_its_fields_are_the_values() -> None:
-    validated = DataclassValidator(Everything).validated(_arguments(), CONTEXT)
+    validated = DataclassValidator(Everything).validated(everything_arguments(), CONTEXT)
     assert isinstance(validated.data, Everything)
-    assert validated.values == DataclassValidator(Everything).validate(_arguments(), CONTEXT)
+    assert validated.values == DataclassValidator(Everything).validate(
+        everything_arguments(), CONTEXT
+    )
     # The values are the instance's own, not a second build of it.
     assert all(validated.values[name] is getattr(validated.data, name) for name in validated.values)
     assert dict(validated.pool) == {}
