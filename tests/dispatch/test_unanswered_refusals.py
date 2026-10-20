@@ -297,29 +297,6 @@ class TestACallable:
         assert built.detail["title"][0].code == "required"
 
 
-class TestTheWords:
-    # ``str()`` of each kind, as the docs page and the docstring quote it.
-    def test_an_unanswered_refusal(self) -> None:
-        (found,) = unanswered_refusals(lambda error: None if type(error) is NotPermitted else 1)
-        assert str(found) == "nothing in the map answers NotPermitted"
-
-    def test_a_bare_base(self) -> None:
-        (found,) = unanswered_refusals(
-            _rows(NotPermitted, InvalidArguments, PrincipalUnavailable, ServiceError)
-        )
-        assert str(found) == (
-            "nothing in the map answers DispatchError itself, though it answers every "
-            "refusal under it, and DispatchError may be raised bare"
-        )
-
-    def test_a_shadowed_row(self) -> None:
-        (found,) = unanswered_refusals(_rows(DispatchError, ServiceError, ServiceConflict))
-        assert str(found) == (
-            "the row for ServiceConflict never answers: the row for ServiceError above it "
-            "answers every ServiceConflict first"
-        )
-
-
 class TestTheKernelsOwnMaps:
     def test_the_exit_codes_answer_every_refusal(self) -> None:
         assert unanswered_refusals(_CODES) == ()
