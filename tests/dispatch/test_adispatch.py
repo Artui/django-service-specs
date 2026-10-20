@@ -20,6 +20,8 @@ import pytest
 from asgiref.sync import sync_to_async
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 
 from django_service_specs.authorization import utils as authorization_utils
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -404,6 +406,93 @@ async def test_an_async_list_raising_does_not_exist_passes_through(ada: Any) -> 
 
     with pytest.raises(Note.DoesNotExist):
         await adispatch(spec, principal=ada, arguments={})
+
+
+# An ``async def`` selector, so the await on the loop is what raises: a sync one
+# under ``adispatch`` runs on ``dispatch``'s path.
+async def _note_or_404(*, pk: int) -> Note:
+    return await sync_to_async(get_object_or_404)(Note, pk=pk)
+
+
+async def test_an_async_retrieve_raising_http404_is_not_found(ada: Any) -> None:
+    spec = SelectorSpec(kind=RETRIEVE, selector=_note_or_404, reads=PK, permissions=OPEN)
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert result == DispatchResult(kind="not_found")
+
+
+async def test_an_async_retrieve_raising_http404_under_allow_none_is_none(ada: Any) -> None:
+    spec = SelectorSpec(
+        kind=RETRIEVE, selector=_note_or_404, reads=PK, permissions=OPEN, allow_none=True
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert (result.kind, result.value) == ("instance", None)
+
+
+@pytest.mark.parametrize("kind", [RETRIEVE, LIST])
+async def test_an_async_http404_from_extend_queryset_is_not_the_selector_s_not_found(
+    ada: Any, kind: SelectorKind
+) -> None:
+    def refuse(*, queryset: Any) -> Any:
+        raise Http404("shaping")
+
+    async def every_note() -> Any:
+        return Note.objects.all()
+
+    spec = SelectorSpec(
+        kind=kind,
+        selector=every_note,
+        permissions=OPEN,
+        allow_none=True,
+        extend_queryset=refuse,
+    )
+
+    with pytest.raises(Http404, match="shaping"):
+        await adispatch(spec, principal=ada, arguments={})
+
+
+async def test_an_async_list_output_selector_raising_http404_is_a_fault_after_the_run(
+    ada: Any,
+) -> None:
+    # The output selector is called through ``lookup`` on a sync hop, so the
+    # re-raise as a fault holds here as on ``dispatch``.
+    service = Record(returns="done")
+
+    async def gone(*, result: Any) -> Any:
+        raise Http404("gone")
+
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        output_selector_spec=SelectorSpec(kind=SelectorKind.LIST, selector=gone),
+    )
+
+    with pytest.raises(RuntimeError, match="after the service ran") as raised:
+        await adispatch(spec, principal=ada, arguments={})
+    assert isinstance(raised.value.__cause__, Http404)
+    assert len(service.calls) == 1
+
+
+@pytest.mark.parametrize("allow_none", [False, True])
+async def test_an_async_list_whose_parent_lookup_raises_http404_is_not_found(
+    ada: Any, allow_none: bool
+) -> None:
+    check = Scoped()
+
+    async def notes(*, pk: int) -> Any:
+        parent = await sync_to_async(get_object_or_404)(Note, pk=pk)
+        return Note.objects.filter(owner=parent.owner)
+
+    spec = SelectorSpec(
+        kind=LIST, selector=notes, reads=PK, permissions=[check], allow_none=allow_none
+    )
+
+    result = await adispatch(spec, principal=ada, arguments={"pk": 404})
+
+    assert (result, check.scopes) == (DispatchResult(kind="not_found"), [])
 
 
 async def test_an_async_list_is_shaped_in_the_second_hop(ada: Any, bob: Any) -> None:
