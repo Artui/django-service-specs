@@ -41,8 +41,8 @@ def authorize_scope(
     in as ``target=``, so never on the list a selector spec reads.
 
     ``arguments`` is handed to each check's method that declares a keyword
-    of that name, and to no other, so a check written before the keyword
-    existed is asked as it always was. Dispatch passes the call's
+    of that name, and to no other, so a check that declares none is asked
+    without it. Dispatch passes the call's
     shape-checked arguments as a read-only mapping, whose values are the
     call's own and must not be mutated; ``None`` when the caller has none to
     hand.
