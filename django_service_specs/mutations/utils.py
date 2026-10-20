@@ -89,8 +89,8 @@ def diff_attrs(
     file or ``""``. A file that is not one a row holds - an upload, a
     ``ContentFile`` - is content to write, and so always a change, as a
     ``ModelForm`` always writes one: compared by name, a re-upload of the
-    file a row holds under its own name, at the storage root, was taken for
-    no change and never written. A file a row holds, ``""`` and a stored
+    file a row holds under its own name, at the storage root, would be taken
+    for no change and never written. A file a row holds, ``""`` and a stored
     name compare by name, so the held file handed back as itself is no
     change. One branch to coverage, so each condition is held by its own
     test: test_no_changes_returns_empty_result (a ``File``: without it every
@@ -125,8 +125,8 @@ def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
     row holds" and to ``False`` for "clear it", and the model field's
     ``save_form_data`` writes them so: nothing for ``None``, and ``""``, no
     file, for any other false value. Read as they came, ``None`` against a
-    held file differs by name and was written over it, and ``False``
-    reached the column, where ``pre_save`` raises on it. ``save_form_data``
+    held file would differ by name and be written over it, and ``False``
+    would reach the column, where ``pre_save`` raises on it. ``save_form_data``
     returns nothing to diff or report, so its reading is restated here,
     ahead of the diff, and ``write_values`` still writes through it. Any
     other field's value passes as it came. Each step is held by its own
@@ -143,6 +143,17 @@ def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
             value = value or ""
         read[attr] = value
     return read
+
+
+def assign_changed_values(instance: Model, values: dict[str, Any]) -> tuple[FieldChange, ...]:
+    """Set on ``instance`` each of ``values`` that differs from what it holds, and return those.
+
+    ``values`` is read as a ``ModelForm`` writes it, through ``form_values``,
+    before the diff. Nothing is saved.
+    """
+    changes = diff_attrs(instance, form_values(type(instance), values))
+    write_values(instance, {change.field: change.new for change in changes})
+    return changes
 
 
 def split_file_values(
@@ -184,14 +195,9 @@ async def am2m_current_pks(instance: Model, attr: str) -> list[Any]:
 
 def m2m_target_pks(value: Any) -> list[Any]:
     """Best-effort extraction of primary keys from an M2M assignment value."""
-    items: list[Any] = list(value) if value is not None else []
-    pks: list[Any] = []
-    for item in items:
-        if isinstance(item, Model):
-            pks.append(item.pk)
-        else:
-            pks.append(item)
-    return pks
+    if value is None:
+        return []
+    return [item.pk if isinstance(item, Model) else item for item in value]
 
 
 def m2m_changes(

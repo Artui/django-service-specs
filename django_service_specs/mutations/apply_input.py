@@ -7,13 +7,7 @@ from typing import Any
 from django.db.models import Model
 
 from django_service_specs.mutations.change_result import ChangeResult
-from django_service_specs.mutations.utils import (
-    coerce_to_dict,
-    diff_attrs,
-    filter_input,
-    form_values,
-    write_values,
-)
+from django_service_specs.mutations.utils import assign_changed_values, coerce_to_dict, filter_input
 
 
 def apply_input(
@@ -31,13 +25,8 @@ def apply_input(
 
     A file field is set as ``update_from_input`` writes it: ``None`` keeps the
     file, and ``False`` leaves none."""
-    raw: dict[str, Any] = coerce_to_dict(data)
-    new_values: dict[str, Any] = filter_input(
-        raw,
-        field_map=field_map,
-        exclude_fields=exclude_fields,
+    new_values = filter_input(
+        coerce_to_dict(data), field_map=field_map, exclude_fields=exclude_fields
     )
-    new_values = form_values(type(instance), new_values)
-    changes = diff_attrs(instance, new_values)
-    write_values(instance, {change.field: change.new for change in changes})
+    changes = assign_changed_values(instance, new_values)
     return ChangeResult(instance=instance, created=False, changes=changes)

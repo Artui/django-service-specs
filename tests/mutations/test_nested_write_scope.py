@@ -71,44 +71,40 @@ class TestAPayloadCannotNameAnotherParentsRow:
             )
         assert Post.objects.count() == 0
 
-    def test_field_map_cannot_smuggle_the_primary_key_in(self) -> None:
-        # field_map runs before the model sees the payload, so an input key
-        # routed onto the pk is the same hazard wearing a different name.
+    @pytest.mark.parametrize(
+        ("spec", "key", "title"),
+        [
+            # field_map runs before the model sees the payload, so an input key
+            # routed onto the pk is the same hazard wearing a different name.
+            pytest.param(
+                ChildSpec(model=Post, fk="author", match_key="ref", field_map={"ref": "id"}),
+                "ref",
+                "pwned",
+                id="field-map-routes-a-key-onto-it",
+            ),
+            # The hazard is the primary key reaching the create, not the match
+            # key. A spec matching on a natural key still must not accept a pk
+            # beside it.
+            pytest.param(
+                ChildSpec(model=Post, fk="author", match_key="title"),
+                "id",
+                "brand new",
+                id="a-stray-pk-beside-a-natural-match-key",
+            ),
+        ],
+    )
+    def test_a_key_landing_on_the_primary_key_is_refused(
+        self, spec: ChildSpec, key: str, title: str
+    ) -> None:
         victim = Author.objects.create(name="victim")
         attacker = Author.objects.create(name="attacker")
         theirs = Post.objects.create(title="secret", author=victim)
-        spec = {
-            "posts": ChildSpec(
-                model=Post,
-                fk="author",
-                match_key="ref",
-                field_map={"ref": "id"},
-            )
-        }
 
         with pytest.raises(ServiceValidationError):
             update_from_input(
                 attacker,
-                {"name": "attacker", "posts": [{"ref": theirs.pk, "title": "pwned"}]},
-                relations=spec,
-            )
-
-        theirs.refresh_from_db()
-        assert theirs.author_id == victim.pk
-
-    def test_a_stray_pk_is_refused_even_when_the_match_key_is_natural(self) -> None:
-        # The hazard is the primary key reaching the create, not the match key.
-        # A spec matching on a natural key still must not accept a pk beside it.
-        victim = Author.objects.create(name="victim")
-        attacker = Author.objects.create(name="attacker")
-        theirs = Post.objects.create(title="secret", author=victim)
-        spec = {"posts": ChildSpec(model=Post, fk="author", match_key="title")}
-
-        with pytest.raises(ServiceValidationError):
-            update_from_input(
-                attacker,
-                {"name": "attacker", "posts": [{"title": "brand new", "id": theirs.pk}]},
-                relations=spec,
+                {"name": "attacker", "posts": [{key: theirs.pk, "title": title}]},
+                relations={"posts": spec},
             )
 
         theirs.refresh_from_db()
@@ -130,31 +126,28 @@ class TestTheLegitimateCasesStillWork:
         mine.refresh_from_db()
         assert mine.title == "after"
 
-    def test_a_row_with_no_identifier_is_created(self) -> None:
+    @pytest.mark.parametrize(
+        ("relations", "title"),
+        [
+            pytest.param(POSTS, "fresh", id="a-row-with-no-identifier"),
+            # The reason this refuses a primary key rather than any unmatched
+            # match key: a natural key that does not match is a genuine create,
+            # and declaring one is how a caller gets upsert semantics.
+            pytest.param(
+                {"posts": ChildSpec(model=Post, fk="author", match_key="title")},
+                "brand new",
+                id="a-natural-match-key-matching-nothing",
+            ),
+        ],
+    )
+    def test_a_row_naming_no_primary_key_is_created(
+        self, relations: dict[str, ChildSpec], title: str
+    ) -> None:
         author = Author.objects.create(name="a")
 
-        update_from_input(
-            author,
-            {"name": "a", "posts": [{"title": "fresh"}]},
-            relations=POSTS,
-        )
+        update_from_input(author, {"name": "a", "posts": [{"title": title}]}, relations=relations)
 
-        assert Post.objects.get(title="fresh").author_id == author.pk
-
-    def test_a_natural_match_key_still_upserts(self) -> None:
-        # The reason this refuses a primary key rather than any unmatched
-        # match key: a natural key that does not match is a genuine create, and
-        # declaring one is how a caller gets upsert semantics.
-        author = Author.objects.create(name="a")
-        spec = {"posts": ChildSpec(model=Post, fk="author", match_key="title")}
-
-        update_from_input(
-            author,
-            {"name": "a", "posts": [{"title": "brand new"}]},
-            relations=spec,
-        )
-
-        assert Post.objects.get(title="brand new").author_id == author.pk
+        assert Post.objects.get(title=title).author_id == author.pk
 
 
 @pytest.mark.django_db(transaction=True)
