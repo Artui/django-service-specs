@@ -13,25 +13,25 @@ A service contract for Django: declare an operation's parameters, permission
 check, validation and output once, and dispatch it from any transport - an HTTP
 view, an MCP tool, an agent tool, a management command or a background task.
 
-Django is the base and the only dependency. Django REST Framework is **not a
-dependency**, and nothing in the package imports it, so a project with business
+Django is the base and the only framework it depends on. Django REST Framework is
+**not a dependency**, and nothing in the package imports it, so a project with business
 logic and no API framework can hand its operations to an agent, a command or a
 queue with Django alone.
 [`djangorestframework-services`](https://github.com/Artui/djangorestframework-services)
-will depend on this package and become its DRF adapter; this package will
-never depend on it.
+depends on this package and is its DRF adapter; this package will never depend
+on it.
 
 **No agent transport reads a spec without DRF yet.** The family's MCP server
 ([`djangorestframework-mcp-server`](https://github.com/Artui/djangorestframework-mcp-server))
 and its Pydantic AI toolset
 ([`djangorestframework-pydantic-ai`](https://github.com/Artui/djangorestframework-pydantic-ai))
-both require DRF and `djangorestframework-services` today. What a tool-building
-transport reads off a spec besides dispatch - affordances, paging, the agent
-projection of an output, progress - is here, and those transports are planned
-to read kernel specs through it, with DRF behind an extra, once
-`djangorestframework-services` is this package's DRF adapter. Until then a
-project without DRF can dispatch its specs from its own views, commands, tasks
-and agent tools, and no ready-made MCP server or agent toolset serves them.
+reach specs through `djangorestframework-services` today, so both still require
+DRF. What a tool-building transport reads off a spec besides dispatch -
+affordances, paging, the agent projection of an output, progress - is here, and
+transport distributions that read kernel specs with no DRF at all are planned.
+Until then a project without DRF can dispatch its specs from its own views,
+commands, tasks and agent tools, and no ready-made MCP server or agent toolset
+serves them.
 
 **Status:** early. The public API may still change between minor releases,
 and every change is recorded in the [changelog](CHANGELOG.md).
