@@ -13,6 +13,6 @@ NON_FIELD_KEYS: Final = (NON_FIELD_ERRORS, DJANGO_NON_FIELD_ERRORS)
 
 Django's is here because a service re-raising a model's ``message_dict`` as a
 ``ServiceValidationError`` carries its form-wide messages under ``"__all__"``.
-Neither adds a step to the path a message is placed or printed with. Each is
-held by its own test: test_non_field_errors_go_to_the_forms_own and
-test_djangos_own_non_field_key_is_read_the_same."""
+Neither adds a step to the path a message is placed or printed with. Both are
+held by test_a_refusal_tree_is_read_as_paths_to_messages, which fails with
+either left out."""
