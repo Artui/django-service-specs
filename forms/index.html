@@ -644,6 +644,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-form-with-keywords-of-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A form with keywords of its own
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refusals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -874,6 +885,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#a-form-with-keywords-of-its-own" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A form with keywords of its own
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#refusals" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -938,33 +960,35 @@ view does the same with
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">Parameter</span><span class="p">,</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>    <span class="n">Parameters</span><span class="p">,</span>
 </span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>    <span class="n">PermissionCheck</span><span class="p">,</span>
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
-</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
-</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
-</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">update_from_input</span><span class="p">,</span>
-</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="p">)</span>
-</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span><span class="p">,</span> <span class="n">Status</span>
-</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>
-</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
-</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
-</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>    <span class="n">title</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">help_text</span><span class="o">=</span><span class="s2">"As printed on the cover."</span><span class="p">)</span>
-</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>    <span class="n">price</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">DecimalField</span><span class="p">(</span><span class="n">max_digits</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
-</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">status</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">ChoiceField</span><span class="p">(</span><span class="n">choices</span><span class="o">=</span><span class="n">Status</span><span class="o">.</span><span class="n">choices</span><span class="p">)</span>
-</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">published_on</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">DateField</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
-</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">author</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">ModelChoiceField</span><span class="p">(</span><span class="n">queryset</span><span class="o">=</span><span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
-</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">shelves</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">MultipleChoiceField</span><span class="p">(</span>
-</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>        <span class="n">choices</span><span class="o">=</span><span class="p">[(</span><span class="s2">"fiction"</span><span class="p">,</span> <span class="s2">"Fiction"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"poetry"</span><span class="p">,</span> <span class="s2">"Poetry"</span><span class="p">)],</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span>
-</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>    <span class="p">)</span>
-</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>
-</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
-</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>        <span class="n">cleaned</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span> <span class="ow">or</span> <span class="p">{}</span>
-</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>        <span class="k">if</span> <span class="n">cleaned</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"status"</span><span class="p">)</span> <span class="o">==</span> <span class="n">Status</span><span class="o">.</span><span class="n">PUBLISHED</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">cleaned</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"published_on"</span><span class="p">):</span>
-</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>            <span class="k">raise</span> <span class="n">forms</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">(</span><span class="s2">"A published book needs its publication date."</span><span class="p">)</span>
-</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>        <span class="k">return</span> <span class="n">cleaned</span>
-</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>
-</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>
-</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a><span class="c1"># The form is read here, once: a field with no JSON type fails on this line.</span>
-</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a><span class="n">book_validator</span> <span class="o">=</span> <span class="n">FormValidator</span><span class="p">(</span><span class="n">BookForm</span><span class="p">)</span>
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>    <span class="n">PoolSeeds</span><span class="p">,</span>
+</span><span id="__span-1-12"><a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>    <span class="n">SelectorKind</span><span class="p">,</span>
+</span><span id="__span-1-13"><a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a>    <span class="n">SelectorSpec</span><span class="p">,</span>
+</span><span id="__span-1-14"><a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-1-15"><a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>    <span class="n">Unrestricted</span><span class="p">,</span>
+</span><span id="__span-1-16"><a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>    <span class="n">update_from_input</span><span class="p">,</span>
+</span><span id="__span-1-17"><a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="p">)</span>
+</span><span id="__span-1-18"><a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.adapter_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Author</span><span class="p">,</span> <span class="n">Book</span><span class="p">,</span> <span class="n">Status</span>
+</span><span id="__span-1-19"><a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a>
+</span><span id="__span-1-20"><a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>
+</span><span id="__span-1-21"><a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+</span><span id="__span-1-22"><a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>    <span class="n">title</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">CharField</span><span class="p">(</span><span class="n">max_length</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">help_text</span><span class="o">=</span><span class="s2">"As printed on the cover."</span><span class="p">)</span>
+</span><span id="__span-1-23"><a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a>    <span class="n">price</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">DecimalField</span><span class="p">(</span><span class="n">max_digits</span><span class="o">=</span><span class="mi">6</span><span class="p">,</span> <span class="n">decimal_places</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</span><span id="__span-1-24"><a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>    <span class="n">status</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">ChoiceField</span><span class="p">(</span><span class="n">choices</span><span class="o">=</span><span class="n">Status</span><span class="o">.</span><span class="n">choices</span><span class="p">)</span>
+</span><span id="__span-1-25"><a id="__codelineno-1-25" name="__codelineno-1-25" href="#__codelineno-1-25"></a>    <span class="n">published_on</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">DateField</span><span class="p">(</span><span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</span><span id="__span-1-26"><a id="__codelineno-1-26" name="__codelineno-1-26" href="#__codelineno-1-26"></a>    <span class="n">author</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">ModelChoiceField</span><span class="p">(</span><span class="n">queryset</span><span class="o">=</span><span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">())</span>
+</span><span id="__span-1-27"><a id="__codelineno-1-27" name="__codelineno-1-27" href="#__codelineno-1-27"></a>    <span class="n">shelves</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">MultipleChoiceField</span><span class="p">(</span>
+</span><span id="__span-1-28"><a id="__codelineno-1-28" name="__codelineno-1-28" href="#__codelineno-1-28"></a>        <span class="n">choices</span><span class="o">=</span><span class="p">[(</span><span class="s2">"fiction"</span><span class="p">,</span> <span class="s2">"Fiction"</span><span class="p">),</span> <span class="p">(</span><span class="s2">"poetry"</span><span class="p">,</span> <span class="s2">"Poetry"</span><span class="p">)],</span> <span class="n">required</span><span class="o">=</span><span class="kc">False</span>
+</span><span id="__span-1-29"><a id="__codelineno-1-29" name="__codelineno-1-29" href="#__codelineno-1-29"></a>    <span class="p">)</span>
+</span><span id="__span-1-30"><a id="__codelineno-1-30" name="__codelineno-1-30" href="#__codelineno-1-30"></a>
+</span><span id="__span-1-31"><a id="__codelineno-1-31" name="__codelineno-1-31" href="#__codelineno-1-31"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">clean</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-1-32"><a id="__codelineno-1-32" name="__codelineno-1-32" href="#__codelineno-1-32"></a>        <span class="n">cleaned</span> <span class="o">=</span> <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="n">clean</span><span class="p">()</span> <span class="ow">or</span> <span class="p">{}</span>
+</span><span id="__span-1-33"><a id="__codelineno-1-33" name="__codelineno-1-33" href="#__codelineno-1-33"></a>        <span class="k">if</span> <span class="n">cleaned</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"status"</span><span class="p">)</span> <span class="o">==</span> <span class="n">Status</span><span class="o">.</span><span class="n">PUBLISHED</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">cleaned</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"published_on"</span><span class="p">):</span>
+</span><span id="__span-1-34"><a id="__codelineno-1-34" name="__codelineno-1-34" href="#__codelineno-1-34"></a>            <span class="k">raise</span> <span class="n">forms</span><span class="o">.</span><span class="n">ValidationError</span><span class="p">(</span><span class="s2">"A published book needs its publication date."</span><span class="p">)</span>
+</span><span id="__span-1-35"><a id="__codelineno-1-35" name="__codelineno-1-35" href="#__codelineno-1-35"></a>        <span class="k">return</span> <span class="n">cleaned</span>
+</span><span id="__span-1-36"><a id="__codelineno-1-36" name="__codelineno-1-36" href="#__codelineno-1-36"></a>
+</span><span id="__span-1-37"><a id="__codelineno-1-37" name="__codelineno-1-37" href="#__codelineno-1-37"></a>
+</span><span id="__span-1-38"><a id="__codelineno-1-38" name="__codelineno-1-38" href="#__codelineno-1-38"></a><span class="c1"># The form is read here, once: a field with no JSON type fails on this line.</span>
+</span><span id="__span-1-39"><a id="__codelineno-1-39" name="__codelineno-1-39" href="#__codelineno-1-39"></a><span class="n">book_validator</span> <span class="o">=</span> <span class="n">FormValidator</span><span class="p">(</span><span class="n">BookForm</span><span class="p">)</span>
 </span></code></pre></div>
 <p>What <code>book_validator.parameters()</code> declares, then, in the form's own order:
 <code>title</code>, a required string with the help text as its <code>help</code>; <code>price</code>, a
@@ -1122,9 +1146,11 @@ the default, the closed argument set refuses its key before the form is ever
 built. A field declared <code>disabled</code> is not a parameter either: a form ignores
 what a caller sends for it and cleans its <code>initial</code>, which <code>validate()</code>
 returns with the rest.</p>
-<p>The form is built from the arguments alone - <code>data=</code>, and <code>instance=</code> for a
-<code>ModelForm</code> - so a form whose <code>__init__</code> requires anything more, such as the
-signed-in user, cannot be used as it is.</p>
+<p>That holds for a form built with keywords of its own, too: a field its
+<code>__init__</code> adds from them is still not a parameter. Declare the field on the
+class and narrow it in <code>__init__</code>, as
+the form in <a href="#a-form-with-keywords-of-its-own">A form with keywords of its own</a>
+does.</p>
 <h2 id="partial-updates">Partial updates<a class="headerlink" href="#partial-updates" title="Permanent link">&para;</a></h2>
 <p>On a <a href="../declaring/#partial-updates"><code>partial</code></a> spec's call, every field the
 arguments do not name is taken off the bound form before it validates, so it
@@ -1229,6 +1255,92 @@ receives before the service runs, and
 which saves only the fields whose value changed, would find nothing to save.
 Any other target - the queryset a collection selector resolves, or none for a
 create - builds the form as a create.</p>
+<h2 id="a-form-with-keywords-of-its-own">A form with keywords of its own<a class="headerlink" href="#a-form-with-keywords-of-its-own" title="Permanent link">&para;</a></h2>
+<p>The adapter builds the form from <code>data=</code> and <code>files=</code>, with <code>instance=</code> for a
+<code>ModelForm</code>. A form whose <code>__init__</code> takes anything more, such as a queryset
+scoped to the caller's tenant, is handed it by <code>form_kwargs</code>, a callable
+returning those keywords:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FeatureForm</span><span class="p">(</span><span class="n">forms</span><span class="o">.</span><span class="n">Form</span><span class="p">):</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="c1"># Declared on the class, so the parameter is described; the rows it may</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="c1"># name are narrowed per form, to the caller's tenant.</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">book</span> <span class="o">=</span> <span class="n">forms</span><span class="o">.</span><span class="n">ModelChoiceField</span><span class="p">(</span><span class="n">queryset</span><span class="o">=</span><span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">none</span><span class="p">())</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">author</span><span class="p">:</span> <span class="n">Author</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">fields</span><span class="p">[</span><span class="s2">"book"</span><span class="p">]</span><span class="o">.</span><span class="n">queryset</span> <span class="o">=</span> <span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">author</span><span class="o">=</span><span class="n">author</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1"># Each signed-in user's tenant: here, the author of their name.</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="n">tenant_seeds</span> <span class="o">=</span> <span class="n">PoolSeeds</span><span class="p">()</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">tenant</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Author</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">user</span><span class="o">.</span><span class="n">username</span><span class="p">))</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="n">feature_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>    <span class="n">service</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">book</span><span class="p">:</span> <span class="n">book</span><span class="p">,</span>
+</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">Unrestricted</span><span class="p">()],</span>
+</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>    <span class="c1"># Named from the pool, as every spec callable is: a seed, ``user``, or the</span>
+</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>    <span class="c1"># row as ``instance`` or ``collection``.</span>
+</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">FormValidator</span><span class="p">(</span><span class="n">FeatureForm</span><span class="p">,</span> <span class="n">form_kwargs</span><span class="o">=</span><span class="k">lambda</span> <span class="o">*</span><span class="p">,</span> <span class="n">tenant</span><span class="p">:</span> <span class="p">{</span><span class="s2">"author"</span><span class="p">:</span> <span class="n">tenant</span><span class="p">}),</span>
+</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The callable binds through the pool, as a selector or a service does, naming
+what it wants:</p>
+<ul>
+<li><code>user</code>, the principal, on every path;</li>
+<li><code>progress</code>, the call's reporter, or
+  <a class="autorefs autorefs-internal" title="null_progress" href="../reference/#django_service_specs.pool.null_progress.null_progress"><code>null_progress</code></a>
+  where there is none;</li>
+<li>every seed the call's
+  <a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.pool.pool_seeds.PoolSeeds"><code>PoolSeeds</code></a> register;</li>
+<li>the target, under the name the service receives it by: <code>instance</code> for a
+  spec with an instance selector, <code>None</code> when one declaring <code>allow_none</code>
+  finds no row, <code>collection</code> for one with a collection selector, and neither
+  for a create. It is the target itself, never the copy a <code>ModelForm</code> edits.
+  The context carries it as
+  <a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext.resolved</code></a>.</li>
+</ul>
+<p>So a caller of <code>feature_spec</code> names a book of their own tenant's and is
+refused one of another's in the field's own words, <code>invalid_choice</code>, though
+the row exists: the queryset the form narrowed is what matches it.</p>
+<p>Off dispatch - in
+<a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>,
+or with a
+<a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
+built by hand - there are no seeds, so a callable naming one gives it a
+default or fails with Python's own <code>TypeError</code>; <code>user</code> and <code>progress</code> are
+there still. <code>bind_arguments</code> names the <code>target=</code> it is passed as dispatch
+would, from the spec's selectors, and a context built by hand names none.
+Under
+<a class="autorefs autorefs-internal" title="adispatch
+
+
+  
+      async
+  " href="../reference/#django_service_specs.dispatch.adispatch.adispatch"><code>adispatch</code></a> it runs on the
+thread the call's synchronous phases share, so it may query. It is called on
+every validation, and a <code>many</code> call validates each row, so it runs once per
+row: a query every row shares belongs in a seed, which resolves once per
+call.</p>
+<p>The bind sets <code>data</code>, <code>files</code> and <code>instance</code> itself, so a callable returning
+one of them - naming <code>instance</code> to read the row is another matter - for a plain form as for a <code>ModelForm</code>, is refused with
+<code>ImproperlyConfigured</code> naming the key, as is one returning anything but a
+mapping. <code>FormValidator(form_class, form_kwargs=...)</code> refuses a <code>form_kwargs</code>
+that is not callable when it is built, and keeps the callable as its
+<code>form_kwargs</code> attribute, so a transport building the form itself, for a page,
+builds it the same way.</p>
 <h2 id="refusals">Refusals<a class="headerlink" href="#refusals" title="Permanent link">&para;</a></h2>
 <p>A refusal is one
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>

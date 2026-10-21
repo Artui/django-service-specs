@@ -1710,7 +1710,10 @@ methods, and a third method and an attribute with defaults:</p>
   <code>PoolSeeds</code>, such as an HTTP adapter's <code>request</code>, for a library whose
   validation reads what its caller registered. It is read-only at its top
   level; its values are the call's own live objects, which a Validator must
-  not mutate.</li>
+  not mutate. <code>resolved</code> carries the target under the pool name the service
+  receives it by - <code>{"instance": row}</code>, <code>{"collection": rows}</code>, or empty for
+  a create - so a callable the Validator resolves through the pool names it
+  as a selector or a service does.</li>
 <li><code>validated(arguments, context)</code> is what dispatch calls: a
   <a class="autorefs autorefs-internal" title="Validated
 

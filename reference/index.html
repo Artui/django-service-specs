@@ -9764,6 +9764,17 @@ reads what its caller registered, as a serializer reads its context's
 argument, a validated value or the target, which have seats of their
 own. Empty for a context built by hand, and in <code>bind_arguments</code>, which
 is handed no seeds; it trails the others, so neither changes.</p>
+<p><code>resolved</code> is the target under the pool name dispatch hands it to the
+service as, read-only: <code>{"instance": row}</code> for a spec with an instance
+selector - <code>{"instance": None}</code> when one that allows none finds no row
+- <code>{"collection": rows}</code> for one with a collection selector, and empty
+for a create. <code>target</code> is the same object with the role taken off, so a
+callable a Validator resolves through the pool, as <code>FormValidator</code>'s
+<code>form_kwargs</code> is, names it as a selector or a service does. Dispatch
+fills it from the target it resolved, and <code>bind_arguments</code> from the
+<code>target</code> its caller passes and the spec's selectors, by the one rule
+both share. Empty for a context built by hand; it trails the rest, so no
+existing construction changes.</p>
 
 
 
@@ -11820,9 +11831,38 @@ would change the row the service receives before the service runs, and a
 helper that saves only what changed, such as
 <a class="autorefs autorefs-internal" title="update_from_input" href="#django_service_specs.mutations.update_from_input.update_from_input"><code>update_from_input</code></a>,
 would find nothing to save. Any other target - the queryset a collection
-selector resolves, or none - binds the form as a create. The form is built
-from <code>data=</code> and <code>instance=</code> alone, so one whose <code>__init__</code> requires
-more, such as the signed-in user, cannot be used as it is.</p>
+selector resolves, or none - binds the form as a create.</p>
+<p><strong>A form whose <code>__init__</code> takes more is handed it by <code>form_kwargs</code>.</strong>
+It is a callable returning a mapping of extra constructor keywords, such
+as a queryset scoped by the caller's tenant, and it binds through the
+pool as a selector or a service does, naming what it wants: <code>user</code>,
+<code>progress</code>, every registered seed, and the target under the name the
+service receives it by, from the context's <code>resolved</code>: <code>instance</code>
+for a spec with an instance selector, <code>None</code> when one that allows none
+finds no row, <code>collection</code> for one with a collection selector, and
+neither for a create. It is the target itself, never the copy the form
+edits. <code>user</code> is the context's principal on every path, and
+<code>progress</code> is <code>null_progress</code> wherever the context carries no
+reporter. Off dispatch - <code>bind_arguments</code>, or a
+<a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
+built by hand - the context holds no seeds, so a callable naming one
+gives it a default or meets Python's own <code>TypeError</code>. It is called on
+every <code>validate()</code>, on the thread the call runs on, which under
+<code>adispatch</code> is the one its synchronous phases share, so it may query;
+on a <code>many</code> call that is once per row, so a query belongs in a seed,
+which resolves once per call.
+What it returns is passed beside <code>data</code>, <code>files</code> and <code>instance</code>,
+and returning one of those three, for a plain form as for a
+<code>ModelForm</code>, is refused with <code>ImproperlyConfigured</code> naming it, as is
+returning anything but a mapping. <code>parameters()</code> still reads only the
+class: a field <code>__init__</code> adds from those keywords is not a parameter.
+The callable is kept as <code>form_kwargs</code>, so a transport building the
+form itself, for a page, builds it the same way.</p>
 <p>A refusal is one
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>
 carrying the form's own errors and messages, <code>{field: [messages]}</code>, with
@@ -13397,7 +13437,10 @@ the spec it compiles to:</p>
   " href="#django_service_specs.specs.service_spec.ServiceSpec"><code>ServiceSpec</code></a>
    with a Validator, <code>validated()</code> on only the arguments the Validator's
    own <code>parameters()</code> declare - never a selector's or the spec's
-   <code>reads</code> - with <code>ValidationContext(principal, target, partial)</code>.</li>
+   <code>reads</code> - with <code>ValidationContext(principal, target, partial)</code>,
+   whose <code>resolved</code> names <code>target</code> as dispatch would: <code>instance</code>
+   for a spec with an instance selector, <code>collection</code> for one with a
+   collection selector, nothing for a create.</li>
 </ol>
 <p>Returns the Validator's values. A service spec with no Validator returns
 <code>{}</code>, because every argument it takes is a read and none is validated. A
