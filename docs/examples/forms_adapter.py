@@ -100,8 +100,8 @@ tenant_seeds = PoolSeeds().extend(tenant=lambda *, user: Author.objects.get(name
 feature_spec = ServiceSpec(
     service=lambda *, book: book,
     permissions=[Unrestricted()],
-    # Named from the pool, as every spec callable is: the seed, ``user`` or
-    # ``target``.
+    # Named from the pool, as every spec callable is: a seed, ``user``, or the
+    # row as ``instance`` or ``collection``.
     validator=FormValidator(FeatureForm, form_kwargs=lambda *, tenant: {"author": tenant}),
 )
 # --8<-- [end:form_kwargs]
