@@ -33,8 +33,8 @@ refuses the call before the operation runs, and a
 operation's own refusal. Both bases are listed, because either may be raised
 bare, and so is ``ServiceConflict``, the base of ``ActionUnavailable``.
 
-A refusal a transport defines - ``http/``'s ``UnsupportedMediaType`` is one -
-is not here: that transport maps it and tests it. Read by
+A refusal a transport defines - django-spec-html's ``UnsupportedMediaType`` is
+one - is not here: that transport maps it and tests it. Read by
 [`unanswered_refusals`][django_service_specs.dispatch.unanswered_refusals.unanswered_refusals];
 a test walking the class tree holds it equal to the package's own refusals,
 so one a later release adds fails there until it is listed."""

@@ -6,7 +6,8 @@ which is the import closure of ``dispatch`` and ``registry``. Authorization is
 in it rather than beside it because dispatch always authorizes, so it is
 reached rather than named as a root. An opt-in module is a feature the
 transports share and core never imports; an authoring library is code a
-project writes against, such as a validator adapter; a transport only wires.
+project writes against, such as a validator adapter. A transport only wires,
+and ships in a distribution of its own, above all three.
 Opt-in is a classification and not a switch: no setting turns a module on, so
 the only thing that keeps one out of core is this file. It holds the
 classification in one table, fails on a subpackage the table does not name,
@@ -52,12 +53,12 @@ ROOTS = ("dispatch", "registry")
 CORE = "core"
 OPT_IN = "opt-in module"
 AUTHORING = "authoring library"
-TRANSPORT = "transport"
 
 # Every subpackage's layer, keyed by its path below the root, plus the one
 # root module core reads. A module takes the layer of its nearest entry, so
-# ``http/error_response.py`` is a transport with ``http/``, and the table names
-# a nested subpackage only where it sits on a different layer from its parent.
+# ``mutations/apply_input.py`` is an opt-in module with ``mutations/``, and the
+# table names a nested subpackage only where it sits on a different layer from
+# its parent.
 LAYERS: dict[str, str] = {
     "affordances": CORE,
     "authorization": CORE,
@@ -88,7 +89,6 @@ LAYERS: dict[str, str] = {
     "mutations": OPT_IN,
     "relations": OPT_IN,
     "schema": OPT_IN,
-    "http": TRANSPORT,
 }
 
 # Packages whose children sit on different layers, so each child, a
@@ -276,7 +276,7 @@ def test_the_import_reader_sees_every_depth_and_spelling() -> None:
     source = (
         "import django_service_specs.relations.utils\n"
         "from django_service_specs.schema import thing\n"
-        "import django_service_specs.http as h\n"
+        "import django_service_specs.validation as v\n"
         "from django_service_specs.registry import spec_registry as r\n"
         "import os\n"
         "def f():\n"
@@ -292,7 +292,7 @@ def test_the_import_reader_sees_every_depth_and_spelling() -> None:
         "django_service_specs.relations.utils",
         "django_service_specs.schema",
         "django_service_specs.schema.thing",
-        "django_service_specs.http",
+        "django_service_specs.validation",
         "django_service_specs.registry",
         "django_service_specs.registry.spec_registry",
         "django_service_specs.mutations.create",

@@ -244,8 +244,6 @@ docs/examples/arguments.py:codes
 | A value outside its `choices` | `invalid_choice` | the shape check |
 | An array longer than it takes, or shorter | `max_length`, `min_length` | the shape check, `coerce_flat` |
 | A flat string that spells no integer, number or boolean, or one sent for a parameter with nested parameters | `invalid` | `coerce_flat` |
-| A request body that is not JSON | `parse_error` | `request_arguments` |
-| A request body that is not a JSON object | `invalid` | `request_arguments` |
 | A read a selector, its `extend_queryset` or a precondition asks for that nothing filled | `required` | dispatch, as the shape check would |
 | A value a FilterSet refuses | its form field's own code, `invalid` where it has none | the FilterSet, through dispatch |
 | A number past a signed 64-bit integer sent to a filter on an integer column, a range filter's bound at its own argument and a CSV filter's element at its index | `max_value`, `min_value` | dispatch, applying the FilterSet |
@@ -266,11 +264,9 @@ unique together says `unique_together` from a form, where DRF's serializer
 validator says `unique`. They come through as Django raised them rather than
 translated to a guess.
 
-Two have no DRF field to follow. DRF ignores a key a serializer does not
+One has no DRF field to follow. DRF ignores a key a serializer does not
 declare, so it has no code for refusing one, and `unknown` names the
-[policy](#the-closed-argument-set) that refused it. And a body DRF cannot parse
-is its `ParseError`, which is not a validation error there and is here, so
-`parse_error` is that exception's own code. A free-form `object` is `invalid`,
+[policy](#the-closed-argument-set) that refused it. A free-form `object` is `invalid`,
 as a nested serializer's refusal is, where DRF's `DictField` would say
 `not_a_dict`. An empty `many` list refused by `many_min_length=1` is
 `min_length`, as its message says, where a `ListSerializer` with
@@ -396,11 +392,10 @@ a whole sits in an `InvalidArguments` tree too. A service's own refusal that
 names no field (`ServiceError` itself) is a 422: the request was understood
 and refused, which is not the same as malformed.
 
-This is the ladder
-[`error_response`][django_service_specs.http.error_response.error_response]
-ships, statuses included, for a transport that answers over HTTP. They are
-djangorestframework-services' statuses;
-[Serving over HTTP](http.md) has the whole of it.
+The statuses are djangorestframework-services'. A transport answering over
+HTTP need not write its own ladder:
+[django-spec-html](https://artui.github.io/django-spec-html/) ships one, and
+[its documentation](https://artui.github.io/django-spec-html/http/#refusals) has the whole of it.
 
 Configuration errors are neither family. A spec with no permission check, a
 parameter named after a pool seed, shaping declared on a selector that returns

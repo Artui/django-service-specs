@@ -26,7 +26,7 @@ def paginate_output(
     it, not a paging scheme: the names a caller pages by, and the ceiling a
     mount allows, are the transport's. A transport takes them off the call
     before the spec's closed argument set sees them, and bounds legitimately
-    differ between two mounts of one spec. HTTP views do not page.
+    differ between two mounts of one spec.
 
     ``page`` and ``limit`` default to 1 and
     [`DEFAULT_PAGE_SIZE`][django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE].

@@ -161,8 +161,8 @@ and a condition on the row reached with no model instance to answer it for is
 of it still answers a conflict. One that wants the code matches it before its
 generic conflict and service-error handlers.
 
-[`error_response`][django_service_specs.http.error_response.error_response]
-answers it at 409, with the code beside the detail a client already reads:
+A transport answering over HTTP puts the code beside the detail a client
+already reads, as [django-spec-html](https://artui.github.io/django-spec-html/)'s `error_response` does at 409:
 
 ```json
 {"detail": "An archived note cannot be renamed. Restore it first.", "code": "note_archived"}
@@ -188,8 +188,8 @@ docs/examples/affordances.py:confirm
 `schema` describes what is missing, keyed by the argument the service expects
 it back under. The answer comes back as an ordinary argument on the next call,
 so the operation declares it like any other, and there is no session to
-resume. `error_response` answers 422, with the schema beside the detail when
-there is one:
+resume. A transport answering over HTTP puts the schema beside the detail when
+there is one, as django-spec-html's `error_response` does at 422:
 
 ```json
 {"detail": "2 archived notes will be deleted. Confirm to proceed.", "schema": {"confirmed": {"type": "boolean"}}}

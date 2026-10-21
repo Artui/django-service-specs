@@ -11,8 +11,8 @@ class PrincipalUnavailable(DispatchError):
     """The principal cannot act: an identifier naming nobody, or a deactivated account.
 
     Raised by ``resolve_principal`` for an identifier that is missing,
-    malformed or names a deactivated row, and by dispatch and the HTTP entry
-    points for a deactivated principal they were handed. Either way it comes
+    malformed or names a deactivated row, and by dispatch for a deactivated
+    principal it was handed. Either way it comes
     before any permission check, which is about what a principal may do, not
     whether there is one.
 

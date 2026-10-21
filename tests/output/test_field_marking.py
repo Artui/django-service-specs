@@ -5,7 +5,8 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 
-from django_service_specs.http.spec_view import SpecView
+from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.dispatch.present import present
 from django_service_specs.output.field_marking import FieldMarking
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
@@ -15,7 +16,6 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
 from tests.dispatch_app.models import Note
-from tests.http.utils import FACTORY, body, signed_in
 
 
 class MarkedNote(Presenter):
@@ -90,13 +90,13 @@ def test_audience_is_a_json_friendly_string() -> None:
 
 @pytest.mark.django_db
 def test_a_caller_naming_no_audience_is_presented_every_field() -> None:
-    """Every HTTP response is such a caller: a hidden field is still served."""
+    """``present`` names none: a hidden field is still served to whoever calls it."""
     ada = get_user_model().objects.create_user(username="ada")
     note = Note.objects.create(owner=ada, title="Draft")
     spec = SelectorSpec(
         kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=MarkedNote()
     )
 
-    response = SpecView.as_view(spec=spec)(signed_in(FACTORY.get("/"), ada))
+    presented = present(spec, dispatch(spec, principal=ada, arguments={}))
 
-    assert body(response) == [{"id": note.pk, "title": "Draft", "owner_id": ada.pk}]
+    assert presented == [{"id": note.pk, "title": "Draft", "owner_id": ada.pk}]

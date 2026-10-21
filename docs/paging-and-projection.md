@@ -9,9 +9,8 @@ plumbing is not shown at all.
 
 Both are functions a transport calls between dispatch and the wire. Neither is
 applied by [`dispatch`][django_service_specs.dispatch.dispatch.dispatch],
-[`present`][django_service_specs.dispatch.present.present] or
-[`SpecView`][django_service_specs.http.spec_view.SpecView], so a caller that
-names no audience - every HTTP response - is not projected: no marking
+[`present`][django_service_specs.dispatch.present.present], so a caller that
+names no audience is not projected: no marking
 applies to it, so it is served every field, each value as presented, and a
 list as a bare array.
 

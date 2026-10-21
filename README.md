@@ -36,7 +36,10 @@ serves them.
 A spec as a management command is
 [`django-spec-cli`](https://github.com/Artui/django-spec-cli), a distribution
 of its own that depends on this one: one command per registry, one subcommand
-per spec, run through `dispatch` as a named user.
+per spec, run through `dispatch` as a named user. A spec served from a plain
+Django view, as JSON or as the page its form renders, is
+[`django-spec-html`](https://github.com/Artui/django-spec-html), likewise its
+own distribution.
 
 **Status:** early. The public API may still change between minor releases,
 and every change is recorded in the [changelog](CHANGELOG.md).
@@ -137,7 +140,7 @@ for the note's owner, `None` when there is no note 1, and raises `NotPermitted`
 for anyone else. The same `rename_note_spec` can be dispatched from an HTTP
 view, an MCP tool, a management command or a task: each supplies a principal
 and the arguments, and answers the result in its own terms; over HTTP,
-`SpecView.as_view(spec=rename_note_spec)` is that view. This code is
+django-spec-html's `SpecView.as_view(spec=rename_note_spec)` is that view. This code is
 `docs/examples/quickstart.py`, where `Note` comes from the test suite's own
 app, and the test suite runs it.
 
@@ -204,7 +207,6 @@ out is refused rather than read as "no restriction".
 
 - [Declaring an operation](https://artui.github.io/django-service-specs/declaring/) - specs, Parameters, Validators, Output and Presenters
 - [Dispatching](https://artui.github.io/django-service-specs/dispatching/) - the order, results, grants, a target resolved ahead of the call, the async rule and pool seeds
-- [Serving over HTTP](https://artui.github.io/django-service-specs/http/) - a spec as a Django view answering JSON, and the status of each refusal
 - [Arguments and refusals](https://artui.github.io/django-service-specs/arguments/) - the shape check, the error tree and the two error families
 - [Affordances](https://artui.github.io/django-service-specs/affordances/) - when an operation is possible right now, its refusal's stable code, and asking for one more value
 - [Relation writes](https://artui.github.io/django-service-specs/relations/) - nested writes through the five relation specs

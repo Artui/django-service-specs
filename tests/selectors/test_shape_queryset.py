@@ -14,12 +14,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Count, QuerySet
 from django.db.models.functions import Length
-from django.test import RequestFactory
 
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
-from django_service_specs.http.request_arguments import request_arguments
+from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.base_pool import base_pool
@@ -422,24 +421,23 @@ class TestFilterSetThroughDispatch:
 
 
 @pytest.mark.django_db
-def test_a_query_string_reaches_the_filters_through_the_http_transport() -> None:
-    # What a FilterSet is mostly for: ``?archived=false`` read by the HTTP
-    # transport against the spec's Parameters, then dispatched.
+def test_a_query_string_s_values_reach_the_filters_through_coerce_flat() -> None:
+    # What a FilterSet is mostly for: ``?archived=false``, every value a
+    # string, coerced against the spec's Parameters as a transport reading a
+    # query string coerces it, then dispatched.
     ada = _three_notes()
     spec = _filtered(NoteFilters)
-    request = RequestFactory().get("/notes", {"archived": "false", "kinds": ["draft", "final"]})
-    arguments = request_arguments(request, spec.parameters())
+    arguments = coerce_flat(spec.parameters(), {"archived": "false", "kinds": ["draft", "final"]})
     result = dispatch(spec, principal=ada, arguments=arguments)
     assert _titles(result.value) == ["draft"]
 
 
 @pytest.mark.django_db
-def test_a_csv_filter_takes_its_values_as_repeated_keys_over_http() -> None:
+def test_a_csv_filter_takes_its_values_as_a_query_string_s_list_of_strings() -> None:
     ada = _three_notes()
     pks = sorted(Note.objects.values_list("pk", flat=True))
     spec = _filtered(NoteFilters)
-    request = RequestFactory().get("/notes", {"pks": [str(pks[0]), str(pks[2])]})
-    arguments = request_arguments(request, spec.parameters())
+    arguments = coerce_flat(spec.parameters(), {"pks": [str(pks[0]), str(pks[2])]})
     result = dispatch(spec, principal=ada, arguments=arguments)
     assert _titles(result.value) == ["draft", "other"]
 
@@ -453,7 +451,7 @@ async def test_adispatch_filters_an_async_selector_s_rows() -> None:
 
 
 @pytest.mark.django_db
-def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over_http() -> None:
+def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row() -> None:
     # Read through ``float``, 2**53 + 1 would become 2**53 and match the
     # neighbour's row. A CSV filter's numbers are decimal strings, handed on
     # with every digit they were sent with.
@@ -461,8 +459,7 @@ def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row_over
     Note.objects.create(pk=2**53, owner=ada, title="neighbour")
     Note.objects.create(pk=2**53 + 1, owner=ada, title="mine")
     spec = _filtered(NoteFilters)
-    request = RequestFactory().get("/notes", {"pks": [str(2**53 + 1)]})
-    arguments = request_arguments(request, spec.parameters())
+    arguments = coerce_flat(spec.parameters(), {"pks": [str(2**53 + 1)]})
     result = dispatch(spec, principal=ada, arguments=arguments)
     assert _titles(result.value) == ["mine"]
 

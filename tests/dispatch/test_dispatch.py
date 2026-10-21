@@ -1063,8 +1063,7 @@ def test_a_grant_does_not_admit_a_deactivated_principal() -> None:
 
 def test_a_deactivated_principal_is_refused_before_its_arguments_are_checked() -> None:
     # ``pk`` is missing, which the shape check would refuse; the principal answers
-    # first, as ``adispatch`` refuses a deactivated ``principal_id`` and the HTTP
-    # entry points a deactivated ``request.user``.
+    # first, as ``adispatch`` refuses a deactivated ``principal_id``.
     with pytest.raises(PrincipalUnavailable):
         dispatch(retrieve(), principal=_deactivated("ada"), arguments={})
 

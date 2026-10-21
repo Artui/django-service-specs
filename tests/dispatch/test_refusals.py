@@ -43,15 +43,15 @@ def _family(base: type[Exception]) -> set[type[Exception]]:
 
 def test_it_is_every_refusal_the_core_defines() -> None:
     # Read from the class tree, so a refusal a later release adds fails here
-    # until it is listed. ``http/`` is a transport, and its own refusal is its
-    # own to map; the tree is filtered by module so a test's subclass is not
+    # until it is listed. The tree is filtered by module so a test's subclass,
+    # or a refusal a transport defines in a distribution of its own, is not
     # read as the package's.
     _import_every_module()
     package = django_service_specs.__name__ + "."
     defined = {
         kind
         for kind in _family(DispatchError) | _family(ServiceError)
-        if kind.__module__.startswith(package) and not kind.__module__.startswith(package + "http.")
+        if kind.__module__.startswith(package)
     }
     assert set(REFUSALS) == defined
 

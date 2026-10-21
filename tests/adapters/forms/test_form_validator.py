@@ -16,14 +16,13 @@ from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.models import QuerySet
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.dispatch import dispatch
-from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
@@ -413,12 +412,6 @@ class TestModelChoices:
         )
         (rows,) = FormValidator(_form("Pick", rows=field)).parameters()
         assert (rows.type, rows.items, rows.format) == ("array", json_type, fmt)
-
-    def test_a_query_string_splits_a_list_of_decimal_keys_on_its_commas(self) -> None:
-        field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
-        parameters = FormValidator(_form("Pick", rows=field)).parameters()
-        request = RequestFactory().get("/", {"rows": "12.50,9.99"})
-        assert request_arguments(request, parameters) == {"rows": ["12.50", "9.99"]}
 
     @pytest.mark.django_db
     def test_a_list_of_decimal_keys_is_matched_on_the_column_s_own_spelling(self) -> None:

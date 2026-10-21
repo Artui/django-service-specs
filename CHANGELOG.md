@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The plain-Django HTTP transport now ships as
+  [`django-spec-html`](https://artui.github.io/django-spec-html/)**:
+  `pip install django-spec-html`. Each name below has left the root `__all__`
+  and is imported from `django_spec_html` instead, under the same name:
+  `SpecView`, `AsyncSpecView`, `dispatch_request`, `adispatch_request`,
+  `error_response`, `request_arguments`, `request_principal`,
+  `route_arguments`, `add_argument_errors` and `UnsupportedMediaType`. So
+  `from django_service_specs import SpecView` becomes
+  `from django_spec_html import SpecView`. The module
+  `django_service_specs.http` is gone with them. There is no re-export and no
+  deprecation period: the kernel cannot import a package that depends on it.
+  No setting and no check id goes with it: `SERVICE_SPECS_MAX_ARRAY_LENGTH`
+  is still read here, by the shape check and the schema, and
+  django-spec-html's request reader reads the same key under the same name.
+  The kernel functions that reader is built on, `coerce_flat`,
+  `check_requested_input`, `refusal_messages` and the rest, stay exported from
+  the root.
+
 ## [0.11.0] — 2026-10-20
 
 ### Removed

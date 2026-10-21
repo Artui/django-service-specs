@@ -521,9 +521,6 @@ SURFACE: dict[str, Pin] = {
         "validation.validation_context", signature="principal, target=, partial=, ambient="
     ),
     "Validated": Pin("validation.validated", signature="values, data, pool="),
-    # --- http: the two helpers a non-DRF HTTP transport reaches for ----------------------------
-    "request_principal": _fn("http.request_principal", "request"),
-    "route_arguments": _fn("http.route_arguments", "parameters, url_kwargs"),
 }
 
 # Public here and taken by nobody downstream through djangorestframework-services,
@@ -531,18 +528,12 @@ SURFACE: dict[str, Pin] = {
 # a new root name lands in SURFACE or here, never in neither.
 NOT_REEXPORTED_BY_DRFS = frozenset(
     {
-        # This package's own JSON transport: djangorestframework-services serves
-        # HTTP through DRF's views, never through these.
-        "SpecView",
-        "AsyncSpecView",
         # The report of a registry's open specs, which django-spec-cli's
         # management command and system check read from here; drfs serves no
         # management command.
         "UnguardedReason",
         "UnguardedSpec",
         "unguarded_specs",
-        "UnsupportedMediaType",
-        "dispatch_request",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.
@@ -550,10 +541,6 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "unanswered_refusals",
         "RefusalFinding",
         "RefusalFindingKind",
-        "adispatch_request",
-        "error_response",
-        "add_argument_errors",
-        "request_arguments",
         # Adapters over dataclasses and Django forms: the DRF adapter is its
         # serializer validator and presenter, which subclass Validator and
         # Presenter above instead.

@@ -1,8 +1,9 @@
 """``clean_held_to_their_columns`` leaves the form as it found it, whether validation returned or raised.
 
-What it refuses is held where its readers are tested, in
-``tests/adapters/forms/test_form_validator.py`` and
-``tests/http/test_add_argument_errors.py``. These hold what it puts back.
+What it refuses is held where its readers are tested: here in
+``tests/adapters/forms/test_form_validator.py``, and in django-spec-html's
+tests of ``add_argument_errors``. These hold what it puts back, and how it
+reads a key sent more than once, which no reader in this package binds.
 """
 
 from __future__ import annotations
@@ -11,11 +12,12 @@ from typing import Any
 
 import pytest
 from django import forms
+from django.http import QueryDict
 
 from django_service_specs.parameters.clean_held_to_their_columns import (
     clean_held_to_their_columns,
 )
-from tests.adapter_app.models import Book
+from tests.adapter_app.models import Author, Book
 
 # Past every integer column: a key no row can hold, so the guard takes the
 # field off the form while it validates.
@@ -81,3 +83,22 @@ def test_a_post_clean_the_form_carried_itself_is_run_and_put_back() -> None:
     clean_held_to_their_columns(form)
     assert calls == ["own"]
     assert vars(form)["_post_clean"] is recorded
+
+
+class _Several(forms.Form):
+    rows = forms.ModelMultipleChoiceField(queryset=Book.objects.all())
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("prefix", [None, "pick"], ids=["unprefixed", "prefixed"])
+def test_a_list_s_key_past_its_column_is_refused_once(prefix: str | None) -> None:
+    # Bound as a view binds ``request.POST``: a ``QueryDict``, whose item is
+    # only the last of a key's values, and here that one is a row. Read
+    # through the widget, every value is held to the column.
+    book = Book.objects.create(author=Author.objects.create(name="Ada"), title="Notes", price=1)
+    name = "rows" if prefix is None else f"{prefix}-rows"
+    form = _Several(data=QueryDict(f"{name}={_BEYOND_THE_COLUMN}&{name}={book.pk}"), prefix=prefix)
+    clean_held_to_their_columns(form)
+    assert form.errors["rows"] == [
+        f"Select a valid choice. {_BEYOND_THE_COLUMN} is not one of the available choices."
+    ]

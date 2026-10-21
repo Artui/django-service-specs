@@ -8,7 +8,7 @@ class CodedMessage(str):
 
     The words are for a person and are translated; the ``code`` is for a
     program and is not. Every refusal the kernel and its shipped adapters
-    make carries one - the shape check, ``coerce_flat``, ``request_arguments``,
+    make carries one - the shape check, ``coerce_flat``,
     a selector or ``extend_queryset`` refusing a read nothing filled, a
     FilterSet refusing its data, a relation write refusing a row, and
     ``DataclassValidator``, ``FormValidator`` and ``PydanticValidator`` - and

@@ -49,8 +49,9 @@ def dispatch(
     authenticated one whose ``is_active`` is false, with or without a
     ``grant``. One with no ``is_active`` reads as active, and anonymous goes on
     to the permission check, which decides whether anonymous may act. It is
-    the rule ``resolve_principal`` and the HTTP entry points apply, so a
-    principal is refused alike whichever way it reached dispatch.
+    the rule ``resolve_principal`` applies and ``is_deactivated`` exports for
+    a transport's own entry points, so a principal is refused alike whichever
+    way it reached dispatch.
 
     Then the same seven steps for both kinds of spec, and for ``adispatch``:
 

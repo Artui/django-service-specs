@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from decimal import Decimal
 from typing import Any, ClassVar
@@ -11,13 +10,10 @@ import django_filters
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
-from django.http import HttpRequest
-from django.test import RequestFactory
 
 from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.dispatch.dispatch import dispatch
-from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -30,13 +26,8 @@ from tests.dispatch_app.models import Note
 from tests.parameters.utils import coded
 
 CSV_HELP = "Multiple values may be separated by commas."
-FACTORY = RequestFactory()
 # django-filter's ``MaxValueValidator(1e50)`` on a number filter, mirrored below.
 BOUNDED: dict[str, Any] = {"minimum": -1e50, "maximum": 1e50}
-
-
-def _json(payload: Any) -> HttpRequest:
-    return FACTORY.post("/", data=json.dumps(payload), content_type="application/json")
 
 
 def _spec(filter_set: Any) -> SelectorSpec:
@@ -330,35 +321,35 @@ def big_ids() -> list[int]:
     return [Note.objects.create(pk=pk, owner=ada, title=str(pk)).pk for pk in (_BIG, _BIG + 1)]
 
 
-def _matched(request: Any) -> list[int]:
+def _matched(arguments: dict[str, Any]) -> list[int]:
     params = filter_set_parameters(_ById)
-    checked = check_arguments(params, request_arguments(request, params))
+    checked = check_arguments(params, arguments)
     rows = shape_queryset(Note.objects.all(), _spec(_ById), checked, source_label="x")
     return list(rows.values_list("pk", flat=True))
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "request_for",
+    "arguments_for",
     [
-        pytest.param(lambda pk: FACTORY.get(f"/?pk={pk}"), id="query-string"),
-        pytest.param(lambda pk: _json({"pk": str(pk)}), id="json-string"),
+        # What a query string or a JSON string hands on: the digits as sent.
+        pytest.param(lambda pk: {"pk": str(pk)}, id="string"),
         # A JSON number was already exact: the decoder makes it an int.
-        pytest.param(lambda pk: _json({"pk": pk}), id="json-number"),
+        pytest.param(lambda pk: {"pk": pk}, id="number"),
         pytest.param(
-            lambda pk: FACTORY.get(f"/?pk_range_min={pk}&pk_range_max={pk}"), id="range-bounds"
+            lambda pk: {"pk_range_min": str(pk), "pk_range_max": str(pk)}, id="range-bounds"
         ),
     ],
 )
 @pytest.mark.parametrize("index", [0, 1])
 def test_a_number_filter_matches_a_key_past_a_float_s_precision_exactly(
-    big_ids: list[int], request_for: Any, index: int
+    big_ids: list[int], arguments_for: Any, index: int
 ) -> None:
     # A number filter's form field is a ``DecimalField``, which reads a string
     # exactly. Declared a JSON number, its string was read as a float on the
     # way, and 2**53 + 1 came back as 2**53: the filter answered with the
     # neighbouring row.
-    assert _matched(request_for(big_ids[index])) == [big_ids[index]]
+    assert _matched(arguments_for(big_ids[index])) == [big_ids[index]]
 
 
 @pytest.mark.django_db
@@ -411,7 +402,12 @@ def _at(name: str, messages: list[str]) -> dict[str, Any]:
     return {name: {0: messages}} if name == "pks" else {name: messages}
 
 
-def _dispatch_refused(request: HttpRequest) -> None:
+def _sent(name: str, value: str) -> dict[str, Any]:
+    """One value of ``name`` as a transport hands it on: a CSV filter's as a list of one."""
+    return {name: [value]} if name == "pks" else {name: value}
+
+
+def _dispatch_refused(arguments: dict[str, Any]) -> None:
     # The permission check refuses every call, so the shape check answering is
     # what proves it ran first, and nothing past it - the FilterSet's own
     # validators, the query - is reached by a value it let through.
@@ -421,7 +417,7 @@ def _dispatch_refused(request: HttpRequest) -> None:
     dispatch(
         spec,
         principal=make_user("ada"),
-        arguments=request_arguments(request, spec.parameters()),
+        arguments=arguments,
     )
 
 
@@ -453,7 +449,7 @@ def test_a_number_past_django_filter_s_bound_is_refused_by_the_shape_check(
     # ``int()``: twenty bytes of query string spelling ``1E+999999999`` built a
     # billion-digit integer and held a worker for minutes.
     with pytest.raises(InvalidArguments) as caught:
-        _dispatch_refused(FACTORY.get("/", {name: value}))
+        _dispatch_refused(_sent(name, value))
     assert caught.value.detail == _at(name, [message])
 
 
@@ -466,35 +462,31 @@ def test_a_number_at_django_filter_s_bound_passes_the_shape_check(name: str, val
     # Inclusive, and the same float django-filter compares against, so 10**50
     # and 10**50 + 1 both sit inside it, as they do in django-filter.
     with pytest.raises(NotPermitted):
-        _dispatch_refused(FACTORY.get("/", {name: value}))
+        _dispatch_refused(_sent(name, value))
 
 
 @pytest.mark.django_db
 def test_a_json_number_past_the_bound_is_refused_too() -> None:
     with pytest.raises(InvalidArguments) as caught:
-        _dispatch_refused(_json({"pk_range_max": 1e60, "pk_range_min": -1e60}))
+        _dispatch_refused({"pk_range_max": 1e60, "pk_range_min": -1e60})
     assert caught.value.detail == {"pk_range_max": [_ABOVE], "pk_range_min": [_BELOW]}
 
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "request_",
+    "arguments",
     [
-        pytest.param(FACTORY.get("/", {"pks": "1,1E+999999999,-1E+999999999"}), id="comma-list"),
-        pytest.param(
-            FACTORY.get("/", {"pks": ["1", "1E+999999999", "-1E+999999999"]}), id="repeated"
-        ),
-        pytest.param(_json({"pks": ["1", "1E+999999999", "-1E+999999999"]}), id="json-strings"),
-        pytest.param(_json({"pks": [1, 1e60, -1e60]}), id="json-numbers"),
+        pytest.param({"pks": ["1", "1E+999999999", "-1E+999999999"]}, id="strings"),
+        pytest.param({"pks": [1, 1e60, -1e60]}, id="numbers"),
     ],
 )
 def test_a_csv_number_filter_s_element_past_the_bound_is_refused_at_its_index(
-    request_: HttpRequest,
+    arguments: dict[str, Any],
 ) -> None:
     # Each element is bounded as a number filter's value is, in the words and
     # with the codes a DRF field gives, before anything converts it.
     with pytest.raises(InvalidArguments) as caught:
-        _dispatch_refused(request_)
+        _dispatch_refused(arguments)
     assert coded(caught.value.detail) == {
         "pks": {1: [(_ABOVE, "max_value")], 2: [(_BELOW, "min_value")]}
     }
@@ -506,19 +498,17 @@ class _ByIds(django_filters.FilterSet):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "request_for",
+    "arguments_for",
     [
-        pytest.param(lambda pk: FACTORY.get(f"/?pks=1,{pk}"), id="comma-list"),
-        pytest.param(lambda pk: FACTORY.get(f"/?pks=1&pks={pk}"), id="repeated"),
-        pytest.param(lambda pk: _json({"pks": [1, pk]}), id="json-numbers"),
-        pytest.param(lambda pk: _json({"pks": ["1", str(pk)]}), id="json-strings"),
+        pytest.param(lambda pk: {"pks": ["1", str(pk)]}, id="strings"),
+        pytest.param(lambda pk: {"pks": [1, pk]}, id="numbers"),
     ],
 )
 def test_a_csv_number_filter_matches_a_key_past_a_float_s_precision_exactly(
-    big_ids: list[int], request_for: Any
+    big_ids: list[int], arguments_for: Any
 ) -> None:
     params = filter_set_parameters(_ByIds)
-    checked = check_arguments(params, request_arguments(request_for(big_ids[1]), params))
+    checked = check_arguments(params, arguments_for(big_ids[1]))
     rows = shape_queryset(Note.objects.all(), _spec(_ByIds), checked, source_label="x")
     assert list(rows.values_list("pk", flat=True)) == [big_ids[1]]
 
@@ -540,18 +530,19 @@ class _Recorded(django_filters.FilterSet):
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
-    "request_",
+    "arguments",
     [
-        pytest.param(FACTORY.get(f"/?amounts={_FORTY_DIGITS},2"), id="comma-list"),
-        pytest.param(FACTORY.get(f"/?amounts={_FORTY_DIGITS}&amounts=2"), id="repeated"),
-        pytest.param(_json({"amounts": [_FORTY_DIGITS, 2]}), id="json-strings"),
+        pytest.param({"amounts": [_FORTY_DIGITS, "2"]}, id="strings"),
+        pytest.param({"amounts": [_FORTY_DIGITS, 2]}, id="a-string-and-a-number"),
     ],
 )
-def test_a_csv_number_filter_s_fraction_reaches_the_filter_exactly(request_: HttpRequest) -> None:
+def test_a_csv_number_filter_s_fraction_reaches_the_filter_exactly(
+    arguments: dict[str, Any],
+) -> None:
     # Read as a float on the way, the fraction reached the filter rounded to
     # seventeen digits; a decimal element stays the string it spells.
     _Recorded.seen.clear()
     params = filter_set_parameters(_Recorded)
-    checked = check_arguments(params, request_arguments(request_, params))
+    checked = check_arguments(params, arguments)
     shape_queryset(Note.objects.all(), _spec(_Recorded), checked, source_label="x")
     assert _Recorded.seen == [[Decimal(_FORTY_DIGITS), Decimal(2)]]

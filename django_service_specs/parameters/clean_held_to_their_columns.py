@@ -34,8 +34,8 @@ def clean_held_to_their_columns(form: forms.BaseForm) -> None:
       refusal of Django's model integer field.
 
     Shared by ``FormValidator``, which validates its form so, and by
-    ``add_argument_errors``, which finds a form's own errors so before it
-    places a refusal beside them.
+    django-spec-html's ``add_argument_errors``, which finds a form's own
+    errors so before it places a refusal beside them.
 
     The form is left as it was found, whether its validation returned or
     raised: every field it had, in its order, and its own ``_post_clean``,
