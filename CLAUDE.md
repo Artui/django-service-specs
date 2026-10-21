@@ -140,7 +140,8 @@ Each of these reads as an oversight and is not.
   omission is how an off-HTTP runner skips authorization with nothing warning.
 - **A deactivated principal is refused by dispatch.** One rule,
   `authorization/is_deactivated.py`'s `is_deactivated`, read by `dispatch` (first, grant
-  or no grant), by `resolve_principal` and by the HTTP entry points. The stock
+  or no grant), by `resolve_principal`, and from the root by the transports, which
+  refuse one before they read a request (django-spec-html's HTTP entry points do). The stock
   permission classes of the frameworks this adapts both pass one, so the
   refusal cannot wait for a permission check. Never fall back to an anonymous
   user.
