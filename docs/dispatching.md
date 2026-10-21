@@ -702,8 +702,8 @@ orders them in code, and a branch for a subclass below its base's is a body
 that never runs, which the transport's own branch coverage reports; a table's order is data, which
 coverage reads as one expression.
 
-A refusal a transport defines itself, such as the HTTP views'
-[`UnsupportedMediaType`][django_service_specs.http.unsupported_media_type.UnsupportedMediaType],
+A refusal a transport defines itself, such as
+[django-spec-html](https://artui.github.io/django-spec-html/)'s `UnsupportedMediaType`,
 is not in `REFUSALS`: that transport maps it and tests it. Its row is still
 read for the precedence trap, since a row nothing reaches is dead whoever's
 refusal it names.

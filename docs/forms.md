@@ -17,9 +17,11 @@ from django_service_specs import FormValidator
 
 There is no presenter: a form describes what goes in, not what comes out.
 
-To serve the form as a page, a host's own view renders it and dispatches the
-post; [a refusal, placed on a form](http.md#a-refusal-placed-on-a-form) on the
-HTTP page is how that view re-renders it with what dispatch refused.
+To serve the form as a page,
+[django-spec-html](https://artui.github.io/django-spec-html/pages/)'s `SpecFormView` renders it,
+dispatches the post and re-renders it with what dispatch refused. A host's own
+view does the same with
+[a refusal, placed on a form](https://artui.github.io/django-spec-html/http/#a-refusal-placed-on-a-form).
 
 ## A form as a Validator
 

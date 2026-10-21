@@ -21,6 +21,8 @@ output format is `SPEC_CLI_OUTPUT`, read by
   when unset; `None` bounds no array. Anything but a non-negative `int` or
   `None` is refused as `ImproperlyConfigured` where it is read. See
   [how long a list may be](arguments.md#how-long-a-list-may-be).
+  [django-spec-html](https://artui.github.io/django-spec-html/)'s request
+  reader bounds a query string's lists by the same key.
 
 ## Specs
 
@@ -119,19 +121,6 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.affordances.operation_affordances.operation_affordances
 ::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
 ::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
-
-## HTTP
-
-::: django_service_specs.http.dispatch_request.dispatch_request
-::: django_service_specs.http.adispatch_request.adispatch_request
-::: django_service_specs.http.spec_view.SpecView
-::: django_service_specs.http.async_spec_view.AsyncSpecView
-::: django_service_specs.http.request_arguments.request_arguments
-::: django_service_specs.http.request_principal.request_principal
-::: django_service_specs.http.route_arguments.route_arguments
-::: django_service_specs.http.error_response.error_response
-::: django_service_specs.http.unsupported_media_type.UnsupportedMediaType
-::: django_service_specs.http.add_argument_errors.add_argument_errors
 
 ## Authorization
 

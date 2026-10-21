@@ -40,8 +40,9 @@ into one, and a test fails if core imports anything classified outside it:
   adapters for dataclasses, [forms](forms.md) and [pydantic](pydantic.md) sit
   outside core the same way, as libraries a project writes against.
 - **A transport only wires** a protocol onto specs and dispatch, and belongs in
-  a distribution of its own. The [HTTP views](http.md) ship here today and are
-  planned to move out; the [management command](commands.md) has moved to
+  a distribution of its own. The [HTTP views](http.md) are
+  [django-spec-html](https://artui.github.io/django-spec-html/) and the
+  [management command](commands.md) is
   [django-spec-cli](https://artui.github.io/django-spec-cli/).
 
 **Where the transports stand.**
@@ -118,8 +119,6 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   Validator contract and its dataclass adapter, Output and the Presenter.
 - [Dispatching](dispatching.md): the seven steps, results, grants, a target
   resolved ahead of the call, the async entry point, and pool seeds.
-- [Serving over HTTP](http.md): a spec as a Django view, answered as JSON:
-  the arguments a request carries, the principal, and the status of each refusal.
 - [Arguments and refusals](arguments.md): the shape check, the error tree, flat
   transports, and the two error families.
 - [Affordances](affordances.md): when an operation is possible right now, the

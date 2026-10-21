@@ -39,10 +39,8 @@ object itself. `dispatch`, `adispatch`, `check_call`, `bind_arguments`,
 `present`, `apresent`, `present_for_audience`, `resolve_target`, the three
 `authorize` functions, the affordance functions and their async twins,
 `server_owned_keys`, `check_requested_input`, `shape_queryset`,
-`spec_input_schema`, `spec_output_schema`, `can_present_nothing`,
-`audience_projection_for_spec`, `dispatch_request` and `adispatch_request` take
-it as they take a spec, `SpecView` and `AsyncSpecView` serve it as their
-`spec`, and
+`spec_input_schema`, `spec_output_schema`, `can_present_nothing` and
+`audience_projection_for_spec` take it as they take a spec, and
 [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] is how a
 transport reads the spec it compiles to anywhere else. It is compiled the
 first time anything reads it, and that compiled spec answers every later call
