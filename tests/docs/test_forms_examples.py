@@ -18,7 +18,7 @@ from django.contrib.auth import get_user_model
 
 from django_service_specs import InvalidArguments, NotPermitted, ValidationContext, dispatch
 from docs.examples import forms_adapter
-from tests.adapter_app.models import Author
+from tests.adapter_app.models import Author, Book
 
 
 def make_user(username: str, **extra: Any) -> Any:
@@ -127,3 +127,29 @@ class TestModelForm:
                 principal=bob,
                 arguments={"pk": ada.pk, "username": "bob2"},
             )
+
+
+@pytest.mark.django_db
+class TestFormKwargs:
+    def test_a_book_of_the_caller_s_tenant_is_taken_and_another_s_refused(self, ada: Any) -> None:
+        own = Book.objects.create(
+            author=Author.objects.create(name="ada"), title="Own", price=Decimal("1.00")
+        )
+        other = Book.objects.create(
+            author=Author.objects.create(name="bob"), title="Other", price=Decimal("1.00")
+        )
+        spec, seeds = forms_adapter.feature_spec, forms_adapter.tenant_seeds
+        result = dispatch(spec, principal=ada, arguments={"book": own.pk}, pool_seeds=seeds)
+        assert result.value == own
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"book": other.pk}, pool_seeds=seeds)
+        assert refused.value.detail == {
+            "book": ["Select a valid choice. That choice is not one of the available choices."]
+        }
+
+    def test_the_field_is_still_declared_from_the_class(self) -> None:
+        validator = forms_adapter.feature_spec.validator
+        assert validator is not None
+        assert [(p.name, p.type, p.required) for p in validator.parameters()] == [
+            ("book", "integer", True)
+        ]

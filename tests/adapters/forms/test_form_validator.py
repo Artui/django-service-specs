@@ -3,11 +3,13 @@ from __future__ import annotations
 import datetime as dt
 import re
 import tempfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal
+from types import MappingProxyType
 from typing import Any
 
 import pytest
+from asgiref.sync import sync_to_async
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -22,12 +24,16 @@ from django.utils.translation import gettext_lazy
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.mutations.update_from_input import update_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.coerce_flat import coerce_flat
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -1658,3 +1664,312 @@ class TestRefusalCodes:
             FormValidator(_EditionForm).validate({"number": taken}, _partial(target))
         assert coded(caught.value.detail) == refused
         assert [code for _, code in refused["non_field_errors"]] == ["unique_together"]
+
+
+class _TenantBooks(forms.Form):
+    """A form scoping its choices in ``__init__``, by a keyword only ``form_kwargs`` supplies."""
+
+    # Any queryset of the model will do here: the class-level field is what
+    # ``parameters()`` reads, and the form narrows it per instance.
+    book = forms.ModelChoiceField(queryset=Book.objects.none())
+
+    def __init__(self, *args: Any, tenant: Author, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["book"].queryset = Book.objects.filter(author=tenant)
+
+
+def _tenant_kwargs(tenant: Author) -> dict[str, Any]:
+    return {"tenant": tenant}
+
+
+_TENANT_SEEDS = PoolSeeds().extend(tenant=lambda *, user: Author.objects.get(name=user.username))
+"""Each principal's tenant: the author named as they are."""
+
+
+def _tenant_spec(form_kwargs: Callable[..., Mapping[str, Any]] = _tenant_kwargs) -> ServiceSpec:
+    return ServiceSpec(
+        service=lambda *, book: book,
+        permissions=[Unrestricted()],
+        validator=FormValidator(_TenantBooks, form_kwargs=form_kwargs),
+    )
+
+
+def _tenants() -> tuple[Any, Book, Book]:
+    """A principal, a book of their tenant's, and one of another tenant's."""
+    ada = User.objects.create_user(username="ada")
+    own = Book.objects.create(
+        author=Author.objects.create(name="ada"), title="Own", price=Decimal("1.00")
+    )
+    other = Book.objects.create(
+        author=Author.objects.create(name="bob"), title="Other", price=Decimal("1.00")
+    )
+    return ada, own, other
+
+
+class _Retitle(forms.ModelForm):
+    """A ModelForm refusing a title the row already has, told it by ``form_kwargs``."""
+
+    class Meta:
+        model = Book
+        fields = ["title"]
+
+    def __init__(self, *args: Any, was: str, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.was = was
+
+    def clean_title(self) -> str:
+        title = self.cleaned_data["title"]
+        if title == self.was:
+            raise ValidationError("Unchanged.", code="unchanged")
+        return title
+
+
+class _Greeted(forms.Form):
+    """A form recording the keywords it was built with."""
+
+    name = forms.CharField()
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.extra = {key: kwargs.pop(key) for key in list(kwargs) if key not in {"data", "files"}}
+        super().__init__(*args, **kwargs)
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean() or {}
+        cleaned["extra"] = self.extra
+        return cleaned
+
+
+def _retrieve_spec(validator: FormValidator, *, allow_none: bool = False) -> ServiceSpec:
+    """An update of the book its ``pk`` names, returning what its service is handed."""
+    return ServiceSpec(
+        service=lambda **kwargs: kwargs,
+        permissions=[Unrestricted()],
+        validator=validator,
+        instance_selector_spec=SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=lambda *, pk: Book.objects.get(pk=pk),
+            reads=Parameters.of(Parameter("pk", "integer", required=True)),
+            allow_none=allow_none,
+        ),
+    )
+
+
+class TestFormKwargs:
+    @pytest.mark.django_db
+    def test_a_queryset_scoped_by_a_seeded_tenant_takes_its_own_row_and_refuses_another_s(
+        self,
+    ) -> None:
+        ada, own, other = _tenants()
+        spec = _tenant_spec()
+        result = dispatch(spec, principal=ada, arguments={"book": own.pk}, pool_seeds=_TENANT_SEEDS)
+        assert result.value == own
+        # The other tenant's row exists and the shape check takes its key: the
+        # scoped queryset is what refuses it.
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(spec, principal=ada, arguments={"book": other.pk}, pool_seeds=_TENANT_SEEDS)
+        assert [code for _, code in coded(caught.value.detail)["book"]] == ["invalid_choice"]
+
+    @pytest.mark.django_db(transaction=True)
+    async def test_adispatch_calls_it_where_it_may_query(self) -> None:
+        ada, own, other = await sync_to_async(_tenants)()
+
+        # Queries: from the event loop itself Django would refuse it with
+        # SynchronousOnlyOperation.
+        def from_the_database(user: Any) -> dict[str, Any]:
+            return {"tenant": Author.objects.get(name=user.username)}
+
+        spec = _tenant_spec(from_the_database)
+        result = await adispatch(spec, principal=ada, arguments={"book": own.pk})
+        assert result.value == own
+        with pytest.raises(InvalidArguments):
+            await adispatch(spec, principal=ada, arguments={"book": other.pk})
+
+    @pytest.mark.django_db
+    def test_an_update_hands_it_the_row_itself_and_the_form_a_copy(self) -> None:
+        book = _book()
+        seen: list[Any] = []
+
+        def was(instance: Book) -> dict[str, Any]:
+            seen.append(instance)
+            return {"was": instance.title}
+
+        spec = _retrieve_spec(FormValidator(_Retitle, form_kwargs=was))
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(spec, principal=None, arguments={"pk": book.pk, "title": "Notes"})
+        assert coded(caught.value.detail) == {"title": [("Unchanged.", "unchanged")]}
+        result = dispatch(spec, principal=None, arguments={"pk": book.pk, "title": "Sequel"})
+        assert (result.value["instance"], result.value["title"]) == (book, "Sequel")
+        # The row the service received itself, not the form's copy.
+        assert len(seen) == 2
+        assert seen[1] is result.value["instance"]
+        # The form edited a copy, as it does without form_kwargs.
+        assert result.value["instance"].title == "Notes"
+
+    @pytest.mark.django_db
+    def test_a_missing_row_an_instance_selector_allows_is_instance_none(self) -> None:
+        def kwargs(instance: Any) -> dict[str, Any]:
+            return {"extra_instance": instance}
+
+        spec = _retrieve_spec(FormValidator(_Greeted, form_kwargs=kwargs), allow_none=True)
+        result = dispatch(spec, principal=None, arguments={"pk": 0, "name": "x"})
+        # What the service is handed, the callable is handed.
+        assert result.value["instance"] is None
+        assert result.value["extra"] == {"extra_instance": None}
+
+    @pytest.mark.django_db
+    def test_a_collection_selector_s_rows_are_its_collection(self) -> None:
+        book = _book()
+
+        def kwargs(collection: Any) -> dict[str, Any]:
+            return {"rows": list(collection)}
+
+        spec = ServiceSpec(
+            service=lambda **kwargs: kwargs,
+            permissions=[Unrestricted()],
+            validator=FormValidator(_Greeted, form_kwargs=kwargs),
+            collection_selector_spec=SelectorSpec(
+                kind=SelectorKind.LIST, selector=lambda: Book.objects.all()
+            ),
+        )
+        result = dispatch(spec, principal=None, arguments={"name": "x"})
+        assert result.value["extra"] == {"rows": [book]}
+
+    @pytest.mark.django_db
+    def test_a_create_has_neither_and_a_seed_named_target_is_only_a_seed(self) -> None:
+        def kwargs(
+            target: Any, instance: Any = "no instance", collection: Any = "no collection"
+        ) -> dict[str, Any]:
+            return {"target": target, "instance_": instance, "collection_": collection}
+
+        spec = ServiceSpec(
+            service=lambda **kwargs: kwargs["extra"],
+            permissions=[Unrestricted()],
+            validator=FormValidator(_Greeted, form_kwargs=kwargs),
+        )
+        seeds = PoolSeeds().extend(target=lambda: "a seed")
+        result = dispatch(spec, principal=None, arguments={"name": "x"}, pool_seeds=seeds)
+        assert result.value == {
+            "target": "a seed",
+            "instance_": "no instance",
+            "collection_": "no collection",
+        }
+
+    @pytest.mark.django_db
+    def test_bind_arguments_names_the_target_it_is_passed_as_dispatch_would(self) -> None:
+        book = _book()
+
+        def kwargs(instance: Book) -> dict[str, Any]:
+            return {"was": instance.title}
+
+        spec = _retrieve_spec(FormValidator(_Retitle, form_kwargs=kwargs))
+        with pytest.raises(InvalidArguments):
+            bind_arguments(spec, {"pk": book.pk, "title": "Notes"}, principal=None, target=book)
+        bound = bind_arguments(
+            spec, {"pk": book.pk, "title": "Sequel"}, principal=None, target=book
+        )
+        assert bound == {"title": "Sequel"}
+
+    @pytest.mark.django_db
+    def test_on_dispatch_it_meets_the_principal_the_progress_reporter_and_the_seeds(
+        self,
+    ) -> None:
+        ada = User.objects.create_user(username="ada")
+        Author.objects.create(name="ada")
+
+        def report(*args: Any, **kwargs: Any) -> None: ...
+
+        def kwargs(user: Any, progress: Any, tenant: Author) -> dict[str, Any]:
+            return {"user": user, "progress": progress, "tenant": tenant.name}
+
+        spec = ServiceSpec(
+            service=lambda **kwargs: kwargs["extra"],
+            permissions=[Unrestricted()],
+            validator=FormValidator(_Greeted, form_kwargs=kwargs),
+        )
+        result = dispatch(
+            spec, principal=ada, arguments={"name": "x"}, pool_seeds=_TENANT_SEEDS, progress=report
+        )
+        assert result.value == {"user": ada, "progress": report, "tenant": "ada"}
+
+    @pytest.mark.django_db
+    def test_off_dispatch_it_meets_the_principal_as_user_and_no_seed(self) -> None:
+        ada = User.objects.create_user(username="ada")
+
+        def kwargs(user: Any, progress: Any, tenant: str = "none registered") -> dict[str, Any]:
+            return {"user": user, "progress": progress, "tenant": tenant}
+
+        spec = ServiceSpec(
+            service=lambda **kwargs: None,
+            permissions=[Unrestricted()],
+            validator=FormValidator(_Greeted, form_kwargs=kwargs),
+        )
+        bound = bind_arguments(spec, {"name": "x"}, principal=ada)
+        assert bound["extra"] == {
+            "user": ada,
+            "progress": null_progress,
+            "tenant": "none registered",
+        }
+
+    def test_a_hand_built_context_s_user_is_still_the_principal(self) -> None:
+        context = ValidationContext("the principal", ambient=MappingProxyType({"user": "another"}))
+        validator = FormValidator(_Greeted, form_kwargs=lambda user: {"user": user})
+        assert validator.validate({"name": "x"}, context)["extra"] == {"user": "the principal"}
+
+    @pytest.mark.django_db
+    def test_a_many_call_calls_it_once_per_row(self) -> None:
+        calls: list[Any] = []
+
+        def kwargs(user: Any) -> dict[str, Any]:
+            calls.append(user)
+            return {}
+
+        spec = ServiceSpec(
+            service=lambda **kwargs: None,
+            permissions=[Unrestricted()],
+            many=True,
+            validator=FormValidator(_Greeted, form_kwargs=kwargs),
+        )
+        dispatch(spec, principal=None, arguments={"items": [{"name": n} for n in "abc"]})
+        assert calls == [None, None, None]
+
+    def test_with_none_the_form_is_built_from_the_arguments_alone(self) -> None:
+        validator = FormValidator(_Greeted)
+        assert validator.form_kwargs is None
+        assert validator.validate({"name": "x"}, CONTEXT)["extra"] == {}
+
+    def test_it_is_the_callable_it_was_given(self) -> None:
+        validator = FormValidator(_Greeted, form_kwargs=_tenant_kwargs)
+        assert validator.form_kwargs is _tenant_kwargs
+
+    @pytest.mark.django_db
+    def test_a_field_the_form_adds_in_its_init_is_still_no_parameter(self) -> None:
+        class Extended(forms.Form):
+            name = forms.CharField()
+
+            def __init__(self, *args: Any, extra: bool, **kwargs: Any) -> None:
+                super().__init__(*args, **kwargs)
+                if extra:
+                    self.fields["nickname"] = forms.CharField()
+
+        validator = FormValidator(Extended, form_kwargs=lambda: {"extra": True})
+        assert validator.parameters().names() == {"name"}
+
+    @pytest.mark.parametrize("given", [{"tenant": 1}, "tenant"], ids=["a-mapping", "a-string"])
+    def test_refuses_anything_but_a_callable(self, given: Any) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"form_kwargs takes a callable"):
+            FormValidator(_Greeted, form_kwargs=given)
+
+    def test_refuses_a_return_that_is_not_a_mapping(self) -> None:
+        validator = FormValidator(_Greeted, form_kwargs=lambda: [("tenant", 1)])
+        with pytest.raises(ImproperlyConfigured, match=r"returned \[\('tenant', 1\)\]"):
+            validator.validate({"name": "x"}, CONTEXT)
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("form_class", [_Greeted, _Retitle], ids=["a-form", "a-model-form"])
+    @pytest.mark.parametrize("key", ["data", "files", "instance"])
+    def test_refuses_a_key_the_bind_sets_itself(
+        self, form_class: type[forms.BaseForm], key: str
+    ) -> None:
+        validator = FormValidator(form_class, form_kwargs=lambda: {"was": "", key: None})
+        with pytest.raises(ImproperlyConfigured, match=rf"returned {key!r}"):
+            validator.validate({"name": "x", "title": "x"}, ValidationContext(None, _book()))

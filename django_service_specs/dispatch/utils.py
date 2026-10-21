@@ -1030,6 +1030,22 @@ def conclude_selector(
     return DispatchResult(kind="instance", value=value, context=context)
 
 
+def target_entry(spec: ServiceSpec, target: Any) -> dict[str, Any]:
+    """``target`` under the pool name a service spec hands it to its service as.
+
+    ``instance`` for a spec with an instance selector, ``None`` included,
+    ``collection`` for one with a collection selector, and nothing for a
+    create. The one rule ``walk_target`` returns its entry by and
+    ``bind_arguments`` fills a ``ValidationContext``'s ``resolved`` by, so a
+    Validator's callable names the target as the service will.
+    """
+    if spec.instance_selector_spec is not None:
+        return {"instance": target}
+    if spec.collection_selector_spec is not None:
+        return {"collection": target}
+    return {}
+
+
 def walk_target(
     spec: ServiceSpec,
     principal: Any,
@@ -1094,7 +1110,7 @@ def walk_target(
             return NOT_FOUND
         else:
             authorize_scope(spec, principal, None, grant=grant, arguments=handed)
-        return {"instance": target}
+        return target_entry(spec, target)
     if collection_spec is not None:
         if target is UNSET:
             pool = selector_pool(
@@ -1112,7 +1128,7 @@ def walk_target(
                 # in test_dispatch.py and test_resolve_target.py).
                 return NOT_FOUND
         authorize_scope(spec, principal, target, grant=grant, arguments=handed)
-        return {"collection": target}
+        return target_entry(spec, target)
     # One arc to coverage, so each conjunct is held by its own test: a create
     # dispatched with no ``target=`` (test_a_create_asks_the_scope_check_of_nothing)
     # the first, test_a_create_takes_a_pre_resolved_none_and_refuses_a_row the second.
@@ -1122,7 +1138,7 @@ def walk_target(
             "selector. A create acts on no existing row; pass target=None or nothing."
         )
     authorize_scope(spec, principal, None, grant=grant, arguments=handed)
-    return {}
+    return target_entry(spec, None)
 
 
 def refuse_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
@@ -1158,6 +1174,7 @@ def validate_arguments(
     target: Any,
     server_input: Mapping[str, Any],
     ambient: Mapping[str, Any] = MappingProxyType({}),
+    resolved: Mapping[str, Any] = MappingProxyType({}),
 ) -> Validated:
     """Step five: the Validator's whole result, on only the arguments its own ``parameters()`` declare.
 
@@ -1171,7 +1188,9 @@ def validate_arguments(
 
     ``ValidationContext.partial`` is the spec's ``partial``, and its
     ``ambient`` is ``ambient``: the call's base pool behind a read-only
-    proxy over its top level, whose values are the call's own, or empty for a caller with no seeds (``bind_arguments``). A spec
+    proxy over its top level, whose values are the call's own, or empty for a caller with no seeds (``bind_arguments``).
+    Its ``resolved`` is ``resolved``, the target under its pool name (see
+    ``target_entry``), behind a read-only proxy of its own. A spec
     with no
     Validator validates nothing: its ``data`` is ``{}``, and every argument it
     takes is a read.
@@ -1190,7 +1209,13 @@ def validate_arguments(
     if validator is None:
         return Validated(values={}, data={})
     declared = validator.parameters().names()
-    context = ValidationContext(principal, target, partial=spec.partial, ambient=ambient)
+    context = ValidationContext(
+        principal,
+        target,
+        partial=spec.partial,
+        ambient=ambient,
+        resolved=MappingProxyType(dict(resolved)),
+    )
     if spec.many:
         return _validate_rows(
             validator, checked[spec.many_argument], spec.many_argument, context, server_input
@@ -1338,6 +1363,7 @@ def prepare_service(
         target=target,
         server_input=server_input,
         ambient=ambient,
+        resolved=resolved,
     )
     values = validated.values
     # A Validator returning ``user`` is a bug, and letting its value outrank the

@@ -525,7 +525,10 @@ methods, and a third method and an attribute with defaults:
   `PoolSeeds`, such as an HTTP adapter's `request`, for a library whose
   validation reads what its caller registered. It is read-only at its top
   level; its values are the call's own live objects, which a Validator must
-  not mutate.
+  not mutate. `resolved` carries the target under the pool name the service
+  receives it by - `{"instance": row}`, `{"collection": rows}`, or empty for
+  a create - so a callable the Validator resolves through the pool names it
+  as a selector or a service does.
 - `validated(arguments, context)` is what dispatch calls: a
   [`Validated`][django_service_specs.validation.validated.Validated] carrying
   the `values` the service is spread with, the call's `data`, and a `pool` of
