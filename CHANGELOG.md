@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-10-21
+
 ### Removed
 - **The plain-Django HTTP transport now ships as
   [`django-spec-html`](https://artui.github.io/django-spec-html/)**:
@@ -1660,7 +1662,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Artui/django-service-specs/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Artui/django-service-specs/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Artui/django-service-specs/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/Artui/django-service-specs/compare/v0.8.0...v0.9.0
