@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -23,6 +23,8 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import coded_messages
+from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -81,6 +83,11 @@ _EMPTY_CHOICES = ("", None)
 ``get_choices`` does. A form never matches a value against one: it reads an
 empty value as no value before it looks at the choices, so neither is a value
 a caller can choose."""
+
+_BOUND_KEYWORDS = frozenset({"data", "files", "instance"})
+"""The constructor keywords the bind sets itself, which ``form_kwargs`` may not
+return: ``instance`` too for a plain form, so a callable's keywords mean one
+thing whichever kind of form it serves."""
 
 _SUPPORTED = (
     "BooleanField, NullBooleanField, IntegerField, FloatField, DecimalField, "
@@ -263,9 +270,34 @@ class FormValidator(Validator):
     helper that saves only what changed, such as
     [`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input],
     would find nothing to save. Any other target - the queryset a collection
-    selector resolves, or none - binds the form as a create. The form is built
-    from ``data=`` and ``instance=`` alone, so one whose ``__init__`` requires
-    more, such as the signed-in user, cannot be used as it is.
+    selector resolves, or none - binds the form as a create.
+
+    **A form whose ``__init__`` takes more is handed it by ``form_kwargs``.**
+    It is a callable returning a mapping of extra constructor keywords, such
+    as a queryset scoped by the caller's tenant, and it binds through the
+    pool as a selector or a service does, naming what it wants: ``user``,
+    ``progress``, every registered seed, and the target under the name the
+    service receives it by, from the context's ``resolved``: ``instance``
+    for a spec with an instance selector, ``None`` when one that allows none
+    finds no row, ``collection`` for one with a collection selector, and
+    neither for a create. It is the target itself, never the copy the form
+    edits. ``user`` is the context's principal on every path, and
+    ``progress`` is ``null_progress`` wherever the context carries no
+    reporter. Off dispatch - ``bind_arguments``, or a
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    built by hand - the context holds no seeds, so a callable naming one
+    gives it a default or meets Python's own ``TypeError``. It is called on
+    every ``validate()``, on the thread the call runs on, which under
+    ``adispatch`` is the one its synchronous phases share, so it may query;
+    on a ``many`` call that is once per row, so a query belongs in a seed,
+    which resolves once per call.
+    What it returns is passed beside ``data``, ``files`` and ``instance``,
+    and returning one of those three, for a plain form as for a
+    ``ModelForm``, is refused with ``ImproperlyConfigured`` naming it, as is
+    returning anything but a mapping. ``parameters()`` still reads only the
+    class: a field ``__init__`` adds from those keywords is not a parameter.
+    The callable is kept as ``form_kwargs``, so a transport building the
+    form itself, for a page, builds it the same way.
 
     A refusal is one
     [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
@@ -276,7 +308,11 @@ class FormValidator(Validator):
     no field for: the closed argument set in front of it is what refuses one.
     """
 
-    def __init__(self, form_class: type[forms.BaseForm]) -> None:
+    def __init__(
+        self,
+        form_class: type[forms.BaseForm],
+        form_kwargs: Callable[..., Mapping[str, Any]] | None = None,
+    ) -> None:
         # One branch to coverage, so each condition is held by its own case of
         # test_refuses_anything_but_a_form_class: the first by a-form-instance,
         # which ``issubclass`` would raise TypeError on; the second by
@@ -285,8 +321,18 @@ class FormValidator(Validator):
             raise ImproperlyConfigured(
                 f"FormValidator takes a Django form class; got {form_class!r}."
             )
+        # One branch to coverage, so each condition is held by its own test:
+        # the first by test_with_none_the_form_is_built_from_the_arguments_alone,
+        # where ``None`` is no callable; the second by
+        # test_it_is_the_callable_it_was_given, which the guard would refuse.
+        if form_kwargs is not None and not callable(form_kwargs):
+            raise ImproperlyConfigured(
+                f"{form_class.__qualname__}: form_kwargs takes a callable returning the "
+                f"form's extra constructor keywords; got {form_kwargs!r}."
+            )
         _check_model(form_class)
         self.form_class = form_class
+        self.form_kwargs = form_kwargs
         # ``base_fields`` is set by the metaclass of Form and ModelForm, or by
         # hand on a form built from BaseForm; the stubs declare it on neither.
         fields: dict[str, forms.Field] = form_class.base_fields  # ty: ignore[unresolved-attribute]
@@ -346,7 +392,9 @@ class FormValidator(Validator):
                 files[name] = value
             else:
                 data[name] = value if field is None else _as_bound(field, value)
-        form, row = self._bind(data, files, context.target)
+        form, row = self._bind(
+            data, files, context.target, _extra_keywords(self.form_class, self.form_kwargs, context)
+        )
         if context.partial:
             # Off the form rather than made optional: an optional field still
             # cleans to its empty value, runs its ``clean_<field>()`` on it and,
@@ -375,16 +423,64 @@ class FormValidator(Validator):
         return dict(form.cleaned_data)
 
     def _bind(
-        self, data: dict[str, Any], files: MultiValueDict[str, Any], target: Any
+        self,
+        data: dict[str, Any],
+        files: MultiValueDict[str, Any],
+        target: Any,
+        extra: Mapping[str, Any],
     ) -> tuple[forms.BaseForm, models.Model | None]:
         """The bound form, and the copy of the target it edits, or ``None`` for no row."""
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
-            return form_class(data=data, files=files), None
+            return form_class(data=data, files=files, **extra), None
         # A copy, because validation writes the cleaned values onto the
         # instance: see the class docstring.
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
-        return form_class(data=data, files=files, instance=instance), instance
+        return form_class(data=data, files=files, instance=instance, **extra), instance
+
+
+def _extra_keywords(
+    form_class: type[forms.BaseForm],
+    form_kwargs: Callable[..., Mapping[str, Any]] | None,
+    context: ValidationContext,
+) -> Mapping[str, Any]:
+    """What ``form_kwargs`` returns for this call, or nothing when there is none.
+
+    Its pool is the context's ``ambient`` over ``null_progress`` as
+    ``progress``, so the name is in every pool, as ``base_pool`` promises,
+    and with ``ambient`` empty off dispatch. ``user`` is laid over
+    ``ambient``, so the principal is ``user`` on every path, the two being
+    one object on dispatch, and the context's ``resolved`` last: its names
+    are reserved, so no seed shares one. Each is held by its own test:
+    test_off_dispatch_it_meets_the_principal_as_user_and_no_seed
+    (``progress``),
+    test_a_hand_built_context_s_user_is_still_the_principal (``user``) and
+    test_an_update_hands_it_the_row_itself_and_the_form_a_copy
+    (``resolved``).
+    """
+    if form_kwargs is None:
+        return {}
+    pool = {
+        "progress": null_progress,
+        **context.ambient,
+        "user": context.principal,
+        **context.resolved,
+    }
+    extra = form_kwargs(**resolve_callable_kwargs(form_kwargs, pool))
+    if not isinstance(extra, Mapping):
+        raise ImproperlyConfigured(
+            f"{form_class.__qualname__}: form_kwargs returned {extra!r}; it returns a "
+            "mapping of constructor keywords."
+        )
+    # Every key in the set is held by its own case of
+    # test_refuses_a_key_the_bind_sets_itself, on a form and a ModelForm.
+    for key in extra:
+        if key in _BOUND_KEYWORDS:
+            raise ImproperlyConfigured(
+                f"{form_class.__qualname__}: form_kwargs returned {key!r}, which the bind "
+                "sets itself from the call; return only the form's own keywords."
+            )
+    return extra
 
 
 def _clear_checkbox(form_class: type[forms.BaseForm], name: str, field: forms.Field) -> str | None:

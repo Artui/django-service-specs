@@ -153,9 +153,11 @@ built. A field declared `disabled` is not a parameter either: a form ignores
 what a caller sends for it and cleans its `initial`, which `validate()`
 returns with the rest.
 
-The form is built from the arguments alone - `data=`, and `instance=` for a
-`ModelForm` - so a form whose `__init__` requires anything more, such as the
-signed-in user, cannot be used as it is.
+That holds for a form built with keywords of its own, too: a field its
+`__init__` adds from them is still not a parameter. Declare the field on the
+class and narrow it in `__init__`, as
+the form in [A form with keywords of its own](#a-form-with-keywords-of-its-own)
+does.
 
 ## Partial updates
 
@@ -235,6 +237,62 @@ receives before the service runs, and
 which saves only the fields whose value changed, would find nothing to save.
 Any other target - the queryset a collection selector resolves, or none for a
 create - builds the form as a create.
+
+## A form with keywords of its own
+
+The adapter builds the form from `data=` and `files=`, with `instance=` for a
+`ModelForm`. A form whose `__init__` takes anything more, such as a queryset
+scoped to the caller's tenant, is handed it by `form_kwargs`, a callable
+returning those keywords:
+
+```python
+--8<--
+docs/examples/forms_adapter.py:form_kwargs
+--8<--
+```
+
+The callable binds through the pool, as a selector or a service does, naming
+what it wants:
+
+- `user`, the principal, on every path;
+- `progress`, the call's reporter, or
+  [`null_progress`][django_service_specs.pool.null_progress.null_progress]
+  where there is none;
+- every seed the call's
+  [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] register;
+- the target, under the name the service receives it by: `instance` for a
+  spec with an instance selector, `None` when one declaring `allow_none`
+  finds no row, `collection` for one with a collection selector, and neither
+  for a create. It is the target itself, never the copy a `ModelForm` edits.
+  The context carries it as
+  [`ValidationContext.resolved`][django_service_specs.validation.validation_context.ValidationContext].
+
+So a caller of `feature_spec` names a book of their own tenant's and is
+refused one of another's in the field's own words, `invalid_choice`, though
+the row exists: the queryset the form narrowed is what matches it.
+
+Off dispatch - in
+[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments],
+or with a
+[`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+built by hand - there are no seeds, so a callable naming one gives it a
+default or fails with Python's own `TypeError`; `user` and `progress` are
+there still. `bind_arguments` names the `target=` it is passed as dispatch
+would, from the spec's selectors, and a context built by hand names none.
+Under
+[`adispatch`][django_service_specs.dispatch.adispatch.adispatch] it runs on the
+thread the call's synchronous phases share, so it may query. It is called on
+every validation, and a `many` call validates each row, so it runs once per
+row: a query every row shares belongs in a seed, which resolves once per
+call.
+
+The bind sets `data`, `files` and `instance` itself, so a callable returning
+one of them - naming `instance` to read the row is another matter - for a plain form as for a `ModelForm`, is refused with
+`ImproperlyConfigured` naming the key, as is one returning anything but a
+mapping. `FormValidator(form_class, form_kwargs=...)` refuses a `form_kwargs`
+that is not callable when it is built, and keeps the callable as its
+`form_kwargs` attribute, so a transport building the form itself, for a page,
+builds it the same way.
 
 ## Refusals
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django_service_specs.dispatch.utils import shape_check, validate_arguments
+from django_service_specs.dispatch.utils import shape_check, target_entry, validate_arguments
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -41,7 +41,10 @@ def bind_arguments(
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
        with a Validator, ``validated()`` on only the arguments the Validator's
        own ``parameters()`` declare - never a selector's or the spec's
-       ``reads`` - with ``ValidationContext(principal, target, partial)``.
+       ``reads`` - with ``ValidationContext(principal, target, partial)``,
+       whose ``resolved`` names ``target`` as dispatch would: ``instance``
+       for a spec with an instance selector, ``collection`` for one with a
+       collection selector, nothing for a create.
 
     Returns the Validator's values. A service spec with no Validator returns
     ``{}``, because every argument it takes is a read and none is validated. A
@@ -85,6 +88,11 @@ def bind_arguments(
     if isinstance(spec, SelectorSpec):
         return checked
     validated = validate_arguments(
-        spec, checked, principal=principal, target=target, server_input={}
+        spec,
+        checked,
+        principal=principal,
+        target=target,
+        server_input={},
+        resolved=target_entry(spec, target),
     )
     return validated.values

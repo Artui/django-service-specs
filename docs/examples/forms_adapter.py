@@ -1,4 +1,5 @@
-"""The forms adapter: a plain form as a Validator, and a ModelForm behind an update."""
+"""The forms adapter: a plain form as a Validator, a ModelForm behind an update, and a form
+built with keywords of its own."""
 
 from __future__ import annotations
 
@@ -13,12 +14,14 @@ from django_service_specs import (
     Parameter,
     Parameters,
     PermissionCheck,
+    PoolSeeds,
     SelectorKind,
     SelectorSpec,
     ServiceSpec,
+    Unrestricted,
     update_from_input,
 )
-from tests.adapter_app.models import Author, Status
+from tests.adapter_app.models import Author, Book, Status
 
 
 class BookForm(forms.Form):
@@ -78,3 +81,27 @@ rename_user_spec = ServiceSpec(
     ),
 )
 # --8<-- [end:model_form]
+
+
+# --8<-- [start:form_kwargs]
+class FeatureForm(forms.Form):
+    # Declared on the class, so the parameter is described; the rows it may
+    # name are narrowed per form, to the caller's tenant.
+    book = forms.ModelChoiceField(queryset=Book.objects.none())
+
+    def __init__(self, *args: Any, author: Author, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["book"].queryset = Book.objects.filter(author=author)
+
+
+# Each signed-in user's tenant: here, the author of their name.
+tenant_seeds = PoolSeeds().extend(tenant=lambda *, user: Author.objects.get(name=user.username))
+
+feature_spec = ServiceSpec(
+    service=lambda *, book: book,
+    permissions=[Unrestricted()],
+    # Named from the pool, as every spec callable is: a seed, ``user``, or the
+    # row as ``instance`` or ``collection``.
+    validator=FormValidator(FeatureForm, form_kwargs=lambda *, tenant: {"author": tenant}),
+)
+# --8<-- [end:form_kwargs]

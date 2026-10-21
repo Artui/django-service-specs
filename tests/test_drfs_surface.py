@@ -518,7 +518,8 @@ SURFACE: dict[str, Pin] = {
         },
     ),
     "ValidationContext": Pin(
-        "validation.validation_context", signature="principal, target=, partial=, ambient="
+        "validation.validation_context",
+        signature="principal, target=, partial=, ambient=, resolved=",
     ),
     "Validated": Pin("validation.validated", signature="values, data, pool="),
 }

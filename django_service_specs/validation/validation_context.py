@@ -38,6 +38,18 @@ class ValidationContext:
     argument, a validated value or the target, which have seats of their
     own. Empty for a context built by hand, and in ``bind_arguments``, which
     is handed no seeds; it trails the others, so neither changes.
+
+    ``resolved`` is the target under the pool name dispatch hands it to the
+    service as, read-only: ``{"instance": row}`` for a spec with an instance
+    selector - ``{"instance": None}`` when one that allows none finds no row
+    - ``{"collection": rows}`` for one with a collection selector, and empty
+    for a create. ``target`` is the same object with the role taken off, so a
+    callable a Validator resolves through the pool, as ``FormValidator``'s
+    ``form_kwargs`` is, names it as a selector or a service does. Dispatch
+    fills it from the target it resolved, and ``bind_arguments`` from the
+    ``target`` its caller passes and the spec's selectors, by the one rule
+    both share. Empty for a context built by hand; it trails the rest, so no
+    existing construction changes.
     """
 
     principal: Any
@@ -48,3 +60,7 @@ class ValidationContext:
     # test_two_contexts_differing_in_ambient_alone_are_equal and
     # test_a_context_carrying_ambient_values_is_hashable.
     ambient: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)
+    # Excluded from equality and the hash for the reason ``ambient`` is: held
+    # by test_two_contexts_differing_in_resolved_alone_are_equal and
+    # test_a_context_carrying_a_resolved_target_is_hashable.
+    resolved: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)

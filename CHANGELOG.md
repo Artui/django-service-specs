@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`FormValidator(form_class, form_kwargs=...)`: a form whose `__init__`
+  takes keywords of its own.** `form_kwargs` is a callable returning a mapping
+  of extra constructor keywords, passed beside `data`, `files` and `instance`,
+  so a form whose `__init__` requires a keyword, such as one scoping a
+  queryset to the caller's tenant or user, validates on every transport where
+  it raised `TypeError` before. It binds through the pool as every spec
+  callable does: `user` (the principal, on every path), `progress`
+  (`null_progress` where the call carries no reporter), the registered seeds,
+  and the target under the name the service receives it by - `instance`,
+  `None` included under `allow_none`, `collection`, or neither for a create -
+  the target itself rather than the copy a `ModelForm` edits. Off dispatch,
+  in `bind_arguments` or with a `ValidationContext` built by hand, there are
+  no seeds. It is called on each `validate()`, once per
+  row on a `many` call, on the thread `adispatch` runs its synchronous phases
+  on, so it may query; a query every row shares belongs in a seed. A `form_kwargs` that is not callable is refused with
+  `ImproperlyConfigured` when the Validator is built; a return that is not a
+  mapping, or that names `data`, `files` or `instance`, for a plain form as
+  for a `ModelForm`, is refused with `ImproperlyConfigured` naming it. The
+  callable is kept as the `form_kwargs` attribute, for a transport that
+  builds the form itself. `parameters()` still reads the class's fields: a
+  field `__init__` adds is not a parameter.
+- **`ValidationContext.resolved`: the target under its pool name.** A
+  read-only mapping, `{"instance": row}` for a spec with an instance selector
+  (`{"instance": None}` when one allowing none finds no row),
+  `{"collection": rows}` for one with a collection selector, and empty for a
+  create, so a callable a Validator resolves through the pool names the
+  target as the service receives it. It trails the other fields with an empty
+  default and is left out of equality and the hash, as `ambient` is, so a
+  context built by hand, positionally or not, is unchanged.
+- **`dispatch`, `adispatch` and `bind_arguments` fill
+  `ValidationContext.resolved`.** Dispatch fills it from the target it
+  resolved, and `bind_arguments` from the `target=` it is passed and the
+  spec's selectors, by the rule dispatch names the target by.
+
 ## [0.12.0] — 2026-10-21
 
 ### Removed

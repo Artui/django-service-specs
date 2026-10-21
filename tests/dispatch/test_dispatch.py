@@ -4069,6 +4069,25 @@ class TestAmbient:
         with pytest.raises(TypeError):
             context.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
 
+    def test_the_validator_reads_the_resolved_row_and_cannot_replace_it(self, ada: Any) -> None:
+        # Behind a read-only proxy, as ``ambient`` is: handed the mapping
+        # itself, a Validator assigning into it would change the row the
+        # service receives.
+        note = Note.objects.create(owner=ada, title="kept")
+        validator = Titled()
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            validator=validator,
+            instance_selector_spec=nested(RETRIEVE, selector=note_by_pk, reads=PK),
+        )
+        dispatch(spec, principal=ada, arguments={"title": "a", "pk": note.pk})
+        [(_, context)] = validator.calls
+        assert dict(context.resolved) == {"instance": note}
+        with pytest.raises(TypeError):
+            context.resolved["instance"] = "another"  # ty: ignore[invalid-assignment]
+        assert spec.service.calls[0]["instance"] == note
+
     def test_each_row_of_a_many_call_reads_them_too(self, ada: Any) -> None:
         validator = Titled()
         spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)

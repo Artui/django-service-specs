@@ -45,3 +45,19 @@ def test_a_context_carrying_ambient_values_is_hashable() -> None:
     a frozen dataclass derives from its compared fields."""
     context = ValidationContext("ada", "row", ambient=MappingProxyType({"tenant": "a"}))
     assert hash(context) == hash(ValidationContext("ada", "row"))
+
+
+def test_a_context_built_by_hand_resolves_no_target_name() -> None:
+    assert dict(ValidationContext("ada", "row").resolved) == {}
+
+
+def test_two_contexts_differing_in_resolved_alone_are_equal() -> None:
+    """The target is compared as ``target``; its pool name says nothing more."""
+    one = ValidationContext("ada", "row", resolved=MappingProxyType({"instance": "row"}))
+    other = ValidationContext("ada", "row")
+    assert one == other
+
+
+def test_a_context_carrying_a_resolved_target_is_hashable() -> None:
+    context = ValidationContext("ada", "row", resolved=MappingProxyType({"instance": "row"}))
+    assert hash(context) == hash(ValidationContext("ada", "row"))
