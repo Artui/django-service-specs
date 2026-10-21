@@ -113,13 +113,36 @@ print(json.dumps([before, after, before_lazy, loaded_lazy()]))
     assert lazy_after == []
 
 
-def test_the_form_page_view_is_not_served_from_this_package() -> None:
-    # A page a person reads belongs to a package that owns presentation, and
-    # this one is the plumbing under it: the view that rendered a spec's form
-    # as a page is not importable from here, at the root or at its old path.
-    assert importlib.util.find_spec("django_service_specs.http.spec_form_view") is None
-    assert not hasattr(django_service_specs, "SpecFormView")
-    assert "SpecFormView" not in django_service_specs.__all__
+# The plain-Django HTTP transport, its JSON views, its request readers and its
+# refusal map, all served by django-spec-html now, with the page that renders a
+# spec's form beside them. The kernel re-exports none of them, since that
+# package imports this one.
+HTTP_NAMES = (
+    "AsyncSpecView",
+    "SpecFormView",
+    "SpecView",
+    "UnsupportedMediaType",
+    "add_argument_errors",
+    "adispatch_request",
+    "dispatch_request",
+    "error_response",
+    "request_arguments",
+    "request_principal",
+    "route_arguments",
+)
+
+
+def test_the_http_transport_is_not_served_from_this_package() -> None:
+    # The package, so every module that was under it goes with it: the form
+    # page's old path included, which a check of that module alone could not
+    # make once its parent stopped existing.
+    assert importlib.util.find_spec("django_service_specs.http") is None
+
+
+@pytest.mark.parametrize("name", HTTP_NAMES)
+def test_no_http_name_is_exported_at_the_root(name: str) -> None:
+    assert name not in django_service_specs.__all__
+    assert not hasattr(django_service_specs, name)
 
 
 # The management command, its exit statuses, its renderers, its argv layer and
@@ -177,33 +200,23 @@ SHARED_WITH_THE_KERNEL = {
         "django_service_specs.dispatch.utils",
         "django_service_specs.schema.spec_input_schema",
     ),
-    "refusal_messages": ("django_service_specs.http.add_argument_errors",),
-    "NON_FIELD_KEYS": (
-        "django_service_specs.http.add_argument_errors",
-        "django_service_specs.parameters.refusal_messages",
-    ),
+    "NON_FIELD_KEYS": ("django_service_specs.parameters.refusal_messages",),
     "expected_type_refusal": (
         "django_service_specs.adapters.dataclass.dataclass_validator",
-        "django_service_specs.http.request_arguments",
         "django_service_specs.parameters.check_arguments",
     ),
     "max_length_in_force": (
-        "django_service_specs.http.request_arguments",
         "django_service_specs.parameters.utils",
         "django_service_specs.schema.parameters_schema",
     ),
-    # The inactive-account rule is one predicate on purpose: dispatch, the
-    # principal an identifier names and the HTTP entry points refuse the same
-    # principals.
+    # The inactive-account rule is one predicate on purpose: dispatch and the
+    # principal an identifier names refuse the same principals, and a
+    # transport's own entry points call it to refuse them too.
     "is_deactivated": (
         "django_service_specs.authorization.resolve_principal",
         "django_service_specs.dispatch.utils",
-        "django_service_specs.http.request_principal",
     ),
-    "clean_held_to_their_columns": (
-        "django_service_specs.adapters.forms.form_validator",
-        "django_service_specs.http.add_argument_errors",
-    ),
+    "clean_held_to_their_columns": ("django_service_specs.adapters.forms.form_validator",),
 }
 
 
