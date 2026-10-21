@@ -874,9 +874,8 @@ read out, a choice is spoken by its display rather than its stored value, and
 plumbing is not shown at all.</p>
 <p>Both are functions a transport calls between dispatch and the wire. Neither is
 applied by <a class="autorefs autorefs-internal" title="dispatch" href="../reference/#django_service_specs.dispatch.dispatch.dispatch"><code>dispatch</code></a>,
-<a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a> or
-<a class="autorefs autorefs-internal" title="SpecView" href="../reference/#django_service_specs.http.spec_view.SpecView"><code>SpecView</code></a>, so a caller that
-names no audience - every HTTP response - is not projected: no marking
+<a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a>, so a caller that
+names no audience is not projected: no marking
 applies to it, so it is served every field, each value as presented, and a
 list as a bare array.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">euros</span> <span class="o">=</span> <span class="n">ValueFormatter</span><span class="p">(</span>

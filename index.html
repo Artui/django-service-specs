@@ -854,8 +854,9 @@ into one, and a test fails if core imports anything classified outside it:</p>
   adapters for dataclasses, <a href="forms/">forms</a> and <a href="pydantic/">pydantic</a> sit
   outside core the same way, as libraries a project writes against.</li>
 <li><strong>A transport only wires</strong> a protocol onto specs and dispatch, and belongs in
-  a distribution of its own. The <a href="http/">HTTP views</a> ship here today and are
-  planned to move out; the <a href="commands/">management command</a> has moved to
+  a distribution of its own. The <a href="http/">HTTP views</a> are
+  <a href="https://artui.github.io/django-spec-html/">django-spec-html</a> and the
+  <a href="commands/">management command</a> is
   <a href="https://artui.github.io/django-spec-cli/">django-spec-cli</a>.</li>
 </ul>
 <p><strong>Where the transports stand.</strong>
@@ -1000,8 +1001,6 @@ row as <code>kind="not_found"</code> rather than raising: an HTTP view answers i
   Validator contract and its dataclass adapter, Output and the Presenter.</li>
 <li><a href="dispatching/">Dispatching</a>: the seven steps, results, grants, a target
   resolved ahead of the call, the async entry point, and pool seeds.</li>
-<li><a href="http/">Serving over HTTP</a>: a spec as a Django view, answered as JSON:
-  the arguments a request carries, the principal, and the status of each refusal.</li>
 <li><a href="arguments/">Arguments and refusals</a>: the shape check, the error tree, flat
   transports, and the two error families.</li>
 <li><a href="affordances/">Affordances</a>: when an operation is possible right now, the

@@ -1099,8 +1099,8 @@ and a condition on the row reached with no model instance to answer it for is
 <p><code>ActionUnavailable</code> is a <code>ServiceConflict</code>, so a transport that has never heard
 of it still answers a conflict. One that wants the code matches it before its
 generic conflict and service-error handlers.</p>
-<p><a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
-answers it at 409, with the code beside the detail a client already reads:</p>
+<p>A transport answering over HTTP puts the code beside the detail a client
+already reads, as <a href="https://artui.github.io/django-spec-html/">django-spec-html</a>'s <code>error_response</code> does at 409:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="p">{</span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"An archived note cannot be renamed. Restore it first."</span><span class="p">,</span><span class="w"> </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"note_archived"</span><span class="p">}</span>
 </span></code></pre></div>
 <h2 id="asking-for-one-more-value">Asking for one more value<a class="headerlink" href="#asking-for-one-more-value" title="Permanent link">&para;</a></h2>
@@ -1142,8 +1142,8 @@ complete.</p>
 <p><code>schema</code> describes what is missing, keyed by the argument the service expects
 it back under. The answer comes back as an ordinary argument on the next call,
 so the operation declares it like any other, and there is no session to
-resume. <code>error_response</code> answers 422, with the schema beside the detail when
-there is one:</p>
+resume. A transport answering over HTTP puts the schema beside the detail when
+there is one, as django-spec-html's <code>error_response</code> does at 422:</p>
 <div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2 archived notes will be deleted. Confirm to proceed."</span><span class="p">,</span><span class="w"> </span><span class="nt">"schema"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"confirmed"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"boolean"</span><span class="p">}}}</span>
 </span></code></pre></div>
 <p>A schema one transport cannot render is the raiser's error, not the caller's,

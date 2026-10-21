@@ -1220,16 +1220,6 @@ unchanged, and a client of both reads one <code>get_codes()</code>.</p>
 <td><code>coerce_flat</code></td>
 </tr>
 <tr>
-<td>A request body that is not JSON</td>
-<td><code>parse_error</code></td>
-<td><code>request_arguments</code></td>
-</tr>
-<tr>
-<td>A request body that is not a JSON object</td>
-<td><code>invalid</code></td>
-<td><code>request_arguments</code></td>
-</tr>
-<tr>
 <td>A read a selector, its <code>extend_queryset</code> or a precondition asks for that nothing filled</td>
 <td><code>required</code></td>
 <td>dispatch, as the shape check would</td>
@@ -1288,11 +1278,9 @@ unchanged, and a client of both reads one <code>get_codes()</code>.</p>
 unique together says <code>unique_together</code> from a form, where DRF's serializer
 validator says <code>unique</code>. They come through as Django raised them rather than
 translated to a guess.</p>
-<p>Two have no DRF field to follow. DRF ignores a key a serializer does not
+<p>One has no DRF field to follow. DRF ignores a key a serializer does not
 declare, so it has no code for refusing one, and <code>unknown</code> names the
-<a href="#the-closed-argument-set">policy</a> that refused it. And a body DRF cannot parse
-is its <code>ParseError</code>, which is not a validation error there and is here, so
-<code>parse_error</code> is that exception's own code. A free-form <code>object</code> is <code>invalid</code>,
+<a href="#the-closed-argument-set">policy</a> that refused it. A free-form <code>object</code> is <code>invalid</code>,
 as a nested serializer's refusal is, where DRF's <code>DictField</code> would say
 <code>not_a_dict</code>. An empty <code>many</code> list refused by <code>many_min_length=1</code> is
 <code>min_length</code>, as its message says, where a <code>ListSerializer</code> with
@@ -1475,11 +1463,10 @@ list detail goes under <code>non_field_errors</code>, where a message about the 
 a whole sits in an <code>InvalidArguments</code> tree too. A service's own refusal that
 names no field (<code>ServiceError</code> itself) is a 422: the request was understood
 and refused, which is not the same as malformed.</p>
-<p>This is the ladder
-<a class="autorefs autorefs-internal" title="error_response" href="../reference/#django_service_specs.http.error_response.error_response"><code>error_response</code></a>
-ships, statuses included, for a transport that answers over HTTP. They are
-djangorestframework-services' statuses;
-<a href="../http/">Serving over HTTP</a> has the whole of it.</p>
+<p>The statuses are djangorestframework-services'. A transport answering over
+HTTP need not write its own ladder:
+<a href="https://artui.github.io/django-spec-html/">django-spec-html</a> ships one, and
+<a href="https://artui.github.io/django-spec-html/http/#refusals">its documentation</a> has the whole of it.</p>
 <p>Configuration errors are neither family. A spec with no permission check, a
 parameter named after a pool seed, shaping declared on a selector that returns
 no queryset: each raises Django's <code>ImproperlyConfigured</code>, because it is the
