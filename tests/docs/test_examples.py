@@ -57,7 +57,6 @@ from django_service_specs import (
     check_server_arguments,
     coerce_flat,
     dispatch,
-    error_response,
     kernel_spec,
     present,
     server_owned_keys,
@@ -622,36 +621,42 @@ class TestTransport:
         assert transport.answer(spec, ada, {"title": "Final"}) == expected
 
     @pytest.mark.parametrize(
-        "refusal",
+        ("refusal", "expected"),
         [
-            InvalidArguments({"title": ["Too dull."]}),
-            NotPermitted("No."),
-            PrincipalUnavailable(),
-            ServiceValidationError({"title": ["Too dull."]}),
-            ServiceValidationError("Pick another day."),
-            ServiceValidationError(["One.", "Two."]),
-            ServiceNotFound("No such shelf."),
-            ServiceConflict("Taken."),
-            ServiceError("Not today."),
+            (InvalidArguments({"title": ["Too dull."]}), (400, {"title": ["Too dull."]})),
+            (NotPermitted("No."), (403, {"detail": "No."})),
+            (PrincipalUnavailable(), (403, {"detail": "The acting principal is unavailable."})),
+            (ServiceValidationError({"title": ["Too dull."]}), (400, {"title": ["Too dull."]})),
+            (
+                ServiceValidationError("Pick another day."),
+                (400, {"non_field_errors": ["Pick another day."]}),
+            ),
+            (
+                ServiceValidationError(["One.", "Two."]),
+                (400, {"non_field_errors": ["One.", "Two."]}),
+            ),
+            (ServiceNotFound("No such shelf."), (404, {"detail": "No such shelf."})),
+            (ServiceConflict("Taken."), (409, {"detail": "Taken."})),
+            (ServiceError("Not today."), (422, {"detail": "Not today."})),
             # A base may be raised bare, so the ladder answers it below its subclasses.
-            DispatchError("Not dispatched."),
+            (DispatchError("Not dispatched."), (400, {"detail": "Not dispatched."})),
         ],
-        ids=lambda refusal: f"{type(refusal).__name__}-{refusal}",
+        ids=lambda value: f"{type(value).__name__}-{value}" if isinstance(value, Exception) else "",
     )
-    def test_the_ladder_is_the_one_error_response_ships(self, ada: Any, refusal: Any) -> None:
-        # The page says so, and the arguments page's reader copies this
-        # ladder into a transport: a status that drifted from the shipped one
-        # would teach a client two answers to one refusal.
+    def test_the_ladder_answers_each_refusal_with_djangorestframework_services_status(
+        self, ada: Any, refusal: Any, expected: Any
+    ) -> None:
+        # The page says the statuses are djangorestframework-services', and the
+        # arguments page's reader copies this ladder into a transport: a status
+        # that drifted from those would teach a client two answers to one
+        # refusal. The table is spelled out rather than read from an HTTP
+        # transport, since none ships here.
         spec = ServiceSpec(
             service=_raising(refusal),
             permissions=[declaring.IsSignedIn()],
             validator=DataclassValidator(quickstart.Rename),
         )
-        shipped = error_response(refusal)
-        assert transport.answer(spec, ada, {"title": "Final"}) == (
-            shipped.status_code,
-            json.loads(shipped.content),
-        )
+        assert transport.answer(spec, ada, {"title": "Final"}) == expected
 
 
 @pytest.mark.django_db

@@ -36,7 +36,8 @@ def check_server_arguments(
     every name it found, in order:
 
     1. **A name that is no top-level parameter of the spec**, read as
-       [`route_arguments`][django_service_specs.http.route_arguments.route_arguments]
+       django-spec-html's
+       [`route_arguments`](https://artui.github.io/django-spec-html/reference/#django_spec_html.http.route_arguments.route_arguments)
        reads a route's kwargs: ``spec.parameters().names()``. So a field
        inside a ``many`` spec's rows cannot be bound; a read beside the list
        can. Held by test_every_undeclared_name_is_refused_in_order and

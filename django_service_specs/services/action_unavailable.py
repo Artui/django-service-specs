@@ -9,8 +9,8 @@ class ActionUnavailable(ServiceConflict):
     Raised when one of a spec's
     [`Affordance`][django_service_specs.types.affordance.Affordance] conditions
     is not met, carrying that affordance's ``code`` and its ``reason`` as the
-    message. Over HTTP it is a ``409`` whose body is
-    ``{"detail": <reason>, "code": <code>}``.
+    message. django-spec-html's ``error_response`` answers it over HTTP as a
+    ``409`` whose body is ``{"detail": <reason>, "code": <code>}``.
 
     A [`ServiceConflict`][django_service_specs.services.service_conflict.ServiceConflict]
     subclass rather than a ``code=`` argument on its parent, for three reasons. The

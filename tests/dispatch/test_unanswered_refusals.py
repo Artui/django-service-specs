@@ -27,11 +27,9 @@ from django_service_specs import (
     ServiceError,
     ServiceNotFound,
     ServiceValidationError,
-    UnsupportedMediaType,
 )
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
-from django_service_specs.http.error_response import _STATUSES, error_response
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 
@@ -42,6 +40,10 @@ SHADOWED = "shadowed_row"
 UNANSWERED = "unanswered"
 
 Fact = tuple[type[BaseException], str, type[BaseException] | None]
+
+
+class _TransportRefusal(DispatchError):
+    """A refusal a transport defines for itself, below the kernel's base."""
 
 
 def _unanswered(kind: type[BaseException]) -> Fact:
@@ -211,8 +213,8 @@ class TestThePrecedenceTrap:
     def test_a_transport_s_own_row_below_its_base_is_reported(self) -> None:
         # The check covers the kernel's refusals, but a row that can never be
         # reached is dead whoever's refusal it names.
-        found = unanswered_refusals(_rows(DispatchError, UnsupportedMediaType, ServiceError))
-        assert _facts(found) == (_shadowed(UnsupportedMediaType, DispatchError),)
+        found = unanswered_refusals(_rows(DispatchError, _TransportRefusal, ServiceError))
+        assert _facts(found) == (_shadowed(_TransportRefusal, DispatchError),)
 
     def test_both_traps_in_one_map_are_both_reported(self) -> None:
         rows = _rows(
@@ -267,10 +269,21 @@ class TestACallable:
             unanswered_refusals(answer)
 
     def test_each_refusal_carries_what_a_real_map_reads(self) -> None:
-        # error_response reads InvalidArguments' detail, ActionUnavailable's
-        # code and AdditionalInputRequired's schema; it has no unanswered
-        # value, so this proves the instances, not the map's coverage.
-        assert unanswered_refusals(error_response) == ()
+        # An HTTP map reads every refusal's message, InvalidArguments' and
+        # ServiceValidationError's detail, ActionUnavailable's code and
+        # AdditionalInputRequired's schema; reading one an instance lacks
+        # raises here. It has no unanswered value, so this proves the
+        # instances, not the map's coverage.
+        def answer(error: DispatchError | ServiceError) -> Any:
+            if isinstance(error, (InvalidArguments, ServiceValidationError)):
+                return error.detail
+            if isinstance(error, ActionUnavailable):
+                return {"detail": error.message, "code": error.code}
+            if isinstance(error, AdditionalInputRequired):
+                return {"detail": error.message, "schema": error.schema}
+            return {"detail": error.message}
+
+        assert unanswered_refusals(answer) == ()
 
     def test_invalid_arguments_carries_the_tree_the_shape_check_raises(self) -> None:
         # Compared message by message rather than by tree: a CodedMessage
@@ -293,13 +306,6 @@ class TestACallable:
                 (type(m), m, getattr(m, "code", None)) for m in real
             ]
         assert built.detail["title"][0].code == "required"
-
-
-class TestTheKernelsOwnMaps:
-    def test_the_http_statuses_answer_every_refusal(self) -> None:
-        # The ladder only: error_response's four arms above it are code, and
-        # its own tests' branch coverage holds their order.
-        assert unanswered_refusals(_STATUSES) == ()
 
 
 def test_a_table_given_as_a_generator_is_read_as_the_same_table() -> None:

@@ -1,8 +1,8 @@
 """``clean_held_to_their_columns`` leaves the form as it found it, whether validation returned or raised.
 
-What it refuses is held where its readers are tested, in
-``tests/adapters/forms/test_form_validator.py`` and
-``tests/http/test_add_argument_errors.py``. These hold what it puts back.
+What it refuses is held where its readers are tested: here in
+``tests/adapters/forms/test_form_validator.py``, and in django-spec-html's
+tests of ``add_argument_errors``. These hold what it puts back.
 """
 
 from __future__ import annotations

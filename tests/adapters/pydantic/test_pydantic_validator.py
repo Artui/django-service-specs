@@ -13,7 +13,6 @@ import pytest
 from annotated_types import Len, MaxLen, MinLen
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
-from django.test import RequestFactory
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -29,7 +28,6 @@ from pydantic_core import PydanticCustomError
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
-from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.mutations.create_from_input import create_from_input
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -684,11 +682,6 @@ class TestDecimalElements:
                 {"prices": ["1", "many"], "at": [], "on": []},
             )
         assert coded(caught.value.detail) == {"prices": {1: [("Enter a number.", "invalid")]}}
-
-    def test_a_query_string_splits_a_list_of_decimals_on_its_commas(self) -> None:
-        request = RequestFactory().get("/", {"prices": "1.5,2.25"})
-        parameters = PydanticValidator(_Dated).parameters()
-        assert request_arguments(request, parameters) == {"prices": ["1.5", "2.25"]}
 
 
 class _Row(BaseModel):

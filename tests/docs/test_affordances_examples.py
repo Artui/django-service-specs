@@ -1,8 +1,8 @@
 """The affordances page's example, run.
 
 Each test is a statement the page makes about ``docs/examples/affordances.py``.
-The page's JSON blocks are read back and compared with what ``error_response``
-answers for the refusals the example raises, so neither can drift from the
+The page's JSON blocks are read back and compared with the message, code and
+schema the refusals the example raises carry, so neither can drift from the
 other.
 """
 
@@ -24,7 +24,6 @@ from django_service_specs import (
     NotPermitted,
     ServiceNotFound,
     check_requested_input,
-    error_response,
     operation_affordances,
     spec_output_schema,
 )
@@ -39,9 +38,11 @@ def json_blocks() -> list[Any]:
     return [json.loads(block) for block in re.findall(r"```json\n(.*?)```", page, re.DOTALL)]
 
 
-def body(exc: ActionUnavailable | AdditionalInputRequired) -> tuple[int, Any]:
-    response = error_response(exc)
-    return response.status_code, json.loads(response.content)
+def body(exc: ActionUnavailable | AdditionalInputRequired) -> dict[str, Any]:
+    """The body the page shows: the detail, and the code or the schema beside it."""
+    if isinstance(exc, ActionUnavailable):
+        return {"detail": exc.message, "code": exc.code}
+    return {"detail": exc.message, "schema": exc.schema}
 
 
 @pytest.fixture
@@ -97,11 +98,11 @@ class TestEnforcing:
         with pytest.raises(ServiceNotFound):
             affordances.rename_step(ada, note, "Final")
 
-    def test_the_page_shows_the_409_error_response_answers(self, ada: Any) -> None:
+    def test_the_page_shows_the_body_the_refusal_carries(self, ada: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft", archived=True)
         with pytest.raises(ActionUnavailable) as refused:
             affordances.rename_step(ada, note, "Final")
-        assert body(refused.value) == (409, json_blocks()[0])
+        assert body(refused.value) == json_blocks()[0]
 
 
 @pytest.mark.django_db
@@ -180,12 +181,12 @@ class TestAskingForOneMoreValue:
         with pytest.raises(ImproperlyConfigured, match="shout"):
             check_requested_input(affordances.purge_spec, {"shout": {"type": "boolean"}})
 
-    def test_the_page_shows_the_422_error_response_answers(self, ada: Any) -> None:
+    def test_the_page_shows_the_question_the_refusal_carries(self, ada: Any) -> None:
         for title in ("a", "b"):
             Note.objects.create(owner=ada, title=title, archived=True)
         with pytest.raises(AdditionalInputRequired) as asked:
             affordances.purge(ada, {})
-        assert body(asked.value) == (422, json_blocks()[1])
+        assert body(asked.value) == json_blocks()[1]
 
     def test_the_page_shows_two_bodies_then_the_rows_and_their_schema(self) -> None:
         assert len(json_blocks()) == 4

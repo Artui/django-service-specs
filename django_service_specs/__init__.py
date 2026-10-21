@@ -40,16 +40,6 @@ from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
-from django_service_specs.http.add_argument_errors import add_argument_errors
-from django_service_specs.http.adispatch_request import adispatch_request
-from django_service_specs.http.async_spec_view import AsyncSpecView
-from django_service_specs.http.dispatch_request import dispatch_request
-from django_service_specs.http.error_response import error_response
-from django_service_specs.http.request_arguments import request_arguments
-from django_service_specs.http.request_principal import request_principal
-from django_service_specs.http.route_arguments import route_arguments
-from django_service_specs.http.spec_view import SpecView
-from django_service_specs.http.unsupported_media_type import UnsupportedMediaType
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.mutations.adelete_collection import adelete_collection
@@ -176,7 +166,6 @@ __all__ = [
     "AdditionalInputRequired",
     "Affordance",
     "AsyncSelector",
-    "AsyncSpecView",
     "AudienceProjection",
     "ChangeResult",
     "ChildCollectionChange",
@@ -234,13 +223,11 @@ __all__ = [
     "ServiceValidationError",
     "SpecRegistry",
     "SpecSource",
-    "SpecView",
     "UnguardedReason",
     "UnguardedSpec",
     "UnknownArguments",
     "Unrestricted",
     "UnsetType",
-    "UnsupportedMediaType",
     "UpdateService",
     "Validated",
     "ValidationContext",
@@ -249,12 +236,10 @@ __all__ = [
     "__version__",
     "acreate_from_input",
     "acreate_model",
-    "add_argument_errors",
     "adelete_collection",
     "adelete_model",
     "adelete_relations",
     "adispatch",
-    "adispatch_request",
     "aenforce_affordances",
     "amaterialize_retrieve",
     "annotate_output_schema",
@@ -286,9 +271,7 @@ __all__ = [
     "delete_model",
     "delete_relations",
     "dispatch",
-    "dispatch_request",
     "enforce_affordances",
-    "error_response",
     "expected_type_refusal",
     "filter_set_parameters",
     "implements",
@@ -310,12 +293,9 @@ __all__ = [
     "refusal_messages",
     "register_row_error",
     "relax_partial",
-    "request_arguments",
-    "request_principal",
     "resolve_callable_kwargs",
     "resolve_principal",
     "resolve_target",
-    "route_arguments",
     "run_selector",
     "run_service",
     "server_owned_keys",

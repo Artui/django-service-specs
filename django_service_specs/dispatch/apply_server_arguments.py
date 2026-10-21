@@ -49,7 +49,8 @@ def apply_server_arguments(
     raised as ``ImproperlyConfigured`` with the refusal as its cause, never
     as ``InvalidArguments``: a client refusal would ask the caller to fix a
     value it neither sent nor can see. This is where the rule parts from
-    [`route_arguments`][django_service_specs.http.route_arguments.route_arguments],
+    django-spec-html's
+    [`route_arguments`](https://artui.github.io/django-spec-html/reference/#django_spec_html.http.route_arguments.route_arguments),
     whose bad value is a client's 400, because a client chose the URL and
     nobody but the server chose a bound value. A bound name the spec does not
     declare, which

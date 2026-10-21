@@ -8,11 +8,10 @@ from typing import Any, Literal
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured, ValidationError
-from django.test import RequestFactory, override_settings
+from django.test import override_settings
 from django.utils import translation
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
-from django_service_specs.http.request_arguments import request_arguments
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -557,14 +556,6 @@ def test_a_list_declares_no_length_and_the_setting_bounds_it() -> None:
     assert coded(caught.value.detail) == {
         "prices": [("Ensure this field has no more than 2 elements.", "max_length")]
     }
-
-
-def test_a_query_string_splits_a_list_of_decimals_on_its_commas() -> None:
-    # No decimal holds a comma, so ``?prices=1.5,2.25`` is two elements, each
-    # the string it was sent as, for the Validator to read exactly.
-    request = RequestFactory().get("/", {"prices": "1.5,2.25"})
-    parameters = DataclassValidator(_Dated).parameters()
-    assert request_arguments(request, parameters) == {"prices": ["1.5", "2.25"]}
 
 
 @dataclass
