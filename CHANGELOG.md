@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`ServiceSpec.shapes` and `SelectorSpec.shapes`: the arguments that shape
+  the output.** A Parameters group beside `reads`, for what the presenter
+  renders rather than what the service does - which fields, a query over the
+  rows. It is part of `parameters()`, after the reads and before the
+  Validator's (on a `many` spec, before the list), so the schema, the closed
+  argument set and the shape check cover it as any argument; it is never
+  handed to the Validator, a provider, a selector or the service. What the
+  caller sent for it reaches the presenter alone, on
+  `PresentationContext.shapes`, whether the presenter is the spec's or its
+  output selector's. A name a read, the target selector, the `many` list or
+  the Validator also declares is refused, as is a seed's name and a key a
+  provider is annotated to fill; so is a nested selector declaring shapes of
+  its own, since the outer spec's call is the one presented.
+- **`call_context` on `ValidationContext` and `PresentationContext`: the
+  call's context.** One plain `dict` the transport creates for its natural
+  scope - a request, an agent run - shared by the Validator and the presenter
+  as the same object, so a later stage, and a nested presenter handed the same
+  context, reuses what an earlier one put there rather than computing it
+  again. It is the stages' to read and write, as a DRF serializer's `context`
+  is; the kernel writes nothing to it. A context built by hand gets an empty
+  dict of its own. Both fields trail the others and stay out of equality and
+  the hash, as `ambient` does, so an existing construction is unchanged.
+- **`PresentationContext.shapes`**: what the caller sent for the spec's
+  declared shapes, by name and read-only; an argument left out is absent
+  rather than `None`.
+- **`json_schema_extra` on `Parameter` and `OutputField`.** A mapping of the
+  JSON Schema keywords no field spells - a `pattern`, a string's
+  `maxLength`, `uniqueItems` - added to that parameter's or field's schema
+  node, so an adapter whose library declares more than a Parameter carries
+  keeps it on every route. A keyword a field states is refused at
+  construction, naming the field to declare it on, whether or not this
+  declaration sets that field: on a `Parameter`, `type`, `format`,
+  `default`, `enum`, `anyOf`, `const`, the bounds, `minItems`, `maxItems`,
+  `items`, `description`, `properties`, `required` and
+  `additionalProperties`; on an `OutputField`, `type`, `format`, `items`,
+  `enum`, `oneOf`, `const`, `title`, `properties` and `required`. A value
+  JSON cannot carry, at any depth, is refused naming its key, and the mapping
+  is held as a deep copy. It is advertised, not enforced: the shape check
+  never reads it.
+- **`ServiceSpec(returns_many=True)`: a service whose own return is a list
+  of rows.** The output half of `many`, leaving the input alone: the call
+  takes one set of arguments and dispatch presents a return that is not
+  `None` as a list, row by row, while `spec_output_schema` describes an array
+  of the item, never paged. A `None` return stays one value, so `allow_none`
+  still decides whether the schema admits `"null"`. Refused beside an
+  `output_selector_spec`, whose kind decides what is presented, and beside a
+  `many` spec with none, which presents its return as a list already. A
+  transport that pages reads it beside `many`: it pages by the spec, never by
+  a result's kind.
+
 ## [0.13.0] — 2026-10-21
 
 ### Added
