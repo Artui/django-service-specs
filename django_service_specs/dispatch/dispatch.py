@@ -231,8 +231,8 @@ def dispatch(
     No shape reaches a pool or the Validator.
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
-    selector is a LIST, or a ``many`` service with no output selector that
-    returned something, and ``"instance"`` otherwise. Nothing is presented here;
+    selector is a LIST, or a ``many`` or ``returns_many`` service with no
+    output selector that returned something, and ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
     transport that hands the object to a template never pays for rendering it.
 
