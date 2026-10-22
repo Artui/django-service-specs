@@ -157,6 +157,19 @@ class ServiceSpec(AffordanceDeclarer):
             changes nothing: a ``RETRIEVE`` re-read admits ``"null"`` already,
             and a ``LIST`` one presents its rows rather than the service's
             return.
+        returns_many: Declares that the service's own return is a list of
+            rows, each presented by the ``presenter``, for a service that takes
+            one set of arguments and hands back rows. The output half of
+            ``many``, and it leaves the input alone: the call's arguments are
+            declared as they would be without it. Dispatch presents a return
+            that is not ``None`` as a list, row by row, and
+            [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+            describes an array of the item, never paged. A ``None`` return
+            stays one value, presented as ``None``, as a ``many`` service's
+            is, so ``allow_none`` still decides whether the schema admits
+            ``"null"``. Refused beside ``many``, which presents its return as
+            a list already, and beside an ``output_selector_spec``, whose kind
+            decides what is presented.
         affordances: What must be true for this operation to be possible right
             now, as a sequence of ``Affordance`` declarations, kept as a tuple
             in declaration order. ``enforce_affordances`` answers them at the
@@ -254,6 +267,11 @@ class ServiceSpec(AffordanceDeclarer):
     # The name a ``SelectorSpec`` already uses for a value that may be ``None``,
     # so one word means one thing on both specs.
     allow_none: bool = False
+    # The output half of ``many``, named to pair with it: ``many`` declares the
+    # list a call carries in, this the list the service hands back. Not
+    # ``presents_list``: the list is presented because the service returns
+    # one, and the declaration is about the service.
+    returns_many: bool = False
     # Not ``availability``: that names the answer rather than the declaration,
     # and in Django reads as scheduling. Not ``conditions``: django-fsm's word
     # for the same idea on a transition, which would promise a state machine
@@ -322,6 +340,7 @@ class ServiceSpec(AffordanceDeclarer):
                 "value is presented once; keep the one that describes what is returned."
             )
         _check_many(self)
+        _check_returns_many(self)
         object.__setattr__(self, "affordances", _check_affordances(self))
         _check_reads(self)
         _check_shapes(self)
@@ -519,6 +538,48 @@ def _check_many(spec: ServiceSpec) -> None:
             f"ServiceSpec.many_argument, which takes no such bound: {refused}"
         ) from refused
     check_reserved(spec.reads + Parameters.of(the_list), label="ServiceSpec.many_argument")
+
+
+def _check_returns_many(spec: ServiceSpec) -> None:
+    """Refuse ``returns_many`` beside a declaration that already decides what is presented.
+
+    Beside an output selector, whose kind decides what is presented, it would
+    say something dispatch never does; beside a ``many`` spec with none, whose
+    return is presented as a list already, it would say nothing. A ``False``
+    written out declares nothing, as ``_check_many`` treats a default.
+    """
+    # The output selector first: a ``many`` spec may declare one, and then its
+    # re-read, not its return, is what is presented, so only this refusal's
+    # wording is true of it
+    # (test_beside_many_and_an_output_selector_the_output_selector_answers).
+    # Two operands in each guard, every one held by its own test in
+    # tests/specs/test_service_spec.py's TestReturnsMany:
+    # test_a_false_written_out_declares_nothing fails without the first of
+    # either ([beside-an-output-selector], [beside-many]), and
+    # test_kept_as_declared without the second of both.
+    if spec.returns_many and spec.output_selector_spec is not None:
+        # A ``many`` spec without its output selector lists its return
+        # already, so for it the one remedy is to drop the field
+        # (test_beside_many_and_an_output_selector_the_output_selector_answers;
+        # test_beside_an_output_selector_is_refused holds the other remedy).
+        instead = (
+            "remove returns_many; without the output selector, many presents the service's "
+            "own return as a list already."
+            if spec.many
+            else "remove returns_many, or remove the output selector to present the "
+            "service's own return as a list."
+        )
+        raise ImproperlyConfigured(
+            "ServiceSpec declares returns_many=True beside an output_selector_spec. The "
+            "output selector's kind decides what is presented, and a LIST re-read presents "
+            f"rows already; {instead}"
+        )
+    if spec.returns_many and spec.many:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares returns_many=True with many=True. A many spec with no "
+            "output selector already presents what its service returns as a list; remove "
+            "returns_many."
+        )
 
 
 def _check_partial(spec: ServiceSpec) -> None:

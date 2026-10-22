@@ -140,6 +140,45 @@ def test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow
     assert spec_output_schema(spec) == NULLABLE_ITEM
 
 
+class TestReturnsMany:
+    """A service declaring ``returns_many`` presents its own return as an array of the item.
+
+    Built inside each test rather than in ``test_the_shape_around_the_item``'s
+    table, so a tree without the field fails each case on its own rather than
+    the module's collection.
+    """
+
+    @pytest.mark.parametrize("paginate", [False, True], ids=["bare", "paginate-asked"])
+    @pytest.mark.parametrize(
+        ("allow_none", "expected"),
+        [
+            pytest.param(False, ARRAY, id="strict"),
+            # The ``many`` service's rule: a ``None`` return is presented as
+            # ``None``, so ``"null"`` wraps the whole array.
+            pytest.param(True, allow_null(ARRAY), id="allowing-none-admits-null-for-the-array"),
+        ],
+    )
+    def test_an_array_of_the_item_never_paged(
+        self, allow_none: bool, expected: dict[str, Any], paginate: bool
+    ) -> None:
+        # Never paged: dispatch hands back every row the service returned, so
+        # there is no page to describe, whatever a transport asks for.
+        spec = service(presenter=NoteTitle(), returns_many=True, allow_none=allow_none)
+
+        assert spec_output_schema(spec, paginate=paginate) == expected
+
+    def test_a_projection_lands_on_the_array_s_items(self) -> None:
+        spec = service(presenter=InvoicePresenter(), returns_many=True)
+
+        schema = spec_output_schema(
+            spec,
+            projection=audience_projection_for_spec(spec),
+            handle_description=HANDLE_DESCRIPTION,
+        )
+
+        assert schema == {"type": "array", "items": PROJECTED_SCHEMA}
+
+
 @pytest.mark.django_db
 class TestWhatDispatchPresents:
     """Each shape above, against what ``dispatch`` and ``present`` actually return."""

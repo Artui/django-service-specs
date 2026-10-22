@@ -551,6 +551,127 @@ class TestMany:
         assert spec.affordances == (ON_NOTHING,)
 
 
+class TestReturnsMany:
+    """``returns_many``: the service's own return is a list of rows, the output half of ``many``.
+
+    Every spec here is built inside its test, as in ``TestMany``, so a tree
+    without the field fails each test on its own rather than the module. What
+    dispatch does with the field is in tests/dispatch/test_returns_many.py.
+    """
+
+    def test_off_by_default(self) -> None:
+        assert ServiceSpec(service=print).returns_many is False
+
+    def test_kept_as_declared(self) -> None:
+        assert ServiceSpec(service=print, returns_many=True).returns_many is True
+
+    def test_the_input_is_left_alone(self) -> None:
+        # The call's arguments are declared as they are without the field: no
+        # list of rows, no ``many_argument``.
+        declared: dict[str, Any] = {
+            "service": print,
+            "validator": Titled(),
+            "instance_selector_spec": RETRIEVE,
+        }
+        plain = ServiceSpec(**declared)
+        listed = ServiceSpec(**declared, returns_many=True)
+        assert listed.parameters() == plain.parameters()
+        assert spec_input_schema(listed) == spec_input_schema(plain)
+
+    def test_beside_many_is_refused(self) -> None:
+        # Sized with a Validator, so ``_check_many`` passes and this is the
+        # refusal that answers.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True, validator=Titled(), returns_many=True)
+        message = str(refused.value)
+        assert message.startswith("ServiceSpec declares returns_many=True with many=True.")
+        assert message.endswith("remove returns_many.")
+        assert "no validator" not in message
+
+    @pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
+    def test_beside_an_output_selector_is_refused(self, kind: SelectorKind) -> None:
+        reread = SelectorSpec(kind=kind, selector=list)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, output_selector_spec=reread, returns_many=True)
+        message = str(refused.value)
+        assert message.startswith(
+            "ServiceSpec declares returns_many=True beside an output_selector_spec."
+        )
+        assert message.endswith(
+            "remove returns_many, or remove the output selector to present the service's "
+            "own return as a list."
+        )
+
+    @pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
+    def test_beside_many_and_an_output_selector_the_output_selector_answers(
+        self, kind: SelectorKind
+    ) -> None:
+        # Both refusals could answer this input, and only one is true of it: a
+        # ``many`` spec with a re-read presents what the re-read returns, one
+        # value for a RETRIEVE, never the service's return as a list. Sized
+        # with a Validator, so ``_check_many`` passes.
+        reread = SelectorSpec(kind=kind, selector=list)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(
+                service=print,
+                many=True,
+                validator=Titled(),
+                output_selector_spec=reread,
+                returns_many=True,
+            )
+        message = str(refused.value)
+        assert message.startswith(
+            "ServiceSpec declares returns_many=True beside an output_selector_spec."
+        )
+        # The remedy names only what clears the refusal: without the re-read,
+        # the many refusal would answer next.
+        assert message.endswith(
+            "remove returns_many; without the output selector, many presents the service's "
+            "own return as a list already."
+        )
+        assert "with many=True" not in message
+        assert "already presents what its service returns" not in message
+
+    @pytest.mark.parametrize(
+        "declared",
+        [
+            pytest.param({"many": True, "validator": Titled()}, id="beside-many"),
+            pytest.param({"output_selector_spec": LIST}, id="beside-an-output-selector"),
+        ],
+    )
+    def test_a_false_written_out_declares_nothing(self, declared: dict[str, Any]) -> None:
+        # The other half of each refusal above: the field carries its default
+        # on every spec, so the default alone refuses nothing.
+        assert ServiceSpec(service=print, **declared, returns_many=False).returns_many is False
+
+    def test_derive_carries_the_field(self) -> None:
+        base = ServiceSpec(service=print, returns_many=True)
+        assert base.derive(atomic=False).returns_many is True
+        assert base.derive(returns_many=False).returns_many is False
+
+    @pytest.mark.parametrize(
+        ("base", "changes"),
+        [
+            pytest.param(
+                {"returns_many": True},
+                {"many": True, "validator": Titled()},
+                id="many-onto-a-returns-many-spec",
+            ),
+            pytest.param(
+                {"output_selector_spec": LIST},
+                {"returns_many": True},
+                id="returns-many-onto-a-spec-with-an-output-selector",
+            ),
+        ],
+    )
+    def test_derive_refuses_what_construction_refuses(
+        self, base: dict[str, Any], changes: dict[str, Any]
+    ) -> None:
+        spec = ServiceSpec(service=print, **base)
+        with pytest.raises(ImproperlyConfigured, match=r"^ServiceSpec declares returns_many=True"):
+            spec.derive(**changes)
+
+
 class _AsyncValidate(Titled):
     async def validate(  # A coroutine nobody awaits, where the values should be.
         self, arguments: Mapping[str, Any], context: ValidationContext
