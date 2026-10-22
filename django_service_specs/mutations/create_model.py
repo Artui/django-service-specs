@@ -5,7 +5,7 @@ from typing import Any
 
 from django_service_specs.mutations.change_result import ModelT
 from django_service_specs.mutations.create_from_input import create_from_input
-from django_service_specs.mutations.utils import resolve_m2m
+from django_service_specs.mutations.utils import handed_on, resolve_m2m
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -40,12 +40,15 @@ def create_model(
     since the row is what a create's output presents. It opens no transaction:
     dispatch runs a service inside one, which covers the row and every nested
     write. It takes ``**kwargs``, so the rest of the pool - the ``user`` and
-    any registered seed - is absorbed rather than refused, and the same pool
-    is handed on as the helper's ``context``, so a row service a relation spec
-    declares can see who is calling.
+    any registered seed - is absorbed rather than refused. It names
+    ``call_context``, which a catch-all is never handed, and the same pool
+    with the call's context beside it is handed on as the helper's
+    ``context``, so a row service a relation spec declares can see who is
+    calling and, by naming ``call_context``, the very dict the call's other
+    stages share.
     """
 
-    def _service(*, data: Any, **kwargs: Any) -> ModelT:
+    def _service(*, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any) -> ModelT:
         return create_from_input(
             model,
             data,
@@ -53,7 +56,7 @@ def create_model(
             exclude_fields=exclude_fields,
             m2m=resolve_m2m(m2m, data),
             relations=relations,
-            context=kwargs,
+            context=handed_on(kwargs, call_context),
         ).instance
 
     return _service

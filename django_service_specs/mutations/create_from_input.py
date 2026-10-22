@@ -48,7 +48,9 @@ def create_from_input(
     of every row service a relation spec declares and of every ``scope`` callable. This
     helper never reads it — it exists so per-row work downstream can see the acting
     caller. A service opts in by handing on the pool it was called with,
-    ``context=kwargs``."""
+    ``context=kwargs``. A catch-all is never handed the call's context, so a
+    service whose nested callables should see it names ``call_context`` and
+    hands it on beside the pool, as ``create_model``'s service does."""
     return create_instance(
         model,
         data,

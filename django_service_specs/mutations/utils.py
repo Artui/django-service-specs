@@ -23,6 +23,7 @@ from django_service_specs.relations.relation_spec import RelationSpec
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import CALL_CONTEXT
 
 
 def coerce_to_dict(data: Any) -> dict[str, Any]:
@@ -568,3 +569,16 @@ def sync_collection_cache(parent: Model, change: ChildCollectionChange, spec: Re
     cache: dict[str, Any] | None = getattr(parent, "_prefetched_objects_cache", None)
     if cache is not None:
         cache.pop(change.relation, None)
+
+
+def handed_on(pool: Mapping[str, Any], call_context: dict[str, Any] | None) -> dict[str, Any]:
+    """A mutation helper's pool, as the context it hands its nested row services and scopes.
+
+    ``call_context`` is the call's context, which a ``**kwargs`` service is
+    never handed (``resolve_callable_kwargs``), so the helper's service names
+    it to carry it on: a nested callable naming it is handed the very dict,
+    and one taking ``**kwargs`` is not, by the same rule
+    (test_the_call_context_reaches_a_row_service_that_names_it). Called with
+    none, off dispatch, the nested callables share a fresh dict.
+    """
+    return {**pool, CALL_CONTEXT: {} if call_context is None else call_context}

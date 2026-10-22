@@ -5,7 +5,7 @@ from typing import Any
 
 from django_service_specs.mutations.aupdate_from_input import aupdate_from_input
 from django_service_specs.mutations.change_result import ModelT
-from django_service_specs.mutations.utils import resolve_m2m
+from django_service_specs.mutations.utils import handed_on, resolve_m2m
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -24,7 +24,9 @@ def aupdate_model(
     [`aupdate_from_input`][django_service_specs.mutations.aupdate_from_input.aupdate_from_input].
     """
 
-    async def _service(*, instance: ModelT, data: Any, **kwargs: Any) -> ModelT:
+    async def _service(
+        *, instance: ModelT, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any
+    ) -> ModelT:
         result = await aupdate_from_input(
             instance,
             data,
@@ -33,7 +35,7 @@ def aupdate_model(
             m2m=resolve_m2m(m2m, data),
             update_fields=update_fields,
             relations=relations,
-            context=kwargs,
+            context=handed_on(kwargs, call_context),
         )
         return result.instance
 

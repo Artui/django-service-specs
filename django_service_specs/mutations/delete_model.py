@@ -5,7 +5,7 @@ from typing import Any
 
 from django_service_specs.mutations.change_result import ModelT
 from django_service_specs.mutations.delete_relations import delete_relations
-from django_service_specs.mutations.utils import relation_map
+from django_service_specs.mutations.utils import handed_on, relation_map
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -52,14 +52,17 @@ def delete_model(
 
     The service opens no transaction: dispatch runs it inside one, so a refused
     cascade leaves every row in place. It absorbs the rest of the pool and
-    hands it on as the cascade's ``context``, so a row's ``delete_service`` can
-    see who is calling.
+    hands it on, with the call's context it names, as the cascade's
+    ``context``, so a row's ``delete_service`` can see who is calling and,
+    by naming ``call_context``, the very dict the call's other stages share.
     """
     declared = relation_map(relations)
 
-    def _service(*, instance: ModelT, **kwargs: Any) -> None:
+    def _service(
+        *, instance: ModelT, call_context: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         if declared:
-            delete_relations(instance, relations=declared, context=kwargs)
+            delete_relations(instance, relations=declared, context=handed_on(kwargs, call_context))
         if soft_delete is not None:
             soft_delete(instance)
         else:

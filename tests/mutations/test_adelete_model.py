@@ -13,7 +13,7 @@ from django.db.models.signals import post_delete
 from django_service_specs.mutations.adelete_model import adelete_model
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.types.is_async import is_async
-from tests.mutations.utils import savepoints_during
+from tests.mutations.utils import bound_call, savepoints_during
 from tests.relations_app.models import Author, Catalog, Item, Section
 
 
@@ -99,6 +99,25 @@ class TestADeleteModel:
         }
         await adelete_model(Catalog, relations=relations)(instance=await _catalog(), user="caller")
         assert seen == ["caller"]
+
+    async def test_the_call_context_reaches_a_rows_delete_service_that_names_it(self) -> None:
+        seen: list[Any] = []
+        context: dict[str, Any] = {}
+
+        async def delete_section(*, instance: Section, call_context: Any) -> None:
+            seen.append(call_context)
+            await instance.adelete()
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", delete_service=delete_section)
+        }
+        await bound_call(
+            adelete_model(Catalog, relations=relations),
+            instance=await _catalog(),
+            call_context=context,
+        )
+        assert len(seen) == 1
+        assert seen[0] is context
 
     async def test_an_empty_map_leaves_the_rows_to_the_database(self, deleted: list[str]) -> None:
         await adelete_model(Catalog, relations={})(instance=await _catalog())
