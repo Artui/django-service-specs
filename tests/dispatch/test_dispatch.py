@@ -10,6 +10,7 @@ from typing import Any, cast
 from unittest import mock
 
 import pytest
+from asgiref.sync import async_to_sync
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -29,6 +30,7 @@ from django_service_specs.adapters.pydantic.pydantic_validator import PydanticVa
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -57,6 +59,7 @@ from tests.dispatch.utils import (
     PK,
     TENANT_SEEDS,
     Arguing,
+    Contextual,
     Listed,
     OwnerOnly,
     Record,
@@ -438,7 +441,9 @@ def test_a_selector_receives_the_pool_and_only_its_declared_reads(ada: Any) -> N
 
     dispatch(spec, principal=ada, arguments={"q": "x"})
 
-    assert selector.calls == [{"user": ada, "progress": null_progress, "q": "x"}]
+    assert selector.calls == [
+        {"user": ada, "progress": null_progress, "call_context": {}, "q": "x"}
+    ]
 
 
 def test_a_selector_spec_s_rows_are_shaped(ada: Any, bob: Any) -> None:
@@ -552,7 +557,13 @@ def test_a_create_runs_with_the_validated_values_and_no_target(ada: Any) -> None
     result = dispatch(spec, principal=ada, arguments={"title": "  Hello "})
 
     assert service.calls == [
-        {"user": ada, "progress": null_progress, "data": {"title": "Hello"}, "title": "Hello"}
+        {
+            "user": ada,
+            "progress": null_progress,
+            "call_context": {},
+            "data": {"title": "Hello"},
+            "title": "Hello",
+        }
     ]
     assert validator.calls[0][1].target is None
     assert result == DispatchResult(
@@ -585,6 +596,7 @@ def test_an_update_resolves_the_row_before_validating_and_hands_it_to_both(ada: 
         {
             "user": ada,
             "progress": null_progress,
+            "call_context": {},
             "data": {"title": "new"},
             "title": "new",
             "instance": note,
@@ -605,7 +617,7 @@ def test_a_target_selector_receives_only_its_own_reads(ada: Any) -> None:
 
     dispatch(spec, principal=ada, arguments={"pk": 7, "title": "t"})
 
-    assert selector.calls == [{"user": ada, "progress": null_progress, "pk": 7}]
+    assert selector.calls == [{"user": ada, "progress": null_progress, "call_context": {}, "pk": 7}]
 
 
 def test_an_update_of_a_missing_row_is_not_found_and_nothing_else_runs(ada: Any) -> None:
@@ -636,7 +648,9 @@ def test_an_upsert_s_missing_row_reaches_the_service_as_none_unchecked(ada: Any)
 
     result = dispatch(spec, principal=ada, arguments={"pk": 404})
 
-    assert service.calls == [{"user": ada, "progress": null_progress, "data": {}, "instance": None}]
+    assert service.calls == [
+        {"user": ada, "progress": null_progress, "call_context": {}, "data": {}, "instance": None}
+    ]
     assert check.rows == []
     assert result.value == "upserted"
 
@@ -686,7 +700,7 @@ def test_a_collection_is_passed_as_collection_and_never_object_checked(ada: Any,
     result = dispatch(spec, principal=ada, arguments={})
 
     (pool,) = service.calls
-    assert set(pool) == {"user", "progress", "data", "collection"}
+    assert set(pool) == {"user", "progress", "call_context", "data", "collection"}
     assert list(pool["collection"]) == list(Note.objects.all())
     assert result.instance is pool["collection"]
     assert result.kind == "instance"
@@ -710,7 +724,13 @@ def test_the_output_selector_re_reads_with_only_the_service_s_return_in_its_pool
     result = dispatch(spec, principal=ada, arguments={"title": "t"})
 
     assert reread.calls == [
-        {"user": ada, "progress": null_progress, "instance": note, "result": note}
+        {
+            "user": ada,
+            "progress": null_progress,
+            "call_context": {},
+            "instance": note,
+            "result": note,
+        }
     ]
     assert result.kind == "instance"
     assert result.value.label == "mine!"
@@ -1644,7 +1664,7 @@ def test_a_callable_taking_the_whole_pool_is_never_missing_anything(ada: Any) ->
         kind=LIST, selector=lambda **tenant: sorted(tenant), reads=TENANT_READ, permissions=OPEN
     )
 
-    assert dispatch(spec, principal=ada, arguments={}).value == ["progress", "user"]
+    assert dispatch(spec, principal=ada, arguments={}).value == ["call_context", "progress", "user"]
 
 
 def test_a_positional_only_parameter_is_not_reported(ada: Any) -> None:
@@ -2359,8 +2379,9 @@ def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
 def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
     ada: Any, asynchronous: bool
 ) -> None:
-    # As a service spec's is: the seeds, never the reads the caller sent, so a
-    # provider taking the whole pool sees what ``base_pool`` holds and no more.
+    # As a service spec's is: the seeds and the call's context, never the
+    # reads the caller sent, so a provider taking the whole pool sees what
+    # ``base_pool`` holds and the context, and no more.
     seen: list[list[str]] = []
 
     def provider(**pool: Any) -> Any:
@@ -2383,7 +2404,7 @@ def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
         progress_reporter=provider,
     )
     dispatch(spec, principal=ada, arguments={"title": "Ada's"})
-    assert seen == [["progress", "user"]]
+    assert seen == [["call_context", "progress", "user"]]
 
 
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
@@ -4723,3 +4744,628 @@ class TestArgumentsChannel:
         )
         dispatch(spec, principal=ada, arguments={"project_pk": 99, "title": "caller"})
         assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]
+
+
+# The call's context: one plain dict, the transport's, handed to every stage
+# that declares it as the same object.
+
+_ENTRIES = pytest.mark.parametrize(
+    "entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"]
+)
+
+
+class _Saw:
+    """Records the call's context each stage was handed, by the stage's name."""
+
+    def __init__(self) -> None:
+        self.contexts: dict[str, list[Any]] = {}
+
+    def __call__(self, stage: str, call_context: Any) -> None:
+        self.contexts.setdefault(stage, []).append(call_context)
+
+    def all_are(self, expected: Any) -> bool:
+        return all(seen is expected for seen in self.every())
+
+    def every(self) -> list[Any]:
+        return [seen for contexts in self.contexts.values() for seen in contexts]
+
+
+class _ContextCheck(PermissionCheck):
+    """Admits everything; each question declares the call's context and records it."""
+
+    def __init__(self, saw: _Saw) -> None:
+        self.saw = saw
+
+    def has_permission(self, principal: Any, spec: Any, *, call_context: Any) -> bool:
+        self.saw("has_permission", call_context)
+        return True
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, call_context: Any
+    ) -> bool:
+        self.saw("has_object_permission", call_context)
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, call_context: Any
+    ) -> bool:
+        self.saw("has_scope_permission", call_context)
+        return True
+
+
+class _ContextValidator(Titled):
+    """``Titled``, recording the ``call_context`` on the context it is handed."""
+
+    def __init__(self, saw: _Saw) -> None:
+        super().__init__()
+        self.saw = saw
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.saw("validator", context.call_context)
+        return super().validate(arguments, context)
+
+
+def _every_stage(saw: _Saw, presenter: Any) -> ServiceSpec:
+    """An update declaring every stage dispatch resolves, each recording the context it is handed."""
+
+    def instance(*, pk: int, call_context: Any) -> Any:
+        saw("instance_selector", call_context)
+        return Note.objects.filter(pk=pk)
+
+    def provider(*, call_context: Any) -> dict[str, Any]:
+        saw("kwargs", call_context)
+        return {}
+
+    def server_input(*, call_context: Any) -> dict[str, Any]:
+        saw("input_data", call_context)
+        return {}
+
+    def when(*, call_context: Any) -> bool:
+        saw("affordance", call_context)
+        return True
+
+    def precondition(*, call_context: Any) -> None:
+        saw("precondition", call_context)
+
+    def service(*, instance: Any, call_context: Any) -> Any:
+        saw("service", call_context)
+        return instance
+
+    def reread(*, result: Any, call_context: Any) -> Any:
+        saw("output_selector", call_context)
+        return Note.objects.filter(pk=result.pk)
+
+    return ServiceSpec(
+        service=service,
+        permissions=(_ContextCheck(saw),),
+        validator=_ContextValidator(saw),
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=instance, reads=PK),
+        kwargs=provider,
+        input_data=server_input,
+        affordances=[Affordance(code="open", reason="Never refused.", when=when)],
+        preconditions=[precondition],
+        output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=reread, presenter=presenter),
+    )
+
+
+class TestTheCallContext:
+    """``call_context``: the transport's dict, handed to every stage as one object."""
+
+    @_ENTRIES
+    def test_every_stage_that_declares_it_is_handed_the_very_dict_passed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """An empty dict included, which an ``or {}`` would swap for another."""
+        note = Note.objects.create(title="n", owner=ada)
+        saw = _Saw()
+        presenter = Contextual()
+        call_context: dict[str, Any] = {}
+        result = entry(
+            _every_stage(saw, presenter),
+            principal=ada,
+            arguments={"pk": note.pk, "title": "t"},
+            call_context=call_context,
+        )
+        present(_every_stage(saw, presenter), result)
+        saw("presenter", presenter.contexts[0].call_context)
+        assert set(saw.contexts) == {
+            "has_permission",
+            "instance_selector",
+            "has_object_permission",
+            "input_data",
+            "validator",
+            "kwargs",
+            "affordance",
+            "precondition",
+            "service",
+            "output_selector",
+            "presenter",
+        }
+        assert saw.all_are(call_context)
+        assert result.context.call_context is call_context
+        # The kernel writes nothing to it.
+        assert call_context == {}
+
+    @_ENTRIES
+    def test_a_selector_spec_s_stages_are_handed_the_very_dict_passed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        saw = _Saw()
+
+        def rows(*, call_context: Any) -> Any:
+            saw("selector", call_context)
+            return Note.objects.all()
+
+        def provider(*, call_context: Any) -> dict[str, Any]:
+            saw("kwargs", call_context)
+            return {}
+
+        def precondition(*, call_context: Any) -> None:
+            saw("precondition", call_context)
+
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=rows,
+            permissions=(_ContextCheck(saw),),
+            kwargs=provider,
+            preconditions=[precondition],
+        )
+        call_context: dict[str, Any] = {}
+        result = entry(spec, principal=ada, arguments={}, call_context=call_context)
+        assert set(saw.contexts) == {
+            "has_permission",
+            "kwargs",
+            "selector",
+            "has_scope_permission",
+            "precondition",
+        }
+        assert saw.all_are(call_context)
+        assert result.context.call_context is call_context
+
+    @_ENTRIES
+    def test_a_call_handed_none_gets_a_fresh_dict_its_stages_share(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """One per call, never one shared between calls, and empty: a stage
+        that writes to it needs no guard for a transport that has none."""
+        note = Note.objects.create(title="n", owner=ada)
+        saw = _Saw()
+        presenter = Contextual()
+        spec = _every_stage(saw, presenter)
+        first = entry(spec, principal=ada, arguments={"pk": note.pk, "title": "t"})
+        second = entry(spec, principal=ada, arguments={"pk": note.pk, "title": "t"})
+        assert isinstance(first.context.call_context, dict)
+        assert first.context.call_context == {}
+        assert first.context.call_context is not second.context.call_context
+        validator_contexts = saw.contexts["validator"]
+        assert validator_contexts[0] is first.context.call_context
+        assert validator_contexts[1] is second.context.call_context
+        assert len({id(seen) for seen in saw.every()}) == 2
+
+    @_ENTRIES
+    def test_a_later_stage_reads_what_an_earlier_stage_wrote(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """The provider computes once and keeps the value; the presenter reuses it."""
+        computed: list[str] = []
+
+        def provider(*, call_context: Any) -> dict[str, Any]:
+            computed.append("tenant")
+            call_context.setdefault("tenant", "acme")
+            return {}
+
+        class _ReadsTenant(Contextual):
+            def presented(self, value: Any, context: Any) -> Any:
+                return {"title": value.title, "tenant": context.call_context["tenant"]}
+
+        note = Note.objects.create(title="n", owner=ada)
+        spec = ServiceSpec(
+            service=lambda: note,
+            permissions=OPEN,
+            kwargs=provider,
+            presenter=_ReadsTenant(),
+        )
+        result = entry(spec, principal=ada, arguments={})
+        assert present(spec, result) == {"title": "n", "tenant": "acme"}
+        assert computed == ["tenant"]
+
+    @_ENTRIES
+    def test_every_row_of_a_list_shares_the_one_dict(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        Note.objects.create(title="a", owner=ada)
+        Note.objects.create(title="b", owner=ada)
+        presenter = Contextual()
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=lambda: Note.objects.order_by("title"),
+            permissions=OPEN,
+            presenter=presenter,
+        )
+        call_context: dict[str, Any] = {}
+        result = entry(spec, principal=ada, arguments={}, call_context=call_context)
+        assert present(spec, result) == [{"title": "a"}, {"title": "b"}]
+        assert [seen.call_context for seen in presenter.contexts] == [{}, {}]
+        assert all(seen.call_context is call_context for seen in presenter.contexts)
+
+    @_ENTRIES
+    def test_ambient_holds_the_seeds_and_never_the_call_context(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """It has a field of its own; ``ambient`` stays the read-only seeds."""
+        note = Note.objects.create(title="n", owner=ada)
+        validator = Titled()
+        service = ServiceSpec(service=lambda: note, permissions=OPEN, validator=validator)
+        selector = SelectorSpec(kind=LIST, selector=Note.objects.all, permissions=OPEN)
+        served = entry(service, principal=ada, arguments={"title": "t"}, pool_seeds=TENANT_SEEDS)
+        read = entry(selector, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+        for ambient in (
+            validator.calls[0][1].ambient,
+            served.context.ambient,
+            read.context.ambient,
+        ):
+            assert set(ambient) == {"user", "progress", "tenant"}
+
+
+@_ENTRIES
+@pytest.mark.parametrize("kind", ["service", "selector"])
+def test_a_progress_provider_is_handed_the_call_context_on_either_kind_of_spec(
+    entry: Callable[..., Any], kind: str, ada: Any
+) -> None:
+    """The run's ``progress_reporter`` provider is a stage like any other."""
+    handed: list[Any] = []
+
+    def provider(*, call_context: Any) -> Any:
+        handed.append(call_context)
+        return None
+
+    def run(*, progress: Any) -> Any:
+        progress(1.0)
+        return Note.objects.none()
+
+    spec: ServiceSpec | SelectorSpec = (
+        ServiceSpec(service=run, permissions=OPEN, progress_reporter=provider)
+        if kind == "service"
+        else SelectorSpec(kind=LIST, selector=run, permissions=OPEN, progress_reporter=provider)
+    )
+    context: dict[str, Any] = {}
+    entry(spec, principal=ada, arguments={}, call_context=context)
+    assert len(handed) == 1
+    assert handed[0] is context
+
+
+@_ENTRIES
+@pytest.mark.parametrize("seat", ["kwargs", "extra_kwargs"])
+def test_no_provider_or_overlay_may_replace_the_call_context(
+    entry: Callable[..., Any], seat: str, ada: Any
+) -> None:
+    """Reserved, so the dict every stage shares is never swapped for another."""
+    changes: dict[str, Any] = (
+        {"spec": {"kwargs": lambda: {"call_context": {}}}}
+        if seat == "kwargs"
+        else {"call": {"extra_kwargs": {"call_context": {}}}}
+    )
+    spec = ServiceSpec(service=Record(), permissions=OPEN, **changes.get("spec", {}))
+    with pytest.raises(ImproperlyConfigured, match="call_context"):
+        entry(spec, principal=ada, arguments={}, **changes.get("call", {}))
+
+
+class TestAsyncRunsCarryTheCallContext:
+    """The paths ``adispatch`` awaits on the loop carry the one dict across their hops."""
+
+    def test_an_awaited_service_s_presenter_reads_the_dict_passed(self, ada: Any) -> None:
+        saw = _Saw()
+
+        async def service(*, call_context: Any) -> Any:
+            saw("service", call_context)
+            return Note.objects.none()
+
+        presenter = Contextual()
+        spec = ServiceSpec(
+            service=service,
+            permissions=OPEN,
+            atomic=False,
+            output_selector_spec=SelectorSpec(
+                kind=LIST, selector=lambda *, call_context: Note.objects.none(), presenter=presenter
+            ),
+        )
+        call_context: dict[str, Any] = {}
+        result = async_to_sync(adispatch)(
+            spec, principal=ada, arguments={}, call_context=call_context
+        )
+        assert saw.all_are(call_context)
+        assert result.context.call_context is call_context
+
+    def test_an_awaited_selector_spec_s_stages_read_the_dict_passed(self, ada: Any) -> None:
+        saw = _Saw()
+
+        async def rows(*, call_context: Any) -> Any:
+            saw("selector", call_context)
+            return Note.objects.all()
+
+        def precondition(*, call_context: Any) -> None:
+            saw("precondition", call_context)
+
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=rows,
+            permissions=(_ContextCheck(saw),),
+            preconditions=[precondition],
+        )
+        call_context: dict[str, Any] = {}
+        result = async_to_sync(adispatch)(
+            spec, principal=ada, arguments={}, call_context=call_context
+        )
+        assert set(saw.contexts) == {
+            "has_permission",
+            "selector",
+            "has_scope_permission",
+            "precondition",
+        }
+        assert saw.all_are(call_context)
+        assert result.context.call_context is call_context
+
+    def test_an_awaited_retrieve_that_finds_nothing_carries_the_dict_passed(self, ada: Any) -> None:
+        async def row() -> Any:
+            raise Note.DoesNotExist
+
+        spec = SelectorSpec(kind=RETRIEVE, selector=row, permissions=OPEN, allow_none=True)
+        call_context: dict[str, Any] = {}
+        result = async_to_sync(adispatch)(
+            spec, principal=ada, arguments={}, call_context=call_context
+        )
+        assert result.value is None
+        assert result.context.call_context is call_context
+
+
+FIELDS_SHAPE = Parameters.of(Parameter("fields", "array", items="string"))
+QUERY_SHAPE = Parameters.of(Parameter("query", "string"))
+
+
+class TestShapesReachThePresenter:
+    """``PresentationContext.shapes``: what the caller sent for the spec's ``shapes``."""
+
+    @_ENTRIES
+    def test_an_output_selector_s_presenter_receives_the_service_spec_s_shapes(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        presenter = Contextual()
+        spec = ServiceSpec(
+            service=lambda: note,
+            permissions=OPEN,
+            shapes=FIELDS_SHAPE + QUERY_SHAPE,
+            output_selector_spec=SelectorSpec(
+                kind=RETRIEVE,
+                selector=lambda *, result: Note.objects.filter(pk=result.pk),
+                presenter=presenter,
+            ),
+        )
+        result = entry(spec, principal=ada, arguments={"fields": ["title"], "query": "q"})
+        present(spec, result)
+        assert dict(presenter.contexts[0].shapes) == {"fields": ["title"], "query": "q"}
+
+    @_ENTRIES
+    def test_a_selector_spec_s_presenter_receives_its_shapes(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        Note.objects.create(title="n", owner=ada)
+        presenter = Contextual()
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=Note.objects.all,
+            permissions=OPEN,
+            shapes=FIELDS_SHAPE,
+            presenter=presenter,
+        )
+        result = entry(spec, principal=ada, arguments={"fields": ["title"]})
+        present(spec, result)
+        assert dict(presenter.contexts[0].shapes) == {"fields": ["title"]}
+
+    @_ENTRIES
+    def test_shapes_are_read_only_and_an_unsent_one_is_absent(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        spec = ServiceSpec(
+            service=lambda: note, permissions=OPEN, shapes=FIELDS_SHAPE + QUERY_SHAPE
+        )
+        shapes = entry(spec, principal=ada, arguments={"query": "q"}).context.shapes
+        assert dict(shapes) == {"query": "q"}
+        assert "fields" not in shapes
+        with pytest.raises(TypeError):
+            cast(Any, shapes)["query"] = "other"
+
+    @_ENTRIES
+    def test_no_other_argument_is_among_the_shapes(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Only the declared shapes: never a read, a target's read or a Validator field."""
+        note = Note.objects.create(title="n", owner=ada)
+        spec = ServiceSpec(
+            service=lambda: note,
+            permissions=OPEN,
+            reads=Parameters.of(Parameter("tag", "string")),
+            validator=Titled(),
+            instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+            shapes=QUERY_SHAPE,
+        )
+        result = entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk, "tag": "x", "title": "t", "query": "q"},
+        )
+        assert dict(result.context.shapes) == {"query": "q"}
+
+
+@_ENTRIES
+def test_with_none_passed_the_validator_and_the_presenter_share_one_fresh_dict(
+    entry: Callable[..., Any], ada: Any
+) -> None:
+    """Neither declares more than its context, so each would otherwise get
+    the empty dict a context built by hand gets, and the two would differ."""
+    note = Note.objects.create(title="n", owner=ada)
+    validator = Titled()
+    spec = ServiceSpec(service=lambda: note, permissions=OPEN, validator=validator)
+    result = entry(spec, principal=ada, arguments={"title": "t"})
+    assert validator.calls[0][1].call_context is result.context.call_context
+
+
+class _Events:
+    """One ordered record of what a call did: each question asked and each seed resolved."""
+
+    def __init__(self) -> None:
+        self.log: list[str] = []
+
+    def seeds(self) -> Any:
+        def tenant(*, user: Any) -> str:
+            self.log.append("resolve")
+            return f"tenant-of-{user.username}"
+
+        return DEFAULT_POOL_SEEDS.extend(tenant=tenant)
+
+
+class _TenantCheck(PermissionCheck):
+    """Admits everything; each question opts into the ``tenant`` seed by name and records it."""
+
+    def __init__(self, events: _Events) -> None:
+        self.events = events
+        self.tenants: list[tuple[str, str]] = []
+
+    def has_permission(self, principal: Any, spec: Any, *, tenant: str) -> bool:
+        self.events.log.append("has_permission")
+        self.tenants.append(("has_permission", tenant))
+        return True
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any, *, tenant: str) -> bool:
+        self.tenants.append(("has_object_permission", tenant))
+        return True
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any, *, tenant: str) -> bool:
+        self.tenants.append(("has_scope_permission", tenant))
+        return True
+
+
+class _NoSeedCheck(PermissionCheck):
+    """Opts into the arguments and the call's context, and into no seed; records each question."""
+
+    def __init__(self, events: _Events) -> None:
+        self.events = events
+
+    def has_permission(
+        self, principal: Any, spec: Any, *, arguments: Any = None, call_context: Any = None
+    ) -> bool:
+        self.events.log.append("has_permission")
+        return True
+
+
+def _update_and_reread(check: PermissionCheck) -> ServiceSpec:
+    """A service spec whose call builds three pools: the target's, the run's and the re-read's."""
+    return ServiceSpec(
+        service=lambda *, instance: instance,
+        permissions=(check,),
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+        output_selector_spec=SelectorSpec(
+            kind=RETRIEVE, selector=lambda *, result: Note.objects.filter(pk=result.pk)
+        ),
+    )
+
+
+class TestSeedsAtThePermissionCheck:
+    """A check method opts into a registered seed by naming it, as into ``arguments``."""
+
+    @_ENTRIES
+    def test_a_check_naming_a_seed_is_handed_it_at_every_question(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+        check = _TenantCheck(events)
+        entry(
+            _update_and_reread(check),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=events.seeds(),
+        )
+        selector = SelectorSpec(kind=LIST, selector=Note.objects.all, permissions=(check,))
+        entry(selector, principal=ada, arguments={}, pool_seeds=events.seeds())
+        assert check.tenants == [
+            ("has_permission", "tenant-of-ada"),
+            ("has_object_permission", "tenant-of-ada"),
+            ("has_permission", "tenant-of-ada"),
+            ("has_scope_permission", "tenant-of-ada"),
+        ]
+
+    @_ENTRIES
+    def test_a_spec_whose_checks_name_a_seed_resolves_it_before_the_class_level_check(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Once more than the pools resolve it: the pools are built as before."""
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+        entry(
+            _update_and_reread(_TenantCheck(events)),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=events.seeds(),
+        )
+        assert events.log == ["resolve", "has_permission", "resolve", "resolve", "resolve"]
+
+    @_ENTRIES
+    def test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Once per pool, every one after the class-level check: opting into
+        the arguments or the call's context resolves nothing early."""
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+        entry(
+            _update_and_reread(_NoSeedCheck(events)),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=events.seeds(),
+        )
+        assert events.log == ["has_permission", "resolve", "resolve", "resolve"]
+
+    @_ENTRIES
+    def test_an_anonymous_caller_is_refused_before_a_seed_reads_its_principal(
+        self, entry: Callable[..., Any]
+    ) -> None:
+        """``PoolSeeds``' own example raises for an anonymous user; a spec whose
+        checks name no seed refuses the caller before it runs."""
+        seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: user.tenant)
+
+        class _Authenticated(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any) -> bool:
+                return bool(principal.is_authenticated)
+
+        spec = ServiceSpec(service=Record(), permissions=(_Authenticated(),))
+        with pytest.raises(NotPermitted):
+            entry(spec, principal=AnonymousUser(), arguments={}, pool_seeds=seeds)
+
+    @_ENTRIES
+    def test_a_positional_parameter_named_after_a_seed_is_not_an_opt_in(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A check written DRF-style, ``has_permission(self, request, spec)``,
+        under a transport registering ``request``: the principal fills the
+        parameter by position, so it is never handed the seed as well, and the
+        spec resolves its seeds as before."""
+        events = _Events()
+        asked: list[Any] = []
+
+        class _DrfStyle(PermissionCheck):
+            def has_permission(self, request: Any, spec: Any) -> bool:
+                events.log.append("has_permission")
+                asked.append(request)
+                return True
+
+        seeds = events.seeds().extend(request=lambda: _REQUEST)
+        entry(
+            ServiceSpec(service=lambda *, tenant: tenant, permissions=(_DrfStyle(),)),
+            principal=ada,
+            arguments={},
+            pool_seeds=seeds,
+        )
+        assert asked == [ada]
+        assert events.log == ["has_permission", "resolve"]

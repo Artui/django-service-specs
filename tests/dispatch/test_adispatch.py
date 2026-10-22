@@ -270,7 +270,7 @@ async def test_its_output_selector_takes_a_second_hop(ada: Any, hops: list[str])
 
     assert result.value.title == "made"
     assert result.value == result.service_result
-    assert set(reread.calls[0]) == {"user", "progress", "instance", "result"}
+    assert set(reread.calls[0]) == {"user", "progress", "call_context", "instance", "result"}
     assert len(hops) == 2
 
 
@@ -1388,8 +1388,8 @@ async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop
     )
     monkeypatch.setattr(
         authorization_utils,
-        "_names_arguments",
-        recorded("signature", authorization_utils._names_arguments),
+        "_reached_names",
+        recorded("signature", authorization_utils._reached_names),
     )
     note = await _create(owner=ada, title="mine")
 

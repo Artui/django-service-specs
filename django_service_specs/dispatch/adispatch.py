@@ -16,6 +16,7 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     NOT_FOUND,
     SELECTOR_SOURCE,
+    CheckKeywords,
     Overlay,
     Prepared,
     conclude_selector,
@@ -54,6 +55,7 @@ async def adispatch(
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
     extra_kwargs: Mapping[str, Any] | None = None,
+    call_context: dict[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
 
@@ -120,6 +122,11 @@ async def adispatch(
     That refusal and the read of whether a check declares ``arguments`` both run off the loop
     (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).
 
+    ``call_context`` is ``dispatch``'s: the transport's dict, handed to every
+    stage that declares it as the same object, on every path and across
+    every hop; with none, one fresh dict for the call, made here on entry, so
+    the stages of each hop share it.
+
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.
 
@@ -144,6 +151,10 @@ async def adispatch(
     # is in a hop changes nothing the run sees
     # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
     overlay = Overlay(dict(extra_kwargs or {}))
+    # Made once, here, and never again by ``dispatch``: every hop is handed
+    # this one object (test_a_call_handed_none_gets_a_fresh_dict_its_stages_share).
+    if call_context is None:
+        call_context = {}
     rest = (
         principal,
         principal_id,
@@ -153,6 +164,7 @@ async def adispatch(
         unknown_arguments,
         progress,
         overlay,
+        call_context,
     )
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
@@ -179,6 +191,7 @@ def _dispatch(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
+    call_context: dict[str, Any],
     target: Any,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
@@ -192,6 +205,7 @@ def _dispatch(
         progress=progress,
         target=target,
         extra_kwargs=overlay.kwargs,
+        call_context=call_context,
     )
 
 
@@ -205,6 +219,7 @@ def _prepare(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
+    call_context: dict[str, Any],
     target: Any,
 ) -> Prepared | DispatchResult:
     return prepare_service(
@@ -215,6 +230,7 @@ def _prepare(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        call_context=call_context,
         target=target,
         overlay=overlay,
     )
@@ -230,6 +246,7 @@ async def _await_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
+    call_context: dict[str, Any],
     target: Any,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
@@ -243,6 +260,7 @@ async def _await_service(
         unknown_arguments,
         progress,
         overlay,
+        call_context,
         target,
     )
     if isinstance(prepared, DispatchResult):
@@ -269,7 +287,8 @@ def _open_selector(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
-) -> tuple[Any, Grant, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    call_context: dict[str, Any],
+) -> tuple[Any, Grant, dict[str, Any], dict[str, Any], dict[str, Any], CheckKeywords]:
     """Steps one and two, the selector's pool, and its keywords, in the one sync hop.
 
     The keywords are bound here, a read the caller left out refused as on
@@ -277,6 +296,7 @@ def _open_selector(
     provider may query, so it is resolved here rather than on the loop.
     """
     who = _principal(principal, principal_id)
+    keywords = CheckKeywords(call_context)
     checked, granted = open_call(
         spec,
         who,
@@ -285,12 +305,14 @@ def _open_selector(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         overlay=overlay,
+        keywords=keywords,
     )
     pool = selector_pool(
         spec,
         checked,
         principal=who,
         pool_seeds=pool_seeds,
+        call_context=call_context,
         progress=progress,
         extra_kwargs=overlay.kwargs,
     )
@@ -301,7 +323,7 @@ def _open_selector(
         reserved=pool_seeds.reserved,
         transport=progress,
     )
-    return who, granted, pool, kwargs, checked
+    return who, granted, pool, kwargs, checked, keywords
 
 
 def _settle_and_conclude(
@@ -312,12 +334,20 @@ def _settle_and_conclude(
     granted: Grant,
     reserved: frozenset[str],
     checked: dict[str, Any],
+    keywords: CheckKeywords,
 ) -> DispatchResult:
     value = settle(
         spec, raw, pool, source=SELECTOR_SOURCE, reserved=reserved, fillable=spec.reads.names()
     )
     return conclude_selector(
-        spec, value, principal=who, grant=granted, pool=pool, reserved=reserved, checked=checked
+        spec,
+        value,
+        principal=who,
+        grant=granted,
+        pool=pool,
+        reserved=reserved,
+        checked=checked,
+        keywords=keywords,
     )
 
 
@@ -331,6 +361,7 @@ async def _await_selector(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     overlay: Overlay,
+    call_context: dict[str, Any],
 ) -> DispatchResult:
     """An ``async def`` selector spec: steps one and two, the await, then shaping and step four.
 
@@ -342,7 +373,7 @@ async def _await_selector(
     """
     # Bound before the await and outside the ``try``: a read the caller left
     # out is refused as a missing argument, as on every other path.
-    who, granted, pool, kwargs, checked = await sync_to_async(
+    who, granted, pool, kwargs, checked, keywords = await sync_to_async(
         _open_selector, thread_sensitive=True
     )(
         spec,
@@ -354,6 +385,7 @@ async def _await_selector(
         unknown_arguments,
         progress,
         overlay,
+        call_context,
     )
     try:
         raw = await spec.selector(**kwargs)
@@ -378,7 +410,8 @@ async def _await_selector(
             pool=pool,
             reserved=pool_seeds.reserved,
             checked=checked,
+            keywords=keywords,
         )
     return await sync_to_async(_settle_and_conclude, thread_sensitive=True)(
-        spec, raw, pool, who, granted, pool_seeds.reserved, checked
+        spec, raw, pool, who, granted, pool_seeds.reserved, checked, keywords
     )

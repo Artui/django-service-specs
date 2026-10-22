@@ -25,6 +25,7 @@ from tests.dispatch.utils import (
     PK,
     TENANT_SEEDS,
     Arguing,
+    Offered,
     Record,
     Refuse,
     Scoped,
@@ -88,7 +89,15 @@ def test_its_keywords_are_dispatch_s_up_to_what_only_a_run_needs() -> None:
     ran = keywords(dispatch)
     assert keywords(check_call) == {
         name: ran[name]
-        for name in ("spec", "principal", "arguments", "grant", "pool_seeds", "unknown_arguments")
+        for name in (
+            "spec",
+            "principal",
+            "arguments",
+            "grant",
+            "pool_seeds",
+            "unknown_arguments",
+            "call_context",
+        )
     }
 
 
@@ -273,3 +282,17 @@ def test_a_many_spec_s_check_is_handed_no_rows_as_under_dispatch(ada: Any) -> No
     arguing = Arguing()
     check_call(_rows(arguing), principal=ada, arguments={"items": [{"title": "a"}]})
     assert arguing.questions() == [("has_permission", {})]
+
+
+def test_its_checks_are_offered_the_call_context_passed_and_the_seeds_they_name() -> None:
+    check = Offered()
+    spec = SelectorSpec(kind=LIST, selector=list, permissions=[check])
+    context: dict[str, Any] = {}
+    ada = make_user("ada")
+    check_call(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS, call_context=context)
+    check_call(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
+    (_, first, tenant), (_, second, _) = check.asked
+    assert first is context
+    assert tenant == "tenant-of-ada"
+    assert second == {}
+    assert second is not context

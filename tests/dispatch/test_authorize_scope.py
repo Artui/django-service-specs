@@ -13,7 +13,7 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import AnswersWith, refuses
-from tests.dispatch.utils import Arguing
+from tests.dispatch.utils import Arguing, Offered
 from tests.specs.utils import Foreign
 
 
@@ -105,3 +105,35 @@ def test_a_check_declaring_arguments_is_handed_them_as_given_and_none_without() 
     authorize_scope(spec, principal, None, grant=Grant(spec, principal), arguments=arguments)
     authorize_scope(spec, principal, None, grant=Grant(spec, principal))
     assert arguing.asked == [("has_scope_permission", arguments), ("has_scope_permission", None)]
+
+
+PRINCIPAL = object()
+
+
+def test_a_check_is_offered_the_call_context_and_the_seeds_it_names() -> None:
+    check = Offered()
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+    context: dict[str, Any] = {}
+    authorize_scope(
+        spec,
+        PRINCIPAL,
+        None,
+        grant=Grant(spec, PRINCIPAL),
+        call_context=context,
+        seeds={"tenant": "acme"},
+    )
+    ((_, handed, tenant),) = check.asked
+    assert handed is context
+    assert tenant == "acme"
+
+
+def test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own() -> None:
+    check = Offered()
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+    for _ in range(2):
+        authorize_scope(
+            spec, PRINCIPAL, None, grant=Grant(spec, PRINCIPAL), seeds={"tenant": "acme"}
+        )
+    (_, first, _), (_, second, _) = check.asked
+    assert first == second == {}
+    assert first is not second

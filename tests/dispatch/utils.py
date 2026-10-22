@@ -134,6 +134,29 @@ class Arguing(PermissionCheck):
         return [(q, None if a is None else dict(a)) for q, a in self.asked]
 
 
+class Offered(PermissionCheck):
+    """Admits everything; each question names the call's context and a ``tenant`` seed, and records both."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, Any, Any]] = []
+
+    def has_permission(self, principal: Any, spec: Any, *, call_context: Any, tenant: Any) -> bool:
+        self.asked.append(("has_permission", call_context, tenant))
+        return True
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, call_context: Any, tenant: Any = None
+    ) -> bool:
+        self.asked.append(("has_object_permission", call_context, tenant))
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, call_context: Any, tenant: Any = None
+    ) -> bool:
+        self.asked.append(("has_scope_permission", call_context, tenant))
+        return True
+
+
 class Titled(Validator):
     """Declares a required title and strips it; records every call.
 

@@ -336,3 +336,16 @@ def test_a_service_source_reaches_the_validator_of_the_spec_it_compiles_to() -> 
         "title": "LATHE",
         "validated": True,
     }
+
+
+def test_the_validator_s_call_context_is_the_dict_passed_or_a_fresh_one() -> None:
+    validator = Recording()
+    spec = ServiceSpec(service=print, validator=validator)
+    context: dict[str, Any] = {}
+    bind_arguments(spec, {"title": "t"}, principal=PRINCIPAL, call_context=context)
+    bind_arguments(spec, {"title": "t"}, principal=PRINCIPAL)
+    bind_arguments(spec, {"title": "t"}, principal=PRINCIPAL)
+    first, second, third = (handed.call_context for _, handed in validator.calls)
+    assert first is context
+    assert second == third == {}
+    assert second is not third

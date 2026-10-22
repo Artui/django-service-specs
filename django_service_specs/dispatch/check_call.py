@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.dispatch.grant import Grant
-from django_service_specs.dispatch.utils import open_call
+from django_service_specs.dispatch.utils import CheckKeywords, open_call
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -23,6 +23,7 @@ def check_call(
     grant: Grant | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    call_context: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], Grant]:
     """``dispatch``'s prelude, run alone: the checked arguments and the grant, or its refusal.
 
@@ -70,6 +71,10 @@ def check_call(
     it compiles to, and the grant is for that compiled spec, which the same
     object answers on every later call.
 
+    ``call_context`` is offered to the checks as ``dispatch`` offers it, the
+    very dict passed, or a fresh one; a check naming a registered seed is
+    handed it, resolved as dispatch resolves it before the class-level check.
+
     Raises:
         PrincipalUnavailable: step one.
         ImproperlyConfigured: step two, or a spec that declares no
@@ -87,4 +92,5 @@ def check_call(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         settle_rows=True,
+        keywords=CheckKeywords({} if call_context is None else call_context),
     )
