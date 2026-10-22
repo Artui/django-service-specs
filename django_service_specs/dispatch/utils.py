@@ -45,7 +45,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
-from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
 from django_service_specs.selectors.is_queryset import is_queryset
@@ -205,6 +205,9 @@ class Prepared:
     # carries beside ``ambient``.
     call_context: dict[str, Any]
     shapes: Mapping[str, Any]
+    # The seeds a check named, resolved before it: the output selector's pool
+    # takes them as they are, as the run's did (see ``seeded_base``).
+    early_seeds: Mapping[str, Any]
 
 
 # The three questions a check is asked, each with how many parameters dispatch
@@ -251,20 +254,61 @@ def shapes_sent(spec: ServiceSpec | SelectorSpec, checked: Mapping[str, Any]) ->
     return MappingProxyType({name: value for name, value in checked.items() if name in names})
 
 
-def _opts_into_seeds(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> bool:
-    """Whether any question of any of ``spec``'s checks names one of the registered seeds ``names``.
+def _named_seeds(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> frozenset[str]:
+    """The registered seeds ``names`` that a question of one of ``spec``'s checks names.
 
     Read off the same declaration ``asked_with`` hands from, so a check is
     resolved seeds exactly when it would be handed one
     (test_a_spec_whose_checks_name_a_seed_resolves_it_before_the_class_level_check),
     and a parameter filled by position is no opt-in
     (test_a_positional_parameter_named_after_a_seed_is_not_an_opt_in).
+    ``arguments`` is never among them: a check naming it is handed the
+    call's arguments, which outrank a seed of that name, so such a seed
+    resolves as an unnamed one does
+    (test_a_seed_registered_as_arguments_resolves_as_it_would_unnamed).
     """
-    return any(
-        declared_keywords(check, method, positional=positional) & names
-        for check in spec.permissions or ()
-        for method, positional in _QUESTIONS
+    named = frozenset().union(
+        *(
+            declared_keywords(check, method, positional=positional) & names
+            for check in spec.permissions or ()
+            for method, positional in _QUESTIONS
+        )
     )
+    return named - {"arguments"}
+
+
+def _only(pool_seeds: PoolSeeds, names: frozenset[str]) -> PoolSeeds:
+    """``pool_seeds`` narrowed to ``names``, in registration order."""
+    return DEFAULT_POOL_SEEDS.extend(
+        **{name: resolver for name, resolver in pool_seeds.resolvers().items() if name in names}
+    )
+
+
+def seeded_base(
+    principal: Any,
+    *,
+    progress: ProgressReporter | None,
+    pool_seeds: PoolSeeds,
+    early: Mapping[str, Any],
+) -> dict[str, Any]:
+    """``base_pool``, taking the seeds already resolved for a check as they are.
+
+    ``early`` holds the seeds a check of the call named, resolved before the
+    class-level check (``open_call``). Every pool after takes those values
+    rather than resolving them again, so each resolves once per call and the
+    check, the selectors and the run see one object
+    (test_the_check_and_every_stage_see_the_one_value). The rest resolve here
+    as ``base_pool`` resolves them, once per pool. An early value was resolved
+    before the run's reporter existed, so its resolver saw ``progress`` as the
+    no-op reporter.
+    """
+    if not early:
+        return base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    pool = base_pool(
+        user=principal, progress=progress, seeds=_only(pool_seeds, pool_seeds.names - early.keys())
+    )
+    pool.update(early)
+    return pool
 
 
 @dataclass(frozen=True)
@@ -352,16 +396,20 @@ def open_call(
     check, which reveals only what the declaration already says.
 
     ``keywords`` is what the call offers its checks by name: its context, and
-    the seeds this fills. **Only for a spec one of whose checks names a
-    registered seed**, at any of its three questions, the seeds are resolved
-    here, once, just before the class-level check, from a base pool with no
-    live reporter, and step four is offered the same values. Every other spec
-    resolves its seeds as before - once per pool, each after the class-level
-    check - so a resolver that reads the principal, ``PoolSeeds``' own
-    ``tenant=lambda *, user: user.tenant``, never runs for an anonymous caller
-    a check refuses
+    the seeds this fills. **Only the registered seeds a check names**, at
+    any of its three questions, are resolved here, once, just before the
+    class-level check, from a base pool with no live reporter; step four is
+    offered the same values, and every pool after takes them as they are
+    (``seeded_base``). Every other seed resolves as before - once per pool,
+    each after the class-level check - so a resolver that reads the
+    principal, ``PoolSeeds``' own ``tenant=lambda *, user: user.tenant``,
+    never runs for an anonymous caller a check refuses unless a check names
+    that very seed
     (test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before,
-    test_an_anonymous_caller_is_refused_before_a_seed_reads_its_principal).
+    test_an_anonymous_caller_is_refused_before_a_seed_reads_its_principal,
+    test_only_the_seeds_a_check_names_resolve_before_it). A resolver raising
+    ``PrincipalUnavailable`` here ends the call before any check is asked
+    (test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check).
     Every entry point hands its own carrier, one per call, so the walk after
     this is offered the seeds this filled.
     """
@@ -383,9 +431,13 @@ def open_call(
         )
     refuse_overlaid_parameters(spec, declared, overlay)
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    if _opts_into_seeds(spec, pool_seeds.names):
-        early = base_pool(user=principal, seeds=pool_seeds)
-        keywords.seeds.update({name: early[name] for name in pool_seeds.names})
+    # Only the seeds a check names: another seed's resolver may read what an
+    # anonymous caller lacks, and this runs before that caller is refused
+    # (test_only_the_seeds_a_check_names_resolve_before_it).
+    named = _named_seeds(spec, pool_seeds.names)
+    if named:
+        early = base_pool(user=principal, seeds=_only(pool_seeds, named))
+        keywords.seeds.update({name: early[name] for name in named})
     granted = authorize(
         spec,
         principal,
@@ -638,7 +690,7 @@ def selector_pool(
     *,
     principal: Any,
     pool_seeds: PoolSeeds,
-    call_context: dict[str, Any],
+    keywords: CheckKeywords,
     progress: ProgressReporter | None = None,
     extra_kwargs: Mapping[str, Any] = MappingProxyType({}),
 ) -> dict[str, Any]:
@@ -665,14 +717,16 @@ def selector_pool(
     provider's answer (see ``overlaid``); only a selector spec's own selector
     is handed one, never a service spec's target selector.
 
-    ``call_context`` is the call's context, added beside the seeds once they
-    are resolved, as every pool dispatch builds carries it.
+    ``keywords`` is what the call's checks were offered: its context, added
+    beside the seeds once they are resolved, as every pool dispatch builds
+    carries it, and the seeds a check named, taken as they are
+    (``seeded_base``).
     """
     reads = selector_spec.reads.names()
-    base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
     pool = {
         **base,
-        CALL_CONTEXT: call_context,
+        CALL_CONTEXT: keywords.call_context,
         **{name: value for name, value in checked.items() if name in reads},
     }
     pool.update(
@@ -847,9 +901,13 @@ def call_pool(
     pool_seeds: PoolSeeds,
     entries: Mapping[str, Any],
     *,
+    early: Mapping[str, Any],
     progress: ProgressReporter | None = None,
 ) -> dict[str, Any]:
     """The base pool, then this call's own entries on top of it: the output selector's pool.
+
+    ``early`` is the seeds a check of the call named, taken as they are
+    (``seeded_base``).
 
     ``progress`` is the caller's reporter, and is passed only for a pool a run
     is called from: a service's, or a selector spec's own selector's, which
@@ -873,7 +931,7 @@ def call_pool(
     ``call_context``, the call's context, which every pool dispatch builds
     carries) are names no project can register.
     """
-    pool = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    pool = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=early)
     pool.update(entries)
     return pool
 
@@ -1228,7 +1286,7 @@ def walk_target(
                 checked,
                 principal=principal,
                 pool_seeds=pool_seeds,
-                call_context=keywords.call_context,
+                keywords=keywords,
             )
             target = lookup(
                 instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
@@ -1247,7 +1305,7 @@ def walk_target(
                 checked,
                 principal=principal,
                 pool_seeds=pool_seeds,
-                call_context=keywords.call_context,
+                keywords=keywords,
             )
             try:
                 target = lookup(
@@ -1494,7 +1552,7 @@ def prepare_service(
     # One base pool for the call, so a seed that queries resolves once for the
     # providers and the service alike. Its ``progress`` is the transport's: the
     # spec's own sink is the run's alone, and joins the run's keywords last.
-    base = base_pool(user=principal, progress=progress, seeds=pool_seeds)
+    base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
     # Behind a proxy, so neither the Validator nor the presenter can change the
     # pool the service is called from. No copy: nothing writes to ``base`` once
     # it is built, and every pool made from it is a dict of its own.
@@ -1639,6 +1697,7 @@ def prepare_service(
         ambient,
         call_context,
         shapes_sent(spec, checked),
+        MappingProxyType(dict(keywords.seeds)),
     )
 
 
@@ -1689,6 +1748,7 @@ def finish_service(
             prepared.principal,
             pool_seeds,
             {"instance": result, "result": result, CALL_CONTEXT: prepared.call_context},
+            early=prepared.early_seeds,
         )
         value = lookup(
             output_spec,

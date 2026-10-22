@@ -61,6 +61,7 @@ from tests.dispatch.utils import (
     Arguing,
     Contextual,
     Listed,
+    Offered,
     OwnerOnly,
     Record,
     Refuse,
@@ -5428,7 +5429,7 @@ class TestSeedsAtThePermissionCheck:
     def test_a_spec_whose_checks_name_a_seed_resolves_it_before_the_class_level_check(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """Once more than the pools resolve it: the pools are built as before."""
+        """Once for the whole call: the three pools after the check take the value it was handed."""
         note = Note.objects.create(title="n", owner=ada)
         events = _Events()
         entry(
@@ -5437,7 +5438,7 @@ class TestSeedsAtThePermissionCheck:
             arguments={"pk": note.pk},
             pool_seeds=events.seeds(),
         )
-        assert events.log == ["resolve", "has_permission", "resolve", "resolve", "resolve"]
+        assert events.log == ["resolve", "has_permission"]
 
     @_ENTRIES
     def test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before(
@@ -5497,3 +5498,197 @@ class TestSeedsAtThePermissionCheck:
         )
         assert asked == [ada]
         assert events.log == ["has_permission", "resolve"]
+
+
+class TestEarlySeeds:
+    """The seeds a check names, resolved before it and taken as they are by every pool after."""
+
+    @_ENTRIES
+    def test_the_check_and_every_stage_see_the_one_value(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        resolved: list[object] = []
+        seen: list[tuple[str, object]] = []
+
+        def tenant() -> object:
+            resolved.append(object())
+            return resolved[-1]
+
+        class _Check(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: object) -> bool:
+                seen.append(("has_permission", tenant))
+                return True
+
+        def instance(*, pk: int, tenant: object) -> Any:
+            seen.append(("instance_selector", tenant))
+            return Note.objects.filter(pk=pk)
+
+        def service(*, instance: Any, tenant: object) -> Any:
+            seen.append(("service", tenant))
+            return instance
+
+        def reread(*, result: Any, tenant: object) -> Any:
+            seen.append(("output_selector", tenant))
+            return Note.objects.filter(pk=result.pk)
+
+        spec = ServiceSpec(
+            service=service,
+            permissions=(_Check(),),
+            instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=instance, reads=PK),
+            output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=reread),
+        )
+        entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=tenant),
+        )
+        assert [stage for stage, _ in seen] == [
+            "has_permission",
+            "instance_selector",
+            "service",
+            "output_selector",
+        ]
+        assert len(resolved) == 1
+        assert all(value is resolved[0] for _, value in seen)
+
+    @_ENTRIES
+    def test_a_selector_spec_s_run_takes_the_value_its_check_was_handed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        resolved: list[object] = []
+        seen: list[object] = []
+
+        def tenant() -> object:
+            resolved.append(object())
+            return resolved[-1]
+
+        class _Check(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: object) -> bool:
+                seen.append(tenant)
+                return True
+
+        def run(*, tenant: object) -> Any:
+            seen.append(tenant)
+            return Note.objects.none()
+
+        spec = SelectorSpec(kind=LIST, selector=run, permissions=(_Check(),))
+        entry(
+            spec, principal=ada, arguments={}, pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=tenant)
+        )
+        assert len(resolved) == 1
+        assert seen == [resolved[0], resolved[0]]
+        assert seen[1] is resolved[0]
+
+    @_ENTRIES
+    def test_a_seed_no_check_names_still_reaches_the_run(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Resolved in the run's pool as before, beside the one a check named."""
+
+        class _Check(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: str) -> bool:
+                return True
+
+        spec = ServiceSpec(
+            service=lambda *, tenant, region: (tenant, region), permissions=(_Check(),)
+        )
+        seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "acme", region=lambda: "eu")
+        result = entry(spec, principal=ada, arguments={}, pool_seeds=seeds)
+        assert result.value == ("acme", "eu")
+
+    @_ENTRIES
+    def test_only_the_seeds_a_check_names_resolve_before_it(
+        self, entry: Callable[..., Any]
+    ) -> None:
+        """Naming a harmless seed never turns a refusal into a crash through another one."""
+        seeds = DEFAULT_POOL_SEEDS.extend(
+            tenant=lambda: "harmless", profile=lambda *, user: user.profile
+        )
+
+        class _Refuse(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: Any) -> bool:
+                return False
+
+        spec = ServiceSpec(service=Record(), permissions=(_Refuse(),))
+        with pytest.raises(NotPermitted):
+            entry(spec, principal=AnonymousUser(), arguments={}, pool_seeds=seeds)
+
+    @_ENTRIES
+    def test_a_seed_registered_as_arguments_resolves_as_it_would_unnamed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A check naming ``arguments`` is handed the call's, so it opts into no seed of that name."""
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+
+        def arguments() -> str:
+            events.log.append("resolve")
+            return "seeded"
+
+        entry(
+            _update_and_reread(_NoSeedCheck(events)),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(arguments=arguments),
+        )
+        assert events.log == ["has_permission", "resolve", "resolve", "resolve"]
+
+    @_ENTRIES
+    def test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        asked: list[str] = []
+        ran: list[str] = []
+
+        def gone(*, user: Any) -> Any:
+            raise PrincipalUnavailable()
+
+        class _Check(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: Any) -> bool:
+                asked.append("has_permission")
+                return True
+
+        def service() -> None:
+            ran.append("service")
+
+        spec = ServiceSpec(service=service, permissions=(_Check(),))
+        with pytest.raises(PrincipalUnavailable):
+            entry(
+                spec, principal=ada, arguments={}, pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=gone)
+            )
+        assert asked == []
+        assert ran == []
+
+    @_ENTRIES
+    @pytest.mark.parametrize("path", ["create", "allow_none"])
+    def test_a_scope_check_on_no_target_is_offered_the_context_and_the_seeds_it_names(
+        self, entry: Callable[..., Any], path: str, ada: Any
+    ) -> None:
+        """A create, and a missing row ``allow_none`` lets through: the scope check of ``None``."""
+        check = Offered()
+        lookup: dict[str, Any] = (
+            {
+                "instance_selector_spec": SelectorSpec(
+                    kind=RETRIEVE, selector=note_by_pk, reads=PK, allow_none=True
+                )
+            }
+            if path == "allow_none"
+            else {}
+        )
+        spec = ServiceSpec(service=lambda: None, permissions=(check,), **lookup)
+        context: dict[str, Any] = {}
+        entry(
+            spec,
+            principal=ada,
+            arguments={"pk": 999} if path == "allow_none" else {},
+            pool_seeds=TENANT_SEEDS,
+            call_context=context,
+        )
+        assert [question for question, _, _ in check.asked] == [
+            "has_permission",
+            "has_scope_permission",
+        ]
+        assert all(handed is context for _, handed, _ in check.asked)
+        assert [tenant for _, _, tenant in check.asked] == ["tenant-of-ada", "tenant-of-ada"]

@@ -312,7 +312,7 @@ def _open_selector(
         checked,
         principal=who,
         pool_seeds=pool_seeds,
-        call_context=call_context,
+        keywords=keywords,
         progress=progress,
         extra_kwargs=overlay.kwargs,
     )

@@ -223,10 +223,14 @@ def dispatch(
 
     A permission check's method may also name a **registered seed** in
     ``pool_seeds`` as a keyword, and is handed its value at whichever of the
-    three questions declares it. For such a spec the seeds are resolved once
-    more, before step two, so the class-level check can read them; a spec
-    whose checks name none resolves its seeds as before, once per pool and
-    each after step two. A parameter a check's method fills by position -
+    three questions declares it. The seeds the checks name, and only those,
+    are resolved before step two, so the class-level check can read them, and
+    every pool after takes those values as they are: each resolves once for
+    the call, and the check, the selectors and the service see one object.
+    Every other seed resolves as before, once per pool and each after step
+    two, as every seed does for a spec whose checks name none. A seed named
+    ``arguments`` is never named this way: a check declaring ``arguments``
+    is handed the call's. A parameter a check's method fills by position -
     ``principal``, ``spec`` and the target or scope, whatever it calls them -
     is never read as an opt-in.
 
@@ -294,7 +298,7 @@ def dispatch(
             checked,
             principal=principal,
             pool_seeds=pool_seeds,
-            call_context=call_context,
+            keywords=keywords,
             progress=progress,
             extra_kwargs=overlay.kwargs,
         )
