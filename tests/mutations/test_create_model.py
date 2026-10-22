@@ -103,7 +103,7 @@ class TestCreateModel:
         seen: list[Any] = []
         context: dict[str, Any] = {}
 
-        def create_section(*, data: dict[str, Any], call_context: Any) -> Section:
+        def create_section(*, data: dict[str, Any], call_context: Any = None) -> Section:
             seen.append(call_context)
             return Section.objects.create(**data)
 
@@ -117,6 +117,28 @@ class TestCreateModel:
         )
         assert len(seen) == 1
         assert seen[0] is context
+
+    def test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context(self) -> None:
+        # The by-name rule holds one level down: the helper hands the call's
+        # context on, and a nested catch-all is still never given it.
+        seen: list[dict[str, Any]] = []
+
+        def create_section(*, data: dict[str, Any], **kwargs: Any) -> Section:
+            seen.append(kwargs)
+            return Section.objects.create(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        bound_call(
+            create_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context={},
+            user="ada",
+        )
+        assert len(seen) == 1
+        assert seen[0]["user"] == "ada"
+        assert "call_context" not in seen[0]
 
     def test_a_null_row_is_refused(self) -> None:
         with pytest.raises(InvalidArguments):

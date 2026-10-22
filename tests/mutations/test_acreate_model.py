@@ -100,7 +100,7 @@ class TestACreateModel:
         seen: list[Any] = []
         context: dict[str, Any] = {}
 
-        async def create_section(*, data: dict[str, Any], call_context: Any) -> Section:
+        async def create_section(*, data: dict[str, Any], call_context: Any = None) -> Section:
             seen.append(call_context)
             return await Section.objects.acreate(**data)
 

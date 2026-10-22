@@ -116,7 +116,7 @@ class TestDeleteModel:
         seen: list[Any] = []
         context: dict[str, Any] = {}
 
-        def delete_section(*, instance: Section, call_context: Any) -> None:
+        def delete_section(*, instance: Section, call_context: Any = None) -> None:
             seen.append(call_context)
             instance.delete()
 

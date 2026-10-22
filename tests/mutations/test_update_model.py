@@ -133,7 +133,7 @@ class TestUpdateModel:
         seen: list[Any] = []
         context: dict[str, Any] = {}
 
-        def create_section(*, data: dict[str, Any], call_context: Any) -> Section:
+        def create_section(*, data: dict[str, Any], call_context: Any = None) -> Section:
             seen.append(call_context)
             return Section.objects.create(**data)
 

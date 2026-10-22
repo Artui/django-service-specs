@@ -578,7 +578,8 @@ def handed_on(pool: Mapping[str, Any], call_context: dict[str, Any] | None) -> d
     never handed (``resolve_callable_kwargs``), so the helper's service names
     it to carry it on: a nested callable naming it is handed the very dict,
     and one taking ``**kwargs`` is not, by the same rule
-    (test_the_call_context_reaches_a_row_service_that_names_it). Called with
+    (test_the_call_context_reaches_a_row_service_that_names_it,
+    test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context). Called with
     none, off dispatch, the nested callables share a fresh dict.
     """
     return {**pool, CALL_CONTEXT: {} if call_context is None else call_context}

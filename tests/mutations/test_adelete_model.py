@@ -104,7 +104,7 @@ class TestADeleteModel:
         seen: list[Any] = []
         context: dict[str, Any] = {}
 
-        async def delete_section(*, instance: Section, call_context: Any) -> None:
+        async def delete_section(*, instance: Section, call_context: Any = None) -> None:
             seen.append(call_context)
             await instance.adelete()
 
