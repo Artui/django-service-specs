@@ -257,7 +257,7 @@ SURFACE: dict[str, Pin] = {
     "OutputField": Pin(
         "output.output",
         signature="name, type, *, format=, nullable=, label=, choices=, always_present=, "
-        "marking=, fields=, items=, items_nullable=",
+        "marking=, fields=, items=, items_nullable=, json_schema_extra=",
     ),
     # Subclassed by the adapter's serializer presenter.
     "Presenter": Pin(
@@ -267,7 +267,8 @@ SURFACE: dict[str, Pin] = {
     ),
     # What the adapter's serializer presenter reads its serializer context from.
     "PresentationContext": Pin(
-        "output.presentation_context", signature="principal, target=, ambient="
+        "output.presentation_context",
+        signature="principal, target=, ambient=, call_context=, shapes=",
     ),
     "FieldMarking": Pin(
         "output.field_marking",
@@ -294,7 +295,7 @@ SURFACE: dict[str, Pin] = {
         "parameters.parameters",
         signature="name, type, *, required=, format=, items=, items_nullable=, fields=, "
         "choices=, choice_labels=, minimum=, maximum=, min_length=, max_length=, default=, "
-        "nullable=, help=",
+        "nullable=, help=, json_schema_extra=",
         methods={"nested": "property"},
     ),
     "Parameters": Pin(
@@ -430,7 +431,7 @@ SURFACE: dict[str, Pin] = {
     # The adapter's spec classes compile to these two through the seam below.
     "ServiceSpec": Pin(
         "specs.service_spec",
-        signature="*, service, permissions=, reads=, partial=, many=, many_argument=, "
+        signature="*, service, permissions=, reads=, shapes=, partial=, many=, many_argument=, "
         "many_min_length=, many_max_length=, validator=, instance_selector_spec=, "
         "collection_selector_spec=, output_selector_spec=, presenter=, allow_none=, "
         "affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
@@ -444,7 +445,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "SelectorSpec": Pin(
         "specs.selector_spec",
-        signature="*, kind, selector, permissions=, reads=, presenter=, allow_none=, "
+        signature="*, kind, selector, permissions=, reads=, shapes=, presenter=, allow_none=, "
         "select_related=, prefetch_related=, annotations=, extend_queryset=, filter_set=, "
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "()", "output": "()"},
@@ -519,7 +520,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "ValidationContext": Pin(
         "validation.validation_context",
-        signature="principal, target=, partial=, ambient=, resolved=",
+        signature="principal, target=, partial=, ambient=, resolved=, call_context=",
     ),
     "Validated": Pin("validation.validated", signature="values, data, pool="),
 }

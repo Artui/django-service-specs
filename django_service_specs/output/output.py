@@ -9,13 +9,18 @@ only for its annotations.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import KW_ONLY, dataclass
+from dataclasses import KW_ONLY, dataclass, field
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.output.field_marking import FieldMarking
-from django_service_specs.parameters.parameters import FORMATS, JSON_TYPES, canonical_choices
+from django_service_specs.parameters.parameters import (
+    FORMATS,
+    JSON_TYPES,
+    canonical_choices,
+    checked_json_schema_extra,
+)
 
 _OUTPUT_TYPES = JSON_TYPES | {"any"}
 
@@ -49,6 +54,14 @@ class OutputField:
     ``Parameter``, ``any`` lists no choices, since a list of values says what
     type they are, and an array of any element declares no ``items`` rather
     than ``items="any"``.
+
+    ``json_schema_extra`` is what the schema states that no other field
+    spells, as on ``Parameter``: a mapping of JSON Schema keywords to their
+    values, held as a ``dict`` of its own, which
+    [`output_schema`][django_service_specs.schema.output_schema.output_schema]
+    adds to this field's node, refusing a key the declaration already states
+    there. It describes what the presenter renders and constrains nothing.
+    Out of the hash and in equality, as on ``Parameter``.
     """
 
     name: str
@@ -63,9 +76,15 @@ class OutputField:
     fields: Output | None = None
     items: str | Output | None = None
     items_nullable: bool = False
+    # Out of the hash, as on ``Parameter``: a dict cannot be hashed. Held by
+    # test_a_field_carrying_one_is_hashable_and_compared_by_it.
+    json_schema_extra: dict[str, Any] | None = field(default=None, hash=False)
 
     def __post_init__(self) -> None:
         where = f"OutputField {self.name!r}"
+        object.__setattr__(
+            self, "json_schema_extra", checked_json_schema_extra(where, self.json_schema_extra)
+        )
         if self.type not in _OUTPUT_TYPES:
             raise ImproperlyConfigured(
                 f"{where}: type {self.type!r} is not a JSON type; use one of "

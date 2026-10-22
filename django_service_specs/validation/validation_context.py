@@ -10,7 +10,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ValidationContext:
-    """The principal, the target the operation acts on, whether the call is partial, and its seeds.
+    """The principal, the target, whether the call is partial, its seeds, and the call's context.
 
     ``target`` is here, rather than a constructor keyword the way DRF takes
     ``instance=``, because the kernel is what resolves it: target resolution
@@ -50,6 +50,18 @@ class ValidationContext:
     ``target`` its caller passes and the spec's selectors, by the one rule
     both share. Empty for a context built by hand; it trails the rest, so no
     existing construction changes.
+
+    ``call_context`` is the call's context: one plain ``dict`` the transport
+    creates for its natural scope - a request, an agent run - and hands to
+    dispatch, which every stage that declares it receives as the same object.
+    A Validator reads it and writes to it directly, as a DRF serializer does
+    its ``context``, and a later stage of the call reuses what it put there
+    rather than computing it again. Unlike ``ambient`` it is the transport's
+    and the stages' to change; the kernel writes nothing to it. A context
+    built by hand gets an empty dict of its own, never one shared with
+    another, so a Validator that writes to it needs no guard for a call that
+    was handed none. It trails every other field, so no existing
+    construction changes.
     """
 
     principal: Any
@@ -64,3 +76,11 @@ class ValidationContext:
     # by test_two_contexts_differing_in_resolved_alone_are_equal and
     # test_a_context_carrying_a_resolved_target_is_hashable.
     resolved: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)
+    # Out of equality and the hash for the reason ``ambient`` is, and because
+    # it is the one field a stage changes: a context's identity cannot move
+    # with what a stage writes. Held by
+    # test_two_contexts_differing_in_call_context_alone_are_equal and
+    # test_a_context_carrying_a_call_context_is_hashable. A factory rather
+    # than a shared default, so no two contexts write to one dict
+    # (test_each_context_built_by_hand_has_a_call_context_of_its_own).
+    call_context: dict[str, Any] = field(default_factory=dict, compare=False)

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
@@ -115,3 +117,34 @@ def test_is_ordered_by_declaration() -> None:
 def test_a_name_declared_twice_is_refused() -> None:
     with pytest.raises(ImproperlyConfigured, match=r"\['id'\] more than once"):
         Output((ID, OutputField("id", "string")))
+
+
+class TestJsonSchemaExtra:
+    """``json_schema_extra``: schema keys an OutputField's own fields cannot spell."""
+
+    def test_none_by_default(self) -> None:
+        assert OutputField("code", "string").json_schema_extra is None
+
+    def test_it_is_kept_as_a_copy_of_its_own(self) -> None:
+        given = {"pattern": "^[A-Z]{3}$"}
+        field = OutputField("code", "string", json_schema_extra=given)
+        given["pattern"] = "changed"
+        assert field.json_schema_extra == {"pattern": "^[A-Z]{3}$"}
+
+    def test_a_field_carrying_one_is_hashable_and_compared_by_it(self) -> None:
+        one = OutputField("code", "string", json_schema_extra={"pattern": "^a"})
+        assert hash(one) == hash(OutputField("code", "string"))
+        assert one != OutputField("code", "string", json_schema_extra={"pattern": "^b"})
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            pytest.param(["pattern"], "is list, not a mapping", id="not-a-mapping"),
+            pytest.param({1: "x"}, r"keys must be strings; got \[1\]", id="a-key-not-a-string"),
+        ],
+    )
+    def test_a_value_no_schema_could_carry_is_refused(self, value: Any, message: str) -> None:
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"OutputField 'code': json_schema_extra {message}"
+        ):
+            OutputField("code", "string", json_schema_extra=value)

@@ -82,6 +82,31 @@ def canonical_choices(
     return tuple(kept)
 
 
+def checked_json_schema_extra(where: str, extra: Any) -> dict[str, Any] | None:
+    """``extra`` as a declaration's own ``dict``, or ``None``; refused when no schema could carry it.
+
+    ``Parameter`` and ``OutputField`` hold their ``json_schema_extra`` through
+    this. A copy, so a mapping its caller changes afterwards leaves the
+    declaration as written (test_it_is_kept_as_a_copy_of_its_own). Its keys
+    are a JSON object's, so each must be a string; its values are stated as
+    they are, as a default is.
+    """
+    if extra is None:
+        return None
+    if not isinstance(extra, Mapping):
+        raise ImproperlyConfigured(
+            f"{where}: json_schema_extra is {type(extra).__name__}, not a mapping of JSON Schema "
+            "keywords to their values."
+        )
+    named = [key for key in extra if not isinstance(key, str)]
+    if named:
+        raise ImproperlyConfigured(
+            f"{where}: json_schema_extra keys must be strings; got {named!r}. Each is a JSON "
+            "Schema keyword."
+        )
+    return dict(extra)
+
+
 def _uuid_spelling(fmt: str | None, choice: Any) -> str | None:
     """The canonical spelling of a ``uuid`` choice, or ``None`` for one this leaves as listed.
 
@@ -185,6 +210,20 @@ class Parameter:
     declared ``max_length`` outranks it either way, wider or narrower.
     ``min_length`` has no default: an empty list is taken unless one says
     otherwise.
+
+    ``json_schema_extra`` is what the schema states that no other field
+    spells: a ``pattern``, a string's ``maxLength``, a ``format`` outside the
+    ones above, as a mapping of JSON Schema keywords to their values, held as
+    a ``dict`` of its own. It is how an adapter whose library declares more
+    than a Parameter carries keeps it on every route rather than on its own.
+    [`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema]
+    adds its keys to this parameter's node and refuses a key the declaration
+    already states there, whichever field states it (``type``, ``enum``, a
+    bound, ``description`` from ``help``), since either one winning would
+    advertise something false or drop what was written. It is advertised, not
+    enforced: the shape check never reads it, and the Validator is what holds
+    the constraint it describes (test_it_is_advertised_and_not_enforced_by_the_shape_check).
+    It takes no part in the hash, as ``default`` does not, and still in equality.
     """
 
     name: str
@@ -214,12 +253,19 @@ class Parameter:
     default: Any = field(default=UNSET, hash=False)
     nullable: bool = False
     help: str | None = None
+    # Out of the hash, as ``default`` is and for its reason: a dict cannot be
+    # hashed, and equality still tells two schemas apart. Held by
+    # test_a_parameter_carrying_one_is_hashable_and_compared_by_it.
+    json_schema_extra: dict[str, Any] | None = field(default=None, hash=False)
 
     def __post_init__(self) -> None:
         # A declaration that no reader can act on is refused where it is written,
         # so the error names the parameter rather than surfacing later as a
         # schema or a shape check that quietly ignores half of it.
         where = f"Parameter {self.name!r}"
+        object.__setattr__(
+            self, "json_schema_extra", checked_json_schema_extra(where, self.json_schema_extra)
+        )
         if self.type not in PARAMETER_TYPES:
             raise ImproperlyConfigured(
                 f"{where}: type {self.type!r} is not a JSON type, a file or any; "

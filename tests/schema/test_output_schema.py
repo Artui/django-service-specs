@@ -4,6 +4,7 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
@@ -299,3 +300,34 @@ class TestNothingElse:
         first["properties"]["publisher"]["properties"]["name"]["x-mine"] = True
 
         assert "x-mine" not in output_schema(BOOK)["properties"]["publisher"]["properties"]["name"]
+
+
+class TestJsonSchemaExtra:
+    """An OutputField's ``json_schema_extra`` joins the schema the declaration builds."""
+
+    def test_its_keys_join_the_field_s_own_node(self) -> None:
+        field = OutputField(
+            "code",
+            "string",
+            nullable=True,
+            label="Code",
+            json_schema_extra={"pattern": "^[A-Z]{3}$"},
+        )
+        assert output_schema(Output((field,)))["properties"]["code"] == {
+            "type": ["string", "null"],
+            "title": "Code",
+            "pattern": "^[A-Z]{3}$",
+        }
+
+    def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
+        inner = Output((OutputField("code", "string", json_schema_extra={"format": "iso-4217"}),))
+        field = OutputField("rows", "array", items=inner)
+        node = output_schema(Output((field,)))["properties"]["rows"]
+        assert node["items"]["properties"]["code"] == {"type": "string", "format": "iso-4217"}
+
+    def test_a_key_the_declaration_states_is_refused(self) -> None:
+        field = OutputField("code", "string", label="Code", json_schema_extra={"title": "Other"})
+        with pytest.raises(
+            ImproperlyConfigured, match=r"OutputField 'code': json_schema_extra repeats \['title'\]"
+        ):
+            output_schema(Output((field,)))

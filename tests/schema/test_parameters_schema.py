@@ -716,3 +716,86 @@ def test_a_minimum_no_call_could_meet_is_refused_when_the_schema_is_built() -> N
 def test_passthrough_is_refused_rather_than_described_as_the_open_set(policy: Any) -> None:
     with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
         parameters_schema(AUTHOR, unknown_arguments=policy)
+
+
+class TestJsonSchemaExtra:
+    """A Parameter's ``json_schema_extra`` joins the schema the declaration builds."""
+
+    def test_its_keys_join_the_parameter_s_own_node(self) -> None:
+        param = Parameter(
+            "code",
+            "string",
+            nullable=True,
+            help="ISO code",
+            json_schema_extra={"pattern": "^[A-Z]{3}$"},
+        )
+        schema = parameters_schema(Parameters.of(param))
+        assert schema["properties"]["code"] == {
+            "type": ["string", "null"],
+            "description": "ISO code",
+            "pattern": "^[A-Z]{3}$",
+        }
+
+    def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
+        inner = Parameters.of(Parameter("code", "string", json_schema_extra={"format": "iso-4217"}))
+        param = Parameter("rows", "array", items=inner, json_schema_extra={"uniqueItems": True})
+        node = parameters_schema(Parameters.of(param))["properties"]["rows"]
+        assert node["uniqueItems"] is True
+        assert node["items"]["properties"]["code"] == {"type": "string", "format": "iso-4217"}
+
+    def test_a_format_no_parameter_declares_is_stated(self) -> None:
+        """A format outside the ones a Parameter declares is the extra's to
+        state where the declaration states none."""
+        param = Parameter("email", "string", json_schema_extra={"format": "email"})
+        node = parameters_schema(Parameters.of(param))["properties"]["email"]
+        assert node == {"type": "string", "format": "email"}
+
+    @pytest.mark.parametrize(
+        ("declared", "keys"),
+        [
+            pytest.param(
+                {"type": "string", "json_schema_extra": {"type": "integer"}}, "['type']", id="type"
+            ),
+            pytest.param(
+                {"type": "string", "help": "h", "json_schema_extra": {"description": "d"}},
+                "['description']",
+                id="help",
+            ),
+            pytest.param(
+                {"type": "array", "items": "string", "json_schema_extra": {"items": {}}},
+                "['items']",
+                id="items",
+            ),
+            pytest.param(
+                {
+                    "type": "integer",
+                    "minimum": 1,
+                    "json_schema_extra": {"minimum": 0, "multipleOf": 2},
+                },
+                "['minimum']",
+                id="bound",
+            ),
+        ],
+    )
+    def test_a_key_the_declaration_states_is_refused(
+        self, declared: dict[str, Any], keys: str
+    ) -> None:
+        """Neither side wins: the extra overriding the declaration would
+        advertise a contract the shape check does not hold, and the
+        declaration overriding the extra would drop what its author wrote.
+        Built inside the test, so a tree without the field fails here alone."""
+        param = Parameter("code", **declared)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            parameters_schema(Parameters.of(param))
+        assert f"Parameter 'code': json_schema_extra repeats {keys}" in str(refused.value)
+
+    def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
+        """The Validator, which the extra describes, is what holds it."""
+        param = Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]{3}$"})
+        assert check_arguments(Parameters.of(param), {"code": "nope"}) == {"code": "nope"}
+
+    def test_each_schema_carries_a_node_of_its_own(self) -> None:
+        extra = {"pattern": "^a"}
+        params = Parameters.of(Parameter("code", "string", json_schema_extra=extra))
+        parameters_schema(params)["properties"]["code"]["pattern"] = "changed"
+        assert params.get("code").json_schema_extra == {"pattern": "^a"}  # ty: ignore[possibly-missing-attribute]

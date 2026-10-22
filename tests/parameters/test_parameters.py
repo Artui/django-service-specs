@@ -392,3 +392,42 @@ def test_a_name_declared_twice_is_refused_at_construction() -> None:
 def test_a_name_two_sources_declare_is_refused_at_add() -> None:
     with pytest.raises(ImproperlyConfigured, match=r"\['pk'\] are declared by two sources"):
         Parameters.of(PK) + Parameters.of(Parameter("pk", "string"))
+
+
+class TestJsonSchemaExtra:
+    """``json_schema_extra``: schema keys a Parameter's own fields cannot spell."""
+
+    def test_none_by_default(self) -> None:
+        assert Parameter("code", "string").json_schema_extra is None
+
+    def test_it_is_kept_as_a_copy_of_its_own(self) -> None:
+        """Copied, so a mapping the caller changes later leaves the declaration
+        as it was written."""
+        given = {"pattern": "^[A-Z]{3}$"}
+        param = Parameter("code", "string", json_schema_extra=given)
+        given["pattern"] = "changed"
+        assert param.json_schema_extra == {"pattern": "^[A-Z]{3}$"}
+        assert type(param.json_schema_extra) is dict
+
+    def test_a_parameter_carrying_one_is_hashable_and_compared_by_it(self) -> None:
+        """Out of the hash, as ``default`` is, since a dict cannot be hashed;
+        still in equality, so two declarations advertising different schemas
+        are two declarations."""
+        one = Parameter("code", "string", json_schema_extra={"pattern": "^a"})
+        assert hash(one) == hash(Parameter("code", "string"))
+        assert one != Parameter("code", "string", json_schema_extra={"pattern": "^b"})
+        assert one == Parameter("code", "string", json_schema_extra={"pattern": "^a"})
+        assert copy.deepcopy(one) == one
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            pytest.param(["pattern"], "is list, not a mapping", id="not-a-mapping"),
+            pytest.param({1: "x"}, r"keys must be strings; got \[1\]", id="a-key-not-a-string"),
+        ],
+    )
+    def test_a_value_no_schema_could_carry_is_refused(self, value: Any, message: str) -> None:
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"Parameter 'code': json_schema_extra {message}"
+        ):
+            Parameter("code", "string", json_schema_extra=value)

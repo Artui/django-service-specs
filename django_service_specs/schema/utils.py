@@ -1,8 +1,10 @@
-"""Dialect rules the schema emitters share: how null is admitted, and which values may be stated."""
+"""Dialect rules the schema emitters share: how null is admitted, which values may be stated, and how a declaration's extra keys join its node."""
 
 from __future__ import annotations
 
 from typing import Any
+
+from django.core.exceptions import ImproperlyConfigured
 
 
 def allow_null(schema: dict[str, Any]) -> dict[str, Any]:
@@ -40,3 +42,35 @@ def is_json_native(value: Any) -> bool:
     if isinstance(value, dict):
         return all(isinstance(key, str) and is_json_native(item) for key, item in value.items())
     return False
+
+
+def with_schema_extra(
+    schema: dict[str, Any], extra: dict[str, Any] | None, *, where: str
+) -> dict[str, Any]:
+    """``schema`` with a declaration's ``json_schema_extra`` added, refusing a key it already states.
+
+    The last step of a ``Parameter``'s node and an ``OutputField``'s, so the
+    keys compared are every one the declaration produced: its type, its
+    nullability, its choices, its bounds, its default and its prose. Neither
+    side wins a key both state. The extra overriding the declaration would
+    advertise a contract the shape check does not hold, a ``type`` or an
+    ``enum`` it never enforces; the declaration overriding the extra would
+    drop what an author wrote. So the declaration is refused when the schema
+    is built, naming the keys, and an adapter filling the extra leaves out
+    what it filled a field with. Only the node's top level is compared, so a
+    flat array's element is the declaration's alone: its ``items`` is a key
+    the node states.
+
+    A new mapping, as every node is; the extra's values are placed in it as
+    declared, not copied, as a default's are.
+    """
+    if extra is None:
+        return schema
+    repeated = sorted(schema.keys() & extra.keys())
+    if repeated:
+        raise ImproperlyConfigured(
+            f"{where}: json_schema_extra repeats {repeated}, which the declaration already "
+            "states. Declare each in one place: remove it from json_schema_extra, or from the "
+            "field that states it."
+        )
+    return {**schema, **extra}
