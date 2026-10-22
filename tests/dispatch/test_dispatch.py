@@ -892,17 +892,26 @@ class _TenantValidator(Titled):
             "SelectorSpec",
         ),
         (
-            ServiceSpec(service=Record(), permissions=OPEN, validator=_TenantValidator(returns={})),
+            ServiceSpec(
+                service=Record(),
+                permissions=OPEN,
+                many=True,
+                validator=_TenantValidator(returns={}),
+                reads=Parameters.of(Parameter("tenant", "string")),
+            ),
             "ServiceSpec",
         ),
     ],
-    ids=["selector reads", "validator"],
+    ids=["selector reads", "a-many-spec-s-read-a-row-field-shares"],
 )
 def test_a_spec_declaring_a_registered_seed_s_name_is_refused(
     ada: Any, spec: Any, label: str
 ) -> None:
     # Optional, well-formed and open: without the registration nothing refuses it.
-    dispatch(spec, principal=ada, arguments={})
+    # A read nobody marked ``reflected`` is refused, and on a ``many`` spec a
+    # row field of the read's name spares it nothing, since no row field is
+    # top level (the ``many`` conjunct of ``seed_named_fields``).
+    dispatch(spec, principal=ada, arguments={"items": []} if spec_is_many(spec) else {})
     with pytest.raises(ImproperlyConfigured) as caught:
         dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
@@ -910,6 +919,10 @@ def test_a_spec_declaring_a_registered_seed_s_name_is_refused(
         f"{label} declares the parameter(s) ['tenant'], which a registered pool seed "
         "occupies. An argument must never meet a seed in one pool; rename the parameter."
     )
+
+
+def spec_is_many(spec: Any) -> bool:
+    return isinstance(spec, ServiceSpec) and spec.many
 
 
 def test_a_seed_s_name_sent_as_an_argument_is_refused_as_unknown(ada: Any) -> None:
@@ -2612,16 +2625,18 @@ def test_a_field_the_provider_does_not_name_stays_required(ada: Any) -> None:
     assert calls == []
 
 
-def test_an_untyped_input_data_provider_relaxes_nothing(ada: Any) -> None:
+def test_an_untyped_input_data_provider_relaxes_the_fields_its_values_reach(ada: Any) -> None:
+    # It may fill any field, so none is demanded of the caller; the Validator
+    # refuses one it left out (test_a_validator_field_an_untyped_input_data_may_fill).
+    validator = Titled()
     spec = ServiceSpec(
         service=Record(),
         permissions=OPEN,
-        validator=Titled(),
+        validator=validator,
         input_data=lambda: {"title": "server's"},
     )
-    with pytest.raises(InvalidArguments) as caught:
-        dispatch(spec, principal=ada, arguments={})
-    assert caught.value.detail == {"title": REQUIRED}
+    dispatch(spec, principal=ada, arguments={})
+    assert validator.calls[0][0] == {"title": "server's"}
 
 
 # A ``kwargs`` provider annotated to fill a read: the spec's own reaches the
@@ -2716,17 +2731,13 @@ def _names_another_key() -> _ServerTenant:
     return {"tenant": "t"}
 
 
-@pytest.mark.parametrize(
-    "provider",
-    [
-        pytest.param(_names_another_key, id="a-typed-provider-naming-another-key"),
-        pytest.param(lambda: {"project_pk": 7}, id="an-untyped-provider"),
-    ],
-)
-def test_a_read_no_typed_provider_fills_stays_required(
-    ada: Any, provider: Callable[..., Any]
-) -> None:
-    spec = ServiceSpec(service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=provider)
+def test_a_read_no_provider_may_fill_stays_required(ada: Any) -> None:
+    # A typed provider naming another key reaches this read with nothing, so
+    # the shape check demands it. One whose return names no keys may fill
+    # it, and is test_seats.py's.
+    spec = ServiceSpec(
+        service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=_names_another_key
+    )
     assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
 
 
@@ -2798,14 +2809,28 @@ class _MaybeTenant(TypedDict, total=False):
 TENANT = Parameters.of(Parameter("tenant", "string", required=True))
 
 
-def test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s(ada: Any) -> None:
+def _tenant_of(*, user: Any) -> _MaybeTenant:
     # A provider that fills the tenant for the users who have one, and this
     # user has none: ``total=False`` still reads as filled.
-    def tenant_of(*, user: Any) -> _MaybeTenant:
-        return {}
+    return {}
 
+
+def test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s(ada: Any) -> None:
+    # Declared required, so the seat refuses the call once the provider has
+    # left it out, though the service takes ``**pool`` and would run without
+    # it; the caller's value never stands in.
     service = Record()
-    spec = ServiceSpec(service=service, permissions=OPEN, reads=TENANT, kwargs=tenant_of)
+    spec = ServiceSpec(service=service, permissions=OPEN, reads=TENANT, kwargs=_tenant_of)
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"tenant": "victim-corp"})
+    assert caught.value.detail == {"tenant": REQUIRED}
+    assert service.calls == []
+
+
+def test_an_optional_server_owned_key_the_provider_leaves_out_is_absent(ada: Any) -> None:
+    service = Record()
+    reads = Parameters.of(Parameter("tenant", "string"))
+    spec = ServiceSpec(service=service, permissions=OPEN, reads=reads, kwargs=_tenant_of)
     dispatch(spec, principal=ada, arguments={"tenant": "victim-corp"})
     assert "tenant" not in service.calls[0]
 
@@ -2947,14 +2972,16 @@ def test_a_declinable_key_stays_the_caller_s(ada: Any) -> None:
     assert calls == [None]
 
 
-def test_a_declinable_key_stays_required_of_the_caller(ada: Any) -> None:
-    # Refused by the shape check, which answers before the class-level check
-    # refuses this principal: relaxed, the call would reach that refusal.
+def test_a_declinable_key_left_out_reaches_the_class_level_check(ada: Any) -> None:
+    # Not demanded by the shape check, since the provider may fill it, so the
+    # class-level check refuses this principal first, and no provider has run:
+    # it stays after class-level authorization.
     calls: list[None] = []
     spec = ServiceSpec(
         service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=_declining_project(calls)
     )
-    assert _refused_at_the_shape_check(spec, ada, {}) == {"project_pk": REQUIRED}
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=ada, arguments={})
     assert calls == []
 
 

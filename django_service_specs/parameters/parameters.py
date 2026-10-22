@@ -268,6 +268,21 @@ class Parameter:
     what it states holds only where the spec's Validator enforces it
     (test_it_is_advertised_and_not_enforced_by_the_shape_check).
     It takes no part in the hash, as ``default`` does not, and still in equality.
+
+    ``reflected`` says the parameter was read off a callable's signature
+    rather than written by an author, as djangorestframework-services reads a
+    selector's, a target lookup's or a spread service's parameters into
+    ``reads``. It counts on a ``reads`` parameter alone - a selector spec's,
+    a target selector's or a service spec's - and only at dispatch: a
+    reflected read named like a seed the call's ``pool_seeds`` registers
+    leaves that call's argument set, and the seed fills it, where an unmarked
+    one is refused as a configuration error
+    (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s).
+    On a Validator field or a shape it changes nothing. No schema carries it,
+    since it describes where a declaration came from rather than what a caller
+    sends; it takes part in equality and the hash, because two declarations
+    that differ in it dispatch differently
+    (test_reflected_is_compared_and_hashed_and_never_in_the_schema).
     """
 
     name: str
@@ -301,6 +316,7 @@ class Parameter:
     # hashed, and equality still tells two schemas apart. Held by
     # test_a_parameter_carrying_one_is_hashable_and_compared_by_it.
     json_schema_extra: dict[str, Any] | None = field(default=None, hash=False)
+    reflected: bool = False
 
     def __post_init__(self) -> None:
         # A declaration that no reader can act on is refused where it is written,

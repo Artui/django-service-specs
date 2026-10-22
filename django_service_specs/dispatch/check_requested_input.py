@@ -59,11 +59,17 @@ def check_requested_input(
       ``reads``, so a value asked once for the whole call is a ``reads``
       parameter, and a key declared only inside a row is refused.
     - **A key the server fills**: one a provider the dispatch runs is
-      annotated to fill, or a seed ``pool_seeds`` registers, as
+      annotated to fill, or a seed ``pool_seeds`` registers - a ``reflected``
+      read the seed fills among them - as
       [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
       reads them. Dispatch drops the caller's value for such a key, so the
       answer would never reach the service. ``pool_seeds`` is the call's, as
-      ``dispatch`` takes it.
+      ``dispatch`` takes it. A top-level Validator field named like a
+      registered seed may be asked for, since the answer reaches the
+      Validator and ``data``
+      (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it),
+      and so may a key a provider may decline or one an untyped provider's
+      values reach, whose caller's value stands when the provider declines.
     - **A fragment that is not a schema object**: a ``dict``, as JSON carries
       one.
     - **A shape some transport cannot render.** The narrowest is an MCP

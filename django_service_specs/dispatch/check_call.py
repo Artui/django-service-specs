@@ -39,12 +39,18 @@ def check_call(
 
     1. A deactivated principal is refused as ``PrincipalUnavailable``, with
        or without a ``grant``.
-    2. A parameter a registered seed in ``pool_seeds`` occupies is refused as
-       ``ImproperlyConfigured``.
+    2. A parameter a registered seed in ``pool_seeds`` is named like is
+       answered as dispatch answers it: a ``reflected`` read leaves the
+       argument set, a top-level Validator field stays in it, and anything
+       else is refused as ``ImproperlyConfigured``.
     3. [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
        under ``unknown_arguments``, relaxed exactly as dispatch relaxes it: a
-       parameter a typed provider fills, and a Validator field under
-       ``partial``.
+       parameter a provider fills or may fill - a typed provider's filled and
+       declinable keys, and every parameter an untyped provider's values
+       reach - and a Validator field under ``partial``. No provider runs
+       here, so a call this passes without such a value may still be refused
+       by ``dispatch`` where the provider's answer is merged
+       (test_check_call_relaxes_a_may_fill_read).
     4. [`authorize`][django_service_specs.dispatch.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal.
 

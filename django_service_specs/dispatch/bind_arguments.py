@@ -36,9 +36,10 @@ def bind_arguments(
        over ``spec.parameters()``, under ``unknown_arguments``: the closed
        argument set and the shape check, at every level, relaxing what
        dispatch relaxes: an absent Validator field when the service spec is
-       ``partial``, one its ``input_data`` provider is annotated to fill, and
-       a read the ``kwargs`` provider of the spec declaring it is annotated
-       to fill.
+       ``partial``, one its ``input_data`` provider fills or may fill, and a
+       read the ``kwargs`` provider of the spec declaring it fills or may
+       fill - a typed provider's filled and declinable keys, and every
+       parameter an untyped provider's values reach.
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
        with a Validator, ``validated()`` on only the arguments the Validator's
        own ``parameters()`` declare - never a selector's or the spec's
@@ -61,9 +62,18 @@ def bind_arguments(
     so a field the provider is annotated to fill passes the shape check and
     is the Validator's to refuse: left out, or sent, since a value the caller
     sends for a field the server owns is checked and then dropped, as in
-    dispatch. No ``kwargs`` provider is called either: a read one fills
-    passes the shape check, and is absent from a selector spec's checked
-    arguments whether or not the caller sent it.
+    dispatch. No ``kwargs`` provider is called either: a read one fills or
+    may fill passes the shape check absent, and the presence check dispatch
+    makes once the provider has answered is not made here
+    (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
+    fill is absent from a selector spec's checked arguments whether or not
+    the caller sent it.
+
+    **It takes no** ``pool_seeds``, so it refuses no registered seed's name
+    and splits none: a ``reflected`` read is checked as declared, and a
+    Validator field named like a registered seed is validated and returned
+    among the values, as any field is. Which values a service's pool spreads
+    is dispatch's question.
 
     **It does not resolve or authorize.** Dispatch runs class-level
     authorization, target resolution and object-level authorization *between*

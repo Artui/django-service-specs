@@ -186,10 +186,11 @@ class TestServerOwned:
         assert NOT_A_SCHEMA not in message
 
     def test_the_pool_seeds_given_are_the_ones_read(self, django_assert_num_queries: Any) -> None:
-        # A parameter a registered seed occupies is refused at the call, and
-        # the parameters are assembled against the default seeds, so a seed
-        # registered for the call is read from the keyword or not at all.
-        spec = declaring(Parameter("confirmed", "boolean"))
+        # A read a registered seed occupies is refused at the call, and the
+        # parameters are assembled against the default seeds, so a seed
+        # registered for the call is read from the keyword or not at all. A
+        # read, since a Validator field of a seed's name is the caller's.
+        spec = ServiceSpec(service=service, reads=Parameters.of(Parameter("confirmed", "boolean")))
         schema = {"confirmed": {"type": "boolean"}}
         seeds = PoolSeeds().extend(confirmed=lambda: None)
         with django_assert_num_queries(0):
