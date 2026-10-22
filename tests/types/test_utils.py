@@ -18,10 +18,12 @@ def test_the_per_call_names_and_the_ambient_seeds_partition_the_reserved_names()
     # rather than derived. This is what holds the two lists together: a name
     # reserved later has to be placed on one side or the other, deliberately.
     # ``serializer`` is the one exception: the DRF adapter's per-call name,
-    # which this kernel never seeds and so never reserves.
+    # which this kernel never seeds and so never reserves. ``call_context`` is
+    # ambient: the transport's dict outlives the call, and an affordance
+    # condition may read it as it reads a seed.
     assert PER_CALL_POOL_NAMES - {"serializer"} <= RESERVED_POOL_SEEDS
     ambient = RESERVED_POOL_SEEDS - PER_CALL_POOL_NAMES
-    assert ambient == {"user", "progress"}
+    assert ambient == {"user", "progress", "call_context"}
 
 
 def test_an_orm_expression_is_a_row_condition_and_a_callable_is_not() -> None:
