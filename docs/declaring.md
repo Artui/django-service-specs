@@ -262,7 +262,7 @@ parameters.
 `PATCH` does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 `ValidationContext.partial`. The spec's `reads` and its target selector's stay
-required as declared unless a `kwargs` provider fills them, so a partial
+required as declared unless a `kwargs` provider fills or may fill them, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.
@@ -376,9 +376,9 @@ sync-only: an `async def` one is refused when the spec is built.
   caller's value for it is checked and then dropped.
 - **`input_data`**, on a write alone, returns values merged over the caller's
   arguments before the Validator sees them, so a server-owned field - an
-  owner, a status - is the author's. A Validator field it is annotated to fill
-  is not demanded of the caller, and the Validator still refuses it if the
-  provider declines it. A value the caller sends for a field the provider is
+  owner, a status - is the author's. A Validator field it fills or may fill
+  is not demanded of the caller, and dispatch refuses a required one the
+  provider leaves out before the Validator runs. A value the caller sends for a field the provider is
   annotated to fill is dropped, not used in its place. The Validator is what
   consumes it, and the service is handed none of it directly, so a spec that
   declares `input_data` with no Validator is refused with
@@ -412,7 +412,10 @@ reads them: `filled`, and `declinable` for a key whose value admits
 `UnsetType`. A key a provider fills or may decline, and every key an
 untyped provider's values reach, is not demanded of the caller: dispatch
 checks it once the provider has answered, after the class-level permission
-check, and refuses a required one nobody filled, a declined one included. So a
+check and, for a Validator field, before the Validator runs, and refuses a
+required one nobody filled, a declined one included.
+[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
+runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
 caller's value for a filled key is dropped, and for a declinable one it stands
 beneath the provider's answer. The provider's values reach these: a selector's `kwargs` fills that selector's `reads`, a
@@ -550,6 +553,11 @@ the same declaration.
   is declared, so a default of `None` stays a real default. It is reported, not
   applied: whether an omitted argument arrives as its default is the validating
   library's behaviour.
+- **`reflected`** says the parameter was read off a callable's signature by
+  an adapter rather than written by an author. It matters only on a read: a
+  `reflected` read named like a registered [pool seed](dispatching.md#pool-seeds)
+  is filled by the seed rather than refused. It takes part in equality and
+  hashing, and no schema carries it.
 - **`json_schema_extra`** carries the JSON Schema keywords no field of a
   Parameter spells - a `pattern`, a string's `maxLength`, `uniqueItems` - as a
   mapping of keyword to value, added to the parameter's

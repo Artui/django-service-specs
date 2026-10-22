@@ -349,7 +349,7 @@ runs dispatch's own steps for a write's target and nothing else: the
 deactivated principal, the shape check over **the target selector's
 parameters alone**, class-level authorization, then the very lookup and checks
 dispatch runs. A Validator field is neither required nor unknown there, and a
-target read the selector's `kwargs` provider fills is not required, as in
+target read the selector's `kwargs` provider fills or may fill is not required, as in
 dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
 does.
 
@@ -430,7 +430,7 @@ refuse at enqueue what the worker's `dispatch` would refuse before it resolves
 anything.
 [`check_call`][django_service_specs.dispatch.check_call.check_call] runs
 dispatch's prelude alone, through the same function, in dispatch's order: a
-deactivated principal, a read or shape a registered seed occupies, the shape check,
+deactivated principal, an unmarked read or a shape a registered seed occupies, the shape check,
 then the class-level permission check. Its keywords are dispatch's, less what
 only a run reads. Nothing after the prelude runs - no lookup, object or scope
 check, Validator, affordance or precondition - so a call it passes may still
@@ -612,18 +612,41 @@ it is registered, and a plain `def` handing back an awaitable is refused where
 it is resolved.
 
 A registered name is **reserved**, and that is half of what registering does.
-A spec that declares a read or a shape by that name is refused at dispatch
-with `ImproperlyConfigured`, with two exceptions. A read marked
-`reflected=True`, one an adapter read off a callable's signature rather than
-one an author wrote, is filled by the seed on every call, and the caller's
-value for it never reaches the pool. A top-level Validator field by that name,
-on a spec that is not `many`, stays the caller's argument: it is validated into
-`data` and never spread into the pool, so the seed keeps its own value. A caller
-that sends any other seed's name is refused like any other undeclared argument; and `extend()` refuses one of the dispatcher's own names,
+A spec that declares a parameter by that name is refused at dispatch with
+`ImproperlyConfigured`; a caller that sends it is refused like any other
+undeclared argument; and `extend()` refuses one of the dispatcher's own names,
 or a name registered twice, with `ValueError`. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.
+
+Two declarations of a seed's name are not refused, because neither shares the
+pool with an argument. A read marked `reflected=True` is one an adapter took off
+a callable's signature rather than one an author wrote, such as a selector's
+`signature` parameter a project's seed is meant to fill. The seed fills it on
+every call: the read is no argument of the call, so a caller sending its name
+is refused as unknown under `REJECT` and dropped under `IGNORE`, and its value
+never reaches the pool. An unmarked read, or a shape, by that name is still
+refused.
+
+```python
+--8<--
+docs/examples/dispatching.py:reflected_seed
+--8<--
+```
+
+A top-level Validator field by a registered seed's name, on a service spec that
+is not `many`, stays the caller's argument. It is validated into `data` and
+never spread into the service's pool, so the service reads the caller's value
+on `data` and the seed's under its own name. A field named like one of the
+dispatcher's own names is still refused when the spec's parameters are
+assembled.
+
+```python
+--8<--
+docs/examples/dispatching.py:seed_named_field
+--8<--
+```
 
 `PoolSeeds` is immutable and `extend()` returns a new registry, so pass one per
 dispatch rather than installing one process-wide: two mounts with different

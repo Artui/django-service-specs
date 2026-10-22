@@ -23,13 +23,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an untyped provider's values reach, passes the shape check absent. Its
   requiredness is checked where the provider's answer is merged, after the
   class-level permission check, as `InvalidArguments` keyed by the parameter in
-  the shape check's wording. A required parameter nobody filled is refused
-  there, including one the provider declined whose callable has a default,
-  which used to run on that default; an optional one is absent. A permission
-  check may therefore see `arguments` without such a key, so it should read
-  one with `.get`. `check_call` and `bind_arguments` relax the same keys, and
-  `check_server_arguments` lets a read an untyped provider reaches be
-  withheld.
+  the shape check's wording, and for a Validator field before the Validator
+  runs, whichever Validator it is. A required parameter nobody filled is
+  refused there, including one the provider declined whose callable has a
+  default, which used to run on that default; an optional one is absent. Such
+  a refusal is its own `InvalidArguments`, no longer one tree with the
+  caller's other shape errors. A permission check may therefore see
+  `arguments` without such a key, so it should read one with `.get`.
+  `check_call` and `bind_arguments` relax the same keys, and
+  `check_server_arguments` lets a read or Validator field an untyped provider
+  reaches be withheld. `bind_arguments` runs no provider, so it makes no
+  presence check for these keys: an absent one reaches the Validator, as a
+  field `input_data` fills always did; and it is handed no seeds, so it still
+  demands a required `reflected` read that dispatch fills from a seed.
 - **A top-level Validator field named like a registered pool seed is
   allowed** on a service spec that is not `many`. It stays the caller's
   argument and is validated into `data`, and it is never spread into the
