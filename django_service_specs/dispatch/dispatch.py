@@ -204,7 +204,11 @@ def dispatch(
     never a copy**. A ``kwargs`` or ``input_data`` provider, a selector of any
     role, an affordance condition, a precondition, the service and the run's
     ``progress_reporter`` declare it as a parameter named ``call_context``, a
-    name reserved as every seed's is, so no argument may take it; a permission
+    name reserved as every seed's is, so no argument may take it. It reaches
+    them by that name alone: one taking ``**kwargs`` for the rest of the pool
+    is never handed it, so a catch-all forwarding what it gets runs as it did
+    before the name was reserved
+    (TestACatchAllIsNeverHandedTheCallContext). A permission
     check's method declares it as a keyword, as it declares ``arguments``;
     the Validator reads it as ``ValidationContext.call_context`` and the
     presenter, every row of a list and any presenter it hands its context on
