@@ -538,8 +538,12 @@ def shape_check(
     """``check_arguments`` over ``parameters``, leaving out what the server fills or may fill.
 
     One function for ``open_call``, ``resolve_target`` and ``bind_arguments``,
-    so a transport that binds for itself relaxes exactly what dispatch
-    relaxes. Two things are relaxed:
+    so a transport that binds for itself relaxes what dispatch relaxes. The
+    one difference is the seeds: ``bind_arguments`` is handed none, so a
+    ``reflected`` read that a registered seed fills on dispatch is checked
+    there as declared, and a required one is demanded of the caller
+    (test_bind_arguments_still_demands_a_required_reflected_read). Two things
+    are relaxed:
 
     - **A parameter a provider fills or may fill**, which is always one that
       provider's values reach (see ``_server_filled``): not demanded of the
@@ -547,15 +551,16 @@ def shape_check(
       provider has answered. It is still required of the assembled pool,
       checked in the seat that merges the provider's answer, after
       class-level authorization: ``selector_pool`` for a selector's reads,
-      ``prepare_service`` for a service spec's ``reads``, and the Validator
-      for one of its fields
-      (test_a_filled_field_the_provider_declines_is_refused_by_the_validator,
+      ``prepare_service`` for a service spec's ``reads``, and
+      ``validate_arguments`` for a Validator field, before the Validator runs
+      (test_a_filled_field_the_provider_declines_is_refused_before_the_validator,
       test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
       test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks,
       test_a_may_fill_read_nobody_fills_is_refused_at_the_service_seat).
       So a principal the class-level check refuses is told that, rather than
       that such a value is missing
-      (test_a_may_fill_read_left_out_reaches_the_class_level_check).
+      (test_a_read_an_untyped_provider_may_fill_left_out_reaches_the_class_level_check,
+      test_a_declinable_key_left_out_reaches_the_class_level_check).
       **What the caller sends for one depends on the provider's annotation.**
       A key a typed provider is annotated to fill is the server's:
       ``server_owned_keys`` tells a transport to hide exactly such a key, and
@@ -1536,6 +1541,7 @@ def validate_arguments(
     target: Any,
     server_input: Mapping[str, Any],
     call_context: dict[str, Any],
+    provider_answered: bool,
     ambient: Mapping[str, Any] = MappingProxyType({}),
     resolved: Mapping[str, Any] = MappingProxyType({}),
 ) -> Validated:
@@ -1582,11 +1588,34 @@ def validate_arguments(
         resolved=MappingProxyType(dict(resolved)),
         call_context=call_context,
     )
+    # The presence check, before the Validator runs, once ``input_data`` has
+    # answered: a field the shape check let through absent, because the
+    # provider fills or may fill it, is held to its declaration against the
+    # caller's arguments and the provider's answer merged, as
+    # ``_refuse_absent`` holds a read. So a Validator that returns what it is
+    # handed never runs without a required field, and every Validator kind is
+    # refused in the shape check's words
+    # (test_a_required_field_nobody_filled_is_refused_before_the_validator_runs).
+    # Read through ``relax_partial``, so a partial call still leaves any field
+    # out (test_a_partial_spec_s_field_nobody_filled_is_still_not_required).
+    # Not made when no provider ran - ``bind_arguments`` - where an absent
+    # field the provider would fill is the Validator's to refuse
+    # (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
+    relaxed = relax_partial(spec, spec.parameters()) if provider_answered else Parameters.of()
     if spec.many:
+        the_list = next((param for param in relaxed if param.name == spec.many_argument), None)
         return _validate_rows(
-            validator, checked[spec.many_argument], spec.many_argument, context, server_input
+            validator,
+            checked[spec.many_argument],
+            spec.many_argument,
+            context,
+            server_input,
+            row_parameters=Parameters.of()
+            if the_list is None
+            else cast(Parameters, the_list.items),
         )
     merged = {**checked, **server_input}
+    _refuse_absent(Parameters.of(*(param for param in relaxed if param.name in declared)), merged)
     own = {name: value for name, value in merged.items() if name in declared}
     return validator.validated(own, context)
 
@@ -1597,16 +1626,32 @@ def _validate_rows(
     name: str,
     context: ValidationContext,
     server_input: Mapping[str, Any],
+    *,
+    row_parameters: Parameters,
 ) -> Validated:
-    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row."""
+    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row.
+
+    Each row is first held to ``row_parameters``, the list's rows as
+    ``relax_partial`` left them, with ``input_data`` merged over it: a row
+    missing a required field nobody filled is refused under its index, as a
+    row the shape check refused is, and never reaches the Validator
+    (test_a_many_row_field_nobody_filled_is_refused_in_its_row).
+    """
     declared = validator.parameters().names()
-    # Only the keys the Validator declares, as on a single call: a row's own
-    # unknown key was refused by the shape check, so only a provider's can
-    # reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
-    rows = {
-        index: {key: value for key, value in {**row, **server_input}.items() if key in declared}
-        for index, row in checked.rows.items()
-    }
+    errors = dict(checked.errors)
+    rows: dict[int, dict[str, Any]] = {}
+    for index, row in checked.rows.items():
+        merged = {**row, **server_input}
+        try:
+            _refuse_absent(row_parameters, merged)
+        except InvalidArguments as refused:
+            errors[index] = refused.detail
+            continue
+        # Only the keys the Validator declares, as on a single call: a row's
+        # own unknown key was refused by the shape check, so only a provider's
+        # can reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
+        rows[index] = {key: value for key, value in merged.items() if key in declared}
+    checked = _CheckedRows(rows, errors)
     try:
         validated = validator.validated_many(rows, context, many_argument=name)
     except InvalidArguments as refused:
@@ -1761,6 +1806,7 @@ def prepare_service(
         target=target,
         server_input=server_input,
         call_context=call_context,
+        provider_answered=True,
         ambient=ambient,
         resolved=resolved,
     )

@@ -59,10 +59,13 @@ def bind_arguments(
     over the caller's arguments before the Validator, is not called here: it
     reads the resolved target and the call's seeds, which this function is
     not handed. A spec declaring one is bound on the caller's arguments alone,
-    so a field the provider is annotated to fill passes the shape check and
-    is the Validator's to refuse: left out, or sent, since a value the caller
+    so a field the provider fills or may fill passes the shape check and is
+    the Validator's to refuse: left out, or sent, since a value the caller
     sends for a field the server owns is checked and then dropped, as in
-    dispatch. No ``kwargs`` provider is called either: a read one fills or
+    dispatch. The presence check dispatch makes of such a field before the
+    Validator, once the provider has answered, is not made here
+    (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
+    No ``kwargs`` provider is called either: a read one fills or
     may fill passes the shape check absent, and the presence check dispatch
     makes once the provider has answered is not made here
     (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
@@ -70,7 +73,11 @@ def bind_arguments(
     the caller sent it.
 
     **It takes no** ``pool_seeds``, so it refuses no registered seed's name
-    and splits none: a ``reflected`` read is checked as declared, and a
+    and splits none: a ``reflected`` read is checked as declared, so a
+    required one is demanded of the caller here though a registered seed
+    fills it on dispatch, which refuses the caller's value for it as an
+    unknown argument under ``REJECT``
+    (test_bind_arguments_still_demands_a_required_reflected_read), and a
     Validator field named like a registered seed is validated and returned
     among the values, as any field is. Which values a service's pool spreads
     is dispatch's question.
@@ -106,6 +113,7 @@ def bind_arguments(
         target=target,
         server_input={},
         call_context={} if call_context is None else call_context,
+        provider_answered=False,
         resolved=target_entry(spec, target),
     )
     return validated.values

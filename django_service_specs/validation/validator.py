@@ -55,7 +55,15 @@ class Validator(abc.ABC):
     runs it in the executor on the async path, and it must not be ``async def``.
 
     ``validate()`` receives only the arguments its own ``parameters()``
-    declare, already through the shape check. It returns the values the
+    declare: the caller's, through the shape check, with the spec's
+    ``input_data`` merged over them. Through dispatch every required field
+    is among them, whoever filled it, since one nobody filled is refused in
+    the shape check's words before ``validate()`` runs
+    (test_a_required_field_nobody_filled_is_refused_before_the_validator_runs).
+    ``bind_arguments`` runs no provider, so there a field ``input_data``
+    fills or may fill can arrive absent, and is the Validator's to refuse
+    (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
+    It returns the values the
     operation receives, keyed by name; a nested row may come back as whatever
     the library builds (a dataclass instance, a model instance), since the
     mutation helpers read either.
@@ -110,7 +118,8 @@ class Validator(abc.ABC):
         ``rows`` maps each row's index in the caller's list to its arguments,
         already through the shape check, with the spec's ``input_data`` merged
         over each and only the keys ``parameters()`` declares, as on a single
-        call. A row the shape check refused is not among them, so the indices
+        call. A row the shape check refused, or one dispatch refused for a
+        required field nobody filled, is not among them, so the indices
         may have gaps: an override validating a list maps its library's
         positions back through ``list(rows)``, and a list-level verdict it
         reaches sees only the rows handed to it.

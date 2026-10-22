@@ -1,13 +1,13 @@
-"""The kernel's three seats: where a provider's parameter and a registered seed's name are answered.
+"""Where a provider's parameter and a registered seed's name are answered.
 
-- **Seat (a)**: a parameter a provider *may* fill - a typed provider's
-  declinable key, or any parameter in the seat an untyped provider's values
-  reach - is not demanded by the shape check. Its requiredness is checked
-  against the assembled pool once the provider has answered, in the seat that
-  merges the answer, and so is every parameter the seat takes.
-- **Seat (b)**: a read marked ``reflected`` that a registered seed is named
+- **A parameter a provider may fill** - a typed provider's declinable key, or
+  any parameter an untyped provider's values reach - is not demanded by the
+  shape check. Its requiredness is checked once the provider has answered,
+  where the answer is merged: for a read against the assembled pool, for a
+  Validator field against the input the Validator is handed.
+- **A reflected read**: a read marked ``reflected`` that a registered seed is named
   like leaves the call's argument set, and the seed fills it.
-- **Seat (c)**: a top-level Validator field named like a registered seed stays
+- **A seed-named Validator field**: a top-level Validator field named like a registered seed stays
   the caller's argument, is validated into ``data``, and is never spread into
   the service's pool, where the seed keeps its own value.
 
@@ -18,15 +18,20 @@ import, so this module collects against a ``Parameter`` with no such field.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
 from asgiref.sync import async_to_sync
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import Q
+from pydantic import BaseModel
 from typing_extensions import TypedDict
 
+from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.bind_arguments import bind_arguments
@@ -40,6 +45,7 @@ from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unknown_arguments import UnknownArguments
@@ -65,6 +71,9 @@ RETRIEVE = SelectorKind.RETRIEVE
 REQUIRED = ["This field is required."]
 SEEDED = "tenant-of-ada"
 """What ``TENANT_SEEDS`` resolves for ada: a value no caller here ever sends."""
+_NOT_ARCHIVED = Affordance(
+    code="note_archived", reason="An archived note cannot be changed.", when=Q(archived=False)
+)
 
 ENTRIES = pytest.mark.parametrize(
     "entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"]
@@ -103,7 +112,7 @@ class Fields(Validator):
         return dict(arguments)
 
 
-# --- seat (a): a parameter a provider may fill -------------------------------------------
+# --- a parameter a provider may fill ----------------------------------------------------
 
 
 class _DecliningProject(TypedDict):
@@ -357,6 +366,138 @@ def test_a_many_spec_s_read_an_untyped_provider_may_fill(ada: Any) -> None:
     assert service.calls[0]["project_pk"] == 4
 
 
+class _TitleModel(BaseModel):
+    title: str
+
+
+@dataclass
+class _TitleRecord:
+    title: str
+
+
+class _DecliningTitle(TypedDict):
+    title: str | UnsetType
+
+
+def _declining_title() -> _DecliningTitle:
+    return {"title": UNSET}
+
+
+@ENTRIES
+@pytest.mark.parametrize(
+    "validator",
+    [
+        pytest.param(lambda: Fields(Parameter("title", "string", required=True)), id="base"),
+        pytest.param(lambda: PydanticValidator(_TitleModel), id="pydantic"),
+        pytest.param(lambda: DataclassValidator(_TitleRecord), id="dataclass"),
+    ],
+)
+@pytest.mark.parametrize(
+    "input_data",
+    [
+        pytest.param(lambda: _untyped({}, []), id="untyped-left-out"),
+        pytest.param(lambda: _declining_title, id="declinable-declined"),
+    ],
+)
+def test_a_required_field_nobody_filled_is_refused_before_the_validator_runs(
+    ada: Any, entry: Any, validator: Callable[[], Validator], input_data: Callable[[], Any]
+) -> None:
+    # Relaxed at step one, so the presence check is the merged input's: a
+    # Validator that returns what it is handed would otherwise run without the
+    # field, and each adapter would refuse it in its own words.
+    service = Record()
+    the_validator = validator()
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, validator=the_validator, input_data=input_data()
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        entry(spec, principal=ada, arguments={})
+    assert caught.value.detail == {"title": REQUIRED}
+    assert service.calls == []
+    assert getattr(the_validator, "calls", []) == []
+
+
+def test_a_required_field_the_caller_sent_is_present_though_the_provider_left_it_out(
+    ada: Any,
+) -> None:
+    # The presence check reads the caller's arguments and the provider's answer
+    # merged, not the provider's alone.
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        validator=Fields(Parameter("title", "string", required=True)),
+        input_data=_untyped({}, []),
+    )
+    dispatch(spec, principal=ada, arguments={"title": "caller's"})
+    assert service.calls[0]["data"] == {"title": "caller's"}
+
+
+def test_a_many_row_field_nobody_filled_is_refused_in_its_row(ada: Any) -> None:
+    # Reported under the row's index, as a row the shape check refused is,
+    # and only the rows that pass reach the Validator.
+    service = Record()
+    validator = Fields(Parameter("title", "string", required=True))
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        many=True,
+        validator=validator,
+        input_data=_untyped({}, []),
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"items": [{}, {"title": "t"}]})
+    assert caught.value.detail == {"items": {0: {"title": REQUIRED}}}
+    assert validator.calls == [{"title": "t"}]
+    assert service.calls == []
+
+
+def test_a_partial_spec_s_field_nobody_filled_is_still_not_required(ada: Any) -> None:
+    # ``partial`` relaxes the presence check as it relaxes the shape check.
+    service = Record()
+    spec = ServiceSpec(
+        service=service,
+        permissions=OPEN,
+        partial=True,
+        validator=Fields(Parameter("title", "string", required=True)),
+        input_data=_untyped({}, []),
+    )
+    dispatch(spec, principal=ada, arguments={})
+    assert service.calls[0]["data"] == {}
+
+
+@pytest.mark.parametrize(
+    "archived", [True, False], ids=["beside-a-refusing-affordance", "beside-a-precondition"]
+)
+def test_a_may_fill_read_nobody_fills_answers_before_an_affordance_and_a_precondition(
+    ada: Any, archived: bool
+) -> None:
+    # A refusal of the call itself answers before one describing the row's
+    # state, as test_a_missing_argument_answers_before_an_affordance holds for
+    # an argument the caller left out. An unarchived note passes the
+    # affordance, so the precondition is the next check on its own.
+    note = Note.objects.create(owner=ada, title="old", archived=archived)
+    ran: list[None] = []
+
+    def refusing() -> None:
+        ran.append(None)
+        raise AssertionError("the precondition ran")
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK),
+        affordances=[_NOT_ARCHIVED],
+        preconditions=[refusing],
+        reads=_project(),
+        kwargs=_untyped({}, []),
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"pk": note.pk})
+    assert caught.value.detail == {"project_pk": REQUIRED}
+    assert ran == []
+
+
 @pytest.mark.parametrize(
     "seat",
     ["service", "selector-spec", "target-selector"],
@@ -472,7 +613,7 @@ def test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_fiel
         check_server_arguments(spec, ServerArguments(withheld=frozenset({"project_pk"})))
 
 
-# --- seat (b): a registered seed fills a reflected read ----------------------------------
+# --- a registered seed fills a reflected read -------------------------------------------
 
 
 @ENTRIES
@@ -490,6 +631,24 @@ def test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s(
         spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS, unknown_arguments=policy
     )
     assert result.value == [SEEDED]
+
+
+def test_bind_arguments_still_demands_a_required_reflected_read(ada: Any) -> None:
+    # It is handed no seeds, so the read is checked as declared; dispatch,
+    # which knows the seed, fills it and refuses the caller's value for it.
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=lambda *, tenant: [tenant],
+        permissions=OPEN,
+        reads=_tenant(required=True, reflected=True),
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {}, principal=ada)
+    assert caught.value.detail == {"tenant": REQUIRED}
+    with pytest.raises(InvalidArguments) as refused:
+        dispatch(spec, principal=ada, arguments={"tenant": "t"}, pool_seeds=TENANT_SEEDS)
+    assert refused.value.detail == {"tenant": ["Unknown argument."]}
+    assert bind_arguments(spec, {"tenant": "t"}, principal=ada) == {"tenant": "t"}
 
 
 @ENTRIES
@@ -647,7 +806,7 @@ def test_check_requested_input_refuses_asking_for_a_reflected_read() -> None:
         check_requested_input(spec, schema, pool_seeds=TENANT_SEEDS)
 
 
-# --- seat (c): a Validator field named like a registered seed ----------------------------
+# --- a Validator field named like a registered seed -------------------------------------
 
 
 def _field_spec(service: Any = None, **kwargs: Any) -> ServiceSpec:
@@ -720,7 +879,7 @@ def test_input_data_filling_a_seed_named_field_reaches_data_and_never_the_pool(a
 
 
 def test_a_reflected_validator_field_is_still_the_caller_s(ada: Any) -> None:
-    # Seat (c) reads no marker: a Validator field is never filled by the seed.
+    # A Validator field reads no ``reflected`` marker: the seed never fills one.
     service = Record()
     spec = ServiceSpec(
         service=service,

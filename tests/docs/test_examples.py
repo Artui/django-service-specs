@@ -488,6 +488,26 @@ class TestDispatching:
             )
         assert refused.value.detail == {"signature": ["Unknown argument."]}
 
+    def test_a_reflected_read_is_filled_by_its_seed_and_never_by_a_caller(self, ada: Any) -> None:
+        Note.objects.create(owner=ada, title="Mine, by ada")
+        Note.objects.create(owner=ada, title="Theirs, by bob")
+        result = dispatching.my_signed_notes(ada)
+        assert [note.title for note in result.value] == ["Mine, by ada"]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                dispatching.signed_notes_spec,
+                principal=ada,
+                arguments={"signature": "bob"},
+                pool_seeds=dispatching.seeds,
+            )
+        assert refused.value.detail == {"signature": ["Unknown argument."]}
+
+    def test_a_field_named_like_a_seed_is_the_caller_s_and_the_seed_keeps_its_value(
+        self, ada: Any
+    ) -> None:
+        result = dispatching.create_countersigned_note(ada, "Hello", "bob")
+        assert result.value.title == "Hello, by bob for ada"
+
     def test_a_spec_declaring_a_seeds_name_is_refused(self, ada: Any) -> None:
         clashing = SelectorSpec(
             kind=SelectorKind.LIST,

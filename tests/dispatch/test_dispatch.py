@@ -2597,7 +2597,7 @@ def test_an_input_data_provider_fills_a_required_validator_field_the_caller_left
     assert validator.calls[0][0] == {"title": "server's"}
 
 
-def test_a_filled_field_the_provider_declines_is_refused_by_the_validator(ada: Any) -> None:
+def test_a_filled_field_the_provider_declines_is_refused_before_the_validator(ada: Any) -> None:
     provider, calls = _title_provider(title=UNSET)
 
     class _TitleForm(forms.Form):
@@ -2609,8 +2609,8 @@ def test_a_filled_field_the_provider_declines_is_refused_by_the_validator(ada: A
     with pytest.raises(InvalidArguments) as caught:
         dispatch(spec, principal=ada, arguments={})
     assert caught.value.detail == {"title": REQUIRED}
-    # The Validator answered, since the shape check let the field through: the
-    # provider ran, and it runs after the shape check.
+    # The presence check answered, once the provider had run: the shape check
+    # let the field through, and the provider runs after it.
     assert calls == [None]
 
 
