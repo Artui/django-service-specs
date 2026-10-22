@@ -7336,6 +7336,43 @@ and one the Validator declares when <code>parameters()</code> is assembled.</p>
             </td>
           </tr>
           <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.shapes">shapes</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Parameters
+
+
+  
+      dataclass
+   (django_service_specs.parameters.parameters.Parameters)" href="#django_service_specs.parameters.parameters.Parameters">Parameters</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The arguments that shape what the presenter renders rather
+than what the service does - which fields, a query over the
+result - as a Parameters group of their own, as a selector spec's
+<code>shapes</code> are. Part of <code>parameters()</code>, after the <code>reads</code> and
+before the Validator's (on a <code>many</code> spec, before the list), so
+the schema, the closed argument set and the shape check cover them
+as any argument; never handed to the Validator, a provider, a
+selector or the service. What the caller sent for them reaches the
+presenter alone, on
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>,
+whether the presenter is this spec's or its output selector's. A
+name a read, the target selector or the <code>many</code> list also
+declares is refused at construction, and one the Validator
+declares when <code>parameters()</code> is assembled, as is one dispatch
+seeds; so is a key a provider is annotated to fill, since no
+provider's values reach them. A nested selector declaring its own
+is refused: this spec's call is the one its presenter renders.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
             <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.partial">partial</span></code></td>
             <td>
                   <code><span title="bool">bool</span></code>
@@ -7525,6 +7562,29 @@ strict object its presenter declares. Beside an output selector it
 changes nothing: a <code>RETRIEVE</code> re-read admits <code>"null"</code> already,
 and a <code>LIST</code> one presents its rows rather than the service's
 return.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.service_spec.ServiceSpec.returns_many">returns_many</span></code></td>
+            <td>
+                  <code><span title="bool">bool</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>Declares that the service's own return is a list of
+rows, each presented by the <code>presenter</code>, for a service that takes
+one set of arguments and hands back rows. The output half of
+<code>many</code>, and it leaves the input alone: the call's arguments are
+declared as they would be without it. Dispatch presents a return
+that is not <code>None</code> as a list, row by row, and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+describes an array of the item, never paged. A <code>None</code> return
+stays one value, presented as <code>None</code>, as a <code>many</code> service's
+is, so <code>allow_none</code> still decides whether the schema admits
+<code>"null"</code>. Refused beside <code>many</code>, which presents its return as
+a list already, and beside an <code>output_selector_spec</code>, whose kind
+decides what is presented.</p>
               </div>
             </td>
           </tr>
@@ -7830,18 +7890,18 @@ tells the two apart: a spec compiles to itself, and is never cached.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Everything this spec takes: its target selector's reads, its own, then its Validator's.</p>
+        <p>Everything this spec takes: its target selector's reads, its own, its shapes, then its Validator's.</p>
 <p>On a <code>many</code> spec the Validator's parameters are each row's, so the
-top level is the spec's <code>reads</code> and then the list itself: a
+top level is the spec's <code>reads</code>, its <code>shapes</code> and then the list itself: a
 required array under <code>many_argument</code> whose rows are the Validator's
 parameters. A row's field is no top-level argument, so it may share a
 read's name.</p>
 <p>Assembled on every call rather than at construction, because a
 Validator reading a model-backed declaration may need the app registry,
 and specs are commonly built at import time. A name two sources declare
-is refused here, as is one dispatch seeds itself; the two that need no
-Validator, the target's reads and the spec's, were refused at
-construction already.</p>
+is refused here, as is one dispatch seeds itself; the three that need no
+Validator, the target's reads, the spec's and its shapes, were refused
+at construction already.</p>
 
 
     </div>
@@ -7991,8 +8051,41 @@ authorization belongs to the spec being dispatched.</p>
               <div class="doc-md-description">
                 <p>The arguments the selector reads with no Validator in front of
 it - its filters, its ordering, the key of the row it retrieves.
-They are the spec's whole Parameters, so the closed argument set and
-the shape check both apply to them.</p>
+With <code>shapes</code> they are the spec's whole Parameters, so the closed
+argument set and the shape check both apply to them.</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td><code><span title="django_service_specs.specs.selector_spec.SelectorSpec.shapes">shapes</span></code></td>
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Parameters
+
+
+  
+      dataclass
+   (django_service_specs.parameters.parameters.Parameters)" href="#django_service_specs.parameters.parameters.Parameters">Parameters</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The arguments that shape what the presenter renders rather
+than which rows are read - which fields, a query over each row -
+as a Parameters group of their own. Part of <code>parameters()</code>,
+after the <code>reads</code>, so the schema, the closed argument set and
+the shape check cover them as any argument; never in the
+selector's pool, so the selector, its <code>extend_queryset</code> and its
+<code>filter_set</code> never see them. What the caller sent for them
+reaches the presenter alone, on
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>.
+A name a read or a filter also declares is refused, as is one
+dispatch seeds and one the <code>kwargs</code> provider is annotated to
+fill, since no provider's values reach them. Refused on a nested
+selector, whose presenter presents no call of its own.</p>
               </div>
             </td>
           </tr>
@@ -8322,7 +8415,7 @@ tells the two apart: a spec compiles to itself, and is never cached.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Everything this spec takes: its <code>reads</code>.</p>
+        <p>Everything this spec takes: its <code>reads</code>, then its <code>shapes</code>.</p>
 
 
     </div>
@@ -8607,6 +8700,27 @@ applies to a declaration built before settings were configured. A
 declared <code>max_length</code> outranks it either way, wider or narrower.
 <code>min_length</code> has no default: an empty list is taken unless one says
 otherwise.</p>
+<p><code>json_schema_extra</code> carries the JSON Schema keywords no field of a
+Parameter spells - a <code>pattern</code>, a string's <code>maxLength</code>,
+<code>uniqueItems</code> - as a mapping of keyword to value, held as a deep copy of
+its own. It is how an adapter whose library declares more than a
+Parameter carries keeps it on every route rather than on its own.
+<a class="autorefs autorefs-internal" title="parameters_schema" href="#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a>
+adds its keys to this parameter's node. A keyword a field states there is
+refused here, naming the field, whether or not this parameter sets it:
+<code>type</code>, <code>format</code> (so a custom format is refused too: <code>format</code> is a
+field), <code>default</code>, the choices' <code>enum</code>, <code>anyOf</code> and <code>const</code>, the
+bounds, <code>minItems</code> and <code>maxItems</code>, <code>items</code>, <code>description</code> from
+<code>help</code>, and <code>properties</code>, <code>required</code> and <code>additionalProperties</code>
+from <code>fields</code>. Either side winning would advertise what the declaration
+does not say or drop what was written, and refusing the keyword only when
+one build stated it would make the same declaration valid until the array
+cap came on or a spec moved to <code>REJECT</code>. A value JSON cannot carry - a
+<code>Decimal</code>, a lazy translation, at any depth - is refused too, naming its
+key. It is advertised, not enforced: the shape check never reads it, so
+what it states holds only where the spec's Validator enforces it
+(test_it_is_advertised_and_not_enforced_by_the_shape_check).
+It takes no part in the hash, as <code>default</code> does not, and still in equality.</p>
 
 
 
@@ -9739,7 +9853,7 @@ neither belongs among the values a caller's argument names.</p>
 
 
 
-        <p>The principal, the target the operation acts on, whether the call is partial, and its seeds.</p>
+        <p>The principal, the target, whether the call is partial, its seeds, and the call's context.</p>
 <p><code>target</code> is here, rather than a constructor keyword the way DRF takes
 <code>instance=</code>, because the kernel is what resolves it: target resolution
 runs <strong>before</strong> validation, so an update's uniqueness check can exclude the
@@ -9775,6 +9889,17 @@ fills it from the target it resolved, and <code>bind_arguments</code> from the
 <code>target</code> its caller passes and the spec's selectors, by the one rule
 both share. Empty for a context built by hand; it trails the rest, so no
 existing construction changes.</p>
+<p><code>call_context</code> is the call's context: one plain <code>dict</code> the transport
+creates for its natural scope - a request, an agent run - and hands to
+dispatch, which every stage that declares it receives as the same object.
+A Validator reads it and writes to it directly, as a DRF serializer does
+its <code>context</code>, and a later stage of the call reuses what it put there
+rather than computing it again. Unlike <code>ambient</code> it is the transport's
+and the stages' to change; the kernel writes nothing to it. A context
+built by hand gets an empty dict of its own, never one shared with
+another, so a Validator that writes to it needs no guard for a call that
+was handed none. It trails every other field, so no existing
+construction changes.</p>
 
 
 
@@ -9968,7 +10093,7 @@ a <code>DispatchResult</code> a transport constructed itself.</p>
 
 
 
-        <p>The principal a call ran for, the target it acted on, and its resolved seeds.</p>
+        <p>The principal a call ran for, its target, its seeds, its context and its shapes.</p>
 <p>The output-side counterpart of
 <a class="autorefs autorefs-internal" title="ValidationContext
 
@@ -9999,6 +10124,18 @@ read the call it is rendering for.</p>
   (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context
   holds both halves). Never an argument, a validated value or a
   provider's key.</li>
+<li><code>call_context</code> is the call's context, the one plain <code>dict</code> the
+  transport created for its scope and every stage that declares it
+  received, as on <code>ValidationContext</code>: the Validator, the service and
+  the presenter share one object, so a presenter - and a nested one
+  handed the same context - reuses what an earlier stage put there. It is
+  the presenter's to read and write; the kernel writes nothing to it. A
+  context built by hand gets an empty dict of its own.</li>
+<li><code>shapes</code> is what the caller sent for the spec's declared <code>shapes</code>,
+  the arguments that shape the output - which fields, a query over the
+  rows - by name, read-only. An argument the caller left out is absent
+  rather than <code>None</code>. Empty for a spec that declares none and for a
+  context built by hand; no other argument is ever here.</li>
 </ul>
 
 
@@ -10180,6 +10317,17 @@ with no <code>type</code> at all rather than as a string it may not be. As on
 <code>Parameter</code>, <code>any</code> lists no choices, since a list of values says what
 type they are, and an array of any element declares no <code>items</code> rather
 than <code>items="any"</code>.</p>
+<p><code>json_schema_extra</code> carries the JSON Schema keywords no field of an
+OutputField spells, as on <code>Parameter</code>: a mapping of keyword to value,
+held as a deep copy of its own, which
+<a class="autorefs autorefs-internal" title="output_schema" href="#django_service_specs.schema.output_schema.output_schema"><code>output_schema</code></a>
+adds to this field's node. A keyword a field states there is refused
+here, naming the field, whether or not this field sets it: <code>type</code>,
+<code>format</code>, <code>items</code>, the choices' <code>enum</code>, <code>oneOf</code> and <code>const</code>,
+<code>title</code> from <code>label</code>, and <code>properties</code> and <code>required</code> from
+<code>fields</code>; so is a value JSON cannot carry. It describes what the
+presenter renders and constrains nothing.
+Out of the hash and in equality, as on <code>Parameter</code>.</p>
 
 
 
@@ -10988,11 +11136,13 @@ itself; anything else returns a new schema and never modifies <code>schema</code
     <div class="doc doc-contents first">
 
         <p><a class="autorefs autorefs-internal" title="parameters_schema" href="#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a> over <code>spec.parameters()</code>.</p>
-<p>The whole argument set dispatch checks: a selector spec's <code>reads</code>, or a
-service spec's target selector's <code>reads</code>, its own, then its Validator's
-parameters. A <code>many</code> service spec's is its <code>reads</code> and the one list
-its <code>many_argument</code> names, each row an object of the Validator's
-parameters. Pass the <code>unknown_arguments</code> the transport dispatches with,
+<p>The whole argument set dispatch checks: a selector spec's <code>reads</code> and
+<code>shapes</code>, or a service spec's target selector's <code>reads</code>, its own, its
+<code>shapes</code>, then its Validator's parameters. A <code>many</code> service spec's is
+its <code>reads</code>, its <code>shapes</code> and the one list its <code>many_argument</code>
+names, each row an object of the Validator's parameters. A shape is an
+argument like any other here, closed set included, though only the
+presenter reads it. Pass the <code>unknown_arguments</code> the transport dispatches with,
 because the schema closes the argument set exactly when dispatch does.</p>
 <p><strong>A</strong> <code>partial</code> <strong>spec's Validator parameters are required nowhere</strong>, at
 any depth - an object's fields and an array's rows included - because
@@ -11053,9 +11203,10 @@ shaped by what dispatch returns for this kind of spec:</p>
   whatever its <code>allow_none</code> says: once the service has run, a re-read
   that finds nothing is <code>None</code> rather than not-found, because reporting
   not-found would tell the caller a committed write did not happen.</li>
-<li><strong>A <code>many</code> service spec with no output selector</strong> presents the rows it
-  wrote as <code>{"type": "array", "items": &lt;item&gt;}</code>, which gains <code>"null"</code>
-  when the spec declares <code>allow_none</code>.</li>
+<li><strong>A <code>many</code> service spec with no output selector</strong>, or a
+  <code>returns_many</code> one, which never has one, presents the rows its service
+  returned as <code>{"type": "array", "items": &lt;item&gt;}</code>, never paged, which
+  gains <code>"null"</code> when the spec declares <code>allow_none</code>.</li>
 <li><strong>A service spec with no output selector</strong> presents what the service
   returned, described by its presenter as the item, which gains
   <code>"null"</code> when the spec declares <code>allow_none</code>. Undeclared, a <code>None</code>
@@ -11192,6 +11343,13 @@ Parameter does not carry.</p>
   is a choice set holding such a value, since listing only some of the
   accepted values would be false.</li>
 <li><strong><code>help</code></strong> becomes <code>"description"</code>.</li>
+<li><strong><code>json_schema_extra</code></strong> joins the parameter's node last, at any
+  depth: the keywords the declaration has no field for, such as a
+  <code>pattern</code> or a string's <code>maxLength</code>. The Parameter refused every
+  keyword a field states here when it was declared, a custom <code>format</code>
+  included, so the extra never restates or contradicts the declaration.
+  What it states is advertised and not enforced by the shape check; it
+  holds where the spec's Validator enforces it.</li>
 </ul>
 <p>Nothing else, deliberately. No <code>title</code> on a property, because a Parameter
 has no label of its own; a <code>title</code> is only ever a choice's.
@@ -11199,12 +11357,14 @@ No <code>$defs</code> or <code>$ref</code> ever: most MCP clients refuse a schem
 reference in it, so every schema is flat and self-contained, however deep
 the declaration nests. No <code>$schema</code> key, which a transport adds if its
 wire wants one. And no bound the shape check does not enforce
-(<code>maxLength</code>, a Validator's <code>max_value</code>): the Validator enforces those.
+(<code>maxLength</code>, a Validator's <code>max_value</code>) unless a <code>json_schema_extra</code>
+states it, for a Validator that enforces it.
 The one stated without being declared is an array's default maximum,
 because the shape check enforces it.</p>
 <p>Every call builds a new schema, so a transport may add its own keys to the
 result without reaching the declaration or another transport's copy.
-Defaults and choice values are placed in it as declared, not copied.</p>
+Defaults, choice values and <code>json_schema_extra</code> values are placed in it
+as declared, not copied.</p>
 <p><code>unknown_arguments</code> accepts the policy's plain value as well, and a value
 that is neither, or the kept <code>PASSTHROUGH</code> member, raises <code>ValueError</code>
 here rather than quietly describing one policy or the other.</p>
@@ -11243,7 +11403,9 @@ differences a description of what came back needs:</p>
 <li><strong>A field</strong> states its type, <code>[t, "null"]</code> when nullable, its
   <code>"format"</code> when it declares one, and <code>"title"</code> from its <code>label</code>
   when it has one. Adapters set a label only where the author wrote one,
-  so a title is never a field name restated in worse English. An <code>any</code>
+  so a title is never a field name restated in worse English. Its
+  <code>json_schema_extra</code> joins the node last, holding only keywords no
+  field states, since the field refused the rest when it was declared. An <code>any</code>
   field states no type, nullable or not, since <code>{}</code> admits every value
   and the null with it.</li>
 <li><strong>Nesting</strong> is as on input: <code>fields</code> make an object schema, an
@@ -11313,10 +11475,12 @@ answer:</p>
   observation: an undeclared <code>None</code> is still presented, against a schema
   that does not admit it.</li>
 </ul>
-<p><code>many</code> is not read. It decides whether the result is a list of what the
-service wrote, not whether it may be <code>None</code>: a <code>many</code> service's
-<code>None</code> return is presented as <code>None</code> too, so its <code>allow_none</code> answers
-as any other service's, and a re-read answers by its kind as above.</p>
+<p><code>many</code> and <code>returns_many</code> are not read. Each decides whether the result
+is a list of what the service returned, not whether it may be <code>None</code>: a
+<code>None</code> return from either is presented as <code>None</code> too, so its
+<code>allow_none</code> answers as any other service's, and a <code>many</code> spec's
+re-read answers by its kind as above. <code>returns_many</code> is refused beside a
+re-read, so it never has one.</p>
 <p>It answers whether <code>None</code> <em>may</em> come back, not whether a schema exists: a
 spec with no presenter has no output schema to widen, whatever this says.</p>
 <p>A <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> answers
@@ -12173,8 +12337,10 @@ first use.</p>
 
         <p>Every field's validated value, keyed by field name, or <code>InvalidArguments</code>.</p>
 <p>The context reaches pydantic's validators as <code>info.context</code>, a dict
-with <code>"principal"</code> and <code>"target"</code>, so a validator can check a
-value against the caller or the row being updated. Nested values stay
+with <code>"principal"</code>, <code>"target"</code> and <code>"call_context"</code>, the call's
+context as the very dict the transport passed, so a validator can check
+a value against the caller or the row being updated, and read or write
+what the call's other stages share. Nested values stay
 model instances, which is what the mutation helpers read a row from.</p>
 <p><strong>A partial call is refused</strong> with <code>ImproperlyConfigured</code>. pydantic
 validates a model whole: a required field not sent is missing, and a
@@ -12345,7 +12511,8 @@ every attribute is missing.</p>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">UNSET</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">extra_kwargs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -12496,9 +12663,47 @@ reaches a selector spec's own selector and a service spec's service,
 never a target or output selector. There is no overlay for the
 Validator's input: a transport merges such values into <code>arguments</code>,
 where the checks and the Validator read one value.</p>
+<p><code>call_context</code> is the call's context: one plain <code>dict</code>, created and
+owned by the transport for its natural scope - an HTTP request, an agent
+run - and handed to every stage that declares it as <strong>the same object,
+never a copy</strong>. A <code>kwargs</code> or <code>input_data</code> provider, a selector of any
+role, an affordance condition, a precondition, the service and the run's
+<code>progress_reporter</code> declare it as a parameter named <code>call_context</code>, a
+name reserved as every seed's is, so no argument may take it. It reaches
+them by that name alone: one taking <code>**kwargs</code> for the rest of the pool
+is never handed it, so a catch-all forwarding what it gets runs as it did
+before the name was reserved
+(TestACatchAllIsNeverHandedTheCallContext). A permission
+check's method declares it as a keyword, as it declares <code>arguments</code>;
+the Validator reads it as <code>ValidationContext.call_context</code> and the
+presenter, every row of a list and any presenter it hands its context on
+to, as <code>PresentationContext.call_context</code>. So a later stage reads what
+an earlier one put there rather than computing it again. With none, a
+fresh empty dict for this call alone, so a stage writing to it runs
+unchanged on a transport with nothing to put in it. The kernel writes
+nothing to it and keeps nothing across calls. Stages of one call run in
+sequence; calls sharing one dict across threads should write to it by
+compute-if-absent - <code>get</code>, and on a miss compute the value and store it
+with <code>call_context.setdefault(key, value)</code> - for a value any of them
+would compute the same.</p>
+<p>A permission check's method may also name a <strong>registered seed</strong> in
+<code>pool_seeds</code> as a keyword, and is handed its value at whichever of the
+three questions declares it. The seeds the checks name, and only those,
+are resolved before step two, so the class-level check can read them, and
+every pool after takes those values as they are: each resolves once for
+the call, and the check, the selectors and the service see one object.
+Every other seed resolves as before, once per pool and each after step
+two, as every seed does for a spec whose checks name none. A seed named
+<code>arguments</code> is never named this way: a check declaring <code>arguments</code>
+is handed the call's. A parameter a check's method fills by position -
+<code>principal</code>, <code>spec</code> and the target or scope, whatever it calls them -
+is never read as an opt-in.</p>
+<p>The presenter's context also carries <code>shapes</code>: what the caller sent
+for the spec's declared <code>shapes</code>, read-only, a shape left out absent.
+No shape reaches a pool or the Validator.</p>
 <p><code>kind</code> is <code>"list"</code> for a LIST selector spec, a service whose output
-selector is a LIST, or a <code>many</code> service with no output selector that
-returned something, and <code>"instance"</code> otherwise. Nothing is presented here;
+selector is a LIST, or a <code>many</code> or <code>returns_many</code> service with no
+output selector that returned something, and <code>"instance"</code> otherwise. Nothing is presented here;
 <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does that, so a
 transport that hands the object to a template never pays for rendering it.</p>
 
@@ -12631,7 +12836,8 @@ precondition answering with a coroutine or an async generator.</p>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">UNSET</span><span class="p">,</span>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">extra_kwargs</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -12694,6 +12900,10 @@ Validator's computed and bound values too, as in <code>dispatch</code>, on both
 hops (test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops).
 That refusal and the read of whether a check declares <code>arguments</code> both run off the loop
 (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).</p>
+<p><code>call_context</code> is <code>dispatch</code>'s: the transport's dict, handed to every
+stage that declares it as the same object, on every path and across
+every hop; with none, one fresh dict for the call, made here on entry, so
+the stages of each hop share it.</p>
 <p>A <code>many</code> spec checks, validates and writes its rows as <code>dispatch</code>
 does, every row inside the one hop.</p>
 
@@ -12863,8 +13073,9 @@ mapping, or the instance a dataclass Validator builds.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>The call a presenter renders for: its principal, its target
-and its resolved seeds, which <code>present</code> hands to
+                <p>The call a presenter renders for: its principal, its target,
+its resolved seeds, the call's context and the arguments sent for
+the spec's <code>shapes</code>, which <code>present</code> hands to
 <code>Presenter.presented()</code>. <code>None</code> on a result dispatch did not
 build, and on a not-found, which is never presented. It takes no
 part in equality: two results of one value are one result.</p>
@@ -12955,7 +13166,12 @@ answers, untouched.</p>
   " href="#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>
 dispatch built for the call, or <code>None</code> on a result it did not build.
 <code>presented()</code> is <code>present()</code> unless overridden, so a Presenter that
-reads nothing of the call needs only <code>present()</code>.</p>
+reads nothing of the call needs only <code>present()</code>. Every value of one
+result is handed the same context, so a list's rows, and a nested
+presenter a presenter hands it on to, share its <code>call_context</code> - the
+dict the transport created for the call - and read the arguments that
+shape the output from its <code>shapes</code>. A spec declaring no <code>shapes</code> and
+a presenter reading neither present exactly as before.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -13095,7 +13311,11 @@ which is what every HTTP response is.</p>
 rows: <code>present_for_audience(spec, replace(result, value=page.items))</code>,
 then <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>envelope</code></a>
 what comes back. The envelope's keys belong to no <code>Output</code>, so the
-projection must never walk them.</p>
+projection must never walk them. Whether to page is read off the spec,
+never off the result's kind: a <code>LIST</code> selector spec, or a service spec
+whose output selector is a <code>LIST</code>, is paged, while a <code>many</code> or
+<code>returns_many</code> service spec's <code>kind="list"</code> is every row its service
+returned, which its output schema describes as a bare array.</p>
 <p>A selector spec's declared <code>affordances</code> pass through whole: the
 <code>affordances</code> object <code>present</code> adds to each row is a key no <code>Output</code>
 declares, so the projection has nothing to say about it, and an agent
@@ -13159,7 +13379,8 @@ data and the declaration, so it is safe on the event loop.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Grant</span><span class="p">]</span> <span class="o">|</span> <span class="n">DispatchResult</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Grant</span><span class="p">]</span> <span class="o">|</span> <span class="n">DispatchResult</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -13196,6 +13417,13 @@ else, and dispatch checks the row its own lookup finds. A
 this function looks its target up itself. A missing row <code>allow_none</code> does not let through
 returns <code>DispatchResult(kind="not_found")</code>, dispatch's own answer, so it
 is never mistaken for the <code>None</code> it lets through.</p>
+<p><code>call_context</code> is the call's context, as <code>dispatch</code> takes it: the
+transport's dict, handed as the same object to the target selector and to
+every permission check method naming it, or a fresh dict of their own when
+none is passed. A check naming a registered seed is offered it here as at
+dispatch, at the class-level check and at the checks on what the lookup
+finds. A page resolving its row ahead of the call passes the dict it will
+hand that call, so the two read and write one context.</p>
 <p>It is sync, as dispatch's steps are; an async caller hops once, with
 <code>sync_to_async(resolve_target, thread_sensitive=True)</code>.</p>
 
@@ -13302,11 +13530,19 @@ a lookup in front of one.</p>
     <div class="doc doc-contents first">
 
         <p>Slice <code>rows</code> into the page a transport serves.</p>
-<p>A function a transport calls on a list result's <code>value</code> before presenting
-it, not a paging scheme: the names a caller pages by, and the ceiling a
-mount allows, are the transport's. A transport takes them off the call
-before the spec's closed argument set sees them, and bounds legitimately
-differ between two mounts of one spec.</p>
+<p>A function a transport calls on a paged spec's result <code>value</code> before
+presenting it, not a paging scheme: the names a caller pages by, and the
+ceiling a mount allows, are the transport's. A transport takes them off the
+call before the spec's closed argument set sees them, and bounds
+legitimately differ between two mounts of one spec.</p>
+<p>Whether to page is read off the spec, never off the result's <code>kind</code>: a
+<code>LIST</code> selector spec, or a service spec whose output selector is a
+<code>LIST</code>, is paged, and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+describes it as the envelope under <code>paginate=True</code>. A <code>many</code> or
+<code>returns_many</code> service spec's result is <code>kind="list"</code> too, and is never
+paged: it is every row the service returned, which its output schema
+describes as a bare array whatever <code>paginate</code> says.</p>
 <p><code>page</code> and <code>limit</code> default to 1 and
 <a class="autorefs autorefs-internal" title="DEFAULT_PAGE_SIZE
 
@@ -13408,7 +13644,8 @@ sequence, so there is nothing to count and nothing to slice.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -13440,7 +13677,8 @@ the spec it compiles to:</p>
    <code>reads</code> - with <code>ValidationContext(principal, target, partial)</code>,
    whose <code>resolved</code> names <code>target</code> as dispatch would: <code>instance</code>
    for a spec with an instance selector, <code>collection</code> for one with a
-   collection selector, nothing for a create.</li>
+   collection selector, nothing for a create, and whose <code>call_context</code>
+   is <code>call_context</code>, the very dict passed, or a fresh one.</li>
 </ol>
 <p>Returns the Validator's values. A service spec with no Validator returns
 <code>{}</code>, because every argument it takes is a read and none is validated. A
@@ -13612,7 +13850,8 @@ read as the spec it compiles to.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">Grant</span><span class="p">]</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">Grant</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -13658,6 +13897,9 @@ finds and checks it.</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the spec
 it compiles to, and the grant is for that compiled spec, which the same
 object answers on every later call.</p>
+<p><code>call_context</code> is offered to the checks as <code>dispatch</code> offers it, the
+very dict passed, or a fresh one; a check naming a registered seed is
+handed it, resolved as dispatch resolves it before the class-level check.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -14082,6 +14324,8 @@ rows included - as djangorestframework-services relaxes only its
 serializer. The spec's <code>reads</code> and its target selector's keep their
 <code>required</code>: a partial update still names the row it updates
 (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
+So do its <code>shapes</code>, which say what is presented rather than what is
+written, as on a <code>many</code> spec, where only the list's rows are walked.
 On a <code>many</code> spec the Validator's parameters are each row's, so the list
 stays required and only its rows are walked, since a read may share a
 row field's name
@@ -14096,8 +14340,9 @@ flag). The Validator's are told apart by what they are not, the spec's
 reads and its target's, so the Validator is not asked for its parameters
 again; a read and a Validator parameter of one name are refused when
 <code>parameters()</code> is assembled. Of the names kept, the spec's reads are
-held by test_a_partial_spec_with_no_target_keeps_its_reads_required and
-the target's by
+held by test_a_partial_spec_with_no_target_keeps_its_reads_required, the
+shapes by test_a_partial_spec_keeps_a_required_shape_required, and the
+target's by
 test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth.</p>
 <p>A copy, so the declaration every other reader sees - <code>parameters()</code>
 itself, which still says what a whole call needs - is untouched.</p>
@@ -14125,7 +14370,8 @@ rather than restating the rule and drifting from it.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14175,6 +14421,11 @@ built with. A callable's result is read for truth, so one that returns
 nothing refuses rather than allows.</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the
 service spec it compiles to.</p>
+<p><code>call_context</code> is the call's context, handed to a callable condition
+that names it and never to one taking <code>**kwargs</code> for the rest: the dict
+passed, else the one <code>pool</code> carries, else a fresh one the conditions of
+this call share. A <code>call_context</code> passed beside a different one in
+<code>pool</code> raises <code>ImproperlyConfigured</code> (<code>with_call_context</code>).</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -14251,7 +14502,8 @@ this one.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">pool</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Affordance</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Affordance</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14300,6 +14552,11 @@ names to <em>other</em> operations, to be answered for its rows, and is never a
 condition on the selector itself - so a transport passes whatever spec it
 holds rather than branching on its type and risking reading that mapping as
 the selector's own.</p>
+<p><code>call_context</code> is the call's context, handed to a callable condition
+that names it and never to one taking <code>**kwargs</code> for the rest: the dict
+passed, else the one <code>pool</code> carries, else a fresh one the conditions of
+this call share. A <code>call_context</code> passed beside a different one in
+<code>pool</code> raises <code>ImproperlyConfigured</code> (<code>with_call_context</code>).</p>
 
 
     </div>
@@ -14359,7 +14616,8 @@ disagree about which conditions there are.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">instance</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14460,7 +14718,8 @@ function's <code>TypeError</code> whatever it declares.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">pool</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">reserved</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="n">RESERVED_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Affordance</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Affordance</span> <span class="o">|</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14538,6 +14797,20 @@ check opted in. <code>arguments</code> is <code>None</code> where a transport ca
 itself what that means; reading it as an allow fails open. Only the mapping
 is read-only: its values are the call's own objects, the ones the run
 receives, so a check must not mutate them.</p>
+<p><strong>A method may ask for the call's context and for a registered seed</strong> the
+same way: a keyword <code>call_context</code> is handed the one <code>dict</code> every stage
+of the call shares, a fresh one where the transport passed none, and a
+keyword named after a seed in the call's <code>PoolSeeds</code> is handed that
+seed's value. Only the seeds a spec's checks name are resolved before the
+class-level check, and the run reuses those values, so each resolves once
+per call and the check and the service see one object; a seed raising
+<code>PrincipalUnavailable</code> there ends the call as a refusal does. A
+parameter the call fills by position - the principal, the spec, the
+target or scope, whatever a method calls them - is never read as an
+opt-in, so a DRF-style <code>has_permission(self, request, spec)</code> under a
+transport registering a <code>request</code> seed is asked as before. A seed named
+<code>arguments</code> is never handed this way: <code>arguments</code> is always the
+call's arguments.</p>
 <p><code>message</code> is what <a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
 says when this check refuses; <code>None</code> keeps the generic wording.</p>
 <p><strong>Sync-only</strong>, like every concept: a check may query, so the async path runs
@@ -14819,7 +15092,9 @@ covers one declaration and not another that compares equal to it.</p>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14852,6 +15127,13 @@ without it. Dispatch passes the call's
 shape-checked arguments as a read-only mapping, whose values are the
 call's own and must not be mutated; <code>None</code> when the caller has none to
 hand.</p>
+<p><code>call_context</code> and <code>seeds</code> are offered the same way, by name: a
+method declaring <code>call_context</code> is handed the call's context - the dict
+the transport handed dispatch, a fresh one when it handed none or this is
+called without one - and a method naming a registered seed is handed that
+seed's value from <code>seeds</code>, which dispatch resolves for the call only
+when one of the spec's checks names one. A parameter the call fills by
+position is never read as an opt-in, whatever its name.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -14916,7 +15198,9 @@ hand.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14942,6 +15226,13 @@ without it. Dispatch passes the call's
 shape-checked arguments as a read-only mapping, whose values are the
 call's own and must not be mutated; <code>None</code> when the caller has none to
 hand.</p>
+<p><code>call_context</code> and <code>seeds</code> are offered the same way, by name: a
+method declaring <code>call_context</code> is handed the call's context - the dict
+the transport handed dispatch, a fresh one when it handed none or this is
+called without one - and a method naming a registered seed is handed that
+seed's value from <code>seeds</code>, which dispatch resolves for the call only
+when one of the spec's checks names one. A parameter the call fills by
+position is never read as an opt-in, whatever its name.</p>
 
 
     </div>
@@ -14963,7 +15254,9 @@ hand.</p>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14994,6 +15287,13 @@ without it. Dispatch passes the call's
 shape-checked arguments as a read-only mapping, whose values are the
 call's own and must not be mutated; <code>None</code> when the caller has none to
 hand.</p>
+<p><code>call_context</code> and <code>seeds</code> are offered the same way, by name: a
+method declaring <code>call_context</code> is handed the call's context - the dict
+the transport handed dispatch, a fresh one when it handed none or this is
+called without one - and a method naming a registered seed is handed that
+seed's value from <code>seeds</code>, which dispatch resolves for the call only
+when one of the spec's checks names one. A parameter the call fills by
+position is never read as an opt-in, whatever its name.</p>
 
 
     </div>
@@ -16137,8 +16437,17 @@ step has them.</p>
 
 <a href="#django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS" class="headerlink" title="Permanent link">&para;</a></h2>
 <div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">RESERVED_POOL_SEEDS</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">(</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="p">{</span><span class="s2">"user"</span><span class="p">,</span> <span class="s2">"data"</span><span class="p">,</span> <span class="s2">"instance"</span><span class="p">,</span> <span class="s2">"collection"</span><span class="p">,</span> <span class="s2">"result"</span><span class="p">,</span> <span class="s2">"queryset"</span><span class="p">,</span> <span class="s2">"progress"</span><span class="p">}</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="p">{</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>        <span class="s2">"user"</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>        <span class="s2">"data"</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>        <span class="s2">"instance"</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>        <span class="s2">"collection"</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="s2">"result"</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">"queryset"</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="s2">"progress"</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="s2">"call_context"</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="p">}</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16148,7 +16457,15 @@ step has them.</p>
 <code>data</code> the validated values, <code>instance</code> and <code>collection</code> the resolved
 target, <code>result</code> the service's return (in an output selector's pool, where
 <code>instance</code> is that return too, as djangorestframework-services binds it) and
-<code>queryset</code> what <code>extend_queryset</code> shapes. They are the names
+<code>queryset</code> what <code>extend_queryset</code> shapes. <code>call_context</code> is the call's
+context: the one plain <code>dict</code> the transport handed <code>dispatch</code>, or a fresh
+one per call when it handed none, which every callable dispatch resolves -
+a <code>kwargs</code> or <code>input_data</code> provider, a selector and its
+<code>extend_queryset</code>, an affordance condition,
+a precondition, the service, the run's <code>progress_reporter</code> - receives as
+the same object by naming it, and never through <code>**kwargs</code>. Never a copy,
+and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
+call adds. The other seven are the names
 <code>djangorestframework-services</code> seeds for the same values, so a callable
 written for it runs under this kernel unchanged.</p>
 <p><code>progress</code> is in every pool, and live only where there is work to report on:
@@ -16583,9 +16900,11 @@ input markers hide, which this package does not read.</p>
 <code>selector</code>, <code>extend_queryset</code>, a service — binds through this one rule,
 so a callable written for one entry point runs unchanged on another: it
 names what it wants and gets exactly that, or takes <code>**kwargs</code> for the
-whole pool.</p>
-<p>If <code>fn</code> declares <code>**kwargs</code>, the entire pool is passed.
-Otherwise only parameters present in the signature are forwarded.</p>
+rest of the pool, which is every entry but the call's context.</p>
+<p>If <code>fn</code> declares <code>**kwargs</code>, the entire pool is passed, except a name
+handed by name only (<code>BY_NAME_ONLY_POOL_NAMES</code>, the call's context),
+which reaches a catch-all only where it also names it. Otherwise only
+parameters present in the signature are forwarded.</p>
 
 
     </div>
@@ -16648,7 +16967,9 @@ Keep the whole call inside the service's atomic block.</p>
 of every row service a relation spec declares and of every <code>scope</code> callable. This
 helper never reads it — it exists so per-row work downstream can see the acting
 caller. A service opts in by handing on the pool it was called with,
-<code>context=kwargs</code>.</p>
+<code>context=kwargs</code>. A catch-all is never handed the call's context, so a
+service whose nested callables should see it names <code>call_context</code> and
+hands it on beside the pool, as <code>create_model</code>'s service does.</p>
 
 
     </div>
@@ -17521,9 +17842,12 @@ arrive in the arguments:</p>
 since the row is what a create's output presents. It opens no transaction:
 dispatch runs a service inside one, which covers the row and every nested
 write. It takes <code>**kwargs</code>, so the rest of the pool - the <code>user</code> and
-any registered seed - is absorbed rather than refused, and the same pool
-is handed on as the helper's <code>context</code>, so a row service a relation spec
-declares can see who is calling.</p>
+any registered seed - is absorbed rather than refused. It names
+<code>call_context</code>, which a catch-all is never handed, and the same pool
+with the call's context beside it is handed on as the helper's
+<code>context</code>, so a row service a relation spec declares can see who is
+calling and, by naming <code>call_context</code>, the very dict the call's other
+stages share.</p>
 
 
     </div>
@@ -17613,7 +17937,8 @@ as they are, and <code>m2m</code> is read as <code>create_model</code> reads it.
       dataclass
   " href="#django_service_specs.mutations.change_result.ChangeResult"><code>ChangeResult</code></a>,
 opens no transaction of its own, absorbs the rest of the pool and hands it
-on as <code>context</code>, as <code>create_model</code>'s does.</p>
+on as <code>context</code> with the call's context beside it, as <code>create_model</code>'s
+does.</p>
 
 
     </div>
@@ -17704,8 +18029,9 @@ rather than at its first call. With no map, or an empty one, nothing but
 the row is touched.</p>
 <p>The service opens no transaction: dispatch runs it inside one, so a refused
 cascade leaves every row in place. It absorbs the rest of the pool and
-hands it on as the cascade's <code>context</code>, so a row's <code>delete_service</code> can
-see who is calling.</p>
+hands it on, with the call's context it names, as the cascade's
+<code>context</code>, so a row's <code>delete_service</code> can see who is calling and,
+by naming <code>call_context</code>, the very dict the call's other stages share.</p>
 
 
     </div>

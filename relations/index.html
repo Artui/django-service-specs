@@ -1009,7 +1009,9 @@ runs, and the helpers own persistence only.</p>
   <a class="autorefs autorefs-internal" title="delete_collection" href="../reference/#django_service_specs.mutations.delete_collection.delete_collection"><code>delete_collection</code></a>
   deletes the rows a spec's <code>collection_selector_spec</code> resolved. Each takes the
   rest of the pool as <code>**kwargs</code>, which the three model services hand on as
-  the helper's <code>context</code>, opens no transaction of its own, since dispatch runs
+  the helper's <code>context</code>, with the call's context beside it, so a nested row
+  service or scope naming <code>call_context</code> is handed the very dict the call's
+  other stages share. Each opens no transaction of its own, since dispatch runs
   the service inside one, and has an async form:
   <a class="autorefs autorefs-internal" title="acreate_model" href="../reference/#django_service_specs.mutations.acreate_model.acreate_model"><code>acreate_model</code></a>,
   <a class="autorefs autorefs-internal" title="aupdate_model" href="../reference/#django_service_specs.mutations.aupdate_model.aupdate_model"><code>aupdate_model</code></a>,
@@ -1017,6 +1019,12 @@ runs, and the helpers own persistence only.</p>
   and
   <a class="autorefs autorefs-internal" title="adelete_collection" href="../reference/#django_service_specs.mutations.adelete_collection.adelete_collection"><code>adelete_collection</code></a>.</li>
 </ul>
+<p>A service of your own that calls a helper and hands its <code>**kwargs</code> on as the
+helper's <code>context</code> hands on no call context: <code>**kwargs</code> is never handed
+<code>call_context</code>, which reaches a callable only by its name. One whose nested
+row services and scopes should see it names <code>call_context</code> and passes it
+beside the pool, <code>context={**kwargs, "call_context": call_context}</code>, as
+<code>create_model</code> does.</p>
 <p><code>data</code> is a dataclass, a mapping, or an object with a <code>__dict__</code> - usually the
 validated values dispatch passes the service as <code>data</code>. A dataclass gives its
 <code>__init__</code> fields only, at every depth: one declared <code>init=False</code> is computed

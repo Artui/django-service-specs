@@ -703,6 +703,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#shaping-each-row-by-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shaping each row by the call
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#the-pieces-on-their-own" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -823,6 +834,17 @@
     <span class="md-ellipsis">
       
         A caller naming no audience
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shaping-each-row-by-the-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Shaping each row by the call
       
     </span>
   </a>
@@ -1100,6 +1122,15 @@ never an unbounded <code>OFFSET</code>, and no page is longer than the rows coun
 a <code>limit</code> no <code>max_page_size</code> bounds, however large, still serves every row
 where a <code>LIMIT</code> past 64 bits would be refused by the database. The envelope
 reports the <code>limit</code> asked for.</p>
+<p>Whether to page is read off the spec, never off the result's kind. A <code>LIST</code>
+selector spec is paged, as is a write whose output selector is a <code>LIST</code>, and
+<a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
+describes either as the envelope under <code>paginate=True</code>. A <code>many</code> write, and
+one declaring <a href="../declaring/#a-service-returning-rows"><code>returns_many</code></a>, come
+back as <code>kind="list"</code> too, but their rows are what the service returned, all
+of them, and they are never paged: their schema is a bare array whatever
+<code>paginate</code> says, so a transport paging every <code>"list"</code> result would serve an
+envelope its schema does not describe.</p>
 <p>The names a caller pages by, and the ceiling, are the transport's. They are
 not arguments of the spec, whose argument set is closed, so the tool takes
 them off the call before dispatch sees the rest; and two mounts of one spec
@@ -1190,6 +1221,77 @@ presented:</p>
 <p>Render an agent's <strong>answer</strong> with the projection. A pipeline that feeds one
 spec's output into the next keeps presenting with <code>present</code>, or the handles
 the next step reads by will have been projected away.</p>
+<h2 id="shaping-each-row-by-the-call">Shaping each row by the call<a class="headerlink" href="#shaping-each-row-by-the-call" title="Permanent link">&para;</a></h2>
+<p>Paging and projection are the transport's. What a caller may ask of the rows
+themselves - which fields, a query over each - is the spec's, declared as its
+<code>shapes</code>: Parameters beside its <code>reads</code> that only the presenter reads.</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ChosenFields</span><span class="p">(</span><span class="n">Presenter</span><span class="p">):</span>
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="w">    </span><span class="sd">"""Each book with its handle and the fields the caller chose, or every field."""</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">output</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Output</span><span class="p">:</span>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>        <span class="k">return</span> <span class="n">Output</span><span class="p">(</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>            <span class="p">(</span>
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">),</span>
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>                <span class="c1"># Left out of a row whose caller did not choose them, so a</span>
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>                <span class="c1"># schema must not call them required.</span>
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">always_present</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"price"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">always_present</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            <span class="p">)</span>
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        <span class="p">)</span>
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">present</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Book</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>        <span class="k">return</span> <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">pk</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="n">value</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s2">"price"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">price</span><span class="p">)}</span>
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>
+</span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">presented</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Book</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">PresentationContext</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-9-19"><a id="__codelineno-9-19" name="__codelineno-9-19" href="#__codelineno-9-19"></a>        <span class="n">row</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">present</span><span class="p">(</span><span class="n">value</span><span class="p">)</span>
+</span><span id="__span-9-20"><a id="__codelineno-9-20" name="__codelineno-9-20" href="#__codelineno-9-20"></a>        <span class="n">chosen</span> <span class="o">=</span> <span class="n">context</span><span class="o">.</span><span class="n">shapes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"fields"</span><span class="p">)</span> <span class="k">if</span> <span class="n">context</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+</span><span id="__span-9-21"><a id="__codelineno-9-21" name="__codelineno-9-21" href="#__codelineno-9-21"></a>        <span class="k">if</span> <span class="n">chosen</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>  <span class="c1"># not sent: every field</span>
+</span><span id="__span-9-22"><a id="__codelineno-9-22" name="__codelineno-9-22" href="#__codelineno-9-22"></a>            <span class="k">return</span> <span class="n">row</span>
+</span><span id="__span-9-23"><a id="__codelineno-9-23" name="__codelineno-9-23" href="#__codelineno-9-23"></a>        <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">row</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"id"</span><span class="p">,</span> <span class="o">*</span><span class="n">chosen</span><span class="p">)}</span>
+</span><span id="__span-9-24"><a id="__codelineno-9-24" name="__codelineno-9-24" href="#__codelineno-9-24"></a>
+</span><span id="__span-9-25"><a id="__codelineno-9-25" name="__codelineno-9-25" href="#__codelineno-9-25"></a>
+</span><span id="__span-9-26"><a id="__codelineno-9-26" name="__codelineno-9-26" href="#__codelineno-9-26"></a><span class="n">pick_books_spec</span> <span class="o">=</span> <span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-9-27"><a id="__codelineno-9-27" name="__codelineno-9-27" href="#__codelineno-9-27"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span>
+</span><span id="__span-9-28"><a id="__codelineno-9-28" name="__codelineno-9-28" href="#__codelineno-9-28"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">catalogue</span><span class="p">,</span>  <span class="c1"># never handed "fields"</span>
+</span><span id="__span-9-29"><a id="__codelineno-9-29" name="__codelineno-9-29" href="#__codelineno-9-29"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-9-30"><a id="__codelineno-9-30" name="__codelineno-9-30" href="#__codelineno-9-30"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">ChosenFields</span><span class="p">(),</span>
+</span><span id="__span-9-31"><a id="__codelineno-9-31" name="__codelineno-9-31" href="#__codelineno-9-31"></a>    <span class="n">shapes</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span>
+</span><span id="__span-9-32"><a id="__codelineno-9-32" name="__codelineno-9-32" href="#__codelineno-9-32"></a>        <span class="n">Parameter</span><span class="p">(</span>
+</span><span id="__span-9-33"><a id="__codelineno-9-33" name="__codelineno-9-33" href="#__codelineno-9-33"></a>            <span class="s2">"fields"</span><span class="p">,</span>
+</span><span id="__span-9-34"><a id="__codelineno-9-34" name="__codelineno-9-34" href="#__codelineno-9-34"></a>            <span class="s2">"array"</span><span class="p">,</span>
+</span><span id="__span-9-35"><a id="__codelineno-9-35" name="__codelineno-9-35" href="#__codelineno-9-35"></a>            <span class="n">items</span><span class="o">=</span><span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-9-36"><a id="__codelineno-9-36" name="__codelineno-9-36" href="#__codelineno-9-36"></a>            <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"price"</span><span class="p">],</span>
+</span><span id="__span-9-37"><a id="__codelineno-9-37" name="__codelineno-9-37" href="#__codelineno-9-37"></a>            <span class="n">required</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+</span><span id="__span-9-38"><a id="__codelineno-9-38" name="__codelineno-9-38" href="#__codelineno-9-38"></a>            <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span><span class="s2">"uniqueItems"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
+</span><span id="__span-9-39"><a id="__codelineno-9-39" name="__codelineno-9-39" href="#__codelineno-9-39"></a>        <span class="p">)</span>
+</span><span id="__span-9-40"><a id="__codelineno-9-40" name="__codelineno-9-40" href="#__codelineno-9-40"></a>    <span class="p">),</span>
+</span><span id="__span-9-41"><a id="__codelineno-9-41" name="__codelineno-9-41" href="#__codelineno-9-41"></a><span class="p">)</span>
+</span></code></pre></div>
+<p><code>fields</code> is an argument like any other to the caller: it is in
+<code>spec_input_schema</code>, with its <code>uniqueItems</code> from <code>json_schema_extra</code>, it is
+shape-checked, so a field not among its choices is refused before the
+selector runs, and an undeclared argument beside it is still refused. It
+never reaches the selector, which declares no <code>fields</code> and would fail if
+handed one. What the caller sent reaches the presenter on the
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>
+as <code>shapes</code>, by name and read-only, with an argument left out absent rather
+than <code>None</code>, so <code>ChosenFields</code> renders every field unless the call chose some.
+Every row of a list is handed the same context, and so the same <code>shapes</code>.</p>
+<p>A presenter that leaves a key out of some rows says so in its declaration:
+<code>title</code> and <code>price</code> are <code>always_present=False</code>, so the schema lists only <code>id</code>
+as required, and a client is never promised a key a row may not carry. An
+adapter that drops keys under a <code>fields</code> shape declares those keys the same
+way.</p>
+<p>A shape is refused by its declaration, before the call runs, never by its
+presenter: the choices on <code>fields</code> are what turns away a field the presenter
+cannot render, and a presenter that raised on one would fail after the
+selector had read the rows. The schema advertises the same choices, so a
+client is told the line before it crosses it.</p>
 <h2 id="the-pieces-on-their-own">The pieces on their own<a class="headerlink" href="#the-pieces-on-their-own" title="Permanent link">&para;</a></h2>
 <p>A transport with a schema or a payload that did not come from a spec uses the
 two halves directly:

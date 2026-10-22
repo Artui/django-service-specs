@@ -1069,7 +1069,9 @@ answers about each row.</p>
 is that step, exported for a transport that runs a service itself. It calls it
 after authorization and validation and before the service, with the pool
 seeds' <code>reserved</code> set, or a condition the direct path refuses is skipped on
-that one:</p>
+that one, and with the call's <code>call_context=</code>, so a condition naming it is
+handed the dict the call's other stages share (the parameter, else one the
+pool carries, else a fresh one; two different dicts are refused):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_step</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">    </span><span class="sd">"""One step of a chain that resolved its row itself and runs the service in hand."""</span>
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">grant</span> <span class="o">=</span> <span class="n">authorize</span><span class="p">(</span><span class="n">rename_spec</span><span class="p">,</span> <span class="n">user</span><span class="p">)</span>

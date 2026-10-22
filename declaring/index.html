@@ -424,6 +424,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-service-returning-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A service returning rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#providers-and-preconditions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -932,6 +943,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#a-service-returning-rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A service returning rows
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#providers-and-preconditions" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1064,7 +1086,8 @@ sequence.</p>
 <p>The service, the selector, <code>extend_queryset</code>, the providers, the preconditions
 and a pool seed's resolver are all called the same way: with the keywords their signature declares, picked from a
 pool dispatch builds for the call, and nothing else. A callable that takes
-<code>**kwargs</code> receives the whole pool.</p>
+<code>**kwargs</code> receives the whole pool but <code>call_context</code>, which reaches a
+callable only by its name.</p>
 <table>
 <thead>
 <tr>
@@ -1139,10 +1162,15 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 <td>Its resolver's value</td>
 <td>Every callable</td>
 </tr>
+<tr>
+<td><code>call_context</code></td>
+<td><a href="../dispatching/#the-calls-context">The call's context</a>: the transport's dict, or a fresh one</td>
+<td>Every callable dispatch resolves that names it, never a <code>**kwargs</code> catch-all; not a seed's resolver or a <code>filter_set</code></td>
+</tr>
 </tbody>
 </table>
 <p>The fixed names - <code>user</code>, <code>progress</code>, <code>data</code>, <code>instance</code>, <code>collection</code>,
-<code>result</code> and <code>queryset</code> - are
+<code>result</code>, <code>queryset</code> and <code>call_context</code> - are
 <a class="autorefs autorefs-internal" title="RESERVED_POOL_SEEDS
 
 
@@ -1304,6 +1332,24 @@ Django's handler and by DRF's. Only the selector's own raise is read this way: a
 read, so these Parameters are what the closed argument set and the shape check
 hold the caller to: an argument the spec does not declare is refused before
 the selector runs.</p>
+<p><code>shapes</code> sits beside <code>reads</code>, for the arguments that shape what the presenter
+renders rather than which rows are read: which fields, a query over each row.
+They are Parameters of their own and part of <code>spec.parameters()</code>, after the
+reads, so the schema, the closed argument set and the shape check cover them
+as any argument. They are never in the selector's pool, so the selector, its
+<code>extend_queryset</code> and its <code>filter_set</code> never see them: what the caller sent
+for them reaches the presenter alone, on
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>.
+A shape a read or a filter also declares is refused when the spec is built,
+as is one named for a seed dispatch provides and one the <code>kwargs</code> provider is
+annotated to fill, since no provider's values reach them. A presenter reading
+them is shown under
+<a href="../paging-and-projection/#shaping-each-row-by-the-call">shaping each row by the call</a>.</p>
 <p><code>select_related</code>, <code>prefetch_related</code> and <code>annotations</code> are applied to the
 queryset the selector returns, in that order, then <code>extend_queryset</code>, with
 the shaped queryset as <code>queryset</code>, and <code>filter_set</code> last. Declaring any of
@@ -1373,11 +1419,18 @@ own checks or audit hooks to read.</p>
 read with no Validator in front of them - the <code>project_pk</code> a create is scoped
 by - named after a selector spec's. They are checked as a read's are and
 handed to each callable that declares them, never to the Validator.</p>
+<p><code>shapes</code> are the arguments that shape what the presenter renders, as on a
+read: never handed to the Validator, a provider, a selector or the service,
+and reaching the presenter alone, whether that is the spec's own or its output
+selector's. A selector nested in a write, its target or its output selector,
+declaring shapes of its own is refused: the write's call is the one presented,
+so they are declared on the write.</p>
 <p><code>spec.parameters()</code> is everything the write takes: its target selector's
-<code>reads</code>, its own, then its Validator's parameters. A name two of them declare
-is refused - two sources claiming one argument is a declaration bug, and a
-last-wins merge would hide which declaration a transport describes. The
-selector sees only its own <code>reads</code>, and the Validator only its own parameters.</p>
+<code>reads</code>, its own, its <code>shapes</code>, then its Validator's parameters. A name two of
+them declare is refused - two sources claiming one argument is a declaration
+bug, and a last-wins merge would hide which declaration a transport describes.
+The selector sees only its own <code>reads</code>, and the Validator only its own
+parameters.</p>
 <h3 id="partial-updates">Partial updates<a class="headerlink" href="#partial-updates" title="Permanent link">&para;</a></h3>
 <p><code>partial=True</code> declares an update that sends only what changes, as an HTTP
 <code>PATCH</code> does. Dispatch does not refuse an absent Validator parameter of such a
@@ -1462,6 +1515,37 @@ refusals. Either is refused on a spec that is not <code>many</code>.</p>
 rows resolves no target, and a condition on the row among its <code>affordances</code> is
 refused. With no output selector its result is <code>kind="list"</code>, unless the
 service returned <code>None</code>.</p>
+<h3 id="a-service-returning-rows">A service returning rows<a class="headerlink" href="#a-service-returning-rows" title="Permanent link">&para;</a></h3>
+<p><code>returns_many=True</code> declares that the service's own return is a list of rows,
+each presented by the spec's presenter: the output half of <code>many</code>, for a
+service that takes one set of arguments and hands back rows. The input is left
+alone, so the call's arguments are declared as they would be without it:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_all</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Note</span><span class="p">]:</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">notes</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="k">for</span> <span class="n">note</span> <span class="ow">in</span> <span class="n">notes</span><span class="p">:</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">return</span> <span class="n">notes</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="n">archive_all_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_all</span><span class="p">,</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>  <span class="c1"># what each row is</span>
+</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>    <span class="n">returns_many</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># the service hands back rows: each is presented</span>
+</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>Dispatch reports a return that is not <code>None</code> as <code>kind="list"</code>, and <code>present</code>
+renders it row by row. Its
+<a href="../schema/#what-a-spec-returns">output schema</a> is an array of the
+presenter's item, never paged: the rows are what the service returned, all of
+them, and a transport that pages a list pages by the spec rather than by the
+result's kind (see <a href="../paging-and-projection/#serving-a-page">serving a page</a>).
+A <code>None</code> return stays one value, presented as <code>None</code>, as a <code>many</code> service's is,
+so <code>allow_none</code> still decides whether the schema admits <code>"null"</code>.</p>
+<p>It is refused when the spec is built beside an <code>output_selector_spec</code>, whose
+kind decides what is presented, and beside <code>many</code>, which presents its return
+as a list already.</p>
 <h3 id="providers-and-preconditions">Providers and preconditions<a class="headerlink" href="#providers-and-preconditions" title="Permanent link">&para;</a></h3>
 <p>Four declarations put the author's code between the checks and the run. Each
 is called with the keywords it declares, like any other callable here, and is
@@ -1518,34 +1602,34 @@ built or, for a Validator field, when <code>parameters()</code> is assembled.
 gathers what every provider of a spec fills, with the seeds' names. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what <code>parameters()</code> lists:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Owned</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>  <span class="c1"># the keys the provider fills, readable before it runs</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">owner_id</span><span class="p">:</span> <span class="nb">int</span>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">the_owner</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Owned</span><span class="p">:</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">"owner_id"</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">pk</span><span class="p">}</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
-</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="nd">@dataclass</span>
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoteCreate</span><span class="p">:</span>
-</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>    <span class="n">owner_id</span><span class="p">:</span> <span class="nb">int</span>
-</span><span id="__span-3-13"><a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
-</span><span id="__span-3-14"><a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>
-</span><span id="__span-3-15"><a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_note</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">NoteCreate</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
-</span><span id="__span-3-16"><a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="k">return</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">owner_id</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">owner_id</span><span class="p">)</span>
-</span><span id="__span-3-17"><a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a>
-</span><span id="__span-3-18"><a id="__codelineno-3-18" name="__codelineno-3-18" href="#__codelineno-3-18"></a>
-</span><span id="__span-3-19"><a id="__codelineno-3-19" name="__codelineno-3-19" href="#__codelineno-3-19"></a><span class="n">create_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-3-20"><a id="__codelineno-3-20" name="__codelineno-3-20" href="#__codelineno-3-20"></a>    <span class="n">service</span><span class="o">=</span><span class="n">create_note</span><span class="p">,</span>
-</span><span id="__span-3-21"><a id="__codelineno-3-21" name="__codelineno-3-21" href="#__codelineno-3-21"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-3-22"><a id="__codelineno-3-22" name="__codelineno-3-22" href="#__codelineno-3-22"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">NoteCreate</span><span class="p">),</span>
-</span><span id="__span-3-23"><a id="__codelineno-3-23" name="__codelineno-3-23" href="#__codelineno-3-23"></a>    <span class="c1"># Merged over the caller's arguments before the Validator sees them, so</span>
-</span><span id="__span-3-24"><a id="__codelineno-3-24" name="__codelineno-3-24" href="#__codelineno-3-24"></a>    <span class="c1"># the owner is the signed-in user whatever the caller sends.</span>
-</span><span id="__span-3-25"><a id="__codelineno-3-25" name="__codelineno-3-25" href="#__codelineno-3-25"></a>    <span class="n">input_data</span><span class="o">=</span><span class="n">the_owner</span><span class="p">,</span>
-</span><span id="__span-3-26"><a id="__codelineno-3-26" name="__codelineno-3-26" href="#__codelineno-3-26"></a><span class="p">)</span>
-</span><span id="__span-3-27"><a id="__codelineno-3-27" name="__codelineno-3-27" href="#__codelineno-3-27"></a><span class="c1"># server_owned_keys(create_note_spec) names "owner_id": a transport's schema</span>
-</span><span id="__span-3-28"><a id="__codelineno-3-28" name="__codelineno-3-28" href="#__codelineno-3-28"></a><span class="c1"># need not ask for it, and dispatch does not demand it of the caller.</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Owned</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>  <span class="c1"># the keys the provider fills, readable before it runs</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>    <span class="n">owner_id</span><span class="p">:</span> <span class="nb">int</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">the_owner</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Owned</span><span class="p">:</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="k">return</span> <span class="p">{</span><span class="s2">"owner_id"</span><span class="p">:</span> <span class="n">user</span><span class="o">.</span><span class="n">pk</span><span class="p">}</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="nd">@dataclass</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="k">class</span><span class="w"> </span><span class="nc">NoteCreate</span><span class="p">:</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">owner_id</span><span class="p">:</span> <span class="nb">int</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_note</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">NoteCreate</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="k">return</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">create</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="n">owner_id</span><span class="o">=</span><span class="n">data</span><span class="o">.</span><span class="n">owner_id</span><span class="p">)</span>
+</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>
+</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>
+</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="n">create_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>    <span class="n">service</span><span class="o">=</span><span class="n">create_note</span><span class="p">,</span>
+</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a>    <span class="n">validator</span><span class="o">=</span><span class="n">DataclassValidator</span><span class="p">(</span><span class="n">NoteCreate</span><span class="p">),</span>
+</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a>    <span class="c1"># Merged over the caller's arguments before the Validator sees them, so</span>
+</span><span id="__span-4-24"><a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    <span class="c1"># the owner is the signed-in user whatever the caller sends.</span>
+</span><span id="__span-4-25"><a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="n">input_data</span><span class="o">=</span><span class="n">the_owner</span><span class="p">,</span>
+</span><span id="__span-4-26"><a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a><span class="p">)</span>
+</span><span id="__span-4-27"><a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a><span class="c1"># server_owned_keys(create_note_spec) names "owner_id": a transport's schema</span>
+</span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="c1"># need not ask for it, and dispatch does not demand it of the caller.</span>
 </span></code></pre></div>
 <p>On a <code>many</code> spec, the keys an <code>input_data</code> provider fills are fields inside
 each row, merged over every row, so a transport subtracting the set from the
@@ -1673,9 +1757,19 @@ the same declaration.</p>
   is declared, so a default of <code>None</code> stays a real default. It is reported, not
   applied: whether an omitted argument arrives as its default is the validating
   library's behaviour.</li>
+<li><strong><code>json_schema_extra</code></strong> carries the JSON Schema keywords no field of a
+  Parameter spells - a <code>pattern</code>, a string's <code>maxLength</code>, <code>uniqueItems</code> - as a
+  mapping of keyword to value, added to the parameter's
+  <a href="../schema/#keywords-no-field-spells">schema</a> node. It is how an adapter
+  whose library declares more than a Parameter carries keeps it on every
+  route. A keyword a field states is refused, naming the field to declare it
+  on, whether or not this parameter sets that field; so is a value JSON cannot
+  carry. It is held as a copy of its own, and it is advertised, not enforced:
+  the shape check never reads it.</li>
 </ul>
 <p>Any other bound - a length, a Validator field's <code>max_value</code> - is the
-Validator's alone. A Parameter's bounds are for the line a caller must not
+Validator's alone, and a <code>json_schema_extra</code> stating one advertises what the
+Validator enforces. A Parameter's bounds are for the line a caller must not
 cross before any Validator runs.</p>
 <p><a class="autorefs autorefs-internal" title="Parameters
 
@@ -1762,29 +1856,29 @@ dataclasses included. The call's <code>data</code> is the instance it built, so 
 service declaring <code>data</code> receives an <code>AuthorIn</code> and one declaring the fields
 by name receives them as before. It cannot validate a partial call, so a
 partial spec over it is refused when the spec is built.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nd">@dataclass</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookIn</span><span class="p">:</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">price</span><span class="p">:</span> <span class="n">Decimal</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">status</span><span class="p">:</span> <span class="n">Status</span> <span class="o">=</span> <span class="n">Status</span><span class="o">.</span><span class="n">DRAFT</span>
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">published_on</span><span class="p">:</span> <span class="n">date</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>    <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># present for a row that exists, absent for a new one</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="nd">@dataclass</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorIn</span><span class="p">:</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
-</span><span id="__span-4-15"><a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>
-</span><span id="__span-4-16"><a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="nd">@dataclass</span>
-</span><span id="__span-4-17"><a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorPatch</span><span class="p">:</span>  <span class="c1"># every field may be left out, and then holds UNSET</span>
-</span><span id="__span-4-18"><a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
-</span><span id="__span-4-19"><a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
-</span><span id="__span-4-20"><a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
-</span><span id="__span-4-21"><a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
-</span><span id="__span-4-22"><a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="c1"># A spec takes a Validator instance: the adapter, wrapping the declaration.</span>
-</span><span id="__span-4-23"><a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="n">author_validator</span> <span class="o">=</span> <span class="n">DataclassValidator</span><span class="p">(</span><span class="n">AuthorIn</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nd">@dataclass</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">BookIn</span><span class="p">:</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">price</span><span class="p">:</span> <span class="n">Decimal</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">status</span><span class="p">:</span> <span class="n">Status</span> <span class="o">=</span> <span class="n">Status</span><span class="o">.</span><span class="n">DRAFT</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">published_on</span><span class="p">:</span> <span class="n">date</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>    <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>  <span class="c1"># present for a row that exists, absent for a new one</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="nd">@dataclass</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorIn</span><span class="p">:</span>
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">=</span> <span class="n">field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="nb">list</span><span class="p">)</span>
+</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="nd">@dataclass</span>
+</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="k">class</span><span class="w"> </span><span class="nc">AuthorPatch</span><span class="p">:</span>  <span class="c1"># every field may be left out, and then holds UNSET</span>
+</span><span id="__span-5-18"><a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
+</span><span id="__span-5-19"><a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookIn</span><span class="p">]</span> <span class="o">|</span> <span class="n">UnsetType</span> <span class="o">=</span> <span class="n">UNSET</span>
+</span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>
+</span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
+</span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="c1"># A spec takes a Validator instance: the adapter, wrapping the declaration.</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="n">author_validator</span> <span class="o">=</span> <span class="n">DataclassValidator</span><span class="p">(</span><span class="n">AuthorIn</span><span class="p">)</span>
 </span></code></pre></div>
 <table>
 <thead>
@@ -1886,7 +1980,10 @@ the Validator:</p>
   " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>,
   carrying its principal, the target a service spec resolved, and its
   resolved seeds as <code>ambient</code>, read-only at its top level, its values the
-  call's own live objects, not to be mutated. The default is <code>present(value)</code>,
+  call's own live objects, not to be mutated. It also carries what the caller
+  sent for the spec's <code>shapes</code>, as <code>shapes</code>, and the call's context as
+  <code>call_context</code>, the one dict the stages of a call share
+  (<a href="../dispatching/#the-calls-context">the call's context</a>). The default is <code>present(value)</code>,
   so only a Presenter whose library renders under a context - a field
   defaulting to the current user, a link built from a request a transport
   registered as a seed - overrides it. Dispatch carries the context on the
@@ -1905,7 +2002,10 @@ schema states it), <code>always_present</code> for a key that some rows omit, an
   
       dataclass
   " href="../reference/#django_service_specs.output.field_marking.FieldMarking"><code>FieldMarking</code></a> saying
-who the field is for. The
+who the field is for. Its <code>json_schema_extra</code> carries JSON Schema keywords
+no field of it spells, as on a Parameter, refusing
+<a href="../schema/#keywords-no-field-spells">those its fields state</a>. It describes
+what the presenter renders and constrains nothing. The
 <a class="autorefs autorefs-internal" title="FieldAudience" href="../reference/#django_service_specs.types.field_audience.FieldAudience"><code>FieldAudience</code></a> is
 <code>CONTENT</code> by default, <code>LABEL</code> for the field that names the record,
 <code>HANDLE</code> for an opaque identifier that is passed to other tools and never read
@@ -1944,12 +2044,12 @@ returns it: the same class, with the named fields replaced and every other one
 equal to the base's. A field is the base's very object unless the constructor
 rebuilds it, as it rebuilds a read's <code>reads</code> when the read has a
 <code>filter_set</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># The same listing for the command line, which offers a search and no choice</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="c1"># of ordering: ``reads=`` is the variant's whole ``reads``, so ``ordering`` is</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># no longer an argument and the selector's own default answers for it.</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">search_only</span> <span class="o">=</span> <span class="n">list_notes_spec</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">)),</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># The same listing for the command line, which offers a search and no choice</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># of ordering: ``reads=`` is the variant's whole ``reads``, so ``ordering`` is</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># no longer an argument and the selector's own default answers for it.</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">search_only</span> <span class="o">=</span> <span class="n">list_notes_spec</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">)),</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>The variant is built through the constructor, so every check a fresh
 declaration passes runs again on it, the combinations included: a change that

@@ -978,6 +978,11 @@ refused with <code>"Enter a number."</code>; any other type refuses one as the w
 Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.</p>
+<p>A Parameter's <code>json_schema_extra</code> is never read here. The keywords it
+carries, such as a <code>pattern</code>, a string's <code>maxLength</code> or <code>uniqueItems</code>, are
+advertised in the <a href="../schema/#keywords-no-field-spells">schema</a> and checked by
+nothing before the Validator, so what one states holds only where the spec's
+Validator enforces it.</p>
 <h3 id="how-long-a-list-may-be">How long a list may be<a class="headerlink" href="#how-long-a-list-may-be" title="Permanent link">&para;</a></h3>
 <p><strong>An array's length is read before any of its elements</strong>, so a list longer
 than it takes is refused whole, at its name, and costs no per-element work.
@@ -1060,6 +1065,19 @@ which compare a policy against it. It is not a policy: every function that
 takes one raises <code>ValueError</code> for it rather than running it as <code>IGNORE</code>.</p>
 <p><code>dispatch</code>, <code>adispatch</code>, <code>check_call</code> and <code>bind_arguments</code> each take
 <code>unknown_arguments=</code>.</p>
+<p>A spec's <code>shapes</code> are declared parameters like any other here: an argument
+sent for one passes the closed set and is shape-checked, choices and lengths
+included, before anything runs, and an undeclared one beside them is refused
+as any is. Only what happens after differs: the value goes to the presenter
+alone, on
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>,
+and never to the Validator, a selector or the service
+(<a href="../declaring/#a-read">declaring an operation</a>).</p>
 <h2 id="the-refusal-tree">The refusal tree<a class="headerlink" href="#the-refusal-tree" title="Permanent link">&para;</a></h2>
 <p>Every refusal of arguments is
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>,

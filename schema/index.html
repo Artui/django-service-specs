@@ -655,6 +655,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#keywords-no-field-spells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keywords no field spells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-partial-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -848,6 +859,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#keywords-no-field-spells" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Keywords no field spells
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#a-partial-update" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -972,8 +994,10 @@ happened to install.</p>
 <ul>
 <li><a class="autorefs autorefs-internal" title="spec_input_schema" href="../reference/#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema(spec, *, unknown_arguments=REJECT)</code></a>
   describes everything <code>spec.parameters()</code> declares: the arguments dispatch
-  checks. A <code>many</code> service spec's is its <code>reads</code> and the one required list
-  <code>many_argument</code> names, each row an object of the Validator's parameters.</li>
+  checks. A <code>many</code> service spec's is its <code>reads</code>, its <code>shapes</code> and the one
+  required list <code>many_argument</code> names, each row an object of the Validator's
+  parameters. A spec's <code>shapes</code> are properties like any other, closed set
+  included, though only the presenter reads what is sent for them.</li>
 <li><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)</code></a>
   describes what <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a>
   returns for the spec, or <code>None</code> when the spec declares no output. With
@@ -992,26 +1016,32 @@ declaration or another transport's copy.</p>
 <p>The notes list and the author write from the earlier pages, described:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">DataclassPresenter</span><span class="p">,</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">UnknownArguments</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">spec_input_schema</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">spec_output_schema</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span><span class="p">,</span> <span class="n">NoteRow</span><span class="p">,</span> <span class="n">list_notes_spec</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_author_spec</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># What a transport advertises for the notes list: its arguments, and its rows.</span>
-</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">notes_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
-</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">notes_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># The author write, as a transport that refuses an undeclared argument...</span>
-</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
-</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># ...and as one that drops it, which must not claim to refuse it.</span>
-</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">lenient_author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span>
-</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>    <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">unknown_arguments</span><span class="o">=</span><span class="n">UnknownArguments</span><span class="o">.</span><span class="n">IGNORE</span>
-</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="p">)</span>
-</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">author_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">Output</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">OutputField</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">Parameter</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">Parameters</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">ServiceSpec</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">UnknownArguments</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">output_schema</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">parameters_schema</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">spec_input_schema</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">spec_output_schema</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.declaring</span><span class="w"> </span><span class="kn">import</span> <span class="n">IsSignedIn</span><span class="p">,</span> <span class="n">NoteRow</span><span class="p">,</span> <span class="n">list_notes_spec</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="kn">from</span><span class="w"> </span><span class="nn">docs.examples.relations</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_author_spec</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="kn">from</span><span class="w"> </span><span class="nn">tests.dispatch_app.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Note</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># What a transport advertises for the notes list: its arguments, and its rows.</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a><span class="n">notes_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="n">notes_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">list_notes_spec</span><span class="p">)</span>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="c1"># The author write, as a transport that refuses an undeclared argument...</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="n">author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a><span class="c1"># ...and as one that drops it, which must not claim to refuse it.</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="n">lenient_author_input</span> <span class="o">=</span> <span class="n">spec_input_schema</span><span class="p">(</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>    <span class="n">create_author_spec</span><span class="p">,</span> <span class="n">unknown_arguments</span><span class="o">=</span><span class="n">UnknownArguments</span><span class="o">.</span><span class="n">IGNORE</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="p">)</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="n">author_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">create_author_spec</span><span class="p">)</span>
 </span></code></pre></div>
 <p>The notes list takes a search term with help text and an ordering with two
 choices and a default, and refuses any other argument:</p>
@@ -1162,7 +1192,8 @@ contradict, and states everything the declaration knows.</p>
 <p>What stays incomplete is only what the declaration does not carry. A
 Parameter's <code>minimum</code> and <code>maximum</code> are stated as <code>"minimum"</code> and
 <code>"maximum"</code>; a bound only the Validator holds, a <code>maxLength</code> or a form field's
-<code>max_value</code>, is not. An array's <code>min_length</code> is stated as <code>"minItems"</code>, and
+<code>max_value</code>, is not, unless the Parameter's
+<a href="#keywords-no-field-spells"><code>json_schema_extra</code></a> states it. An array's <code>min_length</code> is stated as <code>"minItems"</code>, and
 its <code>"maxItems"</code> is <strong>the maximum in force</strong>: the declared <code>max_length</code>, or
 where none is declared the <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting's, 1000
 unless the project sets another. It is the one bound stated without being
@@ -1176,6 +1207,84 @@ needs them configured: outside a configured Django it raises
 when a project configured later may set another. JSON Schema reads <code>minimum</code>
 and <code>maximum</code> on a number instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.</p>
+<h3 id="keywords-no-field-spells">Keywords no field spells<a class="headerlink" href="#keywords-no-field-spells" title="Permanent link">&para;</a></h3>
+<p>A <code>Parameter</code> and an <code>OutputField</code> each take <code>json_schema_extra</code>: a mapping of
+the JSON Schema keywords none of their fields spells, which
+<a class="autorefs autorefs-internal" title="parameters_schema" href="../reference/#django_service_specs.schema.parameters_schema.parameters_schema"><code>parameters_schema</code></a>
+and <a class="autorefs autorefs-internal" title="output_schema" href="../reference/#django_service_specs.schema.output_schema.output_schema"><code>output_schema</code></a>
+add to that declaration's node last, at any depth, as <code>spec_input_schema</code> and
+<code>spec_output_schema</code> do through them:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">isbn</span> <span class="o">=</span> <span class="n">Parameter</span><span class="p">(</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="s2">"isbn"</span><span class="p">,</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">help</span><span class="o">=</span><span class="s2">"The 13-digit ISBN, digits only."</span><span class="p">,</span>
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="c1"># Keywords no field of a Parameter spells, added to its node as written.</span>
+</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span><span class="s2">"pattern"</span><span class="p">:</span> <span class="s2">"^97[89][0-9]</span><span class="si">{10}</span><span class="s2">$"</span><span class="p">,</span> <span class="s2">"maxLength"</span><span class="p">:</span> <span class="mi">13</span><span class="p">},</span>
+</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="p">)</span>
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">isbn_input</span> <span class="o">=</span> <span class="n">parameters_schema</span><span class="p">(</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">isbn</span><span class="p">))</span>
+</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="n">tags</span> <span class="o">=</span> <span class="n">OutputField</span><span class="p">(</span><span class="s2">"tags"</span><span class="p">,</span> <span class="s2">"array"</span><span class="p">,</span> <span class="n">items</span><span class="o">=</span><span class="s2">"string"</span><span class="p">,</span> <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span><span class="s2">"uniqueItems"</span><span class="p">:</span> <span class="kc">True</span><span class="p">})</span>
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a><span class="n">tags_output</span> <span class="o">=</span> <span class="n">output_schema</span><span class="p">(</span><span class="n">Output</span><span class="p">((</span><span class="n">tags</span><span class="p">,)))</span>
+</span></code></pre></div>
+<p><code>isbn_input</code> is:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">    </span><span class="nt">"isbn"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">      </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">,</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">      </span><span class="nt">"description"</span><span class="p">:</span><span class="w"> </span><span class="s2">"The 13-digit ISBN, digits only."</span><span class="p">,</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">      </span><span class="nt">"pattern"</span><span class="p">:</span><span class="w"> </span><span class="s2">"^97[89][0-9]{10}$"</span><span class="p">,</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">      </span><span class="nt">"maxLength"</span><span class="p">:</span><span class="w"> </span><span class="mi">13</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">  </span><span class="nt">"additionalProperties"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>and <code>tags_output</code>:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="p">{</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"object"</span><span class="p">,</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="w">  </span><span class="nt">"properties"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="w">    </span><span class="nt">"tags"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"array"</span><span class="p">,</span><span class="w"> </span><span class="nt">"items"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">},</span><span class="w"> </span><span class="nt">"uniqueItems"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span><span class="nt">"required"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"tags"</span><span class="p">]</span>
+</span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="p">}</span>
+</span></code></pre></div>
+<p>It is how an adapter whose library declares more than a Parameter carries
+keeps it on every route rather than on its own; none of the adapters this
+package ships sets it. Because the node already holds everything the declaration
+states, a keyword a field states is refused when the declaration is built,
+naming the field to declare it on, whether or not this declaration sets that
+field:</p>
+<table>
+<thead>
+<tr>
+<th>On</th>
+<th>Refused keywords</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Parameter</code></td>
+<td><code>type</code>, <code>format</code>, <code>default</code>, the choices' <code>enum</code>, <code>anyOf</code> and <code>const</code>, <code>minimum</code>, <code>maximum</code>, <code>minItems</code>, <code>maxItems</code>, <code>items</code>, <code>description</code>, <code>properties</code>, <code>required</code> and <code>additionalProperties</code></td>
+</tr>
+<tr>
+<td><code>OutputField</code></td>
+<td><code>type</code>, <code>format</code>, <code>items</code>, the choices' <code>enum</code>, <code>oneOf</code> and <code>const</code>, <code>title</code>, <code>properties</code> and <code>required</code></td>
+</tr>
+</tbody>
+</table>
+<p>So a custom <code>format</code> is refused too, since <code>format</code> is a field, and either
+side winning would advertise what the declaration does not say or drop what
+was written. Refusing a keyword only when one build happened to state it would
+make one declaration valid until the array cap came on or a spec moved to
+<code>REJECT</code>. A value JSON cannot carry - a <code>Decimal</code>, a lazy translation - is
+refused too, at any depth, naming its key, since every transport encodes the
+schema as JSON. The mapping is held as a deep copy, so changing it afterwards
+leaves the declaration as written, and its values are placed in each schema as
+the declaration holds them, as a default's are.</p>
+<p>It is advertised, not enforced. The shape check never reads it, so on a
+Parameter what it states holds only where the spec's Validator enforces it,
+and on an OutputField it describes what the presenter renders.</p>
 <h3 id="a-partial-update">A partial update<a class="headerlink" href="#a-partial-update" title="Permanent link">&para;</a></h3>
 <p>A spec declaring <code>partial=True</code> takes any subset of its Validator's
 parameters, so its schema lists none of them in <code>required</code>: not at the top,
@@ -1281,13 +1390,17 @@ on its presenter:</p>
 <td>A <code>many</code> service spec with no output selector</td>
 <td><code>{"type": "array", "items": &lt;item&gt;}</code>, with <code>"null"</code> in its type under <code>allow_none=True</code></td>
 </tr>
+<tr>
+<td>A <code>returns_many</code> service spec</td>
+<td><code>{"type": "array", "items": &lt;item&gt;}</code>, with <code>"null"</code> in its type under <code>allow_none=True</code>; never paged, with or without <code>paginate=True</code></td>
+</tr>
 </tbody>
 </table>
 <p>Where the table says <code>"null"</code> is
 <a class="autorefs autorefs-internal" title="can_present_nothing" href="../reference/#django_service_specs.schema.can_present_nothing.can_present_nothing"><code>can_present_nothing</code></a>'s
 answer, exported for a transport that writes an output schema of its own, so
-the two cannot disagree. It does not read <code>many</code>: a <code>many</code> service's list may
-be <code>None</code> exactly where any service's return may.</p>
+the two cannot disagree. It reads neither <code>many</code> nor <code>returns_many</code>: either
+service's list may be <code>None</code> exactly where any service's return may.</p>
 <p>A <code>RETRIEVE</code> selector spec without <code>allow_none</code> answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so
 its item is not nullable. A service spec's <code>RETRIEVE</code> output selector is
@@ -1299,23 +1412,23 @@ item, and dispatch presents a <code>None</code> it returned as <code>None</code>
 may return one is not otherwise in its declaration, so the spec says it with
 <code>allow_none=True</code>, the name a selector spec already uses, and the item gains
 <code>"null"</code>:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_oldest</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="k">if</span> <span class="n">note</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
-</span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>    <span class="k">return</span> <span class="n">note</span>  <span class="c1"># None once there is nothing left to archive</span>
-</span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>
-</span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="n">archive_oldest_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
-</span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_oldest</span><span class="p">,</span>
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
-</span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>    <span class="c1"># It presents what it returned, which may be nothing: said here, so the</span>
-</span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>    <span class="c1"># schema a transport advertises admits the null it will serve.</span>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>    <span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-</span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a><span class="p">)</span>
-</span><span id="__span-5-17"><a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="n">archive_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">archive_oldest_spec</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_oldest</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">archived</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">)</span><span class="o">.</span><span class="n">first</span><span class="p">()</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>    <span class="k">if</span> <span class="n">note</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>    <span class="k">return</span> <span class="n">note</span>  <span class="c1"># None once there is nothing left to archive</span>
+</span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>
+</span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="n">archive_oldest_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_oldest</span><span class="p">,</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-8-12"><a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">DataclassPresenter</span><span class="p">(</span><span class="n">NoteRow</span><span class="p">),</span>
+</span><span id="__span-8-13"><a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>    <span class="c1"># It presents what it returned, which may be nothing: said here, so the</span>
+</span><span id="__span-8-14"><a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>    <span class="c1"># schema a transport advertises admits the null it will serve.</span>
+</span><span id="__span-8-15"><a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>    <span class="n">allow_none</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+</span><span id="__span-8-16"><a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="p">)</span>
+</span><span id="__span-8-17"><a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a><span class="n">archive_output</span> <span class="o">=</span> <span class="n">spec_output_schema</span><span class="p">(</span><span class="n">archive_oldest_spec</span><span class="p">)</span>
 </span></code></pre></div>
 <p>Left undeclared, a <code>None</code> is not stated, and the item stays the strict object
 its presenter declares: a schema that admitted <code>null</code> for every write would

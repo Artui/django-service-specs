@@ -544,6 +544,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-calls-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The call&#39;s context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handing-dispatch-the-calls-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handing dispatch the call's context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#answering-every-refusal" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1052,6 +1080,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#the-calls-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's context
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The call&#39;s context">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#handing-dispatch-the-calls-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Handing dispatch the call's context
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#answering-every-refusal" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1115,7 +1171,9 @@ the async entry point:</p>
    parameters are not refused, nor one its <code>input_data</code> provider is annotated
    to fill.</li>
 <li><strong>Class-level authorization</strong>: every permission check's <code>has_permission</code>,
-   or the <a href="#grants">grant</a> a transport passed instead.</li>
+   or the <a href="#grants">grant</a> a transport passed instead. A seed a check names
+   is resolved just before it, and only such a seed
+   (<a href="#permissions">permissions</a>).</li>
 <li><strong>Target resolution</strong>: a read's own selector, or a write's instance or
    collection selector, called with the arguments its <code>reads</code> declare and
    what its <code>kwargs</code> provider returns, then shaped. A retrieve that finds
@@ -1254,7 +1312,7 @@ checks and the Validator read the same value.</p>
 <tbody>
 <tr>
 <td><code>"list"</code></td>
-<td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> write with no output selector whose service returned something</td>
+<td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> or <code>returns_many</code> write with no output selector whose service returned something</td>
 <td>The rows, a queryset when the selector returned one, <code>[]</code> when a selector declaring <code>allow_none</code> returned <code>None</code></td>
 </tr>
 <tr>
@@ -1400,6 +1458,24 @@ call's rows are not among the arguments: they are validated after every
 check, so a check sees the call's <code>reads</code> alone. The
 <a class="autorefs autorefs-internal" title="authorize" href="../reference/#django_service_specs.dispatch.authorize.authorize"><code>authorize</code></a> functions
 take the same mapping as <code>arguments=</code> for a transport that calls them itself.</p>
+<p><strong>A check can read the call's context and a registered seed the same way.</strong> A
+keyword <code>call_context</code> is handed the one dict every stage of the call shares
+(<a href="#the-calls-context">the call's context</a>), and a keyword named after a seed
+the call's <a href="#pool-seeds"><code>PoolSeeds</code></a> register is handed that seed's value, at
+whichever of the three questions declares it. A parameter the call fills by
+position - the principal, the spec, the target or scope, whatever the method
+calls them - is never an opt-in, whatever its name, so a DRF-style
+<code>has_permission(self, request, spec)</code> under a transport registering a
+<code>request</code> seed is asked as it always was. A seed named <code>arguments</code> is never
+handed this way: a check declaring <code>arguments</code> gets the call's. Only the seeds
+a spec's checks name are resolved early, before the class-level check, and
+every pool after reuses those values, so each resolves once per call and the
+check and the service see one object; every other seed resolves after the
+class-level check, as it always has. A seed resolver raising
+<a class="autorefs autorefs-internal" title="PrincipalUnavailable" href="../reference/#django_service_specs.authorization.principal_unavailable.PrincipalUnavailable"><code>PrincipalUnavailable</code></a>
+there ends the call before any check is asked, as a refusal does. The
+<code>authorize</code> functions take <code>call_context=</code> and <code>seeds=</code> to offer the same, and
+with no <code>call_context</code> a check declaring it is handed a fresh dict.</p>
 <p><strong>A check is sync-only</strong>: it may query, so the async entry point runs it in
 the executor. An <code>async def</code> method would answer with a coroutine, which is
 truthy and would allow every call, so a spec refuses a check declaring one
@@ -1866,6 +1942,124 @@ have called it. The selector spec's affordance conditions, <code>extend_queryset
 and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets <code>null_progress</code>: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.</p>
+<h2 id="the-calls-context">The call's context<a class="headerlink" href="#the-calls-context" title="Permanent link">&para;</a></h2>
+<p>A call's stages often want one value more than once: a lookup the Validator
+makes and the presenter needs again, a count across the rows of a list. A
+<a href="#pool-seeds">seed</a> is resolved from the principal before the stages run; the
+call's context is for what a stage computes as it goes. It is one plain <code>dict</code>, the
+transport's, created for its natural scope - a request, an agent run - and
+carried as <code>call_context</code> on both
+<a class="autorefs autorefs-internal" title="ValidationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
+and
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext</code></a>.</p>
+<ul>
+<li><strong>One object, never copied.</strong> The Validator and the presenter are handed
+  the same dict, as are every row of a <code>"list"</code> result and a nested presenter
+  a presenter hands its context on to, so a later stage reads what an earlier
+  one put there.</li>
+<li><strong>The stages', to read and write</strong>, as a DRF serializer's <code>context</code> is. The
+  kernel writes nothing to it, and unlike <code>ambient</code> it is not read-only.</li>
+<li><strong>A context built by hand gets an empty dict of its own</strong>, never one shared
+  with another context, so a stage that writes to it needs no guard for a
+  call that was handed none.</li>
+<li><strong>It takes no part in equality or the hash</strong>, as <code>ambient</code> does not, and it
+  comes after the fields each context had before it, so an existing
+  construction is unchanged.</li>
+</ul>
+<p>Every stage shares the one dict, so key what a stage keeps by something of
+its own, and cache a computed value under <code>setdefault</code>: it hands back what an
+earlier stage put there, or puts the default and hands that back. The default
+is evaluated either way, so make it a container to fill rather than the
+computation itself, as the
+<a href="../forms/#the-calls-context">forms adapter's example</a> does.</p>
+<h3 id="handing-dispatch-the-calls-context">Handing dispatch the call's context<a class="headerlink" href="#handing-dispatch-the-calls-context" title="Permanent link">&para;</a></h3>
+<p><code>dispatch</code>, <code>adispatch</code>, <code>check_call</code>, <code>bind_arguments</code> and
+<a class="autorefs autorefs-internal" title="resolve_target" href="../reference/#django_service_specs.dispatch.resolve_target.resolve_target"><code>resolve_target</code></a>
+take the transport's dict as <code>call_context=</code>, and make a fresh one for the
+call when none is passed:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">FromBackOffice</span><span class="p">(</span><span class="n">PermissionCheck</span><span class="p">):</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">message</span> <span class="o">=</span> <span class="s2">"Only the back office may archive a note."</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="c1"># A keyword named ``call_context`` asks for the call's context, as</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="c1"># ``arguments`` asks for its arguments.</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">has_permission</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>        <span class="k">return</span> <span class="n">call_context</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"client"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"back-office"</span>
+</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>
+</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>
+</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_note</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
+</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>    <span class="n">note</span> <span class="o">=</span> <span class="n">Note</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">owner</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">pk</span><span class="o">=</span><span class="n">pk</span><span class="p">)</span>
+</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>    <span class="n">note</span><span class="o">.</span><span class="n">archived</span> <span class="o">=</span> <span class="kc">True</span>
+</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="n">note</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">"archived"</span><span class="p">])</span>
+</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="c1"># Left for whatever stage of the request comes next.</span>
+</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="n">call_context</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="s2">"archived"</span><span class="p">,</span> <span class="p">[])</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">note</span><span class="o">.</span><span class="n">pk</span><span class="p">)</span>
+</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="k">return</span> <span class="n">note</span>
+</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>
+</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>
+</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="n">archive_note_spec</span> <span class="o">=</span> <span class="n">ServiceSpec</span><span class="p">(</span>
+</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>    <span class="n">service</span><span class="o">=</span><span class="n">archive_note</span><span class="p">,</span>
+</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">(),</span> <span class="n">FromBackOffice</span><span class="p">()],</span>
+</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">,</span> <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">)),</span>
+</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="p">)</span>
+</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>
+</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>
+</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a><span class="k">def</span><span class="w"> </span><span class="nf">archive_from_back_office</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>    <span class="c1"># One dict per request, created by the transport and filled as it likes.</span>
+</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>    <span class="n">context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"client"</span><span class="p">:</span> <span class="s2">"back-office"</span><span class="p">}</span>
+</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>    <span class="n">dispatch</span><span class="p">(</span><span class="n">archive_note_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{</span><span class="s2">"pk"</span><span class="p">:</span> <span class="n">pk</span><span class="p">},</span> <span class="n">call_context</span><span class="o">=</span><span class="n">context</span><span class="p">)</span>
+</span><span id="__span-13-30"><a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>    <span class="k">return</span> <span class="n">context</span>
+</span></code></pre></div>
+<p>The same object, never a copy, reaches every callable that names
+<code>call_context</code>: a <code>kwargs</code> or <code>input_data</code> provider, a selector of any role
+and its <code>extend_queryset</code>, an affordance condition, a precondition, the service, the run's
+<code>progress_reporter</code>, <code>FormValidator</code>'s <code>form_kwargs</code>, a permission check's
+methods, the Validator's and the presenter's contexts, and a
+<code>PydanticValidator</code>'s field validators, on pydantic's <code>info.context</code> beside
+<code>principal</code> and <code>target</code>. So the back office's dict above comes back holding
+what the service left there.</p>
+<ul>
+<li><strong>By name only.</strong> A callable taking <code>**kwargs</code> for the rest of the pool is
+  never handed it, so a catch-all forwarding what it gets runs as it did
+  before the name existed. One that wants it names it.</li>
+<li><strong>A reserved name</strong>, in
+  <a class="autorefs autorefs-internal" title="RESERVED_POOL_SEEDS
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS"><code>RESERVED_POOL_SEEDS</code></a>:
+  a seed, a provider's key, an overlay or an argument named <code>call_context</code> is
+  refused. Seed resolvers do not see it, since a seed is resolved before
+  anything the call adds.</li>
+<li><strong>The kernel pre-fills nothing.</strong> What goes in is the transport's
+  convention: a transport over DRF is expected to put DRF's <code>request</code> there,
+  and a key such as <code>request</code>, <code>view</code> or <code>format</code> means what the transport
+  that wrote it says.
+  The kernel writes nothing and keeps nothing across calls.</li>
+<li><strong>Calls sharing one dict.</strong> The stages of one call run in sequence. A
+  transport handing one dict to calls on several threads should have them
+  write by compute-if-absent: read with <code>get</code>, and on a miss compute the value
+  and store it with <code>call_context.setdefault(key, value)</code>, so the first write
+  wins and every call reads one value. Fit for a value any of them would
+  compute the same.</li>
+</ul>
+<p>The affordance functions a transport calls ahead of the call or in place of
+dispatch -
+<a class="autorefs autorefs-internal" title="unmet_operation_affordance" href="../reference/#django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance"><code>unmet_operation_affordance</code></a>,
+<a class="autorefs autorefs-internal" title="enforce_affordances" href="../reference/#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>
+and their async twins - take <code>call_context=</code> too, for a condition that names
+it: the dict passed, else the one the pool carries, else a fresh one. Handed
+one dict as the parameter and a different one in the pool, they refuse with
+<code>ImproperlyConfigured</code> rather than choose.</p>
 <h2 id="answering-every-refusal">Answering every refusal<a class="headerlink" href="#answering-every-refusal" title="Permanent link">&para;</a></h2>
 <p>Dispatch refuses in two families, and a transport answers each refusal in its
 own vocabulary: an exit code, an HTTP status, the state a background run ends
@@ -1879,47 +2073,47 @@ says what a map leaves unanswered of
       module-attribute
   " href="../reference/#django_service_specs.dispatch.refusals.REFUSALS"><code>REFUSALS</code></a>, every refusal the
 kernel defines, so a transport holds its map total from its own test suite:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>    <span class="n">AdditionalInputRequired</span><span class="p">,</span>
-</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">DispatchError</span><span class="p">,</span>
-</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">NotPermitted</span><span class="p">,</span>
-</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
-</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
-</span><span id="__span-13-7"><a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>    <span class="n">ServiceError</span><span class="p">,</span>
-</span><span id="__span-13-8"><a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
-</span><span id="__span-13-9"><a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>    <span class="n">unanswered_refusals</span><span class="p">,</span>
-</span><span id="__span-13-10"><a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="p">)</span>
-</span><span id="__span-13-11"><a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>
-</span><span id="__span-13-12"><a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="n">OUTCOMES</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-13-13"><a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>    <span class="p">(</span><span class="n">NotPermitted</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
-</span><span id="__span-13-14"><a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>    <span class="p">(</span><span class="n">PrincipalUnavailable</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
-</span><span id="__span-13-15"><a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>    <span class="p">(</span><span class="n">DispatchError</span><span class="p">,</span> <span class="s2">"invalid"</span><span class="p">),</span>
-</span><span id="__span-13-16"><a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>    <span class="p">(</span><span class="n">ServiceNotFound</span><span class="p">,</span> <span class="s2">"gone"</span><span class="p">),</span>
-</span><span id="__span-13-17"><a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>    <span class="p">(</span><span class="n">ServiceConflict</span><span class="p">,</span> <span class="s2">"conflict"</span><span class="p">),</span>
-</span><span id="__span-13-18"><a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>    <span class="p">(</span><span class="n">ServiceError</span><span class="p">,</span> <span class="s2">"refused"</span><span class="p">),</span>
-</span><span id="__span-13-19"><a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="p">)</span>
-</span><span id="__span-13-20"><a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="sd">"""Read top to bottom, first match wins, so each subclass sits above its base."""</span>
-</span><span id="__span-13-21"><a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>
-</span><span id="__span-13-22"><a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>
-</span><span id="__span-13-23"><a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">outcome_for</span><span class="p">(</span><span class="n">error</span><span class="p">:</span> <span class="ne">BaseException</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-</span><span id="__span-13-24"><a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="w">    </span><span class="sd">"""The outcome a run that raised ``error`` ends in: ``failed`` for anything undeclared."""</span>
-</span><span id="__span-13-25"><a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>    <span class="k">return</span> <span class="nb">next</span><span class="p">((</span><span class="n">outcome</span> <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">outcome</span> <span class="ow">in</span> <span class="n">OUTCOMES</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">kind</span><span class="p">)),</span> <span class="s2">"failed"</span><span class="p">)</span>
-</span><span id="__span-13-26"><a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>
-</span><span id="__span-13-27"><a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>
-</span><span id="__span-13-28"><a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a><span class="n">NO_QUESTIONS</span> <span class="o">=</span> <span class="p">((</span><span class="n">AdditionalInputRequired</span><span class="p">,</span> <span class="s2">"failed"</span><span class="p">),</span> <span class="o">*</span><span class="n">OUTCOMES</span><span class="p">)</span>
-</span><span id="__span-13-29"><a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a><span class="sd">"""For a queue with nobody to ask: a run that needs more input fails like a bug."""</span>
-</span><span id="__span-13-30"><a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>
-</span><span id="__span-13-31"><a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>
-</span><span id="__span-13-32"><a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a><span class="c1"># In the transport's own test suite:</span>
-</span><span id="__span-13-33"><a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_every_refusal_has_an_outcome</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-13-34"><a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">OUTCOMES</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
-</span><span id="__span-13-35"><a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">outcome_for</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
-</span><span id="__span-13-36"><a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>
-</span><span id="__span-13-37"><a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>
-</span><span id="__span-13-38"><a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_queue_leaves_one_refusal_unanswered_on_purpose</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-13-39"><a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>    <span class="c1"># Filtered by class, never by the finding's words.</span>
-</span><span id="__span-13-40"><a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>    <span class="n">found</span> <span class="o">=</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">NO_QUESTIONS</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span>
-</span><span id="__span-13-41"><a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">finding</span> <span class="k">for</span> <span class="n">finding</span> <span class="ow">in</span> <span class="n">found</span> <span class="k">if</span> <span class="n">finding</span><span class="o">.</span><span class="n">refusal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">AdditionalInputRequired</span><span class="p">]</span> <span class="o">==</span> <span class="p">[]</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">django_service_specs</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>    <span class="n">AdditionalInputRequired</span><span class="p">,</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">DispatchError</span><span class="p">,</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">NotPermitted</span><span class="p">,</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="n">ServiceError</span><span class="p">,</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="n">unanswered_refusals</span><span class="p">,</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="p">)</span>
+</span><span id="__span-14-11"><a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>
+</span><span id="__span-14-12"><a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a><span class="n">OUTCOMES</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-14-13"><a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a>    <span class="p">(</span><span class="n">NotPermitted</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
+</span><span id="__span-14-14"><a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>    <span class="p">(</span><span class="n">PrincipalUnavailable</span><span class="p">,</span> <span class="s2">"denied"</span><span class="p">),</span>
+</span><span id="__span-14-15"><a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>    <span class="p">(</span><span class="n">DispatchError</span><span class="p">,</span> <span class="s2">"invalid"</span><span class="p">),</span>
+</span><span id="__span-14-16"><a id="__codelineno-14-16" name="__codelineno-14-16" href="#__codelineno-14-16"></a>    <span class="p">(</span><span class="n">ServiceNotFound</span><span class="p">,</span> <span class="s2">"gone"</span><span class="p">),</span>
+</span><span id="__span-14-17"><a id="__codelineno-14-17" name="__codelineno-14-17" href="#__codelineno-14-17"></a>    <span class="p">(</span><span class="n">ServiceConflict</span><span class="p">,</span> <span class="s2">"conflict"</span><span class="p">),</span>
+</span><span id="__span-14-18"><a id="__codelineno-14-18" name="__codelineno-14-18" href="#__codelineno-14-18"></a>    <span class="p">(</span><span class="n">ServiceError</span><span class="p">,</span> <span class="s2">"refused"</span><span class="p">),</span>
+</span><span id="__span-14-19"><a id="__codelineno-14-19" name="__codelineno-14-19" href="#__codelineno-14-19"></a><span class="p">)</span>
+</span><span id="__span-14-20"><a id="__codelineno-14-20" name="__codelineno-14-20" href="#__codelineno-14-20"></a><span class="sd">"""Read top to bottom, first match wins, so each subclass sits above its base."""</span>
+</span><span id="__span-14-21"><a id="__codelineno-14-21" name="__codelineno-14-21" href="#__codelineno-14-21"></a>
+</span><span id="__span-14-22"><a id="__codelineno-14-22" name="__codelineno-14-22" href="#__codelineno-14-22"></a>
+</span><span id="__span-14-23"><a id="__codelineno-14-23" name="__codelineno-14-23" href="#__codelineno-14-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">outcome_for</span><span class="p">(</span><span class="n">error</span><span class="p">:</span> <span class="ne">BaseException</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-14-24"><a id="__codelineno-14-24" name="__codelineno-14-24" href="#__codelineno-14-24"></a><span class="w">    </span><span class="sd">"""The outcome a run that raised ``error`` ends in: ``failed`` for anything undeclared."""</span>
+</span><span id="__span-14-25"><a id="__codelineno-14-25" name="__codelineno-14-25" href="#__codelineno-14-25"></a>    <span class="k">return</span> <span class="nb">next</span><span class="p">((</span><span class="n">outcome</span> <span class="k">for</span> <span class="n">kind</span><span class="p">,</span> <span class="n">outcome</span> <span class="ow">in</span> <span class="n">OUTCOMES</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">error</span><span class="p">,</span> <span class="n">kind</span><span class="p">)),</span> <span class="s2">"failed"</span><span class="p">)</span>
+</span><span id="__span-14-26"><a id="__codelineno-14-26" name="__codelineno-14-26" href="#__codelineno-14-26"></a>
+</span><span id="__span-14-27"><a id="__codelineno-14-27" name="__codelineno-14-27" href="#__codelineno-14-27"></a>
+</span><span id="__span-14-28"><a id="__codelineno-14-28" name="__codelineno-14-28" href="#__codelineno-14-28"></a><span class="n">NO_QUESTIONS</span> <span class="o">=</span> <span class="p">((</span><span class="n">AdditionalInputRequired</span><span class="p">,</span> <span class="s2">"failed"</span><span class="p">),</span> <span class="o">*</span><span class="n">OUTCOMES</span><span class="p">)</span>
+</span><span id="__span-14-29"><a id="__codelineno-14-29" name="__codelineno-14-29" href="#__codelineno-14-29"></a><span class="sd">"""For a queue with nobody to ask: a run that needs more input fails like a bug."""</span>
+</span><span id="__span-14-30"><a id="__codelineno-14-30" name="__codelineno-14-30" href="#__codelineno-14-30"></a>
+</span><span id="__span-14-31"><a id="__codelineno-14-31" name="__codelineno-14-31" href="#__codelineno-14-31"></a>
+</span><span id="__span-14-32"><a id="__codelineno-14-32" name="__codelineno-14-32" href="#__codelineno-14-32"></a><span class="c1"># In the transport's own test suite:</span>
+</span><span id="__span-14-33"><a id="__codelineno-14-33" name="__codelineno-14-33" href="#__codelineno-14-33"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_every_refusal_has_an_outcome</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-14-34"><a id="__codelineno-14-34" name="__codelineno-14-34" href="#__codelineno-14-34"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">OUTCOMES</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
+</span><span id="__span-14-35"><a id="__codelineno-14-35" name="__codelineno-14-35" href="#__codelineno-14-35"></a>    <span class="k">assert</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">outcome_for</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span> <span class="o">==</span> <span class="p">()</span>
+</span><span id="__span-14-36"><a id="__codelineno-14-36" name="__codelineno-14-36" href="#__codelineno-14-36"></a>
+</span><span id="__span-14-37"><a id="__codelineno-14-37" name="__codelineno-14-37" href="#__codelineno-14-37"></a>
+</span><span id="__span-14-38"><a id="__codelineno-14-38" name="__codelineno-14-38" href="#__codelineno-14-38"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_the_queue_leaves_one_refusal_unanswered_on_purpose</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-14-39"><a id="__codelineno-14-39" name="__codelineno-14-39" href="#__codelineno-14-39"></a>    <span class="c1"># Filtered by class, never by the finding's words.</span>
+</span><span id="__span-14-40"><a id="__codelineno-14-40" name="__codelineno-14-40" href="#__codelineno-14-40"></a>    <span class="n">found</span> <span class="o">=</span> <span class="n">unanswered_refusals</span><span class="p">(</span><span class="n">NO_QUESTIONS</span><span class="p">,</span> <span class="n">unanswered</span><span class="o">=</span><span class="s2">"failed"</span><span class="p">)</span>
+</span><span id="__span-14-41"><a id="__codelineno-14-41" name="__codelineno-14-41" href="#__codelineno-14-41"></a>    <span class="k">assert</span> <span class="p">[</span><span class="n">finding</span> <span class="k">for</span> <span class="n">finding</span> <span class="ow">in</span> <span class="n">found</span> <span class="k">if</span> <span class="n">finding</span><span class="o">.</span><span class="n">refusal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">AdditionalInputRequired</span><span class="p">]</span> <span class="o">==</span> <span class="p">[]</span>
 </span></code></pre></div>
 <p>It takes the map as it is written. An ordered table of <code>(refusal class,
 outcome)</code> rows is read the way an <code>isinstance</code> ladder reads it, top to bottom
@@ -1949,12 +2143,12 @@ finding. <strong>Either base may be raised bare</strong>: the kernel raises neit
 <code>DispatchError</code> nor a plain <code>ServiceError</code> itself, but both are public classes a
 project's own code may raise, so a map with a row for every refusal under a
 base and none for the base leaves it unanswered:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>nothing in the map answers DispatchError itself, though it answers every refusal under it, and DispatchError may be raised bare
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>nothing in the map answers DispatchError itself, though it answers every refusal under it, and DispatchError may be raised bare
 </span></code></pre></div>
 <p><strong>A subclass below its base never answers</strong>: in an ordered table, the base's
 row catches it first, so the subclass's row is dead and the subclass takes
 the base's outcome:</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>the row for ServiceConflict never answers: the row for ServiceError above it answers every ServiceConflict first
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>the row for ServiceConflict never answers: the row for ServiceError above it answers every ServiceConflict first
 </span></code></pre></div>
 <p>The second is reported for a table only. A callable written as branches
 orders them in code, and a branch for a subclass below its base's is a body

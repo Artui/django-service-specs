@@ -1154,8 +1154,10 @@ say <code>List should have at most 5 items after validation, not 6</code>, under
 <code>max_length</code> code. pydantic's words are what a caller reads for the model's
 own rules: bounds, patterns, validators.</p>
 <p>The context reaches pydantic's validators as <code>info.context</code>, a dict with
-<code>"principal"</code> and <code>"target"</code>, so a <code>field_validator</code> can check a value against
-the caller or the row being updated.</p>
+<code>"principal"</code>, <code>"target"</code> and <code>"call_context"</code>, so a <code>field_validator</code> can
+check a value against the caller or the row being updated, and read or leave
+something in the dict every stage of the call shares
+(<a href="../dispatching/#the-calls-context">the call's context</a>).</p>
 <p><strong>A partial spec is refused</strong> with <code>ImproperlyConfigured</code> when it is built,
 as one over the dataclass adapter is, and so is a partial call made to the
 Validator directly. pydantic validates a model whole, and a
