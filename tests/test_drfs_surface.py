@@ -434,7 +434,7 @@ SURFACE: dict[str, Pin] = {
         signature="*, service, permissions=, reads=, shapes=, partial=, many=, many_argument=, "
         "many_min_length=, many_max_length=, validator=, instance_selector_spec=, "
         "collection_selector_spec=, output_selector_spec=, presenter=, allow_none=, "
-        "affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
+        "returns_many=, affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
         "progress_reporter=, metadata=",
         methods={
             "parameters": "()",

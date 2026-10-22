@@ -1506,14 +1506,19 @@ def finish_service(
     output_spec = spec.output_selector_spec
     value = result
     # A ``many`` spec's return is the rows it wrote, presented as a list, as
-    # djangorestframework-services renders it; an output selector's kind
-    # still decides what its re-read is. A ``None`` it returns stays one
-    # value, presented as ``None`` as any service's is: as a list it would be
-    # refused by ``present`` after the write had committed. One arc to
-    # coverage: test_the_service_runs_once_with_every_validated_row holds the
-    # first conjunct, test_a_many_service_returning_none_presents_none the
-    # second.
-    kind: Literal["instance", "list"] = "list" if spec.many and result is not None else "instance"
+    # djangorestframework-services renders it, and a ``returns_many`` spec
+    # declares its return a list of rows; an output selector's kind still
+    # decides what its re-read is, and is refused beside ``returns_many``. A
+    # ``None`` either returns stays one value, presented as ``None`` as any
+    # service's is: as a list it would be refused by ``present`` after the
+    # write had committed. One arc to coverage, so each operand is named:
+    # test_the_service_runs_once_with_every_validated_row holds ``many``,
+    # tests/dispatch/test_returns_many.py's
+    # test_a_list_of_rows_is_presented_row_by_row ``returns_many``, and
+    # test_a_many_service_returning_none_presents_none and that file's
+    # test_a_none_return_presents_none the ``None``.
+    lists = spec.many or spec.returns_many
+    kind: Literal["instance", "list"] = "list" if lists and result is not None else "instance"
     if output_spec is not None:
         # The service's return under both names djangorestframework-services
         # binds it by, so a re-read declares whichever its author wrote:
