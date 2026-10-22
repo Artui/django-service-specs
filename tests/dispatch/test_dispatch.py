@@ -441,9 +441,7 @@ def test_a_selector_receives_the_pool_and_only_its_declared_reads(ada: Any) -> N
 
     dispatch(spec, principal=ada, arguments={"q": "x"})
 
-    assert selector.calls == [
-        {"user": ada, "progress": null_progress, "call_context": {}, "q": "x"}
-    ]
+    assert selector.calls == [{"user": ada, "progress": null_progress, "q": "x"}]
 
 
 def test_a_selector_spec_s_rows_are_shaped(ada: Any, bob: Any) -> None:
@@ -557,13 +555,7 @@ def test_a_create_runs_with_the_validated_values_and_no_target(ada: Any) -> None
     result = dispatch(spec, principal=ada, arguments={"title": "  Hello "})
 
     assert service.calls == [
-        {
-            "user": ada,
-            "progress": null_progress,
-            "call_context": {},
-            "data": {"title": "Hello"},
-            "title": "Hello",
-        }
+        {"user": ada, "progress": null_progress, "data": {"title": "Hello"}, "title": "Hello"}
     ]
     assert validator.calls[0][1].target is None
     assert result == DispatchResult(
@@ -596,7 +588,6 @@ def test_an_update_resolves_the_row_before_validating_and_hands_it_to_both(ada: 
         {
             "user": ada,
             "progress": null_progress,
-            "call_context": {},
             "data": {"title": "new"},
             "title": "new",
             "instance": note,
@@ -617,7 +608,7 @@ def test_a_target_selector_receives_only_its_own_reads(ada: Any) -> None:
 
     dispatch(spec, principal=ada, arguments={"pk": 7, "title": "t"})
 
-    assert selector.calls == [{"user": ada, "progress": null_progress, "call_context": {}, "pk": 7}]
+    assert selector.calls == [{"user": ada, "progress": null_progress, "pk": 7}]
 
 
 def test_an_update_of_a_missing_row_is_not_found_and_nothing_else_runs(ada: Any) -> None:
@@ -648,9 +639,7 @@ def test_an_upsert_s_missing_row_reaches_the_service_as_none_unchecked(ada: Any)
 
     result = dispatch(spec, principal=ada, arguments={"pk": 404})
 
-    assert service.calls == [
-        {"user": ada, "progress": null_progress, "call_context": {}, "data": {}, "instance": None}
-    ]
+    assert service.calls == [{"user": ada, "progress": null_progress, "data": {}, "instance": None}]
     assert check.rows == []
     assert result.value == "upserted"
 
@@ -700,7 +689,7 @@ def test_a_collection_is_passed_as_collection_and_never_object_checked(ada: Any,
     result = dispatch(spec, principal=ada, arguments={})
 
     (pool,) = service.calls
-    assert set(pool) == {"user", "progress", "call_context", "data", "collection"}
+    assert set(pool) == {"user", "progress", "data", "collection"}
     assert list(pool["collection"]) == list(Note.objects.all())
     assert result.instance is pool["collection"]
     assert result.kind == "instance"
@@ -724,13 +713,7 @@ def test_the_output_selector_re_reads_with_only_the_service_s_return_in_its_pool
     result = dispatch(spec, principal=ada, arguments={"title": "t"})
 
     assert reread.calls == [
-        {
-            "user": ada,
-            "progress": null_progress,
-            "call_context": {},
-            "instance": note,
-            "result": note,
-        }
+        {"user": ada, "progress": null_progress, "instance": note, "result": note}
     ]
     assert result.kind == "instance"
     assert result.value.label == "mine!"
@@ -1664,7 +1647,7 @@ def test_a_callable_taking_the_whole_pool_is_never_missing_anything(ada: Any) ->
         kind=LIST, selector=lambda **tenant: sorted(tenant), reads=TENANT_READ, permissions=OPEN
     )
 
-    assert dispatch(spec, principal=ada, arguments={}).value == ["call_context", "progress", "user"]
+    assert dispatch(spec, principal=ada, arguments={}).value == ["progress", "user"]
 
 
 def test_a_positional_only_parameter_is_not_reported(ada: Any) -> None:
@@ -2379,9 +2362,8 @@ def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
 def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
     ada: Any, asynchronous: bool
 ) -> None:
-    # As a service spec's is: the seeds and the call's context, never the
-    # reads the caller sent, so a provider taking the whole pool sees what
-    # ``base_pool`` holds and the context, and no more.
+    # As a service spec's is: the seeds, never the reads the caller sent, so a
+    # provider taking the whole pool sees what ``base_pool`` holds and no more.
     seen: list[list[str]] = []
 
     def provider(**pool: Any) -> Any:
@@ -2404,7 +2386,7 @@ def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
         progress_reporter=provider,
     )
     dispatch(spec, principal=ada, arguments={"title": "Ada's"})
-    assert seen == [["call_context", "progress", "user"]]
+    assert seen == [["progress", "user"]]
 
 
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
@@ -5032,6 +5014,152 @@ def test_a_progress_provider_is_handed_the_call_context_on_either_kind_of_spec(
     entry(spec, principal=ada, arguments={}, call_context=context)
     assert len(handed) == 1
     assert handed[0] is context
+
+
+def _reporting_first(result: Callable[[dict[str, Any]], Any]) -> Callable[[dict[str, Any]], Any]:
+    """``result``, reporting progress first, which is what resolves the run's reporter."""
+
+    def run(kwargs: dict[str, Any]) -> Any:
+        kwargs["progress"](1.0)
+        return result(kwargs)
+
+    return run
+
+
+def _catch_all_stages(handed: dict[str, list[str]]) -> ServiceSpec:
+    """``_every_stage`` with every stage taking ``**kwargs`` and naming nothing.
+
+    Each records the names it was handed, by the stage's name, so a test reads
+    what a catch-all written before ``call_context`` existed would forward.
+    """
+
+    def seat(stage: str, result: Any) -> Callable[..., Any]:
+        def stage_callable(**kwargs: Any) -> Any:
+            handed.setdefault(stage, []).extend(kwargs)
+            return result(kwargs) if callable(result) else result
+
+        return stage_callable
+
+    rename = ServiceSpec(
+        service=lambda: None,
+        permissions=OPEN,
+        affordances=[Affordance(code="row", reason="r", when=seat("row_affordance", True))],
+    )
+    return ServiceSpec(
+        service=seat("service", _reporting_first(lambda kwargs: kwargs["instance"])),
+        permissions=OPEN,
+        validator=Titled(),
+        instance_selector_spec=SelectorSpec(
+            kind=RETRIEVE,
+            selector=seat("instance_selector", lambda kwargs: Note.objects.filter(pk=kwargs["pk"])),
+            reads=PK,
+        ),
+        kwargs=seat("kwargs", {}),
+        input_data=seat("input_data", {}),
+        affordances=[
+            Affordance(code="open", reason="Never refused.", when=seat("affordance", True))
+        ],
+        preconditions=[seat("precondition", None)],
+        progress_reporter=seat("progress_reporter", None),
+        output_selector_spec=SelectorSpec(
+            kind=RETRIEVE,
+            selector=seat(
+                "output_selector", lambda kwargs: Note.objects.filter(pk=kwargs["result"].pk)
+            ),
+            affordances={"rename": rename},
+        ),
+    )
+
+
+class TestACatchAllIsNeverHandedTheCallContext:
+    """``call_context`` reaches a stage by its name alone, never through ``**kwargs``.
+
+    The kernel's floors are unbounded, so every published transport resolves
+    onto this release: a catch-all condition or provider forwarding its
+    ``**kwargs`` into a strict callable must go on receiving what it did.
+    ``TestTheCallContext`` holds the other half, a stage naming it.
+    """
+
+    _SEATS = (
+        "instance_selector",
+        "kwargs",
+        "input_data",
+        "affordance",
+        "precondition",
+        "progress_reporter",
+        "service",
+        "output_selector",
+        "row_affordance",
+    )
+
+    @_ENTRIES
+    def test_no_stage_of_a_service_spec_is_handed_it(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        handed: dict[str, list[str]] = {}
+        entry(
+            _catch_all_stages(handed),
+            principal=ada,
+            arguments={"pk": note.pk, "title": "t"},
+            call_context={"tenant": "t"},
+        )
+        assert set(handed) == set(self._SEATS)
+        assert not [stage for stage, names in handed.items() if "call_context" in names]
+
+    @_ENTRIES
+    def test_no_stage_of_a_selector_spec_is_handed_it(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        handed: dict[str, list[str]] = {}
+
+        def seat(stage: str, result: Any) -> Callable[..., Any]:
+            def stage_callable(**kwargs: Any) -> Any:
+                handed.setdefault(stage, []).extend(kwargs)
+                if stage == "selector":
+                    kwargs["progress"](1.0)
+                    return Note.objects.none()
+                return result
+
+            return stage_callable
+
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=seat("selector", None),
+            permissions=OPEN,
+            kwargs=seat("kwargs", {}),
+            preconditions=[seat("precondition", None)],
+            progress_reporter=seat("progress_reporter", None),
+        )
+        entry(spec, principal=ada, arguments={}, call_context={"tenant": "t"})
+        assert set(handed) == {"selector", "kwargs", "precondition", "progress_reporter"}
+        assert not [stage for stage, names in handed.items() if "call_context" in names]
+
+    @_ENTRIES
+    def test_a_condition_on_a_list_s_rows_naming_it_is_handed_the_very_dict(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """The list-time seat ``_every_stage`` has no place for; the others name it there."""
+        Note.objects.create(title="n", owner=ada)
+        handed: list[Any] = []
+
+        def when(*, call_context: Any) -> bool:
+            handed.append(call_context)
+            return True
+
+        rename = ServiceSpec(
+            service=lambda: None,
+            permissions=OPEN,
+            affordances=[Affordance(code="row", reason="r", when=when)],
+        )
+        spec = SelectorSpec(
+            kind=LIST, selector=Note.objects.all, permissions=OPEN, affordances={"rename": rename}
+        )
+        context: dict[str, Any] = {}
+        result = entry(spec, principal=ada, arguments={}, call_context=context)
+        assert [row.affordance__rename__row for row in result.value] == [True]
+        assert len(handed) == 1
+        assert handed[0] is context
 
 
 @_ENTRIES

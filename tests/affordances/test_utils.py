@@ -345,7 +345,7 @@ class TestRowsOfAQuerySet:
         rows = rows_of(spec, ada, arguments={"search": "x"})
 
         assert len(seen) == 1
-        assert set(seen[0]) == {"user", "progress", "call_context"}
+        assert set(seen[0]) == {"user", "progress"}
         assert seen[0]["user"] == ada
         assert [row.affordance__rename__books_closed for row in rows] == [False, False]
 

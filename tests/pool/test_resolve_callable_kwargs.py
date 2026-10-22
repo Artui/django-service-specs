@@ -39,3 +39,34 @@ def test_forwards_in_the_order_the_callable_declares() -> None:
     # a sequence sees the signature's.
     resolved = resolve_callable_kwargs(lambda *, b, a, c: None, {"a": 1, "c": 3, "b": 2})
     assert list(resolved) == ["b", "a", "c"]
+
+
+class TestTheCallContextIsHandedByNameOnly:
+    """``call_context`` reaches a callable naming it, never one taking ``**kwargs`` for the rest.
+
+    A catch-all written before the name existed forwards what it gets, so one
+    more key would break it on an upgrade it never asked for.
+    """
+
+    def test_a_catch_all_is_never_handed_it(self) -> None:
+        context: dict[str, Any] = {}
+        assert resolve_callable_kwargs(
+            lambda **kwargs: kwargs, {"a": 1, "call_context": context}
+        ) == {"a": 1}
+
+    def test_a_catch_all_naming_it_is_handed_the_very_dict(self) -> None:
+        context: dict[str, Any] = {}
+
+        def fn(*, call_context: Any, **kwargs: Any) -> Any:
+            return call_context, kwargs
+
+        handed = resolve_callable_kwargs(fn, {"a": 1, "call_context": context})
+        assert handed == {"a": 1, "call_context": context}
+        assert handed["call_context"] is context
+
+    def test_a_callable_naming_it_alone_is_handed_it(self) -> None:
+        context: dict[str, Any] = {}
+        handed = resolve_callable_kwargs(
+            lambda *, call_context: call_context, {"a": 1, "call_context": context}
+        )
+        assert handed == {"call_context": context}

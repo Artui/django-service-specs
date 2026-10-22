@@ -270,7 +270,7 @@ async def test_its_output_selector_takes_a_second_hop(ada: Any, hops: list[str])
 
     assert result.value.title == "made"
     assert result.value == result.service_result
-    assert set(reread.calls[0]) == {"user", "progress", "call_context", "instance", "result"}
+    assert set(reread.calls[0]) == {"user", "progress", "instance", "result"}
     assert len(hops) == 2
 
 
