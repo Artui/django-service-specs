@@ -21,6 +21,7 @@ from django_service_specs.parameters.parameters import (
     canonical_choices,
     checked_json_schema_extra,
 )
+from django_service_specs.types.utils import OUTPUT_FIELD_SCHEMA_KEYWORDS
 
 _OUTPUT_TYPES = JSON_TYPES | {"any"}
 
@@ -55,12 +56,16 @@ class OutputField:
     type they are, and an array of any element declares no ``items`` rather
     than ``items="any"``.
 
-    ``json_schema_extra`` is what the schema states that no other field
-    spells, as on ``Parameter``: a mapping of JSON Schema keywords to their
-    values, held as a ``dict`` of its own, which
+    ``json_schema_extra`` carries the JSON Schema keywords no field of an
+    OutputField spells, as on ``Parameter``: a mapping of keyword to value,
+    held as a deep copy of its own, which
     [`output_schema`][django_service_specs.schema.output_schema.output_schema]
-    adds to this field's node, refusing a key the declaration already states
-    there. It describes what the presenter renders and constrains nothing.
+    adds to this field's node. A keyword a field states there is refused
+    here, naming the field, whether or not this field sets it: ``type``,
+    ``format``, ``items``, the choices' ``enum``, ``oneOf`` and ``const``,
+    ``title`` from ``label``, and ``properties`` and ``required`` from
+    ``fields``; so is a value JSON cannot carry. It describes what the
+    presenter renders and constrains nothing.
     Out of the hash and in equality, as on ``Parameter``.
     """
 
@@ -83,7 +88,9 @@ class OutputField:
     def __post_init__(self) -> None:
         where = f"OutputField {self.name!r}"
         object.__setattr__(
-            self, "json_schema_extra", checked_json_schema_extra(where, self.json_schema_extra)
+            self,
+            "json_schema_extra",
+            checked_json_schema_extra(where, self.json_schema_extra, OUTPUT_FIELD_SCHEMA_KEYWORDS),
         )
         if self.type not in _OUTPUT_TYPES:
             raise ImproperlyConfigured(

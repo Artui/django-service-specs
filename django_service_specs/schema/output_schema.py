@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from django_service_specs.output.output import Output, OutputField
-from django_service_specs.schema.utils import allow_null, is_json_native, with_schema_extra
+from django_service_specs.schema.utils import allow_null, with_schema_extra
+from django_service_specs.types.utils import is_json_native
 
 
 def output_schema(output: Output) -> dict[str, Any]:
@@ -27,8 +28,8 @@ def output_schema(output: Output) -> dict[str, Any]:
       ``"format"`` when it declares one, and ``"title"`` from its ``label``
       when it has one. Adapters set a label only where the author wrote one,
       so a title is never a field name restated in worse English. Its
-      ``json_schema_extra`` joins the node last, and a key the field already
-      states there is refused rather than overridden. An ``any``
+      ``json_schema_extra`` joins the node last, holding only keywords no
+      field states, since the field refused the rest when it was declared. An ``any``
       field states no type, nullable or not, since ``{}`` admits every value
       and the null with it.
     - **Nesting** is as on input: ``fields`` make an object schema, an
@@ -97,7 +98,7 @@ def _field_schema(field: OutputField) -> dict[str, Any]:
         # value: it is rendered in the language active when the schema is built.
         schema["title"] = str(field.label)
     # Last, so every key the declaration states is there to be compared.
-    return with_schema_extra(schema, field.json_schema_extra, where=f"OutputField {field.name!r}")
+    return with_schema_extra(schema, field.json_schema_extra)
 
 
 def _items_schema(field: OutputField) -> dict[str, Any]:

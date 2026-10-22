@@ -4,7 +4,6 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
-from django.core.exceptions import ImproperlyConfigured
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
@@ -320,14 +319,27 @@ class TestJsonSchemaExtra:
         }
 
     def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
-        inner = Output((OutputField("code", "string", json_schema_extra={"format": "iso-4217"}),))
+        inner = Output((OutputField("code", "string", json_schema_extra={"pattern": "^[A-Z]"}),))
         field = OutputField("rows", "array", items=inner)
         node = output_schema(Output((field,)))["properties"]["rows"]
-        assert node["items"]["properties"]["code"] == {"type": "string", "format": "iso-4217"}
+        assert node["items"]["properties"]["code"] == {"type": "string", "pattern": "^[A-Z]"}
 
-    def test_a_key_the_declaration_states_is_refused(self) -> None:
-        field = OutputField("code", "string", label="Code", json_schema_extra={"title": "Other"})
-        with pytest.raises(
-            ImproperlyConfigured, match=r"OutputField 'code': json_schema_extra repeats \['title'\]"
-        ):
-            output_schema(Output((field,)))
+    def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
+        """As on input: every top-level key a node can carry from its fields is
+        refused, and nothing else is, but ``const``, which is the choices' to
+        state. Imported here, so a tree without the table fails this test
+        alone."""
+        from django_service_specs.types.utils import OUTPUT_FIELD_SCHEMA_KEYWORDS
+
+        catalogue = Output(
+            (
+                OutputField("tags", "array", items="string"),
+                OutputField("address", "object", fields=Output((OutputField("city", "string"),))),
+                OutputField("on", "string", format="date", label="On", nullable=True),
+                OutputField("size", "string", choices=(("s", "s"), ("m", "m"))),
+                OutputField("tier", "string", choices=(("a", "Gold"),)),
+            )
+        )
+        nodes = output_schema(catalogue)["properties"].values()
+        stated = {key for node in nodes for key in node}
+        assert stated == OUTPUT_FIELD_SCHEMA_KEYWORDS.keys() - {"const"}
