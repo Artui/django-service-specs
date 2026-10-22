@@ -66,14 +66,7 @@ isbn = Parameter(
     json_schema_extra={"pattern": "^97[89][0-9]{10}$", "maxLength": 13},
 )
 isbn_input = parameters_schema(Parameters.of(isbn))
-# {"type": "object",
-#  "properties": {"isbn": {"type": "string", "description": "The 13-digit ISBN, digits only.",
-#                          "pattern": "^97[89][0-9]{10}$", "maxLength": 13}},
-#  "additionalProperties": false}
 
 tags = OutputField("tags", "array", items="string", json_schema_extra={"uniqueItems": True})
 tags_output = output_schema(Output((tags,)))
-# {"type": "object",
-#  "properties": {"tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}},
-#  "required": ["tags"]}
 # --8<-- [end:extra]

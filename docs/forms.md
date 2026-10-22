@@ -296,8 +296,8 @@ builds it the same way.
 
 ## The call's context
 
-`FormValidator` reads nothing of the call's context, and a form never sees
-it. A Validator built on the adapter reads it, and writes to it, from the
+`FormValidator` itself reads nothing of the call's context. A Validator built
+on the adapter reads it, and writes to it, from the
 [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
 its `validate()` is handed, as `call_context`: the one dict the stages of a
 call share, so a later stage reuses what the Validator put there

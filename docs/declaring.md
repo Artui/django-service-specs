@@ -717,10 +717,9 @@ reader needs beyond a name and a type: a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying
 who the field is for. Its `json_schema_extra` carries JSON Schema keywords
-no field of it spells, as on a Parameter, refusing those its fields state:
-`type`, `format`, `items`, the choices' `enum`, `oneOf` and `const`, `title`
-from `label`, and `properties` and `required` from `fields`. It describes what
-the presenter renders and constrains nothing. The
+no field of it spells, as on a Parameter, refusing
+[those its fields state](schema.md#keywords-no-field-spells). It describes
+what the presenter renders and constrains nothing. The
 [`FieldAudience`][django_service_specs.types.field_audience.FieldAudience] is
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read

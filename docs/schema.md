@@ -242,9 +242,38 @@ docs/examples/schema.py:extra
 --8<--
 ```
 
-It is how an adapter whose library declares more than a Parameter carries - a
-form field's `max_length`, a regex validator - keeps it on every route rather
-than on its own. Because the node already holds everything the declaration
+`isbn_input` is:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "isbn": {
+      "type": "string",
+      "description": "The 13-digit ISBN, digits only.",
+      "pattern": "^97[89][0-9]{10}$",
+      "maxLength": 13
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+and `tags_output`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  },
+  "required": ["tags"]
+}
+```
+
+It is how an adapter whose library declares more than a Parameter carries
+keeps it on every route rather than on its own; none of the adapters this
+package ships sets it. Because the node already holds everything the declaration
 states, a keyword a field states is refused when the declaration is built,
 naming the field to declare it on, whether or not this declaration sets that
 field:

@@ -25,6 +25,7 @@ from django_service_specs import (
     dispatch,
     present,
 )
+from django_service_specs.types.utils import OUTPUT_FIELD_SCHEMA_KEYWORDS, PARAMETER_SCHEMA_KEYWORDS
 from docs.examples import schema
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
@@ -152,7 +153,14 @@ class TestSchemaPage:
         page = (ROOT / "docs" / "schema.md").read_text()
         blocks = [json.loads(b) for b in re.findall(r"```json\n(.*?)```", page, re.DOTALL)]
 
-        assert blocks == [NOTES_INPUT, NOTES_OUTPUT, AUTHOR_INPUT, AUTHOR_OUTPUT]
+        assert blocks == [
+            NOTES_INPUT,
+            NOTES_OUTPUT,
+            AUTHOR_INPUT,
+            AUTHOR_OUTPUT,
+            schema.isbn_input,
+            schema.tags_output,
+        ]
 
 
 class TestJsonSchemaExtra:
@@ -176,6 +184,20 @@ class TestJsonSchemaExtra:
             },
             "required": ["tags"],
         }
+
+    @pytest.mark.parametrize(
+        ("row", "keywords"),
+        [
+            ("`Parameter`", PARAMETER_SCHEMA_KEYWORDS),
+            ("`OutputField`", OUTPUT_FIELD_SCHEMA_KEYWORDS),
+        ],
+    )
+    def test_the_page_s_tables_list_every_keyword_refused_and_no_other(
+        self, row: str, keywords: Any
+    ) -> None:
+        page = (ROOT / "docs" / "schema.md").read_text()
+        (cell,) = re.findall(rf"^\| {re.escape(row)} \| (.*) \|$", page, re.MULTILINE)
+        assert set(re.findall(r"`(\w+)`", cell)) == set(keywords)
 
     def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
         checked = check_arguments(Parameters.of(schema.isbn), {"isbn": "not an isbn"})
