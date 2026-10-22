@@ -556,7 +556,8 @@ class TestReturnsMany:
 
     Every spec here is built inside its test, as in ``TestMany``, so a tree
     without the field fails each test on its own rather than the module. What
-    dispatch does with the field is in tests/dispatch/test_returns_many.py.
+    dispatch does with the field is in tests/dispatch/test_dispatch.py's
+    ``TestReturnsMany``, and on the async path in test_adispatch.py.
     """
 
     def test_off_by_default(self) -> None:

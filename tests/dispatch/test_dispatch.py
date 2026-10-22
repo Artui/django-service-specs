@@ -36,6 +36,7 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.present import present
+from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -56,6 +57,7 @@ from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
     OPEN,
+    OWNER_NAME,
     PK,
     TENANT_SEEDS,
     Arguing,
@@ -71,9 +73,12 @@ from tests.dispatch.utils import (
     make_user,
     note_by_pk,
     notes_of,
+    returning_many,
     shaping_refused,
+    two_notes,
 )
 from tests.dispatch_app.models import Note
+from tests.output.utils import PROJECTED_ROW, ROW, InvoicePresenter
 from tests.parameters.utils import coded
 from tests.specs.utils import Bare, Foreign
 
@@ -5692,3 +5697,79 @@ class TestEarlySeeds:
         ]
         assert all(handed is context for _, handed, _ in check.asked)
         assert [tenant for _, _, tenant in check.asked] == ["tenant-of-ada", "tenant-of-ada"]
+
+
+class TestReturnsMany:
+    """``returns_many``: a service's own return dispatched and presented as a list, row by row.
+
+    The field is the output half of ``many``, so these cases dispatch a spec
+    taking one set of arguments and read back what ``present`` and its
+    audience sibling hand a transport; the async path is in
+    test_adispatch.py. Each asserts the result's kind before it presents, so
+    a tree that ignores the field fails at that assertion rather than inside
+    the presenter, handed a list where it expects a row.
+    """
+
+    def test_a_list_of_rows_is_presented_row_by_row(self) -> None:
+        rows = two_notes()
+        presenter = Titles()
+        spec, service = returning_many(rows, presenter)
+
+        result = dispatch(spec, principal=rows[0].owner, arguments={"owner": "ada"})
+
+        assert result.kind == "list"
+        assert present(spec, result) == [{"title": "First"}, {"title": "Second"}]
+        # Each row reached the item presenter on its own, never the list.
+        assert presenter.seen == rows
+        # The input is left alone: one call, with the one argument as declared.
+        assert [call["owner"] for call in service.calls] == ["ada"]
+
+    def test_a_list_of_mappings_is_presented_row_by_row(self) -> None:
+        ada = make_user("ada")
+        spec, _ = returning_many([ROW, {**ROW, "id": 8}], InvoicePresenter())
+
+        result = dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        assert result.kind == "list"
+        assert present(spec, result) == [ROW, {**ROW, "id": 8}]
+
+    def test_an_empty_list_is_presented_as_one(self) -> None:
+        # Not ``None``: no rows is still a list, and ``present`` hands back ``[]``.
+        ada = make_user("ada")
+        spec, _ = returning_many([], Titles())
+
+        result = dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        assert result.kind == "list"
+        assert present(spec, result) == []
+
+    def test_a_none_return_presents_none(self) -> None:
+        # One value, as a ``many`` service's ``None`` is: as a list it would be
+        # refused by ``present`` after the service had run.
+        ada = make_user("ada")
+        spec, _ = returning_many(None, Titles())
+
+        result = dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        assert result.kind == "instance"
+        assert present(spec, result) is None
+
+    def test_without_the_field_a_returned_list_is_one_value(self) -> None:
+        # The other half of the cases above: the field is what makes the list, so
+        # the same return from a spec without it reaches the presenter whole.
+        ada = make_user("ada")
+        spec = ServiceSpec(service=Record(returns=[ROW]), permissions=OPEN, reads=OWNER_NAME)
+
+        result = dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        assert result.kind == "instance"
+        assert present(spec, result) == [ROW]
+
+    def test_each_row_is_projected_for_an_audience(self) -> None:
+        ada = make_user("ada")
+        spec, _ = returning_many([ROW, ROW], InvoicePresenter())
+
+        result = dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        assert result.kind == "list"
+        assert present_for_audience(spec, result) == [PROJECTED_ROW, PROJECTED_ROW]

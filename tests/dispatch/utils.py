@@ -305,3 +305,19 @@ REFUSED_CLOSED = {
     "code": "books_closed",
     "reason": "Renaming is paused while the books close.",
 }
+
+OWNER_NAME = Parameters.of(Parameter("owner", "string", required=True))
+
+
+def returning_many(rows: Any, presenter: Any) -> tuple[ServiceSpec, Record]:
+    """A ``returns_many`` spec whose service takes one argument and returns ``rows``, with the service."""
+    service = Record(returns=rows)
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, reads=OWNER_NAME, presenter=presenter, returns_many=True
+    )
+    return spec, service
+
+
+def two_notes() -> list[Note]:
+    ada = make_user("ada")
+    return [Note.objects.create(owner=ada, title=title) for title in ("First", "Second")]

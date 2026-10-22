@@ -1738,10 +1738,9 @@ def finish_service(
     # service's is: as a list it would be refused by ``present`` after the
     # write had committed. One arc to coverage, so each operand is named:
     # test_the_service_runs_once_with_every_validated_row holds ``many``,
-    # tests/dispatch/test_returns_many.py's
-    # test_a_list_of_rows_is_presented_row_by_row ``returns_many``, and
-    # test_a_many_service_returning_none_presents_none and that file's
-    # test_a_none_return_presents_none the ``None``.
+    # TestReturnsMany.test_a_list_of_rows_is_presented_row_by_row
+    # ``returns_many``, and test_a_many_service_returning_none_presents_none
+    # and TestReturnsMany.test_a_none_return_presents_none the ``None``.
     lists = spec.many or spec.returns_many
     kind: Literal["instance", "list"] = "list" if lists and result is not None else "instance"
     if output_spec is not None:
