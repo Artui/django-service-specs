@@ -737,60 +737,101 @@ class TestJsonSchemaExtra:
         }
 
     def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
-        inner = Parameters.of(Parameter("code", "string", json_schema_extra={"format": "iso-4217"}))
+        inner = Parameters.of(Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]"}))
         param = Parameter("rows", "array", items=inner, json_schema_extra={"uniqueItems": True})
         node = parameters_schema(Parameters.of(param))["properties"]["rows"]
         assert node["uniqueItems"] is True
-        assert node["items"]["properties"]["code"] == {"type": "string", "format": "iso-4217"}
+        assert node["items"]["properties"]["code"] == {"type": "string", "pattern": "^[A-Z]"}
 
-    def test_a_format_no_parameter_declares_is_stated(self) -> None:
-        """A format outside the ones a Parameter declares is the extra's to
-        state where the declaration states none."""
-        param = Parameter("email", "string", json_schema_extra={"format": "email"})
-        node = parameters_schema(Parameters.of(param))["properties"]["email"]
-        assert node == {"type": "string", "format": "email"}
-
-    @pytest.mark.parametrize(
-        ("declared", "keys"),
-        [
-            pytest.param(
-                {"type": "string", "json_schema_extra": {"type": "integer"}}, "['type']", id="type"
-            ),
-            pytest.param(
-                {"type": "string", "help": "h", "json_schema_extra": {"description": "d"}},
-                "['description']",
-                id="help",
-            ),
-            pytest.param(
-                {"type": "array", "items": "string", "json_schema_extra": {"items": {}}},
-                "['items']",
-                id="items",
-            ),
-            pytest.param(
-                {
-                    "type": "integer",
-                    "minimum": 1,
-                    "json_schema_extra": {"minimum": 0, "multipleOf": 2},
-                },
-                "['minimum']",
-                id="bound",
-            ),
-        ],
-    )
-    def test_a_key_the_declaration_states_is_refused(
-        self, declared: dict[str, Any], keys: str
+    @pytest.mark.parametrize("cap", [3, None], ids=["cap-on", "cap-off"])
+    def test_max_items_is_refused_whether_or_not_the_setting_states_it(
+        self, cap: int | None
     ) -> None:
-        """Neither side wins: the extra overriding the declaration would
-        advertise a contract the shape check does not hold, and the
-        declaration overriding the extra would drop what its author wrote.
-        Built inside the test, so a tree without the field fails here alone."""
-        param = Parameter("code", **declared)
+        """With the cap off, an array declaring no ``max_length`` states no
+        ``maxItems``, so a check made against one build would let the extra
+        through and then refuse it the day the cap came on."""
+        with (
+            override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=cap),
+            pytest.raises(ImproperlyConfigured) as refused,
+        ):
+            parameters_schema(
+                Parameters.of(
+                    Parameter("tags", "array", items="string", json_schema_extra={"maxItems": 5})
+                )
+            )
+        assert "states 'maxItems', which the schema takes from max_length." in str(refused.value)
+
+    @pytest.mark.parametrize("policy", [UnknownArguments.REJECT, UnknownArguments.IGNORE])
+    def test_additional_properties_is_refused_under_either_policy(
+        self, policy: UnknownArguments
+    ) -> None:
+        """Only ``REJECT`` states ``additionalProperties``; the extra is
+        refused under both, since the policy is the spec's to choose and the
+        parameter's fields are what the keyword describes."""
         with pytest.raises(ImproperlyConfigured) as refused:
-            parameters_schema(Parameters.of(param))
-        assert f"Parameter 'code': json_schema_extra repeats {keys}" in str(refused.value)
+            parameters_schema(
+                Parameters.of(
+                    Parameter(
+                        "address",
+                        "object",
+                        fields=Parameters.of(Parameter("city", "string")),
+                        json_schema_extra={"additionalProperties": True},
+                    )
+                ),
+                unknown_arguments=policy,
+            )
+        assert "states 'additionalProperties', which the schema takes from fields." in str(
+            refused.value
+        )
+
+    def test_a_default_beside_one_the_schema_leaves_out_is_refused(self) -> None:
+        """A ``Decimal`` default is left out of the schema, so the extra's
+        ``default`` would have filled the gap with a value the declaration
+        never chose. Its own value is JSON, so the ownership is what refuses."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            parameters_schema(
+                Parameters.of(
+                    Parameter(
+                        "price",
+                        "string",
+                        format="decimal",
+                        default=Decimal("1.5"),
+                        json_schema_extra={"default": "1.5"},
+                    )
+                )
+            )
+        message = str(refused.value)
+        assert "states 'default', which the schema takes from default." in message
+        assert "is no JSON value" not in message
+
+    def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
+        """Every top-level key a node can carry from its fields is refused, and
+        nothing else is, but ``const``: a single accepted value, which is the
+        choices' to state, though the builder spells choices as ``enum`` or
+        ``anyOf``. Imported here, so a tree without the table fails this test
+        alone."""
+        from django_service_specs.types.utils import PARAMETER_SCHEMA_KEYWORDS
+
+        catalogue = Parameters.of(
+            Parameter("tags", "array", items="string", min_length=1, max_length=3),
+            Parameter(
+                "address",
+                "object",
+                fields=Parameters.of(Parameter("city", "string", required=True)),
+            ),
+            Parameter("count", "integer", minimum=0, maximum=9, nullable=True),
+            Parameter("on", "string", format="date"),
+            Parameter("size", "string", choices=("s", "m")),
+            Parameter("tier", "string", choices=("a",), choice_labels=(("a", "Gold"),)),
+            Parameter("code", "string", default="GBP", help="ISO code"),
+        )
+        nodes = parameters_schema(catalogue)["properties"].values()
+        stated = {key for node in nodes for key in node}
+        assert stated == PARAMETER_SCHEMA_KEYWORDS.keys() - {"const"}
 
     def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
-        """The Validator, which the extra describes, is what holds it."""
+        """The shape check never reads it: it holds only where the spec's
+        Validator enforces it."""
         param = Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]{3}$"})
         assert check_arguments(Parameters.of(param), {"code": "nope"}) == {"code": "nope"}
 

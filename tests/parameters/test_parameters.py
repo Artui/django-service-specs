@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.translation import gettext_lazy
 
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.types.unset import UNSET
@@ -401,12 +402,13 @@ class TestJsonSchemaExtra:
         assert Parameter("code", "string").json_schema_extra is None
 
     def test_it_is_kept_as_a_copy_of_its_own(self) -> None:
-        """Copied, so a mapping the caller changes later leaves the declaration
-        as it was written."""
-        given = {"pattern": "^[A-Z]{3}$"}
+        """Copied deeply, so a mapping the caller changes later, at any depth,
+        leaves the declaration as it was written."""
+        given = {"pattern": "^[A-Z]{3}$", "examples": [["GBP"]]}
         param = Parameter("code", "string", json_schema_extra=given)
         given["pattern"] = "changed"
-        assert param.json_schema_extra == {"pattern": "^[A-Z]{3}$"}
+        given["examples"][0].append("changed")
+        assert param.json_schema_extra == {"pattern": "^[A-Z]{3}$", "examples": [["GBP"]]}
         assert type(param.json_schema_extra) is dict
 
     def test_a_parameter_carrying_one_is_hashable_and_compared_by_it(self) -> None:
@@ -431,3 +433,66 @@ class TestJsonSchemaExtra:
             ImproperlyConfigured, match=rf"Parameter 'code': json_schema_extra {message}"
         ):
             Parameter("code", "string", json_schema_extra=value)
+
+    @pytest.mark.parametrize(
+        ("keyword", "owner"),
+        [
+            pytest.param("type", "type and nullable", id="type"),
+            pytest.param("items", "items", id="items"),
+            pytest.param("minItems", "min_length", id="minItems"),
+            pytest.param("maxItems", "max_length", id="maxItems"),
+            pytest.param("properties", "fields", id="properties"),
+            pytest.param("required", "fields", id="required"),
+            pytest.param("additionalProperties", "fields", id="additionalProperties"),
+            pytest.param("format", "format", id="format"),
+            pytest.param("minimum", "minimum", id="minimum"),
+            pytest.param("maximum", "maximum", id="maximum"),
+            pytest.param("enum", "choices and choice_labels", id="enum"),
+            pytest.param("anyOf", "choices and choice_labels", id="anyOf"),
+            pytest.param("const", "choices and choice_labels", id="const"),
+            pytest.param("default", "default", id="default"),
+            pytest.param("description", "help", id="description"),
+        ],
+    )
+    def test_a_keyword_a_field_states_is_refused_whatever_the_parameter_declares(
+        self, keyword: str, owner: str
+    ) -> None:
+        """Refused from the declaration, not from one build of it: this
+        parameter states none of these, and each is still the field's to
+        state, so the author is sent to the field."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Parameter("code", "string", json_schema_extra={"pattern": "^a", keyword: "x"})
+        assert str(refused.value).startswith(
+            f"Parameter 'code': json_schema_extra states {keyword!r}, which the schema takes "
+            f"from {owner}."
+        )
+
+    def test_every_keyword_a_field_states_is_named(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Parameter("code", "string", json_schema_extra={"type": "x", "default": 1})
+        assert "states 'default', which the schema takes from default." in str(refused.value)
+        assert "states 'type', which the schema takes from type and nullable." in str(refused.value)
+
+    @pytest.mark.parametrize(
+        "extra",
+        [
+            pytest.param({"examples": [Decimal("1.5")]}, id="a-decimal-in-a-list"),
+            pytest.param({"examples": [{"tag": gettext_lazy("GBP")}]}, id="a-lazy-string-nested"),
+            pytest.param({"examples": [{1: "x"}]}, id="a-key-no-json-object-has"),
+            pytest.param({"examples": {"a", "b"}}, id="a-set"),
+        ],
+    )
+    def test_a_value_json_cannot_carry_is_refused_naming_its_key(
+        self, extra: dict[str, Any]
+    ) -> None:
+        """Every transport encodes the schema as JSON, so such a value would
+        stop the operation being listed at all rather than describe it worse.
+        Sized with a keyword no field states, so this check is the one that
+        answers."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            Parameter("code", "string", json_schema_extra={"pattern": "^a", **extra})
+        message = str(refused.value)
+        assert message.startswith(
+            "Parameter 'code': json_schema_extra['examples'] is no JSON value"
+        )
+        assert "which the schema takes from" not in message
