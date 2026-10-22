@@ -602,6 +602,36 @@ class TestReturnsMany:
             "own return as a list."
         )
 
+    @pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
+    def test_beside_many_and_an_output_selector_the_output_selector_answers(
+        self, kind: SelectorKind
+    ) -> None:
+        # Both refusals could answer this input, and only one is true of it: a
+        # ``many`` spec with a re-read presents what the re-read returns, one
+        # value for a RETRIEVE, never the service's return as a list. Sized
+        # with a Validator, so ``_check_many`` passes.
+        reread = SelectorSpec(kind=kind, selector=list)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(
+                service=print,
+                many=True,
+                validator=Titled(),
+                output_selector_spec=reread,
+                returns_many=True,
+            )
+        message = str(refused.value)
+        assert message.startswith(
+            "ServiceSpec declares returns_many=True beside an output_selector_spec."
+        )
+        # The remedy names only what clears the refusal: without the re-read,
+        # the many refusal would answer next.
+        assert message.endswith(
+            "remove returns_many; without the output selector, many presents the service's "
+            "own return as a list already."
+        )
+        assert "with many=True" not in message
+        assert "already presents what its service returns" not in message
+
     @pytest.mark.parametrize(
         "declared",
         [

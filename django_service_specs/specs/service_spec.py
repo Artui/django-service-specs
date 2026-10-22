@@ -543,27 +543,42 @@ def _check_many(spec: ServiceSpec) -> None:
 def _check_returns_many(spec: ServiceSpec) -> None:
     """Refuse ``returns_many`` beside a declaration that already decides what is presented.
 
-    Beside ``many``, whose return is presented as a list already, it would say
-    nothing; beside an output selector, whose kind decides what is presented,
-    it would say something dispatch never does. A ``False`` written out
-    declares nothing, as ``_check_many`` treats a default.
+    Beside an output selector, whose kind decides what is presented, it would
+    say something dispatch never does; beside a ``many`` spec with none, whose
+    return is presented as a list already, it would say nothing. A ``False``
+    written out declares nothing, as ``_check_many`` treats a default.
     """
-    # Two operands each, every one held by its own test in
+    # The output selector first: a ``many`` spec may declare one, and then its
+    # re-read, not its return, is what is presented, so only this refusal's
+    # wording is true of it
+    # (test_beside_many_and_an_output_selector_the_output_selector_answers).
+    # Two operands in each guard, every one held by its own test in
     # tests/specs/test_service_spec.py's TestReturnsMany:
     # test_a_false_written_out_declares_nothing fails without the first of
-    # either guard ([beside-many], [beside-an-output-selector]), and
+    # either ([beside-an-output-selector], [beside-many]), and
     # test_kept_as_declared without the second of both.
-    if spec.returns_many and spec.many:
-        raise ImproperlyConfigured(
-            "ServiceSpec declares returns_many=True with many=True. A many spec already "
-            "presents what its service returns as a list; remove returns_many."
-        )
     if spec.returns_many and spec.output_selector_spec is not None:
+        # A ``many`` spec without its output selector lists its return
+        # already, so for it the one remedy is to drop the field
+        # (test_beside_many_and_an_output_selector_the_output_selector_answers;
+        # test_beside_an_output_selector_is_refused holds the other remedy).
+        instead = (
+            "remove returns_many; without the output selector, many presents the service's "
+            "own return as a list already."
+            if spec.many
+            else "remove returns_many, or remove the output selector to present the "
+            "service's own return as a list."
+        )
         raise ImproperlyConfigured(
             "ServiceSpec declares returns_many=True beside an output_selector_spec. The "
             "output selector's kind decides what is presented, and a LIST re-read presents "
-            "rows already; remove returns_many, or remove the output selector to present "
-            "the service's own return as a list."
+            f"rows already; {instead}"
+        )
+    if spec.returns_many and spec.many:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares returns_many=True with many=True. A many spec with no "
+            "output selector already presents what its service returns as a list; remove "
+            "returns_many."
         )
 
 
