@@ -19,6 +19,7 @@ async def aenforce_affordances(
     *,
     instance: Any,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> None:
     """[`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances] for an async caller.
 
@@ -60,4 +61,5 @@ async def aenforce_affordances(
         pool,
         instance=instance,
         reserved=reserved,
+        call_context=call_context,
     )

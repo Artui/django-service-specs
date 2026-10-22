@@ -797,3 +797,24 @@ class TestDeclaredLengths:
             "count": [("Input should be less than or equal to 9", "max_value")],
             "ratio": [("Input should be less than 1", "max_value")],
         }
+
+
+class _ReadsTheCallContext(BaseModel):
+    title: str
+
+    @field_validator("title")
+    @classmethod
+    def _record(cls, value: str, info: ValidationInfo) -> str:
+        info.context["call_context"].setdefault("seen", []).append(value)
+        return value
+
+
+def test_its_validators_read_the_call_context_beside_the_principal_and_the_target() -> None:
+    """``info.context`` carries the context's own dict, as DRF's serializer context does."""
+    call_context: dict[str, Any] = {}
+    target = SimpleNamespace(title="Old")
+    PydanticValidator(_ReadsTheCallContext).validate(
+        {"title": "New"},
+        ValidationContext(principal="ada", target=target, call_context=call_context),
+    )
+    assert call_context == {"seen": ["New"]}

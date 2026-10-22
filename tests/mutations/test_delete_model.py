@@ -22,6 +22,7 @@ from django_service_specs.services.service_validation_error import ServiceValida
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.mutations.utils import bound_call
 from tests.relations_app.models import Author, Catalog, Item, Section, Tag
 
 
@@ -110,6 +111,23 @@ class TestDeleteModel:
         }
         delete_model(Catalog, relations=relations)(instance=_catalog(), user="the caller")
         assert seen == ["the caller"]
+
+    def test_the_call_context_reaches_a_rows_delete_service_that_names_it(self) -> None:
+        seen: list[Any] = []
+        context: dict[str, Any] = {}
+
+        def delete_section(*, instance: Section, call_context: Any = None) -> None:
+            seen.append(call_context)
+            instance.delete()
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", delete_service=delete_section)
+        }
+        bound_call(
+            delete_model(Catalog, relations=relations), instance=_catalog(), call_context=context
+        )
+        assert len(seen) == 1
+        assert seen[0] is context
 
     def test_an_empty_map_leaves_the_rows_to_the_database(self, deleted: list[str]) -> None:
         catalog = _catalog()

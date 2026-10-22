@@ -8,7 +8,7 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import asked_with, sync_answer
+from django_service_specs.authorization.utils import asked_with, offered_to_checks, sync_answer
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -22,6 +22,8 @@ def authorize(
     *,
     grant: Grant | None = None,
     arguments: Mapping[str, Any] | None = None,
+    call_context: dict[str, Any] | None = None,
+    seeds: Mapping[str, Any] | None = None,
 ) -> Grant:
     """Run ``spec``'s class-level permission checks for ``principal``.
 
@@ -57,6 +59,14 @@ def authorize(
     call's own and must not be mutated; ``None`` when the caller has none to
     hand.
 
+    ``call_context`` and ``seeds`` are offered the same way, by name: a
+    method declaring ``call_context`` is handed the call's context - the dict
+    the transport handed dispatch, a fresh one when it handed none or this is
+    called without one - and a method naming a registered seed is handed that
+    seed's value from ``seeds``, which dispatch resolves for the call only
+    when one of the spec's checks names one. A parameter the call fills by
+    position is never read as an opt-in, whatever its name.
+
     Returns:
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
@@ -75,9 +85,10 @@ def authorize(
             f"The {type(spec).__name__} for {getattr(run, '__qualname__', run)!s} declares "
             "no permissions. Pass permissions=[Unrestricted()] to mean that anyone may run it."
         )
+    offered = offered_to_checks(call_context, seeds)
     for check in spec.permissions:
         answer = check.has_permission(
-            principal, spec, **asked_with(check, "has_permission", arguments)
+            principal, spec, **asked_with(check, "has_permission", arguments, offered=offered)
         )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_permission"):
             raise NotPermitted(check.message)

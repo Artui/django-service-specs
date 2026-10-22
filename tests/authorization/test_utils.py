@@ -105,19 +105,20 @@ def test_a_forwarding_wrapper_answers_for_the_method_it_wraps() -> None:
 def test_a_class_defined_function_s_signature_is_inspected_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A call asks each check up to twice, and many checks share a class, so
-    the signature is read once per function rather than once per question."""
+    """A call asks each check up to three times, and many checks share a
+    class, so the signature is read once per function rather than once per
+    question."""
     read: list[Any] = []
 
-    def counted(asked: Any) -> bool:
+    def counted(asked: Any) -> frozenset[str]:
         read.append(asked)
-        return True
+        return frozenset({"arguments"})
 
     class Asking(_Shapes):
         def keyword_only(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
             return True
 
-    monkeypatch.setattr(utils, "_names_arguments", counted)
+    monkeypatch.setattr(utils, "_reached_names", counted)
     for check in (Asking(), Asking()):
         asked_with(check, "keyword_only", {"pk": 1})
     assert read == [Asking.keyword_only]
@@ -205,3 +206,70 @@ def test_a_method_binding_a_callable_object_is_read_uncached() -> None:
     check = _Shapes()
     cast(Any, check).undeclared = types.MethodType(_UnhashableRule(), check)
     assert asked_with(check, "undeclared", {"pk": 1}) == {}
+
+
+class _Offered:
+    """Methods naming the call's context and a seed, by keyword, by position, or not at all."""
+
+    def by_keyword(self, principal: Any, spec: Any, *, call_context: Any, tenant: Any) -> bool:
+        return True
+
+    def tenant_first(self, tenant: Any, spec: Any, *, call_context: Any = None) -> bool:
+        return True
+
+    def tenant_third(self, principal: Any, spec: Any, tenant: Any = None) -> bool:
+        return True
+
+    def naming_none(self, principal: Any, spec: Any) -> bool:
+        return True
+
+
+OFFERED = {"call_context": {"k": 1}, "tenant": "acme", "region": "eu"}
+
+
+def test_an_offered_name_is_handed_only_where_a_keyword_reaches_it() -> None:
+    assert asked_with(_Offered(), "by_keyword", None, offered=OFFERED) == {
+        "call_context": {"k": 1},
+        "tenant": "acme",
+    }
+    assert asked_with(_Offered(), "naming_none", None, offered=OFFERED) == {}
+
+
+def test_the_offered_value_is_the_object_itself() -> None:
+    context: dict[str, Any] = {}
+    handed = asked_with(_Offered(), "by_keyword", None, offered={"call_context": context})
+    assert handed["call_context"] is context
+
+
+def test_a_positional_parameter_named_after_an_offered_name_is_handed_nothing() -> None:
+    """The call fills ``positional`` parameters by position, whatever their
+    names, so naming one after a seed is no opt-in: handing it again by
+    keyword would be a ``TypeError``."""
+    assert asked_with(_Offered(), "tenant_first", None, offered=OFFERED) == {
+        "call_context": {"k": 1}
+    }
+    assert asked_with(_Offered(), "tenant_third", None, positional=3, offered=OFFERED) == {}
+    assert asked_with(_Offered(), "tenant_third", None, offered=OFFERED) == {"tenant": "acme"}
+
+
+def test_a_forwarding_wrapper_s_positional_parameters_are_the_method_s() -> None:
+    """A wrapper spreading ``*args`` passes its positionals to the method it
+    wraps, so the method's names are the ones filled by position."""
+
+    class Wrapped(_Offered):
+        tenant_first = _forwarding(_Offered.tenant_first)
+
+    assert asked_with(Wrapped(), "tenant_first", None, offered=OFFERED) == {
+        "call_context": {"k": 1}
+    }
+
+
+def test_arguments_are_the_call_s_whatever_is_offered() -> None:
+    handed = asked_with(_Shapes(), "keyword_only", {"pk": 1}, offered={"arguments": "seed"})
+    assert handed == {"arguments": {"pk": 1}}
+
+
+def test_a_callable_with_no_signature_fills_nothing_by_position() -> None:
+    check = _Shapes()
+    cast(Any, check).undeclared = max
+    assert utils.declared_keywords(check, "undeclared", positional=2) == frozenset()

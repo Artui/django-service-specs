@@ -23,6 +23,7 @@ async def aunmet_operation_affordance(
     pool: dict[str, Any],
     *,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> Affordance | None:
     """[`unmet_operation_affordance`][django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance] for an async caller.
 
@@ -51,5 +52,5 @@ async def aunmet_operation_affordance(
     if not operation_affordances(compiled):
         return None
     return await sync_to_async(unmet_operation_affordance, thread_sensitive=True)(
-        compiled, pool, reserved=reserved
+        compiled, pool, reserved=reserved, call_context=call_context
     )

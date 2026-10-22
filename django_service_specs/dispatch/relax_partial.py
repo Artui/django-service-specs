@@ -20,6 +20,8 @@ def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> P
     serializer. The spec's ``reads`` and its target selector's keep their
     ``required``: a partial update still names the row it updates
     (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
+    So do its ``shapes``, which say what is presented rather than what is
+    written, as on a ``many`` spec, where only the list's rows are walked.
     On a ``many`` spec the Validator's parameters are each row's, so the list
     stays required and only its rows are walked, since a read may share a
     row field's name
@@ -35,8 +37,9 @@ def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> P
     reads and its target's, so the Validator is not asked for its parameters
     again; a read and a Validator parameter of one name are refused when
     ``parameters()`` is assembled. Of the names kept, the spec's reads are
-    held by test_a_partial_spec_with_no_target_keeps_its_reads_required and
-    the target's by
+    held by test_a_partial_spec_with_no_target_keeps_its_reads_required, the
+    shapes by test_a_partial_spec_keeps_a_required_shape_required, and the
+    target's by
     test_a_partial_spec_requires_none_of_its_validators_parameters_at_any_depth.
 
     A copy, so the declaration every other reader sees - ``parameters()``
@@ -53,7 +56,11 @@ def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> P
             *(_below(param) if param.name == spec.many_argument else param for param in parameters)
         )
     target = spec.target_selector_spec()
-    kept = spec.reads.names() | (target.parameters().names() if target is not None else frozenset())
+    kept = (
+        spec.reads.names()
+        | spec.shapes.names()
+        | (target.parameters().names() if target is not None else frozenset())
+    )
     return Parameters.of(
         *(param if param.name in kept else _optional(param) for param in parameters)
     )

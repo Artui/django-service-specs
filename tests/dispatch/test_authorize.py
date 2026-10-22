@@ -25,7 +25,7 @@ from tests.authorization.utils import (
     refuses,
     refuses_lazily,
 )
-from tests.dispatch.utils import Arguing
+from tests.dispatch.utils import Arguing, Offered
 from tests.specs.utils import Foreign
 
 
@@ -195,3 +195,34 @@ def test_a_check_declaring_arguments_is_handed_them_as_given_and_none_without() 
     authorize(spec, principal, arguments=arguments)
     authorize(spec, principal)
     assert arguing.asked == [("has_permission", arguments), ("has_permission", None)]
+
+
+PRINCIPAL = object()
+
+
+def test_a_check_is_offered_the_call_context_and_the_seeds_it_names() -> None:
+    check = Offered()
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+    context: dict[str, Any] = {}
+    authorize(spec, PRINCIPAL, call_context=context, seeds={"tenant": "acme"})
+    ((_, handed, tenant),) = check.asked
+    assert handed is context
+    assert tenant == "acme"
+
+
+def test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own() -> None:
+    check = Offered()
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+    for _ in range(2):
+        authorize(spec, PRINCIPAL, seeds={"tenant": "acme"})
+    (_, first, _), (_, second, _) = check.asked
+    assert first == second == {}
+    assert first is not second
+
+
+def test_a_seed_left_out_of_seeds_is_not_offered() -> None:
+    """A check naming a seed nobody resolved is asked without it, and its
+    own signature decides: here, a required keyword, so a ``TypeError``."""
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Offered()])
+    with pytest.raises(TypeError, match="tenant"):
+        authorize(spec, PRINCIPAL)

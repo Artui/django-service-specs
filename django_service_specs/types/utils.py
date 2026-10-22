@@ -27,9 +27,9 @@ from typing import Any, Final
 # ``**kwargs``, so the two cannot disagree about what a condition may see.
 #
 # Written out rather than derived from ``RESERVED_POOL_SEEDS``, because ``types/``
-# imports nothing else in the package. The rest of the reserved names - ``user``
-# and ``progress`` - are ambient, and ``tests/types/test_utils.py`` holds the
-# partition, so a name reserved later has to be placed on one side of it.
+# imports nothing else in the package. The rest of the reserved names - ``user``,
+# ``progress`` and ``call_context`` - are ambient, and ``tests/types/test_utils.py``
+# holds the partition, so a name reserved later has to be placed on one side of it.
 #
 # ``serializer`` is djangorestframework-services' per-call name for the bound
 # input serializer, which this kernel never seeds. It stays here because that
@@ -39,6 +39,21 @@ from typing import Any, Final
 PER_CALL_POOL_NAMES: Final = frozenset(
     {"data", "instance", "collection", "result", "queryset", "serializer"}
 )
+
+
+CALL_CONTEXT: Final = "call_context"
+"""The pool name the call's context travels under."""
+
+# The pool names a callable is handed only by naming them: one taking
+# ``**kwargs`` for the rest of the pool never receives them. Read by
+# ``resolve_callable_kwargs``, the one binder every pool-resolved callable goes
+# through, so a catch-all at any seat - a provider, a selector, a precondition,
+# an affordance condition, the service - forwards what it forwarded before the
+# name was reserved. Every published transport resolves onto a new release of
+# this package, and a catch-all passing its ``**kwargs`` into a strict callable
+# would raise on one key more. Ambient all the same: a condition naming the
+# call's context is handed it, as a provider naming it is.
+BY_NAME_ONLY_POOL_NAMES: Final = frozenset({CALL_CONTEXT})
 
 
 def is_row_condition(when: Any) -> bool:

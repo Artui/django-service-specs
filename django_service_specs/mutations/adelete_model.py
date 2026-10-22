@@ -5,7 +5,7 @@ from typing import Any
 
 from django_service_specs.mutations.adelete_relations import adelete_relations
 from django_service_specs.mutations.change_result import ModelT
-from django_service_specs.mutations.utils import relation_map
+from django_service_specs.mutations.utils import handed_on, relation_map
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -24,9 +24,13 @@ def adelete_model(
     """
     declared = relation_map(relations)
 
-    async def _service(*, instance: ModelT, **kwargs: Any) -> None:
+    async def _service(
+        *, instance: ModelT, call_context: dict[str, Any] | None = None, **kwargs: Any
+    ) -> None:
         if declared:
-            await adelete_relations(instance, relations=declared, context=kwargs)
+            await adelete_relations(
+                instance, relations=declared, context=handed_on(kwargs, call_context)
+            )
         if soft_delete is not None:
             await soft_delete(instance)
         else:

@@ -105,17 +105,17 @@ def _protocol(leaf: str, call: str) -> Pin:
 SURFACE: dict[str, Pin] = {
     # --- affordances --------------------------------------------------------------------------
     "enforce_affordances": _fn(
-        "affordances.enforce_affordances", "spec, pool, *, instance, reserved="
+        "affordances.enforce_affordances", "spec, pool, *, instance, reserved=, call_context="
     ),
     "aenforce_affordances": _fn(
-        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved="
+        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved=, call_context="
     ),
     "operation_affordances": _fn("affordances.operation_affordances", "spec"),
     "unmet_operation_affordance": _fn(
-        "affordances.unmet_operation_affordance", "spec, pool, *, reserved="
+        "affordances.unmet_operation_affordance", "spec, pool, *, reserved=, call_context="
     ),
     "aunmet_operation_affordance": _fn(
-        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved="
+        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved=, call_context="
     ),
     # --- authorization ------------------------------------------------------------------------
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
@@ -143,23 +143,25 @@ SURFACE: dict[str, Pin] = {
     "dispatch": _fn(
         "dispatch.dispatch",
         "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, progress=, "
-        "target=, extra_kwargs=",
+        "target=, extra_kwargs=, call_context=",
     ),
     "adispatch": _fn(
         "dispatch.adispatch",
         "spec, *, principal=, principal_id=, arguments, grant=, pool_seeds=, "
-        "unknown_arguments=, progress=, target=, extra_kwargs=",
+        "unknown_arguments=, progress=, target=, extra_kwargs=, call_context=",
     ),
     "check_call": _fn(
         "dispatch.check_call",
-        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=",
+        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, call_context=",
     ),
     "check_requested_input": _fn("dispatch.check_requested_input", "spec, schema, *, pool_seeds="),
     "bind_arguments": _fn(
-        "dispatch.bind_arguments", "spec, arguments, *, principal, target=, unknown_arguments="
+        "dispatch.bind_arguments",
+        "spec, arguments, *, principal, target=, unknown_arguments=, call_context=",
     ),
     "resolve_target": _fn(
-        "dispatch.resolve_target", "spec, *, principal, arguments, grant=, pool_seeds="
+        "dispatch.resolve_target",
+        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=",
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
@@ -173,12 +175,16 @@ SURFACE: dict[str, Pin] = {
         "dispatch.dispatch_result",
         signature="kind, value=, service_result=, instance=, data=, context=",
     ),
-    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant=, arguments="),
+    "authorize": _fn(
+        "dispatch.authorize", "spec, principal, *, grant=, arguments=, call_context=, seeds="
+    ),
     "authorize_scope": _fn(
-        "dispatch.authorize_scope", "spec, principal, scope, *, grant, arguments="
+        "dispatch.authorize_scope",
+        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=",
     ),
     "authorize_target": _fn(
-        "dispatch.authorize_target", "spec, principal, target, *, grant, arguments="
+        "dispatch.authorize_target",
+        "spec, principal, target, *, grant, arguments=, call_context=, seeds=",
     ),
     "Grant": Pin(
         "dispatch.grant",
@@ -326,7 +332,16 @@ SURFACE: dict[str, Pin] = {
     "RESERVED_POOL_SEEDS": Pin(
         "pool.reserved_pool_seeds",
         value=frozenset(
-            {"user", "data", "instance", "collection", "result", "queryset", "progress"}
+            {
+                "user",
+                "data",
+                "instance",
+                "collection",
+                "result",
+                "queryset",
+                "progress",
+                "call_context",
+            }
         ),
     ),
     "base_pool": _fn("pool.base_pool", "*, user, progress=, seeds=, **extra"),

@@ -9,7 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
-from django_service_specs.dispatch.utils import open_call, walk_target
+from django_service_specs.dispatch.utils import CheckKeywords, open_call, walk_target
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -25,6 +25,7 @@ def resolve_target(
     arguments: Mapping[str, Any],
     grant: Grant | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> tuple[Any, Grant] | DispatchResult:
     """Find and check ``spec``'s target as ``dispatch`` would, without running anything else.
 
@@ -59,6 +60,14 @@ def resolve_target(
     this function looks its target up itself. A missing row ``allow_none`` does not let through
     returns ``DispatchResult(kind="not_found")``, dispatch's own answer, so it
     is never mistaken for the ``None`` it lets through.
+
+    ``call_context`` is the call's context, as ``dispatch`` takes it: the
+    transport's dict, handed as the same object to the target selector and to
+    every permission check method naming it, or a fresh dict of their own when
+    none is passed. A check naming a registered seed is offered it here as at
+    dispatch, at the class-level check and at the checks on what the lookup
+    finds. A page resolving its row ahead of the call passes the dict it will
+    hand that call, so the two read and write one context.
 
     It is sync, as dispatch's steps are; an async caller hops once, with
     ``sync_to_async(resolve_target, thread_sensitive=True)``.
@@ -98,6 +107,10 @@ def resolve_target(
         if isinstance(arguments, Mapping)
         else arguments
     )
+    # One carrier for both steps: ``open_call`` fills its seeds where a check
+    # names one, and the walk's checks are offered the same
+    # (test_a_call_handed_none_gets_a_fresh_dict_its_checks_and_its_lookup_share).
+    keywords = CheckKeywords({} if call_context is None else call_context)
     checked, granted = open_call(
         spec,
         principal,
@@ -106,8 +119,11 @@ def resolve_target(
         pool_seeds=pool_seeds,
         unknown_arguments=UnknownArguments.REJECT,
         parameters=parameters,
+        keywords=keywords,
     )
-    resolved = walk_target(spec, principal, checked, grant=granted, pool_seeds=pool_seeds)
+    resolved = walk_target(
+        spec, principal, checked, grant=granted, pool_seeds=pool_seeds, keywords=keywords
+    )
     if isinstance(resolved, DispatchResult):
         return resolved
     return next(iter(resolved.values()), None), Grant(spec, principal, target_checked=True)

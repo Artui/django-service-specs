@@ -1388,8 +1388,8 @@ async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop
     )
     monkeypatch.setattr(
         authorization_utils,
-        "_names_arguments",
-        recorded("signature", authorization_utils._names_arguments),
+        "_reached_names",
+        recorded("signature", authorization_utils._reached_names),
     )
     note = await _create(owner=ada, title="mine")
 

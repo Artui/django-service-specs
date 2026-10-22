@@ -10,6 +10,7 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
     NOT_FOUND,
     SELECTOR_SOURCE,
+    CheckKeywords,
     ListNotFound,
     Overlay,
     conclude_selector,
@@ -42,6 +43,7 @@ def dispatch(
     progress: ProgressReporter | None = None,
     target: Any = UNSET,
     extra_kwargs: Mapping[str, Any] | None = None,
+    call_context: dict[str, Any] | None = None,
 ) -> DispatchResult:
     """Run ``spec`` for ``principal`` with ``arguments``, in a fixed order.
 
@@ -196,9 +198,49 @@ def dispatch(
     Validator's input: a transport merges such values into ``arguments``,
     where the checks and the Validator read one value.
 
+    ``call_context`` is the call's context: one plain ``dict``, created and
+    owned by the transport for its natural scope - an HTTP request, an agent
+    run - and handed to every stage that declares it as **the same object,
+    never a copy**. A ``kwargs`` or ``input_data`` provider, a selector of any
+    role, an affordance condition, a precondition, the service and the run's
+    ``progress_reporter`` declare it as a parameter named ``call_context``, a
+    name reserved as every seed's is, so no argument may take it. It reaches
+    them by that name alone: one taking ``**kwargs`` for the rest of the pool
+    is never handed it, so a catch-all forwarding what it gets runs as it did
+    before the name was reserved
+    (TestACatchAllIsNeverHandedTheCallContext). A permission
+    check's method declares it as a keyword, as it declares ``arguments``;
+    the Validator reads it as ``ValidationContext.call_context`` and the
+    presenter, every row of a list and any presenter it hands its context on
+    to, as ``PresentationContext.call_context``. So a later stage reads what
+    an earlier one put there rather than computing it again. With none, a
+    fresh empty dict for this call alone, so a stage writing to it runs
+    unchanged on a transport with nothing to put in it. The kernel writes
+    nothing to it and keeps nothing across calls. Stages of one call run in
+    sequence; calls sharing one dict across threads should write to it by
+    compute-if-absent, ``call_context.setdefault(key, value)``, for a value
+    any of them would compute the same.
+
+    A permission check's method may also name a **registered seed** in
+    ``pool_seeds`` as a keyword, and is handed its value at whichever of the
+    three questions declares it. The seeds the checks name, and only those,
+    are resolved before step two, so the class-level check can read them, and
+    every pool after takes those values as they are: each resolves once for
+    the call, and the check, the selectors and the service see one object.
+    Every other seed resolves as before, once per pool and each after step
+    two, as every seed does for a spec whose checks name none. A seed named
+    ``arguments`` is never named this way: a check declaring ``arguments``
+    is handed the call's. A parameter a check's method fills by position -
+    ``principal``, ``spec`` and the target or scope, whatever it calls them -
+    is never read as an opt-in.
+
+    The presenter's context also carries ``shapes``: what the caller sent
+    for the spec's declared ``shapes``, read-only, a shape left out absent.
+    No shape reaches a pool or the Validator.
+
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
-    selector is a LIST, or a ``many`` service with no output selector that
-    returned something, and ``"instance"`` otherwise. Nothing is presented here;
+    selector is a LIST, or a ``many`` or ``returns_many`` service with no
+    output selector that returned something, and ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
     transport that hands the object to a template never pays for rendering it.
 
@@ -234,7 +276,13 @@ def dispatch(
     # by a check, say - reaches nothing the run sees
     # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
     overlay = Overlay(dict(extra_kwargs or {}))
+    # ``is None`` rather than ``or``: an empty dict the transport handed over
+    # is its dict, and every stage must be handed that very object
+    # (test_every_stage_that_declares_it_is_handed_the_very_dict_passed).
+    if call_context is None:
+        call_context = {}
     if isinstance(spec, SelectorSpec):
+        keywords = CheckKeywords(call_context)
         checked, granted = open_call(
             spec,
             principal,
@@ -243,12 +291,14 @@ def dispatch(
             pool_seeds=pool_seeds,
             unknown_arguments=unknown_arguments,
             overlay=overlay,
+            keywords=keywords,
         )
         pool = selector_pool(
             spec,
             checked,
             principal=principal,
             pool_seeds=pool_seeds,
+            keywords=keywords,
             progress=progress,
             extra_kwargs=overlay.kwargs,
         )
@@ -273,6 +323,7 @@ def dispatch(
             pool=pool,
             reserved=pool_seeds.reserved,
             checked=checked,
+            keywords=keywords,
         )
     prepared = prepare_service(
         spec,
@@ -282,6 +333,7 @@ def dispatch(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         progress=progress,
+        call_context=call_context,
         target=target,
         overlay=overlay,
     )

@@ -290,3 +290,78 @@ def test_a_selector_spec_is_refused_rather_than_its_mapping_read_as_conditions(w
     )
     with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
         enforce_affordances(wrap(spec), {}, instance=None)
+
+
+# The call's context: a transport asking ahead of a call has one to hand, or
+# the condition gets a dict of its own rather than a TypeError.
+
+
+def _naming_it(handed: list[Any]) -> ServiceSpec:
+    def when(*, call_context: Any) -> bool:
+        handed.append(call_context)
+        return True
+
+    return ServiceSpec(
+        service=print,
+        affordances=[
+            Affordance(code="first", reason="r", when=when),
+            Affordance(code="second", reason="r", when=when),
+        ],
+    )
+
+
+def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None:
+    handed: list[Any] = []
+    context: dict[str, Any] = {}
+    enforce_affordances(
+        _naming_it(handed), base_pool(user=None), instance=None, call_context=context
+    )
+    assert len(handed) == 2
+    assert all(seen is context for seen in handed)
+
+
+def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
+    handed: list[Any] = []
+    spec = _naming_it(handed)
+    enforce_affordances(spec, base_pool(user=None), instance=None)
+    enforce_affordances(spec, base_pool(user=None), instance=None)
+    first, again, second, _ = handed
+    assert first == {}
+    assert again is first
+    assert second is not first
+
+
+def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() -> None:
+    seen: list[set[str]] = []
+
+    def when(**kwargs: Any) -> bool:
+        seen.append(set(kwargs))
+        return True
+
+    spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
+    enforce_affordances(spec, base_pool(user=None), instance=None, call_context={})
+    assert seen == [{"user", "progress"}]
+
+
+def test_the_call_context_passed_else_the_pool_s_else_a_fresh_one() -> None:
+    """A pool carrying the call's context is the call's own; a parameter naming the same is welcome."""
+    handed: list[Any] = []
+    held: dict[str, Any] = {}
+    pool = {**base_pool(user=None), "call_context": held}
+    enforce_affordances(_naming_it(handed), pool, instance=None)
+    enforce_affordances(_naming_it(handed), pool, instance=None, call_context=held)
+    enforce_affordances(_naming_it(handed), base_pool(user=None), instance=None)
+    from_pool, _, passed, _, fresh, _ = handed
+    assert from_pool is held
+    assert passed is held
+    assert fresh == {}
+    assert fresh is not held
+
+
+def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
+    """Two claimants to one name, as dispatch refuses every other: neither is chosen quietly."""
+    handed: list[Any] = []
+    pool = {**base_pool(user=None), "call_context": {}}
+    with pytest.raises(ImproperlyConfigured, match="call_context"):
+        enforce_affordances(_naming_it(handed), pool, instance=None, call_context={})
+    assert handed == []
