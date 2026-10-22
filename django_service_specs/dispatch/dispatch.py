@@ -218,8 +218,9 @@ def dispatch(
     unchanged on a transport with nothing to put in it. The kernel writes
     nothing to it and keeps nothing across calls. Stages of one call run in
     sequence; calls sharing one dict across threads should write to it by
-    compute-if-absent, ``call_context.setdefault(key, value)``, for a value
-    any of them would compute the same.
+    compute-if-absent - ``get``, and on a miss compute the value and store it
+    with ``call_context.setdefault(key, value)`` - for a value any of them
+    would compute the same.
 
     A permission check's method may also name a **registered seed** in
     ``pool_seeds`` as a keyword, and is handed its value at whichever of the

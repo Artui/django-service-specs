@@ -4891,12 +4891,17 @@ class TestTheCallContext:
         def precondition(*, call_context: Any) -> None:
             saw("precondition", call_context)
 
+        def narrowed(*, queryset: Any, call_context: Any) -> Any:
+            saw("extend_queryset", call_context)
+            return queryset
+
         spec = SelectorSpec(
             kind=LIST,
             selector=rows,
             permissions=(_ContextCheck(saw),),
             kwargs=provider,
             preconditions=[precondition],
+            extend_queryset=narrowed,
         )
         call_context: dict[str, Any] = {}
         result = entry(spec, principal=ada, arguments={}, call_context=call_context)
@@ -4904,6 +4909,7 @@ class TestTheCallContext:
             "has_permission",
             "kwargs",
             "selector",
+            "extend_queryset",
             "has_scope_permission",
             "precondition",
         }

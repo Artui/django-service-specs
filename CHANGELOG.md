@@ -28,9 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stage.** `dispatch`, `adispatch`, `check_call`, `bind_arguments` and
   `resolve_target` take the transport's `dict` for its scope - a request, an
   agent run - and a fresh one when none is passed. The same object, never a
-  copy, reaches every callable that names `call_context`: the selectors, the
-  providers, the preconditions, the affordance conditions, the service, the
-  output selector, `FormValidator(form_kwargs=)`, the Validator's and the
+  copy, reaches every callable that names `call_context`: the selectors and
+  their `extend_queryset`, the providers, the preconditions, the affordance
+  conditions, the service, the run's `progress_reporter`, the output
+  selector, `FormValidator(form_kwargs=)`, the Validator's and the
   presenter's contexts, and a `PydanticValidator`'s field validators, on
   pydantic's `info.context` beside `principal` and `target`. `create_model`,
   `update_model`, `delete_model` and their async twins hand it on to the row
@@ -41,12 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A permission check opts into the call's context, its arguments and the
   registered seeds by name.** `has_permission`, `has_object_permission` and
   `has_scope_permission` may name `call_context`, beside `arguments`, and
-  any registered seed, as a parameter the call does not fill by position; `authorize`, `authorize_target` and
-  `authorize_scope` take `call_context=` and `seeds=` to offer them. Only the
-  seeds a spec's checks name resolve before the checks, and the run reuses
-  those values, so each seed resolves once per call and the check and the
-  service see one value. A seed raising `PrincipalUnavailable` there ends the
-  call as a refusal does. A positional parameter never opts in.
+  any registered seed, as a parameter the call does not fill by position;
+  `authorize`, `authorize_target` and `authorize_scope` take `call_context=`
+  and `seeds=` to offer them. Only the seeds a spec's checks name resolve
+  before the checks, and the run reuses those values, so each such seed
+  resolves once per call and the check and the service see one value. A seed
+  raising `PrincipalUnavailable` there ends the call as a refusal does. A
+  parameter the call fills by position never opts in, whatever its name.
 - **`call_context=` on `unmet_operation_affordance`, `enforce_affordances`
   and their async twins.** The dict passed, else one the pool carries, else
   a fresh one; two different dicts are refused with `ImproperlyConfigured`.

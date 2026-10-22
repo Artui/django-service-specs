@@ -710,8 +710,8 @@ docs/examples/dispatching.py:call_context
 ```
 
 The same object, never a copy, reaches every callable that names
-`call_context`: a `kwargs` or `input_data` provider, a selector of any role,
-an affordance condition, a precondition, the service, the run's
+`call_context`: a `kwargs` or `input_data` provider, a selector of any role
+and its `extend_queryset`, an affordance condition, a precondition, the service, the run's
 `progress_reporter`, `FormValidator`'s `form_kwargs`, a permission check's
 methods, the Validator's and the presenter's contexts, and a
 `PydanticValidator`'s field validators, on pydantic's `info.context` beside
@@ -727,13 +727,16 @@ what the service left there.
   refused. Seed resolvers do not see it, since a seed is resolved before
   anything the call adds.
 - **The kernel pre-fills nothing.** What goes in is the transport's
-  convention: django-spec-rest puts DRF's `request` there, and a key such as
-  `request`, `view` or `format` means what the transport that wrote it says.
+  convention: a transport over DRF is expected to put DRF's `request` there,
+  and a key such as `request`, `view` or `format` means what the transport
+  that wrote it says.
   The kernel writes nothing and keeps nothing across calls.
 - **Calls sharing one dict.** The stages of one call run in sequence. A
   transport handing one dict to calls on several threads should have them
-  write by compute-if-absent, `call_context.setdefault(key, value)`, for a
-  value any of them would compute the same.
+  write by compute-if-absent: read with `get`, and on a miss compute the value
+  and store it with `call_context.setdefault(key, value)`, so the first write
+  wins and every call reads one value. Fit for a value any of them would
+  compute the same.
 
 The affordance functions a transport calls ahead of the call or in place of
 dispatch -

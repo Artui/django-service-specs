@@ -16,7 +16,8 @@ target, ``result`` the service's return (in an output selector's pool, where
 ``queryset`` what ``extend_queryset`` shapes. ``call_context`` is the call's
 context: the one plain ``dict`` the transport handed ``dispatch``, or a fresh
 one per call when it handed none, which every callable dispatch resolves -
-a ``kwargs`` or ``input_data`` provider, a selector, an affordance condition,
+a ``kwargs`` or ``input_data`` provider, a selector and its
+``extend_queryset``, an affordance condition,
 a precondition, the service, the run's ``progress_reporter`` - receives as
 the same object by naming it, and never through ``**kwargs``. Never a copy,
 and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
