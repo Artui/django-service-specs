@@ -19,7 +19,7 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
-from django_service_specs.types.utils import is_row_condition
+from django_service_specs.types.utils import CALL_CONTEXT, is_row_condition
 
 
 def enforce_affordances(
@@ -28,6 +28,7 @@ def enforce_affordances(
     *,
     instance: Any,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> None:
     """Refuse the call if one of the spec's ``affordances`` is not met.
 
@@ -70,6 +71,11 @@ def enforce_affordances(
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the
     service spec it compiles to.
 
+    ``call_context`` is the call's context, handed to a callable condition
+    that names it and never to one taking ``**kwargs`` for the rest: the dict
+    passed, or a fresh one the conditions of this call share. It replaces any
+    ``call_context`` entry in ``pool``.
+
     Raises:
         ActionUnavailable: An affordance is not met.
         ServiceNotFound: A condition on the row was reached and the row is gone:
@@ -89,6 +95,7 @@ def enforce_affordances(
     affordances: Sequence[Affordance] | None = compiled.affordances
     if not affordances:
         return
+    pool = {**pool, CALL_CONTEXT: {} if call_context is None else call_context}
     row_flags: dict[int, bool] | None = None
     for index, affordance in enumerate(affordances):
         if is_row_condition(affordance.when):

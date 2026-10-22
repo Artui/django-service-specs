@@ -11,6 +11,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.utils import CALL_CONTEXT
 
 
 def unmet_operation_affordance(
@@ -18,6 +19,7 @@ def unmet_operation_affordance(
     pool: dict[str, Any],
     *,
     reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> Affordance | None:
     """The first of the spec's operation-scope affordances not met now, or ``None``.
 
@@ -63,7 +65,13 @@ def unmet_operation_affordance(
     condition on the selector itself - so a transport passes whatever spec it
     holds rather than branching on its type and risking reading that mapping as
     the selector's own.
+
+    ``call_context`` is the call's context, handed to a callable condition
+    that names it and never to one taking ``**kwargs`` for the rest: the dict
+    passed, or a fresh one the conditions of this call share. It replaces any
+    ``call_context`` entry in ``pool``.
     """
+    pool = {**pool, CALL_CONTEXT: {} if call_context is None else call_context}
     for affordance in operation_affordances(spec):
         if not answer_operation_condition(affordance.when, pool, reserved=reserved):
             return affordance

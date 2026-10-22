@@ -60,6 +60,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import CALL_CONTEXT
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -206,9 +207,6 @@ class Prepared:
     shapes: Mapping[str, Any]
 
 
-CALL_CONTEXT = "call_context"
-"""The pool name, and the ``PermissionCheck`` keyword, the call's context is handed under."""
-
 # The three questions a check is asked, each with how many parameters dispatch
 # fills by position, which no name among them can opt into.
 _QUESTIONS: tuple[tuple[str, int], ...] = (
@@ -312,7 +310,7 @@ def open_call(
     parameters: Parameters | None = None,
     settle_rows: bool = False,
     overlay: Overlay = NO_OVERLAY,
-    keywords: CheckKeywords | None = None,
+    keywords: CheckKeywords,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
@@ -364,8 +362,8 @@ def open_call(
     a check refuses
     (test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before,
     test_an_anonymous_caller_is_refused_before_a_seed_reads_its_principal).
-    Without ``keywords`` - ``resolve_target`` hands none - a check is offered
-    a fresh context and the seeds resolved here, which no later step sees.
+    Every entry point hands its own carrier, one per call, so the walk after
+    this is offered the seeds this filled.
     """
     if is_deactivated(principal):
         raise PrincipalUnavailable()
@@ -385,8 +383,6 @@ def open_call(
         )
     refuse_overlaid_parameters(spec, declared, overlay)
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    if keywords is None:
-        keywords = CheckKeywords()
     if _opts_into_seeds(spec, pool_seeds.names):
         early = base_pool(user=principal, seeds=pool_seeds)
         keywords.seeds.update({name: early[name] for name in pool_seeds.names})
@@ -1177,8 +1173,8 @@ def walk_target(
     *,
     grant: Grant,
     pool_seeds: PoolSeeds,
+    keywords: CheckKeywords,
     target: Any = UNSET,
-    keywords: CheckKeywords | None = None,
 ) -> dict[str, Any] | DispatchResult:
     """Steps three and four for a service spec: its target, found and checked.
 
@@ -1201,8 +1197,7 @@ def walk_target(
 
     Each is handed ``checked`` for a check that declares ``arguments``, as
     step two was, and offered what step two was offered, ``keywords``; the
-    target selector's pool carries its context. Without ``keywords`` -
-    ``resolve_target`` hands none - a fresh context and no seed.
+    target selector's pool carries its context.
 
     ``target``, when given, is the target a caller resolved itself, and stands
     in for the lookup alone: the checks above still run on it, unless
@@ -1220,8 +1215,6 @@ def walk_target(
     """
     if target is UNSET:
         grant = replace(grant, target_checked=False)
-    if keywords is None:
-        keywords = CheckKeywords()
     offered = keywords.offered()
     handed = checks_arguments(checked)
     instance_spec = spec.instance_selector_spec
@@ -1620,7 +1613,13 @@ def prepare_service(
     # test_a_condition_reads_a_registered_seed_through_dispatch fails without it.
     # ``instance`` is the row, never a collection: a condition on the row beside
     # a ``collection_selector_spec`` is refused when the spec is declared.
-    enforce_affordances(spec, pool, instance=resolved.get("instance"), reserved=reserved)
+    enforce_affordances(
+        spec,
+        pool,
+        instance=resolved.get("instance"),
+        reserved=reserved,
+        call_context=call_context,
+    )
     # Then the preconditions, still before the run and in the same hop: after
     # the affordances, djangorestframework-services' order
     # (test_an_affordance_answers_before_a_precondition).

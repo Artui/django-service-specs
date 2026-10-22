@@ -290,3 +290,54 @@ def test_a_selector_spec_is_refused_rather_than_its_mapping_read_as_conditions(w
     )
     with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
         enforce_affordances(wrap(spec), {}, instance=None)
+
+
+# The call's context: a transport asking ahead of a call has one to hand, or
+# the condition gets a dict of its own rather than a TypeError.
+
+
+def _naming_it(handed: list[Any]) -> ServiceSpec:
+    def when(*, call_context: Any) -> bool:
+        handed.append(call_context)
+        return True
+
+    return ServiceSpec(
+        service=print,
+        affordances=[
+            Affordance(code="first", reason="r", when=when),
+            Affordance(code="second", reason="r", when=when),
+        ],
+    )
+
+
+def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None:
+    handed: list[Any] = []
+    context: dict[str, Any] = {}
+    enforce_affordances(
+        _naming_it(handed), base_pool(user=None), instance=None, call_context=context
+    )
+    assert len(handed) == 2
+    assert all(seen is context for seen in handed)
+
+
+def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
+    handed: list[Any] = []
+    spec = _naming_it(handed)
+    enforce_affordances(spec, base_pool(user=None), instance=None)
+    enforce_affordances(spec, base_pool(user=None), instance=None)
+    first, again, second, _ = handed
+    assert first == {}
+    assert again is first
+    assert second is not first
+
+
+def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() -> None:
+    seen: list[set[str]] = []
+
+    def when(**kwargs: Any) -> bool:
+        seen.append(set(kwargs))
+        return True
+
+    spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
+    enforce_affordances(spec, base_pool(user=None), instance=None, call_context={})
+    assert seen == [{"user", "progress"}]

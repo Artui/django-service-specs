@@ -34,6 +34,7 @@ from tests.dispatch.utils import (
     PK,
     TENANT_SEEDS,
     Arguing,
+    Offered,
     OwnerOnly,
     Record,
     Refuse,
@@ -512,3 +513,87 @@ def test_a_collection_s_scope_check_is_handed_them_too(ada: Any) -> None:
     arguing = Arguing()
     resolve_target(_bulk(arguing), principal=ada, arguments={})
     assert arguing.questions() == [("has_permission", {}), ("has_scope_permission", {})]
+
+
+# The call's context, as dispatch hands it: the same dict, never a copy.
+
+
+@pytest.mark.parametrize(
+    ("target", "questions"),
+    [
+        ("instance", ["has_permission", "has_object_permission"]),
+        ("collection", ["has_permission", "has_scope_permission"]),
+    ],
+)
+def test_its_checks_are_offered_the_call_context_passed_and_the_seeds_they_name(
+    ada: Any, target: str, questions: list[str]
+) -> None:
+    """Dispatch's walk, with dispatch's keywords: the target's check is a check like any other."""
+    note = Note.objects.create(owner=ada, title="mine")
+    check = Offered()
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[check],
+        **(
+            {
+                "instance_selector_spec": SelectorSpec(
+                    kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK
+                )
+            }
+            if target == "instance"
+            else {
+                "collection_selector_spec": SelectorSpec(kind=SelectorKind.LIST, selector=notes_of)
+            }
+        ),
+    )
+    arguments = {"pk": note.pk} if target == "instance" else {}
+    context: dict[str, Any] = {}
+    resolve_target(
+        spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS, call_context=context
+    )
+    assert [question for question, _, _ in check.asked] == questions
+    assert all(handed is context for _, handed, _ in check.asked)
+    assert [tenant for _, _, tenant in check.asked] == ["tenant-of-ada", "tenant-of-ada"]
+
+
+def test_a_call_handed_none_gets_a_fresh_dict_its_checks_and_its_lookup_share(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    check = Offered()
+    looked_up: list[Any] = []
+
+    def by_pk(*, pk: int, call_context: Any) -> Any:
+        looked_up.append(call_context)
+        return Note.objects.filter(pk=pk)
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[check],
+        instance_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK),
+    )
+    resolve_target(spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=TENANT_SEEDS)
+    resolve_target(spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=TENANT_SEEDS)
+    first, second = looked_up
+    assert first == {}
+    assert first is not second
+    assert [handed for _, handed, _ in check.asked[:2]] == [first, first]
+    assert all(handed is first for _, handed, _ in check.asked[:2])
+    assert [tenant for _, _, tenant in check.asked[:2]] == ["tenant-of-ada", "tenant-of-ada"]
+
+
+def test_the_lookup_naming_it_is_handed_the_very_dict_passed(ada: Any) -> None:
+    note = Note.objects.create(owner=ada, title="mine")
+    looked_up: list[Any] = []
+
+    def by_pk(*, pk: int, call_context: Any) -> Any:
+        looked_up.append(call_context)
+        return Note.objects.filter(pk=pk)
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        instance_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK),
+    )
+    context: dict[str, Any] = {}
+    resolve_target(spec, principal=ada, arguments={"pk": note.pk}, call_context=context)
+    assert len(looked_up) == 1
+    assert looked_up[0] is context
