@@ -25,6 +25,7 @@ from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import coded_messages
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.types.utils import CALL_CONTEXT
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -451,7 +452,10 @@ def _extra_keywords(
     and with ``ambient`` empty off dispatch. ``user`` is laid over
     ``ambient``, so the principal is ``user`` on every path, the two being
     one object on dispatch, and the context's ``resolved`` last: its names
-    are reserved, so no seed shares one. Each is held by its own test:
+    are reserved, so no seed shares one. The call's context is there too, as
+    the context's own dict, handed to a ``form_kwargs`` naming it
+    (test_form_kwargs_naming_the_call_context_is_handed_the_very_dict) and,
+    as everywhere, never to one taking ``**kwargs``. Each is held by its own test:
     test_off_dispatch_it_meets_the_principal_as_user_and_no_seed
     (``progress``),
     test_a_hand_built_context_s_user_is_still_the_principal (``user``) and
@@ -463,6 +467,7 @@ def _extra_keywords(
     pool = {
         "progress": null_progress,
         **context.ambient,
+        CALL_CONTEXT: context.call_context,
         "user": context.principal,
         **context.resolved,
     }

@@ -9,7 +9,7 @@ from types import MappingProxyType
 from typing import Any
 
 import pytest
-from asgiref.sync import sync_to_async
+from asgiref.sync import async_to_sync, sync_to_async
 from django import forms
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -1973,3 +1973,35 @@ class TestFormKwargs:
         validator = FormValidator(form_class, form_kwargs=lambda: {"was": "", key: None})
         with pytest.raises(ImproperlyConfigured, match=rf"returned {key!r}"):
             validator.validate({"name": "x", "title": "x"}, ValidationContext(None, _book()))
+
+
+class _Named(forms.Form):
+    title = forms.CharField()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
+def test_form_kwargs_naming_the_call_context_is_handed_the_very_dict(
+    entry: Callable[..., Any],
+) -> None:
+    handed: list[Any] = []
+
+    def form_kwargs(*, call_context: Any) -> dict[str, Any]:
+        handed.append(call_context)
+        return {}
+
+    spec = ServiceSpec(
+        service=lambda *, title: title,
+        permissions=[Unrestricted()],
+        validator=FormValidator(_Named, form_kwargs=form_kwargs),
+    )
+    call_context: dict[str, Any] = {}
+    result = entry(
+        spec,
+        principal=User.objects.create_user(username="ada"),
+        arguments={"title": "t"},
+        call_context=call_context,
+    )
+    assert result.value == "t"
+    assert len(handed) == 1
+    assert handed[0] is call_context
