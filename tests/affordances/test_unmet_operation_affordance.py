@@ -171,3 +171,17 @@ def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
     unmet_operation_affordance(spec, base_pool(user=None), call_context={})
     assert seen == [{"user", "progress"}]
+
+
+def test_the_call_context_passed_or_a_fresh_one_replaces_one_in_the_pool() -> None:
+    """``pool`` is the transport's; the parameter is what a condition is handed."""
+    handed: list[Any] = []
+    stale: dict[str, Any] = {"stale": True}
+    pool = {**base_pool(user=None), "call_context": stale}
+    context: dict[str, Any] = {}
+    unmet_operation_affordance(_naming_it(handed), pool, call_context=context)
+    unmet_operation_affordance(_naming_it(handed), pool)
+    passed, _, fresh, _ = handed
+    assert passed is context
+    assert fresh == {}
+    assert fresh is not stale

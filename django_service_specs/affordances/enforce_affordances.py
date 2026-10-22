@@ -74,7 +74,8 @@ def enforce_affordances(
     ``call_context`` is the call's context, handed to a callable condition
     that names it and never to one taking ``**kwargs`` for the rest: the dict
     passed, or a fresh one the conditions of this call share. It replaces any
-    ``call_context`` entry in ``pool``.
+    ``call_context`` entry in ``pool``
+    (test_the_call_context_passed_or_a_fresh_one_replaces_one_in_the_pool).
 
     Raises:
         ActionUnavailable: An affordance is not met.

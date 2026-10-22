@@ -52,7 +52,8 @@ def ambient_pool(pool: Mapping[str, Any], *, reserved: frozenset[str]) -> dict[s
     """The part of a pool an affordance's callable condition may read.
 
     The seeds - ``user``, ``progress`` and whatever the project registered - and
-    nothing else. Not the per-call names (the target, the validated input, and
+    the call's context, which a condition is handed only by naming it
+    (``resolve_callable_kwargs``), and nothing else. Not the per-call names (the target, the validated input, and
     the values a later step adds), which would make the answer depend on
     attempting the call; and not a client argument spread into the pool, which
     would let the caller decide whether the operation is available. Filtering by
