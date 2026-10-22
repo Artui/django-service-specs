@@ -43,6 +43,21 @@ class PermissionCheck(abc.ABC):
     is read-only: its values are the call's own objects, the ones the run
     receives, so a check must not mutate them.
 
+    **A method may ask for the call's context and for a registered seed** the
+    same way: a keyword ``call_context`` is handed the one ``dict`` every stage
+    of the call shares, a fresh one where the transport passed none, and a
+    keyword named after a seed in the call's ``PoolSeeds`` is handed that
+    seed's value. Only the seeds a spec's checks name are resolved before the
+    class-level check, and the run reuses those values, so each resolves once
+    per call and the check and the service see one object; a seed raising
+    ``PrincipalUnavailable`` there ends the call as a refusal does. A
+    parameter the call fills by position - the principal, the spec, the
+    target or scope, whatever a method calls them - is never read as an
+    opt-in, so a DRF-style ``has_permission(self, request, spec)`` under a
+    transport registering a ``request`` seed is asked as before. A seed named
+    ``arguments`` is never handed this way: ``arguments`` is always the
+    call's arguments.
+
     ``message`` is what [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
     says when this check refuses; ``None`` keeps the generic wording.
 

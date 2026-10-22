@@ -262,6 +262,25 @@ check, so a check sees the call's `reads` alone. The
 [`authorize`][django_service_specs.dispatch.authorize.authorize] functions
 take the same mapping as `arguments=` for a transport that calls them itself.
 
+**A check can read the call's context and a registered seed the same way.** A
+keyword `call_context` is handed the one dict every stage of the call shares
+([the call's context](#the-calls-context)), and a keyword named after a seed
+the call's [`PoolSeeds`](#pool-seeds) register is handed that seed's value, at
+whichever of the three questions declares it. A parameter the call fills by
+position - the principal, the spec, the target or scope, whatever the method
+calls them - is never an opt-in, whatever its name, so a DRF-style
+`has_permission(self, request, spec)` under a transport registering a
+`request` seed is asked as it always was. A seed named `arguments` is never
+handed this way: a check declaring `arguments` gets the call's. Only the seeds
+a spec's checks name are resolved early, before the class-level check, and
+every pool after reuses those values, so each resolves once per call and the
+check and the service see one object; every other seed resolves after the
+class-level check, as it always has. A seed resolver raising
+[`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable]
+there ends the call before any check is asked, as a refusal does. The
+`authorize` functions take `call_context=` and `seeds=` to offer the same, and
+with no `call_context` a check declaring it is handed a fresh dict.
+
 **A check is sync-only**: it may query, so the async entry point runs it in
 the executor. An `async def` method would answer with a coroutine, which is
 truthy and would allow every call, so a spec refuses a check declaring one
@@ -675,7 +694,53 @@ is evaluated either way, so make it a container to fill rather than the
 computation itself, as the
 [forms adapter's example](forms.md#the-calls-context) does.
 
-<!-- call_context dispatch seat: written at integration -->
+### Handing dispatch the call's context
+
+`dispatch`, `adispatch`, `check_call`, `bind_arguments` and
+[`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
+take the transport's dict as `call_context=`, and make a fresh one for the
+call when none is passed:
+
+```python
+--8<--
+docs/examples/dispatching.py:call_context
+--8<--
+```
+
+The same object, never a copy, reaches every callable that names
+`call_context`: a `kwargs` or `input_data` provider, a selector of any role,
+an affordance condition, a precondition, the service, the run's
+`progress_reporter`, `FormValidator`'s `form_kwargs`, a permission check's
+methods, the Validator's and the presenter's contexts, and a
+`PydanticValidator`'s field validators, on pydantic's `info.context` beside
+`principal` and `target`. So the back office's dict above comes back holding
+what the service left there.
+
+- **By name only.** A callable taking `**kwargs` for the rest of the pool is
+  never handed it, so a catch-all forwarding what it gets runs as it did
+  before the name existed. One that wants it names it.
+- **A reserved name**, in
+  [`RESERVED_POOL_SEEDS`][django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS]:
+  a seed, a provider's key, an overlay or an argument named `call_context` is
+  refused. Seed resolvers do not see it, since a seed is resolved before
+  anything the call adds.
+- **The kernel pre-fills nothing.** What goes in is the transport's
+  convention: django-spec-rest puts DRF's `request` there, and a key such as
+  `request`, `view` or `format` means what the transport that wrote it says.
+  The kernel writes nothing and keeps nothing across calls.
+- **Calls sharing one dict.** The stages of one call run in sequence. A
+  transport handing one dict to calls on several threads should have them
+  write by compute-if-absent, `call_context.setdefault(key, value)`, for a
+  value any of them would compute the same.
+
+The affordance functions a transport calls ahead of the call or in place of
+dispatch -
+[`unmet_operation_affordance`][django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance],
+[`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
+and their async twins - take `call_context=` too, for a condition that names
+it: the dict passed, else the one the pool carries, else a fresh one. Handed
+one dict as the parameter and a different one in the pool, they refuse with
+`ImproperlyConfigured` rather than choose.
 
 ## Answering every refusal
 

@@ -40,13 +40,22 @@ runs, and the helpers own persistence only.
   [`delete_collection`][django_service_specs.mutations.delete_collection.delete_collection]
   deletes the rows a spec's `collection_selector_spec` resolved. Each takes the
   rest of the pool as `**kwargs`, which the three model services hand on as
-  the helper's `context`, opens no transaction of its own, since dispatch runs
+  the helper's `context`, with the call's context beside it, so a nested row
+  service or scope naming `call_context` is handed the very dict the call's
+  other stages share. Each opens no transaction of its own, since dispatch runs
   the service inside one, and has an async form:
   [`acreate_model`][django_service_specs.mutations.acreate_model.acreate_model],
   [`aupdate_model`][django_service_specs.mutations.aupdate_model.aupdate_model],
   [`adelete_model`][django_service_specs.mutations.adelete_model.adelete_model]
   and
   [`adelete_collection`][django_service_specs.mutations.adelete_collection.adelete_collection].
+
+A service of your own that calls a helper and hands its `**kwargs` on as the
+helper's `context` hands on no call context: `**kwargs` is never handed
+`call_context`, which reaches a callable only by its name. One whose nested
+row services and scopes should see it names `call_context` and passes it
+beside the pool, `context={**kwargs, "call_context": call_context}`, as
+`create_model` does.
 
 `data` is a dataclass, a mapping, or an object with a `__dict__` - usually the
 validated values dispatch passes the service as `data`. A dataclass gives its

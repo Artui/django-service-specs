@@ -22,7 +22,8 @@ sequence.
 The service, the selector, `extend_queryset`, the providers, the preconditions
 and a pool seed's resolver are all called the same way: with the keywords their signature declares, picked from a
 pool dispatch builds for the call, and nothing else. A callable that takes
-`**kwargs` receives the whole pool.
+`**kwargs` receives the whole pool but `call_context`, which reaches a
+callable only by its name.
 
 | Name | Holds | In the pool of |
 | --- | --- | --- |
@@ -39,9 +40,10 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | `result` | The service's return | The output selector, which is handed it as `instance` too |
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
+| `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable that names it, never a `**kwargs` catch-all |
 
 The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
-`result` and `queryset` - are
+`result`, `queryset` and `call_context` - are
 [reserved][django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS]:
 a parameter declared under one is refused, and so is a validated value
 returned under one, so an argument can never outrank a value dispatch put in

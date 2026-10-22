@@ -31,6 +31,7 @@ from django.test.utils import CaptureQueriesContext
 
 import django_service_specs
 from django_service_specs import (
+    RESERVED_POOL_SEEDS,
     UNSET,
     ChildCollectionChange,
     DataclassValidator,
@@ -51,6 +52,7 @@ from django_service_specs import (
     ServiceSpec,
     ServiceValidationError,
     SpecRegistry,
+    Unrestricted,
     ValidationContext,
     authorize,
     check_arguments,
@@ -317,6 +319,35 @@ class TestDeclaringWrites:
         # A caller naming another owner is overruled by the provider.
         sent = dispatch(spec, principal=ada, arguments={"title": "Also mine", "owner_id": bob.pk})
         assert sent.value.owner_id == ada.pk
+
+
+@pytest.mark.django_db
+class TestCallContext:
+    def test_the_check_and_the_service_share_the_transport_s_dict(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+
+        context = dispatching.archive_from_back_office(ada, note.pk)
+
+        assert context == {"client": "back-office", "archived": [note.pk]}
+        note.refresh_from_db()
+        assert note.archived
+
+    def test_a_call_handed_no_context_gets_an_empty_one(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+        with pytest.raises(NotPermitted, match="Only the back office"):
+            dispatch(dispatching.archive_note_spec, principal=ada, arguments={"pk": note.pk})
+
+    def test_a_catch_all_is_never_handed_it(self, ada: Any) -> None:
+        seen: dict[str, Any] = {}
+        spec = ServiceSpec(
+            service=lambda **kwargs: seen.update(kwargs), permissions=[Unrestricted()]
+        )
+        dispatch(spec, principal=ada, arguments={}, call_context={"client": "back-office"})
+        assert "user" in seen
+        assert "call_context" not in seen
+
+    def test_it_is_a_reserved_name(self) -> None:
+        assert "call_context" in RESERVED_POOL_SEEDS
 
 
 @pytest.mark.django_db

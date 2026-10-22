@@ -263,3 +263,39 @@ def retitle_all_reporting(user: Any, title: str, report: ProgressReporter) -> in
 
 
 # --8<-- [end:progress]
+
+
+# --8<-- [start:call_context]
+class FromBackOffice(PermissionCheck):
+    message = "Only the back office may archive a note."
+
+    # A keyword named ``call_context`` asks for the call's context, as
+    # ``arguments`` asks for its arguments.
+    def has_permission(self, principal: Any, spec: Any, *, call_context: dict[str, Any]) -> bool:
+        return call_context.get("client") == "back-office"
+
+
+def archive_note(*, user: Any, pk: int, call_context: dict[str, Any]) -> Note:
+    note = Note.objects.get(owner=user, pk=pk)
+    note.archived = True
+    note.save(update_fields=["archived"])
+    # Left for whatever stage of the request comes next.
+    call_context.setdefault("archived", []).append(note.pk)
+    return note
+
+
+archive_note_spec = ServiceSpec(
+    service=archive_note,
+    permissions=[IsSignedIn(), FromBackOffice()],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+def archive_from_back_office(user: Any, pk: int) -> dict[str, Any]:
+    # One dict per request, created by the transport and filled as it likes.
+    context: dict[str, Any] = {"client": "back-office"}
+    dispatch(archive_note_spec, principal=user, arguments={"pk": pk}, call_context=context)
+    return context
+
+
+# --8<-- [end:call_context]

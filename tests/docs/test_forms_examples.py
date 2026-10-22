@@ -16,7 +16,19 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 
-from django_service_specs import InvalidArguments, NotPermitted, ValidationContext, dispatch
+from django_service_specs import (
+    InvalidArguments,
+    NotPermitted,
+    Output,
+    OutputField,
+    PresentationContext,
+    Presenter,
+    ServiceSpec,
+    Unrestricted,
+    ValidationContext,
+    dispatch,
+    present,
+)
 from docs.examples import forms_adapter
 from tests.adapter_app.models import Author, Book
 
@@ -182,3 +194,35 @@ class TestCallContext:
 
         assert first.call_context == {"forms_adapter.authors": {author.pk: author}}
         assert second.call_context == {}
+
+    def test_the_presenter_reads_what_the_validator_left_in_the_same_call(self) -> None:
+        author = Author.objects.create(name="Ursula K. Le Guin")
+
+        class MatchedAuthors(Presenter):
+            def output(self) -> Output:
+                return Output((OutputField("authors", "array", items="string"),))
+
+            def present(self, value: Any) -> Any:
+                return {"authors": []}
+
+            def presented(self, value: Any, context: PresentationContext | None) -> Any:
+                assert context is not None
+                matched = context.call_context["forms_adapter.authors"]
+                return {"authors": [row.name for row in matched.values()]}
+
+        spec = ServiceSpec(
+            service=lambda **values: values["author"],
+            permissions=[Unrestricted()],
+            validator=forms_adapter.remembering_validator,
+            presenter=MatchedAuthors(),
+        )
+        call_context: dict[str, Any] = {}
+        result = dispatch(
+            spec,
+            principal=None,
+            arguments={"title": "A", "price": "1.00", "status": "draft", "author": author.pk},
+            call_context=call_context,
+        )
+
+        assert present(spec, result) == {"authors": ["Ursula K. Le Guin"]}
+        assert call_context == {"forms_adapter.authors": {author.pk: author}}

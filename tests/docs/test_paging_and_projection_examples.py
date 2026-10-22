@@ -224,3 +224,14 @@ class TestShapes:
         schema = spec_output_schema(paging_and_projection.pick_books_spec)
         assert schema is not None
         assert schema["items"]["required"] == ["id"]
+
+    def test_dispatch_hands_the_presenter_the_shapes_the_caller_sent(
+        self, ada: Any, books: list[Book]
+    ) -> None:
+        spec = paging_and_projection.pick_books_spec
+
+        chosen = present(spec, dispatch(spec, principal=ada, arguments={"fields": ["price"]}))
+        whole = present(spec, dispatch(spec, principal=ada, arguments={}))
+
+        assert chosen[0] == {"id": books[0].pk, "price": "9.99"}
+        assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
