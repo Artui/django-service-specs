@@ -1,4 +1,4 @@
-"""JSON Schema from a spec's declarations: what it takes, and what it returns."""
+"""JSON Schema from a spec's declarations: what it takes, what it returns, and keywords no field spells."""
 
 from __future__ import annotations
 
@@ -7,8 +7,14 @@ from typing import Any
 # --8<-- [start:schema]
 from django_service_specs import (
     DataclassPresenter,
+    Output,
+    OutputField,
+    Parameter,
+    Parameters,
     ServiceSpec,
     UnknownArguments,
+    output_schema,
+    parameters_schema,
     spec_input_schema,
     spec_output_schema,
 )
@@ -49,3 +55,25 @@ archive_oldest_spec = ServiceSpec(
 )
 archive_output = spec_output_schema(archive_oldest_spec)
 # --8<-- [end:allow_none]
+
+
+# --8<-- [start:extra]
+isbn = Parameter(
+    "isbn",
+    "string",
+    help="The 13-digit ISBN, digits only.",
+    # Keywords no field of a Parameter spells, added to its node as written.
+    json_schema_extra={"pattern": "^97[89][0-9]{10}$", "maxLength": 13},
+)
+isbn_input = parameters_schema(Parameters.of(isbn))
+# {"type": "object",
+#  "properties": {"isbn": {"type": "string", "description": "The 13-digit ISBN, digits only.",
+#                          "pattern": "^97[89][0-9]{10}$", "maxLength": 13}},
+#  "additionalProperties": false}
+
+tags = OutputField("tags", "array", items="string", json_schema_extra={"uniqueItems": True})
+tags_output = output_schema(Output((tags,)))
+# {"type": "object",
+#  "properties": {"tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}},
+#  "required": ["tags"]}
+# --8<-- [end:extra]

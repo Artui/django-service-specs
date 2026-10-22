@@ -47,7 +47,11 @@ def present_for_audience(
     rows: ``present_for_audience(spec, replace(result, value=page.items))``,
     then [`envelope`][django_service_specs.types.output_page.OutputPage.envelope]
     what comes back. The envelope's keys belong to no ``Output``, so the
-    projection must never walk them.
+    projection must never walk them. Whether to page is read off the spec,
+    never off the result's kind: a ``LIST`` selector spec, or a service spec
+    whose output selector is a ``LIST``, is paged, while a ``many`` or
+    ``returns_many`` service spec's ``kind="list"`` is every row its service
+    returned, which its output schema describes as a bare array.
 
     A selector spec's declared ``affordances`` pass through whole: the
     ``affordances`` object ``present`` adds to each row is a key no ``Output``

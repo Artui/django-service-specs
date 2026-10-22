@@ -148,7 +148,7 @@ A `DispatchResult` has a `kind` and a `value`:
 
 | `kind` | When | `value` |
 | --- | --- | --- |
-| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
+| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` or `returns_many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
 | `"instance"` | Everything else that ran | The row, the service's return, or what the output selector re-read |
 | `"not_found"` | A required row does not exist | `None` |
 
@@ -642,6 +642,40 @@ have called it. The selector spec's affordance conditions, `extend_queryset`
 and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets `null_progress`: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.
+
+## The call's context
+
+A call's stages often want one value more than once: a lookup the Validator
+makes and the presenter needs again, a count across the rows of a list. A
+[seed](#pool-seeds) is resolved from the principal before the stages run; the
+call's context is for what a stage computes as it goes. It is one plain `dict`, the
+transport's, created for its natural scope - a request, an agent run - and
+carried as `call_context` on both
+[`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+and
+[`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext].
+
+- **One object, never copied.** The Validator and the presenter are handed
+  the same dict, as are every row of a `"list"` result and a nested presenter
+  a presenter hands its context on to, so a later stage reads what an earlier
+  one put there.
+- **The stages', to read and write**, as a DRF serializer's `context` is. The
+  kernel writes nothing to it, and unlike `ambient` it is not read-only.
+- **A context built by hand gets an empty dict of its own**, never one shared
+  with another context, so a stage that writes to it needs no guard for a
+  call that was handed none.
+- **It takes no part in equality or the hash**, as `ambient` does not, and it
+  comes after the fields each context had before it, so an existing
+  construction is unchanged.
+
+Every stage shares the one dict, so key what a stage keeps by something of
+its own, and cache a computed value under `setdefault`: it hands back what an
+earlier stage put there, or puts the default and hands that back. The default
+is evaluated either way, so make it a container to fill rather than the
+computation itself, as the
+[forms adapter's example](forms.md#the-calls-context) does.
+
+<!-- call_context dispatch seat: written at integration -->
 
 ## Answering every refusal
 

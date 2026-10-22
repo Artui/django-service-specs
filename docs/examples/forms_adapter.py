@@ -1,9 +1,10 @@
-"""The forms adapter: a plain form as a Validator, a ModelForm behind an update, and a form
-built with keywords of its own."""
+"""The forms adapter: a plain form as a Validator, a ModelForm behind an update, a form
+built with keywords of its own, and a form Validator writing to the call's context."""
 
 from __future__ import annotations
 
 # --8<-- [start:form]
+from collections.abc import Mapping
 from typing import Any
 
 from django import forms
@@ -19,6 +20,7 @@ from django_service_specs import (
     SelectorSpec,
     ServiceSpec,
     Unrestricted,
+    ValidationContext,
     update_from_input,
 )
 from tests.adapter_app.models import Author, Book, Status
@@ -105,3 +107,20 @@ feature_spec = ServiceSpec(
     validator=FormValidator(FeatureForm, form_kwargs=lambda *, tenant: {"author": tenant}),
 )
 # --8<-- [end:form_kwargs]
+
+
+# --8<-- [start:call_context]
+class RememberingBookValidator(FormValidator):
+    """``BookForm``, leaving each author it matched in the call's context."""
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        cleaned = super().validate(arguments, context)
+        # One key of this Validator's own, made by the first validation of the
+        # call and added to by each after it: every row of a ``many`` call.
+        matched = context.call_context.setdefault("forms_adapter.authors", {})
+        matched[cleaned["author"].pk] = cleaned["author"]
+        return cleaned
+
+
+remembering_validator = RememberingBookValidator(BookForm)
+# --8<-- [end:call_context]

@@ -88,6 +88,12 @@ Like every rule here, it holds wherever the declaration reaches: inside a
 free-form object, or an object or array element that nothing declares, the
 contents are the Validator's.
 
+A Parameter's `json_schema_extra` is never read here. The keywords it
+carries, such as a `pattern`, a string's `maxLength` or `uniqueItems`, are
+advertised in the [schema](schema.md#keywords-no-field-spells) and checked by
+nothing before the Validator, so what one states holds only where the spec's
+Validator enforces it.
+
 ### How long a list may be
 
 **An array's length is read before any of its elements**, so a list longer
@@ -172,6 +178,15 @@ takes one raises `ValueError` for it rather than running it as `IGNORE`.
 
 `dispatch`, `adispatch`, `check_call` and `bind_arguments` each take
 `unknown_arguments=`.
+
+A spec's `shapes` are declared parameters like any other here: an argument
+sent for one passes the closed set and is shape-checked, choices and lengths
+included, before anything runs, and an undeclared one beside them is refused
+as any is. Only what happens after differs: the value goes to the presenter
+alone, on
+[`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext],
+and never to the Validator, a selector or the service
+([declaring an operation](declaring.md#a-read)).
 
 ## The refusal tree
 

@@ -13,13 +13,25 @@ import re
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs import FieldAudience, FieldMarking, audience_projection_for_spec
+from django_service_specs import (
+    DispatchResult,
+    FieldAudience,
+    FieldMarking,
+    InvalidArguments,
+    PresentationContext,
+    audience_projection_for_spec,
+    dispatch,
+    present,
+    spec_input_schema,
+    spec_output_schema,
+)
 from docs.examples import paging_and_projection
 from tests.adapter_app.models import Author, Book, Status
 
@@ -164,3 +176,51 @@ class TestTwoMounts:
         first = paging_and_projection.books_over_http(ada)[0]
 
         assert first == as_stored(OVER_HTTP, books[0])
+
+
+@pytest.mark.django_db
+class TestShapes:
+    def test_a_shape_is_an_argument_in_the_input_schema(self) -> None:
+        assert spec_input_schema(paging_and_projection.pick_books_spec) == {
+            "type": "object",
+            "properties": {
+                "fields": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": ["title", "price"]},
+                    "maxItems": 1000,
+                    "uniqueItems": True,
+                }
+            },
+            "additionalProperties": False,
+        }
+
+    def test_a_shape_is_checked_and_never_reaches_the_selector(
+        self, ada: Any, books: list[Book]
+    ) -> None:
+        spec = paging_and_projection.pick_books_spec
+        # The selector declares no ``fields``: handed one, it would raise.
+        result = dispatch(spec, principal=ada, arguments={"fields": ["title"]})
+        assert len(result.value) == 3
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={"fields": ["author"]})
+        assert refused.value.detail == {
+            "fields": {0: ["Select a valid choice. author is not one of the available choices."]}
+        }
+
+    def test_the_presenter_renders_the_fields_the_call_chose(
+        self, ada: Any, books: list[Book]
+    ) -> None:
+        spec = paging_and_projection.pick_books_spec
+        rows = list(paging_and_projection.catalogue(user=ada))
+        chosen = PresentationContext(ada, shapes=MappingProxyType({"fields": ["price"]}))
+
+        shaped = present(spec, DispatchResult("list", rows, context=chosen))
+        whole = present(spec, DispatchResult("list", rows, context=PresentationContext(ada)))
+
+        assert shaped[0] == {"id": books[0].pk, "price": "9.99"}
+        assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
+
+    def test_only_the_key_every_row_carries_is_required(self) -> None:
+        schema = spec_output_schema(paging_and_projection.pick_books_spec)
+        assert schema is not None
+        assert schema["items"]["required"] == ["id"]

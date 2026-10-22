@@ -172,6 +172,16 @@ a `limit` no `max_page_size` bounds, however large, still serves every row
 where a `LIMIT` past 64 bits would be refused by the database. The envelope
 reports the `limit` asked for.
 
+Whether to page is read off the spec, never off the result's kind. A `LIST`
+selector spec is paged, as is a write whose output selector is a `LIST`, and
+[`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+describes either as the envelope under `paginate=True`. A `many` write, and
+one declaring [`returns_many`](declaring.md#a-service-returning-rows), come
+back as `kind="list"` too, but their rows are what the service returned, all
+of them, and they are never paged: their schema is a bare array whatever
+`paginate` says, so a transport paging every `"list"` result would serve an
+envelope its schema does not describe.
+
 The names a caller pages by, and the ceiling, are the transport's. They are
 not arguments of the spec, whose argument set is closed, so the tool takes
 them off the call before dispatch sees the rest; and two mounts of one spec
@@ -269,6 +279,41 @@ presented:
 Render an agent's **answer** with the projection. A pipeline that feeds one
 spec's output into the next keeps presenting with `present`, or the handles
 the next step reads by will have been projected away.
+
+## Shaping each row by the call
+
+Paging and projection are the transport's. What a caller may ask of the rows
+themselves - which fields, a query over each - is the spec's, declared as its
+`shapes`: Parameters beside its `reads` that only the presenter reads.
+
+```python
+--8<--
+docs/examples/paging_and_projection.py:shapes
+--8<--
+```
+
+`fields` is an argument like any other to the caller: it is in
+`spec_input_schema`, with its `uniqueItems` from `json_schema_extra`, it is
+shape-checked, so a field not among its choices is refused before the
+selector runs, and an undeclared argument beside it is still refused. It
+never reaches the selector, which declares no `fields` and would fail if
+handed one. What the caller sent reaches the presenter on the
+[`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
+as `shapes`, by name and read-only, with an argument left out absent rather
+than `None`, so `ChosenFields` renders every field unless the call chose some.
+Every row of a list is handed the same context, and so the same `shapes`.
+
+A presenter that leaves a key out of some rows says so in its declaration:
+`title` and `price` are `always_present=False`, so the schema lists only `id`
+as required, and a client is never promised a key a row may not carry. An
+adapter that drops keys under a `fields` shape declares those keys the same
+way.
+
+A shape is refused by its declaration, before the call runs, never by its
+presenter: the choices on `fields` are what turns away a field the presenter
+cannot render, and a presenter that raised on one would fail after the
+selector had read the rows. The schema advertises the same choices, so a
+client is told the line before it crosses it.
 
 ## The pieces on their own
 

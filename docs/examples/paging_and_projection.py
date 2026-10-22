@@ -12,6 +12,12 @@ from django.db.models import QuerySet
 from django_service_specs import (
     DataclassPresenter,
     FieldMarking,
+    Output,
+    OutputField,
+    Parameter,
+    Parameters,
+    PresentationContext,
+    Presenter,
     SelectorKind,
     SelectorSpec,
     ValueFormatter,
@@ -114,3 +120,48 @@ def books_over_http(user: Any) -> Any:
 
 
 # --8<-- [end:unprojected]
+
+
+# --8<-- [start:shapes]
+class ChosenFields(Presenter):
+    """Each book with its handle and the fields the caller chose, or every field."""
+
+    def output(self) -> Output:
+        return Output(
+            (
+                OutputField("id", "integer"),
+                # Left out of a row whose caller did not choose them, so a
+                # schema must not call them required.
+                OutputField("title", "string", always_present=False),
+                OutputField("price", "string", always_present=False),
+            )
+        )
+
+    def present(self, value: Book) -> dict[str, Any]:
+        return {"id": value.pk, "title": value.title, "price": str(value.price)}
+
+    def presented(self, value: Book, context: PresentationContext | None) -> dict[str, Any]:
+        row = self.present(value)
+        chosen = context.shapes.get("fields") if context is not None else None
+        if chosen is None:  # not sent: every field
+            return row
+        return {name: row[name] for name in ("id", *chosen)}
+
+
+pick_books_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=catalogue,  # never handed "fields"
+    permissions=[IsSignedIn()],
+    presenter=ChosenFields(),
+    shapes=Parameters.of(
+        Parameter(
+            "fields",
+            "array",
+            items="string",
+            choices=["title", "price"],
+            required=False,
+            json_schema_extra={"uniqueItems": True},
+        )
+    ),
+)
+# --8<-- [end:shapes]

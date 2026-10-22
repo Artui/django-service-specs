@@ -294,6 +294,28 @@ that is not callable when it is built, and keeps the callable as its
 `form_kwargs` attribute, so a transport building the form itself, for a page,
 builds it the same way.
 
+## The call's context
+
+`FormValidator` reads nothing of the call's context, and a form never sees
+it. A Validator built on the adapter reads it, and writes to it, from the
+[`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+its `validate()` is handed, as `call_context`: the one dict the stages of a
+call share, so a later stage reuses what the Validator put there
+([the call's context](dispatching.md#the-calls-context)).
+
+```python
+--8<--
+docs/examples/forms_adapter.py:call_context
+--8<--
+```
+
+`setdefault` hands back the dict an earlier validation of the same call made,
+or makes it, so every validation of the call adds to one mapping: two calls of
+`validate()` handed one context leave both authors there. The key is the
+Validator's own, since every stage shares the dict. A context built by hand
+has an empty dict of its own, so `validate()` called off dispatch writes to
+that and needs no guard.
+
 ## Refusals
 
 A refusal is one

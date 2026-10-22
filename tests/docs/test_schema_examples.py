@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs import dispatch, present
+from django_service_specs import (
+    OutputField,
+    Parameter,
+    Parameters,
+    check_arguments,
+    dispatch,
+    present,
+)
 from docs.examples import schema
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
@@ -144,3 +153,54 @@ class TestSchemaPage:
         blocks = [json.loads(b) for b in re.findall(r"```json\n(.*?)```", page, re.DOTALL)]
 
         assert blocks == [NOTES_INPUT, NOTES_OUTPUT, AUTHOR_INPUT, AUTHOR_OUTPUT]
+
+
+class TestJsonSchemaExtra:
+    def test_each_node_carries_the_keywords_as_written(self) -> None:
+        assert schema.isbn_input == {
+            "type": "object",
+            "properties": {
+                "isbn": {
+                    "type": "string",
+                    "description": "The 13-digit ISBN, digits only.",
+                    "pattern": "^97[89][0-9]{10}$",
+                    "maxLength": 13,
+                }
+            },
+            "additionalProperties": False,
+        }
+        assert schema.tags_output == {
+            "type": "object",
+            "properties": {
+                "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": True}
+            },
+            "required": ["tags"],
+        }
+
+    def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
+        checked = check_arguments(Parameters.of(schema.isbn), {"isbn": "not an isbn"})
+        assert checked == {"isbn": "not an isbn"}
+
+    @pytest.mark.parametrize(
+        ("build", "named"),
+        [
+            (lambda: Parameter("isbn", "string", json_schema_extra={"format": "isbn"}), "format"),
+            (lambda: Parameter("n", "integer", json_schema_extra={"maximum": 3}), "maximum"),
+            (lambda: OutputField("t", "string", json_schema_extra={"title": "T"}), "label"),
+        ],
+    )
+    def test_a_keyword_a_field_states_is_refused_naming_the_field(
+        self, build: Any, named: str
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured, match=f"takes from {named}"):
+            build()
+
+    def test_a_value_json_cannot_carry_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"json_schema_extra\['examples'\]"):
+            Parameter("price", "string", json_schema_extra={"examples": [Decimal("9.99")]})
+
+    def test_it_is_held_as_a_copy(self) -> None:
+        extra: dict[str, Any] = {"examples": [["a"]]}
+        param = Parameter("tags", "array", items="string", json_schema_extra=extra)
+        extra["examples"][0].append("b")
+        assert param.json_schema_extra == {"examples": [["a"]]}

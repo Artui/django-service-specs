@@ -1,4 +1,4 @@
-"""Declaring writes: many rows in one call, and a provider filling a server-owned field."""
+"""Declaring writes: many rows in one call, a service returning rows, and a provider filling a server-owned field."""
 
 from __future__ import annotations
 
@@ -6,12 +6,13 @@ from dataclasses import dataclass
 from typing import Any, TypedDict
 
 from django_service_specs import (
+    DataclassPresenter,
     DataclassValidator,
     Parameter,
     Parameters,
     ServiceSpec,
 )
-from docs.examples.declaring import IsSignedIn
+from docs.examples.declaring import IsSignedIn, NoteRow
 from tests.dispatch_app.models import Note
 
 
@@ -35,6 +36,24 @@ add_notes_spec = ServiceSpec(
     reads=Parameters.of(Parameter("archived", "boolean")),  # asked once, beside the list
 )
 # --8<-- [end:many]
+
+
+# --8<-- [start:returns_many]
+def archive_all(*, user: Any) -> list[Note]:
+    notes = list(Note.objects.filter(owner=user, archived=False))
+    for note in notes:
+        note.archived = True
+        note.save(update_fields=["archived"])
+    return notes
+
+
+archive_all_spec = ServiceSpec(
+    service=archive_all,
+    permissions=[IsSignedIn()],
+    presenter=DataclassPresenter(NoteRow),  # what each row is
+    returns_many=True,  # the service hands back rows: each is presented
+)
+# --8<-- [end:returns_many]
 
 
 # --8<-- [start:providers]

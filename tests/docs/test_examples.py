@@ -61,6 +61,7 @@ from django_service_specs import (
     present,
     server_owned_keys,
     spec_input_schema,
+    spec_output_schema,
     update_from_input,
 )
 from django_service_specs.mutations.utils import ROW_ERROR_READERS
@@ -271,6 +272,39 @@ class TestDeclaringWrites:
                 arguments={"items": [{"title": "Apples"}], "title": "Pears"},
             )
         assert refused.value.detail == {"title": ["Unknown argument."]}
+
+    def test_a_service_returning_rows_is_presented_row_by_row(self, ada: Any, bob: Any) -> None:
+        apples = Note.objects.create(owner=ada, title="Apples")
+        pears = Note.objects.create(owner=ada, title="Pears")
+        Note.objects.create(owner=bob, title="Plums")
+        spec = declaring_writes.archive_all_spec
+
+        result = dispatch(spec, principal=ada, arguments={})
+
+        assert spec.parameters().names() == frozenset()  # the input is left alone
+        assert result.kind == "list"
+        assert present(spec, result) == [
+            {"id": apples.pk, "title": "Apples"},
+            {"id": pears.pk, "title": "Pears"},
+        ]
+
+    def test_a_service_returning_rows_is_an_array_of_its_item_never_paged(self) -> None:
+        spec = declaring_writes.archive_all_spec
+        item = {
+            "type": "object",
+            "properties": {"id": {"type": "integer"}, "title": {"type": "string"}},
+            "required": ["id", "title"],
+        }
+        assert spec_output_schema(spec) == {"type": "array", "items": item}
+        assert spec_output_schema(spec, paginate=True) == {"type": "array", "items": item}
+
+    def test_returns_many_is_refused_beside_many_and_beside_an_output_selector(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="returns_many=True with many=True"):
+            declaring_writes.add_notes_spec.derive(returns_many=True)
+        with pytest.raises(ImproperlyConfigured, match="beside an output_selector_spec"):
+            declaring_writes.archive_all_spec.derive(
+                presenter=None, output_selector_spec=declaring.list_notes_spec
+            )
 
     def test_the_owner_is_the_providers_and_is_not_asked_of_the_caller(
         self, ada: Any, bob: Any
