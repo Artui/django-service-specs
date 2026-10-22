@@ -430,7 +430,7 @@ refuse at enqueue what the worker's `dispatch` would refuse before it resolves
 anything.
 [`check_call`][django_service_specs.dispatch.check_call.check_call] runs
 dispatch's prelude alone, through the same function, in dispatch's order: a
-deactivated principal, a parameter a registered seed occupies, the shape check,
+deactivated principal, a read or shape a registered seed occupies, the shape check,
 then the class-level permission check. Its keywords are dispatch's, less what
 only a run reads. Nothing after the prelude runs - no lookup, object or scope
 check, Validator, affordance or precondition - so a call it passes may still
@@ -480,8 +480,9 @@ docs/examples/dispatching.py:server_arguments
    refuses a binding that cannot mean what it says, with
    `ImproperlyConfigured`, naming the spec's callable: a name that is no
    top-level parameter, so not a field inside a `many` spec's rows; one both
-   bound and withheld; one a pool seed occupies; one a typed provider fills
-   or may fill, whose answer dispatch would keep over the bound value on any
+   bound and withheld; one a pool seed occupies; a `reflected` read a seed
+   fills, which binding or withholding would do nothing for; one a typed
+   provider fills or may fill, whose answer dispatch would keep over the bound value on any
    call where it gives one; a withheld name no call could then do without;
    and a bound value its own parameter refuses, such as a `uuid.UUID` for a
    `format="uuid"` string. A withheld name cannot be done without when the
@@ -611,9 +612,14 @@ it is registered, and a plain `def` handing back an awaitable is refused where
 it is resolved.
 
 A registered name is **reserved**, and that is half of what registering does.
-A spec that declares a parameter by that name is refused at dispatch with
-`ImproperlyConfigured`; a caller that sends it is refused like any other
-undeclared argument; and `extend()` refuses one of the dispatcher's own names,
+A spec that declares a read or a shape by that name is refused at dispatch
+with `ImproperlyConfigured`, with two exceptions. A read marked
+`reflected=True`, one an adapter read off a callable's signature rather than
+one an author wrote, is filled by the seed on every call, and the caller's
+value for it never reaches the pool. A top-level Validator field by that name,
+on a spec that is not `many`, stays the caller's argument: it is validated into
+`data` and never spread into the pool, so the seed keeps its own value. A caller
+that sends any other seed's name is refused like any other undeclared argument; and `extend()` refuses one of the dispatcher's own names,
 or a name registered twice, with `ValueError`. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares

@@ -409,8 +409,13 @@ never a seed.
 A provider annotated to return a `TypedDict` says which keys it fills before
 it runs, and [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
 reads them: `filled`, and `declinable` for a key whose value admits
-`UnsetType`. A filled key is not demanded of the caller where the provider's
-values reach it, and the caller's value for it is dropped: a selector's `kwargs` fills that selector's `reads`, a
+`UnsetType`. A key a provider fills or may decline, and every key an
+untyped provider's values reach, is not demanded of the caller: dispatch
+checks it once the provider has answered, after the class-level permission
+check, and refuses a required one nobody filled, a declined one included. So a
+permission check reading such a key from its `arguments` uses `.get`. The
+caller's value for a filled key is dropped, and for a declinable one it stands
+beneath the provider's answer. The provider's values reach these: a selector's `kwargs` fills that selector's `reads`, a
 service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
 A provider annotated to fill a parameter declared anywhere else -
 `input_data` naming a read, `kwargs` naming a Validator field or the target

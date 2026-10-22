@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`Parameter.reflected`**, a trailing keyword defaulting to `False`, for a
+  read an adapter took off a callable's signature rather than one an author
+  wrote. A `reflected` read named like a registered pool seed is filled by the
+  seed on every call, and the caller's value for it never reaches the pool,
+  under either unknown-argument policy. An unmarked read, or a shape, named
+  like a seed is still refused at dispatch. `check_server_arguments` refuses
+  binding or withholding a `reflected` read a seed fills, since that would do
+  nothing. The field takes part in equality and hashing, and no schema emits it.
+
+### Changed
+- **A parameter a provider may fill is no longer demanded of the caller.** A
+  read or Validator field that a typed provider fills or may decline, or that
+  an untyped provider's values reach, passes the shape check absent. Its
+  requiredness is checked where the provider's answer is merged, after the
+  class-level permission check, as `InvalidArguments` keyed by the parameter in
+  the shape check's wording. A required parameter nobody filled is refused
+  there, including one the provider declined whose callable has a default,
+  which used to run on that default; an optional one is absent. A permission
+  check may therefore see `arguments` without such a key, so it should read
+  one with `.get`. `check_call` and `bind_arguments` relax the same keys, and
+  `check_server_arguments` lets a read an untyped provider reaches be
+  withheld.
+- **A top-level Validator field named like a registered pool seed is
+  allowed** on a service spec that is not `many`. It stays the caller's
+  argument and is validated into `data`, and it is never spread into the
+  service's pool, so the seed keeps its own value.
+  `server_owned_keys(pool_seeds=)` leaves such a field out, and
+  `check_server_arguments` allows binding it. A field named like one of the
+  dispatcher's own names is still refused when the spec's parameters are
+  assembled.
+
 ## [0.14.0] — 2026-10-22
 
 ### Added

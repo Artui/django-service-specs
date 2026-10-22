@@ -1093,7 +1093,10 @@ def call_pool(
     keywords, so a parameter named ``seeds`` would be a ``TypeError`` there.
 
     Nothing here overwrites a seed. ``open_call`` refused every parameter a
-    seed occupies, ``prepare_service`` every validated, bound or provided key,
+    seed occupies but a ``reflected`` read, which it seated so no argument
+    carries it, and a top-level Validator field, which ``prepare_service``
+    keeps out of the spread; ``prepare_service`` refused every other
+    validated, bound or provided key,
     ``provide`` a selector's provided one, and the entries dispatch adds
     itself (``data``, ``instance``, ``collection``, ``result``, and
     ``call_context``, the call's context, which every pool dispatch builds

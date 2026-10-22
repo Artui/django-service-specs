@@ -30,10 +30,10 @@ class ProviderKeys(NamedTuple):
         declinable: The keys whose value admits ``UnsetType``
             (``tenant: str | UnsetType``). The provider may return ``UNSET`` for
             one, which dispatch removes from the pool, so the caller's value is
-            the one the callable receives. Such a key stays the caller's: a
-            transport keeps asking for it, and dispatch holds it to its
-            declaration, so a required one is required of the caller even
-            though the provider may fill it. A ``filled`` key is relaxed where
+            the one the callable receives. Such a key stays the caller's to
+            send: a transport keeps offering it, and dispatch lets the caller
+            leave it out and checks a required one once the provider has
+            answered, refusing it when nobody filled it. A ``filled`` key is relaxed where
             the provider's values reach it - a selector's ``kwargs`` that
             selector's reads, a service spec's ``kwargs`` the spec's
             ``reads``, and ``input_data`` the Validator's parameters, at the
