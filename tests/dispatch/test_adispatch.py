@@ -29,6 +29,7 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch import utils as dispatch_utils
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.apresent import apresent
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -53,9 +54,12 @@ from tests.dispatch.utils import (
     Refuse,
     Scoped,
     Titled,
+    Titles,
     make_user,
     note_by_pk,
     notes_of,
+    returning_many,
+    two_notes,
 )
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign
@@ -1388,8 +1392,8 @@ async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop
     )
     monkeypatch.setattr(
         authorization_utils,
-        "_names_arguments",
-        recorded("signature", authorization_utils._names_arguments),
+        "_reached_names",
+        recorded("signature", authorization_utils._reached_names),
     )
     note = await _create(owner=ada, title="mine")
 
@@ -1516,3 +1520,23 @@ async def test_extra_kwargs_naming_a_declared_parameter_is_refused_inside_the_ho
         ImproperlyConfigured, match=r"extra_kwargs names the parameter\(s\) \['pk'\]"
     ):
         await adispatch(spec, principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})
+
+
+async def test_a_returns_many_service_is_presented_row_by_row() -> None:
+    rows = await sync_to_async(two_notes)()
+    spec, _ = returning_many(rows, Titles())
+
+    result = await adispatch(spec, principal=rows[0].owner, arguments={"owner": "ada"})
+
+    assert result.kind == "list"
+    assert await apresent(spec, result) == [{"title": "First"}, {"title": "Second"}]
+
+
+async def test_a_returns_many_service_presents_a_none_return_as_none() -> None:
+    ada = await sync_to_async(make_user)("ada")
+    spec, _ = returning_many(None, Titles())
+
+    result = await adispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+    assert result.kind == "instance"
+    assert await apresent(spec, result) is None

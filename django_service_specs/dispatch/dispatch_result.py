@@ -26,8 +26,9 @@ class DispatchResult:
         instance: The resolved target - the row, or the collection's queryset.
         data: The Validator's ``data`` the service received: the validated
             mapping, or the instance a dataclass Validator builds.
-        context: The call a presenter renders for: its principal, its target
-            and its resolved seeds, which ``present`` hands to
+        context: The call a presenter renders for: its principal, its target,
+            its resolved seeds, the call's context and the arguments sent for
+            the spec's ``shapes``, which ``present`` hands to
             ``Presenter.presented()``. ``None`` on a result dispatch did not
             build, and on a not-found, which is never presented. It takes no
             part in equality: two results of one value are one result.

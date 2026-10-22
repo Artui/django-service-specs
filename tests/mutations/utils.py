@@ -13,6 +13,7 @@ from django.core.files.base import ContentFile
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from tests.adapter_app.models import Book, Document, Photo
 
 # The image ``stored_photo`` holds, by name only: no file is read, so no Pillow.
@@ -70,3 +71,12 @@ def savepoints_during(call: Callable[[], Any]) -> list[str]:
     with CaptureQueriesContext(connection) as queries:
         call()
     return [q["sql"] for q in queries.captured_queries if "SAVEPOINT" in q["sql"].upper()]
+
+
+def bound_call(service: Callable[..., Any], **pool: Any) -> Any:
+    """``service`` called as dispatch calls it: bound to ``pool`` through ``resolve_callable_kwargs``.
+
+    Calling a helper's service directly hands it every keyword, the call's
+    context included, where dispatch hands a ``**kwargs`` only what it names.
+    """
+    return service(**resolve_callable_kwargs(service, pool))

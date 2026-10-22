@@ -134,6 +134,29 @@ class Arguing(PermissionCheck):
         return [(q, None if a is None else dict(a)) for q, a in self.asked]
 
 
+class Offered(PermissionCheck):
+    """Admits everything; each question names the call's context and a ``tenant`` seed, and records both."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, Any, Any]] = []
+
+    def has_permission(self, principal: Any, spec: Any, *, call_context: Any, tenant: Any) -> bool:
+        self.asked.append(("has_permission", call_context, tenant))
+        return True
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, call_context: Any, tenant: Any = None
+    ) -> bool:
+        self.asked.append(("has_object_permission", call_context, tenant))
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, call_context: Any, tenant: Any = None
+    ) -> bool:
+        self.asked.append(("has_scope_permission", call_context, tenant))
+        return True
+
+
 class Titled(Validator):
     """Declares a required title and strips it; records every call.
 
@@ -282,3 +305,19 @@ REFUSED_CLOSED = {
     "code": "books_closed",
     "reason": "Renaming is paused while the books close.",
 }
+
+OWNER_NAME = Parameters.of(Parameter("owner", "string", required=True))
+
+
+def returning_many(rows: Any, presenter: Any) -> tuple[ServiceSpec, Record]:
+    """A ``returns_many`` spec whose service takes one argument and returns ``rows``, with the service."""
+    service = Record(returns=rows)
+    spec = ServiceSpec(
+        service=service, permissions=OPEN, reads=OWNER_NAME, presenter=presenter, returns_many=True
+    )
+    return spec, service
+
+
+def two_notes() -> list[Note]:
+    ada = make_user("ada")
+    return [Note.objects.create(owner=ada, title=title) for title in ("First", "Second")]

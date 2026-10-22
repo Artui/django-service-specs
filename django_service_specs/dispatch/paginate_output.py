@@ -22,11 +22,20 @@ def paginate_output(
 ) -> OutputPage:
     """Slice ``rows`` into the page a transport serves.
 
-    A function a transport calls on a list result's ``value`` before presenting
-    it, not a paging scheme: the names a caller pages by, and the ceiling a
-    mount allows, are the transport's. A transport takes them off the call
-    before the spec's closed argument set sees them, and bounds legitimately
-    differ between two mounts of one spec.
+    A function a transport calls on a paged spec's result ``value`` before
+    presenting it, not a paging scheme: the names a caller pages by, and the
+    ceiling a mount allows, are the transport's. A transport takes them off the
+    call before the spec's closed argument set sees them, and bounds
+    legitimately differ between two mounts of one spec.
+
+    Whether to page is read off the spec, never off the result's ``kind``: a
+    ``LIST`` selector spec, or a service spec whose output selector is a
+    ``LIST``, is paged, and
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    describes it as the envelope under ``paginate=True``. A ``many`` or
+    ``returns_many`` service spec's result is ``kind="list"`` too, and is never
+    paged: it is every row the service returned, which its output schema
+    describes as a bare array whatever ``paginate`` says.
 
     ``page`` and ``limit`` default to 1 and
     [`DEFAULT_PAGE_SIZE`][django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE].

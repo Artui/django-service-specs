@@ -105,17 +105,17 @@ def _protocol(leaf: str, call: str) -> Pin:
 SURFACE: dict[str, Pin] = {
     # --- affordances --------------------------------------------------------------------------
     "enforce_affordances": _fn(
-        "affordances.enforce_affordances", "spec, pool, *, instance, reserved="
+        "affordances.enforce_affordances", "spec, pool, *, instance, reserved=, call_context="
     ),
     "aenforce_affordances": _fn(
-        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved="
+        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved=, call_context="
     ),
     "operation_affordances": _fn("affordances.operation_affordances", "spec"),
     "unmet_operation_affordance": _fn(
-        "affordances.unmet_operation_affordance", "spec, pool, *, reserved="
+        "affordances.unmet_operation_affordance", "spec, pool, *, reserved=, call_context="
     ),
     "aunmet_operation_affordance": _fn(
-        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved="
+        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved=, call_context="
     ),
     # --- authorization ------------------------------------------------------------------------
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
@@ -143,23 +143,25 @@ SURFACE: dict[str, Pin] = {
     "dispatch": _fn(
         "dispatch.dispatch",
         "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, progress=, "
-        "target=, extra_kwargs=",
+        "target=, extra_kwargs=, call_context=",
     ),
     "adispatch": _fn(
         "dispatch.adispatch",
         "spec, *, principal=, principal_id=, arguments, grant=, pool_seeds=, "
-        "unknown_arguments=, progress=, target=, extra_kwargs=",
+        "unknown_arguments=, progress=, target=, extra_kwargs=, call_context=",
     ),
     "check_call": _fn(
         "dispatch.check_call",
-        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=",
+        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, call_context=",
     ),
     "check_requested_input": _fn("dispatch.check_requested_input", "spec, schema, *, pool_seeds="),
     "bind_arguments": _fn(
-        "dispatch.bind_arguments", "spec, arguments, *, principal, target=, unknown_arguments="
+        "dispatch.bind_arguments",
+        "spec, arguments, *, principal, target=, unknown_arguments=, call_context=",
     ),
     "resolve_target": _fn(
-        "dispatch.resolve_target", "spec, *, principal, arguments, grant=, pool_seeds="
+        "dispatch.resolve_target",
+        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=",
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
@@ -173,12 +175,16 @@ SURFACE: dict[str, Pin] = {
         "dispatch.dispatch_result",
         signature="kind, value=, service_result=, instance=, data=, context=",
     ),
-    "authorize": _fn("dispatch.authorize", "spec, principal, *, grant=, arguments="),
+    "authorize": _fn(
+        "dispatch.authorize", "spec, principal, *, grant=, arguments=, call_context=, seeds="
+    ),
     "authorize_scope": _fn(
-        "dispatch.authorize_scope", "spec, principal, scope, *, grant, arguments="
+        "dispatch.authorize_scope",
+        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=",
     ),
     "authorize_target": _fn(
-        "dispatch.authorize_target", "spec, principal, target, *, grant, arguments="
+        "dispatch.authorize_target",
+        "spec, principal, target, *, grant, arguments=, call_context=, seeds=",
     ),
     "Grant": Pin(
         "dispatch.grant",
@@ -257,7 +263,7 @@ SURFACE: dict[str, Pin] = {
     "OutputField": Pin(
         "output.output",
         signature="name, type, *, format=, nullable=, label=, choices=, always_present=, "
-        "marking=, fields=, items=, items_nullable=",
+        "marking=, fields=, items=, items_nullable=, json_schema_extra=",
     ),
     # Subclassed by the adapter's serializer presenter.
     "Presenter": Pin(
@@ -267,7 +273,8 @@ SURFACE: dict[str, Pin] = {
     ),
     # What the adapter's serializer presenter reads its serializer context from.
     "PresentationContext": Pin(
-        "output.presentation_context", signature="principal, target=, ambient="
+        "output.presentation_context",
+        signature="principal, target=, ambient=, call_context=, shapes=",
     ),
     "FieldMarking": Pin(
         "output.field_marking",
@@ -294,7 +301,7 @@ SURFACE: dict[str, Pin] = {
         "parameters.parameters",
         signature="name, type, *, required=, format=, items=, items_nullable=, fields=, "
         "choices=, choice_labels=, minimum=, maximum=, min_length=, max_length=, default=, "
-        "nullable=, help=",
+        "nullable=, help=, json_schema_extra=",
         methods={"nested": "property"},
     ),
     "Parameters": Pin(
@@ -325,7 +332,16 @@ SURFACE: dict[str, Pin] = {
     "RESERVED_POOL_SEEDS": Pin(
         "pool.reserved_pool_seeds",
         value=frozenset(
-            {"user", "data", "instance", "collection", "result", "queryset", "progress"}
+            {
+                "user",
+                "data",
+                "instance",
+                "collection",
+                "result",
+                "queryset",
+                "progress",
+                "call_context",
+            }
         ),
     ),
     "base_pool": _fn("pool.base_pool", "*, user, progress=, seeds=, **extra"),
@@ -430,10 +446,10 @@ SURFACE: dict[str, Pin] = {
     # The adapter's spec classes compile to these two through the seam below.
     "ServiceSpec": Pin(
         "specs.service_spec",
-        signature="*, service, permissions=, reads=, partial=, many=, many_argument=, "
+        signature="*, service, permissions=, reads=, shapes=, partial=, many=, many_argument=, "
         "many_min_length=, many_max_length=, validator=, instance_selector_spec=, "
         "collection_selector_spec=, output_selector_spec=, presenter=, allow_none=, "
-        "affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
+        "returns_many=, affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
         "progress_reporter=, metadata=",
         methods={
             "parameters": "()",
@@ -444,7 +460,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "SelectorSpec": Pin(
         "specs.selector_spec",
-        signature="*, kind, selector, permissions=, reads=, presenter=, allow_none=, "
+        signature="*, kind, selector, permissions=, reads=, shapes=, presenter=, allow_none=, "
         "select_related=, prefetch_related=, annotations=, extend_queryset=, filter_set=, "
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
         methods={"parameters": "()", "output": "()"},
@@ -519,7 +535,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "ValidationContext": Pin(
         "validation.validation_context",
-        signature="principal, target=, partial=, ambient=, resolved=",
+        signature="principal, target=, partial=, ambient=, resolved=, call_context=",
     ),
     "Validated": Pin("validation.validated", signature="values, data, pool="),
 }

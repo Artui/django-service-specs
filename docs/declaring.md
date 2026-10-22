@@ -22,7 +22,8 @@ sequence.
 The service, the selector, `extend_queryset`, the providers, the preconditions
 and a pool seed's resolver are all called the same way: with the keywords their signature declares, picked from a
 pool dispatch builds for the call, and nothing else. A callable that takes
-`**kwargs` receives the whole pool.
+`**kwargs` receives the whole pool but `call_context`, which reaches a
+callable only by its name.
 
 | Name | Holds | In the pool of |
 | --- | --- | --- |
@@ -39,9 +40,10 @@ pool dispatch builds for the call, and nothing else. A callable that takes
 | `result` | The service's return | The output selector, which is handed it as `instance` too |
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
+| `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable dispatch resolves that names it, never a `**kwargs` catch-all; not a seed's resolver or a `filter_set` |
 
 The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
-`result` and `queryset` - are
+`result`, `queryset` and `call_context` - are
 [reserved][django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS]:
 a parameter declared under one is refused, and so is a validated value
 returned under one, so an argument can never outrank a value dispatch put in
@@ -149,6 +151,20 @@ read, so these Parameters are what the closed argument set and the shape check
 hold the caller to: an argument the spec does not declare is refused before
 the selector runs.
 
+`shapes` sits beside `reads`, for the arguments that shape what the presenter
+renders rather than which rows are read: which fields, a query over each row.
+They are Parameters of their own and part of `spec.parameters()`, after the
+reads, so the schema, the closed argument set and the shape check cover them
+as any argument. They are never in the selector's pool, so the selector, its
+`extend_queryset` and its `filter_set` never see them: what the caller sent
+for them reaches the presenter alone, on
+[`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext].
+A shape a read or a filter also declares is refused when the spec is built,
+as is one named for a seed dispatch provides and one the `kwargs` provider is
+annotated to fill, since no provider's values reach them. A presenter reading
+them is shown under
+[shaping each row by the call](paging-and-projection.md#shaping-each-row-by-the-call).
+
 `select_related`, `prefetch_related` and `annotations` are applied to the
 queryset the selector returns, in that order, then `extend_queryset`, with
 the shaped queryset as `queryset`, and `filter_set` last. Declaring any of
@@ -226,11 +242,19 @@ read with no Validator in front of them - the `project_pk` a create is scoped
 by - named after a selector spec's. They are checked as a read's are and
 handed to each callable that declares them, never to the Validator.
 
+`shapes` are the arguments that shape what the presenter renders, as on a
+read: never handed to the Validator, a provider, a selector or the service,
+and reaching the presenter alone, whether that is the spec's own or its output
+selector's. A selector nested in a write, its target or its output selector,
+declaring shapes of its own is refused: the write's call is the one presented,
+so they are declared on the write.
+
 `spec.parameters()` is everything the write takes: its target selector's
-`reads`, its own, then its Validator's parameters. A name two of them declare
-is refused - two sources claiming one argument is a declaration bug, and a
-last-wins merge would hide which declaration a transport describes. The
-selector sees only its own `reads`, and the Validator only its own parameters.
+`reads`, its own, its `shapes`, then its Validator's parameters. A name two of
+them declare is refused - two sources claiming one argument is a declaration
+bug, and a last-wins merge would hide which declaration a transport describes.
+The selector sees only its own `reads`, and the Validator only its own
+parameters.
 
 ### Partial updates
 
@@ -311,6 +335,32 @@ A `many` spec must declare a Validator and no target selector, since a list of
 rows resolves no target, and a condition on the row among its `affordances` is
 refused. With no output selector its result is `kind="list"`, unless the
 service returned `None`.
+
+### A service returning rows
+
+`returns_many=True` declares that the service's own return is a list of rows,
+each presented by the spec's presenter: the output half of `many`, for a
+service that takes one set of arguments and hands back rows. The input is left
+alone, so the call's arguments are declared as they would be without it:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:returns_many
+--8<--
+```
+
+Dispatch reports a return that is not `None` as `kind="list"`, and `present`
+renders it row by row. Its
+[output schema](schema.md#what-a-spec-returns) is an array of the
+presenter's item, never paged: the rows are what the service returned, all of
+them, and a transport that pages a list pages by the spec rather than by the
+result's kind (see [serving a page](paging-and-projection.md#serving-a-page)).
+A `None` return stays one value, presented as `None`, as a `many` service's is,
+so `allow_none` still decides whether the schema admits `"null"`.
+
+It is refused when the spec is built beside an `output_selector_spec`, whose
+kind decides what is presented, and beside `many`, which presents its return
+as a list already.
 
 ### Providers and preconditions
 
@@ -495,9 +545,19 @@ the same declaration.
   is declared, so a default of `None` stays a real default. It is reported, not
   applied: whether an omitted argument arrives as its default is the validating
   library's behaviour.
+- **`json_schema_extra`** carries the JSON Schema keywords no field of a
+  Parameter spells - a `pattern`, a string's `maxLength`, `uniqueItems` - as a
+  mapping of keyword to value, added to the parameter's
+  [schema](schema.md#keywords-no-field-spells) node. It is how an adapter
+  whose library declares more than a Parameter carries keeps it on every
+  route. A keyword a field states is refused, naming the field to declare it
+  on, whether or not this parameter sets that field; so is a value JSON cannot
+  carry. It is held as a copy of its own, and it is advertised, not enforced:
+  the shape check never reads it.
 
 Any other bound - a length, a Validator field's `max_value` - is the
-Validator's alone. A Parameter's bounds are for the line a caller must not
+Validator's alone, and a `json_schema_extra` stating one advertises what the
+Validator enforces. A Parameter's bounds are for the line a caller must not
 cross before any Validator runs.
 
 [`Parameters`][django_service_specs.parameters.parameters.Parameters] is an
@@ -641,7 +701,10 @@ the Validator:
   [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
   carrying its principal, the target a service spec resolved, and its
   resolved seeds as `ambient`, read-only at its top level, its values the
-  call's own live objects, not to be mutated. The default is `present(value)`,
+  call's own live objects, not to be mutated. It also carries what the caller
+  sent for the spec's `shapes`, as `shapes`, and the call's context as
+  `call_context`, the one dict the stages of a call share
+  ([the call's context](dispatching.md#the-calls-context)). The default is `present(value)`,
   so only a Presenter whose library renders under a context - a field
   defaulting to the current user, a link built from a request a transport
   registered as a seed - overrides it. Dispatch carries the context on the
@@ -655,7 +718,10 @@ reader needs beyond a name and a type: a
 `label`, `choices` as value-and-display pairs (a table shows the display, a
 schema states it), `always_present` for a key that some rows omit, and a
 [`FieldMarking`][django_service_specs.output.field_marking.FieldMarking] saying
-who the field is for. The
+who the field is for. Its `json_schema_extra` carries JSON Schema keywords
+no field of it spells, as on a Parameter, refusing
+[those its fields state](schema.md#keywords-no-field-spells). It describes
+what the presenter renders and constrains nothing. The
 [`FieldAudience`][django_service_specs.types.field_audience.FieldAudience] is
 `CONTENT` by default, `LABEL` for the field that names the record,
 `HANDLE` for an opaque identifier that is passed to other tools and never read

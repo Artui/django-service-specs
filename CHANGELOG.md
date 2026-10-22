@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-10-22
+
+### Added
+- **`ServiceSpec.shapes` and `SelectorSpec.shapes`: the arguments that shape
+  the output.** A Parameters group beside `reads`, for what the presenter
+  renders rather than what the service does - which fields, a query over the
+  rows. It is part of `parameters()`, after the reads and before the
+  Validator's (on a `many` spec, before the list), so the schema, the closed
+  argument set and the shape check cover it as any argument; it is never
+  handed to the Validator, a provider, a selector or the service. What the
+  caller sent for it reaches the presenter alone, on
+  `PresentationContext.shapes`, whether the presenter is the spec's or its
+  output selector's. A name a read, the target selector, the `many` list or
+  the Validator also declares is refused, as is a seed's name and a key a
+  provider is annotated to fill; so is a nested selector declaring shapes of
+  its own, since the outer spec's call is the one presented. A partial call
+  keeps a required shape required, as it keeps the reads.
+- **`dispatch(call_context=...)`: the call's context, handed to every
+  stage.** `dispatch`, `adispatch`, `check_call`, `bind_arguments` and
+  `resolve_target` take the transport's `dict` for its scope - a request, an
+  agent run - and a fresh one when none is passed. The same object, never a
+  copy, reaches every callable that names `call_context`: the selectors and
+  their `extend_queryset`, the providers, the preconditions, the affordance
+  conditions, the service, the run's `progress_reporter`, the output
+  selector, `FormValidator(form_kwargs=)`, the Validator's and the
+  presenter's contexts, and a `PydanticValidator`'s field validators, on
+  pydantic's `info.context` beside `principal` and `target`. `create_model`,
+  `update_model`, `delete_model` and their async twins hand it on to the row
+  services and scopes they call, so a nested service reuses what an outer
+  stage put there. The kernel writes nothing to it and pre-fills nothing;
+  what a transport puts there, such as DRF's `request`, is that transport's
+  convention.
+- **A permission check opts into the call's context, its arguments and the
+  registered seeds by name.** `has_permission`, `has_object_permission` and
+  `has_scope_permission` may name `call_context`, beside `arguments`, and
+  any registered seed, as a parameter the call does not fill by position;
+  `authorize`, `authorize_target` and `authorize_scope` take `call_context=`
+  and `seeds=` to offer them. Only the seeds a spec's checks name resolve
+  before the checks, and the run reuses those values, so each such seed
+  resolves once per call and the check and the service see one value. A seed
+  raising `PrincipalUnavailable` there ends the call as a refusal does. A
+  parameter the call fills by position never opts in, whatever its name.
+- **`call_context=` on `unmet_operation_affordance`, `enforce_affordances`
+  and their async twins.** The dict passed, else one the pool carries, else
+  a fresh one; two different dicts are refused with `ImproperlyConfigured`.
+- **`call_context` on `ValidationContext` and `PresentationContext`: the
+  call's context.** One plain `dict` the transport creates for its natural
+  scope - a request, an agent run - shared by the Validator and the presenter
+  as the same object, so a later stage, and a nested presenter handed the same
+  context, reuses what an earlier one put there rather than computing it
+  again. It is the stages' to read and write, as a DRF serializer's `context`
+  is; the kernel writes nothing to it. A context built by hand gets an empty
+  dict of its own. Both fields trail the others and stay out of equality and
+  the hash, as `ambient` does, so an existing construction is unchanged.
+- **`PresentationContext.shapes`**: what the caller sent for the spec's
+  declared shapes, by name and read-only; an argument left out is absent
+  rather than `None`.
+- **`json_schema_extra` on `Parameter` and `OutputField`.** A mapping of the
+  JSON Schema keywords no field spells - a `pattern`, a string's
+  `maxLength`, `uniqueItems` - added to that parameter's or field's schema
+  node, so an adapter whose library declares more than a Parameter carries
+  keeps it on every route. A keyword a field states is refused at
+  construction, naming the field to declare it on, whether or not this
+  declaration sets that field: on a `Parameter`, `type`, `format`,
+  `default`, `enum`, `anyOf`, `const`, the bounds, `minItems`, `maxItems`,
+  `items`, `description`, `properties`, `required` and
+  `additionalProperties`; on an `OutputField`, `type`, `format`, `items`,
+  `enum`, `oneOf`, `const`, `title`, `properties` and `required`. A value
+  JSON cannot carry, at any depth, is refused naming its key, and the mapping
+  is held as a deep copy. It is advertised, not enforced: the shape check
+  never reads it.
+- **`ServiceSpec(returns_many=True)`: a service whose own return is a list
+  of rows.** The output half of `many`, leaving the input alone: the call
+  takes one set of arguments and dispatch presents a return that is not
+  `None` as a list, row by row, while `spec_output_schema` describes an array
+  of the item, never paged. A `None` return stays one value, so `allow_none`
+  still decides whether the schema admits `"null"`. Refused beside an
+  `output_selector_spec`, whose kind decides what is presented, and beside a
+  `many` spec with none, which presents its return as a list already. A
+  transport that pages reads it beside `many`: it pages by the spec, never by
+  a result's kind.
+
+### Changed
+- **`call_context` is a reserved pool name**, in `RESERVED_POOL_SEEDS`: a
+  seed, a provider, an overlay or an argument naming it is refused. A
+  transport or test pinning the reserved set exactly sees one more name.
+- **`resolve_callable_kwargs` withholds `call_context` from a `**kwargs`
+  catch-all.** The call's context reaches a callable only by its name, so a
+  catch-all receives the rest of the pool but not the context unless it names
+  it too. A caller passing its own pool with a `call_context` key sees the
+  difference. It follows that a hand-written service handing its `**kwargs`
+  on as a helper's `context=` hands on no call context: one whose nested row
+  services should see it names `call_context` and hands it on beside the
+  pool, as `create_model` does.
+
 ## [0.13.0] — 2026-10-21
 
 ### Added
@@ -1699,7 +1794,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Artui/django-service-specs/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Artui/django-service-specs/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Artui/django-service-specs/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Artui/django-service-specs/compare/v0.10.0...v0.11.0

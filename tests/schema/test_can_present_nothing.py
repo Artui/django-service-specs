@@ -118,6 +118,31 @@ def test_every_true_row_really_presents_none(spec: Any) -> None:
     assert present(spec, result) is None
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize("allow_none", [False, True], ids=["strict", "allow-none"])
+def test_returns_many_answers_its_own_allow_none(allow_none: bool) -> None:
+    """``returns_many`` is not read, as ``many`` is not: it shapes the result as a list.
+
+    Built inside the test rather than in ``_TABLE``, so a tree without the
+    field fails this case alone rather than the module's collection. Both
+    halves are observed: the answer, the schema that asks it, and what
+    dispatch presents for the service's ``None``.
+    """
+    spec = ServiceSpec(
+        service=write,
+        permissions=OPEN,
+        presenter=NoteTitle(),
+        returns_many=True,
+        allow_none=allow_none,
+    )
+
+    assert can_present_nothing(spec) is allow_none
+    schema = spec_output_schema(spec)
+    assert schema is not None
+    assert ("null" in schema["type"]) is allow_none
+    assert present(spec, dispatch(spec, principal=make_user("ada"), arguments={})) is None
+
+
 class _ForeignKind(enum.Enum):
     """A selector kind of another library's own, as djangorestframework-services declares."""
 

@@ -8,6 +8,7 @@ for its annotations.
 
 from __future__ import annotations
 
+import copy
 import math
 import uuid
 from collections.abc import Iterable, Iterator, Mapping
@@ -17,6 +18,7 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import PARAMETER_SCHEMA_KEYWORDS, is_json_native
 
 JSON_TYPES = frozenset({"string", "integer", "number", "boolean", "array", "object"})
 """The types a parameter may declare: JSON's own, because that is what crosses
@@ -80,6 +82,65 @@ def canonical_choices(
             seen.add(canonical)
             kept.append((canonical, paired))
     return tuple(kept)
+
+
+def checked_json_schema_extra(
+    where: str, extra: Any, owned: Mapping[str, tuple[str, ...]]
+) -> dict[str, Any] | None:
+    """``extra`` as a declaration's own ``dict``, or ``None``; refused when no schema could carry it.
+
+    ``Parameter`` and ``OutputField`` hold their ``json_schema_extra`` through
+    this, each passing the keywords its fields state in its schema node
+    (``PARAMETER_SCHEMA_KEYWORDS`` and ``OUTPUT_FIELD_SCHEMA_KEYWORDS``). Its
+    keys are a JSON object's, so each must be a string. A keyword a field
+    states is refused whether or not this declaration sets that field, naming
+    the field to declare it on, so whether a declaration is valid never turns
+    on which keys one build happened to emit. A value JSON cannot carry is
+    refused naming its key, at any depth, since every transport encodes the
+    schema as JSON and such a value would stop the operation being listed.
+    Last, a deep copy, so a mapping its caller changes afterwards, at any
+    depth, leaves the declaration as written; after the JSON check, its
+    values are plain containers to copy.
+
+    Each check holds its own test, by the order they run in:
+    test_a_value_no_schema_could_carry_is_refused (the mapping and its keys),
+    test_a_keyword_a_field_states_is_refused_whatever_the_parameter_declares,
+    test_a_value_json_cannot_carry_is_refused_naming_its_key and
+    test_it_is_kept_as_a_copy_of_its_own.
+    """
+    if extra is None:
+        return None
+    if not isinstance(extra, Mapping):
+        raise ImproperlyConfigured(
+            f"{where}: json_schema_extra is {type(extra).__name__}, not a mapping of JSON Schema "
+            "keywords to their values."
+        )
+    named = [key for key in extra if not isinstance(key, str)]
+    if named:
+        raise ImproperlyConfigured(
+            f"{where}: json_schema_extra keys must be strings; got {named!r}. Each is a JSON "
+            "Schema keyword."
+        )
+    stated = sorted(owned.keys() & extra.keys())
+    if stated:
+        each = " ".join(
+            f"json_schema_extra states {key!r}, which the schema takes from "
+            f"{' and '.join(owned[key])}."
+            for key in stated
+        )
+        raise ImproperlyConfigured(
+            f"{where}: {each} Declare each on its field: json_schema_extra carries only the "
+            "keywords no field spells, so the schema never advertises what the declaration "
+            "does not say."
+        )
+    for key, value in extra.items():
+        if not is_json_native(value):
+            raise ImproperlyConfigured(
+                f"{where}: json_schema_extra[{key!r}] is no JSON value: it holds a value of a "
+                "type JSON cannot carry, at some depth. Every transport encodes the schema as "
+                "JSON; state it as a string, number, boolean, null, list or object."
+            )
+    return copy.deepcopy(dict(extra))
 
 
 def _uuid_spelling(fmt: str | None, choice: Any) -> str | None:
@@ -185,6 +246,28 @@ class Parameter:
     declared ``max_length`` outranks it either way, wider or narrower.
     ``min_length`` has no default: an empty list is taken unless one says
     otherwise.
+
+    ``json_schema_extra`` carries the JSON Schema keywords no field of a
+    Parameter spells - a ``pattern``, a string's ``maxLength``,
+    ``uniqueItems`` - as a mapping of keyword to value, held as a deep copy of
+    its own. It is how an adapter whose library declares more than a
+    Parameter carries keeps it on every route rather than on its own.
+    [`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema]
+    adds its keys to this parameter's node. A keyword a field states there is
+    refused here, naming the field, whether or not this parameter sets it:
+    ``type``, ``format`` (so a custom format is refused too: ``format`` is a
+    field), ``default``, the choices' ``enum``, ``anyOf`` and ``const``, the
+    bounds, ``minItems`` and ``maxItems``, ``items``, ``description`` from
+    ``help``, and ``properties``, ``required`` and ``additionalProperties``
+    from ``fields``. Either side winning would advertise what the declaration
+    does not say or drop what was written, and refusing the keyword only when
+    one build stated it would make the same declaration valid until the array
+    cap came on or a spec moved to ``REJECT``. A value JSON cannot carry - a
+    ``Decimal``, a lazy translation, at any depth - is refused too, naming its
+    key. It is advertised, not enforced: the shape check never reads it, so
+    what it states holds only where the spec's Validator enforces it
+    (test_it_is_advertised_and_not_enforced_by_the_shape_check).
+    It takes no part in the hash, as ``default`` does not, and still in equality.
     """
 
     name: str
@@ -214,12 +297,21 @@ class Parameter:
     default: Any = field(default=UNSET, hash=False)
     nullable: bool = False
     help: str | None = None
+    # Out of the hash, as ``default`` is and for its reason: a dict cannot be
+    # hashed, and equality still tells two schemas apart. Held by
+    # test_a_parameter_carrying_one_is_hashable_and_compared_by_it.
+    json_schema_extra: dict[str, Any] | None = field(default=None, hash=False)
 
     def __post_init__(self) -> None:
         # A declaration that no reader can act on is refused where it is written,
         # so the error names the parameter rather than surfacing later as a
         # schema or a shape check that quietly ignores half of it.
         where = f"Parameter {self.name!r}"
+        object.__setattr__(
+            self,
+            "json_schema_extra",
+            checked_json_schema_extra(where, self.json_schema_extra, PARAMETER_SCHEMA_KEYWORDS),
+        )
         if self.type not in PARAMETER_TYPES:
             raise ImproperlyConfigured(
                 f"{where}: type {self.type!r} is not a JSON type, a file or any; "

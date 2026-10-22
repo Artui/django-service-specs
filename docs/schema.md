@@ -20,8 +20,10 @@ happened to install.
 
 - [`spec_input_schema(spec, *, unknown_arguments=REJECT)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
   describes everything `spec.parameters()` declares: the arguments dispatch
-  checks. A `many` service spec's is its `reads` and the one required list
-  `many_argument` names, each row an object of the Validator's parameters.
+  checks. A `many` service spec's is its `reads`, its `shapes` and the one
+  required list `many_argument` names, each row an object of the Validator's
+  parameters. A spec's `shapes` are properties like any other, closed set
+  included, though only the presenter reads what is sent for them.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
@@ -209,7 +211,8 @@ contradict, and states everything the declaration knows.
 What stays incomplete is only what the declaration does not carry. A
 Parameter's `minimum` and `maximum` are stated as `"minimum"` and
 `"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
-`max_value`, is not. An array's `min_length` is stated as `"minItems"`, and
+`max_value`, is not, unless the Parameter's
+[`json_schema_extra`](#keywords-no-field-spells) states it. An array's `min_length` is stated as `"minItems"`, and
 its `"maxItems"` is **the maximum in force**: the declared `max_length`, or
 where none is declared the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting's, 1000
 unless the project sets another. It is the one bound stated without being
@@ -223,6 +226,76 @@ needs them configured: outside a configured Django it raises
 when a project configured later may set another. JSON Schema reads `minimum`
 and `maximum` on a number instance alone, so on a decimal string a validating client enforces neither:
 the shape check does, and the schema tells a reader where the line is.
+
+### Keywords no field spells
+
+A `Parameter` and an `OutputField` each take `json_schema_extra`: a mapping of
+the JSON Schema keywords none of their fields spells, which
+[`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema]
+and [`output_schema`][django_service_specs.schema.output_schema.output_schema]
+add to that declaration's node last, at any depth, as `spec_input_schema` and
+`spec_output_schema` do through them:
+
+```python
+--8<--
+docs/examples/schema.py:extra
+--8<--
+```
+
+`isbn_input` is:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "isbn": {
+      "type": "string",
+      "description": "The 13-digit ISBN, digits only.",
+      "pattern": "^97[89][0-9]{10}$",
+      "maxLength": 13
+    }
+  },
+  "additionalProperties": false
+}
+```
+
+and `tags_output`:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "tags": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+  },
+  "required": ["tags"]
+}
+```
+
+It is how an adapter whose library declares more than a Parameter carries
+keeps it on every route rather than on its own; none of the adapters this
+package ships sets it. Because the node already holds everything the declaration
+states, a keyword a field states is refused when the declaration is built,
+naming the field to declare it on, whether or not this declaration sets that
+field:
+
+| On | Refused keywords |
+| --- | --- |
+| `Parameter` | `type`, `format`, `default`, the choices' `enum`, `anyOf` and `const`, `minimum`, `maximum`, `minItems`, `maxItems`, `items`, `description`, `properties`, `required` and `additionalProperties` |
+| `OutputField` | `type`, `format`, `items`, the choices' `enum`, `oneOf` and `const`, `title`, `properties` and `required` |
+
+So a custom `format` is refused too, since `format` is a field, and either
+side winning would advertise what the declaration does not say or drop what
+was written. Refusing a keyword only when one build happened to state it would
+make one declaration valid until the array cap came on or a spec moved to
+`REJECT`. A value JSON cannot carry - a `Decimal`, a lazy translation - is
+refused too, at any depth, naming its key, since every transport encodes the
+schema as JSON. The mapping is held as a deep copy, so changing it afterwards
+leaves the declaration as written, and its values are placed in each schema as
+the declaration holds them, as a default's are.
+
+It is advertised, not enforced. The shape check never reads it, so on a
+Parameter what it states holds only where the spec's Validator enforces it,
+and on an OutputField it describes what the presenter renders.
 
 ### A partial update
 
@@ -301,12 +374,13 @@ on its presenter:
 | A service spec with no output selector | the item |
 | A service spec with no output selector, with `allow_none=True` | the item, with `"null"` in its type |
 | A `many` service spec with no output selector | `{"type": "array", "items": <item>}`, with `"null"` in its type under `allow_none=True` |
+| A `returns_many` service spec | `{"type": "array", "items": <item>}`, with `"null"` in its type under `allow_none=True`; never paged, with or without `paginate=True` |
 
 Where the table says `"null"` is
 [`can_present_nothing`][django_service_specs.schema.can_present_nothing.can_present_nothing]'s
 answer, exported for a transport that writes an output schema of its own, so
-the two cannot disagree. It does not read `many`: a `many` service's list may
-be `None` exactly where any service's return may.
+the two cannot disagree. It reads neither `many` nor `returns_many`: either
+service's list may be `None` exactly where any service's return may.
 
 A `RETRIEVE` selector spec without `allow_none` answers a missing row as
 not-found, which a transport reports in its own terms and never presents, so

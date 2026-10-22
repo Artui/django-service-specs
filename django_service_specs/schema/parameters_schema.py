@@ -7,9 +7,10 @@ from typing import Any
 from django_service_specs.parameters.max_length_in_force import max_length_in_force
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.utils import unknown_arguments_policy
-from django_service_specs.schema.utils import allow_null, is_json_native
+from django_service_specs.schema.utils import allow_null, with_schema_extra
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import is_json_native
 
 
 def parameters_schema(
@@ -99,6 +100,13 @@ def parameters_schema(
       is a choice set holding such a value, since listing only some of the
       accepted values would be false.
     - **``help``** becomes ``"description"``.
+    - **``json_schema_extra``** joins the parameter's node last, at any
+      depth: the keywords the declaration has no field for, such as a
+      ``pattern`` or a string's ``maxLength``. The Parameter refused every
+      keyword a field states here when it was declared, a custom ``format``
+      included, so the extra never restates or contradicts the declaration.
+      What it states is advertised and not enforced by the shape check; it
+      holds where the spec's Validator enforces it.
 
     Nothing else, deliberately. No ``title`` on a property, because a Parameter
     has no label of its own; a ``title`` is only ever a choice's.
@@ -106,13 +114,15 @@ def parameters_schema(
     reference in it, so every schema is flat and self-contained, however deep
     the declaration nests. No ``$schema`` key, which a transport adds if its
     wire wants one. And no bound the shape check does not enforce
-    (``maxLength``, a Validator's ``max_value``): the Validator enforces those.
+    (``maxLength``, a Validator's ``max_value``) unless a ``json_schema_extra``
+    states it, for a Validator that enforces it.
     The one stated without being declared is an array's default maximum,
     because the shape check enforces it.
 
     Every call builds a new schema, so a transport may add its own keys to the
     result without reaching the declaration or another transport's copy.
-    Defaults and choice values are placed in it as declared, not copied.
+    Defaults, choice values and ``json_schema_extra`` values are placed in it
+    as declared, not copied.
 
     ``unknown_arguments`` accepts the policy's plain value as well, and a value
     that is neither, or the kept ``PASSTHROUGH`` member, raises ``ValueError``
@@ -176,7 +186,8 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
         # ``str()`` because an adapter may pass a lazy translation through, which
         # is not a JSON value: it is rendered in the language active now.
         schema["description"] = str(param.help)
-    return schema
+    # Last, so every key the declaration states is there to be compared.
+    return with_schema_extra(schema, param.json_schema_extra)
 
 
 def _reading(param: Parameter) -> dict[str, Any]:

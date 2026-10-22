@@ -716,3 +716,127 @@ def test_a_minimum_no_call_could_meet_is_refused_when_the_schema_is_built() -> N
 def test_passthrough_is_refused_rather_than_described_as_the_open_set(policy: Any) -> None:
     with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
         parameters_schema(AUTHOR, unknown_arguments=policy)
+
+
+class TestJsonSchemaExtra:
+    """A Parameter's ``json_schema_extra`` joins the schema the declaration builds."""
+
+    def test_its_keys_join_the_parameter_s_own_node(self) -> None:
+        param = Parameter(
+            "code",
+            "string",
+            nullable=True,
+            help="ISO code",
+            json_schema_extra={"pattern": "^[A-Z]{3}$"},
+        )
+        schema = parameters_schema(Parameters.of(param))
+        assert schema["properties"]["code"] == {
+            "type": ["string", "null"],
+            "description": "ISO code",
+            "pattern": "^[A-Z]{3}$",
+        }
+
+    def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
+        inner = Parameters.of(Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]"}))
+        param = Parameter("rows", "array", items=inner, json_schema_extra={"uniqueItems": True})
+        node = parameters_schema(Parameters.of(param))["properties"]["rows"]
+        assert node["uniqueItems"] is True
+        assert node["items"]["properties"]["code"] == {"type": "string", "pattern": "^[A-Z]"}
+
+    @pytest.mark.parametrize("cap", [3, None], ids=["cap-on", "cap-off"])
+    def test_max_items_is_refused_whether_or_not_the_setting_states_it(
+        self, cap: int | None
+    ) -> None:
+        """With the cap off, an array declaring no ``max_length`` states no
+        ``maxItems``, so a check made against one build would let the extra
+        through and then refuse it the day the cap came on."""
+        with (
+            override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=cap),
+            pytest.raises(ImproperlyConfigured) as refused,
+        ):
+            parameters_schema(
+                Parameters.of(
+                    Parameter("tags", "array", items="string", json_schema_extra={"maxItems": 5})
+                )
+            )
+        assert "states 'maxItems', which the schema takes from max_length." in str(refused.value)
+
+    @pytest.mark.parametrize("policy", [UnknownArguments.REJECT, UnknownArguments.IGNORE])
+    def test_additional_properties_is_refused_under_either_policy(
+        self, policy: UnknownArguments
+    ) -> None:
+        """Only ``REJECT`` states ``additionalProperties``; the extra is
+        refused under both, since the policy is the spec's to choose and the
+        parameter's fields are what the keyword describes."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            parameters_schema(
+                Parameters.of(
+                    Parameter(
+                        "address",
+                        "object",
+                        fields=Parameters.of(Parameter("city", "string")),
+                        json_schema_extra={"additionalProperties": True},
+                    )
+                ),
+                unknown_arguments=policy,
+            )
+        assert "states 'additionalProperties', which the schema takes from fields." in str(
+            refused.value
+        )
+
+    def test_a_default_beside_one_the_schema_leaves_out_is_refused(self) -> None:
+        """A ``Decimal`` default is left out of the schema, so the extra's
+        ``default`` would have filled the gap with a value the declaration
+        never chose. Its own value is JSON, so the ownership is what refuses."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            parameters_schema(
+                Parameters.of(
+                    Parameter(
+                        "price",
+                        "string",
+                        format="decimal",
+                        default=Decimal("1.5"),
+                        json_schema_extra={"default": "1.5"},
+                    )
+                )
+            )
+        message = str(refused.value)
+        assert "states 'default', which the schema takes from default." in message
+        assert "is no JSON value" not in message
+
+    def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
+        """Every top-level key a node can carry from its fields is refused, and
+        nothing else is, but ``const``: a single accepted value, which is the
+        choices' to state, though the builder spells choices as ``enum`` or
+        ``anyOf``. Imported here, so a tree without the table fails this test
+        alone."""
+        from django_service_specs.types.utils import PARAMETER_SCHEMA_KEYWORDS
+
+        catalogue = Parameters.of(
+            Parameter("tags", "array", items="string", min_length=1, max_length=3),
+            Parameter(
+                "address",
+                "object",
+                fields=Parameters.of(Parameter("city", "string", required=True)),
+            ),
+            Parameter("count", "integer", minimum=0, maximum=9, nullable=True),
+            Parameter("on", "string", format="date"),
+            Parameter("size", "string", choices=("s", "m")),
+            Parameter("tier", "string", choices=("a",), choice_labels=(("a", "Gold"),)),
+            Parameter("code", "string", default="GBP", help="ISO code"),
+        )
+        nodes = parameters_schema(catalogue)["properties"].values()
+        stated = {key for node in nodes for key in node}
+        assert stated == PARAMETER_SCHEMA_KEYWORDS.keys() - {"const"}
+
+    def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
+        """The shape check never reads it: it holds only where the spec's
+        Validator enforces it."""
+        param = Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]{3}$"})
+        assert check_arguments(Parameters.of(param), {"code": "nope"}) == {"code": "nope"}
+
+    def test_each_schema_carries_a_node_of_its_own(self) -> None:
+        extra = {"pattern": "^a"}
+        params = Parameters.of(Parameter("code", "string", json_schema_extra=extra))
+        parameters_schema(params)["properties"]["code"]["pattern"] = "changed"
+        assert params.get("code").json_schema_extra == {"pattern": "^a"}  # ty: ignore[possibly-missing-attribute]

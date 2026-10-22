@@ -31,6 +31,7 @@ from django.test.utils import CaptureQueriesContext
 
 import django_service_specs
 from django_service_specs import (
+    RESERVED_POOL_SEEDS,
     UNSET,
     ChildCollectionChange,
     DataclassValidator,
@@ -51,6 +52,7 @@ from django_service_specs import (
     ServiceSpec,
     ServiceValidationError,
     SpecRegistry,
+    Unrestricted,
     ValidationContext,
     authorize,
     check_arguments,
@@ -61,6 +63,7 @@ from django_service_specs import (
     present,
     server_owned_keys,
     spec_input_schema,
+    spec_output_schema,
     update_from_input,
 )
 from django_service_specs.mutations.utils import ROW_ERROR_READERS
@@ -272,6 +275,39 @@ class TestDeclaringWrites:
             )
         assert refused.value.detail == {"title": ["Unknown argument."]}
 
+    def test_a_service_returning_rows_is_presented_row_by_row(self, ada: Any, bob: Any) -> None:
+        apples = Note.objects.create(owner=ada, title="Apples")
+        pears = Note.objects.create(owner=ada, title="Pears")
+        Note.objects.create(owner=bob, title="Plums")
+        spec = declaring_writes.archive_all_spec
+
+        result = dispatch(spec, principal=ada, arguments={})
+
+        assert spec.parameters().names() == frozenset()  # the input is left alone
+        assert result.kind == "list"
+        assert present(spec, result) == [
+            {"id": apples.pk, "title": "Apples"},
+            {"id": pears.pk, "title": "Pears"},
+        ]
+
+    def test_a_service_returning_rows_is_an_array_of_its_item_never_paged(self) -> None:
+        spec = declaring_writes.archive_all_spec
+        item = {
+            "type": "object",
+            "properties": {"id": {"type": "integer"}, "title": {"type": "string"}},
+            "required": ["id", "title"],
+        }
+        assert spec_output_schema(spec) == {"type": "array", "items": item}
+        assert spec_output_schema(spec, paginate=True) == {"type": "array", "items": item}
+
+    def test_returns_many_is_refused_beside_many_and_beside_an_output_selector(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="returns_many=True with many=True"):
+            declaring_writes.add_notes_spec.derive(returns_many=True)
+        with pytest.raises(ImproperlyConfigured, match="beside an output_selector_spec"):
+            declaring_writes.archive_all_spec.derive(
+                presenter=None, output_selector_spec=declaring.list_notes_spec
+            )
+
     def test_the_owner_is_the_providers_and_is_not_asked_of_the_caller(
         self, ada: Any, bob: Any
     ) -> None:
@@ -283,6 +319,35 @@ class TestDeclaringWrites:
         # A caller naming another owner is overruled by the provider.
         sent = dispatch(spec, principal=ada, arguments={"title": "Also mine", "owner_id": bob.pk})
         assert sent.value.owner_id == ada.pk
+
+
+@pytest.mark.django_db
+class TestCallContext:
+    def test_the_check_and_the_service_share_the_transport_s_dict(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+
+        context = dispatching.archive_from_back_office(ada, note.pk)
+
+        assert context == {"client": "back-office", "archived": [note.pk]}
+        note.refresh_from_db()
+        assert note.archived
+
+    def test_a_call_handed_no_context_gets_an_empty_one(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+        with pytest.raises(NotPermitted, match="Only the back office"):
+            dispatch(dispatching.archive_note_spec, principal=ada, arguments={"pk": note.pk})
+
+    def test_a_catch_all_is_never_handed_it(self, ada: Any) -> None:
+        seen: dict[str, Any] = {}
+        spec = ServiceSpec(
+            service=lambda **kwargs: seen.update(kwargs), permissions=[Unrestricted()]
+        )
+        dispatch(spec, principal=ada, arguments={}, call_context={"client": "back-office"})
+        assert "user" in seen
+        assert "call_context" not in seen
+
+    def test_it_is_a_reserved_name(self) -> None:
+        assert "call_context" in RESERVED_POOL_SEEDS
 
 
 @pytest.mark.django_db

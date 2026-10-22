@@ -45,7 +45,12 @@ def test_the_validator_sees_only_the_arguments_it_declares() -> None:
     )
 
     validated = validate_arguments(
-        spec, {"pk": 1, "title": " t "}, principal=PRINCIPAL, target=ROW, server_input={}
+        spec,
+        {"pk": 1, "title": " t "},
+        principal=PRINCIPAL,
+        target=ROW,
+        server_input={},
+        call_context={},
     )
 
     assert validated.values == validated.data == {"title": "t"}
@@ -59,7 +64,7 @@ def test_a_spec_with_no_validator_validates_to_nothing() -> None:
     spec = ServiceSpec(service=Record(), permissions=OPEN)
 
     validated = validate_arguments(
-        spec, {"pk": 1}, principal=PRINCIPAL, target=ROW, server_input={}
+        spec, {"pk": 1}, principal=PRINCIPAL, target=ROW, server_input={}, call_context={}
     )
     assert validated.values == validated.data == {}
 
@@ -82,7 +87,7 @@ def test_does_not_exist_and_http404_are_a_missing_row_only_for_a_retrieve(
 def test_seeds_resolve_before_the_call_s_own_entries_exist() -> None:
     seeds = DEFAULT_POOL_SEEDS.extend(seen=lambda **pool: sorted(pool))
 
-    pool: dict[str, Any] = call_pool(PRINCIPAL, seeds, {"pk": 1, "data": {}})
+    pool: dict[str, Any] = call_pool(PRINCIPAL, seeds, {"pk": 1, "data": {}}, early={})
 
     assert pool == {
         "user": PRINCIPAL,

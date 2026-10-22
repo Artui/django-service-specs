@@ -16,7 +16,19 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 
-from django_service_specs import InvalidArguments, NotPermitted, ValidationContext, dispatch
+from django_service_specs import (
+    InvalidArguments,
+    NotPermitted,
+    Output,
+    OutputField,
+    PresentationContext,
+    Presenter,
+    ServiceSpec,
+    Unrestricted,
+    ValidationContext,
+    dispatch,
+    present,
+)
 from docs.examples import forms_adapter
 from tests.adapter_app.models import Author, Book
 
@@ -153,3 +165,64 @@ class TestFormKwargs:
         assert [(p.name, p.type, p.required) for p in validator.parameters()] == [
             ("book", "integer", True)
         ]
+
+
+@pytest.mark.django_db
+class TestCallContext:
+    def test_each_validation_of_one_call_adds_to_the_one_dict(self) -> None:
+        le_guin = Author.objects.create(name="Ursula K. Le Guin")
+        banks = Author.objects.create(name="Iain M. Banks")
+        call_context: dict[str, Any] = {}
+        context = ValidationContext(principal=None, call_context=call_context)
+        validator = forms_adapter.remembering_validator
+
+        for author in (le_guin, banks):
+            validator.validate(
+                {"title": "A", "price": "1.00", "status": "draft", "author": author.pk}, context
+            )
+
+        assert context.call_context is call_context
+        assert call_context == {"forms_adapter.authors": {le_guin.pk: le_guin, banks.pk: banks}}
+
+    def test_a_context_built_by_hand_has_a_dict_of_its_own_to_write_to(self) -> None:
+        author = Author.objects.create(name="Ursula K. Le Guin")
+        first, second = ValidationContext(principal=None), ValidationContext(principal=None)
+
+        forms_adapter.remembering_validator.validate(
+            {"title": "A", "price": "1.00", "status": "draft", "author": author.pk}, first
+        )
+
+        assert first.call_context == {"forms_adapter.authors": {author.pk: author}}
+        assert second.call_context == {}
+
+    def test_the_presenter_reads_what_the_validator_left_in_the_same_call(self) -> None:
+        author = Author.objects.create(name="Ursula K. Le Guin")
+
+        class MatchedAuthors(Presenter):
+            def output(self) -> Output:
+                return Output((OutputField("authors", "array", items="string"),))
+
+            def present(self, value: Any) -> Any:
+                return {"authors": []}
+
+            def presented(self, value: Any, context: PresentationContext | None) -> Any:
+                assert context is not None
+                matched = context.call_context["forms_adapter.authors"]
+                return {"authors": [row.name for row in matched.values()]}
+
+        spec = ServiceSpec(
+            service=lambda **values: values["author"],
+            permissions=[Unrestricted()],
+            validator=forms_adapter.remembering_validator,
+            presenter=MatchedAuthors(),
+        )
+        call_context: dict[str, Any] = {}
+        result = dispatch(
+            spec,
+            principal=None,
+            arguments={"title": "A", "price": "1.00", "status": "draft", "author": author.pk},
+            call_context=call_context,
+        )
+
+        assert present(spec, result) == {"authors": ["Ursula K. Le Guin"]}
+        assert call_context == {"forms_adapter.authors": {author.pk: author}}

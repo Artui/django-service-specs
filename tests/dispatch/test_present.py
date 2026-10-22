@@ -4,6 +4,7 @@ import inspect
 import json
 from collections.abc import Callable
 from dataclasses import replace
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -20,6 +21,7 @@ from django_service_specs.dispatch.paginate_output import paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.output.output import Output, OutputField
+from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -656,3 +658,42 @@ def test_a_foreign_declaration_is_presented_through_its_compiled_spec() -> None:
     source = Foreign(selector_spec(presenter=Titles()))
 
     assert present(source, DispatchResult("instance", Row("a"))) == {"title": "a"}
+
+
+class _ReadsTheCall(Presenter):
+    """Renders each row with the shapes it is handed, and counts rows in the call's context."""
+
+    def __init__(self) -> None:
+        self.contexts: list[Any] = []
+
+    def output(self) -> Output:
+        return Output((OutputField("title", "string"),))
+
+    def present(self, value: Any) -> Any:
+        return {"title": value.title}
+
+    def presented(self, value: Any, context: Any) -> Any:
+        self.contexts.append(context)
+        seen = context.call_context.setdefault("rows", 0) + 1
+        context.call_context["rows"] = seen
+        fields = context.shapes.get("fields", ["title"])
+        return {name: getattr(value, name) for name in fields} | {"n": seen}
+
+
+def test_every_row_of_one_result_shares_its_call_context_and_its_shapes() -> None:
+    """One context per result, never a copy per row, so what one row's
+    presenting writes to the call's context the next one reads."""
+    call_context: dict[str, Any] = {}
+    context = PresentationContext(
+        "ada", call_context=call_context, shapes=MappingProxyType({"fields": ["title"]})
+    )
+    presenter = _ReadsTheCall()
+    rows = (Row("a"), Row("b"))
+
+    rendered = present(
+        selector_spec(LIST, presenter), DispatchResult("list", rows, context=context)
+    )
+
+    assert rendered == [{"title": "a", "n": 1}, {"title": "b", "n": 2}]
+    assert all(seen is context for seen in presenter.contexts)
+    assert call_context == {"rows": 2}

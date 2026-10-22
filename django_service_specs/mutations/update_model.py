@@ -5,7 +5,7 @@ from typing import Any
 
 from django_service_specs.mutations.change_result import ModelT
 from django_service_specs.mutations.update_from_input import update_from_input
-from django_service_specs.mutations.utils import resolve_m2m
+from django_service_specs.mutations.utils import handed_on, resolve_m2m
 from django_service_specs.relations.relation_spec import RelationSpec
 
 
@@ -36,10 +36,13 @@ def update_model(
     The service returns the row rather than the
     [`ChangeResult`][django_service_specs.mutations.change_result.ChangeResult],
     opens no transaction of its own, absorbs the rest of the pool and hands it
-    on as ``context``, as ``create_model``'s does.
+    on as ``context`` with the call's context beside it, as ``create_model``'s
+    does.
     """
 
-    def _service(*, instance: ModelT, data: Any, **kwargs: Any) -> ModelT:
+    def _service(
+        *, instance: ModelT, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any
+    ) -> ModelT:
         return update_from_input(
             instance,
             data,
@@ -48,7 +51,7 @@ def update_model(
             m2m=resolve_m2m(m2m, data),
             update_fields=update_fields,
             relations=relations,
-            context=kwargs,
+            context=handed_on(kwargs, call_context),
         ).instance
 
     return _service

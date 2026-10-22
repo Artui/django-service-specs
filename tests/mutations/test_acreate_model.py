@@ -12,7 +12,7 @@ from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.types.is_async import is_async
-from tests.mutations.utils import savepoints_during
+from tests.mutations.utils import bound_call, savepoints_during
 from tests.relations_app.models import Author, Catalog, Post, Section, Tag
 
 
@@ -95,6 +95,25 @@ class TestACreateModel:
             data={"name": "c", "sections": [{"title": "a"}]}, user="the caller"
         )
         assert seen == ["the caller"]
+
+    async def test_the_call_context_reaches_a_row_service_that_names_it(self) -> None:
+        seen: list[Any] = []
+        context: dict[str, Any] = {}
+
+        async def create_section(*, data: dict[str, Any], call_context: Any = None) -> Section:
+            seen.append(call_context)
+            return await Section.objects.acreate(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        await bound_call(
+            acreate_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context=context,
+        )
+        assert len(seen) == 1
+        assert seen[0] is context
 
     async def test_a_null_row_is_refused(self) -> None:
         with pytest.raises(InvalidArguments):

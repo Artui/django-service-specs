@@ -3,14 +3,14 @@
 ``sync_answer`` is read by the three ``authorize`` functions, so the
 class-level, object-level and scope-level checks cannot disagree about an
 answer that is not one, and so is ``asked_with``, so they cannot disagree
-about which check is handed the call's arguments."""
+about which check is handed the call's arguments, its context or a seed."""
 
 from __future__ import annotations
 
 import inspect
 import weakref
 from collections.abc import Callable, Mapping
-from types import FunctionType
+from types import FunctionType, MappingProxyType
 from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
@@ -46,15 +46,35 @@ def sync_answer(answer: Any, *, asked: str) -> Any:
     return answer
 
 
-def asked_with(check: Any, method: str, arguments: Mapping[str, Any] | None) -> dict[str, Any]:
-    """The keywords to ask ``check``'s ``method`` with: ``arguments``, if it declares them.
+def asked_with(
+    check: Any,
+    method: str,
+    arguments: Mapping[str, Any] | None,
+    *,
+    positional: int = 2,
+    offered: Mapping[str, Any] = MappingProxyType({}),
+) -> dict[str, Any]:
+    """The keywords to ask ``check``'s ``method`` with: those of ``arguments`` and ``offered`` it declares.
 
-    The base ``PermissionCheck`` methods declare no ``arguments``, so every
-    check written without them keeps its signature and stays a
-    valid override; a method that wants the call's arguments declares the
-    keyword, and only a method that does is handed it. Read off
-    ``getattr(check, method)``, the callable dispatch is about to call, so a
-    callable set on the instance answers for itself
+    The base ``PermissionCheck`` methods declare no keyword, so every check
+    written without one keeps its signature and stays a valid override; a
+    method that wants the call's arguments declares ``arguments``, one that
+    wants the call's context ``call_context``, and one that wants a
+    registered seed that seed's name. ``offered`` is what the call offers
+    under a name - its context, and the seeds resolved for the checks - and
+    only a method declaring one of its names is handed that entry.
+    ``arguments`` is always the call's arguments, whatever ``offered`` holds.
+
+    ``positional`` is how many parameters the call fills by position - two
+    for ``has_permission``, three for the other two questions - and a
+    parameter among them is never read as an opt-in, whatever its name: a
+    check written DRF-style, ``has_permission(self, request, spec)``, under a
+    transport registering ``request`` as a seed, is asked as before rather
+    than handed its principal twice
+    (test_a_positional_parameter_named_after_an_offered_name_is_handed_nothing).
+
+    Read off ``getattr(check, method)``, the callable dispatch is about to
+    call, so a callable set on the instance answers for itself
     (test_a_method_shadowed_on_the_instance_is_read_as_the_shadow), a mock
     patched over the method is asked as a check that never opted in
     (test_a_mock_patched_over_a_method_is_asked_as_before), a forwarding
@@ -65,17 +85,49 @@ def asked_with(check: Any, method: str, arguments: Mapping[str, Any] | None) -> 
     inherited one as its declaring class wrote it
     (test_a_subclass_inherits_the_declaration).
     """
-    return {"arguments": arguments} if _declares_arguments(getattr(check, method)) else {}
+    named = declared_keywords(check, method, positional=positional)
+    asked = {name: value for name, value in offered.items() if name in named}
+    if "arguments" in named:
+        asked["arguments"] = arguments
+    return asked
 
 
-def _declares_arguments(asked: Callable[..., Any]) -> bool:
-    """Whether ``asked`` declares ``arguments``, cached only where that is safe.
+def offered_to_checks(
+    call_context: dict[str, Any] | None, seeds: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    """What a check may opt into by name besides ``arguments``: the call's context and its seeds.
 
-    A method the class defines is cached under the function it binds, never
-    under the bound method, which is made afresh on every lookup and would hold
-    its check for the cache's life (test_a_check_is_not_kept_once_asked). Any
-    other callable is read uncached: one set on an instance or patched in as a
-    mock is as short-lived as its check
+    Read by the three ``authorize`` functions, so a transport calling one
+    directly hands a check what dispatch would. With no ``call_context``, a
+    fresh empty dict, as dispatch makes one for a call handed none: a check
+    declaring it always receives a mapping it may write to
+    (test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own). A seed
+    absent from ``seeds`` is not offered, so a check declaring it is asked
+    without it.
+    """
+    return {**(seeds or {}), "call_context": {} if call_context is None else call_context}
+
+
+def declared_keywords(check: Any, method: str, *, positional: int) -> frozenset[str]:
+    """The names ``check``'s ``method`` takes by keyword, less the ``positional`` it is called with.
+
+    What ``asked_with`` hands from, and what dispatch reads to decide whether
+    a spec's checks opt into its seeds at all, so the two cannot disagree
+    about which check declared one.
+    """
+    reached, filled = _keywords(getattr(check, method))
+    return reached - frozenset(filled[:positional])
+
+
+def _keywords(asked: Callable[..., Any]) -> tuple[frozenset[str], tuple[str, ...]]:
+    """What ``asked`` takes by keyword, and its parameters a positional call fills, in order.
+
+    Cached only where that is safe. A method the class defines is cached
+    under the function it binds, never under the bound method, which is made
+    afresh on every lookup and would hold its check for the cache's life
+    (test_a_check_is_not_kept_once_asked). Any other callable is read
+    uncached: one set on an instance or patched in as a mock is as
+    short-lived as its check
     (test_a_callable_set_on_the_instance_is_not_kept_once_asked), and a
     callable object with ``eq`` and no hash could not be a key at all
     (test_a_callable_the_class_holds_unhashed_is_read_by_its_own_signature).
@@ -86,75 +138,111 @@ def _declares_arguments(asked: Callable[..., Any]) -> bool:
     """
     function = getattr(asked, "__func__", None)
     if isinstance(function, FunctionType):
-        return _function_declares_arguments(function)
-    return _names_arguments(asked)
+        return _function_keywords(function)
+    return _reached_names(asked), _filled_by_position(asked)
 
 
 # Keyed weakly on the function, so the entry goes with it: a check class a
 # factory builds per call is freed with its last instance, and the cache does
 # not grow with every class ever asked
 # (test_a_class_built_at_runtime_is_not_kept_once_asked).
-_DECLARES: Final[weakref.WeakKeyDictionary[FunctionType, bool]] = weakref.WeakKeyDictionary()
+_DECLARES: Final[
+    weakref.WeakKeyDictionary[FunctionType, tuple[frozenset[str], tuple[str, ...]]]
+] = weakref.WeakKeyDictionary()
 
 
-def _function_declares_arguments(function: FunctionType) -> bool:
-    """``_names_arguments`` over a function a class defines, inspected once.
+def _function_keywords(function: FunctionType) -> tuple[frozenset[str], tuple[str, ...]]:
+    """``_keywords`` of a function a class defines, inspected once.
 
-    A call asks each check up to twice, and checks share a class, so the
-    signature is read once per function
+    A call asks each check up to three times, and checks share a class, so
+    the signature is read once per function
     (test_a_class_defined_function_s_signature_is_inspected_once); it does not
     change while its function lives, and replacing the method on the class
     binds a different function, which is read afresh
-    (test_a_method_replaced_on_its_class_is_read_as_it_now_is).
+    (test_a_method_replaced_on_its_class_is_read_as_it_now_is). Its first
+    positional parameter is the instance the method binds, which the call
+    never fills, so it is dropped from the positional ones.
     """
-    declares = _DECLARES.get(function)
-    if declares is None:
-        declares = _DECLARES[function] = _names_arguments(function)
-    return declares
+    keywords = _DECLARES.get(function)
+    if keywords is None:
+        keywords = _DECLARES[function] = (
+            _reached_names(function),
+            _filled_by_position(function)[1:],
+        )
+    return keywords
 
 
-def _names_arguments(asked: Callable[..., Any]) -> bool:
-    """Whether ``asked`` takes ``arguments`` by keyword, itself or by forwarding it.
+def _filled_by_position(asked: Callable[..., Any]) -> tuple[str, ...]:
+    """The parameters a positional call of ``asked`` fills, in order, as Python reports them.
+
+    The signature ``inspect`` reports, which follows the ``__wrapped__`` chain
+    to the method a forwarding decorator wraps, so a wrapper spreading
+    ``*args`` reports the names its positionals land in
+    (test_a_forwarding_wrapper_s_positional_parameters_are_the_method_s). Up
+    to the first that is not positional, since nothing after a ``*args`` or
+    a keyword-only parameter is filled by position. None where there is no
+    signature to read, or a ``__wrapped__`` chain that loops: nothing is
+    then held back, which is how such a callable was read before.
+    """
+    try:
+        parameters = inspect.signature(asked).parameters.values()
+    except (ValueError, TypeError):
+        return ()
+    filled: list[str] = []
+    for parameter in parameters:
+        if parameter.kind not in _POSITIONAL:
+            break
+        filled.append(parameter.name)
+    return tuple(filled)
+
+
+_POSITIONAL: Final = (inspect.Parameter.POSITIONAL_ONLY, inspect.Parameter.POSITIONAL_OR_KEYWORD)
+
+
+def _reached_names(asked: Callable[..., Any]) -> frozenset[str]:
+    """The names a keyword reaches in ``asked``, itself or by forwarding it.
 
     A walk down the ``__wrapped__`` chain ``functools.wraps`` leaves, one
     layer at a time, each read by its own signature - every layer is called
-    in turn, so each must take the keyword or pass it on:
+    in turn, so each must take a keyword or pass it on:
 
-    - a layer naming ``arguments`` by keyword takes it, and the answer is
-      yes (test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them,
+    - a name a layer takes by keyword is reached
+      (test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them,
       test_forwarding_layers_over_an_opted_in_method_are_handed_them);
-    - a layer with no ``**kwargs`` would refuse it, and the answer is no,
-      whatever lies beneath: a wrapper narrower than what it wraps
+    - a layer with no ``**kwargs`` would refuse any other, so the walk ends
+      there, whatever lies beneath: a wrapper narrower than what it wraps
       (test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper),
       or one met lower down
       (test_a_forwarding_wrapper_over_a_narrower_one_is_handed_nothing);
-    - a layer spreading ``**kwargs`` passes it on, so the walk steps to what
-      it wraps; with nothing beneath, nothing that asked would receive it,
-      and the answer is no (test_a_method_taking_only_keywords_is_handed_nothing,
+    - a layer spreading ``**kwargs`` passes the rest on, so the walk steps to
+      what it wraps; with nothing beneath, nothing that asked would receive
+      them (test_a_method_taking_only_keywords_is_handed_nothing,
       test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing).
 
-    A layer with no signature to read ends it with no too (``_own_parameters``).
-    A layer met twice ends the walk with no, since a chain that loops names
-    nothing new (test_a_wrapped_chain_that_loops_is_handed_nothing; without
-    that conjunct the test never finishes). The other conjunct stops the walk
-    at the bottom of the chain: without it,
+    A layer with no signature to read ends it (``_own_parameters``). A layer
+    met twice ends the walk, since a chain that loops names nothing new
+    (test_a_wrapped_chain_that_loops_is_handed_nothing; without that conjunct
+    the test never finishes). The other conjunct stops the walk at the bottom
+    of the chain: without it,
     test_a_decorator_without_wraps_answers_for_its_own_spread_alone fails.
     """
     layer: Any = asked
     walked: list[Any] = []
+    reached: set[str] = set()
     while layer is not None and not any(layer is seen for seen in walked):
         walked.append(layer)
         parameters = _own_parameters(layer)
         if parameters is None:
-            return False
-        if _reached_by_keyword(parameters.get("arguments")):
-            return True
+            break
+        reached.update(
+            name for name, parameter in parameters.items() if _reached_by_keyword(parameter)
+        )
         if not any(
             parameter.kind is inspect.Parameter.VAR_KEYWORD for parameter in parameters.values()
         ):
-            return False
+            break
         layer = getattr(layer, "__wrapped__", None)
-    return False
+    return frozenset(reached)
 
 
 def _own_parameters(layer: Any) -> Mapping[str, inspect.Parameter] | None:
@@ -174,20 +262,16 @@ def _own_parameters(layer: Any) -> Mapping[str, inspect.Parameter] | None:
         return None
 
 
-def _reached_by_keyword(parameter: inspect.Parameter | None) -> bool:
-    """Whether ``parameter`` is one a keyword ``arguments=`` reaches as the mapping itself.
+def _reached_by_keyword(parameter: inspect.Parameter) -> bool:
+    """Whether ``parameter`` is one a keyword reaches as the value itself.
 
-    One branch to coverage, so each conjunct is held by its own test in
-    ``tests/authorization/test_utils.py``:
-    ``test_a_method_that_names_no_arguments_is_handed_nothing`` fails without
-    the first, and
     ``test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing``
-    without the second (as does
+    fails without it (as does
     ``test_a_forwarding_wrapper_over_a_positional_only_arguments_is_handed_nothing``
-    beneath a forwarding layer): a parameter of that name that is positional-only or
-    variadic is not reached.
+    beneath a forwarding layer): a parameter of that name that is
+    positional-only or variadic is not reached.
     """
-    return parameter is not None and parameter.kind in (
+    return parameter.kind in (
         inspect.Parameter.POSITIONAL_OR_KEYWORD,
         inspect.Parameter.KEYWORD_ONLY,
     )

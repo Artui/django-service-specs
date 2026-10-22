@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Final
 
 RESERVED_POOL_SEEDS: Final[frozenset[str]] = frozenset(
-    {"user", "data", "instance", "collection", "result", "queryset", "progress"}
+    {"user", "data", "instance", "collection", "result", "queryset", "progress", "call_context"}
 )
 """The names dispatch seeds into a callable's keyword pool, which no argument may use.
 
@@ -13,7 +13,15 @@ RESERVED_POOL_SEEDS: Final[frozenset[str]] = frozenset(
 ``data`` the validated values, ``instance`` and ``collection`` the resolved
 target, ``result`` the service's return (in an output selector's pool, where
 ``instance`` is that return too, as djangorestframework-services binds it) and
-``queryset`` what ``extend_queryset`` shapes. They are the names
+``queryset`` what ``extend_queryset`` shapes. ``call_context`` is the call's
+context: the one plain ``dict`` the transport handed ``dispatch``, or a fresh
+one per call when it handed none, which every callable dispatch resolves -
+a ``kwargs`` or ``input_data`` provider, a selector and its
+``extend_queryset``, an affordance condition,
+a precondition, the service, the run's ``progress_reporter`` - receives as
+the same object by naming it, and never through ``**kwargs``. Never a copy,
+and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
+call adds. The other seven are the names
 ``djangorestframework-services`` seeds for the same values, so a callable
 written for it runs under this kernel unchanged.
 

@@ -18,6 +18,7 @@ from django_service_specs.mutations.create_model import create_model
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from tests.mutations.utils import bound_call
 from tests.relations_app.models import Author, Catalog, Post, Section, Tag
 
 
@@ -97,6 +98,47 @@ class TestCreateModel:
             data={"name": "c", "sections": [{"title": "a"}]}, user="the caller"
         )
         assert seen == ["the caller"]
+
+    def test_the_call_context_reaches_a_row_service_that_names_it(self) -> None:
+        seen: list[Any] = []
+        context: dict[str, Any] = {}
+
+        def create_section(*, data: dict[str, Any], call_context: Any = None) -> Section:
+            seen.append(call_context)
+            return Section.objects.create(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        bound_call(
+            create_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context=context,
+        )
+        assert len(seen) == 1
+        assert seen[0] is context
+
+    def test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context(self) -> None:
+        # The by-name rule holds one level down: the helper hands the call's
+        # context on, and a nested catch-all is still never given it.
+        seen: list[dict[str, Any]] = []
+
+        def create_section(*, data: dict[str, Any], **kwargs: Any) -> Section:
+            seen.append(kwargs)
+            return Section.objects.create(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        bound_call(
+            create_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context={},
+            user="ada",
+        )
+        assert len(seen) == 1
+        assert seen[0]["user"] == "ada"
+        assert "call_context" not in seen[0]
 
     def test_a_null_row_is_refused(self) -> None:
         with pytest.raises(InvalidArguments):

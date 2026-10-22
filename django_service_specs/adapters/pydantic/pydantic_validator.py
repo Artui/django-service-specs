@@ -134,8 +134,10 @@ class PydanticValidator(Validator):
         """Every field's validated value, keyed by field name, or ``InvalidArguments``.
 
         The context reaches pydantic's validators as ``info.context``, a dict
-        with ``"principal"`` and ``"target"``, so a validator can check a
-        value against the caller or the row being updated. Nested values stay
+        with ``"principal"``, ``"target"`` and ``"call_context"``, the call's
+        context as the very dict the transport passed, so a validator can check
+        a value against the caller or the row being updated, and read or write
+        what the call's other stages share. Nested values stay
         model instances, which is what the mutation helpers read a row from.
 
         **A partial call is refused** with ``ImproperlyConfigured``. pydantic
@@ -158,7 +160,15 @@ class PydanticValidator(Validator):
         try:
             instance = self.model.model_validate(
                 dict(arguments),
-                context={"principal": context.principal, "target": context.target},
+                # The call's context is the context's own dict, as DRF hands a
+                # serializer its context: a validator writing to it writes to
+                # the call's
+                # (test_its_validators_read_the_call_context_beside_the_principal_and_the_target).
+                context={
+                    "principal": context.principal,
+                    "target": context.target,
+                    "call_context": context.call_context,
+                },
             )
         except ValidationError as exc:
             raise InvalidArguments(_detail(self.model, self._fields, exc)) from exc

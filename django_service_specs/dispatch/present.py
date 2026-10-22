@@ -54,7 +54,12 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
     dispatch built for the call, or ``None`` on a result it did not build.
     ``presented()`` is ``present()`` unless overridden, so a Presenter that
-    reads nothing of the call needs only ``present()``.
+    reads nothing of the call needs only ``present()``. Every value of one
+    result is handed the same context, so a list's rows, and a nested
+    presenter a presenter hands it on to, share its ``call_context`` - the
+    dict the transport created for the call - and read the arguments that
+    shape the output from its ``shapes``. A spec declaring no ``shapes`` and
+    a presenter reading neither present exactly as before.
 
     Raises:
         ValueError: ``kind="not_found"``. Presenting nothing as a success is the

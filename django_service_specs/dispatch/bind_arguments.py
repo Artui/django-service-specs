@@ -20,6 +20,7 @@ def bind_arguments(
     principal: Any,
     target: Any = None,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Check ``arguments`` against the spec's parameters, then validate them.
 
@@ -44,7 +45,8 @@ def bind_arguments(
        ``reads`` - with ``ValidationContext(principal, target, partial)``,
        whose ``resolved`` names ``target`` as dispatch would: ``instance``
        for a spec with an instance selector, ``collection`` for one with a
-       collection selector, nothing for a create.
+       collection selector, nothing for a create, and whose ``call_context``
+       is ``call_context``, the very dict passed, or a fresh one.
 
     Returns the Validator's values. A service spec with no Validator returns
     ``{}``, because every argument it takes is a read and none is validated. A
@@ -93,6 +95,7 @@ def bind_arguments(
         principal=principal,
         target=target,
         server_input={},
+        call_context={} if call_context is None else call_context,
         resolved=target_entry(spec, target),
     )
     return validated.values

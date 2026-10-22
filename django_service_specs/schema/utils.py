@@ -1,4 +1,4 @@
-"""Dialect rules the schema emitters share: how null is admitted, and which values may be stated."""
+"""Dialect rules the schema emitters share: how null is admitted, and how a declaration's extra keys join its node."""
 
 from __future__ import annotations
 
@@ -22,21 +22,22 @@ def allow_null(schema: dict[str, Any]) -> dict[str, Any]:
     return {**schema, "type": [schema["type"], "null"]}
 
 
-def is_json_native(value: Any) -> bool:
-    """Whether ``value`` survives the JSON encoding every transport performs on a schema.
+def with_schema_extra(schema: dict[str, Any], extra: dict[str, Any] | None) -> dict[str, Any]:
+    """``schema`` with a declaration's ``json_schema_extra`` added.
 
-    A schema carries a value in two places, a ``default`` and a choice, and both
-    reach the wire as they are. A ``Decimal``, a date or a model row there does
-    not describe the input less well - it breaks the encoding, so the transport
-    fails to list the operation at all. The emitters leave such a value out
-    rather than restate it in a form the declaration did not choose.
+    The last step of a ``Parameter``'s node and an ``OutputField``'s. No key is
+    compared here: the declaration refused, where it was written, every keyword
+    its fields can make the builder state, so the two never share one. That
+    refusal is made once rather than per build because a key the builder
+    states on one build and not another - ``maxItems`` under the array cap,
+    ``additionalProperties`` under ``REJECT``, a default left out for being no
+    JSON value - would otherwise make one declaration valid on one route and
+    refused on the next. test_the_keywords_refused_are_the_ones_the_builder_states
+    holds that the builders state nothing else.
 
-    ``bool`` needs no case of its own: it is an ``int``, and both are native.
+    A new mapping, as every node is; the extra's values are placed in it as
+    the declaration holds them, as a default's are.
     """
-    if value is None or isinstance(value, (str, int, float)):
-        return True
-    if isinstance(value, (list, tuple)):
-        return all(is_json_native(item) for item in value)
-    if isinstance(value, dict):
-        return all(isinstance(key, str) and is_json_native(item) for key, item in value.items())
-    return False
+    if extra is None:
+        return schema
+    return {**schema, **extra}

@@ -49,9 +49,10 @@ def spec_output_schema(
       whatever its ``allow_none`` says: once the service has run, a re-read
       that finds nothing is ``None`` rather than not-found, because reporting
       not-found would tell the caller a committed write did not happen.
-    - **A ``many`` service spec with no output selector** presents the rows it
-      wrote as ``{"type": "array", "items": <item>}``, which gains ``"null"``
-      when the spec declares ``allow_none``.
+    - **A ``many`` service spec with no output selector**, or a
+      ``returns_many`` one, which never has one, presents the rows its service
+      returned as ``{"type": "array", "items": <item>}``, never paged, which
+      gains ``"null"`` when the spec declares ``allow_none``.
     - **A service spec with no output selector** presents what the service
       returned, described by its presenter as the item, which gains
       ``"null"`` when the spec declares ``allow_none``. Undeclared, a ``None``
@@ -114,12 +115,17 @@ def spec_output_schema(
         kind = compiled.output_selector_spec.kind
     else:
         # One value, the service's return. A ``many`` service returns the rows
-        # it wrote, which dispatch presents as a list, never paged; a ``None``
-        # return is still presented as ``None``, so a ``"null"`` wraps the array.
-        # Held by test_the_shape_around_the_item's
-        # [a-many-service-presents-an-array-of-its-item] and
-        # [a-many-service-allowing-none-admits-null-for-the-whole-array].
-        whole: dict[str, Any] = {"type": "array", "items": item} if compiled.many else item
+        # it wrote, and a ``returns_many`` one declares its return a list of
+        # rows; dispatch presents either as a list, never paged. A ``None``
+        # return is still presented as ``None``, so a ``"null"`` wraps the
+        # array. One arc to coverage, so each operand is named:
+        # test_the_shape_around_the_item[a-many-service-presents-an-array-of-its-item]
+        # holds ``many``, TestReturnsMany.test_an_array_of_the_item_never_paged
+        # ``returns_many``, and the ``"null"`` is held by
+        # [a-many-service-allowing-none-admits-null-for-the-whole-array] and that
+        # test's [allowing-none-admits-null-for-the-array] cases.
+        lists = compiled.many or compiled.returns_many
+        whole: dict[str, Any] = {"type": "array", "items": item} if lists else item
         return allow_null(whole) if can_present_nothing(compiled) else whole
     if kind is SelectorKind.LIST:
         array: dict[str, Any] = {"type": "array", "items": item}

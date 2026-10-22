@@ -10,7 +10,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class PresentationContext:
-    """The principal a call ran for, the target it acted on, and its resolved seeds.
+    """The principal a call ran for, its target, its seeds, its context and its shapes.
 
     The output-side counterpart of
     [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext].
@@ -32,6 +32,18 @@ class PresentationContext:
       (test_a_selector_spec_s_rows_are_each_presented_with_the_call_s_context
       holds both halves). Never an argument, a validated value or a
       provider's key.
+    - ``call_context`` is the call's context, the one plain ``dict`` the
+      transport created for its scope and every stage that declares it
+      received, as on ``ValidationContext``: the Validator, the service and
+      the presenter share one object, so a presenter - and a nested one
+      handed the same context - reuses what an earlier stage put there. It is
+      the presenter's to read and write; the kernel writes nothing to it. A
+      context built by hand gets an empty dict of its own.
+    - ``shapes`` is what the caller sent for the spec's declared ``shapes``,
+      the arguments that shape the output - which fields, a query over the
+      rows - by name, read-only. An argument the caller left out is absent
+      rather than ``None``. Empty for a spec that declares none and for a
+      context built by hand; no other argument is ever here.
     """
 
     principal: Any
@@ -41,3 +53,12 @@ class PresentationContext:
     # test_two_contexts_differing_in_ambient_alone_are_equal and
     # test_a_context_carrying_ambient_values_is_hashable_where_its_target_is.
     ambient: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)
+    # Both out of equality and the hash, as ``ambient`` is: a dict and the
+    # lists a caller sends as a shape cannot be hashed, and the context is the
+    # one field a stage changes. Held by
+    # test_two_contexts_differing_in_call_context_or_shapes_alone_are_equal and
+    # test_a_context_carrying_a_call_context_and_shapes_is_hashable. A factory
+    # rather than a shared default, so no two contexts write to one dict
+    # (test_each_context_built_by_hand_has_a_call_context_of_its_own).
+    call_context: dict[str, Any] = field(default_factory=dict, compare=False)
+    shapes: Mapping[str, Any] = field(default_factory=lambda: MappingProxyType({}), compare=False)

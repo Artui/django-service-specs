@@ -152,8 +152,10 @@ say `List should have at most 5 items after validation, not 6`, under the same
 own rules: bounds, patterns, validators.
 
 The context reaches pydantic's validators as `info.context`, a dict with
-`"principal"` and `"target"`, so a `field_validator` can check a value against
-the caller or the row being updated.
+`"principal"`, `"target"` and `"call_context"`, so a `field_validator` can
+check a value against the caller or the row being updated, and read or leave
+something in the dict every stage of the call shares
+([the call's context](dispatching.md#the-calls-context)).
 
 **A partial spec is refused** with `ImproperlyConfigured` when it is built,
 as one over the dataclass adapter is, and so is a partial call made to the

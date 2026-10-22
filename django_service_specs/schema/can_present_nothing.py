@@ -33,10 +33,12 @@ def can_present_nothing(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool:
       observation: an undeclared ``None`` is still presented, against a schema
       that does not admit it.
 
-    ``many`` is not read. It decides whether the result is a list of what the
-    service wrote, not whether it may be ``None``: a ``many`` service's
-    ``None`` return is presented as ``None`` too, so its ``allow_none`` answers
-    as any other service's, and a re-read answers by its kind as above.
+    ``many`` and ``returns_many`` are not read. Each decides whether the result
+    is a list of what the service returned, not whether it may be ``None``: a
+    ``None`` return from either is presented as ``None`` too, so its
+    ``allow_none`` answers as any other service's, and a ``many`` spec's
+    re-read answers by its kind as above. ``returns_many`` is refused beside a
+    re-read, so it never has one.
 
     It answers whether ``None`` *may* come back, not whether a schema exists: a
     spec with no presenter has no output schema to widen, whatever this says.
