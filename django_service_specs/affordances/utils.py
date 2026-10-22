@@ -35,6 +35,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import (
+    CALL_CONTEXT,
     PER_CALL_POOL_NAMES,
     affordance_alias,
     is_row_condition,
@@ -67,12 +68,43 @@ def ambient_pool(pool: Mapping[str, Any], *, reserved: frozenset[str]) -> dict[s
     # Two conjuncts, each held in tests/affordances/test_utils.py:
     # ``test_a_spread_argument_is_not_ambient`` fails without the first, and
     # ``test_a_per_call_name_is_not_ambient_although_it_is_reserved`` without
-    # the second.
+    # the second. The call's context is kept whatever ``reserved`` names,
+    # because the affordance functions set that key themselves
+    # (``test_the_call_context_is_ambient_whatever_reserved_names``).
     return {
         key: value
         for key, value in pool.items()
-        if key in reserved and key not in PER_CALL_POOL_NAMES
+        if (key in reserved and key not in PER_CALL_POOL_NAMES) or key == CALL_CONTEXT
     }
+
+
+def with_call_context(
+    pool: Mapping[str, Any], call_context: dict[str, Any] | None
+) -> dict[str, Any]:
+    """``pool`` carrying the call's context: the one passed, else the pool's own, else a fresh one.
+
+    For the affordance functions a transport calls ahead of the call or in
+    place of dispatch. A pool built by dispatch already carries the call's
+    context, and one a transport builds usually does not, so either may hold
+    it; handed two different dicts, this refuses rather than choosing one, as
+    dispatch refuses every other claimant to the name
+    (test_a_call_context_passed_beside_another_in_the_pool_is_refused). The
+    same dict in both is one claimant
+    (test_the_call_context_passed_else_the_pool_s_else_a_fresh_one).
+    """
+    held = pool.get(CALL_CONTEXT, _MISSING)
+    if call_context is None:
+        return {**pool, CALL_CONTEXT: {} if held is _MISSING else held}
+    # Two conjuncts: test_a_condition_naming_the_call_context_is_handed_the_dict_passed
+    # fails without the first (a pool with no context of its own), and
+    # test_the_call_context_passed_else_the_pool_s_else_a_fresh_one without
+    # the second (the pool's own dict passed back).
+    if held is not _MISSING and held is not call_context:
+        raise ImproperlyConfigured(
+            "call_context was passed beside a different call_context in the pool. A call has "
+            "one context: pass it once, or pass the same dict the pool carries."
+        )
+    return {**pool, CALL_CONTEXT: call_context}
 
 
 def answer_operation_condition(

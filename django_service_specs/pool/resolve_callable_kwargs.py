@@ -19,7 +19,7 @@ def resolve_callable_kwargs(
     ``selector``, ``extend_queryset``, a service — binds through this one rule,
     so a callable written for one entry point runs unchanged on another: it
     names what it wants and gets exactly that, or takes ``**kwargs`` for the
-    whole pool.
+    rest of the pool, which is every entry but the call's context.
 
     If ``fn`` declares ``**kwargs``, the entire pool is passed, except a name
     handed by name only (``BY_NAME_ONLY_POOL_NAMES``, the call's context),

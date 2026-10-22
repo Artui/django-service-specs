@@ -343,15 +343,25 @@ def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() 
     assert seen == [{"user", "progress"}]
 
 
-def test_the_call_context_passed_or_a_fresh_one_replaces_one_in_the_pool() -> None:
-    """``pool`` is the transport's; the parameter is what a condition is handed."""
+def test_the_call_context_passed_else_the_pool_s_else_a_fresh_one() -> None:
+    """A pool carrying the call's context is the call's own; a parameter naming the same is welcome."""
     handed: list[Any] = []
-    stale: dict[str, Any] = {"stale": True}
-    pool = {**base_pool(user=None), "call_context": stale}
-    context: dict[str, Any] = {}
-    enforce_affordances(_naming_it(handed), pool, instance=None, call_context=context)
+    held: dict[str, Any] = {}
+    pool = {**base_pool(user=None), "call_context": held}
     enforce_affordances(_naming_it(handed), pool, instance=None)
-    passed, _, fresh, _ = handed
-    assert passed is context
+    enforce_affordances(_naming_it(handed), pool, instance=None, call_context=held)
+    enforce_affordances(_naming_it(handed), base_pool(user=None), instance=None)
+    from_pool, _, passed, _, fresh, _ = handed
+    assert from_pool is held
+    assert passed is held
     assert fresh == {}
-    assert fresh is not stale
+    assert fresh is not held
+
+
+def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
+    """Two claimants to one name, as dispatch refuses every other: neither is chosen quietly."""
+    handed: list[Any] = []
+    pool = {**base_pool(user=None), "call_context": {}}
+    with pytest.raises(ImproperlyConfigured, match="call_context"):
+        enforce_affordances(_naming_it(handed), pool, instance=None, call_context={})
+    assert handed == []

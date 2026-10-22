@@ -56,6 +56,14 @@ class TestAmbientPool:
     # The filter is ``key in reserved and key not in PER_CALL_POOL_NAMES``. The
     # first test holds the first half and the second test the second: delete
     # either half and exactly that test fails.
+    def test_the_call_context_is_ambient_whatever_reserved_names(self) -> None:
+        """The affordance functions set the key themselves, so a narrower ``reserved`` keeps it."""
+        context: dict[str, Any] = {}
+        pool = {"user": "ada", "call_context": context}
+        ambient = ambient_pool(pool, reserved=RESERVED_POOL_SEEDS - {"call_context"})
+        assert ambient == {"user": "ada", "call_context": context}
+        assert ambient["call_context"] is context
+
     def test_a_spread_argument_is_not_ambient(self) -> None:
         pool = {"user": "ada", "title": "Final", "tenant": "t"}
         assert ambient_pool(pool, reserved=TENANT_SEEDS.reserved) == {"user": "ada", "tenant": "t"}

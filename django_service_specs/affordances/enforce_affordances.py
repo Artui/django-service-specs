@@ -11,6 +11,7 @@ from django.db.models import Model
 from django_service_specs.affordances.utils import (
     affordance_expression,
     answer_operation_condition,
+    with_call_context,
 )
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -19,7 +20,7 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
-from django_service_specs.types.utils import CALL_CONTEXT, is_row_condition
+from django_service_specs.types.utils import is_row_condition
 
 
 def enforce_affordances(
@@ -73,9 +74,9 @@ def enforce_affordances(
 
     ``call_context`` is the call's context, handed to a callable condition
     that names it and never to one taking ``**kwargs`` for the rest: the dict
-    passed, or a fresh one the conditions of this call share. It replaces any
-    ``call_context`` entry in ``pool``
-    (test_the_call_context_passed_or_a_fresh_one_replaces_one_in_the_pool).
+    passed, else the one ``pool`` carries, else a fresh one the conditions of
+    this call share. A ``call_context`` passed beside a different one in
+    ``pool`` raises ``ImproperlyConfigured`` (``with_call_context``).
 
     Raises:
         ActionUnavailable: An affordance is not met.
@@ -96,7 +97,7 @@ def enforce_affordances(
     affordances: Sequence[Affordance] | None = compiled.affordances
     if not affordances:
         return
-    pool = {**pool, CALL_CONTEXT: {} if call_context is None else call_context}
+    pool = with_call_context(pool, call_context)
     row_flags: dict[int, bool] | None = None
     for index, affordance in enumerate(affordances):
         if is_row_condition(affordance.when):
