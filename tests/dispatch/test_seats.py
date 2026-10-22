@@ -318,8 +318,8 @@ class _TitleForm(forms.Form):
 def test_a_validator_field_an_untyped_input_data_may_fill(
     ada: Any, entry: Any, answers: bool
 ) -> None:
-    # Relaxed at step one, and the Validator refuses it if nobody filled it,
-    # which is where a Validator field is already refused.
+    # Relaxed at step one, and refused by dispatch before the Validator runs
+    # if nobody filled it, in the shape check's words.
     service = Record()
     spec = ServiceSpec(
         service=service,
@@ -450,6 +450,58 @@ def test_a_many_row_field_nobody_filled_is_refused_in_its_row(ada: Any) -> None:
     assert caught.value.detail == {"items": {0: {"title": REQUIRED}}}
     assert validator.calls == [{"title": "t"}]
     assert service.calls == []
+
+
+class _TitleAndBodyForm(forms.Form):
+    title = forms.CharField()
+    body = forms.CharField()
+
+    def clean_body(self) -> str:
+        raise forms.ValidationError("bad body")
+
+
+class _MaybeTitle(TypedDict, total=False):
+    title: str
+
+
+def _no_title() -> _MaybeTitle:
+    return {}
+
+
+def test_a_field_nobody_filled_answers_without_the_validator_s_refusals_of_other_fields(
+    ada: Any,
+) -> None:
+    # Holds the changelog's claim that the presence check's refusal is its own
+    # answer: the Validator never runs, so its refusal of ``body`` waits until
+    # ``title`` is supplied, where it once came back in the same tree.
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=FormValidator(_TitleAndBodyForm),
+        input_data=_no_title,
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"body": "x"})
+    assert caught.value.detail == {"title": REQUIRED}
+
+
+def test_a_caller_s_shape_error_answers_before_a_field_nobody_filled(ada: Any) -> None:
+    # Holds the changelog's claim that the caller's other shape errors answer
+    # first: the shape check refuses ``count`` alone, before any provider runs,
+    # and the missing ``title`` is not reported beside it.
+    calls: list[None] = []
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=Fields(
+            Parameter("title", "string", required=True), Parameter("count", "integer")
+        ),
+        input_data=_untyped({}, calls),
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        dispatch(spec, principal=ada, arguments={"count": "x"})
+    assert caught.value.detail == {"count": ["Expected an integer."]}
+    assert calls == []
 
 
 def test_a_partial_spec_s_field_nobody_filled_is_still_not_required(ada: Any) -> None:
