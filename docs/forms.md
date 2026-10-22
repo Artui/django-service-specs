@@ -260,6 +260,8 @@ what it wants:
   where there is none;
 - every seed the call's
   [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] register;
+- `call_context`, the call's context, the one dict every stage of the call
+  shares ([the call's context](dispatching.md#the-calls-context));
 - the target, under the name the service receives it by: `instance` for a
   spec with an instance selector, `None` when one declaring `allow_none`
   finds no row, `collection` for one with a collection selector, and neither
@@ -296,8 +298,9 @@ builds it the same way.
 
 ## The call's context
 
-`FormValidator` itself reads nothing of the call's context. A Validator built
-on the adapter reads it, and writes to it, from the
+`FormValidator` hands the call's context to `form_kwargs` when it names it,
+and reads nothing of it otherwise. A Validator built on the adapter reads it,
+and writes to it, from the
 [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
 its `validate()` is handed, as `call_context`: the one dict the stages of a
 call share, so a later stage reuses what the Validator put there

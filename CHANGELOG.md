@@ -38,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   convention.
 - **A permission check opts into the call's context, its arguments and the
   registered seeds by name.** `has_permission`, `has_object_permission` and
-  `has_scope_permission` may declare keyword-only `call_context`, beside
-  `arguments`, and any registered seed; `authorize`, `authorize_target` and
+  `has_scope_permission` may name `call_context`, beside `arguments`, and
+  any registered seed, as a parameter the call does not fill by position; `authorize`, `authorize_target` and
   `authorize_scope` take `call_context=` and `seeds=` to offer them. Only the
   seeds a spec's checks name resolve before the checks, and the run reuses
   those values, so each seed resolves once per call and the check and the

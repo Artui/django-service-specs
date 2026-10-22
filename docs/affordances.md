@@ -136,7 +136,9 @@ docs/examples/affordances.py:dispatch
 is that step, exported for a transport that runs a service itself. It calls it
 after authorization and validation and before the service, with the pool
 seeds' `reserved` set, or a condition the direct path refuses is skipped on
-that one:
+that one, and with the call's `call_context=`, so a condition naming it is
+handed the dict the call's other stages share (the parameter, else one the
+pool carries, else a fresh one; two different dicts are refused):
 
 ```python
 --8<--
