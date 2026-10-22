@@ -26,7 +26,9 @@ the async entry point:
    parameters are not refused, nor one its `input_data` provider is annotated
    to fill.
 2. **Class-level authorization**: every permission check's `has_permission`,
-   or the [grant](#grants) a transport passed instead.
+   or the [grant](#grants) a transport passed instead. A seed a check names
+   is resolved just before it, and only such a seed
+   ([permissions](#permissions)).
 3. **Target resolution**: a read's own selector, or a write's instance or
    collection selector, called with the arguments its `reads` declare and
    what its `kwargs` provider returns, then shaped. A retrieve that finds

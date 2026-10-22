@@ -40,7 +40,7 @@ callable only by its name.
 | `result` | The service's return | The output selector, which is handed it as `instance` too |
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
-| `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable that names it, never a `**kwargs` catch-all |
+| `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable that names it but a seed's resolver, never a `**kwargs` catch-all |
 
 The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
 `result`, `queryset` and `call_context` - are
