@@ -20,7 +20,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   output selector's. A name a read, the target selector, the `many` list or
   the Validator also declares is refused, as is a seed's name and a key a
   provider is annotated to fill; so is a nested selector declaring shapes of
-  its own, since the outer spec's call is the one presented.
+  its own, since the outer spec's call is the one presented. A partial call
+  keeps a required shape required, as it keeps the reads.
+- **`dispatch(call_context=...)`: the call's context, handed to every
+  stage.** `dispatch`, `adispatch`, `check_call`, `bind_arguments` and
+  `resolve_target` take the transport's `dict` for its scope - a request, an
+  agent run - and a fresh one when none is passed. The same object, never a
+  copy, reaches every callable that names `call_context`: the selectors, the
+  providers, the preconditions, the affordance conditions, the service, the
+  output selector, `FormValidator(form_kwargs=)`, the Validator's and the
+  presenter's contexts, and a `PydanticValidator`'s field validators, on
+  pydantic's `info.context` beside `principal` and `target`. `create_model`,
+  `update_model`, `delete_model` and their async twins hand it on to the row
+  services and scopes they call, so a nested service reuses what an outer
+  stage put there. The kernel writes nothing to it and pre-fills nothing;
+  what a transport puts there, such as DRF's `request`, is that transport's
+  convention.
+- **A permission check opts into the call's context, its arguments and the
+  registered seeds by name.** `has_permission`, `has_object_permission` and
+  `has_scope_permission` may declare keyword-only `call_context`, beside
+  `arguments`, and any registered seed; `authorize`, `authorize_target` and
+  `authorize_scope` take `call_context=` and `seeds=` to offer them. Only the
+  seeds a spec's checks name resolve before the checks, and the run reuses
+  those values, so each seed resolves once per call and the check and the
+  service see one value. A seed raising `PrincipalUnavailable` there ends the
+  call as a refusal does. A positional parameter never opts in.
+- **`call_context=` on `unmet_operation_affordance`, `enforce_affordances`
+  and their async twins.** The dict passed, else one the pool carries, else
+  a fresh one; two different dicts are refused with `ImproperlyConfigured`.
 - **`call_context` on `ValidationContext` and `PresentationContext`: the
   call's context.** One plain `dict` the transport creates for its natural
   scope - a request, an agent run - shared by the Validator and the presenter
@@ -57,6 +84,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `many` spec with none, which presents its return as a list already. A
   transport that pages reads it beside `many`: it pages by the spec, never by
   a result's kind.
+
+### Changed
+- **`call_context` is a reserved pool name**, in `RESERVED_POOL_SEEDS`: a
+  seed, a provider, an overlay or an argument naming it is refused. A
+  transport or test pinning the reserved set exactly sees one more name.
+- **`resolve_callable_kwargs` withholds `call_context` from a `**kwargs`
+  catch-all.** The call's context reaches a callable only by its name, so a
+  catch-all receives the rest of the pool but not the context unless it names
+  it too. A caller passing its own pool with a `call_context` key sees the
+  difference. It follows that a hand-written service handing its `**kwargs`
+  on as a helper's `context=` hands on no call context: one whose nested row
+  services should see it names `call_context` and hands it on beside the
+  pool, as `create_model` does.
 
 ## [0.13.0] — 2026-10-21
 
