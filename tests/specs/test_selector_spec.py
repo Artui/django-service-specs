@@ -3,13 +3,20 @@ from __future__ import annotations
 import dataclasses
 import re
 import sys
+from collections.abc import Callable
+from typing import Any
 
 import django_filters
 import pytest
+from asgiref.sync import async_to_sync
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -463,3 +470,96 @@ class TestDerive:
         message = f"SelectorSpec.derive() takes the spec's own fields, and not {named}."
         with pytest.raises(TypeError, match=re.escape(message)):
             listing().derive(**changes)
+
+
+FIELDS = Parameters.of(Parameter("fields", "array", items="string"))
+
+
+class _FillsFields(TypedDict):
+    fields: list[str]
+
+
+def _fields() -> _FillsFields:
+    return {"fields": ["name"]}
+
+
+class TestShapes:
+    """``shapes``: the arguments that shape what the presenter renders.
+
+    Every spec here is built inside its test rather than at module level, so a
+    tree without the field fails each test on its own rather than the module.
+    """
+
+    def test_none_by_default(self) -> None:
+        assert SelectorSpec(kind=SelectorKind.LIST, selector=list).shapes == Parameters()
+
+    def test_the_parameters_are_the_reads_then_the_shapes(self) -> None:
+        spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, shapes=FIELDS)
+        assert [p.name for p in spec.parameters()] == ["pk", "fields"]
+
+    def test_the_input_schema_describes_each_shape(self) -> None:
+        spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, shapes=FIELDS)
+        assert set(spec_input_schema(spec)["properties"]) == {"pk", "fields"}
+
+    @pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
+    def test_a_shape_is_kept_out_of_the_selector_s_pool(self, entry: Callable[..., Any]) -> None:
+        """Part of the closed set, so the call is not refused for sending one,
+        and never handed to the selector, whose ``fields`` keeps its default."""
+
+        def rows(fields: Any = "absent") -> list[Any]:
+            return [fields]
+
+        spec = SelectorSpec(
+            kind=SelectorKind.LIST, selector=rows, permissions=[Unrestricted()], shapes=FIELDS
+        )
+        result = entry(spec, principal=AnonymousUser(), arguments={"fields": ["name"]})
+        assert list(result.value) == ["absent"]
+
+    def test_anything_but_parameters_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"SelectorSpec\.shapes must be Parameters"):
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, shapes=())  # ty: ignore[invalid-argument-type]
+
+    def test_a_shape_named_after_a_reserved_seed_is_refused(self) -> None:
+        shapes = Parameters.of(Parameter("user", "string"))
+        with pytest.raises(ImproperlyConfigured, match=r"SelectorSpec\.shapes declares .*'user'"):
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, shapes=shapes)
+
+    def test_a_shape_a_read_also_declares_is_refused(self) -> None:
+        reads = Parameters.of(Parameter("fields", "string"))
+        with pytest.raises(ImproperlyConfigured, match=r"\['fields'\] are declared by two sources"):
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=reads, shapes=FIELDS)
+
+    def test_a_shape_a_filter_also_declares_is_refused(self) -> None:
+        # After the filters join the reads, so a filter is compared as a read.
+        shapes = Parameters.of(Parameter("title", "string"))
+        with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):
+            listing(filter_set=TitleFilter, shapes=shapes)
+
+    def test_a_kwargs_provider_annotated_to_fill_a_shape_is_refused(self) -> None:
+        """Its values reach the selector's pool and never the shapes, so the
+        key would be reported as the server's while dispatch still asked the
+        caller for it."""
+        with pytest.raises(
+            ImproperlyConfigured,
+            match=r"SelectorSpec\.kwargs is annotated to fill \['fields'\].*No provider fills "
+            r"SelectorSpec\.shapes",
+        ):
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, shapes=FIELDS, kwargs=_fields)
+
+    def test_a_kwargs_provider_filling_other_keys_is_accepted(self) -> None:
+        spec = SelectorSpec(
+            kind=SelectorKind.RETRIEVE, selector=list, reads=PK, shapes=FIELDS, kwargs=_pk
+        )
+        assert spec.kwargs is _pk
+
+    def test_a_derived_spec_replaces_its_shapes(self) -> None:
+        base = SelectorSpec(kind=SelectorKind.LIST, selector=list, shapes=FIELDS)
+        assert base.derive(shapes=Parameters()).parameters() == Parameters()
+
+
+class _FillsPk(TypedDict):
+    pk: int
+
+
+def _pk() -> _FillsPk:
+    return {"pk": 1}

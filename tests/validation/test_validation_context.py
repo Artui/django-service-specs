@@ -61,3 +61,46 @@ def test_two_contexts_differing_in_resolved_alone_are_equal() -> None:
 def test_a_context_carrying_a_resolved_target_is_hashable() -> None:
     context = ValidationContext("ada", "row", resolved=MappingProxyType({"instance": "row"}))
     assert hash(context) == hash(ValidationContext("ada", "row"))
+
+
+def test_a_context_built_by_hand_carries_an_empty_call_context() -> None:
+    """A plain ``dict`` every context has, so a Validator declaring nothing
+    else still reads and writes one without guarding for ``None``."""
+    context = ValidationContext("ada", "row")
+    assert type(context.call_context) is dict
+    assert context.call_context == {}
+
+
+def test_each_context_built_by_hand_has_a_call_context_of_its_own() -> None:
+    """A fresh dict per context, never one shared default every call writes to."""
+    assert ValidationContext("ada").call_context is not ValidationContext("ada").call_context
+
+
+def test_the_call_context_is_the_object_handed_in() -> None:
+    """The same dict, not a copy: what a Validator writes is there for every
+    later stage of the call that holds it."""
+    shared: dict[str, object] = {}
+    context = ValidationContext("ada", call_context=shared)
+    context.call_context["tenant"] = "a"
+    assert shared == {"tenant": "a"}
+
+
+def test_the_call_context_trails_every_other_field() -> None:
+    """Built positionally as dispatch builds the rest, so no existing
+    construction changes."""
+    shared: dict[str, object] = {"request": None}
+    context = ValidationContext(
+        "ada", "row", True, MappingProxyType({}), MappingProxyType({}), shared
+    )
+    assert context.call_context is shared
+
+
+def test_two_contexts_differing_in_call_context_alone_are_equal() -> None:
+    one = ValidationContext("ada", "row", call_context={"tenant": "a"})
+    assert one == ValidationContext("ada", "row", call_context={"tenant": "b"})
+
+
+def test_a_context_carrying_a_call_context_is_hashable() -> None:
+    """A dict cannot be hashed, so the call's context stays out of the hash."""
+    context = ValidationContext("ada", "row", call_context={"tenant": "a"})
+    assert hash(context) == hash(ValidationContext("ada", "row"))

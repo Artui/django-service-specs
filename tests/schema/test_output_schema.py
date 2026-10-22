@@ -299,3 +299,47 @@ class TestNothingElse:
         first["properties"]["publisher"]["properties"]["name"]["x-mine"] = True
 
         assert "x-mine" not in output_schema(BOOK)["properties"]["publisher"]["properties"]["name"]
+
+
+class TestJsonSchemaExtra:
+    """An OutputField's ``json_schema_extra`` joins the schema the declaration builds."""
+
+    def test_its_keys_join_the_field_s_own_node(self) -> None:
+        field = OutputField(
+            "code",
+            "string",
+            nullable=True,
+            label="Code",
+            json_schema_extra={"pattern": "^[A-Z]{3}$"},
+        )
+        assert output_schema(Output((field,)))["properties"]["code"] == {
+            "type": ["string", "null"],
+            "title": "Code",
+            "pattern": "^[A-Z]{3}$",
+        }
+
+    def test_a_nested_field_s_keys_join_its_own_node(self) -> None:
+        inner = Output((OutputField("code", "string", json_schema_extra={"pattern": "^[A-Z]"}),))
+        field = OutputField("rows", "array", items=inner)
+        node = output_schema(Output((field,)))["properties"]["rows"]
+        assert node["items"]["properties"]["code"] == {"type": "string", "pattern": "^[A-Z]"}
+
+    def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
+        """As on input: every top-level key a node can carry from its fields is
+        refused, and nothing else is, but ``const``, which is the choices' to
+        state. Imported here, so a tree without the table fails this test
+        alone."""
+        from django_service_specs.types.utils import OUTPUT_FIELD_SCHEMA_KEYWORDS
+
+        catalogue = Output(
+            (
+                OutputField("tags", "array", items="string"),
+                OutputField("address", "object", fields=Output((OutputField("city", "string"),))),
+                OutputField("on", "string", format="date", label="On", nullable=True),
+                OutputField("size", "string", choices=(("s", "s"), ("m", "m"))),
+                OutputField("tier", "string", choices=(("a", "Gold"),)),
+            )
+        )
+        nodes = output_schema(catalogue)["properties"].values()
+        stated = {key for node in nodes for key in node}
+        assert stated == OUTPUT_FIELD_SCHEMA_KEYWORDS.keys() - {"const"}

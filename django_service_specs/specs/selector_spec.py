@@ -16,6 +16,7 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.utils import (
     check_callable,
     check_changes,
@@ -53,8 +54,21 @@ class SelectorSpec:
             authorization belongs to the spec being dispatched.
         reads: The arguments the selector reads with no Validator in front of
             it - its filters, its ordering, the key of the row it retrieves.
-            They are the spec's whole Parameters, so the closed argument set and
-            the shape check both apply to them.
+            With ``shapes`` they are the spec's whole Parameters, so the closed
+            argument set and the shape check both apply to them.
+        shapes: The arguments that shape what the presenter renders rather
+            than which rows are read - which fields, a query over each row -
+            as a Parameters group of their own. Part of ``parameters()``,
+            after the ``reads``, so the schema, the closed argument set and
+            the shape check cover them as any argument; never in the
+            selector's pool, so the selector, its ``extend_queryset`` and its
+            ``filter_set`` never see them. What the caller sent for them
+            reaches the presenter alone, on
+            [`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext].
+            A name a read or a filter also declares is refused, as is one
+            dispatch seeds and one the ``kwargs`` provider is annotated to
+            fill, since no provider's values reach them. Refused on a nested
+            selector, whose presenter presents no call of its own.
         presenter: Renders the rows. Not read on an instance or collection
             selector, whose rows the service consumes rather than returns.
         allow_none: On a ``RETRIEVE``, a missing row is the value ``None``
@@ -146,6 +160,9 @@ class SelectorSpec:
     selector: Callable[..., Any]
     permissions: Sequence[PermissionCheck] | None = None
     reads: Parameters = field(default_factory=Parameters)
+    # Beside ``reads`` and named for what the arguments do, as ``reads`` is:
+    # they shape the output, and the presenter is their one reader.
+    shapes: Parameters = field(default_factory=Parameters)
     presenter: Presenter | None = None
     allow_none: bool = False
     select_related: Sequence[str] | None = None
@@ -222,6 +239,7 @@ class SelectorSpec:
         # read named ``user`` is:
         # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
         check_reserved(self.reads, label=f"{label}.reads")
+        _check_shapes(self)
         check_presenter(self.presenter, label=label)
         for name in ("select_related", "prefetch_related"):
             value = getattr(self, name)
@@ -235,6 +253,9 @@ class SelectorSpec:
             check_callable(self.extend_queryset, label=f"{label}.extend_queryset", sync=True)
         _check_affordances(self)
         check_providers(self, ("kwargs", "progress_reporter"), label=label)
+        # After ``check_providers`` has proved it callable, so a value that is
+        # no callable is still refused as one.
+        _check_shapes_unfilled(self)
         object.__setattr__(
             self, "preconditions", check_preconditions(self.preconditions, label=label)
         )
@@ -281,8 +302,13 @@ class SelectorSpec:
         return self
 
     def parameters(self) -> Parameters:
-        """Everything this spec takes: its ``reads``."""
-        return self.reads
+        """Everything this spec takes: its ``reads``, then its ``shapes``."""
+        # The reads themselves where there are no shapes, so a spec declaring
+        # none hands back the object it holds
+        # (test_defaults_and_normalization), as it did before shapes existed.
+        if not self.shapes:
+            return self.reads
+        return self.reads + self.shapes
 
     def output(self) -> Output | None:
         """What this spec returns, as its presenter declares it, or ``None``."""
@@ -340,6 +366,45 @@ def _read_filters(spec: SelectorSpec) -> None:
     added = Parameters(tuple(p for p in filters if p not in own.items))
     object.__setattr__(spec, "reads", own + added)
     object.__setattr__(spec, "_filter_reads", added)
+
+
+def _check_shapes(spec: SelectorSpec) -> None:
+    """Refuse ``shapes`` that are not Parameters, name a seed, or repeat a read.
+
+    After the filters join the reads, so a filter is compared as a read is
+    (TestShapes.test_a_shape_a_filter_also_declares_is_refused). A shape
+    never reaches a pool today, and a seed's name is refused anyway: the
+    names a selector's pool may one day carry stay free of the seeds, as
+    every parameter's are.
+    """
+    if not isinstance(spec.shapes, Parameters):
+        raise ImproperlyConfigured("SelectorSpec.shapes must be Parameters.")
+    check_reserved(spec.shapes, label="SelectorSpec.shapes")
+    # ``+`` refuses a name both declare (TestShapes.test_a_shape_a_read_also_declares_is_refused).
+    spec.reads + spec.shapes
+
+
+def _check_shapes_unfilled(spec: SelectorSpec) -> None:
+    """Refuse a ``kwargs`` provider annotated to fill a shape.
+
+    Its values are merged into the selector's pool, and a shape never is, so
+    a key it fills would be reported by ``server_owned_keys`` as the
+    server's while dispatch still demanded it of the caller. Only a
+    ``filled`` key of a provider whose return names its keys, as for the
+    service spec's seats
+    (TestShapes.test_a_kwargs_provider_filling_other_keys_is_accepted).
+    """
+    keys = provider_keys(spec.kwargs)
+    if keys is None:
+        return
+    stray = sorted(keys.filled & spec.shapes.names())
+    if stray:
+        raise ImproperlyConfigured(
+            f"SelectorSpec.kwargs is annotated to fill {stray}, which SelectorSpec.shapes "
+            f"declares, and its values never reach SelectorSpec.shapes, so dispatch would still "
+            f"demand {stray} of the caller. No provider fills SelectorSpec.shapes, whose values "
+            "reach only the presenter; rename the key."
+        )
 
 
 def _check_affordances(spec: SelectorSpec) -> None:

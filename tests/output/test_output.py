@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from decimal import Decimal
+from typing import Any
+
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
@@ -115,3 +118,70 @@ def test_is_ordered_by_declaration() -> None:
 def test_a_name_declared_twice_is_refused() -> None:
     with pytest.raises(ImproperlyConfigured, match=r"\['id'\] more than once"):
         Output((ID, OutputField("id", "string")))
+
+
+class TestJsonSchemaExtra:
+    """``json_schema_extra``: schema keys an OutputField's own fields cannot spell."""
+
+    def test_none_by_default(self) -> None:
+        assert OutputField("code", "string").json_schema_extra is None
+
+    def test_it_is_kept_as_a_copy_of_its_own(self) -> None:
+        given = {"pattern": "^[A-Z]{3}$", "examples": [["GBP"]]}
+        field = OutputField("code", "string", json_schema_extra=given)
+        given["pattern"] = "changed"
+        given["examples"][0].append("changed")
+        assert field.json_schema_extra == {"pattern": "^[A-Z]{3}$", "examples": [["GBP"]]}
+
+    def test_a_field_carrying_one_is_hashable_and_compared_by_it(self) -> None:
+        one = OutputField("code", "string", json_schema_extra={"pattern": "^a"})
+        assert hash(one) == hash(OutputField("code", "string"))
+        assert one != OutputField("code", "string", json_schema_extra={"pattern": "^b"})
+
+    @pytest.mark.parametrize(
+        ("value", "message"),
+        [
+            pytest.param(["pattern"], "is list, not a mapping", id="not-a-mapping"),
+            pytest.param({1: "x"}, r"keys must be strings; got \[1\]", id="a-key-not-a-string"),
+        ],
+    )
+    def test_a_value_no_schema_could_carry_is_refused(self, value: Any, message: str) -> None:
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"OutputField 'code': json_schema_extra {message}"
+        ):
+            OutputField("code", "string", json_schema_extra=value)
+
+    @pytest.mark.parametrize(
+        ("keyword", "owner"),
+        [
+            pytest.param("type", "type and nullable", id="type"),
+            pytest.param("items", "items", id="items"),
+            pytest.param("properties", "fields", id="properties"),
+            pytest.param("required", "fields", id="required"),
+            pytest.param("format", "format", id="format"),
+            pytest.param("enum", "choices", id="enum"),
+            pytest.param("oneOf", "choices", id="oneOf"),
+            pytest.param("const", "choices", id="const"),
+            pytest.param("title", "label", id="title"),
+        ],
+    )
+    def test_a_keyword_a_field_states_is_refused_whatever_the_field_declares(
+        self, keyword: str, owner: str
+    ) -> None:
+        """As on ``Parameter``: refused from the declaration, not from one
+        build of it, and the message names the field that states it."""
+        with pytest.raises(ImproperlyConfigured) as refused:
+            OutputField("code", "string", json_schema_extra={"pattern": "^a", keyword: "x"})
+        assert str(refused.value).startswith(
+            f"OutputField 'code': json_schema_extra states {keyword!r}, which the schema takes "
+            f"from {owner}."
+        )
+
+    def test_a_value_json_cannot_carry_is_refused_naming_its_key(self) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            OutputField("code", "string", json_schema_extra={"examples": [Decimal("1.5")]})
+        message = str(refused.value)
+        assert message.startswith(
+            "OutputField 'code': json_schema_extra['examples'] is no JSON value"
+        )
+        assert "which the schema takes from" not in message

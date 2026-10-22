@@ -2,15 +2,20 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import pytest
+from asgiref.sync import async_to_sync
+from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -889,3 +894,167 @@ class TestDerive:
         message = f"ServiceSpec.derive() takes the spec's own fields, and not {named}."
         with pytest.raises(TypeError, match=re.escape(message)):
             self._base().derive(**changes)
+
+
+FIELDS = Parameters.of(Parameter("fields", "array", items="string"))
+
+
+class _FillsFields(TypedDict):
+    fields: list[str]
+
+
+def _fields() -> _FillsFields:
+    return {"fields": ["name"]}
+
+
+class _Recording(Validator):
+    """A Validator declaring ``title``, keeping the arguments it was handed."""
+
+    def __init__(self) -> None:
+        self.handed: dict[str, Any] = {}
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string"))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.handed = dict(arguments)
+        return dict(arguments)
+
+
+class TestShapes:
+    """``shapes``: the arguments that shape what the presenter renders.
+
+    Every spec here is built inside its test rather than at module level, so a
+    tree without the field fails each test on its own rather than the module.
+    """
+
+    def test_none_by_default(self) -> None:
+        assert ServiceSpec(service=print).shapes == Parameters()
+
+    def test_shapes_sit_after_the_reads_and_before_the_validator_s(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            reads=Parameters.of(Parameter("project_pk", "integer", required=True)),
+            shapes=FIELDS,
+            validator=Titled(),
+            instance_selector_spec=RETRIEVE,
+        )
+        assert [p.name for p in spec.parameters()] == ["pk", "project_pk", "fields", "title"]
+
+    def test_a_many_spec_takes_them_beside_its_reads_and_before_the_list(self) -> None:
+        reads = Parameters.of(Parameter("confirmed", "boolean"))
+        spec = ServiceSpec(service=print, many=True, validator=Titled(), reads=reads, shapes=FIELDS)
+        assert [p.name for p in spec.parameters()] == ["confirmed", "fields", "items"]
+
+    def test_the_input_schema_describes_each_shape_in_the_closed_set(self) -> None:
+        spec = ServiceSpec(service=print, shapes=FIELDS, validator=Titled())
+        schema = spec_input_schema(spec)
+        assert schema["properties"]["fields"] == {
+            "type": "array",
+            "items": {"type": "string"},
+            "maxItems": 1000,
+        }
+        assert schema["additionalProperties"] is False
+
+    @pytest.mark.django_db
+    @pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
+    def test_a_shape_reaches_neither_the_validator_nor_the_service(
+        self, entry: Callable[..., Any]
+    ) -> None:
+        """Part of the closed set, so the call is not refused for sending one,
+        and kept out of the Validator's arguments and the run's pool, whose
+        ``fields`` keeps its default."""
+        received: dict[str, Any] = {}
+
+        def service(*, data: Any, fields: Any = "absent") -> None:
+            received.update(data=data, fields=fields)
+
+        validator = _Recording()
+        spec = ServiceSpec(
+            service=service, permissions=[Unrestricted()], shapes=FIELDS, validator=validator
+        )
+        entry(spec, principal=AnonymousUser(), arguments={"title": "t", "fields": ["name"]})
+        assert validator.handed == {"title": "t"}
+        assert received == {"data": {"title": "t"}, "fields": "absent"}
+
+    def test_a_shape_s_declaration_is_shape_checked(self) -> None:
+        spec = ServiceSpec(service=print, permissions=[Unrestricted()], shapes=FIELDS)
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=AnonymousUser(), arguments={"fields": "name"})
+        assert "fields" in refused.value.detail
+
+    def test_anything_but_parameters_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"ServiceSpec\.shapes must be Parameters"):
+            ServiceSpec(service=print, shapes=[Parameter("fields", "string")])  # ty: ignore[invalid-argument-type]
+
+    def test_a_shape_named_after_a_reserved_seed_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"ServiceSpec\.shapes declares .*'user'"):
+            ServiceSpec(service=print, shapes=Parameters.of(Parameter("user", "string")))
+
+    def test_a_shape_a_read_also_declares_is_refused(self) -> None:
+        reads = Parameters.of(Parameter("fields", "string"))
+        with pytest.raises(ImproperlyConfigured, match=r"\['fields'\] are declared by two sources"):
+            ServiceSpec(service=print, reads=reads, shapes=FIELDS)
+
+    def test_a_shape_the_target_selector_reads_is_refused(self) -> None:
+        shapes = Parameters.of(Parameter("pk", "integer"))
+        with pytest.raises(ImproperlyConfigured, match=r"\['pk'\] are declared by two sources"):
+            ServiceSpec(service=print, shapes=shapes, instance_selector_spec=RETRIEVE)
+
+    def test_a_shape_named_as_the_many_list_is_refused(self) -> None:
+        shapes = Parameters.of(Parameter("items", "string"))
+        with pytest.raises(ImproperlyConfigured, match=r"\['items'\] are declared by two sources"):
+            ServiceSpec(service=print, many=True, validator=Titled(), shapes=shapes)
+
+    def test_a_shape_the_validator_also_declares_is_refused_when_read(self) -> None:
+        # The Validator's names are read lazily, as everywhere in parameters().
+        shapes = Parameters.of(Parameter("title", "string"))
+        spec = ServiceSpec(service=print, shapes=shapes, validator=Titled())
+        with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):
+            spec.parameters()
+
+    @pytest.mark.parametrize(
+        ("changes", "provider"),
+        [
+            pytest.param({"kwargs": _fields}, "ServiceSpec.kwargs", id="kwargs"),
+            pytest.param(
+                {"input_data": _fields, "validator": Bare()},
+                "ServiceSpec.input_data",
+                id="input-data",
+            ),
+            pytest.param(
+                {"instance_selector_spec": dataclasses.replace(RETRIEVE, kwargs=_fields)},
+                r"ServiceSpec\.instance_selector_spec\.kwargs",
+                id="target-kwargs",
+            ),
+        ],
+    )
+    def test_a_provider_annotated_to_fill_a_shape_is_refused(
+        self, changes: dict[str, Any], provider: str
+    ) -> None:
+        """No provider's values reach the shapes, so a key one fills would be
+        reported as the server's while dispatch still asked the caller for it."""
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"{provider} is annotated to fill \['fields'\]"
+        ):
+            ServiceSpec(service=print, shapes=FIELDS, **changes)
+
+    def test_the_refusal_says_no_provider_fills_a_shape(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"No provider fills ServiceSpec\.shapes"):
+            ServiceSpec(service=print, shapes=FIELDS, kwargs=_fields)
+
+    @pytest.mark.parametrize("role", ["instance", "collection", "output"])
+    def test_a_nested_selector_declaring_shapes_is_refused(self, role: str) -> None:
+        """Its presenter never presents this spec's call, or presents it under
+        this spec's shapes; one case per role, since coverage cannot see one
+        dropped from the loop."""
+        kind = SelectorKind.LIST if role == "collection" else SelectorKind.RETRIEVE
+        nested = SelectorSpec(kind=kind, selector=list, shapes=FIELDS)
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"ServiceSpec\.{role}_selector_spec declares shapes"
+        ):
+            ServiceSpec(service=print, **{f"{role}_selector_spec": nested})
+
+    def test_a_derived_spec_replaces_its_shapes(self) -> None:
+        base = ServiceSpec(service=print, shapes=FIELDS)
+        assert base.derive(shapes=Parameters()).shapes == Parameters()
