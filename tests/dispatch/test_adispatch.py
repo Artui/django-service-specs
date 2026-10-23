@@ -1533,21 +1533,32 @@ async def test_a_returns_many_service_is_presented_row_by_row() -> None:
     assert await apresent(spec, result) == [{"title": "First"}, {"title": "Second"}]
 
 
-async def test_a_returns_many_service_returning_one_row_is_the_authors_error() -> None:
+@pytest.mark.parametrize("atomic", [True, False])
+@pytest.mark.parametrize("is_async_service", [True, False])
+async def test_a_returns_many_service_returning_one_row_is_the_authors_error(
+    atomic: bool, is_async_service: bool
+) -> None:
     # The same refusal as the sync path, raised after the service has run and its
-    # write has committed: the note is still there.
+    # write has committed on every route the service can take (the one-hop sync
+    # path, an atomic async service joining it, and a non-atomic async service
+    # awaited on the loop): the note is still there.
     ada = await sync_to_async(make_user)("ada")
 
     def write_the_note(**pool: Any) -> Any:
         Note.objects.create(owner=ada, title="written")
         return {"title": "Only"}
 
+    async def awrite_the_note(**pool: Any) -> Any:
+        await Note.objects.acreate(owner=ada, title="written")
+        return {"title": "Only"}
+
     spec = ServiceSpec(
-        service=write_the_note,
+        service=awrite_the_note if is_async_service else write_the_note,
         permissions=OPEN,
         reads=OWNER_NAME,
         presenter=Titles(),
         returns_many=True,
+        atomic=atomic,
     )
 
     with pytest.raises(

@@ -2004,7 +2004,7 @@ def finish_service(
     # is one value, such as test_a_create_runs_with_the_validated_values_and_no_target,
     # and by the ``None`` tests above.
     if output_spec is None and kind == "list":
-        check_service_rows(spec, result)
+        _check_service_rows(spec, result)
     if output_spec is not None:
         # The service's return under both names djangorestframework-services
         # binds it by, so a re-read declares whichever its author wrote:
@@ -2040,7 +2040,7 @@ def finish_service(
     )
 
 
-def check_service_rows(spec: ServiceSpec, value: Any) -> None:
+def _check_service_rows(spec: ServiceSpec, value: Any) -> None:
     """Refuse a list-presenting service's return that is not a set of rows.
 
     A ``many`` or ``returns_many`` spec with no output selector presents the

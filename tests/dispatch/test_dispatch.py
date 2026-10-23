@@ -3787,9 +3787,10 @@ class TestMany:
         result = dispatch(spec, principal=ada, arguments={"items": []})
         assert result.kind == expected
 
+    @pytest.mark.parametrize("atomic", [True, False])
     @pytest.mark.parametrize(("returned", "name"), NOT_A_SET_OF_ROWS)
     def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
-        self, ada: Any, returned: Any, name: str
+        self, ada: Any, returned: Any, name: str, atomic: bool
     ) -> None:
         # The operands of the check in ``finish_service``, for a ``many`` spec:
         # fails without any of them. The fix it names is not ``returns_many``'s,
@@ -3799,6 +3800,7 @@ class TestMany:
             permissions=OPEN,
             many=True,
             validator=Titled(),
+            atomic=atomic,
         )
 
         with pytest.raises(ImproperlyConfigured) as refused:
@@ -5854,9 +5856,10 @@ class TestReturnsMany:
         assert result.kind == "instance"
         assert present(spec, result) is None
 
+    @pytest.mark.parametrize("atomic", [True, False])
     @pytest.mark.parametrize(("returned", "name"), NOT_A_SET_OF_ROWS)
     def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
-        self, returned: Any, name: str
+        self, returned: Any, name: str, atomic: bool
     ) -> None:
         # ``mapping``, ``str``, ``bytes`` and ``non-iterable`` are each an operand
         # of the one check in ``finish_service``, which fails without it: the
@@ -5870,6 +5873,7 @@ class TestReturnsMany:
             reads=OWNER_NAME,
             presenter=Titles(),
             returns_many=True,
+            atomic=atomic,
         )
 
         with pytest.raises(ImproperlyConfigured) as refused:
