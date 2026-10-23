@@ -3356,6 +3356,27 @@ class Rows(Titled):
         return values
 
 
+# What a list-presenting spec's service must not return: a mapping, a ``str`` and
+# ``bytes`` iterate by key or character rather than by row, and the last two do
+# not iterate at all. One row per operand of the check in ``finish_service``.
+NOT_A_SET_OF_ROWS = [
+    pytest.param({"id": 7, "title": "Only"}, "dict", id="mapping"),
+    pytest.param("done", "str", id="str"),
+    pytest.param(b"done", "bytes", id="bytes"),
+    pytest.param(7, "int", id="non-iterable"),
+]
+
+
+def writes_then_returns(owner: Any, returned: Any) -> Callable[..., Any]:
+    """A named service that writes one note, then returns ``returned``."""
+
+    def write_the_note(**pool: Any) -> Any:
+        Note.objects.create(owner=owner, title="written")
+        return returned
+
+    return write_the_note
+
+
 class TestMany:
     """A ``many`` spec: a list of rows, each checked and validated, then one run.
 
@@ -3765,6 +3786,52 @@ class TestMany:
         )
         result = dispatch(spec, principal=ada, arguments={"items": []})
         assert result.kind == expected
+
+    @pytest.mark.parametrize(("returned", "name"), NOT_A_SET_OF_ROWS)
+    def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
+        self, ada: Any, returned: Any, name: str
+    ) -> None:
+        # The operands of the check in ``finish_service``, for a ``many`` spec:
+        # fails without any of them. The fix it names is not ``returns_many``'s,
+        # which a ``many`` spec does not set, and the write is still there.
+        spec = ServiceSpec(
+            service=writes_then_returns(ada, returned),
+            permissions=OPEN,
+            many=True,
+            validator=Titled(),
+        )
+
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+
+        message = str(refused.value)
+        assert message.startswith("writes_then_returns.<locals>.write_the_note is declared")
+        assert "(many) and returned " + name + "," in message
+        assert "Return the rows, or None to present nothing." in message
+        assert "returns_many" not in message
+        assert "The service has already run, so its write stands." in message
+        assert Note.objects.count() == 1
+
+    def test_a_single_value_is_presented_when_an_output_selector_re_reads_it(
+        self, ada: Any
+    ) -> None:
+        # Holds the ``output_spec is None`` operand of the check in
+        # ``finish_service``: with a selector the service's return is only what
+        # it re-reads, so a summary mapping is not refused.
+        spec = ServiceSpec(
+            service=Record(returns={"written": 1}),
+            permissions=OPEN,
+            many=True,
+            validator=Titled(),
+            output_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE, selector=lambda *, result: result
+            ),
+        )
+
+        result = dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+
+        assert result.kind == "instance"
+        assert result.value == {"written": 1}
 
     def test_its_affordances_and_preconditions_are_answered_once(self, ada: Any) -> None:
         asked: list[str] = []
@@ -5786,6 +5853,43 @@ class TestReturnsMany:
 
         assert result.kind == "instance"
         assert present(spec, result) is None
+
+    @pytest.mark.parametrize(("returned", "name"), NOT_A_SET_OF_ROWS)
+    def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
+        self, returned: Any, name: str
+    ) -> None:
+        # ``mapping``, ``str``, ``bytes`` and ``non-iterable`` are each an operand
+        # of the one check in ``finish_service``, which fails without it: the
+        # return would reach ``present`` as a list and die there on an unrelated
+        # error. Raised as ``ImproperlyConfigured``, not a refusal, because the
+        # service has run; the note it wrote is still there.
+        ada = make_user("ada")
+        spec = ServiceSpec(
+            service=writes_then_returns(ada, returned),
+            permissions=OPEN,
+            reads=OWNER_NAME,
+            presenter=Titles(),
+            returns_many=True,
+        )
+
+        with pytest.raises(ImproperlyConfigured) as refused:
+            dispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+        message = str(refused.value)
+        assert message.startswith("writes_then_returns.<locals>.write_the_note is declared")
+        assert "(returns_many) and returned " + name + "," in message
+        assert "Return the rows, or drop returns_many to present one value." in message
+        assert "The service has already run, so its write stands." in message
+        assert Note.objects.count() == 1
+
+    def test_a_model_instance_is_not_a_set_of_rows(self) -> None:
+        # The realistic single-row return: a model row is not iterable.
+        ada = make_user("ada")
+        note = Note.objects.create(owner=ada, title="Only")
+        spec, _ = returning_many(note, Titles())
+
+        with pytest.raises(ImproperlyConfigured, match=r"\(returns_many\) and returned Note,"):
+            dispatch(spec, principal=ada, arguments={"owner": "ada"})
 
     def test_without_the_field_a_returned_list_is_one_value(self) -> None:
         # The other half of the cases above: the field is what makes the list, so

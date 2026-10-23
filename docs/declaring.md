@@ -334,7 +334,12 @@ refusals. Either is refused on a spec that is not `many`.
 A `many` spec must declare a Validator and no target selector, since a list of
 rows resolves no target, and a condition on the row among its `affordances` is
 refused. With no output selector its result is `kind="list"`, unless the
-service returned `None`.
+service returned `None`, and the service must return the rows: a mapping, a
+`str`, `bytes` or anything else that does not iterate is refused as
+`ImproperlyConfigured`, naming the service and what it returned. It is the
+author's error rather than a validation error, since the service has already
+run and its write stands. With an output selector the return is only what the
+selector re-reads, so any value is allowed.
 
 ### A service returning rows
 
@@ -357,6 +362,10 @@ them, and a transport that pages a list pages by the spec rather than by the
 result's kind (see [serving a page](paging-and-projection.md#serving-a-page)).
 A `None` return stays one value, presented as `None`, as a `many` service's is,
 so `allow_none` still decides whether the schema admits `"null"`.
+A return that is not a set of rows (a single mapping or model row, a `str` or
+`bytes`, anything that does not iterate) is refused as `ImproperlyConfigured`
+naming the service, after the service has run and its write stands: return the
+rows, or drop `returns_many` to present one value.
 
 It is refused when the spec is built beside an `output_selector_spec`, whose
 kind decides what is presented, and beside `many`, which presents its return

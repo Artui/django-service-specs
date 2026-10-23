@@ -150,7 +150,7 @@ A `DispatchResult` has a `kind` and a `value`:
 
 | `kind` | When | `value` |
 | --- | --- | --- |
-| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` or `returns_many` write with no output selector whose service returned something | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
+| `"list"` | A `LIST` read, a write whose output selector is a `LIST`, or a `many` or `returns_many` write with no output selector whose service returned something that is a set of rows (a mapping, `str`, `bytes` or non-iterable is `ImproperlyConfigured`, after the write) | The rows, a queryset when the selector returned one, `[]` when a selector declaring `allow_none` returned `None` |
 | `"instance"` | Everything else that ran | The row, the service's return, or what the output selector re-read |
 | `"not_found"` | A required row does not exist | `None` |
 

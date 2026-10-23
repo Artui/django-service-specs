@@ -44,6 +44,7 @@ from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
     OPEN,
+    OWNER_NAME,
     PK,
     RENAME,
     TENANT_SEEDS,
@@ -1530,6 +1531,32 @@ async def test_a_returns_many_service_is_presented_row_by_row() -> None:
 
     assert result.kind == "list"
     assert await apresent(spec, result) == [{"title": "First"}, {"title": "Second"}]
+
+
+async def test_a_returns_many_service_returning_one_row_is_the_authors_error() -> None:
+    # The same refusal as the sync path, raised after the service has run and its
+    # write has committed: the note is still there.
+    ada = await sync_to_async(make_user)("ada")
+
+    def write_the_note(**pool: Any) -> Any:
+        Note.objects.create(owner=ada, title="written")
+        return {"title": "Only"}
+
+    spec = ServiceSpec(
+        service=write_the_note,
+        permissions=OPEN,
+        reads=OWNER_NAME,
+        presenter=Titles(),
+        returns_many=True,
+    )
+
+    with pytest.raises(
+        ImproperlyConfigured,
+        match=r"write_the_note is declared .*\(returns_many\) and returned dict,",
+    ):
+        await adispatch(spec, principal=ada, arguments={"owner": "ada"})
+
+    assert await sync_to_async(Note.objects.count)() == 1
 
 
 async def test_a_returns_many_service_presents_a_none_return_as_none() -> None:

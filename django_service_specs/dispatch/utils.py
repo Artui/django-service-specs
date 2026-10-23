@@ -13,7 +13,7 @@ transport takes when it binds input for itself.
 from __future__ import annotations
 
 import inspect
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
 from typing import Any, Literal, cast
@@ -1995,6 +1995,16 @@ def finish_service(
     # and TestReturnsMany.test_a_none_return_presents_none the ``None``.
     lists = spec.many or spec.returns_many
     kind: Literal["instance", "list"] = "list" if lists and result is not None else "instance"
+    # With no output selector the return is what is presented, so a list of it
+    # that is not rows is the author's error, raised here rather than as an
+    # unrelated failure inside ``present``. One arc to coverage, so each operand
+    # is named: TestMany.test_a_single_value_is_presented_when_an_output_selector_re_reads_it
+    # holds ``output_spec is None`` (a selector's re-read takes the return as a
+    # single value), and ``kind == "list"`` by every plain service whose return
+    # is one value, such as test_a_create_runs_with_the_validated_values_and_no_target,
+    # and by the ``None`` tests above.
+    if output_spec is None and kind == "list":
+        check_service_rows(spec, result)
     if output_spec is not None:
         # The service's return under both names djangorestframework-services
         # binds it by, so a re-read declares whichever its author wrote:
@@ -2028,6 +2038,38 @@ def finish_service(
             shapes=prepared.shapes,
         ),
     )
+
+
+def check_service_rows(spec: ServiceSpec, value: Any) -> None:
+    """Refuse a list-presenting service's return that is not a set of rows.
+
+    A ``many`` or ``returns_many`` spec with no output selector presents the
+    service's own return as a list, so a return that cannot be one is the
+    author's error: a mapping, a ``str`` or ``bytes`` (iterable, but by key or
+    character rather than by row), or anything else that does not iterate.
+    Raised as ``ImproperlyConfigured``, not a refusal: the service has run and
+    its write stands, so it must not reach a caller as a validation error
+    saying nothing happened.
+
+    The test is one arc to coverage, so each member is a row of
+    ``TestReturnsMany.test_a_return_that_is_not_a_set_of_rows_is_the_authors_error``
+    and ``TestMany.test_a_return_that_is_not_a_set_of_rows_is_the_authors_error``,
+    each of which fails without it: ``mapping``, ``str``, ``bytes`` and
+    ``non-iterable``. The remedy names ``returns_many`` only for a spec that
+    sets it, the same two tests.
+    """
+    if isinstance(value, Mapping | str | bytes) or not isinstance(value, Iterable):
+        remedy = (
+            "Return the rows, or drop returns_many to present one value."
+            if spec.returns_many
+            else "Return the rows, or None to present nothing."
+        )
+        raise ImproperlyConfigured(
+            f"{callable_name(spec.service)} is declared to return a list of rows "
+            f"({'returns_many' if spec.returns_many else 'many'}) and returned "
+            f"{type(value).__name__}, which is not a set of rows. {remedy} "
+            "The service has already run, so its write stands."
+        )
 
 
 def server_arguments_label(spec: ServiceSpec | SelectorSpec) -> str:
