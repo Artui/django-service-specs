@@ -1436,7 +1436,7 @@ parameters.</p>
 <code>PATCH</code> does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 <code>ValidationContext.partial</code>. The spec's <code>reads</code> and its target selector's stay
-required as declared unless a <code>kwargs</code> provider fills them, so a partial
+required as declared unless a <code>kwargs</code> provider fills or may fill them, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. <code>parameters()</code> is unchanged:
 <code>required</code> still says what a whole update needs.
@@ -1559,9 +1559,9 @@ sync-only: an <code>async def</code> one is refused when the spec is built.</p>
   caller's value for it is checked and then dropped.</li>
 <li><strong><code>input_data</code></strong>, on a write alone, returns values merged over the caller's
   arguments before the Validator sees them, so a server-owned field - an
-  owner, a status - is the author's. A Validator field it is annotated to fill
-  is not demanded of the caller, and the Validator still refuses it if the
-  provider declines it. A value the caller sends for a field the provider is
+  owner, a status - is the author's. A Validator field it fills or may fill
+  is not demanded of the caller, and dispatch refuses a required one the
+  provider leaves out before the Validator runs. A value the caller sends for a field the provider is
   annotated to fill is dropped, not used in its place. The Validator is what
   consumes it, and the service is handed none of it directly, so a spec that
   declares <code>input_data</code> with no Validator is refused with
@@ -1591,8 +1591,16 @@ never a seed.</p>
 <p>A provider annotated to return a <code>TypedDict</code> says which keys it fills before
 it runs, and <a class="autorefs autorefs-internal" title="provider_keys" href="../reference/#django_service_specs.pool.provider_keys.provider_keys"><code>provider_keys</code></a>
 reads them: <code>filled</code>, and <code>declinable</code> for a key whose value admits
-<code>UnsetType</code>. A filled key is not demanded of the caller where the provider's
-values reach it, and the caller's value for it is dropped: a selector's <code>kwargs</code> fills that selector's <code>reads</code>, a
+<code>UnsetType</code>. A key a provider fills or may decline, and every key an
+untyped provider's values reach, is not demanded of the caller: dispatch
+checks it once the provider has answered, after the class-level permission
+check and, for a Validator field, before the Validator runs, and refuses a
+required one nobody filled, a declined one included.
+<a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
+runs no provider, so it leaves that check to the Validator. So a
+permission check reading such a key from its <code>arguments</code> uses <code>.get</code>. The
+caller's value for a filled key is dropped, and for a declinable one it stands
+beneath the provider's answer. The provider's values reach these: a selector's <code>kwargs</code> fills that selector's <code>reads</code>, a
 service spec's <code>kwargs</code> its <code>reads</code>, and <code>input_data</code> its Validator's fields.
 A provider annotated to fill a parameter declared anywhere else -
 <code>input_data</code> naming a read, <code>kwargs</code> naming a Validator field or the target
@@ -1757,6 +1765,11 @@ the same declaration.</p>
   is declared, so a default of <code>None</code> stays a real default. It is reported, not
   applied: whether an omitted argument arrives as its default is the validating
   library's behaviour.</li>
+<li><strong><code>reflected</code></strong> says the parameter was read off a callable's signature by
+  an adapter rather than written by an author. It matters only on a read: a
+  <code>reflected</code> read named like a registered <a href="../dispatching/#pool-seeds">pool seed</a>
+  is filled by the seed rather than refused. It takes part in equality and
+  hashing, and no schema carries it.</li>
 <li><strong><code>json_schema_extra</code></strong> carries the JSON Schema keywords no field of a
   Parameter spells - a <code>pattern</code>, a string's <code>maxLength</code>, <code>uniqueItems</code> - as a
   mapping of keyword to value, added to the parameter's
