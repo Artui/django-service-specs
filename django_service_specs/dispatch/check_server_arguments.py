@@ -9,7 +9,12 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.dispatch.relax_partial import relax_partial
-from django_service_specs.dispatch.utils import checked_server_values, server_arguments_label
+from django_service_specs.dispatch.utils import (
+    checked_server_values,
+    provider_reached,
+    seed_named_parameters,
+    server_arguments_label,
+)
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -44,11 +49,24 @@ def check_server_arguments(
        test_a_field_inside_a_many_row_is_not_a_top_level_parameter.
     2. **A name both bound and withheld**, which asks for a value and for
        none. Held by test_a_name_both_bound_and_withheld_is_refused.
-    3. **A name a pool seed occupies**, the dispatcher's own or one
-       ``pool_seeds`` registers: dispatch refuses a parameter declared under
-       one. Only a registered seed can reach here, since ``parameters()``
-       refuses the dispatcher's names as it assembles. Held by
-       test_a_parameter_a_registered_seed_occupies_is_refused.
+    3. **A name a registered seed occupies**, as dispatch reads one. Only a
+       registered seed can reach here, since ``parameters()`` refuses the
+       dispatcher's names as it assembles. Two refusals, in this order, each
+       naming only its own:
+
+       - a parameter dispatch refuses as a configuration error - a read
+         nobody marked ``reflected``, a shape. Held by
+         test_a_parameter_a_registered_seed_occupies_is_refused and
+         test_an_unmarked_read_is_still_refused_as_dispatch_refuses_it;
+       - a ``reflected`` read, which the seed fills on every call, so a
+         binding or a withholding would do nothing. Held by
+         test_binding_or_withholding_it_is_refused_as_doing_nothing.
+
+       A top-level Validator field named like a registered seed is not
+       refused: it is the caller's argument, so a bound value reaches the
+       Validator and ``data`` while the seed keeps the service's parameter of
+       its name (test_check_server_arguments_binds_such_a_field), and
+       withholding it meets rule 5 as any field does.
     4. **A name a typed provider fills or may fill**: the spec's ``kwargs``
        and, on a service spec, its ``input_data`` and its target selector's
        ``kwargs``, the providers
@@ -75,7 +93,14 @@ def check_server_arguments(
        declared default, so the callable's is the only one that answers, and
        a call without one is refused as missing, a client error no caller can
        fix. A Validator parameter is the shape check's alone. Each conjunct
-       is held by its own test, named beside the guard.
+       is held by its own test, named beside the guard. **A parameter an
+       untyped provider's values reach is never refused here**: that
+       provider may fill it on any call, so a call may do without the
+       caller's value, and dispatch refuses one nobody filled where the
+       provider's answer is merged
+       (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld,
+       test_check_server_arguments_lets_a_field_an_untyped_input_data_reaches_be_withheld).
+       A typed provider's keys, filled or declinable, were refused by rule 4.
     6. **A bound value its parameter refuses**, checked as the shape check
        checks it, so a server value in its Python form - a ``uuid.UUID``, a
        ``date``, a ``Decimal`` - for a parameter that takes the wire's string
@@ -102,12 +127,20 @@ def check_server_arguments(
             f"{label}: ServerArguments has {', '.join(both)} both bound and withheld: a bound "
             "name takes the server's value and a withheld one takes none, so name each once."
         )
-    seeded = sorted(names & pool_seeds.reserved)
-    if seeded:
+    seated, taken = seed_named_parameters(spec, parameters, pool_seeds)
+    refused = sorted(names & taken)
+    if refused:
         raise ImproperlyConfigured(
-            f"{label}: ServerArguments names {', '.join(seeded)}, which a registered pool seed "
+            f"{label}: ServerArguments names {', '.join(refused)}, which a registered pool seed "
             "occupies; dispatch refuses a spec declaring a parameter there, so rename the "
             "parameter."
+        )
+    filled = sorted(names & seated)
+    if filled:
+        raise ImproperlyConfigured(
+            f"{label}: ServerArguments names {', '.join(filled)}, a reflected read which a "
+            "registered pool seed fills on every call, so binding or withholding it would do "
+            "nothing. Leave the name to the seed."
         )
     provided = sorted(names & _provider_names(spec))
     if provided:
@@ -117,7 +150,8 @@ def check_server_arguments(
             "gives one, so the binding could not be relied on. Leave the name to the provider."
         )
     receivers = _read_receivers(spec)
-    # One branch arc of four conditions, each held by its own test:
+    reached = provider_reached(spec)
+    # One branch arc of five conditions, each held by its own test:
     # test_a_required_name_with_no_default_may_be_bound fails without
     # ``withheld``, test_an_optional_read_its_selector_defaults_may_be_withheld
     # without ``required``, test_a_required_read_with_both_defaults_may_be_withheld
@@ -126,11 +160,14 @@ def check_server_arguments(
     # without the callable's; test_a_demanded_read_is_refused_though_its_selector_has_a_default
     # holds the shape check's half of the disjunction for a read, and
     # test_a_required_validator_field_may_be_withheld_from_a_partial_spec
-    # fails if the declaration is read unrelaxed.
+    # fails if the declaration is read unrelaxed;
+    # test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld
+    # fails without ``reached``.
     unfillable = [
         parameter.name
         for parameter in relax_partial(spec, parameters)
         if parameter.name in server.withheld
+        and parameter.name not in reached
         and (
             (parameter.required and parameter.default is UNSET)
             or _lacks_default(receivers.get(parameter.name), parameter.name)

@@ -24,14 +24,23 @@ def server_owned_keys(
 
     - the names the pool seeds carry: the dispatcher's own (``user``,
       ``data``, ``instance`` and the rest) and every seed ``pool_seeds``
-      registers, which no parameter may be named after;
+      registers, but a registered seed's name that the spec's Validator
+      declares as a top-level field. Such a field is the caller's to send:
+      dispatch validates it into ``data`` and leaves the service's parameter
+      of its name to the seed, so a transport subtracting this set still
+      asks for it
+      (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it).
+      A read marked ``reflected`` and named like a registered seed is here,
+      since the seed fills it and the call takes no argument of its name;
     - the keys each provider the dispatch runs is annotated to fill, as
       [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
       reads them: the spec's ``kwargs`` and, on a service spec, its
       ``input_data`` and its target selector's ``kwargs``. Dispatch drops the
       caller's value for a key a provider fills once it has been checked, so
-      the key holds the author's value whatever the caller sent, or nothing
-      at all when the provider leaves it out or returns ``UNSET``.
+      the key holds the author's value whatever the caller sent. When the
+      provider leaves it out or returns ``UNSET``, a parameter declared
+      required is refused where the provider's answer is merged, and one
+      that is not is absent.
 
     **No name here is a parameter dispatch demands of the caller**, so a key
     a provider fills is the server's for the whole call. Each provider's
@@ -43,10 +52,14 @@ def server_owned_keys(
     ``parameters()`` is assembled. A key no parameter declares is the server's
     alone.
 
-    A key a provider may decline with ``UNSET`` is not here: the caller's
-    value is the one the callable receives when it does. Nor is any key of a
-    provider whose return says nothing about its keys, which may fill any name
-    and so names none.
+    A key a provider may decline with ``UNSET`` is not here, nor is any key
+    of a provider whose return says nothing about its keys, which may fill
+    any name and so names none. Dispatch does not demand either of the
+    caller, since the provider may fill it, and keeps the caller's value
+    beneath the provider's answer, so the caller's is the one the callable
+    receives when the provider declines. A transport that asks the caller
+    for neither reads them off ``provider_keys``: its ``declinable`` keys, or
+    every parameter in the seat of a provider it reads as ``None``.
 
     **Static per spec.** A transport that also answers some declared
     parameters itself, per mount or per toolset, describes them with a
@@ -61,6 +74,15 @@ def server_owned_keys(
     """
     spec = kernel_spec(spec)
     owned: set[str] = set(pool_seeds.reserved)
+    # The Validator's top-level fields, as dispatch reads them: a ``many``
+    # spec's are each row's, and none is top level. Read only for the
+    # registered seeds: ``parameters()`` refuses a field named like one of the
+    # dispatcher's own, and this reads the Validator without assembling
+    # (test_server_owned_keys_still_lists_a_dispatcher_name_a_field_takes).
+    # One arc to coverage, each conjunct held by a case of
+    # test_server_owned_keys_still_lists_a_seed_no_top_level_field_takes.
+    if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
+        owned -= spec.validator.parameters().names() & pool_seeds.names
     providers: list[Callable[..., Any] | None] = [spec.kwargs]
     if isinstance(spec, ServiceSpec):
         target = spec.target_selector_spec()

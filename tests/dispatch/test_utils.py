@@ -51,6 +51,7 @@ def test_the_validator_sees_only_the_arguments_it_declares() -> None:
         target=ROW,
         server_input={},
         call_context={},
+        provider_answered=True,
     )
 
     assert validated.values == validated.data == {"title": "t"}
@@ -64,7 +65,13 @@ def test_a_spec_with_no_validator_validates_to_nothing() -> None:
     spec = ServiceSpec(service=Record(), permissions=OPEN)
 
     validated = validate_arguments(
-        spec, {"pk": 1}, principal=PRINCIPAL, target=ROW, server_input={}, call_context={}
+        spec,
+        {"pk": 1},
+        principal=PRINCIPAL,
+        target=ROW,
+        server_input={},
+        call_context={},
+        provider_answered=True,
     )
     assert validated.values == validated.data == {}
 

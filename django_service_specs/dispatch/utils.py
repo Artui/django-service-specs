@@ -383,13 +383,32 @@ def open_call(
     ``grant`` does not stand in for it: a grant says the permission check ran,
     and whether there is anyone to check is a question before that.
 
-    A parameter a registered seed occupies is refused next, before the
-    arguments are looked at, because it is the declaration that is wrong and it
-    is wrong for every caller. The dispatcher's own names never reach this
-    check: ``spec.parameters()`` refuses them as it assembles. A registered
-    seed is the project's, so only dispatch - which is handed the registry -
-    can see the collision. So is an ``overlay`` key naming a declared
-    parameter, for the same reason (see ``refuse_overlaid_parameters``).
+    **A parameter a registered seed is named like** is answered next, before
+    the arguments are looked at, by where it is declared. A registered seed is
+    the project's, so only dispatch - which is handed the registry - can see
+    the name it shares. The dispatcher's own names never reach here:
+    ``spec.parameters()`` refuses them as it assembles. Of the names a
+    registered seed shares (see ``seed_named_parameters``):
+
+    - **A** ``reflected`` **read**, one read off a callable's signature
+      rather than written, leaves this call's argument set, and the seed
+      fills it in every pool, as it fills a service's parameter of its name
+      (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s).
+      A caller's value for it meets the rule for any seed's name sent as an
+      argument: unknown under ``REJECT``, dropped under ``IGNORE``, and never
+      merged over the seed
+      (test_a_caller_s_value_for_a_reflected_read_never_reaches_its_callable).
+    - **A top-level Validator field** stays an argument of the call, checked
+      and validated as declared. ``prepare_service`` keeps its value out of
+      the service's pool, where the seed keeps its own, so it reaches the
+      service in ``data`` alone
+      (test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed).
+    - **Anything else** - a read nobody marked, a shape, a ``many`` spec's
+      list - is refused as ``ImproperlyConfigured``, because it is the
+      declaration that is wrong and it is wrong for every caller.
+
+    So is an ``overlay`` key naming a declared parameter, for the same reason
+    (see ``refuse_overlaid_parameters``).
 
     Class-level authorization runs before anything is resolved, so a principal
     it refuses learns nothing about which rows exist. It runs after the shape
@@ -417,19 +436,25 @@ def open_call(
         raise PrincipalUnavailable()
     # Against the spec's whole parameters, whatever ``parameters`` narrows the
     # shape check to: the declaration is wrong for every caller, so
-    # ``resolve_target`` refuses it as dispatch does
-    # (test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
+    # ``resolve_target`` and ``check_call`` answer as dispatch does
+    # (test_resolve_target_and_check_call_split_as_dispatch_does, and
+    # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it
+    # for a field, which is outside the target's parameters).
     declared = spec.parameters()
-    taken = sorted(declared.names() & pool_seeds.reserved)
+    seated, taken = seed_named_parameters(spec, declared, pool_seeds)
     if parameters is None:
         parameters = declared
     if taken:
         raise ImproperlyConfigured(
-            f"{type(spec).__name__} declares the parameter(s) {taken}, which a registered "
-            "pool seed occupies. An argument must never meet a seed in one pool; rename "
-            "the parameter."
+            f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
+            "registered pool seed occupies. An argument must never meet a seed in one pool; "
+            "rename the parameter."
         )
     refuse_overlaid_parameters(spec, declared, overlay)
+    if seated:
+        # Out of the call's argument set, the narrowed one too, so the closed
+        # set refuses or drops a caller's value for it as for any seed's name.
+        parameters = Parameters.of(*(param for param in parameters if param.name not in seated))
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
     # Only the seeds a check names: another seed's resolver may read what an
     # anonymous caller lacks, and this runs before that caller is refused
@@ -459,6 +484,50 @@ def open_call(
     return checked, granted
 
 
+def seed_named_parameters(
+    spec: ServiceSpec | SelectorSpec, declared: Parameters, pool_seeds: PoolSeeds
+) -> tuple[frozenset[str], frozenset[str]]:
+    """Of ``declared``'s names a registered seed shares: the reads it fills, and the ones refused.
+
+    Three ways, which cannot overlap, since ``parameters()`` refuses a name
+    two sources declare:
+
+    - a ``reflected`` read - a selector spec's, a target selector's or a
+      service spec's - which the seed fills: the first set;
+    - a top-level Validator field (``seed_named_fields``), the caller's:
+      in neither set;
+    - every other name - a read nobody marked, a shape, a ``many`` spec's
+      list - refused: the second set
+      (test_a_spec_declaring_a_registered_seed_s_name_is_refused,
+      test_a_reflected_shape_named_like_a_registered_seed_is_still_refused).
+    """
+    shared = declared.names() & pool_seeds.reserved
+    seated = shared & frozenset(
+        param.name for _, reads in _read_seats(spec) for param in reads if param.reflected
+    )
+    return seated, shared - seated - seed_named_fields(spec, pool_seeds.names)
+
+
+def seed_named_fields(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> frozenset[str]:
+    """The top-level Validator fields of ``spec`` named in ``names``: the caller's, and never the pool's.
+
+    ``names`` is the registered seeds' names; the dispatcher's own never name
+    a top-level field, since ``parameters()`` refuses them as it assembles. A
+    ``many`` spec's fields are each row's, travel inside the list and are
+    never spread, so none is top level. One arc to coverage, each conjunct
+    held by its own test: a selector spec has no Validator
+    (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s), a
+    service spec may have none
+    (test_a_caller_s_value_for_a_reflected_read_never_reaches_its_callable[service-sync]),
+    and a ``many`` spec's row field shares a name with an unmarked read, which
+    stays refused
+    (test_a_spec_declaring_a_registered_seed_s_name_is_refused[a-many-spec-s-read-a-row-field-shares]).
+    """
+    if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
+        return spec.validator.parameters().names() & names
+    return frozenset()
+
+
 def shape_check(
     spec: ServiceSpec | SelectorSpec,
     parameters: Parameters,
@@ -466,55 +535,69 @@ def shape_check(
     *,
     unknown_arguments: UnknownArguments,
 ) -> dict[str, Any]:
-    """``check_arguments`` over ``parameters``, leaving out what the server will fill anyway.
+    """``check_arguments`` over ``parameters``, leaving out what the server fills or may fill.
 
     One function for ``open_call``, ``resolve_target`` and ``bind_arguments``,
-    so a transport that binds for itself relaxes exactly what dispatch
-    relaxes. Two things are relaxed:
+    so a transport that binds for itself relaxes what dispatch relaxes. The
+    one difference is the seeds: ``bind_arguments`` is handed none, so a
+    ``reflected`` read that a registered seed fills on dispatch is checked
+    there as declared, and a required one is demanded of the caller
+    (test_bind_arguments_still_demands_a_required_reflected_read). Two things
+    are relaxed:
 
-    - **A parameter a typed provider is annotated to fill**, which is always
-      one that provider's values reach (see ``_server_filled``): not
-      demanded of the caller, since it is the server's:
-      ``server_owned_keys`` tells a transport to hide exactly such a key.
-      **A value the caller sends for it anyway is checked as declared, then
-      dropped** from what this returns, so it reaches no merge and the
-      provider's answer is the only one
-      (test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s).
-      It is still required of the merged result: a
-      provider that declines it after all, with ``UNSET`` or by leaving it
-      out, leaves the key absent rather than the caller's, and the usual
-      refusal to the step that reads it - the
-      Validator for one of its fields
-      (test_a_filled_field_the_provider_declines_is_refused_by_the_validator),
-      ``call_keywords`` for a read the service or a selector asks for
-      (test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
-      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks),
-      whether or not the caller sent it
-      (test_a_filled_read_the_caller_sends_is_refused_where_the_service_asks_if_the_provider_declines).
+    - **A parameter a provider fills or may fill**, which is always one that
+      provider's values reach (see ``_server_filled``): not demanded of the
+      caller here, because whether the call has it is known only once the
+      provider has answered. It is still required of the assembled pool,
+      checked in the seat that merges the provider's answer, after
+      class-level authorization: ``selector_pool`` for a selector's reads,
+      ``prepare_service`` for a service spec's ``reads``, and
+      ``validate_arguments`` for a Validator field, before the Validator runs
+      (test_a_filled_field_the_provider_declines_is_refused_before_the_validator,
+      test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it,
+      test_a_target_read_the_lookup_s_provider_declines_is_refused_where_the_selector_asks,
+      test_a_may_fill_read_nobody_fills_is_refused_at_the_service_seat).
+      So a principal the class-level check refuses is told that, rather than
+      that such a value is missing
+      (test_a_read_an_untyped_provider_may_fill_left_out_reaches_the_class_level_check,
+      test_a_declinable_key_left_out_reaches_the_class_level_check).
+      **What the caller sends for one depends on the provider's annotation.**
+      A key a typed provider is annotated to fill is the server's:
+      ``server_owned_keys`` tells a transport to hide exactly such a key, and
+      a value the caller sends anyway is checked as declared, then dropped
+      from what this returns, so it reaches no merge and the provider's
+      answer is the only one
+      (test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s,
+      test_a_filled_read_the_caller_sends_is_refused_where_the_service_asks_if_the_provider_declines).
       djangorestframework-services drops the caller's value for a
       server-owned key at every site that spreads caller input, and this is
-      that rule.
+      that rule. A key a provider may decline, or any key beside a provider
+      whose return names none, is checked and kept, beneath the provider's
+      answer, so it stands when the provider declines
+      (test_a_declinable_key_stays_the_caller_s,
+      test_a_may_fill_read_the_caller_sends_stands_when_an_untyped_provider_leaves_it_out).
     - **Under** ``partial`` **an absent Validator field**, at any depth, as
       djangorestframework-services relaxes only its serializer. A ``reads``
       argument and a target selector's read, the ``pk`` among them, stay
-      required as declared unless a provider fills them: a partial update
-      still needs to say which row it updates
+      required as declared unless a provider fills or may fill them: a
+      partial update still needs to say which row it updates
       (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
 
     A present value is checked as declared either way, and an unknown key is
     still refused
-    (test_a_relaxed_read_the_caller_sends_is_still_checked_and_the_provider_outranks_it).
+    (test_a_relaxed_read_the_caller_sends_is_still_checked_and_the_provider_outranks_it,
+    test_a_may_fill_read_the_caller_sends_is_still_checked).
 
     **On a** ``many`` **spec the Validator's parameters are each row's**, so
     the Validator's relaxings apply inside every row and none at the top
     level, where the list stays required and a read is relaxed only as a
-    provider fills it (test_partial_leaves_the_list_and_the_reads_required,
+    provider fills or may fill it (test_partial_leaves_the_list_and_the_reads_required,
     test_a_many_spec_s_read_its_kwargs_provider_fills_is_not_demanded_of_the_caller).
     The list's own refusal - absent, null, not a list - and the top level's
     are raised here; each row's is carried to ``validate_arguments`` as
     ``_CheckedRows``, to be reported with the Validator's.
     """
-    reads = _server_filled(spec)
+    owned, reached = _server_filled(spec)
     # The schema relaxes ``partial`` through the same function, so the two
     # cannot disagree about which fields a partial call may leave out.
     parameters = relax_partial(spec, parameters)
@@ -523,22 +606,24 @@ def shape_check(
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        fields = _filled(spec.input_data, spec.validator.parameters())
+        fields, fields_reached = _reach(spec.input_data, spec.validator.parameters())
         if spec.many:
             return _check_bulk(
-                _relaxed(parameters, reads),
+                _relaxed(parameters, reached),
                 arguments,
                 name=spec.many_argument,
                 unknown_arguments=unknown_arguments,
-                owned=reads,
+                owned=owned,
                 owned_in_rows=fields,
+                reached_in_rows=fields_reached,
             )
-        reads |= fields
+        owned |= fields
+        reached |= fields_reached
     return _without(
         check_arguments(
-            _relaxed(parameters, reads), arguments, unknown_arguments=unknown_arguments
+            _relaxed(parameters, reached), arguments, unknown_arguments=unknown_arguments
         ),
-        reads,
+        owned,
     )
 
 
@@ -556,11 +641,11 @@ def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
     return {name: value for name, value in checked.items() if name not in owned}
 
 
-def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
-    """The reads a typed ``kwargs`` provider fills where its values reach them: no caller's to send.
+def _server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], frozenset[str]]:
+    """The reads a ``kwargs`` provider fills where its values reach them, and the reads it fills or may fill.
 
     **A provider relaxes only the parameters its values reach**, so a key it
-    is annotated to fill is relaxed where the callable reading it is called
+    fills or may fill is relaxed where the callable reading it is called
     with the provider's value:
 
     - A selector's own ``kwargs`` is merged over its ``reads`` in
@@ -581,25 +666,74 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
     selector's ``kwargs`` - is refused by ``ServiceSpec`` before any call
     reaches here, so every name ``server_owned_keys`` lists that a parameter
     declares is one this relaxes. The rule is still read per provider rather
-    than as that union, so the relaxing never outruns the delivery.
+    than as that union, so the relaxing never outruns the delivery
+    (test_a_target_read_is_relaxed_only_by_the_lookup_s_own_provider).
 
-    Only ``filled`` keys: a ``declinable`` one stays the caller's, required
-    of the caller as declared and kept when the provider declines it
-    (test_a_declinable_key_stays_required_of_the_caller,
-    test_a_declinable_key_stays_the_caller_s). And a
-    provider whose return says nothing about its keys relaxes nothing
-    (test_a_read_no_typed_provider_fills_stays_required[an-untyped-provider]).
+    The first set is the ``filled`` keys alone, whose caller's value is
+    dropped (see ``_without``). The second adds a ``declinable`` key, and
+    every parameter in the seat of a provider whose return says nothing about
+    its keys, since it may fill any of them
+    (test_a_may_fill_read_the_provider_answers_reaches_the_service): those
+    are relaxed and kept as the caller's
+    (test_a_declinable_key_stays_the_caller_s).
     """
+    owned: frozenset[str] = frozenset()
+    reached: frozenset[str] = frozenset()
+    for provider, reads in _read_seats(spec):
+        filled, may_fill = _reach(provider, reads)
+        owned |= filled
+        reached |= may_fill
+    return owned, reached
+
+
+def provider_reached(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
+    """Every top-level parameter of ``spec`` a provider fills or may fill: what the shape check relaxes.
+
+    The reads ``_server_filled`` relaxes and, on a service spec that is not
+    ``many``, the Validator's fields ``input_data`` reaches.
+    ``check_server_arguments`` reads it, so a parameter the shape check does
+    not demand may be withheld. One arc to coverage, each conjunct held by
+    its own test: a selector spec has no Validator
+    (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld),
+    a service spec may have none
+    (test_a_service_spec_s_read_is_judged_by_its_service), and a ``many``
+    spec's row fields are no top-level parameter, though one may share a
+    read's name
+    (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).
+    """
+    reached = _server_filled(spec)[1]
+    if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
+        reached |= _reach(spec.input_data, spec.validator.parameters())[1]
+    return reached
+
+
+def _read_seats(
+    spec: ServiceSpec | SelectorSpec,
+) -> list[tuple[Callable[..., Any] | None, Parameters]]:
+    """Each selector or service seat of ``spec``: the ``kwargs`` provider, and the reads its values reach."""
     if isinstance(spec, SelectorSpec):
-        return _filled(spec.kwargs, spec.reads)
+        return [(spec.kwargs, spec.reads)]
+    seats: list[tuple[Callable[..., Any] | None, Parameters]] = [(spec.kwargs, spec.reads)]
     target = spec.target_selector_spec()
-    lookup = frozenset() if target is None else _filled(target.kwargs, target.reads)
-    return lookup | _filled(spec.kwargs, spec.reads)
+    if target is not None:
+        seats.append((target.kwargs, target.reads))
+    return seats
 
 
-def _filled(provider: Callable[..., Any] | None, parameters: Parameters) -> frozenset[str]:
-    """The names in ``parameters`` that ``provider`` is annotated to fill; none if it does not say."""
-    return parameters.names() & _owned(provider)
+def _reach(
+    provider: Callable[..., Any] | None, parameters: Parameters
+) -> tuple[frozenset[str], frozenset[str]]:
+    """The names in ``parameters`` that ``provider`` is annotated to fill, and those it fills or may fill.
+
+    A typed provider may fill its ``filled`` and its ``declinable`` keys. One
+    whose return says nothing about its keys may fill every name its values
+    reach, and is annotated to fill none. No provider fills nothing.
+    """
+    keys = provider_keys(provider)
+    names = parameters.names()
+    if keys is None:
+        return frozenset(), names
+    return names & keys.filled, names & (keys.filled | keys.declinable)
 
 
 def _owned(provider: Callable[..., Any] | None) -> frozenset[str]:
@@ -616,14 +750,16 @@ def _check_bulk(
     unknown_arguments: UnknownArguments,
     owned: frozenset[str],
     owned_in_rows: frozenset[str],
+    reached_in_rows: frozenset[str],
 ) -> dict[str, Any]:
     """The top level of a ``many`` call checked here, and each row checked on its own.
 
     Each row is the list's own ``items``, as ``relax_partial`` left them,
-    with what ``input_data`` fills relaxed on top. ``owned`` is what a typed
-    ``kwargs`` provider fills at the top level and ``owned_in_rows`` what
-    ``input_data`` fills in each row: dropped from each once checked (see
-    ``_without``).
+    with what ``input_data`` fills or may fill relaxed on top
+    (test_a_many_row_field_an_untyped_input_data_may_fill_is_relaxed_in_each_row).
+    ``owned`` is what a typed ``kwargs`` provider fills at the top level and
+    ``owned_in_rows`` what ``input_data`` fills in each row: dropped from
+    each once checked (see ``_without``).
 
     A list is checked at the top level as an empty one, so the list itself
     and every argument beside it are checked as declared while no row is: a
@@ -641,7 +777,7 @@ def _check_bulk(
     the_list = next(param for param in parameters if param.name == name)
     # A ``many`` spec's list is built with the Validator's parameters as its
     # rows (``ServiceSpec.parameters``), never a JSON type or nothing.
-    rows = _relaxed(cast(Parameters, the_list.items), owned_in_rows)
+    rows = _relaxed(cast(Parameters, the_list.items), reached_in_rows)
     # One branch to coverage, each condition held by its own test:
     # test_the_list_s_own_refusal_is_a_list_under_its_name (the type: without
     # it, a value that is no list is measured and read as rows) and
@@ -672,16 +808,41 @@ def _check_bulk(
     return checked
 
 
-def _relaxed(parameters: Parameters, filled: frozenset[str]) -> Parameters:
-    """``parameters`` with the ones a typed provider fills optional, at the top level only.
+def _relaxed(parameters: Parameters, reached: frozenset[str]) -> Parameters:
+    """``parameters`` with the ones a provider fills or may fill optional, at the top level only.
 
     A copy, made for the shape check alone, so the declaration every other
     reader sees - the schema, ``required`` - is untouched. Only the top
     level, because a provider fills a whole argument, never a field inside one.
     """
     return Parameters.of(
-        *(replace(param, required=False) if param.name in filled else param for param in parameters)
+        *(
+            replace(param, required=False) if param.name in reached else param
+            for param in parameters
+        )
     )
+
+
+def _refuse_absent(parameters: Parameters, pool: Mapping[str, Any]) -> None:
+    """Refuse every parameter in ``parameters`` that is required of the call and absent from ``pool``.
+
+    The seat's half of a parameter a provider fills or may fill, which the
+    shape check does not demand: once the provider has answered, the
+    declaration's ``required`` is checked against the pool the callable is
+    called from, for every parameter the seat takes, whoever filled it.
+    ``check_arguments`` itself answers, over the absent ones with no
+    arguments, so the refusal is the shape check's own, in its wording and
+    code and keyed by the parameter, and requires what it requires: a
+    parameter ``required`` and declaring no default. Its conjuncts are held
+    at the seat by test_an_optional_read_nobody_fills_is_not_refused_at_the_seat
+    and test_a_required_read_declaring_a_default_is_not_refused_at_the_seat.
+    So a read declared required that a provider declines is refused though
+    the callable has a default of its own, or takes ``**`` whatever arrives
+    (test_a_required_read_the_provider_declines_is_refused_though_its_callable_has_a_default).
+    ``call_keywords`` stays the backstop for a callable parameter with no
+    default that no declaration requires.
+    """
+    check_arguments(Parameters.of(*(param for param in parameters if param.name not in pool)), {})
 
 
 def selector_pool(
@@ -704,7 +865,18 @@ def selector_pool(
     the lookup (test_a_target_selector_s_kwargs_provider_scopes_the_lookup).
     A read it is annotated to fill never carries the caller's value here at
     all: ``shape_check`` dropped it, so a provider that leaves it out leaves
-    it absent.
+    it absent. A ``reflected`` read a registered seed fills is no argument of
+    the call, so the seed's value is the one here
+    (test_a_caller_s_value_for_a_reflected_read_never_reaches_its_callable).
+
+    **Then the seat's presence check**: every read the selector declares
+    required with no default must be in the assembled pool, whoever filled
+    it, or the call is refused as ``InvalidArguments`` keyed by the read (see
+    ``_refuse_absent``). It is where a read a provider fills or may fill,
+    which the shape check let through absent, is refused when nobody filled
+    it (test_a_selector_spec_s_read_an_untyped_provider_may_fill,
+    test_a_target_read_an_untyped_lookup_provider_may_fill), after
+    class-level authorization and before the selector runs.
 
     ``progress`` is passed only for a selector spec's own selector, which is
     that spec's run (see ``call_pool``), and is the pool's ``progress``, as
@@ -743,6 +915,7 @@ def selector_pool(
             reserved=pool_seeds.reserved,
         )
     )
+    _refuse_absent(selector_spec.reads, pool)
     return pool
 
 
@@ -925,7 +1098,10 @@ def call_pool(
     keywords, so a parameter named ``seeds`` would be a ``TypeError`` there.
 
     Nothing here overwrites a seed. ``open_call`` refused every parameter a
-    seed occupies, ``prepare_service`` every validated, bound or provided key,
+    seed occupies but a ``reflected`` read, which it seated so no argument
+    carries it, and a top-level Validator field, which ``prepare_service``
+    keeps out of the spread; ``prepare_service`` refused every other
+    validated, bound or provided key,
     ``provide`` a selector's provided one, and the entries dispatch adds
     itself (``data``, ``instance``, ``collection``, ``result``, and
     ``call_context``, the call's context, which every pool dispatch builds
@@ -1365,6 +1541,7 @@ def validate_arguments(
     target: Any,
     server_input: Mapping[str, Any],
     call_context: dict[str, Any],
+    provider_answered: bool,
     ambient: Mapping[str, Any] = MappingProxyType({}),
     resolved: Mapping[str, Any] = MappingProxyType({}),
 ) -> Validated:
@@ -1411,11 +1588,34 @@ def validate_arguments(
         resolved=MappingProxyType(dict(resolved)),
         call_context=call_context,
     )
+    # The presence check, before the Validator runs, once ``input_data`` has
+    # answered: a field the shape check let through absent, because the
+    # provider fills or may fill it, is held to its declaration against the
+    # caller's arguments and the provider's answer merged, as
+    # ``_refuse_absent`` holds a read. So a Validator that returns what it is
+    # handed never runs without a required field, and every Validator kind is
+    # refused in the shape check's words
+    # (test_a_required_field_nobody_filled_is_refused_before_the_validator_runs).
+    # Read through ``relax_partial``, so a partial call still leaves any field
+    # out (test_a_partial_spec_s_field_nobody_filled_is_still_not_required).
+    # Not made when no provider ran - ``bind_arguments`` - where an absent
+    # field the provider would fill is the Validator's to refuse
+    # (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
+    relaxed = relax_partial(spec, spec.parameters()) if provider_answered else Parameters.of()
     if spec.many:
+        the_list = next((param for param in relaxed if param.name == spec.many_argument), None)
         return _validate_rows(
-            validator, checked[spec.many_argument], spec.many_argument, context, server_input
+            validator,
+            checked[spec.many_argument],
+            spec.many_argument,
+            context,
+            server_input,
+            row_parameters=Parameters.of()
+            if the_list is None
+            else cast(Parameters, the_list.items),
         )
     merged = {**checked, **server_input}
+    _refuse_absent(Parameters.of(*(param for param in relaxed if param.name in declared)), merged)
     own = {name: value for name, value in merged.items() if name in declared}
     return validator.validated(own, context)
 
@@ -1426,16 +1626,32 @@ def _validate_rows(
     name: str,
     context: ValidationContext,
     server_input: Mapping[str, Any],
+    *,
+    row_parameters: Parameters,
 ) -> Validated:
-    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row."""
+    """``validated_many()`` on the rows the shape check passed, and one refusal for every failing row.
+
+    Each row is first held to ``row_parameters``, the list's rows as
+    ``relax_partial`` left them, with ``input_data`` merged over it: a row
+    missing a required field nobody filled is refused under its index, as a
+    row the shape check refused is, and never reaches the Validator
+    (test_a_many_row_field_nobody_filled_is_refused_in_its_row).
+    """
     declared = validator.parameters().names()
-    # Only the keys the Validator declares, as on a single call: a row's own
-    # unknown key was refused by the shape check, so only a provider's can
-    # reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
-    rows = {
-        index: {key: value for key, value in {**row, **server_input}.items() if key in declared}
-        for index, row in checked.rows.items()
-    }
+    errors = dict(checked.errors)
+    rows: dict[int, dict[str, Any]] = {}
+    for index, row in checked.rows.items():
+        merged = {**row, **server_input}
+        try:
+            _refuse_absent(row_parameters, merged)
+        except InvalidArguments as refused:
+            errors[index] = refused.detail
+            continue
+        # Only the keys the Validator declares, as on a single call: a row's
+        # own unknown key was refused by the shape check, so only a provider's
+        # can reach here (test_each_row_s_validator_sees_only_the_keys_it_declares).
+        rows[index] = {key: value for key, value in merged.items() if key in declared}
+    checked = _CheckedRows(rows, errors)
     try:
         validated = validator.validated_many(rows, context, many_argument=name)
     except InvalidArguments as refused:
@@ -1511,10 +1727,18 @@ def prepare_service(
        over the call's ``extra_kwargs`` overlay.
     6. ``instance`` or ``collection``.
 
-    No entry outranks a seed: a parameter named after one is refused by
-    ``open_call``, and a validated value, a bound value or a provider key
-    named after one here, as is a bound value named after a validated value
-    or a parameter. A
+    No entry outranks a seed. A parameter named after one is refused by
+    ``open_call``, but for a ``reflected`` read, which is no argument of the
+    call and so carries no value of its own, and a top-level Validator field
+    named like a registered seed: its validated value reaches the service in
+    ``data`` alone and is never spread into the pool by name, so the seed
+    keeps its own value
+    (test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed,
+    test_input_data_filling_a_seed_named_field_reaches_data_and_never_the_pool).
+    A validated value the Validator returns under a seed's name *without
+    declaring it* is refused here, as is a bound value or a provider key
+    named after one, and a bound value named after a validated value or a
+    parameter. A
     read and a Validator parameter of one name are refused when
     ``parameters()`` is assembled, so a read outranks only a value the
     Validator returns without declaring it, as djangorestframework-services'
@@ -1522,6 +1746,16 @@ def prepare_service(
     (test_a_read_outranks_a_validated_value_of_its_name). The two providers are called from the base pool, the
     ``reads`` and the resolved target, and never see the Validator's values:
     ``input_data`` runs before the Validator, and ``kwargs`` is read the same.
+
+    **Once the pool is assembled, the seat's presence check**: every one of
+    the spec's ``reads`` declared required with no default must be in it,
+    whoever filled it, or the call is refused as ``InvalidArguments`` keyed by
+    the read (see ``_refuse_absent``), before the affordances, the
+    preconditions and the run's transaction. It is where a read the spec's
+    ``kwargs`` provider fills or may fill, which the shape check let through
+    absent, is refused when nobody filled it
+    (test_a_may_fill_read_nobody_fills_is_refused_at_the_service_seat), so it
+    answers after the target is resolved and checked and after the Validator.
     """
     keywords = CheckKeywords(call_context)
     checked, granted = open_call(
@@ -1572,14 +1806,27 @@ def prepare_service(
         target=target,
         server_input=server_input,
         call_context=call_context,
+        provider_answered=True,
         ambient=ambient,
         resolved=resolved,
     )
     values = validated.values
+    # What the pool spreads by name: the values less a top-level field named
+    # like a registered seed, which reaches the service in ``data`` alone. A
+    # new mapping, never ``values`` changed in place: the base ``validated()``
+    # hands one dict as ``values`` and ``data``, so a pop would drop the field
+    # from ``data`` too
+    # (test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed).
+    fields = seed_named_fields(spec, pool_seeds.names)
+    spread = {name: value for name, value in values.items() if name not in fields}
     # A Validator returning ``user`` is a bug, and letting its value outrank the
     # seed silently would be the worse one: the service would act as whoever
     # the arguments named. Refused rather than dropped, so the bug is found.
-    seeded = sorted(values.keys() & reserved)
+    # Read on what the pool spreads, so a seed-named value the Validator
+    # returns without declaring it is still refused:
+    # test_a_validated_value_named_after_a_seed_is_refused fails if every
+    # seed's name is left out of the spread rather than the declared fields'.
+    seeded = sorted(spread.keys() & reserved)
     if seeded:
         raise ImproperlyConfigured(
             f"The Validator returned the key(s) {seeded}, which dispatch seeds itself. A "
@@ -1608,9 +1855,11 @@ def prepare_service(
     # (test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call).
     # Each side of the union is held by a case of
     # test_a_value_the_validator_computed_outranks_the_overlay:
-    # ``a-validated-value`` fails without ``values``, ``a-bound-value`` without
-    # the pool.
-    computed = values.keys() | validated.pool.keys()
+    # ``a-validated-value`` fails without the values, ``a-bound-value`` without
+    # the pool. The values the pool spreads, so an overlay key named like a
+    # seed-named field still reaches ``overlaid``, which refuses a seed's name
+    # (test_an_overlay_key_named_like_the_seed_is_still_refused_beside_such_a_field).
+    computed = spread.keys() | validated.pool.keys()
     author = overlaid(
         {name: value for name, value in overlay.kwargs.items() if name not in computed},
         provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved),
@@ -1620,13 +1869,16 @@ def prepare_service(
     )
     pool = {
         **surroundings,
-        **values,
+        **spread,
         **reads,
         "data": validated.data,
         **validated.pool,
         **author,
         **resolved,
     }
+    # The seat's presence check, once the provider has answered: after the
+    # Validator and before the affordances, as a missing argument answers.
+    _refuse_absent(spec.reads, pool)
     # Before the affordances, as the Validator is: a refusal of the call itself
     # answers before one describing the row's state.
     # test_a_missing_argument_answers_before_an_affordance fails without it.
