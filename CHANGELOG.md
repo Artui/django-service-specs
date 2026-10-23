@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.1] — 2026-10-23
+
 ### Fixed
 - **A `many` or `returns_many` service returning one value, not rows, is refused
   where it returns.** With no output selector the service's own return is what
@@ -1848,7 +1850,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/Artui/django-service-specs/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/Artui/django-service-specs/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Artui/django-service-specs/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Artui/django-service-specs/compare/v0.12.0...v0.13.0
