@@ -40,8 +40,10 @@ def resolve_target(
        only the arguments they name. A Validator field is neither required
        nor an unknown key here, so a GET carrying the route's arguments and a
        POST carrying the whole form both resolve; the target's own reads are
-       required as declared, except one its ``kwargs`` provider is annotated
-       to fill.
+       required as declared, except one its ``kwargs`` provider fills or may
+       fill, which the lookup's pool must then hold once the provider has
+       answered, as at dispatch. A ``reflected`` target read a registered
+       seed is named like is no argument, and the seed fills it.
     3. Class-level authorization, honouring ``grant`` as dispatch does. Like
        the two steps before it, before any query.
     4. The lookup, and the checks on what it finds: ``has_object_permission``
@@ -77,9 +79,9 @@ def resolve_target(
         InvalidArguments: a target read the arguments leave out or get wrong.
         NotPermitted: the class-level, object-level or scope check.
         ImproperlyConfigured: as ``dispatch``, for a spec declaring no
-            permissions or any parameter a registered seed occupies - a
-            Validator field too, though this checks no Validator field's
-            value.
+            permissions or a parameter a registered seed occupies that is
+            neither a ``reflected`` read nor a top-level Validator field,
+            though this checks no Validator field's value.
         ImproperlyConfigured: also a ``many`` spec, which declares no lookup:
             its rows are the call's arguments, and none is found ahead of it.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than

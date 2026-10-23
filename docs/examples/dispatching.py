@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any
 
 from django.db.models import QuerySet
@@ -237,6 +238,62 @@ def create_signed_note(user: Any, title: str) -> DispatchResult:
 
 
 # --8<-- [end:seeds]
+
+
+# --8<-- [start:reflected_seed]
+def notes_signed_by(*, user: Any, signature: str) -> QuerySet[Note]:
+    return Note.objects.filter(owner=user, title__endswith=f", by {signature}")
+
+
+# The read is marked reflected, so the registered ``signature`` seed fills it
+# on every call: it is no argument of the call, and a caller naming it is
+# refused as an unknown argument.
+signed_notes_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_signed_by,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("signature", "string", required=True, reflected=True)),
+)
+
+
+def my_signed_notes(user: Any) -> DispatchResult:
+    return dispatch(signed_notes_spec, principal=user, arguments={}, pool_seeds=seeds)
+
+
+# --8<-- [end:reflected_seed]
+
+
+# --8<-- [start:seed_named_field]
+@dataclass
+class Countersign:
+    title: str
+    signature: str  # the caller's own: validated into ``data``, never the pool
+
+
+def countersign(*, user: Any, data: Countersign, signature: str) -> Note:
+    # ``signature`` is the seed's, whatever the caller sent under that name.
+    return Note.objects.create(
+        owner=user, title=f"{data.title}, by {data.signature} for {signature}"
+    )
+
+
+countersign_spec = ServiceSpec(
+    service=countersign,
+    permissions=[IsSignedIn()],
+    validator=DataclassValidator(Countersign),
+)
+
+
+def create_countersigned_note(user: Any, title: str, signature: str) -> DispatchResult:
+    return dispatch(
+        countersign_spec,
+        principal=user,
+        arguments={"title": title, "signature": signature},
+        pool_seeds=seeds,
+    )
+
+
+# --8<-- [end:seed_named_field]
 
 
 # --8<-- [start:progress]

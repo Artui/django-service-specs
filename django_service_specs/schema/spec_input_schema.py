@@ -37,8 +37,13 @@ def spec_input_schema(
     them, so the schema still says which row a partial update names. On a
     ``many`` spec the list stays required and its rows' fields are not.
     ``parameters()`` itself is unchanged and still says what a whole call
-    needs. Nothing else is relaxed: a read a ``kwargs`` provider fills is
-    listed as declared, and ``server_owned_keys`` is how a transport finds it.
+    needs. Nothing else is relaxed: a read a ``kwargs`` provider fills or may
+    fill is listed as declared, ``required`` meaning the call needs the value
+    from someone - the caller, or a provider that may fill it - and
+    ``server_owned_keys`` is how a transport finds the keys a provider fills;
+    ``provider_keys`` gives the ones it may decline, or ``None`` for a
+    provider that names none. A ``reflected`` read and a Validator field
+    named like a registered seed are listed as declared too.
     Nor is anything a transport binds or withholds: this takes no
     ``ServerArguments``, and a transport subtracts its ``names()`` in the
     schema it builds, as it subtracts ``server_owned_keys``.
@@ -47,7 +52,8 @@ def spec_input_schema(
     model-backed declaration is asked only once the app registry is ready.
     """
     # Relaxed by the shape check's own reading of ``partial``, so the schema
-    # requires exactly what dispatch refuses absent, less what a provider fills.
+    # requires exactly what dispatch refuses absent, less what a provider fills
+    # or may fill.
     spec = kernel_spec(spec)
     parameters = relax_partial(spec, spec.parameters())
     return parameters_schema(parameters, unknown_arguments=unknown_arguments)

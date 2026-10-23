@@ -301,7 +301,7 @@ SURFACE: dict[str, Pin] = {
         "parameters.parameters",
         signature="name, type, *, required=, format=, items=, items_nullable=, fields=, "
         "choices=, choice_labels=, minimum=, maximum=, min_length=, max_length=, default=, "
-        "nullable=, help=, json_schema_extra=",
+        "nullable=, help=, json_schema_extra=, reflected=",
         methods={"nested": "property"},
     ),
     "Parameters": Pin(

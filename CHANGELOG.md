@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-10-22
+
+### Added
+- **`Parameter.reflected`**, a trailing keyword defaulting to `False`, for a
+  read an adapter took off a callable's signature rather than one an author
+  wrote. A `reflected` read named like a registered pool seed is filled by the
+  seed on every call, and the caller's value for it never reaches the pool,
+  under either unknown-argument policy. An unmarked read, or a shape, named
+  like a seed is still refused at dispatch. `check_server_arguments` refuses
+  binding or withholding a `reflected` read a seed fills, since that would do
+  nothing. The field takes part in equality and hashing, and no schema emits it.
+
+### Changed
+- **A parameter a provider may fill is no longer demanded of the caller.** A
+  read or Validator field that a typed provider fills or may decline, or that
+  an untyped provider's values reach, passes the shape check absent. Its
+  requiredness is checked where the provider's answer is merged, after the
+  class-level permission check, as `InvalidArguments` keyed by the parameter in
+  the shape check's wording, and for a Validator field before the Validator
+  runs, whichever Validator it is. A required parameter nobody filled is
+  refused there, including one the provider declined whose callable has a
+  default, which used to run on that default; an optional one is absent. Such a
+  refusal is its own `InvalidArguments`: it is no longer one tree with the
+  caller's other shape errors, which answer first, nor with the Validator's
+  refusals of the call's other fields, which answer once it is supplied. A
+  permission check may therefore see `arguments` without such a key, so it
+  should read one with `.get`. `check_call` and `bind_arguments` relax the same
+  keys, and `check_server_arguments` lets a read or Validator field an untyped
+  provider reaches be withheld. `bind_arguments` runs no provider, so it makes
+  no presence check for these keys: an absent one reaches the Validator, as a
+  field `input_data` fills always did; and it is handed no seeds, so it still
+  demands a required `reflected` read that dispatch fills from a seed.
+- **A top-level Validator field named like a registered pool seed is
+  allowed** on a service spec that is not `many`. It stays the caller's
+  argument and is validated into `data`, and it is never spread into the
+  service's pool, so the seed keeps its own value.
+  `server_owned_keys(pool_seeds=)` leaves such a field out, and
+  `check_server_arguments` allows binding it. A field named like one of the
+  dispatcher's own names is still refused when the spec's parameters are
+  assembled.
+
 ## [0.14.0] — 2026-10-22
 
 ### Added
@@ -1794,7 +1835,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/Artui/django-service-specs/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Artui/django-service-specs/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Artui/django-service-specs/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Artui/django-service-specs/compare/v0.11.0...v0.12.0

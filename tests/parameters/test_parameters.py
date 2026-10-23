@@ -10,6 +10,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.types.unset import UNSET
 
 PK = Parameter("pk", "integer", required=True)
@@ -44,6 +45,20 @@ def test_defaults() -> None:
     assert p.default is UNSET
     assert p.items_nullable is False
     assert (p.minimum, p.maximum) == (None, None)
+
+
+def test_reflected_is_compared_and_hashed_and_never_in_the_schema() -> None:
+    # Two declarations differing only in it dispatch differently, so they are
+    # two keys; and it says where a declaration came from, not what a caller
+    # sends, so no schema states it.
+    written, reflected = (
+        Parameter("tenant", "string"),
+        Parameter("tenant", "string", reflected=True),
+    )
+    assert written.reflected is False
+    assert written != reflected
+    assert hash(written) != hash(reflected)
+    assert parameters_schema(Parameters.of(reflected)) == parameters_schema(Parameters.of(written))
 
 
 def test_choices_are_normalized_to_a_tuple() -> None:

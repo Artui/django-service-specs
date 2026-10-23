@@ -295,11 +295,12 @@ def test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded() -> None:
     }
 
 
-def test_a_read_an_untyped_kwargs_provider_returns_stays_required() -> None:
+def test_a_read_an_untyped_kwargs_provider_may_fill_is_not_demanded() -> None:
+    # A provider whose return names no keys may fill any read its values
+    # reach, so the shape check relaxes them as dispatch does; dispatch
+    # refuses the read at its seat if the provider leaves it out.
     spec = ServiceSpec(service=service, reads=PK, kwargs=lambda: {"pk": 1})
-    with pytest.raises(InvalidArguments) as caught:
-        bind_arguments(spec, {}, principal=PRINCIPAL)
-    assert caught.value.detail == {"pk": ["This field is required."]}
+    assert bind_arguments(spec, {}, principal=PRINCIPAL) == {}
 
 
 # --- the caller's value for a key a typed provider fills ---------------------------

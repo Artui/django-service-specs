@@ -66,10 +66,18 @@ def call_keywords(
 
     A parameter is refused only if it is filled by name, has no default, is
     not in the pool, and is one a caller could fill. No reserved name needs
-    excluding, because none is ever fillable: a read or Validator parameter
-    named after one of the dispatcher's own is refused as it is declared or
-    assembled (``check_reserved``), and one named after a registered seed by
-    ``open_call`` (test_a_spec_declaring_a_registered_seed_s_name_is_refused).
+    excluding, because none is ever missing from the pool: a read or
+    Validator parameter named after one of the dispatcher's own is refused as
+    it is declared or assembled (``check_reserved``), and one named after a
+    registered seed is refused by ``open_call``
+    (test_a_spec_declaring_a_registered_seed_s_name_is_refused) unless it is a
+    ``reflected`` read or a top-level Validator field, which the call's pool
+    carries under the seed's value whatever the caller sent
+    (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s,
+    test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed).
+    A read declared required that a provider declined never reaches here:
+    the seat that merges the provider's answer refuses it first, whatever
+    default the callable declares.
 
     One branch to coverage, so each condition is held by its own test:
     test_a_callable_taking_the_whole_pool_is_never_missing_anything,

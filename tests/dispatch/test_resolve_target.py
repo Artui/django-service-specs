@@ -7,7 +7,7 @@ rather than restated: the same result, or the same error at the same step.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django import forms
@@ -389,22 +389,23 @@ def test_a_parameter_a_registered_seed_occupies_is_refused(ada: Any) -> None:
         resolve_target(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
 
 
-def test_a_validator_field_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it(
+def test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it(
     ada: Any,
 ) -> None:
     # The field is not among the target selector's parameters, which are all
-    # resolve_target checks; the declaration is still wrong for every caller.
+    # resolve_target checks; it is the caller's argument, and dispatch runs the
+    # call with the field in ``data`` and the seed's value under its name.
     note = Note.objects.create(owner=ada, title="mine")
     seeds = DEFAULT_POOL_SEEDS.extend(title=lambda *, user: "seeded")
     spec = _update()
-    for call, arguments in (
-        (resolve_target, {"pk": note.pk}),
-        (dispatch, {"pk": note.pk, "title": "T"}),
-    ):
-        with pytest.raises(
-            ImproperlyConfigured, match=r"\['title'\], which a registered pool seed"
-        ):
-            call(spec, principal=ada, arguments=arguments, pool_seeds=seeds)
+    target, _ = _found(
+        resolve_target(spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=seeds)
+    )
+    assert target == note
+    dispatch(spec, principal=ada, arguments={"pk": note.pk, "title": "T"}, pool_seeds=seeds)
+    received = cast(Record, spec.service).calls[0]
+    assert received["data"] == {"title": "T"}
+    assert received["title"] == "seeded"
 
 
 def test_a_spec_declaring_no_permissions_is_refused_as_dispatch_refuses_it(ada: Any) -> None:

@@ -62,12 +62,23 @@ def dispatch(
        argument set and the shape check. It refuses no absent Validator field
        under a service spec's ``partial``, at any depth, while a ``reads``
        argument and the target's read stay required; nor a parameter a
-       typed provider is annotated to fill - a read the ``kwargs`` of the
-       spec declaring it fills, a Validator field ``input_data`` fills -
-       which is still refused, where it is read, if the provider declines
-       it. Such a parameter is the server's: a value the caller sends for it
-       is checked, then dropped, so it never stands in for the provider's. A parameter a registered seed in
-       ``pool_seeds`` occupies is refused before that, as a configuration error.
+       provider fills or may fill - a read the ``kwargs`` of the spec
+       declaring it reaches, a Validator field ``input_data`` reaches, where
+       the provider is annotated to fill the key, may decline it, or names
+       no keys at all. Such a parameter is still required of the call: once
+       the provider has answered, a read declared required that nobody
+       filled is refused where the answer is merged, in the shape check's
+       words (step three for a selector's read, before the affordances for a
+       service spec's), and a Validator field by the Validator. A value the
+       caller sends for a key a typed provider is annotated to fill is
+       checked, then dropped, so it never stands in for the provider's; one
+       for a key the provider may fill is kept beneath its answer. Before
+       that, a parameter a registered seed in ``pool_seeds`` is named like is
+       answered by where it is declared: a ``reflected`` read leaves the
+       argument set and the seed fills it; a top-level Validator field stays
+       the caller's, and reaches the service in ``data`` while the seed keeps
+       the parameter of its name; anything else is refused as a configuration
+       error.
     2. [`authorize`][django_service_specs.dispatch.authorize.authorize],
        honouring ``grant`` if it covers this spec and principal. Before anything
        is resolved, so a refused principal learns nothing about which rows exist.
