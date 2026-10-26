@@ -3,17 +3,22 @@
 ``sync_answer`` is read by the three ``authorize`` functions, so the
 class-level, object-level and scope-level checks cannot disagree about an
 answer that is not one, and so is ``asked_with``, so they cannot disagree
-about which check is handed the call's arguments, its context or a seed."""
+about which check is handed the call's arguments, its context or a seed.
+``seeds_for_checks`` is read by them and by dispatch, so a transport handing
+one ``pool_seeds`` resolves a check's seeds exactly as dispatch would."""
 
 from __future__ import annotations
 
 import inspect
 import weakref
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from types import FunctionType, MappingProxyType
 from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
+
+from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.utils import resolved_seeds
 
 
 def sync_answer(answer: Any, *, asked: str) -> Any:
@@ -106,6 +111,92 @@ def offered_to_checks(
     without it.
     """
     return {**(seeds or {}), "call_context": {} if call_context is None else call_context}
+
+
+# The three questions a check is asked, each with how many parameters the call
+# fills by position, which no name among them can opt into.
+CLASS_LEVEL: Final = ("has_permission", 2)
+OBJECT_LEVEL: Final = ("has_object_permission", 3)
+SCOPE_LEVEL: Final = ("has_scope_permission", 3)
+QUESTIONS: Final = (CLASS_LEVEL, OBJECT_LEVEL, SCOPE_LEVEL)
+
+
+def offered_seeds(
+    spec: Any,
+    principal: Any,
+    *,
+    seeds: Mapping[str, Any] | None,
+    pool_seeds: PoolSeeds | None,
+    question: tuple[str, int],
+    asked: str,
+) -> Mapping[str, Any] | None:
+    """The seeds one ``authorize`` function offers its checks: ``seeds`` as handed, or resolved.
+
+    With ``pool_seeds``, the registered seeds ``question`` names on one of
+    ``spec``'s checks, resolved now (``seeds_for_checks``), and no other: a
+    seed only another question names, or one no check names, is not resolved
+    (test_the_seed_the_class_level_check_names_is_resolved_for_it, and each
+    sibling's test_the_seed_its_question_names_is_resolved_for_it). The
+    caller asks after its own short cuts - a covering grant, a grant that
+    checked the target - so a call they answer resolves nothing.
+
+    ``seeds`` and ``pool_seeds`` together are refused with ``TypeError``
+    rather than merged, as ``base_pool`` refuses a seed meeting an entry the
+    caller spread in: one would silently outrank the other
+    (test_seeds_and_pool_seeds_together_are_refused, in each of the three).
+    ``asked`` names the function in that refusal.
+    """
+    if pool_seeds is None:
+        return seeds
+    if seeds is not None:
+        raise TypeError(
+            f"{asked}() takes seeds= or pool_seeds=, not both: seeds= are values already "
+            "resolved and pool_seeds= resolves them, so one would silently outrank the other."
+        )
+    return seeds_for_checks(spec, principal, pool_seeds, (question,))
+
+
+def seeds_for_checks(
+    spec: Any, principal: Any, pool_seeds: PoolSeeds, questions: Iterable[tuple[str, int]]
+) -> dict[str, Any]:
+    """The registered seeds a check of ``spec`` names at one of ``questions``, resolved, by name.
+
+    Resolved from a base pool with ``principal`` as ``user`` and no live
+    reporter, so a resolver reads what it would at the class-level check of a
+    dispatch. Dispatch asks with all three questions, before its class-level
+    check; an ``authorize`` function handed ``pool_seeds`` asks with its own
+    one (``offered_seeds``). A resolver that raises ends the call there, as it
+    does in dispatch
+    (test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check).
+    """
+    return resolved_seeds(
+        pool_seeds, _named_seeds(spec, pool_seeds.names, questions), user=principal
+    )
+
+
+def _named_seeds(
+    spec: Any, names: frozenset[str], questions: Iterable[tuple[str, int]]
+) -> frozenset[str]:
+    """The registered seeds ``names`` that one of ``questions``, on one of ``spec``'s checks, names.
+
+    Read off the same declaration ``asked_with`` hands from, so a check is
+    resolved seeds exactly when it would be handed one
+    (test_a_spec_whose_checks_name_a_seed_resolves_it_before_the_class_level_check),
+    and a parameter filled by position is no opt-in
+    (test_a_positional_parameter_named_after_a_seed_is_not_an_opt_in).
+    ``arguments`` is never among them: a check naming it is handed the
+    call's arguments, which outrank a seed of that name, so such a seed
+    resolves as an unnamed one does
+    (test_a_seed_registered_as_arguments_resolves_as_it_would_unnamed).
+    """
+    named = frozenset().union(
+        *(
+            declared_keywords(check, method, positional=positional) & names
+            for check in spec.permissions or ()
+            for method, positional in questions
+        )
+    )
+    return named - {"arguments"}
 
 
 def declared_keywords(check: Any, method: str, *, positional: int) -> frozenset[str]:

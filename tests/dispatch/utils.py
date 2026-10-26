@@ -15,7 +15,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
-from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.validation.validated import Validated
@@ -155,6 +155,55 @@ class Offered(PermissionCheck):
     ) -> bool:
         self.asked.append(("has_scope_permission", call_context, tenant))
         return True
+
+
+class SeedPerQuestion(PermissionCheck):
+    """Admits everything; each question names a seed of its own, and records what it was handed.
+
+    ``club`` at the class-level question, ``row_club`` at the object-level one
+    and ``scope_club`` at the scope one, so a test can tell which question's
+    seeds a call resolved.
+    """
+
+    def __init__(self) -> None:
+        self.handed: list[tuple[str, Any]] = []
+
+    def has_permission(self, principal: Any, spec: Any, *, club: Any) -> bool:
+        self.handed.append(("has_permission", club))
+        return True
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, row_club: Any
+    ) -> bool:
+        self.handed.append(("has_object_permission", row_club))
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, scope_club: Any
+    ) -> bool:
+        self.handed.append(("has_scope_permission", scope_club))
+        return True
+
+
+def recorded_seeds(raising: BaseException | None = None) -> tuple[PoolSeeds, list[str]]:
+    """``SeedPerQuestion``'s three seeds and one no check names, each recording when it resolves.
+
+    Each value names the seed and the principal it was resolved for. With
+    ``raising``, every resolver raises it instead.
+    """
+    resolved: list[str] = []
+
+    def resolver(name: str) -> Any:
+        def resolve(*, user: Any) -> str:
+            resolved.append(name)
+            if raising is not None:
+                raise raising
+            return f"{name} of {user}"
+
+        return resolve
+
+    names = ("club", "row_club", "scope_club", "locale")
+    return DEFAULT_POOL_SEEDS.extend(**{name: resolver(name) for name in names}), resolved
 
 
 class Titled(Validator):

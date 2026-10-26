@@ -6,8 +6,15 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import asked_with, offered_to_checks, sync_answer
+from django_service_specs.authorization.utils import (
+    OBJECT_LEVEL,
+    asked_with,
+    offered_seeds,
+    offered_to_checks,
+    sync_answer,
+)
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -23,6 +30,7 @@ def authorize_target(
     arguments: Mapping[str, Any] | None = None,
     call_context: dict[str, Any] | None = None,
     seeds: Mapping[str, Any] | None = None,
+    pool_seeds: PoolSeeds | None = None,
 ) -> None:
     """Run ``spec``'s object-level permission checks against a resolved ``target``.
 
@@ -62,11 +70,34 @@ def authorize_target(
     seed's value from ``seeds``, which dispatch resolves for the call only
     when one of the spec's checks names one. A parameter the call fills by
     position is never read as an opt-in, whatever its name.
+
+    ``pool_seeds`` is for a transport that calls this itself and has the
+    registry rather than the values: the
+    [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] it would
+    hand dispatch. Only the registered seeds a check's ``has_object_permission`` names
+    are resolved, once, for ``principal`` as ``user``, and offered as
+    ``seeds`` would be; a seed only another question names, or one no check
+    names, is never resolved, and nothing is when ``grant.target_checked`` answers
+    first. A resolver raising - ``PrincipalUnavailable`` for one - ends the
+    call before any check is asked, as in dispatch. Handing ``seeds`` too
+    raises ``TypeError``, since one would silently outrank the other.
     """
     spec = kernel_spec(spec)
     if grant.target_checked:
         return
-    offered = offered_to_checks(call_context, seeds)
+    # After ``target_checked`` has answered, so a call it answers resolves no seed
+    # (test_a_grant_that_checked_the_target_resolves_no_seed).
+    offered = offered_to_checks(
+        call_context,
+        offered_seeds(
+            spec,
+            principal,
+            seeds=seeds,
+            pool_seeds=pool_seeds,
+            question=OBJECT_LEVEL,
+            asked="authorize_target",
+        ),
+    )
     for check in spec.permissions or ():
         answer = check.has_object_permission(
             principal,

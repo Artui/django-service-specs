@@ -280,7 +280,9 @@ check and the service see one object; every other seed resolves after the
 class-level check, as it always has. A seed resolver raising
 [`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable]
 there ends the call before any check is asked, as a refusal does. The
-`authorize` functions take `call_context=` and `seeds=` to offer the same, and
+`authorize` functions take `call_context=` and `seeds=` to offer the same, or
+`pool_seeds=` to resolve the seeds their checks name
+([admitting a request before the form](#admitting-a-request-before-the-form)), and
 with no `call_context` a check declaring it is handed a fresh dict.
 
 **A check is sync-only**: it may query, so the async entry point runs it in
@@ -338,6 +340,33 @@ are the three checks dispatch runs, exported for a transport that runs them
 itself; `authorize` returns the grant it honoured or a new one covering the
 spec and principal, and dispatch skips the other two under `target_checked`
 only where a service spec's target was handed in as `target=`.
+
+### Admitting a request before the form
+
+A page asks the class-level check before it shows anything, so a principal
+the check refuses never sees the form. Where that check names a seed - the
+club a route captured, a tenant read off the request - the transport has the
+registry it would hand dispatch rather than the seed's value, and hands that
+to `authorize` as `pool_seeds=`:
+
+```python
+--8<--
+docs/examples/dispatching.py:admit
+--8<--
+```
+
+Only the seeds the spec's `has_permission` checks name are resolved, once in
+the `authorize` call, for the principal as `user`, exactly as dispatch
+resolves them before its own class-level check; a seed no check names there is
+never resolved, and neither is any seed when a covering grant answers first.
+The values are not carried on the grant, so the `dispatch` that follows
+resolves the seeds its checks name again, for its own call: the check
+`authorize` asked and the service may see two objects from one resolver. `authorize_target`
+and `authorize_scope` take `pool_seeds=` the same way, for the seeds their own
+question names. `seeds=` is the alternative for a caller holding resolved
+values, and handing both raises `TypeError`, since one would silently outrank
+the other. A check naming a seed the registry does not hold is asked without
+it, as under `seeds=`, so its own signature decides.
 
 ### A target resolved ahead of the call
 

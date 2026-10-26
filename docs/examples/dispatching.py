@@ -1,4 +1,4 @@
-"""Dispatching: results, not-found, grants, binding outside dispatch, pool seeds, progress."""
+"""Dispatching: results, not-found, grants, admitting, binding outside dispatch, seeds, progress."""
 
 from __future__ import annotations
 
@@ -17,12 +17,14 @@ from django_service_specs import (
     Parameter,
     Parameters,
     PermissionCheck,
+    PoolSeeds,
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
     ServerArguments,
     ServiceSpec,
     apply_server_arguments,
+    authorize,
     bind_arguments,
     check_call,
     check_server_arguments,
@@ -193,6 +195,51 @@ def offered(schema: Mapping[str, Any], server: ServerArguments) -> list[str]:
 
 
 # --8<-- [end:server_arguments]
+
+
+# --8<-- [start:admit]
+class InClub(PermissionCheck):
+    """Admits a member of the club the route names, read from a seed."""
+
+    message = "Members of this club only."
+
+    def has_permission(self, principal: Any, spec: Any, *, club: str) -> bool:
+        return principal.groups.filter(name=club).exists()
+
+
+def post_to_club(*, user: Any, title: str, club: str) -> Note:
+    return Note.objects.create(owner=user, title=f"{club}: {title}")
+
+
+club_note_spec = ServiceSpec(
+    service=post_to_club,
+    permissions=[InClub()],
+    validator=DataclassValidator(Rename),
+)
+
+
+def club_seeds(club: str) -> PoolSeeds:
+    # Built per request, from what the route captured.
+    return DEFAULT_POOL_SEEDS.extend(club=lambda: club)
+
+
+def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
+    pool_seeds = club_seeds(club)
+    # Before the form: a principal the class-level check refuses never sees
+    # it. NotPermitted for anyone outside the club.
+    grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
+    if title is None:
+        return "the form"  # the GET
+    return dispatch(
+        club_note_spec,
+        principal=user,
+        arguments={"title": title},
+        pool_seeds=pool_seeds,
+        grant=grant,
+    )
+
+
+# --8<-- [end:admit]
 
 
 # --8<-- [start:resolve_target]

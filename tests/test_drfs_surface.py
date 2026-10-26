@@ -176,15 +176,16 @@ SURFACE: dict[str, Pin] = {
         signature="kind, value=, service_result=, instance=, data=, context=",
     ),
     "authorize": _fn(
-        "dispatch.authorize", "spec, principal, *, grant=, arguments=, call_context=, seeds="
+        "dispatch.authorize",
+        "spec, principal, *, grant=, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "authorize_scope": _fn(
         "dispatch.authorize_scope",
-        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=",
+        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "authorize_target": _fn(
         "dispatch.authorize_target",
-        "spec, principal, target, *, grant, arguments=, call_context=, seeds=",
+        "spec, principal, target, *, grant, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "Grant": Pin(
         "dispatch.grant",

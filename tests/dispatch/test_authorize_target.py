@@ -13,7 +13,7 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses
-from tests.dispatch.utils import Arguing, Offered
+from tests.dispatch.utils import Arguing, Offered, SeedPerQuestion, recorded_seeds
 from tests.specs.utils import Foreign
 
 
@@ -144,3 +144,50 @@ def test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own() -> None:
     (_, first, _), (_, second, _) = check.asked
     assert first == second == {}
     assert first is not second
+
+
+class TestPoolSeeds:
+    """``pool_seeds=`` resolves the seeds ``has_object_permission`` names, and no other."""
+
+    def test_the_seed_its_question_names_is_resolved_for_it(self) -> None:
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        authorize_target(
+            spec, principal, object(), grant=Grant(spec, principal), pool_seeds=pool_seeds
+        )
+        assert check.handed == [("has_object_permission", "row_club of ada")]
+        assert resolved == ["row_club"]
+
+    def test_a_grant_that_checked_the_target_resolves_no_seed(self) -> None:
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        grant = Grant(spec, principal, target_checked=True)
+        authorize_target(spec, principal, object(), grant=grant, pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_seeds_and_pool_seeds_together_are_refused(self) -> None:
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(TypeError, match=r"seeds= or pool_seeds=, not both"):
+            authorize_target(
+                spec,
+                principal,
+                object(),
+                grant=Grant(spec, principal),
+                seeds={"row_club": "chosen"},
+                pool_seeds=pool_seeds,
+            )
+        assert resolved == []
+
+    def test_a_call_without_pool_seeds_asks_a_seed_naming_check_as_before(self) -> None:
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        with pytest.raises(TypeError) as raised:
+            authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+        assert str(raised.value).endswith(
+            "has_object_permission() missing 1 required keyword-only argument: 'row_club'"
+        )
+        assert check.handed == []

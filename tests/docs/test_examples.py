@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -423,6 +423,17 @@ class TestDispatching:
         assert renamed == {"id": note.pk, "title": "Final"}
         looked_up = [q["sql"] for q in queries if q["sql"].startswith("SELECT")]
         assert len(looked_up) == 1  # resolve_target's lookup, and no second one from dispatch
+
+    def test_a_page_admits_by_a_seed_before_the_form(self, ada: Any, bob: Any) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        assert dispatching.club_note_page(ada, "chess") == "the form"
+        result = dispatching.club_note_page(ada, "chess", "Openings")
+        assert result.kind == "instance" and result.value.title == "chess: Openings"
+        # Refused before the form, and by the club the route names.
+        with pytest.raises(NotPermitted, match="Members of this club only."):
+            dispatching.club_note_page(bob, "chess")
+        with pytest.raises(NotPermitted, match="Members of this club only."):
+            dispatching.club_note_page(ada, "go")
 
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")

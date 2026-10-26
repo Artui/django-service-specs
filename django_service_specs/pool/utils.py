@@ -1,4 +1,4 @@
-"""Helpers shared across the readers of a spec's providers, which dispatch calls."""
+"""Helpers shared across the readers of a spec's providers, which dispatch calls, and of its seeds."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET
@@ -128,3 +130,31 @@ def _fan(transport: ProgressReporter | None, own: ProgressReporter | None) -> Pr
                 sink(progress, total=total, message=message, meta=meta)
 
     return report
+
+
+def only_seeds(pool_seeds: PoolSeeds, names: frozenset[str]) -> PoolSeeds:
+    """``pool_seeds`` narrowed to ``names``, in registration order.
+
+    What resolves a part of a registry and leaves the rest for later: the
+    seeds a call's checks name, before the class-level check, and every other
+    seed after it.
+    """
+    return DEFAULT_POOL_SEEDS.extend(
+        **{name: resolver for name, resolver in pool_seeds.resolvers().items() if name in names}
+    )
+
+
+def resolved_seeds(pool_seeds: PoolSeeds, names: frozenset[str], *, user: Any) -> dict[str, Any]:
+    """The seeds of ``pool_seeds`` that ``names`` names, resolved for ``user``, and no other.
+
+    What resolves a seed ahead of a call's pools, for whatever named it: a
+    permission check before the class-level check (``seeds_for_checks``). A
+    name the registry does not hold is skipped, so the caller passes every
+    name its callable declares and only the registered ones resolve
+    (test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped). From a
+    base pool with no live reporter, so a resolver reading ``progress`` sees
+    the no-op one; a resolver that raises ends the call here.
+    """
+    named = names & pool_seeds.names
+    resolved = base_pool(user=user, seeds=only_seeds(pool_seeds, named))
+    return {name: resolved[name] for name in named}

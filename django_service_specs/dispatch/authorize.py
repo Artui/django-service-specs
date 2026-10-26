@@ -8,8 +8,15 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
-from django_service_specs.authorization.utils import asked_with, offered_to_checks, sync_answer
+from django_service_specs.authorization.utils import (
+    CLASS_LEVEL,
+    asked_with,
+    offered_seeds,
+    offered_to_checks,
+    sync_answer,
+)
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -24,6 +31,7 @@ def authorize(
     arguments: Mapping[str, Any] | None = None,
     call_context: dict[str, Any] | None = None,
     seeds: Mapping[str, Any] | None = None,
+    pool_seeds: PoolSeeds | None = None,
 ) -> Grant:
     """Run ``spec``'s class-level permission checks for ``principal``.
 
@@ -67,6 +75,17 @@ def authorize(
     when one of the spec's checks names one. A parameter the call fills by
     position is never read as an opt-in, whatever its name.
 
+    ``pool_seeds`` is for a transport that calls this itself and has the
+    registry rather than the values: the
+    [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] it would
+    hand dispatch. Only the registered seeds a check's ``has_permission`` names
+    are resolved, once, for ``principal`` as ``user``, and offered as
+    ``seeds`` would be; a seed only another question names, or one no check
+    names, is never resolved, and nothing is when a covering ``grant`` answers
+    first. A resolver raising - ``PrincipalUnavailable`` for one - ends the
+    call before any check is asked, as in dispatch. Handing ``seeds`` too
+    raises ``TypeError``, since one would silently outrank the other.
+
     Returns:
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
@@ -85,7 +104,19 @@ def authorize(
             f"The {type(spec).__name__} for {getattr(run, '__qualname__', run)!s} declares "
             "no permissions. Pass permissions=[Unrestricted()] to mean that anyone may run it."
         )
-    offered = offered_to_checks(call_context, seeds)
+    # After a covering grant has answered, so a call it answers resolves no seed
+    # (test_a_covering_grant_resolves_no_seed).
+    offered = offered_to_checks(
+        call_context,
+        offered_seeds(
+            spec,
+            principal,
+            seeds=seeds,
+            pool_seeds=pool_seeds,
+            question=CLASS_LEVEL,
+            asked="authorize",
+        ),
+    )
     for check in spec.permissions:
         answer = check.has_permission(
             principal, spec, **asked_with(check, "has_permission", arguments, offered=offered)

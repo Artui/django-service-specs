@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`authorize(..., pool_seeds=)`**, so a transport that admits a request
+  before showing a form - and holds the `PoolSeeds` it would hand dispatch
+  rather than resolved values - can answer a class-level check that names a
+  seed. Only the seeds the spec's `has_permission` checks name are resolved,
+  once, for the principal, as dispatch resolves them; a seed no check names
+  is never resolved, and none is when a covering grant answers first. Such a
+  check previously failed with `TypeError` unless every seed was resolved by
+  hand and passed as `seeds=`. `authorize_target` and `authorize_scope` take
+  the same keyword for the seeds their own question names. Handing `seeds=`
+  and `pool_seeds=` together raises `TypeError`, and a call without
+  `pool_seeds=` behaves as before.
+
 ## [0.16.0] — 2026-10-26
 
 ### Added
