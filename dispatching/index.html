@@ -550,6 +550,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-calls-request-and-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's request and view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#progress" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1119,6 +1130,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#the-calls-request-and-view" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's request and view
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#progress" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1458,8 +1480,11 @@ row to a template never pays for rendering it.</p>
 async code, in one executor hop, since a presenter may query.</p>
 <h2 id="permissions">Permissions<a class="headerlink" href="#permissions" title="Permanent link">&para;</a></h2>
 <p>A <a class="autorefs autorefs-internal" title="PermissionCheck" href="../reference/#django_service_specs.authorization.permission_check.PermissionCheck"><code>PermissionCheck</code></a>
-takes a principal and a spec, and nothing else: no request and no view, because
-most transports have neither. Checks are <strong>instances</strong>, so a check can carry
+takes a principal and a spec, and nothing else by position: no request and no
+view, because most transports have neither. A check that wants them declares
+<code>request</code> or <code>view</code> by keyword and is handed what the call's context holds
+under that key, <code>None</code> where it holds none
+(<a href="#the-calls-request-and-view">the call's <code>request</code> and <code>view</code></a>). Checks are <strong>instances</strong>, so a check can carry
 its own configuration - a codename, a group - and a spec reads as the list of
 checks it applies. <code>has_permission</code> is the class-level check;
 <code>has_object_permission</code> runs on a resolved row and allows unless overridden;
@@ -2059,6 +2084,44 @@ or a name registered twice, with <code>ValueError</code>. Either half alone is a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.</p>
+<h3 id="the-calls-request-and-view">The call's <code>request</code> and <code>view</code><a class="headerlink" href="#the-calls-request-and-view" title="Permanent link">&para;</a></h3>
+<p><code>dispatch</code> and <code>adispatch</code> hand two values to every callable they bind that
+names one, read off the call's context:
+<a class="autorefs autorefs-internal" title="CALL_SEEDS
+
+
+  
+      module-attribute
+  " href="../reference/#django_service_specs.pool.call_seeds.CALL_SEEDS"><code>CALL_SEEDS</code></a>, <code>request</code> and
+<code>view</code>. Each is the very object the transport put in <code>call_context</code> under that
+key, and <code>None</code> where it put none, so a spec callable written for HTTP binds on
+every route and learns from a <code>None</code> that the call came from no request. Every
+stage is handed them by declaring them: a seed's resolver, the selectors (the
+target selector on every route, <code>resolve_target</code> included), <code>extend_queryset</code>,
+a FilterSet, the providers, a <code>FormValidator</code>'s <code>form_kwargs</code>, the affordance
+conditions, the preconditions, the run's <code>progress_reporter</code>, the service, the
+output selector, and the row services and callable scopes of a nested write.</p>
+<p>They are handed <strong>by name only</strong>, as <code>call_context</code> itself is: a <code>**kwargs</code>
+catch-all is handed neither, and neither is a pool entry, so the Validator's
+<code>ambient</code> holds neither and a Validator reads them off its context's
+<code>call_context</code>. A seed's resolver may declare them; the commonest seed, a tenant
+read off the request, is <code>tenant=lambda *, request: request.tenant</code>. The three
+<code>authorize</code> functions offer both to a permission check that declares one, and
+<a class="autorefs autorefs-internal" title="form_keywords" href="../reference/#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>
+and the affordance functions read them off the <code>call_context</code> they are handed,
+so a page or a listing asks what dispatch would.</p>
+<p>A spec declaring a parameter named <code>request</code> or <code>view</code> is refused at dispatch
+with <code>ImproperlyConfigured</code>, on every route, and so is a <code>kwargs</code> provider or an
+<code>extra_kwargs</code> key of either name. A read reflected off a selector's own
+signature is not refused: the call's value fills it, as a registered seed fills
+one named like it. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
+<code>data</code> while a service naming it reads the call's own. Neither name is in
+<code>RESERVED_POOL_SEEDS</code> or <code>PoolSeeds.reserved</code>, so <strong>a mount may still register
+either</strong> through <code>PoolSeeds</code>, by the constructor or <code>extend()</code>, as transports
+released before dispatch supplied them do. Such a mount keeps its own: the
+registered seed is a pool entry, the value at every stage and every check, and a
+<code>**kwargs</code> catch-all is handed it as any seed; another seed's resolver still
+reads the call's.</p>
 <p>Two declarations of a seed's name are not refused, because neither shares the
 pool with an argument. A read marked <code>reflected=True</code> is one an adapter took off
 a callable's signature rather than one an author wrote, such as a selector's
@@ -2326,7 +2389,9 @@ what the service left there.</p>
   convention: a transport over DRF is expected to put DRF's <code>request</code> there,
   and a key such as <code>request</code>, <code>view</code> or <code>format</code> means what the transport
   that wrote it says.
-  The kernel writes nothing and keeps nothing across calls.</li>
+  The kernel writes nothing and keeps nothing across calls. It reads two
+  keys, <code>request</code> and <code>view</code>, for a callable naming one
+  (<a href="#the-calls-request-and-view">the call's <code>request</code> and <code>view</code></a>).</li>
 <li><strong><code>transport</code> names the transport, across the family.</strong> One key is reserved
   for every transport rather than left to each: a transport sets
   <code>call_context["transport"]</code> to name itself, so a stage that answers one

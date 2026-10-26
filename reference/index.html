@@ -2558,6 +2558,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.pool.call_seeds.CALL_SEEDS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CALL_SEEDS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.pool.base_pool.base_pool" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5851,6 +5862,17 @@
     <span class="md-ellipsis">
       
         RESERVED_POOL_SEEDS
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.pool.call_seeds.CALL_SEEDS" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CALL_SEEDS
       
     </span>
   </a>
@@ -12277,6 +12299,10 @@ beside those three: <code>form_class(data=..., **form_keywords(...))</code>.</p>
   names, or every seed for one taking <code>**kwargs</code>, as on dispatch;</li>
 <li><code>call_context</code>, the dict handed here, or a fresh one; a page hands the
   dict it will hand dispatch, so what the two calls write is shared;</li>
+<li><code>request</code> and <code>view</code>, read off that context, <code>None</code> for a key it
+  lacks, as in every pool dispatch builds, unless <code>pool_seeds</code> registers
+  the name, whose seed is the value then; and a seed's resolver may declare
+  either;</li>
 <li><code>target</code> under the name dispatch hands it by: <code>instance</code> for a spec
   with an instance selector, <code>collection</code> for one with a collection
   selector, and nothing for a create.</li>
@@ -14109,10 +14135,11 @@ drift apart:</p>
 <ol>
 <li>A deactivated principal is refused as <code>PrincipalUnavailable</code>, with
    or without a <code>grant</code>.</li>
-<li>A parameter a registered seed in <code>pool_seeds</code> is named like is
-   answered as dispatch answers it: a <code>reflected</code> read leaves the
-   argument set, a top-level Validator field stays in it, and anything
-   else is refused as <code>ImproperlyConfigured</code>.</li>
+<li>A parameter a registered seed in <code>pool_seeds</code> is named like, or
+   one named <code>request</code> or <code>view</code> on any mount, is answered as
+   dispatch answers it: a <code>reflected</code> read leaves the argument set, a
+   top-level Validator field stays in it, and anything else is refused
+   as <code>ImproperlyConfigured</code>.</li>
 <li><a class="autorefs autorefs-internal" title="check_arguments" href="#django_service_specs.parameters.check_arguments.check_arguments"><code>check_arguments</code></a>
    under <code>unknown_arguments</code>, relaxed exactly as dispatch relaxes it: a
    parameter a provider fills or may fill - a typed provider's filled and
@@ -16509,7 +16536,10 @@ declares, annotated or not.</p>
 <p>The names in <code>RESERVED_POOL_SEEDS</code> are the dispatcher's own. Everything
 else a service legitimately needs — a tenant, a correlation id, a locale, a
 clock, a feature-flag reader — has no channel, because off HTTP there is no
-<code>request</code> for it to hang off. This is that channel.</p>
+<code>request</code> for it to hang off. This is that channel. Where there is one,
+a resolver declaring <code>request</code> reads it (<code>CALL_SEEDS</code>), and a
+transport may still register <code>request</code> or <code>view</code> itself, as the ones
+released before dispatch supplied them do; such a mount keeps its own.</p>
 <p>A registration contributes two things:</p>
 <ul>
 <li><strong>the value</strong>, resolved into every pool
@@ -16835,8 +16865,74 @@ client as the work restarting.</p>
 <p>A parameter declaring one of these names is refused, because a spread argument
 must never be able to outrank the value dispatch seeded - a caller naming
 itself <code>user</code> is the case that matters. <code>request</code> and <code>view</code> are not here:
-they are an HTTP adapter's, and it registers them through <code>PoolSeeds</code>, which
-reserves them the same way.</p>
+they are <code>CALL_SEEDS</code>, the call's own, which dispatch hands a callable naming
+one off the call's context. A transport may still register either through
+<code>PoolSeeds</code>, which reserves it the same way, and dispatch refuses a spec
+parameter of either name on every mount.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="django_service_specs.pool.call_seeds.CALL_SEEDS" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">CALL_SEEDS</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.pool.call_seeds.CALL_SEEDS" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">CALL_SEEDS</span><span class="p">:</span> <span class="n">Final</span><span class="p">[</span><span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s1">'request'</span><span class="p">,</span> <span class="s1">'view'</span><span class="p">})</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The names dispatch reads off the call's context for every callable naming one.</p>
+<p><code>request</code> is the Django <code>HttpRequest</code> the call arrived on and <code>view</code> the
+view serving it, each the very object the transport put in <code>call_context</code>
+under that key, and <code>None</code> where it put none: off HTTP there is no request,
+and code reading one learns that from the <code>None</code>
+(test_with_neither_key_in_the_context_every_stage_is_handed_none). A spec
+callable written for HTTP declares both, so a spec serves unchanged from every
+transport only if every stage can be handed them.</p>
+<p><strong>Handed by name only.</strong> Every stage dispatch resolves - a seed's resolver,
+the selectors, the target selector on every route included, the providers, a
+<code>FormValidator</code>'s <code>form_kwargs</code>, the affordance conditions, the
+preconditions, the run's <code>progress_reporter</code>, the service and the output
+selector - is handed either name it declares, and so is every permission
+check that declares one. A <code>**kwargs</code> catch-all is handed neither, and
+neither is a pool entry, so the Validator's <code>ambient</code> holds neither, as the
+call's context itself is handled (test_a_catch_all_is_handed_neither,
+test_the_validator_s_ambient_holds_neither).</p>
+<p><strong>Outside</strong> <code>RESERVED_POOL_SEEDS</code>, so <code>PoolSeeds.extend</code> and the
+constructor both accept a registration under either name, as the transports
+released before the kernel supplied them make one. Such a mount keeps its own:
+the registered seed is a pool entry, the value at every stage and every check,
+and reaches a catch-all as any seed does
+(test_the_registered_seed_supplies_the_name,
+test_a_registered_view_still_reaches_a_catch_all).</p>
+<p><strong>Outside</strong> <code>PoolSeeds.reserved</code> as well, which keeps its published answer
+for the transports that read it. Dispatch refuses a spec parameter of either
+name on every mount all the same (test_a_parameter_named_either_is_refused),
+and a <code>kwargs</code> provider's or an <code>extra_kwargs</code> key of either name
+(test_a_provider_returning_request_is_refused,
+test_an_overlay_key_named_either_is_refused). Two are not refused. A read
+reflected off a selector's signature is filled with the call's value, as one
+named like a registered seed is filled with the seed's
+(test_a_reflected_read_named_either_is_the_call_s). A top-level Validator
+field of either name is the caller's: it validates into <code>data</code> and never
+reaches the service under the name, as a field named like a registered seed
+(test_a_validator_field_named_request_takes_the_seat). A value of either name
+that a Validator returns without declaring it, or binds for the call, is
+refused, as a provider's is, since it would outrank the context's
+(test_a_validator_returning_either_is_refused,
+test_a_validator_binding_either_is_refused). A transport refusing a
+caller's argument by these names reads this set.</p>
 
     </div>
 
@@ -16872,10 +16968,14 @@ it wrote there, because <code>resolve_callable_kwargs</code> forwards only keys 
 pool actually has. A callable declaring a seed the literal omitted then
 raises <code>TypeError</code> at call time rather than running - <code>progress</code> most
 often, since it is the seed with a default and so the one nobody remembers.</p>
-<p>There is no <code>request</code> entry here: this is the kernel, and off HTTP there
-is no request to seed. An HTTP adapter that wants one registers it as its
-own seed through <code>PoolSeeds</code>, the same way any other ambient value is
-added.</p>
+<p>There is no <code>request</code> or <code>view</code> entry here (<code>CALL_SEEDS</code>): a
+resolver declaring either is handed the one in the pool's
+<code>call_context</code> where the pool carries one, <code>None</code> where the context
+holds none, and a catch-all never is
+(test_a_resolver_reads_the_request_off_the_pool_s_call_context). Dispatch
+passes the call's context in for its resolvers and keeps it out of the
+pool it hands on. A transport that registers either name as its own seed
+keeps it, as before.</p>
 <p>A seed resolving to an awaitable is refused with <code>ImproperlyConfigured</code>
 and never enters the pool. <code>PoolSeeds</code> refuses an <code>async def</code>
 resolver when it is registered, but a plain <code>def</code> handing back a
@@ -17207,6 +17307,10 @@ asks the caller for no key the server answers anyway. The union of:</p>
   (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it).
   A read marked <code>reflected</code> and named like a registered seed is here,
   since the seed fills it and the call takes no argument of its name;</li>
+<li>a read marked <code>reflected</code> and named <code>request</code> or <code>view</code>, on any
+  mount: dispatch fills it from the call's context and refuses a caller's
+  argument of its name
+  (test_server_owned_keys_owns_a_reflected_read_named_either);</li>
 <li>the keys each provider the dispatch runs is annotated to fill, as
   <a class="autorefs autorefs-internal" title="provider_keys" href="#django_service_specs.pool.provider_keys.provider_keys"><code>provider_keys</code></a>
   reads them: the spec's <code>kwargs</code> and, on a service spec, its
