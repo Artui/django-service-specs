@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
@@ -168,7 +169,17 @@ def _presented_rows(
             "one presented value per row, in the order given: affordances are added to "
             "each presented row by its position."
         )
-    return [_row(presenter, row) for row in answer]
+    try:
+        return [_row(presenter, row) for row in answer]
+    except ImproperlyConfigured:
+        # The default's presented() per row has made every row's answer before
+        # the first is read, so a refused row leaves the rest of a list of
+        # coroutines behind to warn that they were never awaited. Closing one
+        # already closed is a no-op (test_every_row_still_to_be_awaited_is_closed).
+        for row in answer:
+            if inspect.iscoroutine(row):
+                row.close()
+        raise
 
 
 def _row(presenter: Presenter, answer: Any) -> Any:

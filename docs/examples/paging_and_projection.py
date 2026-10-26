@@ -130,8 +130,9 @@ class ChosenFields(Presenter):
         return Output(
             (
                 OutputField("id", "integer"),
-                # Left out of a row whose caller did not choose them, so a
-                # schema must not call them required.
+                # Left out of a row whose caller did not choose them. The
+                # schema of a spec declaring shapes requires no field of a row
+                # anyway, since a selection can leave out any of them.
                 OutputField("title", "string", always_present=False),
                 OutputField("price", "string", always_present=False),
             )

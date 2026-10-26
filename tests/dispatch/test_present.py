@@ -117,6 +117,31 @@ def test_a_presenter_answering_with_a_coroutine_is_refused(kind: SelectorKind, v
     ]
 
 
+@pytest.mark.parametrize(
+    "rows",
+    [
+        pytest.param([Row("a"), Row("b"), Row("c")], id="every-row-a-coroutine"),
+        pytest.param([Row("a"), {"title": "b"}, Row("c")], id="a-presented-row-among-them"),
+    ],
+)
+def test_every_row_still_to_be_awaited_is_closed(rows: list[Any]) -> None:
+    """The first refused, and every other row's coroutine closed with it."""
+
+    class Mixed(Awaiting):
+        def present(self, value: Any) -> Any:
+            return value if isinstance(value, dict) else super().present(value)
+
+    presenter = Mixed()
+
+    with pytest.raises(ImproperlyConfigured):
+        present(selector_spec(LIST, presenter), DispatchResult("list", rows))
+
+    assert len(presenter.answers) == (2 if isinstance(rows[1], dict) else 3)
+    assert {inspect.getcoroutinestate(answer) for answer in presenter.answers} == {
+        inspect.CORO_CLOSED
+    }
+
+
 def test_an_instance_with_no_presenter_is_returned_as_it_is() -> None:
     row = Row("a")
 

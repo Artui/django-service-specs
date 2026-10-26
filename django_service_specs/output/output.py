@@ -42,7 +42,8 @@ class OutputField:
     - ``always_present``: whether the key is in every rendered row. A rendering
       rule rather than a type - one library drops a read-only key it cannot
       read where another always emits it - so the adapter supplies it, and a
-      schema lists only always-present keys as required.
+      schema lists only always-present keys as required. The schema of a spec
+      declaring shapes requires none of a row's keys, whatever this says.
     - ``marking``: how an agent audience is shown the field.
 
     ``fields`` and ``items`` describe a nested object and an array's element,
