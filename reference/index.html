@@ -1758,6 +1758,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_keywords.form_keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        form_keywords
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#filters-adapter" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5043,6 +5054,17 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.forms.form_keywords.form_keywords" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        form_keywords
+      
+    </span>
+  </a>
   
 </li>
       
@@ -12110,15 +12132,17 @@ finds no row, <code>collection</code> for one with a collection selector, and
 neither for a create. It is the target itself, never the copy the form
 edits. <code>user</code> is the context's principal on every path, and
 <code>progress</code> is <code>null_progress</code> wherever the context carries no
-reporter. Off dispatch - <code>bind_arguments</code>, or a
+reporter. In <code>bind_arguments</code>, or with a
 <a class="autorefs autorefs-internal" title="ValidationContext
 
 
   
       dataclass
   " href="#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
-built by hand - the context holds no seeds, so a callable naming one
-gives it a default or meets Python's own <code>TypeError</code>. It is called on
+built by hand, the context holds no seeds, so a callable naming one
+gives it a default or meets Python's own <code>TypeError</code>;
+<a class="autorefs autorefs-internal" title="form_keywords" href="#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>
+is the path off dispatch that resolves the seeds it names. It is called on
 every <code>validate()</code>, on the thread the call runs on, which under
 <code>adispatch</code> is the one its synchronous phases share, so it may query;
 on a <code>many</code> call that is once per row, so a query belongs in a seed,
@@ -12128,8 +12152,10 @@ and returning one of those three, for a plain form as for a
 <code>ModelForm</code>, is refused with <code>ImproperlyConfigured</code> naming it, as is
 returning anything but a mapping. <code>parameters()</code> still reads only the
 class: a field <code>__init__</code> adds from those keywords is not a parameter.
-The callable is kept as <code>form_kwargs</code>, so a transport building the
-form itself, for a page, builds it the same way.</p>
+The callable is kept as <code>form_kwargs</code>. A transport building the form
+itself, for a page, builds it the same way with
+<a class="autorefs autorefs-internal" title="form_keywords" href="#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>,
+which calls it from the pool dispatch would, the seeds it names included.</p>
 <p>A refusal is one
 <a class="autorefs autorefs-internal" title="InvalidArguments" href="#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>
 carrying the form's own errors and messages, <code>{field: [messages]}</code>, with
@@ -12207,6 +12233,71 @@ checks still read the whole row, as the class docstring says.</p>
 
 
   </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.adapters.forms.form_keywords.form_keywords" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">form_keywords</span>
+
+
+<a href="#django_service_specs.adapters.forms.form_keywords.form_keywords" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">form_keywords</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>What <code>spec</code>'s FormValidator's <code>form_kwargs</code> returns, for a transport building the form.</p>
+<p>A page shows the form before the call runs, so it builds the form itself,
+and a form whose <code>__init__</code> takes a keyword of its own needs what
+dispatch would hand it. This calls <code>form_kwargs</code> from the pool dispatch
+binds it from, through the same code
+<a class="autorefs autorefs-internal" title="FormValidator" href="#django_service_specs.adapters.forms.form_validator.FormValidator"><code>FormValidator</code></a>
+calls it with, so the returned mapping is checked as there: one that is
+not a mapping, or that returns <code>data</code>, <code>files</code> or <code>instance</code>, which
+the bind sets itself, is refused with <code>ImproperlyConfigured</code>. Spread it
+beside those three: <code>form_class(data=..., **form_keywords(...))</code>.</p>
+<p>The pool holds:</p>
+<ul>
+<li><code>user</code>, the principal;</li>
+<li><code>progress</code>, the no-op reporter, since no call is running;</li>
+<li>the registered seeds of <code>pool_seeds</code> that <code>form_kwargs</code> would be
+  handed, resolved once for the principal, and no other: the seeds it
+  names, or every seed for one taking <code>**kwargs</code>, as on dispatch;</li>
+<li><code>call_context</code>, the dict handed here, or a fresh one; a page hands the
+  dict it will hand dispatch, so what the two calls write is shared;</li>
+<li><code>target</code> under the name dispatch hands it by: <code>instance</code> for a spec
+  with an instance selector, <code>collection</code> for one with a collection
+  selector, and nothing for a create.</li>
+</ul>
+<p>A deactivated principal resolves no seed, as on dispatch, which refuses one
+before any resolver runs: where a seed would be resolved for one, this raises
+<code>PrincipalUnavailable</code> first. A call that resolves none - no <code>pool_seeds</code>,
+or a <code>form_kwargs</code> naming no registered seed - is asked as ever.</p>
+<p>A spec whose Validator is not a <code>FormValidator</code> is refused with
+<code>TypeError</code>, as <code>resolve_target</code> refuses a spec it cannot answer for:
+a page wired to a spec it cannot build a form for is the caller's mistake,
+and an empty answer would hide it. A <code>FormValidator</code> with no
+<code>form_kwargs</code> returns <code>{}</code>, resolving nothing.</p>
+<p>It neither authorizes nor resolves the target: a page admits the
+principal with
+<a class="autorefs autorefs-internal" title="authorize" href="#django_service_specs.dispatch.authorize.authorize"><code>authorize</code></a> and
+finds the row with
+<a class="autorefs autorefs-internal" title="resolve_target" href="#django_service_specs.dispatch.resolve_target.resolve_target"><code>resolve_target</code></a>
+first. It is sync, and <code>form_kwargs</code> may query, so an async caller hops
+once with <code>sync_to_async</code>.</p>
+
 
     </div>
 
@@ -15271,7 +15362,8 @@ covers one declaration and not another that compares equal to it.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -15311,6 +15403,27 @@ called without one - and a method naming a registered seed is handed that
 seed's value from <code>seeds</code>, which dispatch resolves for the call only
 when one of the spec's checks names one. A parameter the call fills by
 position is never read as an opt-in, whatever its name.</p>
+<p><code>pool_seeds</code> is for a transport that calls this itself and has the
+registry rather than the values: the
+<a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="#django_service_specs.pool.pool_seeds.PoolSeeds"><code>PoolSeeds</code></a> it would
+hand dispatch. Only the registered seeds a check's <code>has_permission</code> names
+are resolved, once, for <code>principal</code> as <code>user</code>, and offered as
+<code>seeds</code> would be; a seed only another question names, or one no check
+names, is never resolved, and nothing is when a covering <code>grant</code> answers
+first. A resolver raising - <code>PrincipalUnavailable</code> for one - ends the
+call before any check is asked, as in dispatch. Handing <code>seeds</code> too
+raises <code>TypeError</code>, since one would silently outrank the other, even when
+the call is answered before a check is asked.</p>
+<p>A deactivated <code>principal</code> handed with <code>pool_seeds</code> raises
+<code>PrincipalUnavailable</code> before any seed is resolved, as dispatch refuses
+one before anything else - grant or no grant, so a covering grant does not
+stand in for it. Without <code>pool_seeds</code> nothing is resolved, and the call
+is asked exactly as before the keyword existed.</p>
 
 
     <p><span class="doc-section-title">Returns:</span></p>
@@ -15377,7 +15490,8 @@ position is never read as an opt-in, whatever its name.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -15410,6 +15524,27 @@ called without one - and a method naming a registered seed is handed that
 seed's value from <code>seeds</code>, which dispatch resolves for the call only
 when one of the spec's checks names one. A parameter the call fills by
 position is never read as an opt-in, whatever its name.</p>
+<p><code>pool_seeds</code> is for a transport that calls this itself and has the
+registry rather than the values: the
+<a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="#django_service_specs.pool.pool_seeds.PoolSeeds"><code>PoolSeeds</code></a> it would
+hand dispatch. Only the registered seeds a check's <code>has_scope_permission</code> names
+are resolved, once, for <code>principal</code> as <code>user</code>, and offered as
+<code>seeds</code> would be; a seed only another question names, or one no check
+names, is never resolved, and nothing is when <code>grant.target_checked</code> answers
+first. A resolver raising - <code>PrincipalUnavailable</code> for one - ends the
+call before any check is asked, as in dispatch. Handing <code>seeds</code> too
+raises <code>TypeError</code>, since one would silently outrank the other, even when
+the call is answered before a check is asked.</p>
+<p>A deactivated <code>principal</code> handed with <code>pool_seeds</code> raises
+<code>PrincipalUnavailable</code> before any seed is resolved, as dispatch refuses
+one before anything else - grant or no grant, so a grant that checked the target
+does not stand in for it. Without <code>pool_seeds</code> nothing is resolved, and the call
+is asked exactly as before the keyword existed.</p>
 
 
     </div>
@@ -15433,7 +15568,8 @@ position is never read as an opt-in, whatever its name.</p>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -15471,6 +15607,27 @@ called without one - and a method naming a registered seed is handed that
 seed's value from <code>seeds</code>, which dispatch resolves for the call only
 when one of the spec's checks names one. A parameter the call fills by
 position is never read as an opt-in, whatever its name.</p>
+<p><code>pool_seeds</code> is for a transport that calls this itself and has the
+registry rather than the values: the
+<a class="autorefs autorefs-internal" title="PoolSeeds
+
+
+  
+      dataclass
+  " href="#django_service_specs.pool.pool_seeds.PoolSeeds"><code>PoolSeeds</code></a> it would
+hand dispatch. Only the registered seeds a check's <code>has_object_permission</code> names
+are resolved, once, for <code>principal</code> as <code>user</code>, and offered as
+<code>seeds</code> would be; a seed only another question names, or one no check
+names, is never resolved, and nothing is when <code>grant.target_checked</code> answers
+first. A resolver raising - <code>PrincipalUnavailable</code> for one - ends the
+call before any check is asked, as in dispatch. Handing <code>seeds</code> too
+raises <code>TypeError</code>, since one would silently outrank the other, even when
+the call is answered before a check is asked.</p>
+<p>A deactivated <code>principal</code> handed with <code>pool_seeds</code> raises
+<code>PrincipalUnavailable</code> before any seed is resolved, as dispatch refuses
+one before anything else - grant or no grant, so a grant that checked the target
+does not stand in for it. Without <code>pool_seeds</code> nothing is resolved, and the call
+is asked exactly as before the keyword existed.</p>
 
 
     </div>
@@ -15537,9 +15694,13 @@ principal has no principal, not an anonymous one.</p>
 transport that holds a user object of its own may hand one over long after
 it was deactivated. The kernel's rule is that a deactivated principal never
 acts, whichever way it arrived.</p>
-<p>The kernel reads the rule in two places: dispatch, refusing the principal
-it was handed, first and whether or not a <code>Grant</code> came with it; and
-<code>resolve_principal</code>, refusing the row an identifier named. It is public
+<p>The kernel reads the rule where a principal first acts: dispatch, refusing
+the principal it was handed, first and whether or not a <code>Grant</code> came with
+it; <code>resolve_principal</code>, refusing the row an identifier named; and, ahead
+of the first seed resolver, the <code>authorize</code> functions handed
+<code>pool_seeds</code> and <code>form_keywords</code>, which refuse as dispatch does. Those
+three read it through <code>refuse_deactivated</code> in <code>authorization/utils.py</code>.
+It is public
 so that a transport in a distribution of its own refuses exactly the
 principals dispatch refuses, by calling this rather than restating it, as
 django-spec-html's entry points do with <code>request.user</code> before the

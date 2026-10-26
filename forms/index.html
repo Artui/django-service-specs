@@ -1336,7 +1336,7 @@ what it wants:</p>
 <p>So a caller of <code>feature_spec</code> names a book of their own tenant's and is
 refused one of another's in the field's own words, <code>invalid_choice</code>, though
 the row exists: the queryset the form narrowed is what matches it.</p>
-<p>Off dispatch - in
+<p>In
 <a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>,
 or with a
 <a class="autorefs autorefs-internal" title="ValidationContext
@@ -1345,9 +1345,12 @@ or with a
   
       dataclass
   " href="../reference/#django_service_specs.validation.validation_context.ValidationContext"><code>ValidationContext</code></a>
-built by hand - there are no seeds, so a callable naming one gives it a
+built by hand, there are no seeds, so a callable naming one gives it a
 default or fails with Python's own <code>TypeError</code>; <code>user</code> and <code>progress</code> are
-there still. <code>bind_arguments</code> names the <code>target=</code> it is passed as dispatch
+there still.
+<a class="autorefs autorefs-internal" title="form_keywords" href="../reference/#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>
+is the off-dispatch path that does resolve them: the seeds of the
+<code>pool_seeds=</code> it is handed that the callable would be handed. <code>bind_arguments</code> names the <code>target=</code> it is passed as dispatch
 would, from the spec's selectors, and a context built by hand names none.
 Under
 <a class="autorefs autorefs-internal" title="adispatch
@@ -1365,8 +1368,11 @@ one of them - naming <code>instance</code> to read the row is another matter - f
 <code>ImproperlyConfigured</code> naming the key, as is one returning anything but a
 mapping. <code>FormValidator(form_class, form_kwargs=...)</code> refuses a <code>form_kwargs</code>
 that is not callable when it is built, and keeps the callable as its
-<code>form_kwargs</code> attribute, so a transport building the form itself, for a page,
-builds it the same way.</p>
+<code>form_kwargs</code> attribute. A transport building the form itself, for a page,
+builds it the same way with
+<a class="autorefs autorefs-internal" title="form_keywords" href="../reference/#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>,
+which calls that callable from the pool dispatch would
+(<a href="../dispatching/#building-the-form-before-the-call">building the form before the call</a>).</p>
 <h2 id="the-calls-context">The call's context<a class="headerlink" href="#the-calls-context" title="Permanent link">&para;</a></h2>
 <p><code>FormValidator</code> hands the call's context to <code>form_kwargs</code> when it names it,
 and reads nothing of it otherwise. A Validator built on the adapter reads it,
