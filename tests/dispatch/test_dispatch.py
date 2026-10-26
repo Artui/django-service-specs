@@ -4902,6 +4902,31 @@ class TestTheCallContext:
         assert call_context == {}
 
     @_ENTRIES
+    def test_the_transport_key_is_the_transport_s_and_the_kernel_leaves_it_alone(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """``transport`` is a family convention: never set, read, refused or replaced here.
+
+        The other half, that the kernel sets none on a dict handed none, is
+        ``call_context == {}`` in the test above.
+        """
+        note = Note.objects.create(title="n", owner=ada)
+        saw = _Saw()
+        presenter = Contextual()
+        call_context: dict[str, Any] = {"transport": "agent"}
+        result = entry(
+            _every_stage(saw, presenter),
+            principal=ada,
+            arguments={"pk": note.pk, "title": "t"},
+            call_context=call_context,
+        )
+        present(_every_stage(saw, presenter), result)
+        saw("presenter", presenter.contexts[0].call_context)
+
+        assert saw.all_are(call_context)
+        assert call_context == {"transport": "agent"}
+
+    @_ENTRIES
     def test_a_selector_spec_s_stages_are_handed_the_very_dict_passed(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:

@@ -760,6 +760,18 @@ what the service left there.
   and a key such as `request`, `view` or `format` means what the transport
   that wrote it says.
   The kernel writes nothing and keeps nothing across calls.
+- **`transport` names the transport, across the family.** One key is reserved
+  for every transport rather than left to each: a transport sets
+  `call_context["transport"]` to name itself, so a stage that answers one
+  transport differently from another - a condition, a provider, a presenter -
+  reads one key whichever transport it runs under. The values are `"agent"`,
+  which django-spec-agents sets on every call, and `"http"` and `"mcp"`, kept
+  for an HTTP and an MCP transport. The transport serving the call sets it,
+  replacing an entry already there: an agent run that arrived over HTTP and
+  carries its request is still an agent's call when the agent's tools serve it.
+  It is a convention, not a check: the kernel neither sets nor reads it, no
+  name is refused for it, and a dict built by hand or handed to `dispatch`
+  directly has none, so read it with `call_context.get("transport")`.
 - **Calls sharing one dict.** The stages of one call run in sequence. A
   transport handing one dict to calls on several threads should have them
   write by compute-if-absent: read with `get`, and on a miss compute the value

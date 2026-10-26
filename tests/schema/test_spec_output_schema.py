@@ -4,10 +4,15 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.affordances.utils import AFFORDANCES_KEY
 from django_service_specs.dispatch.audience_projection_for_spec import audience_projection_for_spec
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.output import Output, OutputField
+from django_service_specs.output.presentation_context import PresentationContext
+from django_service_specs.output.presenter import Presenter
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.schema.utils import allow_null
@@ -26,7 +31,7 @@ from tests.dispatch.utils import (
 )
 from tests.dispatch_app.models import Note
 from tests.output.utils import HANDLE_DESCRIPTION, INVOICE, PROJECTED_SCHEMA, InvoicePresenter
-from tests.schema.utils import NoteTitle, nothing, write
+from tests.schema.utils import NoteTitle, nothing, walk, write
 from tests.specs.utils import Foreign, Titled
 
 ITEM = {"type": "object", "properties": {"title": {"type": "string"}}, "required": ["title"]}
@@ -476,3 +481,169 @@ class TestSources:
     def test_a_source_is_described_as_the_spec_it_compiles_to(self, compiled: Any) -> None:
         assert spec_output_schema(Foreign(compiled)) == spec_output_schema(compiled)
         assert spec_output_schema(Foreign(compiled)) is not None
+
+
+class Card(Presenter):
+    """A row with a nested object, a nullable one and an array of objects, each requiring a key."""
+
+    def output(self) -> Output:
+        named = Output((OutputField("name", "string"),))
+        return Output(
+            (
+                OutputField("title", "string"),
+                OutputField("author", "object", fields=named),
+                OutputField("editor", "object", fields=named, nullable=True),
+                OutputField("tags", "array", items=Output((OutputField("label", "string"),))),
+            )
+        )
+
+    def present(self, value: Any) -> Any:
+        return {"title": value.title}
+
+
+class Chosen(Presenter):
+    """``NoteTitle``, leaving ``title`` out unless the call's ``fields`` shape names it."""
+
+    def output(self) -> Output:
+        return NoteTitle().output()
+
+    def present(self, value: Any) -> Any:
+        return {"title": value.title}
+
+    def presented(self, value: Any, context: PresentationContext | None) -> Any:
+        chosen = context.shapes.get("fields") if context is not None else None
+        row = self.present(value)
+        return row if chosen is None else {key: row[key] for key in chosen}
+
+
+FIELDS = Parameters.of(Parameter("fields", "array", items="string", required=False))
+
+
+def requirements(schema: dict[str, Any]) -> list[list[str]]:
+    """Every ``required`` list in ``schema``, at any depth."""
+    return [node["required"] for node in walk(schema) if "required" in node]
+
+
+def item_of(schema: dict[str, Any]) -> dict[str, Any]:
+    """The item inside ``schema``: a page's array's ``items``, an array's ``items``, or itself."""
+    if "page" in schema.get("properties", {}):
+        return schema["properties"]["items"]["items"]
+    if schema.get("type") in ("array", ["array", "null"]):
+        return schema["items"]
+    return schema
+
+
+class TestShapes:
+    """A spec declaring ``shapes`` promises no field of a row, at any depth.
+
+    A shape reaches the presenter alone, and a ``fields`` selection there
+    leaves keys out, so no field the presenter declares can be promised.
+    """
+
+    @pytest.mark.parametrize(
+        ("spec", "paginate"),
+        [
+            pytest.param(retrieve(presenter=Card(), shapes=FIELDS), False, id="the-item-itself"),
+            pytest.param(
+                retrieve(presenter=Card(), shapes=FIELDS, allow_none=True),
+                False,
+                id="an-item-admitting-null",
+            ),
+            pytest.param(listing(presenter=Card(), shapes=FIELDS), False, id="an-arrays-items"),
+            pytest.param(listing(presenter=Card(), shapes=FIELDS), True, id="a-pages-items"),
+            pytest.param(service(presenter=Card(), shapes=FIELDS), False, id="a-services-return"),
+            pytest.param(
+                service(presenter=Card(), shapes=FIELDS, many=True, validator=Titled()),
+                False,
+                id="a-many-services-items",
+            ),
+            pytest.param(
+                service(presenter=Card(), shapes=FIELDS, returns_many=True, allow_none=True),
+                False,
+                id="a-returns-many-array-admitting-null",
+            ),
+            pytest.param(
+                service(
+                    shapes=FIELDS, output_selector_spec=listing(selector=nothing, presenter=Card())
+                ),
+                True,
+                id="a-services-paged-re-read",
+            ),
+        ],
+    )
+    def test_every_shaped_item_requires_nothing_wherever_it_sits(
+        self, spec: Any, paginate: bool
+    ) -> None:
+        schema = spec_output_schema(spec, paginate=paginate)
+        assert schema is not None
+
+        item = item_of(schema)
+        assert requirements(item) == []
+        # Every field is still described, nested ones included: only the
+        # promise is gone.
+        assert set(item["properties"]) == {"title", "author", "editor", "tags"}
+        assert item["properties"]["editor"]["type"] == ["object", "null"]
+        assert set(item["properties"]["editor"]["properties"]) == {"name"}
+        assert set(item["properties"]["tags"]["items"]["properties"]) == {"label"}
+
+    def test_the_envelope_around_a_shaped_page_keeps_its_own(self) -> None:
+        schema = spec_output_schema(listing(presenter=Card(), shapes=FIELDS), paginate=True)
+        assert schema is not None
+
+        assert requirements(schema) == [["items", "page", "totalPages", "hasNext"]]
+
+    @pytest.mark.parametrize("paginate", [False, True], ids=["array", "page"])
+    def test_a_shaped_row_keeps_the_affordances_dispatch_adds_required(
+        self, paginate: bool
+    ) -> None:
+        spec = listing(presenter=NoteTitle(), shapes=FIELDS, affordances=AFFORDANCES)
+        schema = spec_output_schema(spec, paginate=paginate)
+        assert schema is not None
+
+        item = item_of(schema)
+        assert item["required"] == [AFFORDANCES_KEY]
+        # The answers' own schema is the kernel's, whole.
+        assert item["properties"][AFFORDANCES_KEY] == ANSWERS
+        assert item["properties"]["title"] == {"type": "string"}
+
+    def test_a_shaped_projected_item_is_projected_and_requires_nothing(self) -> None:
+        schema = projected(retrieve(presenter=InvoicePresenter(), shapes=FIELDS))
+        assert schema is not None
+
+        assert requirements(schema) == []
+        assert set(schema["properties"]) == set(PROJECTED_SCHEMA["properties"])
+        assert schema["properties"]["number"] == PROJECTED_SCHEMA["properties"]["number"]
+
+    @pytest.mark.parametrize(
+        "spec",
+        [
+            pytest.param(retrieve(presenter=Card()), id="retrieve"),
+            pytest.param(listing(presenter=Card()), id="list"),
+            pytest.param(service(presenter=Card()), id="service-return"),
+        ],
+    )
+    def test_a_spec_declaring_no_shapes_keeps_every_required(self, spec: Any) -> None:
+        schema = spec_output_schema(spec)
+        assert schema is not None
+
+        assert item_of(schema) == output_schema(Card().output())
+        assert requirements(item_of(schema)) == [
+            ["title", "author", "editor", "tags"],
+            ["name"],
+            ["name"],
+            ["label"],
+        ]
+
+    @pytest.mark.django_db
+    def test_a_row_a_selection_shortens_still_has_all_its_schema_requires(self) -> None:
+        ada = make_user("ada")
+        Note.objects.create(owner=ada, title="live")
+        spec = listing(presenter=Chosen(), shapes=FIELDS, affordances=AFFORDANCES)
+        schema = spec_output_schema(spec)
+        assert schema is not None
+        assert "title" in schema["items"]["properties"]
+
+        rows = present(spec, dispatch(spec, principal=ada, arguments={"fields": []}))
+
+        assert "title" not in rows[0]
+        assert set(schema["items"]["required"]) <= set(rows[0])
