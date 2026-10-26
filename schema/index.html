@@ -723,6 +723,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What a spec returns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-spec-that-declares-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A spec that declares shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -926,6 +943,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="What a spec returns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-spec-that-declares-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A spec that declares shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1436,6 +1470,25 @@ describe every service as one that may return nothing. On a service spec with
 an output selector, <code>allow_none</code> changes nothing: a <code>RETRIEVE</code> re-read admits
 <code>"null"</code> already, and a <code>LIST</code> one presents its rows rather than the
 service's return.</p>
+<h3 id="a-spec-that-declares-shapes">A spec that declares shapes<a class="headerlink" href="#a-spec-that-declares-shapes" title="Permanent link">&para;</a></h3>
+<p>A spec's <code>shapes</code> say what its presenter renders, and a <code>fields</code> selection there
+leaves keys out of a row, so whether a key is present depends on what the
+caller sent. Nothing in the presenter's declaration says that for every value
+a caller may send, so for a spec declaring any <code>shapes</code> the item lists no
+<code>required</code>: not at its top, not in a nested object's fields, not in an array's
+rows. Every field is still described, nested ones included, so a client
+still knows what a key means when it is there.</p>
+<p>The trigger is any shape, not one marked as a field selection. A shape is a
+<code>Parameter</code>, the presenter reads it however it likes - a <code>query</code> over each
+row leaves keys out as surely as a <code>fields</code> list - and a flag saying "this one
+selects fields" would be a claim nothing could check.</p>
+<p>What the kernel writes around the item keeps its own <code>required</code>, wherever the
+item sits: the <code>affordances</code> object dispatch adds to each row stays required,
+with its answers' schema whole, and a page's envelope still requires <code>items</code>,
+<code>page</code>, <code>totalPages</code> and <code>hasNext</code>. A spec declaring no shapes is described
+exactly as before, with the <code>required</code> its presenter's <code>always_present</code>
+states. <a href="../paging-and-projection/#shaping-each-row-by-the-call">Shaping each row by the call</a>
+shows a shaped list.</p>
 <h2 id="what-is-deliberately-not-emitted">What is deliberately not emitted<a class="headerlink" href="#what-is-deliberately-not-emitted" title="Permanent link">&para;</a></h2>
 <ul>
 <li><strong>No <code>title</code> on an input property.</strong> A Parameter has no label of its own;

@@ -1243,6 +1243,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.presenter.Presenter.presented_rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        presented_rows
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -4515,6 +4526,17 @@
     <span class="md-ellipsis">
       
         presented
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.output.presenter.Presenter.presented_rows" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        presented_rows
       
     </span>
   </a>
@@ -9922,7 +9944,11 @@ and the stages' to change; the kernel writes nothing to it. A context
 built by hand gets an empty dict of its own, never one shared with
 another, so a Validator that writes to it needs no guard for a call that
 was handed none. It trails every other field, so no existing
-construction changes.</p>
+construction changes. One key is the family's rather than any one
+transport's: <code>"transport"</code> names the transport serving the call
+(<code>"agent"</code>, <code>"http"</code>, <code>"mcp"</code>), set by that transport, by
+convention only - the kernel neither sets nor checks it, so read it with
+<code>.get</code>.</p>
 
 
 
@@ -9976,11 +10002,12 @@ construction changes.</p>
 are separate because describing the result is not optional where rendering
 is: an HTML transport hands the object to a template and never renders it,
 but its confirmation page still reads what the result declares.</p>
-<p><code>present</code> takes <strong>one</strong> value. A list result is presented item by item by
-dispatch's <code>present</code>, so a Presenter never has to guess whether it was
-handed a row or a collection of them.</p>
-<p><code>presented()</code> is what dispatch's <code>present</code> asks for: one value and the
-call's <a class="autorefs autorefs-internal" title="PresentationContext
+<p><code>present</code> takes <strong>one</strong> value. A list result is handed to
+<code>presented_rows()</code> whole, which by default presents it item by item, so a
+Presenter never has to guess whether it was handed a row or a collection of
+them.</p>
+<p><code>presented()</code> is what dispatch's <code>present</code> asks for a single value: one
+value and the call's <a class="autorefs autorefs-internal" title="PresentationContext
 
 
   
@@ -9993,10 +10020,18 @@ overrides <code>presented()</code> and reads it there. A method of its own rathe
 than a keyword on <code>present()</code>, so every Presenter written against
 <code>present(value)</code> is still one, and nothing reads a signature to decide
 whether to pass the context.</p>
+<p><code>presented_rows()</code> is what it asks for a list: every row it presents at
+once - a transport serving one page has already sliced the result, so the
+page's rows - and the same context. By default it is <code>presented()</code> per
+row, so only a Presenter that batches something over the rows overrides
+it: one lookup for every row on the page rather than one per row, or a
+library whose list rendering takes the collection.</p>
 <p><strong>Sync-only.</strong> Presenting a row that reads a relation is a query, and the
 kernel cannot tell in advance whether the row was prefetched, so the async
-path runs every Presenter in the executor. An <code>async def</code> <code>present</code> or
-<code>presented</code> is refused when the spec is built.</p>
+path runs every Presenter in the executor. An <code>async def</code> <code>present</code>,
+<code>presented</code> or <code>presented_rows</code> is refused when the spec is built, and
+an answer from any of the three that is still to be awaited is refused
+where it is read.</p>
 
 
 
@@ -10089,6 +10124,33 @@ a <code>DispatchResult</code> a transport constructed itself.</p>
 
 </div>
 
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.output.presenter.Presenter.presented_rows" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">presented_rows</span>
+
+
+<a href="#django_service_specs.output.presenter.Presenter.presented_rows" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">presented_rows</span><span class="p">(</span><span class="n">values</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> <span class="n">context</span><span class="p">:</span> <span class="n">PresentationContext</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Every row of a list to JSON-like data, in one call: <code>presented()</code> per row.</p>
+<p><code>values</code> is a tuple of the rows being presented, already evaluated,
+so it can be walked as often as a batched lookup needs. Return a
+list with one presented value per row, <strong>in the order given</strong>: a
+selector spec's affordances are added to each presented row by its
+position, so dispatch's <code>present</code> refuses an answer that is not a
+list or whose length differs from <code>values</code>. <code>context</code> is the one
+every row of the result shares, as <code>presented()</code> receives it.</p>
+
+
+    </div>
+
+</div>
+
 
 
   </div>
@@ -10153,12 +10215,17 @@ read the call it is rendering for.</p>
   the presenter share one object, so a presenter - and a nested one
   handed the same context - reuses what an earlier stage put there. It is
   the presenter's to read and write; the kernel writes nothing to it. A
-  context built by hand gets an empty dict of its own.</li>
+  context built by hand gets an empty dict of its own. Its
+  <code>"transport"</code> key, where set, names the transport serving the call
+  (<code>"agent"</code>, <code>"http"</code>, <code>"mcp"</code>): a family convention the kernel
+  neither sets nor checks, so read it with <code>.get</code>.</li>
 <li><code>shapes</code> is what the caller sent for the spec's declared <code>shapes</code>,
   the arguments that shape the output - which fields, a query over the
   rows - by name, read-only. An argument the caller left out is absent
   rather than <code>None</code>. Empty for a spec that declares none and for a
-  context built by hand; no other argument is ever here.</li>
+  context built by hand; no other argument is ever here. Under dispatch
+  it is also the pool's <code>shapes</code> seed, so a selector naming <code>shapes</code>
+  reads what the presenter reads.</li>
 </ul>
 
 
@@ -10328,7 +10395,8 @@ carrying what a reader needs that names and types alone do not give:</p>
 <li><code>always_present</code>: whether the key is in every rendered row. A rendering
   rule rather than a type - one library drops a read-only key it cannot
   read where another always emits it - so the adapter supplies it, and a
-  schema lists only always-present keys as required.</li>
+  schema lists only always-present keys as required. The schema of a spec
+  declaring shapes requires none of a row's keys, whatever this says.</li>
 <li><code>marking</code>: how an agent audience is shown the field.</li>
 </ul>
 <p><code>fields</code> and <code>items</code> describe a nested object and an array's element,
@@ -11262,6 +11330,13 @@ it, as every caller naming no audience does, and the schema is the full
 declaration. <code>handle_description</code> is the wording for a handle whose
 marking declares none, and defaults to none: what a reader should do with
 an identifier depends on the reader, and the transport is what knows.</p>
+<p><strong>A spec declaring <code>shapes</code> promises no field of a row.</strong> A shape
+reaches the presenter alone, and a <code>fields</code> selection there leaves keys
+out, which nothing in the presenter's declaration can say for every value
+a caller may send. So the item lists no <code>required</code> at any depth, wherever
+it sits, while the <code>affordances</code> object dispatch adds to each row and the
+paging envelope keep theirs. A spec declaring none is described with the
+<code>required</code> its presenter's <code>always_present</code> states.</p>
 
 
     </div>
@@ -12739,7 +12814,11 @@ is handed the call's. A parameter a check's method fills by position -
 is never read as an opt-in.</p>
 <p>The presenter's context also carries <code>shapes</code>: what the caller sent
 for the spec's declared <code>shapes</code>, read-only, a shape left out absent.
-No shape reaches a pool or the Validator.</p>
+No shape reaches a pool under its own name, nor the Validator at all; the
+same mapping is in the pool of every callable but a service spec's target
+selector as the <code>shapes</code> seed, for a callable that names it (the target
+selector is handed an empty mapping, as under <code>resolve_target</code>; see
+<code>RESERVED_POOL_SEEDS</code>).</p>
 <p><code>kind</code> is <code>"list"</code> for a LIST selector spec, a service whose output
 selector is a LIST, or a <code>many</code> or <code>returns_many</code> service with no
 output selector that returned something, and <code>"instance"</code> otherwise. Nothing is presented here;
@@ -13171,7 +13250,10 @@ part in equality: two results of one value are one result.</p>
 <code>presenter_for_output()</code>: its own, or its output selector's when it
 declares none.</p>
 <ul>
-<li><code>kind="list"</code>: each item through the presenter, into a list. With no
+<li><code>kind="list"</code>: every item through the presenter's <code>presented_rows()</code>
+  in one call, which presents each in turn unless the presenter batches
+  over them. To serve a page, hand <code>present</code> a result holding the page's
+  rows, and those are the rows it receives. With no
   presenter the items are returned as they are, but still in a list: a
   queryset is evaluated here rather than handed back lazily, because
   <code>apresent</code>'s caller is on the event loop, where the first iteration of
@@ -13196,7 +13278,8 @@ answers it attached to rows a selector returned directly - so presenting
 them costs no query. A spec declaring none presents what its presenter
 answers, untouched.</p>
 <p><strong>The call's context.</strong> Each value is handed to the presenter's
-<code>presented()</code> with <code>result.context</code>, the
+<code>presented()</code>, or a list's to its <code>presented_rows()</code>, with
+<code>result.context</code>, the
 <a class="autorefs autorefs-internal" title="PresentationContext
 
 
@@ -13246,7 +13329,8 @@ already has an <code>affordances</code> key; or a row carries no answer,
 because it did not come through the selector that declares them.
 Also a presenter answering with a coroutine or an async generator,
 which is never awaited, so it is refused rather than handed back
-as the payload.</p>
+as the payload; and a <code>presented_rows()</code> answering with anything
+but a list of one presented value per row.</p>
               </div>
             </td>
           </tr>
@@ -13349,8 +13433,10 @@ which is what every HTTP response is.</p>
 <p>To serve one page, page the result's value first and present the page's
 rows: <code>present_for_audience(spec, replace(result, value=page.items))</code>,
 then <a class="autorefs autorefs-internal" title="envelope" href="#django_service_specs.types.output_page.OutputPage.envelope"><code>envelope</code></a>
-what comes back. The envelope's keys belong to no <code>Output</code>, so the
-projection must never walk them. Whether to page is read off the spec,
+what comes back. The presenter's <code>presented_rows()</code> is then called once,
+with the page's rows and no others, so a lookup it batches over them
+costs the same whatever the size of the whole set. The envelope's keys
+belong to no <code>Output</code>, so the projection must never walk them. Whether to page is read off the spec,
 never off the result's kind: a <code>LIST</code> selector spec, or a service spec
 whose output selector is a <code>LIST</code>, is paged, while a <code>many</code> or
 <code>returns_many</code> service spec's <code>kind="list"</code> is every row its service
@@ -16537,8 +16623,9 @@ step has them.</p>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>        <span class="s2">"queryset"</span><span class="p">,</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="s2">"progress"</span><span class="p">,</span>
 </span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="s2">"call_context"</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="p">}</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>        <span class="s2">"shapes"</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="p">}</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16556,7 +16643,27 @@ a <code>kwargs</code> or <code>input_data</code> provider, a selector and its
 a precondition, the service, the run's <code>progress_reporter</code> - receives as
 the same object by naming it, and never through <code>**kwargs</code>. Never a copy,
 and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
-call adds. The other seven are the names
+call adds. <code>shapes</code> is what the caller sent for the spec's declared
+<code>shapes</code>, keyed by shape name and read-only: the mapping
+<code>PresentationContext.shapes</code> holds, so a selector that eager-loads by the
+query its presenter renders reads the value the presenter reads. It is in
+the pools dispatch builds for a spec's callables: a selector and its
+<code>extend_queryset</code>, a <code>kwargs</code> or <code>input_data</code> provider, a
+precondition, the service, the run's <code>progress_reporter</code>, and a service
+spec's output selector. A service spec's target selector is handed an empty
+mapping instead, on every route, because <code>resolve_target</code> checks only the
+target's own parameters and the lookup must find the same row either way
+(test_a_target_selector_is_handed_no_shapes_on_any_route). It is an empty
+mapping on a spec declaring no shapes, and, like <code>call_context</code>, it is handed only to a
+callable naming it, never through <code>**kwargs</code>. Unlike <code>call_context</code> it
+is not in an affordance condition's pool, the Validator's (a
+<code>FormValidator</code>'s <code>form_kwargs</code> included) or a mutation helper's nested
+row services', and like it, not in a seed resolver's or a <code>filter_set</code>'s
+(test_form_kwargs_naming_the_shapes_is_handed_no_seed,
+test_a_seed_resolver_naming_the_shapes_is_handed_none,
+test_a_filter_naming_the_shapes_is_handed_none; a helper's row services
+are handed its <code>**kwargs</code>, which
+test_a_catch_all_is_never_handed_the_shapes keeps free of the seed). The seven besides those two are the names
 <code>djangorestframework-services</code> seeds for the same values, so a callable
 written for it runs under this kernel unchanged.</p>
 <p><code>progress</code> is in every pool, and live only where there is work to report on:

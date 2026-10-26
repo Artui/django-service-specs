@@ -498,6 +498,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Output and the Presenter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#presenting-a-page-in-one-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Presenting a page in one call
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1017,6 +1034,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Output and the Presenter">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#presenting-a-page-in-one-call" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Presenting a page in one call
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1086,8 +1120,8 @@ sequence.</p>
 <p>The service, the selector, <code>extend_queryset</code>, the providers, the preconditions
 and a pool seed's resolver are all called the same way: with the keywords their signature declares, picked from a
 pool dispatch builds for the call, and nothing else. A callable that takes
-<code>**kwargs</code> receives the whole pool but <code>call_context</code>, which reaches a
-callable only by its name.</p>
+<code>**kwargs</code> receives the whole pool but <code>call_context</code> and <code>shapes</code>, which
+reach a callable only by their names.</p>
 <table>
 <thead>
 <tr>
@@ -1167,10 +1201,15 @@ callable only by its name.</p>
 <td><a href="../dispatching/#the-calls-context">The call's context</a>: the transport's dict, or a fresh one</td>
 <td>Every callable dispatch resolves that names it, never a <code>**kwargs</code> catch-all; not a seed's resolver or a <code>filter_set</code></td>
 </tr>
+<tr>
+<td><code>shapes</code></td>
+<td><a href="../dispatching/#the-calls-shapes">The call's shapes</a>: what the caller sent for the spec's <code>shapes</code>, read-only, empty on a spec declaring none</td>
+<td>Every callable dispatch resolves that names it but an affordance condition and a write's target selector, never a <code>**kwargs</code> catch-all; not a seed's resolver, a <code>filter_set</code> or the Validator</td>
+</tr>
 </tbody>
 </table>
 <p>The fixed names - <code>user</code>, <code>progress</code>, <code>data</code>, <code>instance</code>, <code>collection</code>,
-<code>result</code>, <code>queryset</code> and <code>call_context</code> - are
+<code>result</code>, <code>queryset</code>, <code>call_context</code> and <code>shapes</code> - are
 <a class="autorefs autorefs-internal" title="RESERVED_POOL_SEEDS
 
 
@@ -1336,15 +1375,18 @@ the selector runs.</p>
 renders rather than which rows are read: which fields, a query over each row.
 They are Parameters of their own and part of <code>spec.parameters()</code>, after the
 reads, so the schema, the closed argument set and the shape check cover them
-as any argument. They are never in the selector's pool, so the selector, its
-<code>extend_queryset</code> and its <code>filter_set</code> never see them: what the caller sent
-for them reaches the presenter alone, on
+as any argument. No shape is in the selector's pool under its own name, so
+the selector, its <code>extend_queryset</code> and its <code>filter_set</code> never receive one as
+an argument: what the caller sent for them reaches the presenter on
 <a class="autorefs autorefs-internal" title="PresentationContext
 
 
   
       dataclass
-  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>.
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>,
+and any callable that names <a href="../dispatching/#the-calls-shapes">the <code>shapes</code> seed</a>,
+which holds the same mapping. A selector that eager-loads by the query its
+presenter renders reads it there.
 A shape a read or a filter also declares is refused when the spec is built,
 as is one named for a seed dispatch provides and one the <code>kwargs</code> provider is
 annotated to fill, since no provider's values reach them. A presenter reading
@@ -1420,9 +1462,13 @@ read with no Validator in front of them - the <code>project_pk</code> a create i
 by - named after a selector spec's. They are checked as a read's are and
 handed to each callable that declares them, never to the Validator.</p>
 <p><code>shapes</code> are the arguments that shape what the presenter renders, as on a
-read: never handed to the Validator, a provider, a selector or the service,
-and reaching the presenter alone, whether that is the spec's own or its output
-selector's. A selector nested in a write, its target or its output selector,
+read: never handed to the Validator, a provider, a selector or the service
+under their own names, and reaching the presenter, whether that is the spec's
+own or its output selector's. A callable that names
+<a href="../dispatching/#the-calls-shapes">the <code>shapes</code> seed</a> is handed them, the output
+selector included, but not the Validator, an affordance condition, a seed's
+resolver, a <code>filter_set</code> or the write's target selector, whose lookup is the
+same on every route and is handed none. A selector nested in a write, its target or its output selector,
 declaring shapes of its own is refused: the write's call is the one presented,
 so they are declared on the write.</p>
 <p><code>spec.parameters()</code> is everything the write takes: its target selector's
@@ -1980,9 +2026,10 @@ the Validator:</p>
   renders it, and still reads the declaration.</li>
 <li><code>present(value)</code> renders <strong>one</strong> value. Dispatch's
   <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a> hands a list's
-  items over one at a time, so a Presenter never has to guess whether it was
-  given a row or a collection. It may query, and it is sync-only: an
-  <code>async def</code> <code>present</code> is refused when the spec is built.</li>
+  items over one at a time unless the Presenter batches them (below), so a
+  Presenter never has to guess whether it was given a row or a collection. It
+  may query, and it is sync-only: an <code>async def</code> <code>present</code> is refused when the
+  spec is built.</li>
 <li><code>presented(value, context)</code> is what dispatch's <code>present</code> calls: the value,
   and the call's
   <a class="autorefs autorefs-internal" title="PresentationContext
@@ -2002,6 +2049,11 @@ the Validator:</p>
   registered as a seed - overrides it. Dispatch carries the context on the
   <code>DispatchResult</code> as <code>context</code>; a result built by hand has none, and is
   presented with <code>None</code>.</li>
+<li><code>presented_rows(values, context)</code> is what dispatch's <code>present</code> calls for a
+  list: every row at once, as a tuple, with the one context they all share.
+  The default is <code>presented(value, context)</code> for each row, so only a
+  Presenter that batches something over its rows overrides it
+  (<a href="#presenting-a-page-in-one-call">presenting a page in one call</a>).</li>
 </ul>
 <p>An <code>OutputField</code>'s type is one of the JSON types, or <code>any</code> for a value whose
 JSON type is open, such as a computed field or a JSON column: its schema is
@@ -2050,6 +2102,75 @@ A <code>Decimal</code> is rendered as its string, a date or date-time in ISO 860
 selector's when it declares none, and declaring both is refused. A presenter on
 an instance or collection selector is never read, because the service consumes
 those rows rather than returning them.</p>
+<h3 id="presenting-a-page-in-one-call">Presenting a page in one call<a class="headerlink" href="#presenting-a-page-in-one-call" title="Permanent link">&para;</a></h3>
+<p>A Presenter that looks something up for each row - a count, a related record
+from another store, a permission answered per row - would otherwise ask once
+per row. <code>presented_rows</code> hands it every row being presented, so it asks once:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">BooksWithEditions</span><span class="p">(</span><span class="n">Presenter</span><span class="p">):</span>
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">    </span><span class="sd">"""Each book with its number of editions, counted once for every row presented."""</span>
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">output</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Output</span><span class="p">:</span>
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="k">return</span> <span class="n">Output</span><span class="p">(</span>
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>            <span class="p">(</span>
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"id"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">),</span>
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"title"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">),</span>
+</span><span id="__span-6-9"><a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>                <span class="n">OutputField</span><span class="p">(</span><span class="s2">"editions"</span><span class="p">,</span> <span class="s2">"integer"</span><span class="p">),</span>
+</span><span id="__span-6-10"><a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>            <span class="p">)</span>
+</span><span id="__span-6-11"><a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>        <span class="p">)</span>
+</span><span id="__span-6-12"><a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>
+</span><span id="__span-6-13"><a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">present</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Book</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-6-14"><a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">presented</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-6-15"><a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>
+</span><span id="__span-6-16"><a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">presented</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Book</span><span class="p">,</span> <span class="n">context</span><span class="p">:</span> <span class="n">PresentationContext</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+</span><span id="__span-6-17"><a id="__codelineno-6-17" name="__codelineno-6-17" href="#__codelineno-6-17"></a>        <span class="c1"># One book alone, as a retrieve presents it, is a batch of one, under</span>
+</span><span id="__span-6-18"><a id="__codelineno-6-18" name="__codelineno-6-18" href="#__codelineno-6-18"></a>        <span class="c1"># the same context a page's rows would be presented with.</span>
+</span><span id="__span-6-19"><a id="__codelineno-6-19" name="__codelineno-6-19" href="#__codelineno-6-19"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">presented_rows</span><span class="p">((</span><span class="n">value</span><span class="p">,),</span> <span class="n">context</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-6-20"><a id="__codelineno-6-20" name="__codelineno-6-20" href="#__codelineno-6-20"></a>
+</span><span id="__span-6-21"><a id="__codelineno-6-21" name="__codelineno-6-21" href="#__codelineno-6-21"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">presented_rows</span><span class="p">(</span>
+</span><span id="__span-6-22"><a id="__codelineno-6-22" name="__codelineno-6-22" href="#__codelineno-6-22"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">Book</span><span class="p">],</span> <span class="n">context</span><span class="p">:</span> <span class="n">PresentationContext</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-6-23"><a id="__codelineno-6-23" name="__codelineno-6-23" href="#__codelineno-6-23"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="__span-6-24"><a id="__codelineno-6-24" name="__codelineno-6-24" href="#__codelineno-6-24"></a>        <span class="n">counts</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+</span><span id="__span-6-25"><a id="__codelineno-6-25" name="__codelineno-6-25" href="#__codelineno-6-25"></a>            <span class="n">Edition</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">book__in</span><span class="o">=</span><span class="n">values</span><span class="p">)</span>
+</span><span id="__span-6-26"><a id="__codelineno-6-26" name="__codelineno-6-26" href="#__codelineno-6-26"></a>            <span class="o">.</span><span class="n">order_by</span><span class="p">()</span>
+</span><span id="__span-6-27"><a id="__codelineno-6-27" name="__codelineno-6-27" href="#__codelineno-6-27"></a>            <span class="o">.</span><span class="n">values_list</span><span class="p">(</span><span class="s2">"book"</span><span class="p">)</span>
+</span><span id="__span-6-28"><a id="__codelineno-6-28" name="__codelineno-6-28" href="#__codelineno-6-28"></a>            <span class="o">.</span><span class="n">annotate</span><span class="p">(</span><span class="n">Count</span><span class="p">(</span><span class="s2">"pk"</span><span class="p">))</span>
+</span><span id="__span-6-29"><a id="__codelineno-6-29" name="__codelineno-6-29" href="#__codelineno-6-29"></a>        <span class="p">)</span>
+</span><span id="__span-6-30"><a id="__codelineno-6-30" name="__codelineno-6-30" href="#__codelineno-6-30"></a>        <span class="c1"># One presented value per row, in the order the rows were given.</span>
+</span><span id="__span-6-31"><a id="__codelineno-6-31" name="__codelineno-6-31" href="#__codelineno-6-31"></a>        <span class="k">return</span> <span class="p">[</span>
+</span><span id="__span-6-32"><a id="__codelineno-6-32" name="__codelineno-6-32" href="#__codelineno-6-32"></a>            <span class="p">{</span><span class="s2">"id"</span><span class="p">:</span> <span class="n">book</span><span class="o">.</span><span class="n">pk</span><span class="p">,</span> <span class="s2">"title"</span><span class="p">:</span> <span class="n">book</span><span class="o">.</span><span class="n">title</span><span class="p">,</span> <span class="s2">"editions"</span><span class="p">:</span> <span class="n">counts</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">book</span><span class="o">.</span><span class="n">pk</span><span class="p">,</span> <span class="mi">0</span><span class="p">)}</span>
+</span><span id="__span-6-33"><a id="__codelineno-6-33" name="__codelineno-6-33" href="#__codelineno-6-33"></a>            <span class="k">for</span> <span class="n">book</span> <span class="ow">in</span> <span class="n">values</span>
+</span><span id="__span-6-34"><a id="__codelineno-6-34" name="__codelineno-6-34" href="#__codelineno-6-34"></a>        <span class="p">]</span>
+</span><span id="__span-6-35"><a id="__codelineno-6-35" name="__codelineno-6-35" href="#__codelineno-6-35"></a>
+</span><span id="__span-6-36"><a id="__codelineno-6-36" name="__codelineno-6-36" href="#__codelineno-6-36"></a>
+</span><span id="__span-6-37"><a id="__codelineno-6-37" name="__codelineno-6-37" href="#__codelineno-6-37"></a><span class="k">def</span><span class="w"> </span><span class="nf">catalogue</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">QuerySet</span><span class="p">[</span><span class="n">Book</span><span class="p">]:</span>
+</span><span id="__span-6-38"><a id="__codelineno-6-38" name="__codelineno-6-38" href="#__codelineno-6-38"></a>    <span class="k">return</span> <span class="n">Book</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">"title"</span><span class="p">)</span>
+</span><span id="__span-6-39"><a id="__codelineno-6-39" name="__codelineno-6-39" href="#__codelineno-6-39"></a>
+</span><span id="__span-6-40"><a id="__codelineno-6-40" name="__codelineno-6-40" href="#__codelineno-6-40"></a>
+</span><span id="__span-6-41"><a id="__codelineno-6-41" name="__codelineno-6-41" href="#__codelineno-6-41"></a><span class="n">books_spec</span> <span class="o">=</span> <span class="n">SelectorSpec</span><span class="p">(</span>
+</span><span id="__span-6-42"><a id="__codelineno-6-42" name="__codelineno-6-42" href="#__codelineno-6-42"></a>    <span class="n">kind</span><span class="o">=</span><span class="n">SelectorKind</span><span class="o">.</span><span class="n">LIST</span><span class="p">,</span>
+</span><span id="__span-6-43"><a id="__codelineno-6-43" name="__codelineno-6-43" href="#__codelineno-6-43"></a>    <span class="n">selector</span><span class="o">=</span><span class="n">catalogue</span><span class="p">,</span>
+</span><span id="__span-6-44"><a id="__codelineno-6-44" name="__codelineno-6-44" href="#__codelineno-6-44"></a>    <span class="n">permissions</span><span class="o">=</span><span class="p">[</span><span class="n">IsSignedIn</span><span class="p">()],</span>
+</span><span id="__span-6-45"><a id="__codelineno-6-45" name="__codelineno-6-45" href="#__codelineno-6-45"></a>    <span class="n">presenter</span><span class="o">=</span><span class="n">BooksWithEditions</span><span class="p">(),</span>
+</span><span id="__span-6-46"><a id="__codelineno-6-46" name="__codelineno-6-46" href="#__codelineno-6-46"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The rows are the ones being presented and no others. A transport serving one
+page slices the result before presenting it, so <code>presented_rows</code> receives the
+page's rows rather than the whole catalogue, and the lookup is one query
+whichever page size the caller asked for:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">first_page</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">limit</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]:</span>
+</span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">result</span> <span class="o">=</span> <span class="n">dispatch</span><span class="p">(</span><span class="n">books_spec</span><span class="p">,</span> <span class="n">principal</span><span class="o">=</span><span class="n">user</span><span class="p">,</span> <span class="n">arguments</span><span class="o">=</span><span class="p">{})</span>
+</span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="n">page</span> <span class="o">=</span> <span class="n">paginate_output</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="n">limit</span><span class="p">)</span>
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="c1"># presented_rows is handed the page's rows, never the whole catalogue.</span>
+</span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="k">return</span> <span class="n">present</span><span class="p">(</span><span class="n">books_spec</span><span class="p">,</span> <span class="n">replace</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">page</span><span class="o">.</span><span class="n">items</span><span class="p">))</span>
+</span></code></pre></div>
+<p>Return a list with one presented value per row, in the order the rows were
+given. A selector spec's <a href="../affordances/">affordances</a> are added to each
+presented row by its position, so <code>present</code> refuses an answer that is not a
+list, or whose length differs from the rows', with <code>ImproperlyConfigured</code>,
+whether or not the spec declares any. A single value, such as a retrieve's,
+still goes through <code>presented</code>; the example's <code>presented</code> hands it to
+<code>presented_rows</code> as a batch of one, with the call's context, so both render
+the same fields.</p>
 <h2 id="a-variant-of-a-spec">A variant of a spec<a class="headerlink" href="#a-variant-of-a-spec" title="Permanent link">&para;</a></h2>
 <p>A spec is frozen, so a variant of one is a new spec.
 <a class="autorefs autorefs-internal" title="derive" href="../reference/#django_service_specs.specs.service_spec.ServiceSpec.derive"><code>derive(**changes)</code></a>
@@ -2057,12 +2178,12 @@ returns it: the same class, with the named fields replaced and every other one
 equal to the base's. A field is the base's very object unless the constructor
 rebuilds it, as it rebuilds a read's <code>reads</code> when the read has a
 <code>filter_set</code>.</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># The same listing for the command line, which offers a search and no choice</span>
-</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="c1"># of ordering: ``reads=`` is the variant's whole ``reads``, so ``ordering`` is</span>
-</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># no longer an argument and the selector's own default answers for it.</span>
-</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">search_only</span> <span class="o">=</span> <span class="n">list_notes_spec</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span>
-</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">)),</span>
-</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># The same listing for the command line, which offers a search and no choice</span>
+</span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="c1"># of ordering: ``reads=`` is the variant's whole ``reads``, so ``ordering`` is</span>
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># no longer an argument and the selector's own default answers for it.</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">search_only</span> <span class="o">=</span> <span class="n">list_notes_spec</span><span class="o">.</span><span class="n">derive</span><span class="p">(</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>    <span class="n">reads</span><span class="o">=</span><span class="n">Parameters</span><span class="o">.</span><span class="n">of</span><span class="p">(</span><span class="n">Parameter</span><span class="p">(</span><span class="s2">"search"</span><span class="p">,</span> <span class="s2">"string"</span><span class="p">,</span> <span class="n">help</span><span class="o">=</span><span class="s2">"Part of the title, in any case."</span><span class="p">)),</span>
+</span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>The variant is built through the constructor, so every check a fresh
 declaration passes runs again on it, the combinations included: a change that

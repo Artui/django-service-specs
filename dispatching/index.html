@@ -538,6 +538,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#the-calls-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's shapes
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1068,6 +1079,17 @@
     <span class="md-ellipsis">
       
         Progress
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-calls-shapes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The call's shapes
       
     </span>
   </a>
@@ -2003,6 +2025,55 @@ have called it. The selector spec's affordance conditions, <code>extend_queryset
 and preconditions read the transport's reporter, as a service spec's do. A target or output selector always gets <code>null_progress</code>: a lookup has
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.</p>
+<h3 id="the-calls-shapes">The call's shapes<a class="headerlink" href="#the-calls-shapes" title="Permanent link">&para;</a></h3>
+<p><code>shapes</code> is a reserved seed, as <code>progress</code> is: what the caller sent for the
+spec's declared <a href="../declaring/#a-read"><code>shapes</code></a>, keyed by shape name
+and read-only. It is the mapping the presenter reads as
+<a class="autorefs autorefs-internal" title="PresentationContext
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.output.presentation_context.PresentationContext"><code>PresentationContext.shapes</code></a>,
+so a selector that eager-loads by what the presenter will render, as
+django-restql's <code>query</code> does, reads the value the presenter reads. Any
+callable dispatch resolves receives it by naming it: a selector and its
+<code>extend_queryset</code>, a <code>kwargs</code> or <code>input_data</code> provider, a precondition, the
+run's <code>progress_reporter</code>, the service, and a service spec's output selector,
+which is handed the write's shapes. Its target selector is the exception, and
+is handed an empty mapping (see the last item below).</p>
+<ul>
+<li><strong>Always there.</strong> A spec declaring no shapes hands an empty mapping, and a
+  shape the caller left out is absent from it rather than <code>None</code>, as on the
+  presenter's context. A reservation with no value would fail the callable
+  that declares it.</li>
+<li><strong>By name only</strong>, as <code>call_context</code> is: a callable taking <code>**kwargs</code> is never
+  handed it, so a selector forwarding its keywords into <code>filter()</code> runs
+  unchanged.</li>
+<li><strong>Never the caller's.</strong> It is in
+  <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>,
+  and a parameter, read, shape or <code>many</code> list named <code>shapes</code> is refused when
+  the spec is built, a Validator field of that name when the spec's
+  parameters are first read (a transport's registration, or the first
+  dispatch). Each of those refusals carries the rename in its message: name
+  the parameter for what it holds, such as <code>fields</code> or <code>query</code>, and have the
+  callable that read it declare <code>shapes</code>. <code>PoolSeeds.extend()</code> refuses a seed
+  of that name, and says to register it under another.</li>
+<li><strong>Not for an affordance condition or the Validator.</strong> A condition naming
+  <code>shapes</code> is refused when it is declared, because what the caller sent would
+  decide whether the operation is available, and the Validator, which is no
+  pool callable, reads only its own arguments. Neither context's <code>ambient</code>
+  holds it.</li>
+<li><strong>Empty for a target selector.</strong> A write's target lookup is handed no
+  shapes, on every route. <code>resolve_target</code> checks the target selector's own
+  parameters alone, so a shape sent there is no argument of the lookup, and a
+  lookup that read the shapes under <code>dispatch</code> would find a different row from
+  the one <code>resolve_target</code> found. A target selector that names <code>shapes</code> is not
+  refused, since it is often a read's own selector reused: it
+  receives an empty mapping, and the row it finds is the row dispatch finds.</li>
+</ul>
+<p>A selector joining only what the caller chose is shown under
+<a href="../paging-and-projection/#shaping-each-row-by-the-call">shaping each row by the call</a>.</p>
 <h2 id="the-calls-context">The call's context<a class="headerlink" href="#the-calls-context" title="Permanent link">&para;</a></h2>
 <p>A call's stages often want one value more than once: a lookup the Validator
 makes and the presenter needs again, a count across the rows of a list. A
@@ -2106,6 +2177,18 @@ what the service left there.</p>
   and a key such as <code>request</code>, <code>view</code> or <code>format</code> means what the transport
   that wrote it says.
   The kernel writes nothing and keeps nothing across calls.</li>
+<li><strong><code>transport</code> names the transport, across the family.</strong> One key is reserved
+  for every transport rather than left to each: a transport sets
+  <code>call_context["transport"]</code> to name itself, so a stage that answers one
+  transport differently from another - a condition, a provider, a presenter -
+  reads one key whichever transport it runs under. The values are <code>"agent"</code>,
+  which django-spec-agents sets on every call, and <code>"http"</code> and <code>"mcp"</code>, kept
+  for an HTTP and an MCP transport. The transport serving the call sets it,
+  replacing an entry already there: an agent run that arrived over HTTP and
+  carries its request is still an agent's call when the agent's tools serve it.
+  It is a convention, not a check: the kernel neither sets nor reads it, no
+  name is refused for it, and a dict built by hand or handed to <code>dispatch</code>
+  directly has none, so read it with <code>call_context.get("transport")</code>.</li>
 <li><strong>Calls sharing one dict.</strong> The stages of one call run in sequence. A
   transport handing one dict to calls on several threads should have them
   write by compute-if-absent: read with <code>get</code>, and on a miss compute the value
