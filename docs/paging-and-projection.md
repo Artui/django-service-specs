@@ -303,11 +303,18 @@ as `shapes`, by name and read-only, with an argument left out absent rather
 than `None`, so `ChosenFields` renders every field unless the call chose some.
 Every row of a list is handed the same context, and so the same `shapes`.
 
-A presenter that leaves a key out of some rows says so in its declaration:
-`title` and `price` are `always_present=False`, so the schema lists only `id`
-as required, and a client is never promised a key a row may not carry. An
-adapter that drops keys under a `fields` shape declares those keys the same
-way.
+**A spec declaring `shapes` promises no field of a row.** A shape reaches the
+presenter alone, and the kernel cannot see which keys it leaves out: an
+adapter's `always_present` follows its library's rendering rule, not the call.
+So
+[`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+lists no presenter field in any `required`, at any depth, wherever the item
+sits: the item itself, an array's `items`, or a page's. Here even `id`, which
+every row carries, is not required, and a client is never promised a key a
+row may not carry. What the kernel writes around the item keeps its own: the
+`affordances` object dispatch adds to each row, and a page's envelope. A spec
+declaring no shapes keeps the `required` its presenter's `always_present`
+states.
 
 A shape is refused by its declaration, before the call runs, never by its
 presenter: the choices on `fields` are what turns away a field the presenter

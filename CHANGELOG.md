@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`spec_output_schema` promises no field of a row for a spec declaring
+  `shapes`.** A shape reaches the presenter alone, and a `fields` selection
+  there leaves keys out, so the item now lists no `required` at any depth -
+  the item itself, a nested object, an array's rows - wherever it sits: a
+  retrieve's item, an array's `items`, or a page's. Every field is still
+  described. The `affordances` object dispatch adds to each row stays
+  required, with its answers' schema unchanged, and the paging envelope keeps
+  its `items`, `page`, `totalPages` and `hasNext`. A spec declaring no shapes
+  is described exactly as before, and `output_schema` is unchanged. A caller
+  of `spec_output_schema` that read a shaped spec's `required` to learn which
+  keys every row carries sees none; `always_present=False` is still how a
+  presenter says a key is left out of some rows of a spec declaring none.
+  Among the family's transports only django-spec-agents reads this schema,
+  and it already advertised a shaped spec's schema this way, so what its
+  tools advertise is unchanged.
+
 ## [0.15.0] — 2026-10-22
 
 ### Added

@@ -408,6 +408,29 @@ an output selector, `allow_none` changes nothing: a `RETRIEVE` re-read admits
 `"null"` already, and a `LIST` one presents its rows rather than the
 service's return.
 
+### A spec that declares shapes
+
+A spec's `shapes` reach its presenter alone, and a `fields` selection there
+leaves keys out of a row, so whether a key is present depends on what the
+caller sent. Nothing in the presenter's declaration says that for every value
+a caller may send, so for a spec declaring any `shapes` the item lists no
+`required`: not at its top, not in a nested object's fields, not in an array's
+rows. Every field is still described, nested ones included, so a client
+still knows what a key means when it is there.
+
+The trigger is any shape, not one marked as a field selection. A shape is a
+`Parameter`, the presenter reads it however it likes - a `query` over each
+row leaves keys out as surely as a `fields` list - and a flag saying "this one
+selects fields" would be a claim nothing could check.
+
+What the kernel writes around the item keeps its own `required`, wherever the
+item sits: the `affordances` object dispatch adds to each row stays required,
+with its answers' schema whole, and a page's envelope still requires `items`,
+`page`, `totalPages` and `hasNext`. A spec declaring no shapes is described
+exactly as before, with the `required` its presenter's `always_present`
+states. [Shaping each row by the call](paging-and-projection.md#shaping-each-row-by-the-call)
+shows a shaped list.
+
 ## What is deliberately not emitted
 
 - **No `title` on an input property.** A Parameter has no label of its own;

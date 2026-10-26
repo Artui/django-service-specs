@@ -220,10 +220,13 @@ class TestShapes:
         assert shaped[0] == {"id": books[0].pk, "price": "9.99"}
         assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
 
-    def test_only_the_key_every_row_carries_is_required(self) -> None:
+    def test_a_shaped_list_requires_no_field_of_a_row(self) -> None:
+        # ``id`` is in every row this presenter renders, and still not
+        # promised: the kernel cannot see which keys a shape leaves out.
         schema = spec_output_schema(paging_and_projection.pick_books_spec)
         assert schema is not None
-        assert schema["items"]["required"] == ["id"]
+        assert "required" not in schema["items"]
+        assert set(schema["items"]["properties"]) == {"id", "title", "price"}
 
     def test_dispatch_hands_the_presenter_the_shapes_the_caller_sent(
         self, ada: Any, books: list[Book]
