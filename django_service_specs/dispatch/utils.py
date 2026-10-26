@@ -46,6 +46,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
@@ -258,6 +259,7 @@ def seeded_base(
     progress: ProgressReporter | None,
     pool_seeds: PoolSeeds,
     early: Mapping[str, Any],
+    call_context: Mapping[str, Any],
 ) -> dict[str, Any]:
     """``base_pool``, taking the seeds already resolved for a check as they are.
 
@@ -269,14 +271,18 @@ def seeded_base(
     as ``base_pool`` resolves them, once per pool. An early value was resolved
     before the run's reporter existed, so its resolver saw ``progress`` as the
     no-op reporter.
+
+    The resolvers bind against a pool carrying ``call_context``, so one
+    declaring ``request`` or ``view`` reads the context's
+    (test_a_seed_resolved_with_its_pool_reads_the_request), and the context
+    leaves the pool before it is returned: it is no seed, and the Validator's
+    ``ambient`` is this pool (test_ambient_holds_the_seeds_and_never_the_call_context).
+    A seed registered under either name is the value instead, early or not
+    (test_the_registered_seed_supplies_the_name).
     """
-    if not early:
-        return base_pool(user=principal, progress=progress, seeds=pool_seeds)
-    pool = base_pool(
-        user=principal,
-        progress=progress,
-        seeds=only_seeds(pool_seeds, pool_seeds.names - early.keys()),
-    )
+    seeds = pool_seeds if not early else only_seeds(pool_seeds, pool_seeds.names - early.keys())
+    pool = base_pool(user=principal, progress=progress, seeds=seeds, call_context=call_context)
+    del pool[CALL_CONTEXT]
     pool.update(early)
     return pool
 
@@ -414,10 +420,19 @@ def open_call(
     if parameters is None:
         parameters = declared
     if taken:
+        # The dispatcher's names never get here, so a name no seed registers
+        # is one of the call's two, which dispatch fills itself
+        # (test_a_parameter_named_either_is_refused asserts the hint, and
+        # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
+        hint = (
+            ""
+            if taken <= pool_seeds.names
+            else " 'request' and 'view' are the call's own, read off its context."
+        )
         raise ImproperlyConfigured(
             f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
             "registered pool seed occupies. An argument must never meet a seed in one pool; "
-            "rename the parameter."
+            f"rename the parameter.{hint}"
         )
     refuse_overlaid_parameters(spec, declared, overlay)
     if seated:
@@ -428,7 +443,9 @@ def open_call(
     # Only the seeds a check names: another seed's resolver may read what an
     # anonymous caller lacks, and this runs before that caller is refused
     # (test_only_the_seeds_a_check_names_resolve_before_it).
-    keywords.seeds.update(seeds_for_checks(spec, principal, pool_seeds, QUESTIONS))
+    keywords.seeds.update(
+        seeds_for_checks(spec, principal, pool_seeds, QUESTIONS, call_context=keywords.call_context)
+    )
     granted = authorize(
         spec,
         principal,
@@ -467,11 +484,19 @@ def seed_named_parameters(
       (test_a_spec_declaring_a_registered_seed_s_name_is_refused,
       test_a_reflected_shape_named_like_a_registered_seed_is_still_refused).
     """
-    shared = declared.names() & pool_seeds.reserved
+    # The call's ``request`` and ``view`` beside the reserved names: dispatch
+    # hands both to every callable naming one, so a parameter of either name is
+    # refused on every mount (test_a_parameter_named_either_is_refused fails
+    # without the union), and a top-level Validator field of either takes the
+    # seat a registered seed's name does
+    # (test_a_validator_field_named_request_takes_the_seat fails without the
+    # second). ``PoolSeeds.reserved`` itself keeps its published answer, which
+    # the transports read.
+    shared = declared.names() & (pool_seeds.reserved | CALL_SEEDS)
     seated = shared & frozenset(
         param.name for _, reads in _read_seats(spec) for param in reads if param.reflected
     )
-    return seated, shared - seated - seed_named_fields(spec, pool_seeds.names)
+    return seated, shared - seated - seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
 
 
 def seed_named_fields(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> frozenset[str]:
@@ -868,7 +893,13 @@ def selector_pool(
     route (test_a_target_selector_is_handed_no_shapes_on_any_route).
     """
     reads = selector_spec.reads.names()
-    base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
+    base = seeded_base(
+        principal,
+        progress=progress,
+        pool_seeds=pool_seeds,
+        early=keywords.seeds,
+        call_context=keywords.call_context,
+    )
     pool = {
         **base,
         CALL_CONTEXT: keywords.call_context,
@@ -882,11 +913,11 @@ def selector_pool(
                 selector_spec.kwargs,
                 pool,
                 label="SelectorSpec.kwargs",
-                reserved=pool_seeds.reserved,
+                reserved=pool_seeds.reserved | CALL_SEEDS,
             ),
             selector_spec.kwargs,
             label="extra_kwargs",
-            reserved=pool_seeds.reserved,
+            reserved=pool_seeds.reserved | CALL_SEEDS,
         )
     )
     _refuse_absent(selector_spec.reads, pool)
@@ -1051,6 +1082,7 @@ def call_pool(
     entries: Mapping[str, Any],
     *,
     early: Mapping[str, Any],
+    call_context: Mapping[str, Any],
     progress: ProgressReporter | None = None,
 ) -> dict[str, Any]:
     """The base pool, then this call's own entries on top of it: the output selector's pool.
@@ -1084,7 +1116,9 @@ def call_pool(
     which every pool dispatch builds carries) are names no project can
     register.
     """
-    pool = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=early)
+    pool = seeded_base(
+        principal, progress=progress, pool_seeds=pool_seeds, early=early, call_context=call_context
+    )
     pool.update(entries)
     return pool
 
@@ -1775,16 +1809,27 @@ def prepare_service(
     # and the run's result carry.
     target = next(iter(resolved.values()), None)
     reserved = pool_seeds.reserved
+    # A provider's or the overlay's key may not name the call's ``request`` or
+    # ``view`` either, or it would outrank the context's in the service's pool
+    # (test_a_provider_returning_request_is_refused).
+    provided = reserved | CALL_SEEDS
     # One base pool for the call, so a seed that queries resolves once for the
     # providers and the service alike. Its ``progress`` is the transport's: the
     # spec's own sink is the run's alone, and joins the run's keywords last.
-    base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
+    base = seeded_base(
+        principal,
+        progress=progress,
+        pool_seeds=pool_seeds,
+        early=keywords.seeds,
+        call_context=call_context,
+    )
     # Behind a proxy, so neither the Validator nor the presenter can change the
     # pool the service is called from. No copy: nothing writes to ``base`` once
     # it is built, and every pool made from it is a dict of its own.
     ambient = MappingProxyType(base)
     # The call's context beside the seeds rather than in ``base``, so
-    # ``ambient`` stays the seeds alone: it has a field of its own on both
+    # ``ambient`` stays the seeds alone and never the dict itself, which has a
+    # field of its own on both
     # contexts (test_ambient_holds_the_seeds_and_never_the_call_context). The
     # shapes the same way, for the presenter's field of its own and for the
     # Validator, which never sees them (test_ambient_never_holds_the_shapes).
@@ -1809,12 +1854,14 @@ def prepare_service(
     )
     values = validated.values
     # What the pool spreads by name: the values less a top-level field named
-    # like a registered seed, which reaches the service in ``data`` alone. A
+    # like a registered seed or the call's ``request`` or ``view``, which
+    # reaches the service in ``data`` alone, so the service naming it reads the
+    # seed or the context's (test_a_validator_field_named_request_takes_the_seat). A
     # new mapping, never ``values`` changed in place: the base ``validated()``
     # hands one dict as ``values`` and ``data``, so a pop would drop the field
     # from ``data`` too
     # (test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed).
-    fields = seed_named_fields(spec, pool_seeds.names)
+    fields = seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
     spread = {name: value for name, value in values.items() if name not in fields}
     # A Validator returning ``user`` is a bug, and letting its value outrank the
     # seed silently would be the worse one: the service would act as whoever
@@ -1823,7 +1870,9 @@ def prepare_service(
     # returns without declaring it is still refused:
     # test_a_validated_value_named_after_a_seed_is_refused fails if every
     # seed's name is left out of the spread rather than the declared fields'.
-    seeded = sorted(spread.keys() & reserved)
+    # The call's ``request`` and ``view`` too, or a returned value would
+    # outrank the context's (test_a_validator_returning_either_is_refused).
+    seeded = sorted(spread.keys() & provided)
     if seeded:
         raise ImproperlyConfigured(
             f"The Validator returned the key(s) {seeded}, which dispatch seeds itself. A "
@@ -1836,8 +1885,9 @@ def prepare_service(
     # held by its own case: test_a_bound_value_naming_a_seed_or_a_validated_value_is_refused
     # (``a-seed``; ``an-undeclared-validated-value`` for the values, since
     # ``a-validated-value`` names a parameter too) and
-    # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``).
-    named = reserved | values.keys() | spec.parameters().names()
+    # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``),
+    # and the call's names by test_a_validator_binding_either_is_refused.
+    named = provided | values.keys() | spec.parameters().names()
     bound = sorted(validated.pool.keys() & named)
     if bound:
         raise ImproperlyConfigured(
@@ -1859,10 +1909,10 @@ def prepare_service(
     computed = spread.keys() | validated.pool.keys()
     author = overlaid(
         {name: value for name, value in overlay.kwargs.items() if name not in computed},
-        provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=reserved),
+        provide(spec.kwargs, providers_pool, label="ServiceSpec.kwargs", reserved=provided),
         spec.kwargs,
         label="extra_kwargs",
-        reserved=reserved,
+        reserved=provided,
     )
     pool = {
         **surroundings,
@@ -2008,6 +2058,7 @@ def finish_service(
                 SHAPES: prepared.shapes,
             },
             early=prepared.early_seeds,
+            call_context=prepared.call_context,
         )
         value = lookup(
             output_spec,

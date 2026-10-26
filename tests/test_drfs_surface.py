@@ -547,6 +547,10 @@ SURFACE: dict[str, Pin] = {
 # a new root name lands in SURFACE or here, never in neither.
 NOT_REEXPORTED_BY_DRFS = frozenset(
     {
+        # The names dispatch reads off the call's context for a callable naming
+        # one: djangorestframework-services registers ``request`` and ``view``
+        # as seeds of its own, which the kernel lets stand.
+        "CALL_SEEDS",
         # The report of a registry's open specs, which django-spec-cli's
         # management command and system check read from here; drfs serves no
         # management command.

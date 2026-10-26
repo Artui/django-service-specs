@@ -14,6 +14,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
 )
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
@@ -195,3 +196,42 @@ def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
     with pytest.raises(ImproperlyConfigured, match="call_context"):
         unmet_operation_affordance(_naming_it(handed), pool, call_context={})
     assert handed == []
+
+
+class TestTheCallSRequestAndView:
+    """A condition declaring ``request`` or ``view`` reads the call's context, by default too."""
+
+    def test_a_condition_reads_the_context_s_request_from_a_pool_holding_none(self) -> None:
+        request = object()
+        seen: list[Any] = []
+
+        def when(*, request: Any, view: Any) -> bool:
+            seen.append((request, view))
+            return True
+
+        spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
+        assert (
+            unmet_operation_affordance(
+                spec, base_pool(user=None), call_context={"request": request}
+            )
+            is None
+        )
+        assert seen == [(request, None)]
+
+    def test_the_pool_s_own_entry_outranks_the_context_s(self) -> None:
+        """A pool built with a registered ``request`` seed is asked with that seed."""
+        seen: list[Any] = []
+
+        def when(*, request: Any) -> bool:
+            seen.append(request)
+            return True
+
+        seeds = DEFAULT_POOL_SEEDS.extend(request=lambda: "registered")
+        spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
+        unmet_operation_affordance(
+            spec,
+            base_pool(user=None, seeds=seeds),
+            reserved=seeds.reserved,
+            call_context={"request": "context"},
+        )
+        assert seen == ["registered"]

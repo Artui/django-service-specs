@@ -27,9 +27,10 @@ from django_service_specs.parameters.utils import (
     integer_range_refusal,
     path_column,
 )
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.utils import CALL_CONTEXT
 
 _NAMED: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 """The parameter kinds a pool fills by name, and so the only ones it can leave unfilled."""
@@ -110,7 +111,7 @@ def call_keywords(
                 for name in missing
             }
         )
-    return resolve_callable_kwargs(fn, dict(pool))
+    return pool_kwargs(fn, pool)
 
 
 def apply_shaping(
@@ -214,8 +215,9 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     itself may hand over a pool with one, and it is a filter's argument only
     under a filter's own name (test_a_pool_s_data_is_not_the_filters_data).
 
-    ``request`` is handed over when the pool carries one - a seed an HTTP
-    adapter registers - and the constructor declares it, by the
+    ``request`` is handed over when the constructor declares it - the pool's,
+    a seed an HTTP adapter registers, else the call's off its context
+    (test_a_filter_set_naming_request_is_handed_the_context_s) - by the
     declare-to-receive rule of every pool-resolved callable, so a
     request-scoped FilterSet sees the ``self.request`` it would behind
     django-filter's own backend.
@@ -237,9 +239,13 @@ def _filtered(filter_set: Any, queryset: Any, pool: Mapping[str, Any]) -> Any:
     integer column can hold is refused next, before any lookup is built with
     it; see ``_past_their_columns``.
     """
-    seen = {"request": pool["request"]} if "request" in pool else {}
+    # The pool's ``request`` and its call's context, so the binder hands the
+    # call's own where no seed registered the name, and the FilterSet only ever
+    # the ``request``.
+    seen = {name: pool[name] for name in ("request", CALL_CONTEXT) if name in pool}
+    asked = pool_kwargs(filter_set, seen)
     bound = filter_set(
-        **resolve_callable_kwargs(filter_set, seen),
+        **({"request": asked["request"]} if "request" in asked else {}),
         data=_filter_data(filter_set, pool),
         queryset=queryset,
     )

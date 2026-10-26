@@ -7,7 +7,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.types.progress_reporter import ProgressReporter
 
 
@@ -32,10 +32,14 @@ def base_pool(
     raises ``TypeError`` at call time rather than running - ``progress`` most
     often, since it is the seed with a default and so the one nobody remembers.
 
-    There is no ``request`` entry here: this is the kernel, and off HTTP there
-    is no request to seed. An HTTP adapter that wants one registers it as its
-    own seed through ``PoolSeeds``, the same way any other ambient value is
-    added.
+    There is no ``request`` or ``view`` entry here (``CALL_SEEDS``): a
+    resolver declaring either is handed the one in the pool's
+    ``call_context`` where the pool carries one, ``None`` where the context
+    holds none, and a catch-all never is
+    (test_a_resolver_reads_the_request_off_the_pool_s_call_context). Dispatch
+    passes the call's context in for its resolvers and keeps it out of the
+    pool it hands on. A transport that registers either name as its own seed
+    keeps it, as before.
 
     A seed resolving to an awaitable is refused with ``ImproperlyConfigured``
     and never enters the pool. ``PoolSeeds`` refuses an ``async def``
@@ -85,7 +89,7 @@ def base_pool(
                 f"base_pool() got a registered pool seed {name!r} that an entry already "
                 f"occupies. A seed cannot silently outrank what the caller spread in."
             )
-        pool[name] = _settled(name, resolver(**resolve_callable_kwargs(resolver, bound)))
+        pool[name] = _settled(name, resolver(**pool_kwargs(resolver, bound)))
     return pool
 
 

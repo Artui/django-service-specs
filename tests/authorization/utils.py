@@ -82,3 +82,26 @@ class NotACoroutine:
 async def refuses_lazily() -> Any:
     """An async generator: not awaitable, never started, and truthy."""
     yield False
+
+
+class SeesTheCall(PermissionCheck):
+    """Passes at every level, recording the ``request`` and ``view`` each question is handed."""
+
+    def __init__(self) -> None:
+        self.seen: list[tuple[str, Any, Any]] = []
+
+    def has_permission(self, principal: Any, spec: Any, *, request: Any, view: Any) -> bool:
+        self.seen.append(("has_permission", request, view))
+        return True
+
+    def has_object_permission(
+        self, principal: Any, spec: Any, target: Any, *, request: Any, view: Any
+    ) -> bool:
+        self.seen.append(("has_object_permission", request, view))
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, request: Any, view: Any
+    ) -> bool:
+        self.seen.append(("has_scope_permission", request, view))
+        return True

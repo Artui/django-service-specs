@@ -64,7 +64,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.utils import coded_messages, key_past_its_column
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec
@@ -474,7 +474,7 @@ def _run_child_service(fn: Callable[..., Any], pool: dict[str, Any]) -> Any:
     marked on its way out, so no row above this one reads it as its own.
     """
     try:
-        return run_service(fn, resolve_callable_kwargs(fn, pool), atomic=False)
+        return run_service(fn, pool_kwargs(fn, pool), atomic=False)
     except DJANGO_WRITE_ERRORS as exc:
         mark_caller_raised(exc)
         raise
@@ -504,7 +504,7 @@ async def _arun_child_service(
             "this relation through the sync helpers."
         )
     try:
-        return await arun_service(fn, resolve_callable_kwargs(fn, pool), atomic=False)
+        return await arun_service(fn, pool_kwargs(fn, pool), atomic=False)
     except DJANGO_WRITE_ERRORS as exc:
         mark_caller_raised(exc)
         raise
@@ -696,7 +696,7 @@ def _resolve_scope(
         return (scope, key)
     # Caller code, so an error it raises is marked: see ``mark_caller_raised``.
     try:
-        queryset: Any = scope(**resolve_callable_kwargs(scope, dict(context or {})))
+        queryset: Any = scope(**pool_kwargs(scope, context or {}))
     except DJANGO_WRITE_ERRORS as exc:
         mark_caller_raised(exc)
         raise

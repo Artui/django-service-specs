@@ -9,7 +9,7 @@ from django import forms
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.null_progress import null_progress
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.types.utils import CALL_CONTEXT
 from django_service_specs.validation.validation_context import ValidationContext
 
@@ -36,7 +36,12 @@ def extra_keywords(
     are reserved, so no seed shares one. The call's context is there too, as
     the context's own dict, handed to a ``form_kwargs`` naming it
     (test_form_kwargs_naming_the_call_context_is_handed_the_very_dict) and,
-    as everywhere, never to one taking ``**kwargs``. Each is held by its own test:
+    as everywhere, never to one taking ``**kwargs``. So are the call's
+    ``request`` and ``view``, read off that dict, unless ``ambient`` holds a
+    seed registered under the name, which is the value then
+    (test_a_form_s_form_kwargs_is_handed_the_context_s_request_and_view, and
+    test_a_seed_registered_under_the_name_outranks_the_context_s_value in
+    ``form_keywords``' tests). Each is held by its own test:
     test_off_dispatch_it_meets_the_principal_as_user_and_no_seed
     (``progress``),
     test_a_hand_built_context_s_user_is_still_the_principal (``user``) and
@@ -52,7 +57,7 @@ def extra_keywords(
         "user": context.principal,
         **context.resolved,
     }
-    extra = form_kwargs(**resolve_callable_kwargs(form_kwargs, pool))
+    extra = form_kwargs(**pool_kwargs(form_kwargs, pool))
     if not isinstance(extra, Mapping):
         raise ImproperlyConfigured(
             f"{form_class.__qualname__}: form_kwargs returned {extra!r}; it returns a "

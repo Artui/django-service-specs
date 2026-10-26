@@ -102,6 +102,7 @@ def authorize_scope(
             seeds=seeds,
             pool_seeds=pool_seeds,
             question=SCOPE_LEVEL,
+            call_context=call_context,
         ),
     )
     for check in spec.permissions or ():

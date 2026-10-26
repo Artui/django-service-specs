@@ -35,7 +35,10 @@ class PoolSeeds:
     The names in ``RESERVED_POOL_SEEDS`` are the dispatcher's own. Everything
     else a service legitimately needs — a tenant, a correlation id, a locale, a
     clock, a feature-flag reader — has no channel, because off HTTP there is no
-    ``request`` for it to hang off. This is that channel.
+    ``request`` for it to hang off. This is that channel. Where there is one,
+    a resolver declaring ``request`` reads it (``CALL_SEEDS``), and a
+    transport may still register ``request`` or ``view`` itself, as the ones
+    released before dispatch supplied them do; such a mount keeps its own.
 
     A registration contributes two things:
 

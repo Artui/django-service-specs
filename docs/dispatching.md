@@ -214,8 +214,11 @@ async code, in one executor hop, since a presenter may query.
 ## Permissions
 
 A [`PermissionCheck`][django_service_specs.authorization.permission_check.PermissionCheck]
-takes a principal and a spec, and nothing else: no request and no view, because
-most transports have neither. Checks are **instances**, so a check can carry
+takes a principal and a spec, and nothing else by position: no request and no
+view, because most transports have neither. A check that wants them declares
+`request` or `view` by keyword and is handed what the call's context holds
+under that key, `None` where it holds none
+([the call's `request` and `view`](#the-calls-request-and-view)). Checks are **instances**, so a check can carry
 its own configuration - a codename, a group - and a spec reads as the list of
 checks it applies. `has_permission` is the class-level check;
 `has_object_permission` runs on a resolved row and allows unless overridden;
@@ -695,6 +698,43 @@ value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.
 
+### The call's `request` and `view`
+
+`dispatch` and `adispatch` hand two values to every callable they bind that
+names one, read off the call's context:
+[`CALL_SEEDS`][django_service_specs.pool.call_seeds.CALL_SEEDS], `request` and
+`view`. Each is the very object the transport put in `call_context` under that
+key, and `None` where it put none, so a spec callable written for HTTP binds on
+every route and learns from a `None` that the call came from no request. Every
+stage is handed them by declaring them: a seed's resolver, the selectors (the
+target selector on every route, `resolve_target` included), `extend_queryset`,
+a FilterSet, the providers, a `FormValidator`'s `form_kwargs`, the affordance
+conditions, the preconditions, the run's `progress_reporter`, the service, the
+output selector, and the row services and callable scopes of a nested write.
+
+They are handed **by name only**, as `call_context` itself is: a `**kwargs`
+catch-all is handed neither, and neither is a pool entry, so the Validator's
+`ambient` holds neither and a Validator reads them off its context's
+`call_context`. A seed's resolver may declare them; the commonest seed, a tenant
+read off the request, is `tenant=lambda *, request: request.tenant`. The three
+`authorize` functions offer both to a permission check that declares one, and
+[`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
+and the affordance functions read them off the `call_context` they are handed,
+so a page or a listing asks what dispatch would.
+
+A spec declaring a parameter named `request` or `view` is refused at dispatch
+with `ImproperlyConfigured`, on every route, and so is a `kwargs` provider or an
+`extra_kwargs` key of either name. A read reflected off a selector's own
+signature is not refused: the call's value fills it, as a registered seed fills
+one named like it. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
+`data` while a service naming it reads the call's own. Neither name is in
+`RESERVED_POOL_SEEDS` or `PoolSeeds.reserved`, so **a mount may still register
+either** through `PoolSeeds`, by the constructor or `extend()`, as transports
+released before dispatch supplied them do. Such a mount keeps its own: the
+registered seed is a pool entry, the value at every stage and every check, and a
+`**kwargs` catch-all is handed it as any seed; another seed's resolver still
+reads the call's.
+
 Two declarations of a seed's name are not refused, because neither shares the
 pool with an argument. A read marked `reflected=True` is one an adapter took off
 a callable's signature rather than one an author wrote, such as a selector's
@@ -880,7 +920,9 @@ what the service left there.
   convention: a transport over DRF is expected to put DRF's `request` there,
   and a key such as `request`, `view` or `format` means what the transport
   that wrote it says.
-  The kernel writes nothing and keeps nothing across calls.
+  The kernel writes nothing and keeps nothing across calls. It reads two
+  keys, `request` and `view`, for a callable naming one
+  ([the call's `request` and `view`](#the-calls-request-and-view)).
 - **`transport` names the transport, across the family.** One key is reserved
   for every transport rather than left to each: a transport sets
   `call_context["transport"]` to name itself, so a stage that answers one

@@ -118,6 +118,25 @@ class TestCreateModel:
         assert len(seen) == 1
         assert seen[0] is context
 
+    def test_the_call_s_request_reaches_a_row_service_that_names_it(self) -> None:
+        """Read off the context handed on, as the service above is handed it."""
+        seen: list[Any] = []
+        request = object()
+
+        def create_section(*, data: dict[str, Any], request: Any, view: Any) -> Section:
+            seen.append((request, view))
+            return Section.objects.create(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        bound_call(
+            create_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context={"request": request},
+        )
+        assert seen == [(request, None)]
+
     def test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context(self) -> None:
         # The by-name rule holds one level down: the helper hands the call's
         # context on, and a nested catch-all is still never given it.

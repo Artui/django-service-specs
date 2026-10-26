@@ -212,3 +212,24 @@ class TestDispatchDoesNotRunOnAnAwaitableSeed:
         with pytest.raises(ImproperlyConfigured, match="resolved to an awaitable"):
             dispatch(spec, principal=object(), arguments={}, pool_seeds=seeds)
         assert ran == []
+
+
+def test_a_resolver_reads_the_request_off_the_pool_s_call_context() -> None:
+    """Named, it is handed the context's; ``None`` for a key the context lacks."""
+    request = object()
+    seeds = DEFAULT_POOL_SEEDS.extend(
+        tenant=lambda *, request, view: (request, view), seen=lambda **kwargs: sorted(kwargs)
+    )
+    pool = base_pool(user="u", seeds=seeds, call_context={"request": request})
+    assert pool["tenant"] == (request, None)
+    # A catch-all is handed neither, and the pool holds neither.
+    assert pool["seen"] == ["progress", "user"]
+    assert "request" not in pool
+    assert "view" not in pool
+
+
+def test_a_registered_request_beside_a_spread_one_still_raises() -> None:
+    """The published refusal: nothing spreads the two any more, so the pair is a collision."""
+    seeds = DEFAULT_POOL_SEEDS.extend(request=lambda: "registered")
+    with pytest.raises(TypeError, match="'request'"):
+        base_pool(user="u", seeds=seeds, request="entry")

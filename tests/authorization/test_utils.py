@@ -12,7 +12,9 @@ from typing import Any, cast
 import pytest
 
 from django_service_specs.authorization import utils
-from django_service_specs.authorization.utils import asked_with
+from django_service_specs.authorization.utils import asked_with, resolved_seeds
+from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 
 
 class _Shapes:
@@ -273,3 +275,24 @@ def test_a_callable_with_no_signature_fills_nothing_by_position() -> None:
     check = _Shapes()
     cast(Any, check).undeclared = max
     assert utils.declared_keywords(check, "undeclared", positional=2) == frozenset()
+
+
+class TestResolvedSeeds:
+    """Only the registered seeds a caller names resolve, for the principal as ``user``."""
+
+    def test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped(self) -> None:
+        resolved: list[str] = []
+
+        def recording(name: str) -> Any:
+            def resolve(*, user: Any, progress: Any) -> Any:
+                resolved.append(name)
+                return (name, user, progress)
+
+            return resolve
+
+        pool_seeds = DEFAULT_POOL_SEEDS.extend(club=recording("club"), locale=recording("locale"))
+        values = resolved_seeds(
+            pool_seeds, frozenset({"club", "unregistered"}), user="ada", call_context=None
+        )
+        assert values == {"club": ("club", "ada", null_progress)}
+        assert resolved == ["club"]

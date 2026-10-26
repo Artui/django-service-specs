@@ -293,3 +293,36 @@ class TestTheDispatchRoute:
         if not catch_all:
             assert on_the_page["ctx"] is page
             assert on_dispatch["ctx"] is call
+
+
+class TestTheCallSRequestAndView:
+    """``form_kwargs`` declaring ``request`` or ``view`` is handed what the call's context holds."""
+
+    def test_form_kwargs_is_handed_the_context_s_request_and_none_for_an_absent_view(
+        self,
+    ) -> None:
+        request = object()
+        spec = _create(lambda *, request, view: {"request": request, "view": view})
+        handed = form_keywords(spec, make_user("ada"), call_context={"request": request})
+        assert handed["request"] is request
+        assert handed["view"] is None
+
+    def test_a_seed_registered_under_the_name_outranks_the_context_s_value(self) -> None:
+        spec = _create(lambda *, request: {"request": request})
+        handed = form_keywords(
+            spec,
+            make_user("ada"),
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(request=lambda: "registered"),
+            call_context={"request": "context"},
+        )
+        assert handed["request"] == "registered"
+
+    def test_a_seed_form_kwargs_names_reads_the_context_s_request(self) -> None:
+        spec = _create(lambda *, tenant: {"tenant": tenant})
+        handed = form_keywords(
+            spec,
+            make_user("ada"),
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=lambda *, request: request["tenant"]),
+            call_context={"request": {"tenant": "acme"}},
+        )
+        assert handed["tenant"] == "acme"

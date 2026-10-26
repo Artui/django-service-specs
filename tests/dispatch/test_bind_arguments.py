@@ -5,9 +5,11 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
+from django import forms
 from typing_extensions import TypedDict
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -350,3 +352,35 @@ def test_the_validator_s_call_context_is_the_dict_passed_or_a_fresh_one() -> Non
     assert first is context
     assert second == third == {}
     assert second is not third
+
+
+class _Kept(forms.Form):
+    """Takes ``seen``, which ``form_kwargs`` returns, and keeps it for the test."""
+
+    title = forms.CharField()
+
+    def __init__(self, *args: Any, seen: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.seen = seen
+
+    def clean(self) -> dict[str, Any]:
+        cleaned = super().clean() or {}
+        return {**cleaned, "seen": self.seen}
+
+
+def test_a_form_s_form_kwargs_is_handed_the_context_s_request_and_view() -> None:
+    """The Validator's own pool carries the two values off dispatch as it does on it."""
+    request, view = object(), object()
+    spec = ServiceSpec(
+        service=service,
+        validator=FormValidator(
+            _Kept, form_kwargs=lambda *, request, view: {"seen": (request, view)}
+        ),
+    )
+    bound = bind_arguments(
+        spec,
+        {"title": "Lathe"},
+        principal=PRINCIPAL,
+        call_context={"request": request, "view": view},
+    )
+    assert bound["seen"] == (request, view)

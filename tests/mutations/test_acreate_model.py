@@ -115,6 +115,24 @@ class TestACreateModel:
         assert len(seen) == 1
         assert seen[0] is context
 
+    async def test_the_call_s_request_reaches_a_row_service_that_names_it(self) -> None:
+        seen: list[Any] = []
+        request = object()
+
+        async def create_section(*, data: dict[str, Any], request: Any) -> Section:
+            seen.append(request)
+            return await Section.objects.acreate(**data)
+
+        relations = {
+            "sections": ChildSpec(model=Section, fk="catalog", create_service=create_section)
+        }
+        await bound_call(
+            acreate_model(Catalog, relations=relations),
+            data={"name": "c", "sections": [{"title": "a"}]},
+            call_context={"request": request},
+        )
+        assert seen == [request]
+
     async def test_a_null_row_is_refused(self) -> None:
         with pytest.raises(InvalidArguments):
             await acreate_model(Catalog, relations=_SECTIONS)(

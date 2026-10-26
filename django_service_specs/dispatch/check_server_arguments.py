@@ -133,14 +133,14 @@ def check_server_arguments(
         raise ImproperlyConfigured(
             f"{label}: ServerArguments names {', '.join(refused)}, which a registered pool seed "
             "occupies; dispatch refuses a spec declaring a parameter there, so rename the "
-            "parameter."
+            f"parameter.{_call_hint(refused, pool_seeds)}"
         )
     filled = sorted(names & seated)
     if filled:
         raise ImproperlyConfigured(
             f"{label}: ServerArguments names {', '.join(filled)}, a reflected read which a "
             "registered pool seed fills on every call, so binding or withholding it would do "
-            "nothing. Leave the name to the seed."
+            f"nothing. Leave the name to the seed.{_call_hint(filled, pool_seeds)}"
         )
     provided = sorted(names & _provider_names(spec))
     if provided:
@@ -221,3 +221,15 @@ def _lacks_default(fn: Callable[..., Any] | None, name: str) -> bool:
         return False
     declared = inspect.signature(fn).parameters.get(name)
     return declared is not None and declared.default is inspect.Parameter.empty
+
+
+def _call_hint(names: list[str], pool_seeds: PoolSeeds) -> str:
+    """The note that a name no seed registers is the call's own, as dispatch's refusal adds it.
+
+    The dispatcher's names never reach the two refusals above, so a name the
+    mount does not register is ``request`` or ``view``
+    (test_server_arguments_naming_either_say_it_is_the_call_s).
+    """
+    if set(names) <= pool_seeds.names:
+        return ""
+    return " 'request' and 'view' are the call's own, read off its context."

@@ -7,6 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **The call's `request` and `view` for every callable `dispatch` and
+  `adispatch` bind**, read off `call_context`: the very objects the transport
+  put there, and `None` for a key it left out. Every stage that declares either
+  by name is handed it - a seed's resolver, the selectors (the target selector
+  on every route, `resolve_target` included), `extend_queryset`, a FilterSet,
+  the providers, a `FormValidator`'s `form_kwargs`, the affordance conditions,
+  the preconditions, the run's `progress_reporter`, the service and the output
+  selector, and the row services and callable scopes of a nested write. A
+  tenant read off the request is `tenant=lambda *, request: request.tenant`. A
+  spec callable written for HTTP now binds on every transport rather than only
+  on the ones that registered the two as seeds of their own.
+- **`CALL_SEEDS`**, the two names, exported from the root beside
+  `RESERVED_POOL_SEEDS` and outside it. A transport refusing a caller's
+  argument by these names reads it.
+- `authorize`, `authorize_target` and `authorize_scope` offer both to a
+  permission check that declares one, and `form_keywords`, `bind_arguments`
+  (through `form_kwargs`), `enforce_affordances`, `aenforce_affordances`,
+  `unmet_operation_affordance` and `aunmet_operation_affordance` read them off
+  the `call_context` they are handed, so a page or a listing asks what dispatch
+  would. Each already took `call_context`; no signature changes.
+- `base_pool` hands a resolver declaring `request` or `view` the one in the
+  `call_context` its caller passes in, and a resolver may name `call_context`
+  itself. Dispatch passes the call's context in for its resolvers and keeps it
+  out of the pool it hands on.
+
+### Changed
+- **A spec declaring a parameter named `request` or `view` is now refused at
+  dispatch on every route**, with `ImproperlyConfigured`. Transports that
+  registered the two as seeds refused such a spec already; django-spec-html,
+  which registers neither, accepted one. A `kwargs` provider or an
+  `extra_kwargs` key of either name is refused the same way, and so is a
+  `ServerArguments` naming either, by `check_server_arguments` and
+  `check_call`. A read reflected off a selector's own signature is not
+  refused: the call's value fills it, as a registered seed fills one named
+  like it, and `server_owned_keys` lists it on every mount.
+- **A top-level Validator field named `request` or `view` takes the seat** a
+  field named like a registered seed takes: it validates into `data`, is never
+  spread into the service's pool under its name, and is not refused. On a
+  mount that registers neither, as django-spec-html's, a service declaring
+  `request` or `view` beside such a field used to be handed the submitted
+  value and is now handed the call's; it reads the field from `data`. A value
+  of either name that a Validator returns without declaring it, or binds for
+  the call, is refused with `ImproperlyConfigured`, as a provider's key is.
+- **The values the kernel fills reach only a callable that names them.** A
+  `**kwargs` catch-all at any seat is handed neither, as it is never handed
+  `call_context`, and neither is a pool entry: the Validator's `ambient` and a
+  presenter's hold neither.
+- **A mount that registers `request` or `view` keeps its own.** `PoolSeeds`
+  accepts both, by the constructor or `extend()`, and the registered seed is a
+  pool entry: the value at every stage and every check, outranking the
+  context's, and handed to a `**kwargs` catch-all as any seed is. Another
+  seed's resolver on that mount still reads the call's value, since seeds
+  resolve against the pool before any seed is written.
+- `PoolSeeds.reserved` and `server_owned_keys` keep their published answers:
+  neither names `request` or `view` unless the mount registers it.
+
 ## [0.17.0] — 2026-10-26
 
 ### Added

@@ -21,8 +21,9 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.is_deactivated import is_deactivated
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
-from django_service_specs.pool.utils import resolved_seeds
+from django_service_specs.pool.utils import call_entries, only_seeds
 
 
 def sync_answer(answer: Any, *, asked: str) -> Any:
@@ -112,9 +113,14 @@ def offered_to_checks(
     declaring it always receives a mapping it may write to
     (test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own). A seed
     absent from ``seeds`` is not offered, so a check declaring it is asked
-    without it.
+    without it. The call's ``request`` and ``view`` are offered too, read off
+    the context as every callable dispatch binds reads them, ``None`` for a key it
+    lacks (test_a_check_is_handed_the_context_s_request_and_none_for_an_absent_view);
+    a seed registered under either name outranks them, as it does in the pools
+    (test_a_seed_registered_under_the_name_outranks_the_context_s_value).
     """
-    return {**(seeds or {}), "call_context": {} if call_context is None else call_context}
+    context = {} if call_context is None else call_context
+    return {**call_entries(context), **(seeds or {}), "call_context": context}
 
 
 # The three questions a check is asked, each with how many parameters the call
@@ -188,6 +194,7 @@ def offered_seeds(
     seeds: Mapping[str, Any] | None,
     pool_seeds: PoolSeeds | None,
     question: tuple[str, int],
+    call_context: Mapping[str, Any] | None,
 ) -> Mapping[str, Any] | None:
     """The seeds one ``authorize`` function offers its checks: ``seeds`` as handed, or resolved.
 
@@ -203,11 +210,47 @@ def offered_seeds(
     """
     if pool_seeds is None:
         return seeds
-    return seeds_for_checks(spec, principal, pool_seeds, (question,))
+    return seeds_for_checks(spec, principal, pool_seeds, (question,), call_context=call_context)
+
+
+def resolved_seeds(
+    pool_seeds: PoolSeeds,
+    names: frozenset[str],
+    *,
+    user: Any,
+    call_context: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """The seeds of ``pool_seeds`` that ``names`` names, resolved for ``user``, and no other.
+
+    What resolves a seed ahead of a call's pools, for whatever named it: a
+    permission check before the class-level check (``seeds_for_checks``), and
+    a form's keywords outside dispatch (``form_keywords``). A name the
+    registry does not hold is skipped, so the caller passes every name its
+    callable declares and only the registered ones resolve
+    (test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped). From a
+    base pool with no live reporter, so a resolver reading ``progress`` sees
+    the no-op one; a resolver that raises ends the call here. The pool carries
+    ``call_context``, so a resolver declaring ``request`` or ``view`` reads
+    the context's, as in every pool dispatch builds for its resolvers
+    (test_a_seed_resolved_early_for_a_check_reads_the_request); only the
+    seeds leave it.
+    """
+    named = names & pool_seeds.names
+    resolved = base_pool(
+        user=user,
+        seeds=only_seeds(pool_seeds, named),
+        call_context={} if call_context is None else call_context,
+    )
+    return {name: resolved[name] for name in named}
 
 
 def seeds_for_checks(
-    spec: Any, principal: Any, pool_seeds: PoolSeeds, questions: Iterable[tuple[str, int]]
+    spec: Any,
+    principal: Any,
+    pool_seeds: PoolSeeds,
+    questions: Iterable[tuple[str, int]],
+    *,
+    call_context: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     """The registered seeds a check of ``spec`` names at one of ``questions``, resolved, by name.
 
@@ -218,9 +261,15 @@ def seeds_for_checks(
     one (``offered_seeds``). A resolver that raises ends the call there, as it
     does in dispatch
     (test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check).
+    The call's ``request`` and ``view`` are read off ``call_context`` into that
+    pool, so a resolver declaring one reads what it would in any other
+    (test_a_seed_resolved_for_a_check_reads_the_context_s_request).
     """
     return resolved_seeds(
-        pool_seeds, _named_seeds(spec, pool_seeds.names, questions), user=principal
+        pool_seeds,
+        _named_seeds(spec, pool_seeds.names, questions),
+        user=principal,
+        call_context=call_context,
     )
 
 

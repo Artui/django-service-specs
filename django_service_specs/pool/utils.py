@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable, Mapping
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import CALL_CONTEXT
 
 
 def resolve_provider(
@@ -19,7 +21,7 @@ def resolve_provider(
 ) -> dict[str, Any]:
     """Call a ``kwargs`` or ``input_data`` provider from ``pool``, and keep what it fills.
 
-    Bound by ``resolve_callable_kwargs``, as every pool-resolved callable is,
+    Bound by ``pool_kwargs``, as every callable dispatch resolves is,
     so a provider names what it reads - ``user``, a seed, a ``reads``
     argument - or takes ``**kwargs`` for the whole pool. A key whose value is
     ``UNSET`` is dropped: the provider is declining it, not setting it to
@@ -38,7 +40,7 @@ def resolve_provider(
     """
     if provider is None:
         return {}
-    resolved = provider(**resolve_callable_kwargs(provider, dict(pool)))
+    resolved = provider(**pool_kwargs(provider, pool))
     if not isinstance(resolved, Mapping):
         raise ImproperlyConfigured(
             f"{label} returned {type(resolved).__name__}; a provider returns a mapping of "
@@ -90,7 +92,7 @@ def deferred_progress(
         meta: Mapping[str, Any] | None = None,
     ) -> None:
         if not resolved:
-            resolved.append(provider(**resolve_callable_kwargs(provider, dict(pool))))
+            resolved.append(provider(**pool_kwargs(provider, pool)))
         _fan(transport, resolved[0])(progress, total=total, message=message, meta=meta)
 
     return report
@@ -112,7 +114,7 @@ def resolve_progress(
     """
     if provider is None:
         return transport
-    return _fan(transport, provider(**resolve_callable_kwargs(provider, dict(pool))))
+    return _fan(transport, provider(**pool_kwargs(provider, pool)))
 
 
 def _fan(transport: ProgressReporter | None, own: ProgressReporter | None) -> ProgressReporter:
@@ -144,17 +146,45 @@ def only_seeds(pool_seeds: PoolSeeds, names: frozenset[str]) -> PoolSeeds:
     )
 
 
-def resolved_seeds(pool_seeds: PoolSeeds, names: frozenset[str], *, user: Any) -> dict[str, Any]:
-    """The seeds of ``pool_seeds`` that ``names`` names, resolved for ``user``, and no other.
+def call_entries(call_context: Mapping[str, Any] | None) -> dict[str, Any]:
+    """The call's ``request`` and ``view``, read off ``call_context``: ``None`` for a key it lacks.
 
-    What resolves a seed ahead of a call's pools, for whatever named it: a
-    permission check before the class-level check (``seeds_for_checks``). A
-    name the registry does not hold is skipped, so the caller passes every
-    name its callable declares and only the registered ones resolve
-    (test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped). From a
-    base pool with no live reporter, so a resolver reading ``progress`` sees
-    the no-op one; a resolver that raises ends the call here.
+    The very objects the context holds, never copies
+    (test_a_service_spec_s_stages_are_handed_the_context_s_request_and_view),
+    and ``None`` for both when there is no context at all. One definition for
+    ``pool_kwargs``, which binds every callable dispatch resolves and every
+    affordance condition and ``form_kwargs`` asked outside it, and for every
+    check the ``authorize`` functions ask, so none of them can read the two
+    differently.
     """
-    named = names & pool_seeds.names
-    resolved = base_pool(user=user, seeds=only_seeds(pool_seeds, named))
-    return {name: resolved[name] for name in named}
+    context = {} if call_context is None else call_context
+    return {name: context.get(name) for name in sorted(CALL_SEEDS)}
+
+
+def pool_kwargs(fn: Callable[..., Any], pool: Mapping[str, Any]) -> dict[str, Any]:
+    """``resolve_callable_kwargs``, with the call's ``request`` and ``view`` for a callable naming one.
+
+    The binder every callable dispatch resolves goes through. The two are
+    never pool entries: a pool carrying the call's context hands each to a
+    callable declaring it, read off that context (``None`` where it holds
+    none), and never to a ``**kwargs`` catch-all, as the context itself is
+    handed (test_a_catch_all_is_handed_neither). A mount that registers either
+    name has it in the pool, where the seed reaches a callable as any entry
+    does, a catch-all included; the pool's own value is merged last, which is
+    what makes it outrank the context's
+    (test_the_registered_seed_supplies_the_name fails with the order flipped).
+    A pool with no ``call_context``, as a transport builds its own, binds as
+    ``resolve_callable_kwargs`` binds it
+    (test_a_pool_with_no_call_context_binds_as_published). The public binder
+    stays as published, since the transports bind their own pools through it.
+    """
+    kwargs = resolve_callable_kwargs(fn, dict(pool))
+    if CALL_CONTEXT not in pool:
+        return kwargs
+    entries = call_entries(pool[CALL_CONTEXT])
+    declared = {
+        param.name
+        for param in inspect.signature(fn).parameters.values()
+        if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+    }
+    return {**{name: entries[name] for name in sorted(declared & CALL_SEEDS)}, **kwargs}
