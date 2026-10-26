@@ -702,9 +702,10 @@ and read-only. It is the mapping the presenter reads as
 so a selector that eager-loads by what the presenter will render, as
 django-restql's `query` does, reads the value the presenter reads. Any
 callable dispatch resolves receives it by naming it: a selector and its
-`extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the run's `progress_reporter`, the
-service, and a service spec's target and output selectors, which are handed
-the write's shapes.
+`extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the
+run's `progress_reporter`, the service, and a service spec's output selector,
+which is handed the write's shapes. Its target selector is the exception, and
+is handed an empty mapping (see the last item below).
 
 - **Always there.** A spec declaring no shapes hands an empty mapping, and a
   shape the caller left out is absent from it rather than `None`, as on the
@@ -715,19 +716,25 @@ the write's shapes.
   unchanged.
 - **Never the caller's.** It is in
   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys],
-  and a parameter, read, shape or Validator field named `shapes` is refused
-  when the spec is built, with the rename in the message: name the parameter
-  for what it selects, such as `fields` or `query`, and have the callable that
-  read it declare `shapes`. `PoolSeeds.extend()` refuses a seed of that name.
+  and a parameter, read, shape or `many` list named `shapes` is refused when
+  the spec is built, a Validator field of that name when the spec's
+  parameters are first read (a transport's registration, or the first
+  dispatch). Each of those refusals carries the rename in its message: name
+  the parameter for what it selects, such as `fields` or `query`, and have the
+  callable that read it declare `shapes`. `PoolSeeds.extend()` refuses a seed
+  of that name, and says to register it under another.
 - **Not for an affordance condition or the Validator.** A condition naming
   `shapes` is refused when it is declared, because what the caller sent would
   decide whether the operation is available, and the Validator, which is no
   pool callable, reads only its own arguments. Neither context's `ambient`
   holds it.
-- **Empty under `resolve_target`.** It checks the target selector's own
-  parameters alone, so a shape sent there is no argument of the lookup: the
-  row it finds is the row dispatch finds, and only what a selector loads by
-  the shapes can differ.
+- **Empty for a target selector.** A write's target lookup is handed no
+  shapes, on every route. `resolve_target` checks the target selector's own
+  parameters alone, so a shape sent there is no argument of the lookup, and a
+  lookup that read the shapes under `dispatch` would find another row than the
+  page that called `resolve_target` showed. A target selector that names
+  `shapes` is not refused, since it is often the list selector reused: it
+  receives an empty mapping, and the row it finds is the row dispatch finds.
 
 A selector joining only what the caller chose is shown under
 [shaping each row by the call](paging-and-projection.md#shaping-each-row-by-the-call).

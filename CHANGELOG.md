@@ -35,28 +35,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PresentationContext.shapes`, so a selector can load what the presenter
   will render, as django-restql's `query` needs. Every callable dispatch
   resolves receives it by naming `shapes`: a selector and its
-  `extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the run's `progress_reporter`, the
-  service, and a service spec's target and output selectors, which are handed
-  the write's shapes. A spec declaring no shapes hands an empty mapping. A
-  `**kwargs` catch-all is never handed it, as it is never handed
-  `call_context`; an affordance condition naming it is refused when declared,
-  since what the caller sent would decide availability; the Validator never
-  sees it, and neither context's `ambient` holds it. `resolve_target` checks
-  only the target's own parameters, so its lookup is handed an empty mapping.
+  `extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the
+  run's `progress_reporter`, the service, and a service spec's output
+  selector, which is handed the write's shapes. A spec declaring no shapes
+  hands an empty mapping. A `**kwargs` catch-all is never handed it, as it is
+  never handed `call_context`; an affordance condition naming it is refused
+  when declared, since what the caller sent would decide availability; the
+  Validator never sees it, and neither context's `ambient` holds it. A
+  service spec's target selector is handed an empty mapping on every route,
+  not the write's shapes: `resolve_target` checks only the target's own
+  parameters, so its lookup has none, and a lookup that read them under
+  `dispatch` would find another row than the page showed. A target selector
+  naming `shapes` is not refused, since it is often the list selector reused.
   It is in `server_owned_keys`, so no transport asks a caller for it.
   Described in the dispatching guide's pool seeds and on the paging page,
   whose example joins a book's author only when the caller chose it.
 
 ### Changed
 - **Breaking: `shapes` is a reserved pool name**, in `RESERVED_POOL_SEEDS`.
-  A parameter, read, shape, `many` list or Validator field named `shapes` is
-  refused when the spec is built, and so are a seed registered under it with
-  `PoolSeeds.extend()` and a provider, overlay or Validator value returned
-  under it. Rename the parameter for what it selects - `fields`, `query` - and
-  have the callable that read it declare `shapes` instead; the refusal says
-  so. An affordance condition taking
-  a parameter named `shapes` is refused at its declaration. A transport or
-  test pinning the reserved set exactly sees one more name.
+  A parameter, read, shape or `many` list named `shapes` is refused when the
+  spec is built, and a Validator field of that name when the spec's
+  parameters are first read, which is a transport's registration or the first
+  dispatch. A seed registered under it with `PoolSeeds.extend()` is refused,
+  and so is a provider, overlay or Validator value returned under it, when
+  the call is dispatched. Rename the parameter for what it selects - `fields`,
+  `query` - and have the callable that read it declare `shapes` instead; the
+  refusals of a parameter, read, shape, `many` list, Validator field or
+  registered seed say so, and the provider, overlay and Validator-value
+  refusals name the key without saying it. An affordance condition taking a
+  parameter named `shapes` is refused at its declaration. A transport or test
+  pinning the reserved set exactly sees one more name. A drfs user on the
+  kernel route sees it differently: a serializer field named `shapes` leaves
+  the input schema, and a required one makes the spec uncallable; a
+  `QueryParam` named `shapes` is refused with drfs's own message; a drfs
+  channel named `shapes` is refused.
 - **`spec_output_schema` promises no field of a row for a spec declaring
   `shapes`.** A shape is the presenter's to apply, and a `fields` selection
   there leaves keys out, so the item now lists no `required` at any depth -

@@ -78,14 +78,18 @@ def test_a_parameter_named_shapes_is_refused_with_the_rename(declare: object) ->
     """The seed's name: an argument by it would meet the call's shape values in one pool."""
     with pytest.raises(ImproperlyConfigured, match="reserved for the seed") as refused:
         declare()  # ty: ignore[call-non-callable]
-    assert "rename" in str(refused.value)
+    # "rename the parameter." is said once, and the suffix carries the new name.
+    assert str(refused.value).count("rename the parameter") == 1
+    assert "Name it for what it selects ('fields', 'query')" in str(refused.value)
     assert "'shapes'" in str(refused.value)
 
 
 def test_a_seed_named_shapes_is_refused_with_the_rename() -> None:
     with pytest.raises(ValueError, match="reserved for the seed") as refused:
         DEFAULT_POOL_SEEDS.extend(shapes=dict)
-    assert "rename" in str(refused.value)
+    # Worded for a seed, not a parameter.
+    assert "register the resolver under a name of its own" in str(refused.value)
+    assert "parameter" not in str(refused.value)
 
 
 @pytest.mark.parametrize(

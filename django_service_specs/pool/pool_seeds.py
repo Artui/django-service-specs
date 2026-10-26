@@ -11,12 +11,21 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.types.is_async import is_async
-from django_service_specs.types.utils import SHAPES, SHAPES_RENAME
+from django_service_specs.types.utils import SHAPES
 
 # A single registration: ``(name, resolver)``. A tuple rather than a mapping so
 # the registry stays frozen and the resolution order is the registration order,
 # which is what makes an error message or a listing reproducible.
 _Seed = tuple[str, Callable[..., Any]]
+
+# What the refusal of a seed registered as ``shapes`` adds, for a project that
+# registered the name before it was reserved. A seed is no parameter, so it
+# cannot say "rename the parameter": it says where the call's shape values are
+# read, and that the resolver needs a name of its own.
+_SHAPES_SEED_HINT = (
+    " 'shapes' is reserved for the seed holding the call's shape values by name, which a "
+    "callable reads by declaring 'shapes'; register the resolver under a name of its own."
+)
 
 
 @dataclass(frozen=True)
@@ -107,11 +116,12 @@ class PoolSeeds:
         """
         for name in seeds:
             if name in RESERVED_POOL_SEEDS:
-                # The rename for ``shapes`` alone, as ``check_reserved`` adds it:
-                # test_a_seed_named_shapes_is_refused_with_the_rename fails without it,
-                # and test_a_parameter_named_call_context_is_refused_without_the_shapes_rename
+                # A hint for ``shapes`` alone, the name reserved after projects had
+                # registered it: test_a_seed_named_shapes_is_refused_with_the_rename
+                # fails without it, and
+                # test_a_parameter_named_call_context_is_refused_without_the_shapes_rename
                 # if every refusal carries it.
-                hint = SHAPES_RENAME if name == SHAPES else ""
+                hint = _SHAPES_SEED_HINT if name == SHAPES else ""
                 raise ValueError(
                     f"{name!r} is a reserved pool seed carrying the dispatcher's own "
                     f"value; registering it would shadow what the transport resolved. "

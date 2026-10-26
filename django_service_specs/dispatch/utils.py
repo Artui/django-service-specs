@@ -898,8 +898,8 @@ def selector_pool(
     ``shapes`` is the seed of that name: what the caller sent for the shapes
     of the spec being dispatched, read off ``shapes_sent``. Passed rather than
     read off ``selector_spec``, because a service spec's target selector
-    declares no shapes of its own and is handed the write's
-    (test_a_service_spec_s_callables_receive_the_shapes_the_presenter_is_handed).
+    declares no shapes of its own and is handed none of the write's, on any
+    route (test_a_target_selector_is_handed_no_shapes_on_any_route).
     """
     reads = selector_spec.reads.names()
     base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
@@ -949,9 +949,11 @@ def with_run_progress(
 
     The provider is called from the base pool, as a service spec's is: the
     entries of ``pool`` under a seeded name, which are exactly
-    ``base_pool``'s and the call's context, since no read and no provided key
-    may take one
-    (test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool),
+    ``base_pool``'s, the call's context and its ``shapes``, since no read and
+    no provided key may take one
+    (test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool,
+    and test_a_selector_spec_s_callables_receive_the_shapes_the_presenter_is_handed
+    for the reporter that names ``shapes``),
     as a service's provider is called from its base pool and the context
     (test_a_progress_provider_is_handed_the_call_context_on_either_kind_of_spec).
     """
@@ -1462,11 +1464,17 @@ def walk_target(
         grant = replace(grant, target_checked=False)
     offered = keywords.offered()
     handed = checks_arguments(checked)
-    # The write's shapes, which its target selector declares none of. Under
+    # The target selector is handed no shapes, on any route. Under
     # ``resolve_target`` the arguments are narrowed to the target's own
-    # parameters, so this is empty there
-    # (test_resolve_target_hands_its_target_selector_no_shapes).
-    shapes = shapes_sent(spec, checked)
+    # parameters, so the write's shapes are not among them; handing them here
+    # would let one selector see different values by route, and one that
+    # filters by them write a different row than the page showed. So the lookup
+    # reads the same empty mapping everywhere, at both pools below, each held
+    # by its own case of test_a_target_selector_is_handed_no_shapes_on_any_route
+    # (instance and collection; sync, async and ``resolve_target``).
+    # A selector that declares ``shapes`` is not refused: it is often the list
+    # selector reused, and an empty mapping lets that reuse keep running.
+    no_shapes: Mapping[str, Any] = MappingProxyType({})
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector
@@ -1479,7 +1487,7 @@ def walk_target(
                 principal=principal,
                 pool_seeds=pool_seeds,
                 keywords=keywords,
-                shapes=shapes,
+                shapes=no_shapes,
             )
             target = lookup(
                 instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
@@ -1499,7 +1507,7 @@ def walk_target(
                 principal=principal,
                 pool_seeds=pool_seeds,
                 keywords=keywords,
-                shapes=shapes,
+                shapes=no_shapes,
             )
             try:
                 target = lookup(
@@ -1815,6 +1823,8 @@ def prepare_service(
     # shapes the same way, for the presenter's field of its own and for the
     # Validator, which never sees them (test_ambient_never_holds_the_shapes).
     shapes = shapes_sent(spec, checked)
+    # The presenter's own mapping, not a copy: held by the identity assertion of
+    # test_a_service_spec_s_callables_receive_the_shapes_the_presenter_is_handed.
     surroundings = {**base, CALL_CONTEXT: call_context, SHAPES: shapes}
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
@@ -2028,6 +2038,7 @@ def finish_service(
                 "instance": result,
                 "result": result,
                 CALL_CONTEXT: prepared.call_context,
+                # Not a copy, for the same test as ``surroundings`` above.
                 SHAPES: prepared.shapes,
             },
             early=prepared.early_seeds,

@@ -41,7 +41,7 @@ reach a callable only by their names.
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
 | `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable dispatch resolves that names it, never a `**kwargs` catch-all; not a seed's resolver or a `filter_set` |
-| `shapes` | [The call's shapes](dispatching.md#the-calls-shapes): what the caller sent for the spec's `shapes`, read-only, empty on a spec declaring none | Every callable dispatch resolves that names it but an affordance condition, never a `**kwargs` catch-all; not a seed's resolver, a `filter_set` or the Validator |
+| `shapes` | [The call's shapes](dispatching.md#the-calls-shapes): what the caller sent for the spec's `shapes`, read-only, empty on a spec declaring none | Every callable dispatch resolves that names it but an affordance condition and a write's target selector, never a `**kwargs` catch-all; not a seed's resolver, a `filter_set` or the Validator |
 
 The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
 `result`, `queryset`, `call_context` and `shapes` - are
@@ -249,9 +249,11 @@ handed to each callable that declares them, never to the Validator.
 `shapes` are the arguments that shape what the presenter renders, as on a
 read: never handed to the Validator, a provider, a selector or the service
 under their own names, and reaching the presenter, whether that is the spec's
-own or its output selector's, and every callable but the Validator that names
-[the `shapes` seed](dispatching.md#the-calls-shapes), the target and output
-selectors included. A selector nested in a write, its target or its output selector,
+own or its output selector's. A callable that names
+[the `shapes` seed](dispatching.md#the-calls-shapes) is handed them, the output
+selector included, but not the Validator, an affordance condition, a seed's
+resolver, a `filter_set` or the write's target selector, whose lookup is the
+same on every route and is handed none. A selector nested in a write, its target or its output selector,
 declaring shapes of its own is refused: the write's call is the one presented,
 so they are declared on the write.
 

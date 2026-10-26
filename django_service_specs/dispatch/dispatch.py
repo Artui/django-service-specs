@@ -250,8 +250,10 @@ def dispatch(
     The presenter's context also carries ``shapes``: what the caller sent
     for the spec's declared ``shapes``, read-only, a shape left out absent.
     No shape reaches a pool under its own name, nor the Validator at all; the
-    same mapping is in every pool as the ``shapes`` seed, for a callable that
-    names it (see ``RESERVED_POOL_SEEDS``).
+    same mapping is in the pool of every callable but a service spec's target
+    selector as the ``shapes`` seed, for a callable that names it (the target
+    selector is handed an empty mapping, as under ``resolve_target``; see
+    ``RESERVED_POOL_SEEDS``).
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
     selector is a LIST, or a ``many`` or ``returns_many`` service with no

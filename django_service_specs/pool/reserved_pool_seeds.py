@@ -38,8 +38,11 @@ query its presenter renders reads the value the presenter reads. It is in
 the pools dispatch builds for a spec's callables: a selector and its
 ``extend_queryset``, a ``kwargs`` or ``input_data`` provider, a
 precondition, the service, the run's ``progress_reporter``, and a service
-spec's target and output selectors. It is an empty mapping on a spec
-declaring no shapes, and, like ``call_context``, it is handed only to a
+spec's output selector. A service spec's target selector is handed an empty
+mapping instead, on every route, because ``resolve_target`` checks only the
+target's own parameters and the lookup must find the same row either way
+(test_a_target_selector_is_handed_no_shapes_on_any_route). It is an empty
+mapping on a spec declaring no shapes, and, like ``call_context``, it is handed only to a
 callable naming it, never through ``**kwargs``. Unlike ``call_context`` it
 is not in an affordance condition's pool, the Validator's (a
 ``FormValidator``'s ``form_kwargs`` included) or a mutation helper's nested

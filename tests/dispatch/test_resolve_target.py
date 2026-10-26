@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any, cast
 
 import pytest
+from asgiref.sync import async_to_sync
 from django import forms
 from django.core.exceptions import ImproperlyConfigured
 from django.http import Http404
@@ -19,6 +20,7 @@ from typing_extensions import TypedDict
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -600,12 +602,30 @@ def test_the_lookup_naming_it_is_handed_the_very_dict_passed(ada: Any) -> None:
     assert looked_up[0] is context
 
 
-def test_resolve_target_hands_its_target_selector_no_shapes(ada: Any) -> None:
-    """Only the target's own parameters are checked here, so a shape sent is no argument.
+def _resolved(spec: ServiceSpec, principal: Any, arguments: dict[str, Any]) -> Any:
+    return resolve_target(spec, principal=principal, arguments=arguments)
 
-    Where dispatch hands the lookup what the caller sent for the write's
-    shapes, this hands it an empty mapping: the row found is the same, and
-    only what a selector loads by the shapes can differ.
+
+@pytest.mark.parametrize(
+    "route",
+    [dispatch, async_to_sync(adispatch), _resolved],
+    ids=["sync", "async", "resolve_target"],
+)
+@pytest.mark.parametrize("kind", ["instance", "collection"])
+def test_a_target_selector_is_handed_no_shapes_on_any_route(
+    kind: str, route: Callable[..., Any], ada: Any
+) -> None:
+    """The lookup is the same call on every route, so it reads the same shapes: none.
+
+    ``resolve_target`` checks only the target's own parameters, so a shape the
+    caller sent is no argument of the lookup there. A target selector reading
+    the shapes would then find one row under ``dispatch`` and another here,
+    and a write would act on a row the page never showed. So ``walk_target``
+    hands an empty mapping on every route; each of its two ``selector_pool``
+    sites (instance, collection) is held by its own case, and a route that
+    built the pool for itself would show in its own. The service is still
+    handed the shapes, which the last assertion holds, so the exclusion is the
+    lookup's alone.
     """
     note = Note.objects.create(owner=ada, title="mine")
     looked_up: list[Any] = []
@@ -614,14 +634,32 @@ def test_resolve_target_hands_its_target_selector_no_shapes(ada: Any) -> None:
         looked_up.append(shapes)
         return Note.objects.filter(pk=pk)
 
+    def mine(*, user: Any, shapes: Any) -> Any:
+        looked_up.append(shapes)
+        return Note.objects.filter(owner=user)
+
+    served: list[Any] = []
+
+    def service(*, shapes: Any, **pool: Any) -> None:
+        served.append(shapes)
+
+    selecting: dict[str, Any] = (
+        {
+            "instance_selector_spec": SelectorSpec(
+                kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK
+            )
+        }
+        if kind == "instance"
+        else {"collection_selector_spec": SelectorSpec(kind=SelectorKind.LIST, selector=mine)}
+    )
     spec = ServiceSpec(
-        service=Record(),
+        service=service,
         permissions=OPEN,
         shapes=Parameters.of(Parameter("query", "string")),
-        instance_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK),
+        **selecting,
     )
-    arguments = {"pk": note.pk, "query": "title"}
-    found, grant = cast(tuple[Any, Grant], resolve_target(spec, principal=ada, arguments=arguments))
-    dispatch(spec, principal=ada, arguments=arguments)
-    assert found == note
-    assert [dict(shapes) for shapes in looked_up] == [{}, {"query": "title"}]
+    arguments = {"query": "title", **({"pk": note.pk} if kind == "instance" else {})}
+    route(spec, principal=ada, arguments=arguments)
+    assert [dict(shapes) for shapes in looked_up] == [{}]
+    if route is not _resolved:
+        assert [dict(shapes) for shapes in served] == [{"query": "title"}]

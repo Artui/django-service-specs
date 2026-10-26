@@ -5465,8 +5465,10 @@ class TestShapesReachThePool:
         saw = _SawShapes()
         presenter = Contextual()
 
+        looked_up: list[Any] = []
+
         def row(*, pk: int, shapes: Any) -> Any:
-            saw("target", shapes)
+            looked_up.append(shapes)
             return Note.objects.filter(pk=pk)
 
         def provider(*, shapes: Any) -> dict[str, Any]:
@@ -5510,7 +5512,6 @@ class TestShapesReachThePool:
         )
         present(spec, result)
         assert set(saw.shapes) == {
-            "target",
             "kwargs",
             "input_data",
             "precondition",
@@ -5520,6 +5521,18 @@ class TestShapesReachThePool:
         }
         assert saw.all_are({"query": "name"})
         assert dict(presenter.contexts[0].shapes) == {"query": "name"}
+        # The seed is the presenter's own mapping, not an equal copy of it, at
+        # every seat that is handed it: the providers' pool and the output
+        # selector's are each built from it, and a copy that merely equals it
+        # passes the equality above and fails this.
+        assert all(
+            each is presenter.contexts[0].shapes for seen in saw.shapes.values() for each in seen
+        )
+        # The write's target selector is the one callable that is not: it is
+        # handed nothing on any route, as ``resolve_target`` does, so one that
+        # filters by the shapes finds the same row under either
+        # (test_a_target_selector_is_handed_no_shapes_on_any_route).
+        assert [dict(shapes) for shapes in looked_up] == [{}]
 
     def test_an_awaited_selector_receives_the_shapes_the_presenter_is_handed(
         self, ada: Any

@@ -19,14 +19,16 @@ from typing import Any, Final
 SHAPES: Final = "shapes"
 """The pool name the call's shape values travel under: ``PresentationContext.shapes``."""
 
-# What a refusal of the name adds, for the declaration that predates the seed:
-# the one reserved name a project is likely to have used for a parameter of its
-# own, so the refusal says what to rename it to and how to read the values now.
-# Read by ``check_reserved`` and ``PoolSeeds.extend``.
+# What a refusal of a parameter named ``shapes`` adds, for the declaration that
+# predates the seed: the one reserved name a project is likely to have used for
+# a parameter of its own, so the refusal says what to name it instead and how to
+# read the values now. It follows "rename the parameter." in ``check_reserved``'s
+# message, so it begins by saying what to rename it to. ``PoolSeeds.extend``
+# words its own suffix, since a registered seed is no parameter.
 SHAPES_RENAME: Final = (
-    " 'shapes' is reserved for the seed holding the call's shape values by name: rename "
-    "the parameter for what it selects ('fields', 'query'), and have a callable that "
-    "reads the shape values declare 'shapes'."
+    " Name it for what it selects ('fields', 'query'): 'shapes' is reserved for the seed "
+    "holding the call's shape values by name, and a callable that reads them declares "
+    "'shapes'."
 )
 
 # The pool names dispatch seeds per call rather than per process: the validated
