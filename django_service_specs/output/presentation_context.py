@@ -38,7 +38,10 @@ class PresentationContext:
       the presenter share one object, so a presenter - and a nested one
       handed the same context - reuses what an earlier stage put there. It is
       the presenter's to read and write; the kernel writes nothing to it. A
-      context built by hand gets an empty dict of its own.
+      context built by hand gets an empty dict of its own. Its
+      ``"transport"`` key, where set, names the transport serving the call
+      (``"agent"``, ``"http"``, ``"mcp"``): a family convention the kernel
+      neither sets nor checks, so read it with ``.get``.
     - ``shapes`` is what the caller sent for the spec's declared ``shapes``,
       the arguments that shape the output - which fields, a query over the
       rows - by name, read-only. An argument the caller left out is absent

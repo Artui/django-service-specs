@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`call_context["transport"]` is documented as the family's key for naming
+  the transport serving a call**: `"agent"`, which django-spec-agents sets on
+  every call, and `"http"` and `"mcp"` for an HTTP and an MCP transport. The
+  transport sets it, replacing an entry already there, so a provider, a
+  condition or a presenter reads one key under every transport. It is a
+  convention only: the kernel neither sets nor checks it and defines no
+  constant for it, so a dict built by hand or handed to `dispatch` directly
+  has none, and a stage reads it with `.get`. Described in the dispatching
+  guide and on `ValidationContext` and `PresentationContext`.
+
 ### Changed
 - **`spec_output_schema` promises no field of a row for a spec declaring
   `shapes`.** A shape reaches the presenter alone, and a `fields` selection

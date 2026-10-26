@@ -61,7 +61,11 @@ class ValidationContext:
     built by hand gets an empty dict of its own, never one shared with
     another, so a Validator that writes to it needs no guard for a call that
     was handed none. It trails every other field, so no existing
-    construction changes.
+    construction changes. One key is the family's rather than any one
+    transport's: ``"transport"`` names the transport serving the call
+    (``"agent"``, ``"http"``, ``"mcp"``), set by that transport, by
+    convention only - the kernel neither sets nor checks it, so read it with
+    ``.get``.
     """
 
     principal: Any
