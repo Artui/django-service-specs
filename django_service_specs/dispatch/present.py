@@ -138,8 +138,9 @@ def _presented_rows(
     (test_the_rows_are_handed_over_as_a_tuple). Each guard holds its own case
     in ``TestPresentedRows``:
 
-    - the answer itself still to be awaited, an ``async def presented_rows``
-      in effect (test_an_answer_still_to_be_awaited_is_refused);
+    - the answer itself still to be awaited: a plain ``def presented_rows``
+      handing back a coroutine, since an ``async def`` one is refused when the
+      spec is built (test_an_answer_still_to_be_awaited_is_refused);
     - an answer that is not a list, which a tuple would pass silently and a
       generator or a dict would not survive ``len()`` or would give its keys
       (test_an_answer_that_is_not_a_list_is_refused);

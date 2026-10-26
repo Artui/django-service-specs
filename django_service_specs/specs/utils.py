@@ -160,7 +160,7 @@ def check_permissions(
 
 
 def check_presenter(presenter: Presenter | None, *, label: str) -> None:
-    """Refuse a presenter that is not a ``Presenter`` instance, or whose ``present`` or ``presented`` is async.
+    """Refuse a presenter that is not a ``Presenter`` instance, or with an async ``present``, ``presented`` or ``presented_rows``.
 
     ``present`` is called from sync code on both entry points and never
     awaited, so an ``async def`` one would hand a transport a coroutine where
@@ -176,8 +176,9 @@ def check_presenter(presenter: Presenter | None, *, label: str) -> None:
             f"{label}.presenter is {describe(presenter)}, which is not a Presenter instance."
         )
     # Each method by name, held by its own case in TestAnAsyncPresenterIsRefused:
-    # test_on_a_service_spec and test_an_async_presented_is_refused_too.
-    for method in ("present", "presented"):
+    # test_on_a_service_spec, test_an_async_presented_is_refused_too and
+    # test_an_async_presented_rows_is_refused_too.
+    for method in ("present", "presented", "presented_rows"):
         check_callable(getattr(presenter, method), label=f"{label}.presenter.{method}", sync=True)
 
 

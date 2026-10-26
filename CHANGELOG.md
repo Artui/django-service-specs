@@ -18,8 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   before. `present`, and through it `present_for_audience` and `apresent`,
   refuses an answer that is not a list, or whose length differs from the
   rows', with `ImproperlyConfigured`, because a selector spec's affordances
-  are added to each presented row by its position; an answer still to be
-  awaited is refused as `presented`'s is.
+  are added to each presented row by its position. An `async def
+  presented_rows` is refused when the spec is built, as an async `present` or
+  `presented` is, and an answer still to be awaited is refused where it is read.
 - **`call_context["transport"]` is documented as the family's key for naming
   the transport serving a call**: `"agent"`, which django-spec-agents sets on
   every call, and `"http"` and `"mcp"` for an HTTP and an MCP transport. The

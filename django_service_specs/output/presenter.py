@@ -42,9 +42,10 @@ class Presenter(abc.ABC):
 
     **Sync-only.** Presenting a row that reads a relation is a query, and the
     kernel cannot tell in advance whether the row was prefetched, so the async
-    path runs every Presenter in the executor. An ``async def`` ``present`` or
-    ``presented`` is refused when the spec is built, and an answer from any of
-    the three that is still to be awaited is refused where it is read.
+    path runs every Presenter in the executor. An ``async def`` ``present``,
+    ``presented`` or ``presented_rows`` is refused when the spec is built, and
+    an answer from any of the three that is still to be awaited is refused
+    where it is read.
     """
 
     @abc.abstractmethod
