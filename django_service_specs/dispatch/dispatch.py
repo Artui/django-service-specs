@@ -20,6 +20,7 @@ from django_service_specs.dispatch.utils import (
     prepare_service,
     refuse_target,
     selector_pool,
+    shapes_sent,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.services.run_service import run_service
@@ -248,7 +249,9 @@ def dispatch(
 
     The presenter's context also carries ``shapes``: what the caller sent
     for the spec's declared ``shapes``, read-only, a shape left out absent.
-    No shape reaches a pool or the Validator.
+    No shape reaches a pool under its own name, nor the Validator at all; the
+    same mapping is in every pool as the ``shapes`` seed, for a callable that
+    names it (see ``RESERVED_POOL_SEEDS``).
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
     selector is a LIST, or a ``many`` or ``returns_many`` service with no
@@ -311,6 +314,7 @@ def dispatch(
             principal=principal,
             pool_seeds=pool_seeds,
             keywords=keywords,
+            shapes=shapes_sent(spec, checked),
             progress=progress,
             extra_kwargs=overlay.kwargs,
         )

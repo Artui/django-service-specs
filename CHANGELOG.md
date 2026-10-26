@@ -30,10 +30,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   constant for it, so a dict built by hand or handed to `dispatch` directly
   has none, and a stage reads it with `.get`. Described in the dispatching
   guide and on `ValidationContext` and `PresentationContext`.
+- **A `shapes` pool seed**: what the caller sent for the spec's `shapes`,
+  keyed by shape name and read-only - the mapping the presenter reads as
+  `PresentationContext.shapes`, so a selector can load what the presenter
+  will render, as django-restql's `query` needs. Every callable dispatch
+  resolves receives it by naming `shapes`: a selector and its
+  `extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the run's `progress_reporter`, the
+  service, and a service spec's target and output selectors, which are handed
+  the write's shapes. A spec declaring no shapes hands an empty mapping. A
+  `**kwargs` catch-all is never handed it, as it is never handed
+  `call_context`; an affordance condition naming it is refused when declared,
+  since what the caller sent would decide availability; the Validator never
+  sees it, and neither context's `ambient` holds it. `resolve_target` checks
+  only the target's own parameters, so its lookup is handed an empty mapping.
+  It is in `server_owned_keys`, so no transport asks a caller for it.
+  Described in the dispatching guide's pool seeds and on the paging page,
+  whose example joins a book's author only when the caller chose it.
 
 ### Changed
+- **Breaking: `shapes` is a reserved pool name**, in `RESERVED_POOL_SEEDS`.
+  A parameter, read, shape, `many` list or Validator field named `shapes` is
+  refused when the spec is built, and so are a seed registered under it with
+  `PoolSeeds.extend()` and a provider, overlay or Validator value returned
+  under it. Rename the parameter for what it selects - `fields`, `query` - and
+  have the callable that read it declare `shapes` instead; the refusal says
+  so. An affordance condition taking
+  a parameter named `shapes` is refused at its declaration. A transport or
+  test pinning the reserved set exactly sees one more name.
 - **`spec_output_schema` promises no field of a row for a spec declaring
-  `shapes`.** A shape reaches the presenter alone, and a `fields` selection
+  `shapes`.** A shape is the presenter's to apply, and a `fields` selection
   there leaves keys out, so the item now lists no `required` at any depth -
   the item itself, a nested object, an array's rows - wherever it sits: a
   retrieve's item, an array's `items`, or a page's. Every field is still

@@ -410,7 +410,7 @@ service's return.
 
 ### A spec that declares shapes
 
-A spec's `shapes` reach its presenter alone, and a `fields` selection there
+A spec's `shapes` say what its presenter renders, and a `fields` selection there
 leaves keys out of a row, so whether a key is present depends on what the
 caller sent. Nothing in the presenter's declaration says that for every value
 a caller may send, so for a spec declaring any `shapes` the item lists no

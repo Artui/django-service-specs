@@ -598,3 +598,30 @@ def test_the_lookup_naming_it_is_handed_the_very_dict_passed(ada: Any) -> None:
     resolve_target(spec, principal=ada, arguments={"pk": note.pk}, call_context=context)
     assert len(looked_up) == 1
     assert looked_up[0] is context
+
+
+def test_resolve_target_hands_its_target_selector_no_shapes(ada: Any) -> None:
+    """Only the target's own parameters are checked here, so a shape sent is no argument.
+
+    Where dispatch hands the lookup what the caller sent for the write's
+    shapes, this hands it an empty mapping: the row found is the same, and
+    only what a selector loads by the shapes can differ.
+    """
+    note = Note.objects.create(owner=ada, title="mine")
+    looked_up: list[Any] = []
+
+    def by_pk(*, pk: int, shapes: Any) -> Any:
+        looked_up.append(shapes)
+        return Note.objects.filter(pk=pk)
+
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        shapes=Parameters.of(Parameter("query", "string")),
+        instance_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK),
+    )
+    arguments = {"pk": note.pk, "query": "title"}
+    found, grant = cast(tuple[Any, Grant], resolve_target(spec, principal=ada, arguments=arguments))
+    dispatch(spec, principal=ada, arguments=arguments)
+    assert found == note
+    assert [dict(shapes) for shapes in looked_up] == [{}, {"query": "title"}]
