@@ -1,4 +1,4 @@
-"""Dispatching: results, not-found, grants, binding outside dispatch, pool seeds, progress."""
+"""Dispatching: results, not-found, grants, admitting, binding outside dispatch, seeds, progress."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from django import forms
 from django.db.models import QuerySet
 
 from django_service_specs import (
@@ -13,20 +14,25 @@ from django_service_specs import (
     DataclassPresenter,
     DataclassValidator,
     DispatchResult,
+    FormValidator,
     Grant,
+    InvalidArguments,
     Parameter,
     Parameters,
     PermissionCheck,
+    PoolSeeds,
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
     ServerArguments,
     ServiceSpec,
     apply_server_arguments,
+    authorize,
     bind_arguments,
     check_call,
     check_server_arguments,
     dispatch,
+    form_keywords,
     present,
     resolve_target,
 )
@@ -193,6 +199,76 @@ def offered(schema: Mapping[str, Any], server: ServerArguments) -> list[str]:
 
 
 # --8<-- [end:server_arguments]
+
+
+# --8<-- [start:admit_check]
+class InClub(PermissionCheck):
+    """Admits a member of the club the route names, read from a seed."""
+
+    message = "Members of this club only."
+
+    def has_permission(self, principal: Any, spec: Any, *, club: str) -> bool:
+        return principal.groups.filter(name=club).exists()
+
+
+# --8<-- [end:admit_check]
+
+
+# --8<-- [start:club_form]
+class ClubNoteForm(forms.Form):
+    title = forms.CharField()
+
+    def __init__(self, *args: Any, club: str, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["title"].help_text = f"Posted to {club}."
+
+
+def post_to_club(*, user: Any, title: str, club: str) -> Note:
+    return Note.objects.create(owner=user, title=f"{club}: {title}")
+
+
+club_note_spec = ServiceSpec(
+    service=post_to_club,
+    permissions=[InClub()],
+    validator=FormValidator(ClubNoteForm, form_kwargs=lambda *, club: {"club": club}),
+)
+
+
+# --8<-- [end:club_form]
+
+
+# --8<-- [start:admit]
+def club_seeds(club: str) -> PoolSeeds:
+    # Built per request, from what the route captured.
+    return DEFAULT_POOL_SEEDS.extend(club=lambda: club)
+
+
+def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
+    pool_seeds = club_seeds(club)
+    # Before the form: a principal the class-level check refuses never sees
+    # it. NotPermitted for anyone outside the club.
+    grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
+    context: dict[str, Any] = {}  # handed to dispatch, and to the form re-rendered if it refuses
+    if title is None:  # the GET: the form, built as dispatch will build it
+        extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
+        return ClubNoteForm(**extra)
+    try:
+        return dispatch(
+            club_note_spec,
+            principal=user,
+            arguments={"title": title},
+            pool_seeds=pool_seeds,
+            grant=grant,
+            call_context=context,
+        )
+    except InvalidArguments:
+        # The POST failed validation: the form again, bound to what was posted,
+        # with the keywords dispatch bound it with and the dict dispatch ran with.
+        extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
+        return ClubNoteForm(data={"title": title}, **extra)
+
+
+# --8<-- [end:admit]
 
 
 # --8<-- [start:resolve_target]

@@ -176,15 +176,16 @@ SURFACE: dict[str, Pin] = {
         signature="kind, value=, service_result=, instance=, data=, context=",
     ),
     "authorize": _fn(
-        "dispatch.authorize", "spec, principal, *, grant=, arguments=, call_context=, seeds="
+        "dispatch.authorize",
+        "spec, principal, *, grant=, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "authorize_scope": _fn(
         "dispatch.authorize_scope",
-        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=",
+        "spec, principal, scope, *, grant, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "authorize_target": _fn(
         "dispatch.authorize_target",
-        "spec, principal, target, *, grant, arguments=, call_context=, seeds=",
+        "spec, principal, target, *, grant, arguments=, call_context=, seeds=, pool_seeds=",
     ),
     "Grant": Pin(
         "dispatch.grant",
@@ -565,6 +566,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "DataclassPresenter",
         "DataclassValidator",
         "FormValidator",
+        # What a FormValidator's ``form_kwargs`` returns, for a page building
+        # the form itself: django-spec-html's, which drfs neither wraps nor
+        # re-exports.
+        "form_keywords",
         # A transport's binding of declared parameters to server values: the
         # transports that bind call these from this package, and
         # djangorestframework-services neither wraps nor re-exports them. A

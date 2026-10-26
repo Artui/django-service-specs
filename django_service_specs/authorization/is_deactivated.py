@@ -14,9 +14,13 @@ def is_deactivated(principal: Any) -> bool:
     it was deactivated. The kernel's rule is that a deactivated principal never
     acts, whichever way it arrived.
 
-    The kernel reads the rule in two places: dispatch, refusing the principal
-    it was handed, first and whether or not a ``Grant`` came with it; and
-    ``resolve_principal``, refusing the row an identifier named. It is public
+    The kernel reads the rule where a principal first acts: dispatch, refusing
+    the principal it was handed, first and whether or not a ``Grant`` came with
+    it; ``resolve_principal``, refusing the row an identifier named; and, ahead
+    of the first seed resolver, the ``authorize`` functions handed
+    ``pool_seeds`` and ``form_keywords``, which refuse as dispatch does. Those
+    three read it through ``refuse_deactivated`` in ``authorization/utils.py``.
+    It is public
     so that a transport in a distribution of its own refuses exactly the
     principals dispatch refuses, by calling this rather than restating it, as
     django-spec-html's entry points do with ``request.user`` before the

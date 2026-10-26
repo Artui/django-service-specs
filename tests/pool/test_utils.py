@@ -6,7 +6,15 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
+from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.pool.utils import (
+    deferred_progress,
+    only_seeds,
+    resolve_progress,
+    resolve_provider,
+    resolved_seeds,
+)
 from django_service_specs.types.unset import UNSET
 
 
@@ -135,3 +143,26 @@ class TestResolveProgress:
         assert report is not None
         report(1, message="only the transport")
         assert transport.reports == [(1, None, "only the transport", None)]
+
+
+class TestResolvedSeeds:
+    """Only the registered seeds a caller names resolve, for the principal as ``user``."""
+
+    def test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped(self) -> None:
+        resolved: list[str] = []
+
+        def recording(name: str) -> Any:
+            def resolve(*, user: Any, progress: Any) -> Any:
+                resolved.append(name)
+                return (name, user, progress)
+
+            return resolve
+
+        pool_seeds = DEFAULT_POOL_SEEDS.extend(club=recording("club"), locale=recording("locale"))
+        values = resolved_seeds(pool_seeds, frozenset({"club", "unregistered"}), user="ada")
+        assert values == {"club": ("club", "ada", null_progress)}
+        assert resolved == ["club"]
+
+    def test_only_seeds_keeps_registration_order(self) -> None:
+        pool_seeds = DEFAULT_POOL_SEEDS.extend(a=lambda: 1, b=lambda: 2, c=lambda: 3)
+        assert list(only_seeds(pool_seeds, frozenset({"c", "a"})).resolvers()) == ["a", "c"]

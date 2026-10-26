@@ -81,6 +81,7 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ## Forms adapter
 
 ::: django_service_specs.adapters.forms.form_validator.FormValidator
+::: django_service_specs.adapters.forms.form_keywords.form_keywords
 
 ## Filters adapter
 

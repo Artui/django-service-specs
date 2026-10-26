@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth.models import AnonymousUser, Group
 from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
@@ -423,6 +423,39 @@ class TestDispatching:
         assert renamed == {"id": note.pk, "title": "Final"}
         looked_up = [q["sql"] for q in queries if q["sql"].startswith("SELECT")]
         assert len(looked_up) == 1  # resolve_target's lookup, and no second one from dispatch
+
+    def test_a_page_admits_by_a_seed_before_the_form(self, ada: Any, bob: Any) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        form = dispatching.club_note_page(ada, "chess")
+        # Built with the keyword its __init__ takes, from the seed dispatch reads.
+        assert form.fields["title"].help_text == "Posted to chess."
+        assert not form.is_bound
+        result = dispatching.club_note_page(ada, "chess", "Openings")
+        assert result.kind == "instance" and result.value.title == "chess: Openings"
+        # Refused before the form, and by the club the route names.
+        with pytest.raises(NotPermitted, match="Members of this club only."):
+            dispatching.club_note_page(bob, "chess")
+        with pytest.raises(NotPermitted, match="Members of this club only."):
+            dispatching.club_note_page(ada, "go")
+
+    def test_a_post_that_fails_re_renders_the_form_with_the_dict_dispatch_ran_with(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        contexts: dict[str, Any] = {}
+        for name in ("dispatch", "form_keywords"):
+            real = getattr(dispatching, name)
+
+            def record(*args: Any, _name: str = name, _real: Any = real, **kwargs: Any) -> Any:
+                contexts[_name] = kwargs["call_context"]
+                return _real(*args, **kwargs)
+
+            monkeypatch.setattr(dispatching, name, record)
+        form = dispatching.club_note_page(ada, "chess", "")
+        # Refused by the form itself, not by the shape check ahead of it.
+        assert form.is_bound and form.errors["title"] == ["This field is required."]
+        assert form.fields["title"].help_text == "Posted to chess."
+        assert contexts["form_keywords"] is contexts["dispatch"]
 
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")

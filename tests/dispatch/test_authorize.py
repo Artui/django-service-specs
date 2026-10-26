@@ -7,11 +7,13 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -25,7 +27,14 @@ from tests.authorization.utils import (
     refuses,
     refuses_lazily,
 )
-from tests.dispatch.utils import Arguing, Offered
+from tests.dispatch.utils import (
+    Arguing,
+    Deactivated,
+    Offered,
+    PositionalOnly,
+    SeedPerQuestion,
+    recorded_seeds,
+)
 from tests.specs.utils import Foreign
 
 
@@ -226,3 +235,134 @@ def test_a_seed_left_out_of_seeds_is_not_offered() -> None:
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Offered()])
     with pytest.raises(TypeError, match="tenant"):
         authorize(spec, PRINCIPAL)
+
+
+class TestPoolSeeds:
+    """``pool_seeds=`` resolves the seeds the class-level check names, and no other."""
+
+    def test_the_seed_the_class_level_check_names_is_resolved_for_it(self) -> None:
+        check = SeedPerQuestion()
+        pool_seeds, resolved = recorded_seeds()
+        authorize(_spec([check]), "ada", pool_seeds=pool_seeds)
+        assert check.handed == [("has_permission", "club of ada")]
+        # Not a seed only the object or scope question names, and not one no
+        # check names at all: either could read what a refused caller lacks.
+        assert resolved == ["club"]
+
+    def test_a_spec_whose_checks_name_no_seed_resolves_none(self) -> None:
+        pool_seeds, resolved = recorded_seeds()
+        authorize(_spec([Unrestricted()]), "ada", pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_a_covering_grant_resolves_no_seed(self) -> None:
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        grant = Grant(spec, principal)
+        assert authorize(spec, principal, grant=grant, pool_seeds=pool_seeds) is grant
+        assert resolved == []
+        assert check.handed == []
+
+    def test_seeds_and_pool_seeds_together_are_refused(self) -> None:
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(TypeError, match=r"seeds= or pool_seeds=, not both"):
+            authorize(
+                _spec([SeedPerQuestion()]), "ada", seeds={"club": "chosen"}, pool_seeds=pool_seeds
+            )
+        assert resolved == []
+
+    def test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check(self) -> None:
+        check = SeedPerQuestion()
+        pool_seeds, _ = recorded_seeds(raising=PrincipalUnavailable())
+        with pytest.raises(PrincipalUnavailable):
+            authorize(_spec([check]), "ada", pool_seeds=pool_seeds)
+        assert check.handed == []
+
+    def test_a_named_seed_left_unregistered_is_not_offered(self) -> None:
+        """As with ``seeds=``: the check's own signature decides, here a ``TypeError``."""
+        with pytest.raises(TypeError, match="club"):
+            authorize(_spec([SeedPerQuestion()]), "ada", pool_seeds=DEFAULT_POOL_SEEDS)
+
+    def test_a_call_without_pool_seeds_asks_a_seed_naming_check_as_before(self) -> None:
+        """A transport calling ``authorize(spec, principal)`` - django-spec-html's page
+        does - is asked exactly as before ``pool_seeds`` existed: the check is handed
+        no seed, and its own signature refuses the call."""
+        check = SeedPerQuestion()
+        with pytest.raises(TypeError) as raised:
+            authorize(_spec([check]), "ada")
+        assert str(raised.value).endswith(
+            "has_permission() missing 1 required keyword-only argument: 'club'"
+        )
+        assert check.handed == []
+
+    def test_a_dispatch_after_it_resolves_the_named_seed_again(self) -> None:
+        """The values are not carried on the grant, as the docs say."""
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        grant = authorize(spec, principal, pool_seeds=pool_seeds)
+        dispatch(spec, principal=principal, arguments={}, grant=grant, pool_seeds=pool_seeds)
+        # Once for authorize, and once for dispatch's own call.
+        assert resolved.count("club") == 2
+        # The grant stood in for dispatch's class-level check: it was asked once.
+        assert [asked for asked in check.handed if asked[0] == "has_permission"] == [
+            ("has_permission", "club of ada")
+        ]
+
+    def test_both_kinds_are_refused_before_a_covering_grant_answers(self) -> None:
+        """Unconditionally, as documented: not only when a check is asked.
+
+        Holds the refusal's place at the top of the function: below the grant's
+        short cut, this call would return the grant.
+        """
+        spec, principal = _spec([SeedPerQuestion()]), "ada"
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(TypeError) as raised:
+            authorize(
+                spec,
+                principal,
+                grant=Grant(spec, principal),
+                seeds={"club": "chosen"},
+                pool_seeds=pool_seeds,
+            )
+        assert str(raised.value) == (
+            "authorize() takes seeds= or pool_seeds=, not both: seeds= are values already "
+            "resolved and pool_seeds= resolves them, so one would silently outrank the other."
+        )
+        assert resolved == []
+
+    def test_a_deactivated_principal_resolves_no_seed(self) -> None:
+        """Dispatch refuses one before any resolver runs, so this does."""
+        check = SeedPerQuestion()
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(PrincipalUnavailable):
+            authorize(_spec([check]), Deactivated(), pool_seeds=pool_seeds)
+        assert resolved == []
+        assert check.handed == []
+
+    def test_a_deactivated_principal_is_refused_though_a_grant_covers_it(self) -> None:
+        """Grant or no grant, as dispatch: a grant says the check ran, not that anyone may act."""
+        principal = Deactivated()
+        spec = _spec([SeedPerQuestion()])
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(PrincipalUnavailable):
+            authorize(spec, principal, grant=Grant(spec, principal), pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_a_deactivated_principal_without_pool_seeds_is_asked_as_before(self) -> None:
+        """The guard is on ``pool_seeds``: django-spec-html calls ``authorize(spec, principal)``
+        and a call without the keyword is no different from 0.16.0, a deactivated
+        principal included (this test fails without the ``pool_seeds is not None`` conjunct)."""
+        principal = Deactivated()
+        spec = _spec([Unrestricted()])
+        assert authorize(spec, principal).covers(spec, principal)
+        assert authorize(spec, principal, seeds={"club": "chosen"}).covers(spec, principal)
+
+    def test_a_positional_parameter_named_like_a_seed_is_not_one(self) -> None:
+        """``CLASS_LEVEL`` counts two: ``club`` here is the spec, not a seed to resolve."""
+        check = PositionalOnly()
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        authorize(spec, "ada", pool_seeds=pool_seeds)
+        assert resolved == []
+        assert check.handed == [("has_permission", kernel_spec(spec))]

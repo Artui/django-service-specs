@@ -29,9 +29,11 @@ from django_service_specs.affordances.utils import (
     rows_with_affordances,
     split_affordances,
 )
-from django_service_specs.authorization.is_deactivated import is_deactivated
-from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.authorization.utils import declared_keywords
+from django_service_specs.authorization.utils import (
+    QUESTIONS,
+    refuse_deactivated,
+    seeds_for_checks,
+)
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
@@ -45,9 +47,14 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import length_problem
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
-from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
-from django_service_specs.pool.utils import deferred_progress, resolve_progress, resolve_provider
+from django_service_specs.pool.utils import (
+    deferred_progress,
+    only_seeds,
+    resolve_progress,
+    resolve_provider,
+)
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
 from django_service_specs.selectors.run_selector import run_selector
@@ -210,15 +217,6 @@ class Prepared:
     early_seeds: Mapping[str, Any]
 
 
-# The three questions a check is asked, each with how many parameters dispatch
-# fills by position, which no name among them can opt into.
-_QUESTIONS: tuple[tuple[str, int], ...] = (
-    ("has_permission", 2),
-    ("has_object_permission", 3),
-    ("has_scope_permission", 3),
-)
-
-
 @dataclass(frozen=True)
 class CheckKeywords:
     """What a call offers its permission checks by name besides ``arguments``.
@@ -254,36 +252,6 @@ def shapes_sent(spec: ServiceSpec | SelectorSpec, checked: Mapping[str, Any]) ->
     return MappingProxyType({name: value for name, value in checked.items() if name in names})
 
 
-def _named_seeds(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> frozenset[str]:
-    """The registered seeds ``names`` that a question of one of ``spec``'s checks names.
-
-    Read off the same declaration ``asked_with`` hands from, so a check is
-    resolved seeds exactly when it would be handed one
-    (test_a_spec_whose_checks_name_a_seed_resolves_it_before_the_class_level_check),
-    and a parameter filled by position is no opt-in
-    (test_a_positional_parameter_named_after_a_seed_is_not_an_opt_in).
-    ``arguments`` is never among them: a check naming it is handed the
-    call's arguments, which outrank a seed of that name, so such a seed
-    resolves as an unnamed one does
-    (test_a_seed_registered_as_arguments_resolves_as_it_would_unnamed).
-    """
-    named = frozenset().union(
-        *(
-            declared_keywords(check, method, positional=positional) & names
-            for check in spec.permissions or ()
-            for method, positional in _QUESTIONS
-        )
-    )
-    return named - {"arguments"}
-
-
-def _only(pool_seeds: PoolSeeds, names: frozenset[str]) -> PoolSeeds:
-    """``pool_seeds`` narrowed to ``names``, in registration order."""
-    return DEFAULT_POOL_SEEDS.extend(
-        **{name: resolver for name, resolver in pool_seeds.resolvers().items() if name in names}
-    )
-
-
 def seeded_base(
     principal: Any,
     *,
@@ -305,7 +273,9 @@ def seeded_base(
     if not early:
         return base_pool(user=principal, progress=progress, seeds=pool_seeds)
     pool = base_pool(
-        user=principal, progress=progress, seeds=_only(pool_seeds, pool_seeds.names - early.keys())
+        user=principal,
+        progress=progress,
+        seeds=only_seeds(pool_seeds, pool_seeds.names - early.keys()),
     )
     pool.update(early)
     return pool
@@ -432,8 +402,7 @@ def open_call(
     Every entry point hands its own carrier, one per call, so the walk after
     this is offered the seeds this filled.
     """
-    if is_deactivated(principal):
-        raise PrincipalUnavailable()
+    refuse_deactivated(principal)
     # Against the spec's whole parameters, whatever ``parameters`` narrows the
     # shape check to: the declaration is wrong for every caller, so
     # ``resolve_target`` and ``check_call`` answer as dispatch does
@@ -459,10 +428,7 @@ def open_call(
     # Only the seeds a check names: another seed's resolver may read what an
     # anonymous caller lacks, and this runs before that caller is refused
     # (test_only_the_seeds_a_check_names_resolve_before_it).
-    named = _named_seeds(spec, pool_seeds.names)
-    if named:
-        early = base_pool(user=principal, seeds=_only(pool_seeds, named))
-        keywords.seeds.update({name: early[name] for name in named})
+    keywords.seeds.update(seeds_for_checks(spec, principal, pool_seeds, QUESTIONS))
     granted = authorize(
         spec,
         principal,
