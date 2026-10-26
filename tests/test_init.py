@@ -214,7 +214,7 @@ SHARED_WITH_THE_KERNEL = {
     # transport's own entry points call it to refuse them too.
     "is_deactivated": (
         "django_service_specs.authorization.resolve_principal",
-        "django_service_specs.dispatch.utils",
+        "django_service_specs.authorization.utils",
     ),
     "clean_held_to_their_columns": ("django_service_specs.adapters.forms.form_validator",),
 }
@@ -229,3 +229,9 @@ def test_a_name_the_kernel_shares_is_the_root_s_own_object(name: str, reader: st
     assert getattr(django_service_specs, name, None) is getattr(
         importlib.import_module(reader), name
     )
+
+
+def test_the_root_s_functions_are_listed_in_sorted_order() -> None:
+    """The lowercase block of ``__all__`` is the functions, kept sorted so a new one has one place."""
+    functions = [name for name in django_service_specs.__all__ if name[0].islower()]
+    assert functions == sorted(functions)

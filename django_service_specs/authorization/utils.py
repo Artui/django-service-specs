@@ -5,7 +5,9 @@ class-level, object-level and scope-level checks cannot disagree about an
 answer that is not one, and so is ``asked_with``, so they cannot disagree
 about which check is handed the call's arguments, its context or a seed.
 ``seeds_for_checks`` is read by them and by dispatch, so a transport handing
-one ``pool_seeds`` resolves a check's seeds exactly as dispatch would."""
+one ``pool_seeds`` resolves a check's seeds exactly as dispatch would, and
+``refuse_deactivated`` by them, dispatch and ``form_keywords``, so none of them
+runs a resolver for a principal dispatch refuses."""
 
 from __future__ import annotations
 
@@ -17,6 +19,8 @@ from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.is_deactivated import is_deactivated
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.utils import resolved_seeds
 
@@ -121,6 +125,62 @@ SCOPE_LEVEL: Final = ("has_scope_permission", 3)
 QUESTIONS: Final = (CLASS_LEVEL, OBJECT_LEVEL, SCOPE_LEVEL)
 
 
+def refuse_deactivated(principal: Any) -> None:
+    """Raise ``PrincipalUnavailable`` for a deactivated ``principal``, as dispatch does first of all.
+
+    Dispatch refuses one before anything else, whether or not a grant came
+    with it, so no seed resolver runs for a principal that may not act. A
+    caller resolving seeds itself calls this before the first resolver, by the
+    same rule (``is_deactivated``) and with the same error.
+    """
+    if is_deactivated(principal):
+        raise PrincipalUnavailable()
+
+
+def check_seed_arguments(
+    principal: Any,
+    *,
+    seeds: Mapping[str, Any] | None,
+    pool_seeds: PoolSeeds | None,
+    asked: str,
+) -> None:
+    """Refuse what an ``authorize`` function cannot honour with the seeds it was handed.
+
+    Called first by each of the three, ahead of every short cut - a covering
+    grant, a grant that checked the target - so the refusals hold for a call
+    whatever else answers it, as documented.
+
+    ``seeds`` and ``pool_seeds`` together are refused with ``TypeError``
+    rather than merged, as ``base_pool`` refuses a seed meeting an entry the
+    caller spread in: one would silently outrank the other
+    (test_both_kinds_are_refused_before_a_covering_grant_answers, and its
+    sibling in each of the other two). The guard is one ``and``-chain, and each
+    conjunct has a test that fails without it: dropping ``seeds is not None``
+    fails test_the_seed_the_class_level_check_names_is_resolved_for_it, which
+    hands ``pool_seeds`` alone, and dropping ``pool_seeds is not None`` fails
+    test_a_check_is_offered_the_call_context_and_the_seeds_it_names, which
+    hands ``seeds`` alone.
+
+    A deactivated ``principal`` handed with ``pool_seeds`` is refused with
+    ``PrincipalUnavailable``, since this is where a resolver would run for it
+    (test_a_deactivated_principal_resolves_no_seed, in each of the three, and
+    test_a_deactivated_principal_is_refused_though_a_grant_covers_it for the
+    short cuts). Without ``pool_seeds`` nothing resolves, so a call is asked
+    exactly as before the keyword existed - ``authorize(spec, principal)`` from a
+    transport that refuses a deactivated principal itself included
+    (test_a_deactivated_principal_without_pool_seeds_is_asked_as_before, which
+    fails without the ``pool_seeds is not None`` conjunct). ``asked`` names the
+    function in the first refusal.
+    """
+    if seeds is not None and pool_seeds is not None:
+        raise TypeError(
+            f"{asked}() takes seeds= or pool_seeds=, not both: seeds= are values already "
+            "resolved and pool_seeds= resolves them, so one would silently outrank the other."
+        )
+    if pool_seeds is not None:
+        refuse_deactivated(principal)
+
+
 def offered_seeds(
     spec: Any,
     principal: Any,
@@ -128,7 +188,6 @@ def offered_seeds(
     seeds: Mapping[str, Any] | None,
     pool_seeds: PoolSeeds | None,
     question: tuple[str, int],
-    asked: str,
 ) -> Mapping[str, Any] | None:
     """The seeds one ``authorize`` function offers its checks: ``seeds`` as handed, or resolved.
 
@@ -138,21 +197,12 @@ def offered_seeds(
     (test_the_seed_the_class_level_check_names_is_resolved_for_it, and each
     sibling's test_the_seed_its_question_names_is_resolved_for_it). The
     caller asks after its own short cuts - a covering grant, a grant that
-    checked the target - so a call they answer resolves nothing.
-
-    ``seeds`` and ``pool_seeds`` together are refused with ``TypeError``
-    rather than merged, as ``base_pool`` refuses a seed meeting an entry the
-    caller spread in: one would silently outrank the other
-    (test_seeds_and_pool_seeds_together_are_refused, in each of the three).
-    ``asked`` names the function in that refusal.
+    checked the target - so a call they answer resolves nothing, and after
+    ``check_seed_arguments``, which has refused both kinds together and a
+    deactivated principal.
     """
     if pool_seeds is None:
         return seeds
-    if seeds is not None:
-        raise TypeError(
-            f"{asked}() takes seeds= or pool_seeds=, not both: seeds= are values already "
-            "resolved and pool_seeds= resolves them, so one would silently outrank the other."
-        )
     return seeds_for_checks(spec, principal, pool_seeds, (question,))
 
 

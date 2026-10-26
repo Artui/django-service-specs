@@ -11,6 +11,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import (
     CLASS_LEVEL,
     asked_with,
+    check_seed_arguments,
     offered_seeds,
     offered_to_checks,
     sync_answer,
@@ -84,12 +85,24 @@ def authorize(
     names, is never resolved, and nothing is when a covering ``grant`` answers
     first. A resolver raising - ``PrincipalUnavailable`` for one - ends the
     call before any check is asked, as in dispatch. Handing ``seeds`` too
-    raises ``TypeError``, since one would silently outrank the other.
+    raises ``TypeError``, since one would silently outrank the other, even when
+    the call is answered before a check is asked.
+
+    A deactivated ``principal`` handed with ``pool_seeds`` raises
+    ``PrincipalUnavailable`` before any seed is resolved, as dispatch refuses
+    one before anything else - grant or no grant, so a covering grant does not
+    stand in for it. Without ``pool_seeds`` nothing is resolved, and the call
+    is asked exactly as before the keyword existed.
 
     Returns:
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
     """
+    # Ahead of every short cut below, so a call they answer is still refused
+    # for both kinds, and for a deactivated principal, as dispatch refuses one
+    # grant or no grant (tests: TestPoolSeeds.test_both_kinds_are_refused_*
+    # and test_a_deactivated_principal_is_refused_though_*).
+    check_seed_arguments(principal, seeds=seeds, pool_seeds=pool_seeds, asked="authorize")
     spec = kernel_spec(spec)
     if grant is not None:
         if grant.covers(spec, principal):
@@ -114,7 +127,6 @@ def authorize(
             seeds=seeds,
             pool_seeds=pool_seeds,
             question=CLASS_LEVEL,
-            asked="authorize",
         ),
     )
     for check in spec.permissions:

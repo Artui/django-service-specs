@@ -7,13 +7,21 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import Allow, AnswersWith, Refuse, RefuseWithMessage, refuses
-from tests.dispatch.utils import Arguing, Offered, SeedPerQuestion, recorded_seeds
+from tests.dispatch.utils import (
+    Arguing,
+    Deactivated,
+    Offered,
+    PositionalOnly,
+    SeedPerQuestion,
+    recorded_seeds,
+)
 from tests.specs.utils import Foreign
 
 
@@ -191,3 +199,60 @@ class TestPoolSeeds:
             "has_object_permission() missing 1 required keyword-only argument: 'row_club'"
         )
         assert check.handed == []
+
+    def test_both_kinds_are_refused_though_the_grant_checked_the_target(self) -> None:
+        """Unconditionally: below the ``target_checked`` short cut this call would return."""
+        spec, principal = _spec([SeedPerQuestion()]), "ada"
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(TypeError) as raised:
+            authorize_target(
+                spec,
+                principal,
+                object(),
+                grant=Grant(spec, principal, target_checked=True),
+                seeds={"row_club": "chosen"},
+                pool_seeds=pool_seeds,
+            )
+        assert str(raised.value) == (
+            "authorize_target() takes seeds= or pool_seeds=, not both: seeds= are values already "
+            "resolved and pool_seeds= resolves them, so one would silently outrank the other."
+        )
+        assert resolved == []
+
+    def test_a_deactivated_principal_resolves_no_seed(self) -> None:
+        principal, check = Deactivated(), SeedPerQuestion()
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        with pytest.raises(PrincipalUnavailable):
+            authorize_target(
+                spec, principal, object(), grant=Grant(spec, principal), pool_seeds=pool_seeds
+            )
+        assert resolved == []
+        assert check.handed == []
+
+    def test_a_deactivated_principal_is_refused_though_the_grant_checked_the_target(self) -> None:
+        principal = Deactivated()
+        spec = _spec([SeedPerQuestion()])
+        pool_seeds, resolved = recorded_seeds()
+        grant = Grant(spec, principal, target_checked=True)
+        with pytest.raises(PrincipalUnavailable):
+            authorize_target(spec, principal, object(), grant=grant, pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_a_deactivated_principal_without_pool_seeds_is_asked_as_before(self) -> None:
+        """Fails without the ``pool_seeds is not None`` conjunct of the guard."""
+        principal, check = Deactivated(), Allow()
+        spec = _spec([check])
+        authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+        assert check.object_level_calls == 1
+
+    def test_a_positional_parameter_named_like_a_seed_is_not_one(self) -> None:
+        """``OBJECT_LEVEL`` counts three: ``row_club`` here is the target, not a seed."""
+        check, principal, target = PositionalOnly(), "ada", object()
+        spec = _spec([check])
+        pool_seeds, resolved = recorded_seeds()
+        authorize_target(
+            spec, principal, target, grant=Grant(spec, principal), pool_seeds=pool_seeds
+        )
+        assert resolved == []
+        assert check.handed == [("has_object_permission", target)]

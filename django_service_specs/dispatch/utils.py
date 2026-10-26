@@ -29,9 +29,11 @@ from django_service_specs.affordances.utils import (
     rows_with_affordances,
     split_affordances,
 )
-from django_service_specs.authorization.is_deactivated import is_deactivated
-from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
-from django_service_specs.authorization.utils import QUESTIONS, seeds_for_checks
+from django_service_specs.authorization.utils import (
+    QUESTIONS,
+    refuse_deactivated,
+    seeds_for_checks,
+)
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
@@ -400,8 +402,7 @@ def open_call(
     Every entry point hands its own carrier, one per call, so the walk after
     this is offered the seeds this filled.
     """
-    if is_deactivated(principal):
-        raise PrincipalUnavailable()
+    refuse_deactivated(principal)
     # Against the spec's whole parameters, whatever ``parameters`` narrows the
     # shape check to: the declaration is wrong for every caller, so
     # ``resolve_target`` and ``check_call`` answer as dispatch does

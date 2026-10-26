@@ -16,6 +16,7 @@ from django_service_specs import (
     DispatchResult,
     FormValidator,
     Grant,
+    InvalidArguments,
     Parameter,
     Parameters,
     PermissionCheck,
@@ -247,18 +248,24 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
     # Before the form: a principal the class-level check refuses never sees
     # it. NotPermitted for anyone outside the club.
     grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
-    context: dict[str, Any] = {}  # the one dict the form and the call share
+    context: dict[str, Any] = {}  # handed to dispatch, and to the form re-rendered if it refuses
     if title is None:  # the GET: the form, built as dispatch will build it
         extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
         return ClubNoteForm(**extra)
-    return dispatch(
-        club_note_spec,
-        principal=user,
-        arguments={"title": title},
-        pool_seeds=pool_seeds,
-        grant=grant,
-        call_context=context,
-    )
+    try:
+        return dispatch(
+            club_note_spec,
+            principal=user,
+            arguments={"title": title},
+            pool_seeds=pool_seeds,
+            grant=grant,
+            call_context=context,
+        )
+    except InvalidArguments:
+        # The POST failed validation: the form again, bound to what was posted,
+        # with the keywords dispatch bound it with and the dict dispatch ran with.
+        extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
+        return ClubNoteForm(data={"title": title}, **extra)
 
 
 # --8<-- [end:admit]

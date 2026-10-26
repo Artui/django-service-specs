@@ -185,6 +185,41 @@ class SeedPerQuestion(PermissionCheck):
         return True
 
 
+class Deactivated:
+    """An authenticated principal whose ``is_active`` is false: ``is_deactivated`` reads it as one."""
+
+    is_authenticated = True
+    is_active = False
+
+    def __str__(self) -> str:
+        return "dormant"
+
+
+class PositionalOnly(PermissionCheck):
+    """Names a registered seed in each question's last positional slot, and records what it got.
+
+    ``club`` is where ``has_permission`` is handed the spec, ``row_club`` where
+    ``has_object_permission`` is handed the target, and ``scope_club`` where
+    ``has_scope_permission`` is handed the scope: a parameter the call fills by
+    position, so no seed's, whatever its name.
+    """
+
+    def __init__(self) -> None:
+        self.handed: list[tuple[str, Any]] = []
+
+    def has_permission(self, principal: Any, club: Any) -> bool:
+        self.handed.append(("has_permission", club))
+        return True
+
+    def has_object_permission(self, principal: Any, spec: Any, row_club: Any) -> bool:
+        self.handed.append(("has_object_permission", row_club))
+        return True
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope_club: Any) -> bool:
+        self.handed.append(("has_scope_permission", scope_club))
+        return True
+
+
 def recorded_seeds(raising: BaseException | None = None) -> tuple[PoolSeeds, list[str]]:
     """``SeedPerQuestion``'s three seeds and one no check names, each recording when it resolves.
 

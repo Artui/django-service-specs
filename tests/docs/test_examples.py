@@ -438,6 +438,25 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.club_note_page(ada, "go")
 
+    def test_a_post_that_fails_re_renders_the_form_with_the_dict_dispatch_ran_with(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        contexts: dict[str, Any] = {}
+        for name in ("dispatch", "form_keywords"):
+            real = getattr(dispatching, name)
+
+            def record(*args: Any, _name: str = name, _real: Any = real, **kwargs: Any) -> Any:
+                contexts[_name] = kwargs["call_context"]
+                return _real(*args, **kwargs)
+
+            monkeypatch.setattr(dispatching, name, record)
+        form = dispatching.club_note_page(ada, "chess", "")
+        # Refused by the form itself, not by the shape check ahead of it.
+        assert form.is_bound and form.errors["title"] == ["This field is required."]
+        assert form.fields["title"].help_text == "Posted to chess."
+        assert contexts["form_keywords"] is contexts["dispatch"]
+
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")
         with pytest.raises(NotPermitted):

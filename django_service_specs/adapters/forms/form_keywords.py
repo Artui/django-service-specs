@@ -8,6 +8,7 @@ from typing import Any
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.forms.utils import extra_keywords
+from django_service_specs.authorization.utils import refuse_deactivated
 from django_service_specs.dispatch.utils import target_entry
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
@@ -52,6 +53,11 @@ def form_keywords(
       with an instance selector, ``collection`` for one with a collection
       selector, and nothing for a create.
 
+    A deactivated principal resolves no seed, as on dispatch, which refuses one
+    before any resolver runs: where a seed would be resolved for one, this raises
+    ``PrincipalUnavailable`` first. A call that resolves none - no ``pool_seeds``,
+    or a ``form_kwargs`` naming no registered seed - is asked as ever.
+
     A spec whose Validator is not a ``FormValidator`` is refused with
     ``TypeError``, as ``resolve_target`` refuses a spec it cannot answer for:
     a page wired to a spec it cannot build a form for is the caller's mistake,
@@ -88,6 +94,16 @@ def form_keywords(
     # (test_a_catch_all_is_handed_every_seed_as_on_dispatch), and a callable
     # naming one is handed that one alone (test_only_the_seed_form_kwargs_names_resolves).
     named = frozenset(resolve_callable_kwargs(validator.form_kwargs, dict.fromkeys(registry.names)))
+    # Before the first resolver, as dispatch refuses a deactivated principal before
+    # any runs. Only a call that would resolve a seed is refused, so one that
+    # resolves none is asked as ever: one with no ``pool_seeds`` (the default
+    # registry holds no seed) and a ``form_kwargs`` naming none are untouched. The
+    # test that the condition is needed is
+    # test_a_form_kwargs_naming_no_registered_seed_resolves_none_and_is_asked and
+    # test_with_no_pool_seeds_it_is_asked_as_before, which fail if it is dropped;
+    # the refusal itself is TestADeactivatedPrincipal's other two.
+    if named:
+        refuse_deactivated(principal)
     context = ValidationContext(
         principal,
         target,

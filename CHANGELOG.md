@@ -14,11 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   seed. Only the seeds the spec's `has_permission` checks name are resolved,
   once, for the principal, as dispatch resolves them; a seed no check names
   is never resolved, and none is when a covering grant answers first. Such a
-  check previously failed with `TypeError` unless every seed was resolved by
-  hand and passed as `seeds=`. `authorize_target` and `authorize_scope` take
-  the same keyword for the seeds their own question names. Handing `seeds=`
-  and `pool_seeds=` together raises `TypeError`, and a call without
-  `pool_seeds=` behaves as before.
+  check previously failed with `TypeError` unless the caller resolved the seed
+  it names by hand and passed it as `seeds=`, which `seeds=` still does.
+  `authorize_target` and `authorize_scope` take the same keyword for the seeds
+  their own question names. Handing `seeds=` and `pool_seeds=` together raises
+  `TypeError`, even when a covering grant or `target_checked` would have
+  answered the call, and a deactivated principal handed with `pool_seeds=`
+  raises `PrincipalUnavailable` before any seed resolves, as dispatch refuses
+  one before anything else. A call without `pool_seeds=` behaves as before,
+  a deactivated principal included.
 - **`form_keywords(spec, principal, *, pool_seeds=, target=, call_context=)`**,
   what a `FormValidator`'s `form_kwargs` returns, for a transport that builds
   the form itself before the call runs, such as a page showing it. It calls
@@ -28,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pool_seeds=` the callable would be handed. Its answer is checked as the
   Validator checks it. A spec whose Validator is not a `FormValidator` is
   refused with `TypeError`, and a `FormValidator` with no `form_kwargs`
-  returns `{}`.
+  returns `{}`. Where it would resolve a seed for a deactivated principal it
+  raises `PrincipalUnavailable` first, as dispatch does.
 
 ## [0.16.0] — 2026-10-26
 

@@ -18,6 +18,7 @@ from django.core.exceptions import ImproperlyConfigured
 import django_service_specs
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -128,6 +129,43 @@ class TestSeeds:
         pool_seeds, resolved = _recorded()
         assert form_keywords(_create(None), make_user("ada"), pool_seeds=pool_seeds) == {}
         assert resolved == []
+
+
+class TestADeactivatedPrincipal:
+    """Dispatch refuses one before any resolver runs, so a seed is not resolved for one."""
+
+    @staticmethod
+    def _deactivated() -> Any:
+        user = make_user("dormant")
+        user.is_active = False
+        return user
+
+    def test_a_seed_form_kwargs_names_is_not_resolved_for_one(self) -> None:
+        pool_seeds, resolved = _recorded()
+        spec = _create(lambda *, club: {"club": club})
+        with pytest.raises(PrincipalUnavailable):
+            form_keywords(spec, self._deactivated(), pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_a_catch_all_is_refused_before_any_seed_resolves(self) -> None:
+        pool_seeds, resolved = _recorded()
+        with pytest.raises(PrincipalUnavailable):
+            form_keywords(_create(lambda **kwargs: {}), self._deactivated(), pool_seeds=pool_seeds)
+        assert resolved == []
+
+    def test_a_form_kwargs_naming_no_registered_seed_resolves_none_and_is_asked(self) -> None:
+        """Nothing would resolve, so nothing is refused: fails without the seed conjunct."""
+        pool_seeds, resolved = _recorded()
+        spec = _create(lambda *, user: {"owner": user.username})
+        assert form_keywords(spec, self._deactivated(), pool_seeds=pool_seeds) == {
+            "owner": "dormant"
+        }
+        assert resolved == []
+
+    def test_with_no_pool_seeds_it_is_asked_as_before(self) -> None:
+        """The default registry holds no seed, so none would resolve."""
+        spec = _create(lambda *, club="none": {"club": club})
+        assert form_keywords(spec, self._deactivated()) == {"club": "none"}
 
 
 class TestThePool:
