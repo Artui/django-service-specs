@@ -27,6 +27,7 @@ from django_service_specs.dispatch.utils import (
     reraise_unless_retrieve,
     selector_pool,
     settle,
+    shapes_sent,
     with_run_progress,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -313,6 +314,7 @@ def _open_selector(
         principal=who,
         pool_seeds=pool_seeds,
         keywords=keywords,
+        shapes=shapes_sent(spec, checked),
         progress=progress,
         extra_kwargs=overlay.kwargs,
     )

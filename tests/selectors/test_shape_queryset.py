@@ -334,6 +334,25 @@ class TestFilterSet:
         rows = shape_queryset(Note.objects.all(), _filtered(NoRequest), pool, source_label="x")
         assert _titles(rows) == ["draft"]
 
+    def test_a_filter_naming_the_shapes_is_handed_none(self) -> None:
+        # A FilterSet is handed ``request`` and its filters' values, never
+        # the ``shapes`` seed, even from a pool carrying one.
+        handed: list[Any] = []
+        not_handed = object()
+
+        class NamesShapes(TitleFilter):
+            def __init__(
+                self, data: Any = None, queryset: Any = None, shapes: Any = not_handed
+            ) -> None:
+                handed.append(shapes)
+                super().__init__(data=data, queryset=queryset)
+
+        _three_notes()
+        pool = {"title": "draft", "shapes": {"query": "title"}}
+        rows = shape_queryset(Note.objects.all(), _filtered(NamesShapes), pool, source_label="x")
+        assert _titles(rows) == ["draft"]
+        assert handed == [not_handed]
+
     def test_it_runs_after_extend_queryset(self) -> None:
         # ``extend_queryset`` sees the declaratively shaped rows and no filter,
         # so a slice or an ordering it applies is never made over filtered rows

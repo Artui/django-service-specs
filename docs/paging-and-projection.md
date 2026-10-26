@@ -284,7 +284,7 @@ the next step reads by will have been projected away.
 
 Paging and projection are the transport's. What a caller may ask of the rows
 themselves - which fields, a query over each - is the spec's, declared as its
-`shapes`: Parameters beside its `reads` that only the presenter reads.
+`shapes`: Parameters beside its `reads` that no callable receives by name.
 
 ```python
 --8<--
@@ -303,8 +303,20 @@ as `shapes`, by name and read-only, with an argument left out absent rather
 than `None`, so `ChosenFields` renders every field unless the call chose some.
 Every row of a list is handed the same context, and so the same `shapes`.
 
-**A spec declaring `shapes` promises no field of a row.** A shape reaches the
-presenter alone, and the kernel cannot see which keys it leaves out: an
+A selector that should load what the presenter will render reads the same
+mapping by declaring the [`shapes` seed](dispatching.md#the-calls-shapes),
+never the shape by its own name. Here the author's row is joined only when
+the caller chose `author`, or chose nothing, so each page is one query
+whichever fields were asked for:
+
+```python
+--8<--
+docs/examples/paging_and_projection.py:shapes_seed
+--8<--
+```
+
+**A spec declaring `shapes` promises no field of a row.** A shape is the
+presenter's to apply, and the kernel cannot see which keys it leaves out: an
 adapter's `always_present` follows its library's rendering rule, not the call.
 So
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]

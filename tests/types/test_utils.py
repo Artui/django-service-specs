@@ -8,12 +8,14 @@ from decimal import Decimal
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, F, OuterRef, Q
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.output.output import OutputField
 from django_service_specs.parameters.parameters import Parameter
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.unset import UNSET
 from django_service_specs.types.utils import (
     OUTPUT_FIELD_SCHEMA_KEYWORDS,
@@ -33,10 +35,21 @@ def test_the_per_call_names_and_the_ambient_seeds_partition_the_reserved_names()
     # ``serializer`` is the one exception: the DRF adapter's per-call name,
     # which this kernel never seeds and so never reserves. ``call_context`` is
     # ambient: the transport's dict outlives the call, and an affordance
-    # condition may read it as it reads a seed.
+    # condition may read it as it reads a seed. ``shapes`` is per call: what
+    # the caller sent is no surrounding of the call.
     assert PER_CALL_POOL_NAMES - {"serializer"} <= RESERVED_POOL_SEEDS
     ambient = RESERVED_POOL_SEEDS - PER_CALL_POOL_NAMES
     assert ambient == {"user", "progress", "call_context"}
+
+
+def test_a_condition_naming_the_shapes_is_refused_at_its_declaration() -> None:
+    """A condition reading what the caller sent would let the caller decide availability."""
+
+    def by_query(*, shapes: Any) -> bool:
+        return "query" in shapes
+
+    with pytest.raises(ImproperlyConfigured, match="'shapes'"):
+        Affordance(code="c", reason="r", when=by_query)
 
 
 def test_an_orm_expression_is_a_row_condition_and_a_callable_is_not() -> None:

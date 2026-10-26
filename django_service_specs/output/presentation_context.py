@@ -46,7 +46,9 @@ class PresentationContext:
       the arguments that shape the output - which fields, a query over the
       rows - by name, read-only. An argument the caller left out is absent
       rather than ``None``. Empty for a spec that declares none and for a
-      context built by hand; no other argument is ever here.
+      context built by hand; no other argument is ever here. Under dispatch
+      it is also the pool's ``shapes`` seed, so a selector naming ``shapes``
+      reads what the presenter reads.
     """
 
     principal: Any

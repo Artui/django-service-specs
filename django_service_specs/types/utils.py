@@ -16,11 +16,28 @@ from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Final
 
+SHAPES: Final = "shapes"
+"""The pool name the call's shape values travel under: ``PresentationContext.shapes``."""
+
+# What a refusal of the name adds, for the declaration that predates the seed:
+# the one reserved name a project is likely to have used for a parameter of its
+# own, so the refusal says what to rename it to and how to read the values now.
+# Read by ``check_reserved`` and ``PoolSeeds.extend``.
+SHAPES_RENAME: Final = (
+    " 'shapes' is reserved for the seed holding the call's shape values by name: rename "
+    "the parameter for what it selects ('fields', 'query'), and have a callable that "
+    "reads the shape values declare 'shapes'."
+)
+
 # The pool names dispatch seeds per call rather than per process: the validated
 # input (``data``), the resolved target (``instance``, ``collection``), and the
 # values only a later step has - the service's return, as ``result`` and
 # ``instance`` in an output selector's pool, and the queryset being shaped, as
-# ``queryset`` in ``extend_queryset``'s. An affordance condition reading one of them is a rule
+# ``queryset`` in ``extend_queryset``'s. ``shapes`` is here too: what the caller
+# sent for the spec's shapes is an argument of this call, and a condition
+# reading it would let the caller decide whether the operation is available
+# (test_a_condition_naming_the_shapes_is_refused_at_its_declaration).
+# An affordance condition reading one of them is a rule
 # about *this call*, and could never be answered without attempting the call,
 # which is the one thing an affordance exists to allow. The declaration refuses
 # a callable naming them, and ``ambient_pool`` withholds them from one that takes
@@ -37,7 +54,7 @@ from typing import Any, Final
 # with ``serializer`` in it and a reserved set naming it: without it, a condition
 # taking ``**kwargs`` would be handed the call's input there.
 PER_CALL_POOL_NAMES: Final = frozenset(
-    {"data", "instance", "collection", "result", "queryset", "serializer"}
+    {"data", "instance", "collection", "result", "queryset", SHAPES, "serializer"}
 )
 
 
@@ -52,8 +69,11 @@ CALL_CONTEXT: Final = "call_context"
 # name was reserved. Every published transport resolves onto a new release of
 # this package, and a catch-all passing its ``**kwargs`` into a strict callable
 # would raise on one key more. Ambient all the same: a condition naming the
-# call's context is handed it, as a provider naming it is.
-BY_NAME_ONLY_POOL_NAMES: Final = frozenset({CALL_CONTEXT})
+# call's context is handed it, as a provider naming it is. ``shapes`` for the
+# same reason: a selector forwarding its ``**kwargs`` into ``filter()`` would
+# otherwise be handed a key no model has
+# (test_a_catch_all_is_never_handed_the_shapes).
+BY_NAME_ONLY_POOL_NAMES: Final = frozenset({CALL_CONTEXT, SHAPES})
 
 
 def is_row_condition(when: Any) -> bool:

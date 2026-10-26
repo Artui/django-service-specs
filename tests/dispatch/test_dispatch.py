@@ -5390,6 +5390,252 @@ class TestShapesReachThePresenter:
         assert dict(result.context.shapes) == {"query": "q"}
 
 
+class _SawShapes:
+    """Records the ``shapes`` each stage was handed, by the stage's name."""
+
+    def __init__(self) -> None:
+        self.shapes: dict[str, list[Any]] = {}
+
+    def __call__(self, stage: str, shapes: Any) -> None:
+        self.shapes.setdefault(stage, []).append(shapes)
+
+    def all_are(self, expected: Mapping[str, Any]) -> bool:
+        return all(dict(each) == expected for seen in self.shapes.values() for each in seen)
+
+
+class TestShapesReachThePool:
+    """The ``shapes`` seed: what ``PresentationContext.shapes`` holds, for any callable naming it."""
+
+    @_ENTRIES
+    def test_a_selector_spec_s_callables_receive_the_shapes_the_presenter_is_handed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        Note.objects.create(title="name", owner=ada)
+        saw = _SawShapes()
+        presenter = Contextual()
+
+        def selector(*, shapes: Any, progress: Any) -> Any:
+            saw("selector", shapes)
+            progress(1)
+            return Note.objects.all()
+
+        def reporter(*, shapes: Any) -> Any:
+            saw("progress_reporter", shapes)
+            return null_progress
+
+        def extend(*, queryset: Any, shapes: Any) -> Any:
+            saw("extend_queryset", shapes)
+            return queryset
+
+        def provider(*, shapes: Any) -> dict[str, Any]:
+            saw("kwargs", shapes)
+            return {}
+
+        def precondition(*, shapes: Any) -> None:
+            saw("precondition", shapes)
+
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=selector,
+            permissions=OPEN,
+            shapes=QUERY_SHAPE,
+            presenter=presenter,
+            extend_queryset=extend,
+            kwargs=provider,
+            preconditions=[precondition],
+            progress_reporter=reporter,
+        )
+        result = entry(spec, principal=ada, arguments={"query": "name"})
+        present(spec, result)
+        assert set(saw.shapes) == {
+            "selector",
+            "extend_queryset",
+            "kwargs",
+            "precondition",
+            "progress_reporter",
+        }
+        assert saw.all_are({"query": "name"})
+        assert dict(presenter.contexts[0].shapes) == {"query": "name"}
+
+    @_ENTRIES
+    def test_a_service_spec_s_callables_receive_the_shapes_the_presenter_is_handed(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="name", owner=ada)
+        saw = _SawShapes()
+        presenter = Contextual()
+
+        def row(*, pk: int, shapes: Any) -> Any:
+            saw("target", shapes)
+            return Note.objects.filter(pk=pk)
+
+        def provider(*, shapes: Any) -> dict[str, Any]:
+            saw("kwargs", shapes)
+            return {}
+
+        def server_input(*, shapes: Any) -> dict[str, Any]:
+            saw("input_data", shapes)
+            return {}
+
+        def precondition(*, shapes: Any) -> None:
+            saw("precondition", shapes)
+
+        def service(*, instance: Any, shapes: Any, progress: Any) -> Any:
+            saw("service", shapes)
+            progress(1)
+            return instance
+
+        def reporter(*, shapes: Any) -> Any:
+            saw("progress_reporter", shapes)
+            return null_progress
+
+        def reread(*, result: Any, shapes: Any) -> Any:
+            saw("output", shapes)
+            return Note.objects.filter(pk=result.pk)
+
+        spec = ServiceSpec(
+            service=service,
+            permissions=OPEN,
+            shapes=QUERY_SHAPE,
+            kwargs=provider,
+            validator=Titled(),
+            input_data=server_input,
+            preconditions=[precondition],
+            progress_reporter=reporter,
+            instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=row, reads=PK),
+            output_selector_spec=SelectorSpec(kind=RETRIEVE, selector=reread, presenter=presenter),
+        )
+        result = entry(
+            spec, principal=ada, arguments={"pk": note.pk, "title": "t", "query": "name"}
+        )
+        present(spec, result)
+        assert set(saw.shapes) == {
+            "target",
+            "kwargs",
+            "input_data",
+            "precondition",
+            "service",
+            "progress_reporter",
+            "output",
+        }
+        assert saw.all_are({"query": "name"})
+        assert dict(presenter.contexts[0].shapes) == {"query": "name"}
+
+    def test_an_awaited_selector_receives_the_shapes_the_presenter_is_handed(
+        self, ada: Any
+    ) -> None:
+        """An ``async def`` selector's pool is built on its own path through ``adispatch``."""
+        saw = _SawShapes()
+
+        async def selector(*, shapes: Any) -> list[Any]:
+            saw("selector", shapes)
+            return []
+
+        spec = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN, shapes=QUERY_SHAPE)
+        result = async_to_sync(adispatch)(spec, principal=ada, arguments={"query": "name"})
+        assert saw.all_are({"query": "name"})
+        assert saw.shapes["selector"][0] is result.context.shapes
+
+    @_ENTRIES
+    def test_a_spec_declaring_no_shapes_hands_an_empty_mapping(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Present on every call, as every seed is, so a selector reused across specs runs."""
+        Note.objects.create(title="name", owner=ada)
+        saw = _SawShapes()
+
+        def selector(*, shapes: Any) -> Any:
+            saw("selector", shapes)
+            return Note.objects.all()
+
+        spec = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN)
+        result = entry(spec, principal=ada, arguments={})
+        assert dict(saw.shapes["selector"][0]) == {}
+        assert dict(result.context.shapes) == {}
+
+    @_ENTRIES
+    def test_a_selector_spec_s_seed_is_the_presenter_s_mapping_and_read_only(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        Note.objects.create(title="name", owner=ada)
+        saw = _SawShapes()
+
+        def selector(*, shapes: Any) -> Any:
+            saw("selector", shapes)
+            with pytest.raises(TypeError):
+                shapes["query"] = "other"
+            return Note.objects.all()
+
+        spec = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN, shapes=QUERY_SHAPE)
+        result = entry(spec, principal=ada, arguments={"query": "name"})
+        assert saw.shapes["selector"][0] is result.context.shapes
+
+    @_ENTRIES
+    def test_a_catch_all_is_never_handed_the_shapes(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """By name only, as ``call_context`` is: a selector forwarding its ``**kwargs``
+        into ``filter()`` runs as it did before the name was reserved."""
+        Note.objects.create(title="name", owner=ada)
+        saw: list[Mapping[str, Any]] = []
+
+        def selector(**kwargs: Any) -> Any:
+            saw.append(kwargs)
+            return Note.objects.filter(owner=kwargs["user"])
+
+        def service(**kwargs: Any) -> Any:
+            saw.append(kwargs)
+
+        reads = SelectorSpec(kind=LIST, selector=selector, permissions=OPEN, shapes=QUERY_SHAPE)
+        write = ServiceSpec(service=service, permissions=OPEN, shapes=QUERY_SHAPE)
+        entry(reads, principal=ada, arguments={"query": "name"})
+        entry(write, principal=ada, arguments={"query": "name"})
+        assert len(saw) == 2
+        assert all("shapes" not in kwargs for kwargs in saw)
+
+    @_ENTRIES
+    def test_a_seed_resolver_naming_the_shapes_is_handed_none(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A seed is resolved before anything the call adds, so its resolver
+        gets its own default for ``shapes``, as for ``call_context``."""
+        handed: list[Any] = []
+        not_handed = object()
+
+        def tenant(*, shapes: Any = not_handed) -> str:
+            handed.append(shapes)
+            return "t"
+
+        spec = SelectorSpec(
+            kind=LIST,
+            selector=lambda *, tenant: Note.objects.all(),
+            permissions=OPEN,
+            shapes=QUERY_SHAPE,
+        )
+        seeds = DEFAULT_POOL_SEEDS.extend(tenant=tenant)
+        result = entry(spec, principal=ada, arguments={"query": "name"}, pool_seeds=seeds)
+        assert dict(result.context.shapes) == {"query": "name"}
+        assert handed == [not_handed]
+
+    @_ENTRIES
+    def test_ambient_never_holds_the_shapes(self, entry: Callable[..., Any], ada: Any) -> None:
+        """Each context has a field of its own for them, and the Validator none at all."""
+        note = Note.objects.create(title="name", owner=ada)
+        validator = Titled()
+        reads = SelectorSpec(
+            kind=LIST, selector=Note.objects.all, permissions=OPEN, shapes=QUERY_SHAPE
+        )
+        write = ServiceSpec(
+            service=lambda: note, permissions=OPEN, validator=validator, shapes=QUERY_SHAPE
+        )
+        read = entry(reads, principal=ada, arguments={"query": "name"})
+        wrote = entry(write, principal=ada, arguments={"title": "t", "query": "name"})
+        assert "shapes" not in read.context.ambient
+        assert "shapes" not in wrote.context.ambient
+        assert "shapes" not in validator.calls[0][1].ambient
+        assert dict(read.context.shapes) == dict(wrote.context.shapes) == {"query": "name"}
+
+
 @_ENTRIES
 def test_with_none_passed_the_validator_and_the_presenter_share_one_fresh_dict(
     entry: Callable[..., Any], ada: Any

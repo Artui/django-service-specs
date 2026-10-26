@@ -341,6 +341,7 @@ SURFACE: dict[str, Pin] = {
                 "queryset",
                 "progress",
                 "call_context",
+                "shapes",
             }
         ),
     ),

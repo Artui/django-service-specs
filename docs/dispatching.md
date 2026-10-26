@@ -693,6 +693,45 @@ and preconditions read the transport's reporter, as a service spec's do. A targe
 nothing to report, and one reporting after the service finished would read to
 a watching client as the work restarting.
 
+### The call's shapes
+
+`shapes` is a reserved seed, as `progress` is: what the caller sent for the
+spec's declared [`shapes`](declaring.md#a-read), keyed by shape name
+and read-only. It is the mapping the presenter reads as
+[`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext],
+so a selector that eager-loads by what the presenter will render, as
+django-restql's `query` does, reads the value the presenter reads. Any
+callable dispatch resolves receives it by naming it: a selector and its
+`extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the run's `progress_reporter`, the
+service, and a service spec's target and output selectors, which are handed
+the write's shapes.
+
+- **Always there.** A spec declaring no shapes hands an empty mapping, and a
+  shape the caller left out is absent from it rather than `None`, as on the
+  presenter's context. A reservation with no value would fail the callable
+  that declares it.
+- **By name only**, as `call_context` is: a callable taking `**kwargs` is never
+  handed it, so a selector forwarding its keywords into `filter()` runs
+  unchanged.
+- **Never the caller's.** It is in
+  [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys],
+  and a parameter, read, shape or Validator field named `shapes` is refused
+  when the spec is built, with the rename in the message: name the parameter
+  for what it selects, such as `fields` or `query`, and have the callable that
+  read it declare `shapes`. `PoolSeeds.extend()` refuses a seed of that name.
+- **Not for an affordance condition or the Validator.** A condition naming
+  `shapes` is refused when it is declared, because what the caller sent would
+  decide whether the operation is available, and the Validator, which is no
+  pool callable, reads only its own arguments. Neither context's `ambient`
+  holds it.
+- **Empty under `resolve_target`.** It checks the target selector's own
+  parameters alone, so a shape sent there is no argument of the lookup: the
+  row it finds is the row dispatch finds, and only what a selector loads by
+  the shapes can differ.
+
+A selector joining only what the caller chose is shown under
+[shaping each row by the call](paging-and-projection.md#shaping-each-row-by-the-call).
+
 ## The call's context
 
 A call's stages often want one value more than once: a lookup the Validator

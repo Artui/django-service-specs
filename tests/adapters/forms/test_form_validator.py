@@ -2005,3 +2005,34 @@ def test_form_kwargs_naming_the_call_context_is_handed_the_very_dict(
     assert result.value == "t"
     assert len(handed) == 1
     assert handed[0] is call_context
+
+
+_NOT_HANDED = object()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
+def test_form_kwargs_naming_the_shapes_is_handed_no_seed(entry: Callable[..., Any]) -> None:
+    """The shapes seed is the pool's, and a Validator is never handed what
+    the caller sent for the spec's shapes: the form is built from the
+    arguments alone, so ``form_kwargs`` gets its own default here."""
+    handed: list[Any] = []
+
+    def form_kwargs(*, shapes: Any = _NOT_HANDED) -> dict[str, Any]:
+        handed.append(shapes)
+        return {}
+
+    spec = ServiceSpec(
+        service=lambda *, title: title,
+        permissions=[Unrestricted()],
+        validator=FormValidator(_Named, form_kwargs=form_kwargs),
+        shapes=Parameters.of(Parameter("query", "string")),
+    )
+    result = entry(
+        spec,
+        principal=User.objects.create_user(username="ada"),
+        arguments={"title": "t", "query": "name"},
+    )
+    assert result.value == "t"
+    assert dict(result.context.shapes) == {"query": "name"}
+    assert handed == [_NOT_HANDED]

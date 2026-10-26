@@ -60,7 +60,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.types.utils import CALL_CONTEXT
+from django_service_specs.types.utils import CALL_CONTEXT, SHAPES
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -852,6 +852,7 @@ def selector_pool(
     principal: Any,
     pool_seeds: PoolSeeds,
     keywords: CheckKeywords,
+    shapes: Mapping[str, Any],
     progress: ProgressReporter | None = None,
     extra_kwargs: Mapping[str, Any] = MappingProxyType({}),
 ) -> dict[str, Any]:
@@ -893,12 +894,19 @@ def selector_pool(
     beside the seeds once they are resolved, as every pool dispatch builds
     carries it, and the seeds a check named, taken as they are
     (``seeded_base``).
+
+    ``shapes`` is the seed of that name: what the caller sent for the shapes
+    of the spec being dispatched, read off ``shapes_sent``. Passed rather than
+    read off ``selector_spec``, because a service spec's target selector
+    declares no shapes of its own and is handed the write's
+    (test_a_service_spec_s_callables_receive_the_shapes_the_presenter_is_handed).
     """
     reads = selector_spec.reads.names()
     base = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=keywords.seeds)
     pool = {
         **base,
         CALL_CONTEXT: keywords.call_context,
+        SHAPES: shapes,
         **{name: value for name, value in checked.items() if name in reads},
     }
     pool.update(
@@ -1104,8 +1112,9 @@ def call_pool(
     validated, bound or provided key,
     ``provide`` a selector's provided one, and the entries dispatch adds
     itself (``data``, ``instance``, ``collection``, ``result``, and
-    ``call_context``, the call's context, which every pool dispatch builds
-    carries) are names no project can register.
+    ``call_context`` and ``shapes``, the call's context and its shape values,
+    which every pool dispatch builds carries) are names no project can
+    register.
     """
     pool = seeded_base(principal, progress=progress, pool_seeds=pool_seeds, early=early)
     pool.update(entries)
@@ -1348,27 +1357,29 @@ def conclude_selector(
 
     ``checked`` is the call's shape-checked arguments, handed to a check that
     declares ``arguments`` as step two handed them, and ``keywords`` what step
-    two offered. The context also carries the call's context, which ``pool``
-    holds under a reserved name and ``ambient`` leaves out, since it has a
-    field of its own, and the ``shapes`` the caller sent.
+    two offered. The context also carries the call's context and the
+    ``shapes`` the caller sent, which ``pool`` holds under reserved names and
+    ``ambient`` leaves out, since each has a field of its own. The field is the
+    pool's own mapping, so the presenter reads the object the selector was
+    handed.
     """
     grant = replace(grant, target_checked=False)
     handed = checks_arguments(checked)
     fillable = spec.reads.names()
-    # Two conjuncts: test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay
+    # Three conjuncts: test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay
     # fails without the first, test_ambient_holds_the_seeds_and_never_the_call_context
-    # without the second.
+    # without the second, and test_ambient_never_holds_the_shapes without the third.
     context = PresentationContext(
         principal,
         ambient=MappingProxyType(
             {
                 name: entry
                 for name, entry in pool.items()
-                if name in reserved and name != CALL_CONTEXT
+                if name in reserved and name != CALL_CONTEXT and name != SHAPES
             }
         ),
         call_context=keywords.call_context,
-        shapes=shapes_sent(spec, checked),
+        shapes=pool[SHAPES],
     )
     if spec.kind is SelectorKind.LIST:
         authorize_scope(spec, principal, value, grant=grant, arguments=handed, **keywords.offered())
@@ -1451,6 +1462,11 @@ def walk_target(
         grant = replace(grant, target_checked=False)
     offered = keywords.offered()
     handed = checks_arguments(checked)
+    # The write's shapes, which its target selector declares none of. Under
+    # ``resolve_target`` the arguments are narrowed to the target's own
+    # parameters, so this is empty there
+    # (test_resolve_target_hands_its_target_selector_no_shapes).
+    shapes = shapes_sent(spec, checked)
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec
     # The target lookups get no live reporter, and nor does the output selector
@@ -1463,6 +1479,7 @@ def walk_target(
                 principal=principal,
                 pool_seeds=pool_seeds,
                 keywords=keywords,
+                shapes=shapes,
             )
             target = lookup(
                 instance_spec, pool, source=INSTANCE_SOURCE, reserved=pool_seeds.reserved
@@ -1482,6 +1499,7 @@ def walk_target(
                 principal=principal,
                 pool_seeds=pool_seeds,
                 keywords=keywords,
+                shapes=shapes,
             )
             try:
                 target = lookup(
@@ -1793,8 +1811,11 @@ def prepare_service(
     ambient = MappingProxyType(base)
     # The call's context beside the seeds rather than in ``base``, so
     # ``ambient`` stays the seeds alone: it has a field of its own on both
-    # contexts (test_ambient_holds_the_seeds_and_never_the_call_context).
-    surroundings = {**base, CALL_CONTEXT: call_context}
+    # contexts (test_ambient_holds_the_seeds_and_never_the_call_context). The
+    # shapes the same way, for the presenter's field of its own and for the
+    # Validator, which never sees them (test_ambient_never_holds_the_shapes).
+    shapes = shapes_sent(spec, checked)
+    surroundings = {**base, CALL_CONTEXT: call_context, SHAPES: shapes}
     declared_reads = spec.reads.names()
     reads = {name: value for name, value in checked.items() if name in declared_reads}
     providers_pool = {**surroundings, **reads, **resolved}
@@ -1948,7 +1969,7 @@ def prepare_service(
         kwargs,
         ambient,
         call_context,
-        shapes_sent(spec, checked),
+        shapes,
         MappingProxyType(dict(keywords.seeds)),
     )
 
@@ -2003,7 +2024,12 @@ def finish_service(
         pool = call_pool(
             prepared.principal,
             pool_seeds,
-            {"instance": result, "result": result, CALL_CONTEXT: prepared.call_context},
+            {
+                "instance": result,
+                "result": result,
+                CALL_CONTEXT: prepared.call_context,
+                SHAPES: prepared.shapes,
+            },
             early=prepared.early_seeds,
         )
         value = lookup(
