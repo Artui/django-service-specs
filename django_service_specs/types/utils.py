@@ -26,7 +26,7 @@ SHAPES: Final = "shapes"
 # message, so it begins by saying what to rename it to. ``PoolSeeds.extend``
 # words its own suffix, since a registered seed is no parameter.
 SHAPES_RENAME: Final = (
-    " Name it for what it selects ('fields', 'query'): 'shapes' is reserved for the seed "
+    " Name it for what it holds ('fields', 'query'): 'shapes' is reserved for the seed "
     "holding the call's shape values by name, and a callable that reads them declares "
     "'shapes'."
 )

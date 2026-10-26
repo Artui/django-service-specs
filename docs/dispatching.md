@@ -720,7 +720,7 @@ is handed an empty mapping (see the last item below).
   the spec is built, a Validator field of that name when the spec's
   parameters are first read (a transport's registration, or the first
   dispatch). Each of those refusals carries the rename in its message: name
-  the parameter for what it selects, such as `fields` or `query`, and have the
+  the parameter for what it holds, such as `fields` or `query`, and have the
   callable that read it declare `shapes`. `PoolSeeds.extend()` refuses a seed
   of that name, and says to register it under another.
 - **Not for an affordance condition or the Validator.** A condition naming
@@ -731,9 +731,9 @@ is handed an empty mapping (see the last item below).
 - **Empty for a target selector.** A write's target lookup is handed no
   shapes, on every route. `resolve_target` checks the target selector's own
   parameters alone, so a shape sent there is no argument of the lookup, and a
-  lookup that read the shapes under `dispatch` would find another row than the
-  page that called `resolve_target` showed. A target selector that names
-  `shapes` is not refused, since it is often the list selector reused: it
+  lookup that read the shapes under `dispatch` would find a different row from
+  the one `resolve_target` found. A target selector that names `shapes` is not
+  refused, since it is often a read's own selector reused: it
   receives an empty mapping, and the row it finds is the row dispatch finds.
 
 A selector joining only what the caller chose is shown under

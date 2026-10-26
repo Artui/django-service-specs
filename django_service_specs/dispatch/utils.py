@@ -1472,8 +1472,8 @@ def walk_target(
     # reads the same empty mapping everywhere, at both pools below, each held
     # by its own case of test_a_target_selector_is_handed_no_shapes_on_any_route
     # (instance and collection; sync, async and ``resolve_target``).
-    # A selector that declares ``shapes`` is not refused: it is often the list
-    # selector reused, and an empty mapping lets that reuse keep running.
+    # A selector that declares ``shapes`` is not refused: it is often a read's
+    # own selector reused, and an empty mapping lets that reuse keep running.
     no_shapes: Mapping[str, Any] = MappingProxyType({})
     instance_spec = spec.instance_selector_spec
     collection_spec = spec.collection_selector_spec

@@ -80,7 +80,7 @@ def test_a_parameter_named_shapes_is_refused_with_the_rename(declare: object) ->
         declare()  # ty: ignore[call-non-callable]
     # "rename the parameter." is said once, and the suffix carries the new name.
     assert str(refused.value).count("rename the parameter") == 1
-    assert "Name it for what it selects ('fields', 'query')" in str(refused.value)
+    assert "Name it for what it holds ('fields', 'query')" in str(refused.value)
     assert "'shapes'" in str(refused.value)
 
 
