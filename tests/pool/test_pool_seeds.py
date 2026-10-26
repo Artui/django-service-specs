@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 
@@ -100,3 +101,19 @@ class TestAnAsyncResolverIsRefused:
         # ``extend`` is not the only door: the dataclass is public.
         with pytest.raises(ImproperlyConfigured, match="has an async resolver"):
             PoolSeeds(seeds=(("books_open", _books_open),))
+
+
+def test_reserved_keeps_its_published_answer_without_the_call_s_names() -> None:
+    """The transports drop or refuse a caller's argument by ``reserved``; dispatch refuses the rest.
+
+    djangorestframework-services drops a caller's argument named in ``reserved``,
+    so widening it would drop a caller's ``view`` where that transport refuses it.
+    """
+    assert PoolSeeds().reserved == RESERVED_POOL_SEEDS
+    assert not CALL_SEEDS & PoolSeeds().reserved
+
+
+def test_extend_registers_request_and_view_as_a_released_transport_does() -> None:
+    """Refusing either would refuse django-spec-agents' registration on every call."""
+    seeds = DEFAULT_POOL_SEEDS.extend(request=lambda: "r", view=lambda: "v")
+    assert seeds.names == {"request", "view"}

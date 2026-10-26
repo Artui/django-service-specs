@@ -13,7 +13,7 @@ from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.authorization.utils import AnswersWith, refuses
+from tests.authorization.utils import AnswersWith, SeesTheCall, refuses
 from tests.dispatch.utils import (
     Arguing,
     Deactivated,
@@ -245,3 +245,16 @@ class TestPoolSeeds:
         authorize_scope(spec, principal, scope, grant=Grant(spec, principal), pool_seeds=pool_seeds)
         assert resolved == []
         assert check.handed == [("has_scope_permission", scope)]
+
+
+def test_a_check_is_handed_the_context_s_request_and_view() -> None:
+    check, request, view = SeesTheCall(), object(), object()
+    spec, principal = _spec([check]), object()
+    authorize_scope(
+        spec,
+        principal,
+        [],
+        grant=Grant(spec, principal),
+        call_context={"request": request, "view": view},
+    )
+    assert check.seen == [("has_scope_permission", request, view)]

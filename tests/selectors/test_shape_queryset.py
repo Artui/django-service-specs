@@ -322,6 +322,32 @@ class TestFilterSet:
         )
         assert _titles(rows) == ["draft", "final", "other"]
 
+    def test_a_filter_set_naming_request_is_handed_the_context_s(self) -> None:
+        """With no ``request`` in the pool, the call's own, read off its context."""
+        ada = _three_notes()
+        Note.objects.create(owner=make_user("bob"), title="bob's")
+        pool = {"mine": True, "call_context": {"request": SimpleNamespace(user=ada)}}
+        rows = shape_queryset(
+            Note.objects.all(), _filtered(RequestScopedFilter), pool, source_label="x"
+        )
+        assert _titles(rows) == ["draft", "final", "other"]
+
+    def test_a_filter_set_naming_the_call_context_is_never_handed_it(self) -> None:
+        handed: list[Any] = []
+        not_handed = object()
+
+        class NamesTheContext(TitleFilter):
+            def __init__(
+                self, data: Any = None, queryset: Any = None, call_context: Any = not_handed
+            ) -> None:
+                handed.append(call_context)
+                super().__init__(data=data, queryset=queryset)
+
+        _three_notes()
+        pool = {"title": "draft", "call_context": {"request": None}}
+        shape_queryset(Note.objects.all(), _filtered(NamesTheContext), pool, source_label="x")
+        assert handed == [not_handed]
+
     def test_a_filter_that_takes_no_request_is_not_handed_one(self) -> None:
         # Its constructor takes no ``request``, so handing it one would be a
         # ``TypeError``: it is handed only what it declares.

@@ -82,6 +82,7 @@ from django_service_specs.parameters.non_field_keys import NON_FIELD_KEYS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.parameters.refusal_messages import refusal_messages
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.combine_progress import combine_progress
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -156,6 +157,7 @@ from django_service_specs.validation.validator import Validator
 from django_service_specs.version import __version__
 
 __all__ = [
+    "CALL_SEEDS",
     "DEFAULT_PAGE_SIZE",
     "DEFAULT_POOL_SEEDS",
     "NON_FIELD_ERRORS",

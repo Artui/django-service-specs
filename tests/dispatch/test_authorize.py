@@ -24,6 +24,7 @@ from tests.authorization.utils import (
     NotACoroutine,
     Refuse,
     RefuseWithMessage,
+    SeesTheCall,
     refuses,
     refuses_lazily,
 )
@@ -366,3 +367,49 @@ class TestPoolSeeds:
         authorize(spec, "ada", pool_seeds=pool_seeds)
         assert resolved == []
         assert check.handed == [("has_permission", kernel_spec(spec))]
+
+
+class TestTheCallSRequestAndView:
+    """A check declaring ``request`` or ``view`` is handed what the call's context holds."""
+
+    def test_a_check_is_handed_the_context_s_request_and_none_for_an_absent_view(self) -> None:
+        check, request = SeesTheCall(), object()
+        spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+        authorize(spec, object(), call_context={"request": request})
+        assert check.seen == [("has_permission", request, None)]
+
+    def test_with_no_call_context_both_are_none(self) -> None:
+        check = SeesTheCall()
+        authorize(
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check]), object()
+        )
+        assert check.seen == [("has_permission", None, None)]
+
+    def test_a_seed_resolved_for_a_check_reads_the_context_s_request(self) -> None:
+        seen: list[Any] = []
+
+        class Tenant(Unrestricted):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: Any) -> bool:
+                seen.append(tenant)
+                return True
+
+        spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Tenant()])
+        authorize(
+            spec,
+            object(),
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=lambda *, request: request["tenant"]),
+            call_context={"request": {"tenant": "acme"}},
+        )
+        assert seen == ["acme"]
+
+    def test_a_seed_registered_under_the_name_outranks_the_context_s_value(self) -> None:
+        """A mount registering ``request`` keeps its own, at the check as in every pool."""
+        check = SeesTheCall()
+        spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+        authorize(
+            spec,
+            object(),
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(request=lambda: "registered"),
+            call_context={"request": "context"},
+        )
+        assert check.seen == [("has_permission", "registered", None)]

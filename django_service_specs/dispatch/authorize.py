@@ -127,6 +127,7 @@ def authorize(
             seeds=seeds,
             pool_seeds=pool_seeds,
             question=CLASS_LEVEL,
+            call_context=call_context,
         ),
     )
     for check in spec.permissions:

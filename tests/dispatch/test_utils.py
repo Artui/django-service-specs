@@ -94,7 +94,9 @@ def test_does_not_exist_and_http404_are_a_missing_row_only_for_a_retrieve(
 def test_seeds_resolve_before_the_call_s_own_entries_exist() -> None:
     seeds = DEFAULT_POOL_SEEDS.extend(seen=lambda **pool: sorted(pool))
 
-    pool: dict[str, Any] = call_pool(PRINCIPAL, seeds, {"pk": 1, "data": {}}, early={})
+    pool: dict[str, Any] = call_pool(
+        PRINCIPAL, seeds, {"pk": 1, "data": {}}, early={}, call_context={}
+    )
 
     assert pool == {
         "user": PRINCIPAL,

@@ -365,3 +365,18 @@ def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
     with pytest.raises(ImproperlyConfigured, match="call_context"):
         enforce_affordances(_naming_it(handed), pool, instance=None, call_context={})
     assert handed == []
+
+
+def test_a_condition_reads_the_call_s_request_and_view_from_its_context() -> None:
+    request, view = object(), object()
+    seen: list[Any] = []
+
+    def when(*, request: Any, view: Any) -> bool:
+        seen.append((request, view))
+        return True
+
+    spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
+    enforce_affordances(
+        spec, base_pool(user=None), instance=None, call_context={"request": request, "view": view}
+    )
+    assert seen == [(request, view)]

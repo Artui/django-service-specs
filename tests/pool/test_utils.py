@@ -6,14 +6,13 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.pool.utils import (
     deferred_progress,
     only_seeds,
+    pool_kwargs,
     resolve_progress,
     resolve_provider,
-    resolved_seeds,
 )
 from django_service_specs.types.unset import UNSET
 
@@ -145,24 +144,49 @@ class TestResolveProgress:
         assert transport.reports == [(1, None, "only the transport", None)]
 
 
-class TestResolvedSeeds:
-    """Only the registered seeds a caller names resolve, for the principal as ``user``."""
-
-    def test_only_the_named_seeds_resolve_and_an_unregistered_name_is_skipped(self) -> None:
-        resolved: list[str] = []
-
-        def recording(name: str) -> Any:
-            def resolve(*, user: Any, progress: Any) -> Any:
-                resolved.append(name)
-                return (name, user, progress)
-
-            return resolve
-
-        pool_seeds = DEFAULT_POOL_SEEDS.extend(club=recording("club"), locale=recording("locale"))
-        values = resolved_seeds(pool_seeds, frozenset({"club", "unregistered"}), user="ada")
-        assert values == {"club": ("club", "ada", null_progress)}
-        assert resolved == ["club"]
+class TestOnlySeeds:
+    """A registry narrowed to the names asked for."""
 
     def test_only_seeds_keeps_registration_order(self) -> None:
         pool_seeds = DEFAULT_POOL_SEEDS.extend(a=lambda: 1, b=lambda: 2, c=lambda: 3)
         assert list(only_seeds(pool_seeds, frozenset({"c", "a"})).resolvers()) == ["a", "c"]
+
+
+class TestPoolKwargs:
+    """The kernel's binder: the public one, with the call's two read off a pool's context."""
+
+    def test_a_named_parameter_is_handed_the_context_s_and_none_for_an_absent_key(self) -> None:
+        request = object()
+
+        def fn(*, request: Any, view: Any, user: Any) -> None: ...
+
+        pool = {"user": "u", "call_context": {"request": request}}
+        assert pool_kwargs(fn, pool) == {"request": request, "view": None, "user": "u"}
+
+    def test_a_context_of_none_hands_none(self) -> None:
+        def fn(*, request: Any) -> None: ...
+
+        assert pool_kwargs(fn, {"call_context": None}) == {"request": None}
+
+    def test_a_pool_with_no_call_context_binds_as_published(self) -> None:
+        """Nothing to read the two off, so a callable naming one is handed what the pool has."""
+
+        def fn(*, request: Any = "default", user: Any) -> None: ...
+
+        assert pool_kwargs(fn, {"user": "u"}) == {"user": "u"}
+
+    def test_a_catch_all_is_handed_neither_and_a_pool_entry_outranks(self) -> None:
+        def catch_all(**kwargs: Any) -> None: ...
+
+        def named(*, request: Any) -> None: ...
+
+        pool = {"user": "u", "call_context": {"request": "context", "view": "context"}}
+        assert pool_kwargs(catch_all, pool) == {"user": "u"}
+        assert pool_kwargs(named, {**pool, "request": "seed"}) == {"request": "seed"}
+
+    def test_a_positional_only_name_is_never_handed(self) -> None:
+        """Only a name a keyword can fill, as the public binder reads a signature."""
+
+        def fn(request: Any, /) -> None: ...
+
+        assert pool_kwargs(fn, {"call_context": {"request": "r"}}) == {}

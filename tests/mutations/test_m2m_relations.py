@@ -203,6 +203,23 @@ class TestScopeIsWhatMakesMatchingSafe:
         mine.refresh_from_db()
         assert mine.name == "renamed"
 
+    def test_a_callable_scope_naming_request_reads_the_call_s(self) -> None:
+        mine = Tag.objects.create(name="mine")
+
+        create_from_input(
+            Post,
+            {"title": "t", "tags": [{"pk": mine.pk, "name": "renamed"}]},
+            relations={
+                "tags": ManyToManySpec(
+                    model=Tag, scope=lambda request: Tag.objects.filter(name=request)
+                )
+            },
+            context={"call_context": {"request": "mine"}},
+        )
+
+        mine.refresh_from_db()
+        assert mine.name == "renamed"
+
 
 @pytest.mark.django_db
 class TestAM2MTargetCannotBeCreatedUnderAForeignPrimaryKey:

@@ -8,11 +8,10 @@ from typing import Any
 
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.forms.utils import extra_keywords
-from django_service_specs.authorization.utils import refuse_deactivated
+from django_service_specs.authorization.utils import refuse_deactivated, resolved_seeds
 from django_service_specs.dispatch.utils import target_entry
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
-from django_service_specs.pool.utils import resolved_seeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -49,6 +48,10 @@ def form_keywords(
       names, or every seed for one taking ``**kwargs``, as on dispatch;
     - ``call_context``, the dict handed here, or a fresh one; a page hands the
       dict it will hand dispatch, so what the two calls write is shared;
+    - ``request`` and ``view``, read off that context, ``None`` for a key it
+      lacks, as in every pool dispatch builds, unless ``pool_seeds`` registers
+      the name, whose seed is the value then; and a seed's resolver may declare
+      either;
     - ``target`` under the name dispatch hands it by: ``instance`` for a spec
       with an instance selector, ``collection`` for one with a collection
       selector, and nothing for a create.
@@ -107,7 +110,9 @@ def form_keywords(
     context = ValidationContext(
         principal,
         target,
-        ambient=MappingProxyType(resolved_seeds(registry, named, user=principal)),
+        ambient=MappingProxyType(
+            resolved_seeds(registry, named, user=principal, call_context=call_context)
+        ),
         # dispatch's own naming (test_an_update_names_the_target_instance,
         # test_a_collection_spec_names_the_target_collection).
         resolved=MappingProxyType(target_entry(spec, target)),

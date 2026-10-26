@@ -29,7 +29,7 @@ from typing import Any, Final
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Exists, Model, OuterRef
 
-from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
@@ -54,7 +54,10 @@ def ambient_pool(pool: Mapping[str, Any], *, reserved: frozenset[str]) -> dict[s
 
     The seeds - ``user``, ``progress`` and whatever the project registered - and
     the call's context, which a condition is handed only by naming it
-    (``resolve_callable_kwargs``), and nothing else. Not the per-call names (the target, the validated input, and
+    (``resolve_callable_kwargs``), and nothing else. The call's ``request`` and
+    ``view`` are read off that context for a condition naming one
+    (test_a_condition_reads_the_context_s_request_from_a_pool_holding_none),
+    unless the project registered the name, whose seed is ambient as any is. Not the per-call names (the target, the validated input, and
     the values a later step adds), which would make the answer depend on
     attempting the call; and not a client argument spread into the pool, which
     would let the caller decide whether the operation is available. Filtering by
@@ -134,7 +137,7 @@ def answer_operation_condition(
     first and ``test_an_async_generator_is_refused`` without the second.
     """
     ambient = ambient_pool(pool, reserved=reserved)
-    answer = when(**resolve_callable_kwargs(when, ambient))
+    answer = when(**pool_kwargs(when, ambient))
     if inspect.isawaitable(answer) or inspect.isasyncgen(answer):
         if inspect.iscoroutine(answer):
             answer.close()

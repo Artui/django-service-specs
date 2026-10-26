@@ -64,6 +64,8 @@ client as the work restarting.
 A parameter declaring one of these names is refused, because a spread argument
 must never be able to outrank the value dispatch seeded - a caller naming
 itself ``user`` is the case that matters. ``request`` and ``view`` are not here:
-they are an HTTP adapter's, and it registers them through ``PoolSeeds``, which
-reserves them the same way.
+they are ``CALL_SEEDS``, the call's own, which dispatch hands a callable naming
+one off the call's context. A transport may still register either through
+``PoolSeeds``, which reserves it the same way, and dispatch refuses a spec
+parameter of either name on every mount.
 """

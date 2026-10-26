@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -32,6 +33,10 @@ def server_owned_keys(
       (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it).
       A read marked ``reflected`` and named like a registered seed is here,
       since the seed fills it and the call takes no argument of its name;
+    - a read marked ``reflected`` and named ``request`` or ``view``, on any
+      mount: dispatch fills it from the call's context and refuses a caller's
+      argument of its name
+      (test_server_owned_keys_owns_a_reflected_read_named_either);
     - the keys each provider the dispatch runs is annotated to fill, as
       [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
       reads them: the spec's ``kwargs`` and, on a service spec, its
@@ -84,9 +89,16 @@ def server_owned_keys(
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
         owned -= spec.validator.parameters().names() & pool_seeds.names
     providers: list[Callable[..., Any] | None] = [spec.kwargs]
+    reads = [spec.reads]
     if isinstance(spec, ServiceSpec):
         target = spec.target_selector_spec()
         providers += [spec.input_data, None if target is None else target.kwargs]
+        if target is not None:
+            reads.append(target.reads)
+    # Not in ``pool_seeds.reserved``, which keeps its published answer, so
+    # added here. On a mount registering either name the seed's line above
+    # owns it already, and this adds nothing.
+    owned |= CALL_SEEDS & {param.name for seat in reads for param in seat if param.reflected}
     for provider in providers:
         keys = provider_keys(provider)
         if keys is not None:

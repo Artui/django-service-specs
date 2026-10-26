@@ -108,6 +108,7 @@ def authorize_target(
             seeds=seeds,
             pool_seeds=pool_seeds,
             question=OBJECT_LEVEL,
+            call_context=call_context,
         ),
     )
     for check in spec.permissions or ():
