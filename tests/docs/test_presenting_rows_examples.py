@@ -5,6 +5,7 @@ Each test is a statement the page makes about ``docs/examples/presenting_rows.py
 
 from __future__ import annotations
 
+from dataclasses import replace
 from decimal import Decimal
 from typing import Any
 
@@ -13,7 +14,7 @@ from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
-from django_service_specs import DispatchResult, present
+from django_service_specs import DispatchResult, PresentationContext, present
 from docs.examples import presenting_rows
 from tests.adapter_app.models import Author, Book, Edition
 
@@ -59,7 +60,21 @@ def test_the_count_is_one_query_however_many_rows_the_page_holds(
     assert grouped == [False, False, True]
 
 
-def test_one_book_alone_is_a_batch_of_one(books: list[Book]) -> None:
-    rendered = present(presenting_rows.books_spec, DispatchResult("instance", books[2]))
+def test_one_book_alone_is_a_batch_of_one_under_the_call_s_context(
+    ada: Any, books: list[Book]
+) -> None:
+    seen: list[Any] = []
+
+    class Recording(presenting_rows.BooksWithEditions):
+        def presented_rows(self, values: Any, context: Any) -> Any:
+            seen.append((values, context))
+            return super().presented_rows(values, context)
+
+    spec = replace(presenting_rows.books_spec, presenter=Recording())
+    context = PresentationContext(ada)
+
+    rendered = present(spec, DispatchResult("instance", books[2], context=context))
 
     assert rendered == {"id": books[2].pk, "title": "The Dispossessed", "editions": 1}
+    assert seen == [((books[2],), context)]
+    assert Recording().present(books[0])["editions"] == 2

@@ -37,8 +37,12 @@ class BooksWithEditions(Presenter):
         )
 
     def present(self, value: Book) -> dict[str, Any]:
-        # One book alone, as a retrieve presents it, is a batch of one.
-        return self.presented_rows((value,), None)[0]
+        return self.presented(value, None)
+
+    def presented(self, value: Book, context: PresentationContext | None) -> dict[str, Any]:
+        # One book alone, as a retrieve presents it, is a batch of one, under
+        # the same context a page's rows would be presented with.
+        return self.presented_rows((value,), context)[0]
 
     def presented_rows(
         self, values: Sequence[Book], context: PresentationContext | None

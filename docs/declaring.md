@@ -798,8 +798,9 @@ given. A selector spec's [affordances](affordances.md) are added to each
 presented row by its position, so `present` refuses an answer that is not a
 list, or whose length differs from the rows', with `ImproperlyConfigured`,
 whether or not the spec declares any. A single value, such as a retrieve's,
-still goes through `presented`; the example's `present` hands it to
-`presented_rows` as a batch of one, so both render the same fields.
+still goes through `presented`; the example's `presented` hands it to
+`presented_rows` as a batch of one, with the call's context, so both render
+the same fields.
 
 ## A variant of a spec
 
