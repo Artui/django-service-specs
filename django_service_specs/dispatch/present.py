@@ -24,7 +24,10 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     ``presenter_for_output()``: its own, or its output selector's when it
     declares none.
 
-    - ``kind="list"``: each item through the presenter, into a list. With no
+    - ``kind="list"``: every item through the presenter's ``presented_rows()``
+      in one call, which presents each in turn unless the presenter batches
+      over them. To serve a page, hand ``present`` a result holding the page's
+      rows, and those are the rows it receives. With no
       presenter the items are returned as they are, but still in a list: a
       queryset is evaluated here rather than handed back lazily, because
       ``apresent``'s caller is on the event loop, where the first iteration of
@@ -50,7 +53,8 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
     answers, untouched.
 
     **The call's context.** Each value is handed to the presenter's
-    ``presented()`` with ``result.context``, the
+    ``presented()``, or a list's to its ``presented_rows()``, with
+    ``result.context``, the
     [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
     dispatch built for the call, or ``None`` on a result it did not build.
     ``presented()`` is ``present()`` unless overridden, so a Presenter that
@@ -71,7 +75,8 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
             because it did not come through the selector that declares them.
             Also a presenter answering with a coroutine or an async generator,
             which is never awaited, so it is refused rather than handed back
-            as the payload.
+            as the payload; and a ``presented_rows()`` answering with anything
+            but a list of one presented value per row.
     """
     spec = kernel_spec(spec)
     if result.kind == "not_found":
@@ -99,7 +104,7 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
         items = list(value)
         if presenter is None:
             return items
-        payload = [_presented(presenter, item, result.context) for item in items]
+        payload = _presented_rows(presenter, items, result.context)
         if affordances is None:
             return payload
         return with_affordances(payload, items, affordances, many=True)
@@ -117,6 +122,57 @@ def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResul
 def _presented(presenter: Presenter, value: Any, context: PresentationContext | None) -> Any:
     """``presenter.presented(value, context)``, refusing an answer still to be awaited.
 
+    One value: a list is presented by ``_presented_rows`` instead.
+    """
+    return _row(presenter, presenter.presented(value, context))
+
+
+def _presented_rows(
+    presenter: Presenter, items: list[Any], context: PresentationContext | None
+) -> list[Any]:
+    """``presenter.presented_rows(items, context)``, refusing an answer that does not line up.
+
+    One call for the whole list, so a presenter can batch a lookup over the
+    rows. They are handed over as a tuple, so an override cannot reorder the
+    list the affordances are then walked from
+    (test_the_rows_are_handed_over_as_a_tuple). Each guard holds its own case
+    in ``TestPresentedRows``:
+
+    - the answer itself still to be awaited, an ``async def presented_rows``
+      in effect (test_an_answer_still_to_be_awaited_is_refused);
+    - an answer that is not a list, which a tuple would pass silently and a
+      generator or a dict would not survive ``len()`` or would give its keys
+      (test_an_answer_that_is_not_a_list_is_refused);
+    - a length differing from the rows', refused whatever the spec declares:
+      with no affordances it would otherwise pass unnoticed, and with them it
+      would reach ``with_affordances``, which pairs rows by position
+      (test_an_answer_with_a_row_too_few_or_too_many_is_refused, and
+      test_a_mismatch_is_refused_before_the_answers_are_walked_against_it);
+    - each row still to be awaited, which is how the default's ``presented()``
+      per row reports a coroutine
+      (test_a_presenter_answering_with_a_coroutine_is_refused, ``list``).
+    """
+    asked = f"{type(presenter).__qualname__}.presented_rows"
+    answer = sync_result(
+        presenter.presented_rows(tuple(items), context), asked=asked, seat="A presenter"
+    )
+    if not isinstance(answer, list):
+        raise ImproperlyConfigured(
+            f"{asked} answered with {type(answer).__name__!r} where a list is expected. "
+            "Return one presented value per row, in the order given."
+        )
+    if len(answer) != len(items):
+        raise ImproperlyConfigured(
+            f"{asked} answered with a list of {len(answer)} for {len(items)} rows. Return "
+            "one presented value per row, in the order given: affordances are added to "
+            "each presented row by its position."
+        )
+    return [_row(presenter, row) for row in answer]
+
+
+def _row(presenter: Presenter, answer: Any) -> Any:
+    """One presented row, refusing it while it is still to be awaited.
+
     ``present`` is sync-only and runs after the write has committed, so an
     answer that is a coroutine - a decorated ``async def present`` - would
     otherwise be returned as the payload and serialized as garbage, or not at
@@ -124,8 +180,4 @@ def _presented(presenter: Presenter, value: Any, context: PresentationContext | 
     (test_a_presenter_answering_with_a_coroutine_is_refused, ``list``) and one
     row (the same test, ``instance``).
     """
-    return sync_result(
-        presenter.presented(value, context),
-        asked=f"{type(presenter).__qualname__}.present",
-        seat="A presenter",
-    )
+    return sync_result(answer, asked=f"{type(presenter).__qualname__}.present", seat="A presenter")

@@ -239,6 +239,16 @@ class TestPresent:
     def test_none_is_presented_as_none(self) -> None:
         assert PydanticPresenter(Everything).present(None) is None
 
+    def test_a_list_s_rows_are_each_presented_by_the_inherited_default(self) -> None:
+        rows = (
+            SimpleNamespace(first_name="Ada", note="hi"),
+            SimpleNamespace(first_name="Bo", note="yo"),
+        )
+        assert PydanticPresenter(_Wire).presented_rows(rows, None) == [
+            {"firstName": "Ada", "memo": "hi"},
+            {"firstName": "Bo", "memo": "yo"},
+        ]
+
     def test_keys_are_the_output_names(self) -> None:
         presented = PydanticPresenter(_Wire).present(SimpleNamespace(first_name="Ada", note="hi"))
         assert presented == {"firstName": "Ada", "memo": "hi"}

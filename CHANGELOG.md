@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`Presenter.presented_rows(values, context)`**, the method dispatch's
+  `present` calls once for a list result, with every row being presented as a
+  tuple and the context they share. A transport serving a page presents the
+  page's rows, so a Presenter that overrides it can batch a lookup over the
+  page - one query for every row rather than one per row. The default is
+  `presented(value, context)` for each row, so every existing Presenter,
+  `DataclassPresenter` and `PydanticPresenter` included, presents exactly as
+  before. `present`, and through it `present_for_audience` and `apresent`,
+  refuses an answer that is not a list, or whose length differs from the
+  rows', with `ImproperlyConfigured`, because a selector spec's affordances
+  are added to each presented row by its position; an answer still to be
+  awaited is refused as `presented`'s is.
+
 ## [0.15.0] — 2026-10-22
 
 ### Added

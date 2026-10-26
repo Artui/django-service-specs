@@ -706,9 +706,10 @@ the Validator:
   renders it, and still reads the declaration.
 - `present(value)` renders **one** value. Dispatch's
   [`present`][django_service_specs.dispatch.present.present] hands a list's
-  items over one at a time, so a Presenter never has to guess whether it was
-  given a row or a collection. It may query, and it is sync-only: an
-  `async def` `present` is refused when the spec is built.
+  items over one at a time unless the Presenter batches them (below), so a
+  Presenter never has to guess whether it was given a row or a collection. It
+  may query, and it is sync-only: an `async def` `present` is refused when the
+  spec is built.
 - `presented(value, context)` is what dispatch's `present` calls: the value,
   and the call's
   [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
@@ -723,6 +724,11 @@ the Validator:
   registered as a seed - overrides it. Dispatch carries the context on the
   `DispatchResult` as `context`; a result built by hand has none, and is
   presented with `None`.
+- `presented_rows(values, context)` is what dispatch's `present` calls for a
+  list: every row at once, as a tuple, with the one context they all share.
+  The default is `presented(value, context)` for each row, so only a
+  Presenter that batches something over its rows overrides it
+  ([presenting a page in one call](#presenting-a-page-in-one-call)).
 
 An `OutputField`'s type is one of the JSON types, or `any` for a value whose
 JSON type is open, such as a computed field or a JSON column: its schema is
@@ -763,6 +769,37 @@ A read's presenter is its own `presenter`. A write's is its own, or its output
 selector's when it declares none, and declaring both is refused. A presenter on
 an instance or collection selector is never read, because the service consumes
 those rows rather than returning them.
+
+### Presenting a page in one call
+
+A Presenter that looks something up for each row - a count, a related record
+from another store, a permission answered per row - would otherwise ask once
+per row. `presented_rows` hands it every row being presented, so it asks once:
+
+```python
+--8<--
+docs/examples/presenting_rows.py:batching
+--8<--
+```
+
+The rows are the ones being presented and no others. A transport serving one
+page slices the result before presenting it, so `presented_rows` receives the
+page's rows rather than the whole catalogue, and the lookup is one query
+whichever page size the caller asked for:
+
+```python
+--8<--
+docs/examples/presenting_rows.py:page
+--8<--
+```
+
+Return a list with one presented value per row, in the order the rows were
+given. A selector spec's [affordances](affordances.md) are added to each
+presented row by its position, so `present` refuses an answer that is not a
+list, or whose length differs from the rows', with `ImproperlyConfigured`,
+whether or not the spec declares any. A single value, such as a retrieve's,
+still goes through `presented`; the example's `present` hands it to
+`presented_rows` as a batch of one, so both render the same fields.
 
 ## A variant of a spec
 

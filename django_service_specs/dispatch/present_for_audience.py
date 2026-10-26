@@ -46,8 +46,10 @@ def present_for_audience(
     To serve one page, page the result's value first and present the page's
     rows: ``present_for_audience(spec, replace(result, value=page.items))``,
     then [`envelope`][django_service_specs.types.output_page.OutputPage.envelope]
-    what comes back. The envelope's keys belong to no ``Output``, so the
-    projection must never walk them. Whether to page is read off the spec,
+    what comes back. The presenter's ``presented_rows()`` is then called once,
+    with the page's rows and no others, so a lookup it batches over them
+    costs the same whatever the size of the whole set. The envelope's keys
+    belong to no ``Output``, so the projection must never walk them. Whether to page is read off the spec,
     never off the result's kind: a ``LIST`` selector spec, or a service spec
     whose output selector is a ``LIST``, is paged, while a ``many`` or
     ``returns_many`` service spec's ``kind="list"`` is every row its service
