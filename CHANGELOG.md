@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-10-26
+
 ### Added
 - **The call's `request` and `view` for every callable `dispatch` and
   `adispatch` bind**, read off `call_context`: the very objects the transport
@@ -2004,7 +2006,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Artui/django-service-specs/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Artui/django-service-specs/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Artui/django-service-specs/compare/v0.14.0...v0.15.0
