@@ -41,3 +41,23 @@ def test_by_default_a_value_is_presented_whatever_the_call() -> None:
 
     assert _Doubling().presented(2, None) == 4
     assert _Doubling().presented(3, object()) == 6
+
+
+def test_by_default_a_list_is_each_of_its_rows_presented_with_the_one_context() -> None:
+    """``presented_rows()`` is what dispatch's ``present`` asks for a list; a
+    presenter that batches nothing overrides ``present()`` or ``presented()``."""
+
+    class _Tagging(Presenter):
+        def output(self) -> Output:
+            return Output()
+
+        def present(self, value: Any) -> Any:
+            return value
+
+        def presented(self, value: Any, context: Any) -> Any:
+            return (value, context)
+
+    context = object()
+
+    assert _Tagging().presented_rows((1, 2), context) == [(1, context), (2, context)]
+    assert _Tagging().presented_rows((), None) == []

@@ -638,9 +638,9 @@ def _check_shapes(spec: ServiceSpec) -> None:
     """Refuse ``shapes`` that are not Parameters, name a seed, or repeat a read or the list.
 
     At construction, as the reads are: none of it needs the Validator. A
-    shape never reaches a pool today, and a seed's name is refused anyway, so
-    the names a pool may one day carry stay free of the seeds, as every
-    parameter's are. On a ``many`` spec the list is beside them, which
+    shape never reaches a pool under its own name - the pool carries them
+    all as the ``shapes`` seed - and a seed's name is refused anyway, as
+    every parameter's is, ``shapes`` included. On a ``many`` spec the list is beside them, which
     ``_check_many`` has already proved can be built.
     """
     if not isinstance(spec.shapes, Parameters):
@@ -662,7 +662,8 @@ _Seat = tuple[str, Parameters, str | None]
 def _read_seats(spec: ServiceSpec) -> list[_Seat]:
     """The spec's ``reads``, its target selector's and its ``shapes``: the seats known at construction.
 
-    No provider's values reach the shapes, which only the presenter reads.
+    No provider's values reach the shapes, which the presenter and the
+    ``shapes`` seed read.
     """
     seats: list[_Seat] = [
         ("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs"),

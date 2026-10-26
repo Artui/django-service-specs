@@ -7,6 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-10-26
+
+### Added
+- **`Presenter.presented_rows(values, context)`**, the method dispatch's
+  `present` calls once for a list result, with every row being presented as a
+  tuple and the context they share. A transport serving a page presents the
+  page's rows, so a Presenter that overrides it can batch a lookup over the
+  page - one query for every row rather than one per row. The default is
+  `presented(value, context)` for each row, so every existing Presenter,
+  `DataclassPresenter` and `PydanticPresenter` included, presents exactly as
+  before. `present`, and through it `present_for_audience` and `apresent`,
+  refuses an answer that is not a list, or whose length differs from the
+  rows', with `ImproperlyConfigured`, because a selector spec's affordances
+  are added to each presented row by its position. An `async def
+  presented_rows` is refused when the spec is built, as an async `present` or
+  `presented` is, and an answer still to be awaited is refused where it is read.
+- **`call_context["transport"]` is documented as the family's key for naming
+  the transport serving a call**: `"agent"`, which django-spec-agents sets on
+  every call, and `"http"` and `"mcp"` for an HTTP and an MCP transport. The
+  transport sets it, replacing an entry already there, so a provider, a
+  condition or a presenter reads one key under every transport. It is a
+  convention only: the kernel neither sets nor checks it and defines no
+  constant for it, so a dict built by hand or handed to `dispatch` directly
+  has none, and a stage reads it with `.get`. Described in the dispatching
+  guide and on `ValidationContext` and `PresentationContext`.
+- **A `shapes` pool seed**: what the caller sent for the spec's `shapes`,
+  keyed by shape name and read-only - the mapping the presenter reads as
+  `PresentationContext.shapes`, so a selector can load what the presenter
+  will render, as django-restql's `query` needs. Every callable dispatch
+  resolves receives it by naming `shapes`: a selector and its
+  `extend_queryset`, a `kwargs` or `input_data` provider, a precondition, the
+  run's `progress_reporter`, the service, and a service spec's output
+  selector, which is handed the write's shapes. A spec declaring no shapes
+  hands an empty mapping. A `**kwargs` catch-all is never handed it, as it is
+  never handed `call_context`; an affordance condition naming it is refused
+  when declared, since what the caller sent would decide availability; the
+  Validator never sees it, and neither context's `ambient` holds it. A
+  service spec's target selector is handed an empty mapping on every route,
+  not the write's shapes: `resolve_target` checks only the target's own
+  parameters, so its lookup has none, and a lookup that read them under
+  `dispatch` would find a different row from the one `resolve_target` found.
+  A target selector naming `shapes` is not refused, since it is often a
+  read's own selector reused.
+  It is in `server_owned_keys`, so no transport asks a caller for it.
+  Described in the dispatching guide's pool seeds and on the paging page,
+  whose example joins a book's author only when the caller chose it.
+
+### Changed
+- **Breaking: `shapes` is a reserved pool name**, in `RESERVED_POOL_SEEDS`.
+  A read, shape or `many` list named `shapes` is refused when the spec is
+  built, and a Validator field of that name when the spec's
+  parameters are first read, which is a transport's registration or the first
+  dispatch. A provider, overlay or Validator value returned under it is
+  refused when the call is dispatched. Rename the declaration for what it
+  holds - `fields`, `query` - and have the callable that read it declare
+  `shapes` instead; the refusals of a read, shape, `many` list or Validator
+  field say so, and the provider, overlay and Validator-value refusals name
+  the key without saying it. `PoolSeeds.extend()` refuses a seed of that name
+  and says to register it under another. An affordance condition taking a
+  parameter named `shapes` is refused at its declaration. A transport or test
+  pinning the reserved set exactly sees one more name. A drfs user on the
+  kernel route sees it differently: a serializer field named `shapes` leaves
+  the input schema, and a required one makes the spec uncallable; a
+  `QueryParam` or `UrlKwarg` named `shapes` is refused with drfs's own
+  message when the spec is compiled for the kernel, and
+  `validate_channel_names` refuses either.
+- **`spec_output_schema` promises no field of a row for a spec declaring
+  `shapes`.** A shape is the presenter's to apply, and a `fields` selection
+  there leaves keys out, so the item now lists no `required` at any depth -
+  the item itself, a nested object, an array's rows - wherever it sits: a
+  retrieve's item, an array's `items`, or a page's. Every field is still
+  described. The `affordances` object dispatch adds to each row stays
+  required, with its answers' schema unchanged, and the paging envelope keeps
+  its `items`, `page`, `totalPages` and `hasNext`. A spec declaring no shapes
+  is described exactly as before, and `output_schema` is unchanged. A caller
+  of `spec_output_schema` that read a shaped spec's `required` to learn which
+  keys every row carries sees none; `always_present=False` is still how a
+  presenter says a key is left out of some rows of a spec declaring none.
+  Among the family's transports only django-spec-agents reads this schema,
+  and it already advertised a shaped spec's schema this way, so what its
+  tools advertise is unchanged.
+
 ## [0.15.0] — 2026-10-22
 
 ### Added
@@ -1835,7 +1917,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/Artui/django-service-specs/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Artui/django-service-specs/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Artui/django-service-specs/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Artui/django-service-specs/compare/v0.12.0...v0.13.0

@@ -22,8 +22,8 @@ sequence.
 The service, the selector, `extend_queryset`, the providers, the preconditions
 and a pool seed's resolver are all called the same way: with the keywords their signature declares, picked from a
 pool dispatch builds for the call, and nothing else. A callable that takes
-`**kwargs` receives the whole pool but `call_context`, which reaches a
-callable only by its name.
+`**kwargs` receives the whole pool but `call_context` and `shapes`, which
+reach a callable only by their names.
 
 | Name | Holds | In the pool of |
 | --- | --- | --- |
@@ -41,9 +41,10 @@ callable only by its name.
 | `queryset` | The shaped queryset so far | `extend_queryset` |
 | a registered seed | Its resolver's value | Every callable |
 | `call_context` | [The call's context](dispatching.md#the-calls-context): the transport's dict, or a fresh one | Every callable dispatch resolves that names it, never a `**kwargs` catch-all; not a seed's resolver or a `filter_set` |
+| `shapes` | [The call's shapes](dispatching.md#the-calls-shapes): what the caller sent for the spec's `shapes`, read-only, empty on a spec declaring none | Every callable dispatch resolves that names it but an affordance condition and a write's target selector, never a `**kwargs` catch-all; not a seed's resolver, a `filter_set` or the Validator |
 
 The fixed names - `user`, `progress`, `data`, `instance`, `collection`,
-`result`, `queryset` and `call_context` - are
+`result`, `queryset`, `call_context` and `shapes` - are
 [reserved][django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS]:
 a parameter declared under one is refused, and so is a validated value
 returned under one, so an argument can never outrank a value dispatch put in
@@ -155,10 +156,13 @@ the selector runs.
 renders rather than which rows are read: which fields, a query over each row.
 They are Parameters of their own and part of `spec.parameters()`, after the
 reads, so the schema, the closed argument set and the shape check cover them
-as any argument. They are never in the selector's pool, so the selector, its
-`extend_queryset` and its `filter_set` never see them: what the caller sent
-for them reaches the presenter alone, on
-[`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext].
+as any argument. No shape is in the selector's pool under its own name, so
+the selector, its `extend_queryset` and its `filter_set` never receive one as
+an argument: what the caller sent for them reaches the presenter on
+[`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext],
+and any callable that names [the `shapes` seed](dispatching.md#the-calls-shapes),
+which holds the same mapping. A selector that eager-loads by the query its
+presenter renders reads it there.
 A shape a read or a filter also declares is refused when the spec is built,
 as is one named for a seed dispatch provides and one the `kwargs` provider is
 annotated to fill, since no provider's values reach them. A presenter reading
@@ -243,9 +247,13 @@ by - named after a selector spec's. They are checked as a read's are and
 handed to each callable that declares them, never to the Validator.
 
 `shapes` are the arguments that shape what the presenter renders, as on a
-read: never handed to the Validator, a provider, a selector or the service,
-and reaching the presenter alone, whether that is the spec's own or its output
-selector's. A selector nested in a write, its target or its output selector,
+read: never handed to the Validator, a provider, a selector or the service
+under their own names, and reaching the presenter, whether that is the spec's
+own or its output selector's. A callable that names
+[the `shapes` seed](dispatching.md#the-calls-shapes) is handed them, the output
+selector included, but not the Validator, an affordance condition, a seed's
+resolver, a `filter_set` or the write's target selector, whose lookup is the
+same on every route and is handed none. A selector nested in a write, its target or its output selector,
 declaring shapes of its own is refused: the write's call is the one presented,
 so they are declared on the write.
 
@@ -706,9 +714,10 @@ the Validator:
   renders it, and still reads the declaration.
 - `present(value)` renders **one** value. Dispatch's
   [`present`][django_service_specs.dispatch.present.present] hands a list's
-  items over one at a time, so a Presenter never has to guess whether it was
-  given a row or a collection. It may query, and it is sync-only: an
-  `async def` `present` is refused when the spec is built.
+  items over one at a time unless the Presenter batches them (below), so a
+  Presenter never has to guess whether it was given a row or a collection. It
+  may query, and it is sync-only: an `async def` `present` is refused when the
+  spec is built.
 - `presented(value, context)` is what dispatch's `present` calls: the value,
   and the call's
   [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext],
@@ -723,6 +732,11 @@ the Validator:
   registered as a seed - overrides it. Dispatch carries the context on the
   `DispatchResult` as `context`; a result built by hand has none, and is
   presented with `None`.
+- `presented_rows(values, context)` is what dispatch's `present` calls for a
+  list: every row at once, as a tuple, with the one context they all share.
+  The default is `presented(value, context)` for each row, so only a
+  Presenter that batches something over its rows overrides it
+  ([presenting a page in one call](#presenting-a-page-in-one-call)).
 
 An `OutputField`'s type is one of the JSON types, or `any` for a value whose
 JSON type is open, such as a computed field or a JSON column: its schema is
@@ -763,6 +777,38 @@ A read's presenter is its own `presenter`. A write's is its own, or its output
 selector's when it declares none, and declaring both is refused. A presenter on
 an instance or collection selector is never read, because the service consumes
 those rows rather than returning them.
+
+### Presenting a page in one call
+
+A Presenter that looks something up for each row - a count, a related record
+from another store, a permission answered per row - would otherwise ask once
+per row. `presented_rows` hands it every row being presented, so it asks once:
+
+```python
+--8<--
+docs/examples/presenting_rows.py:batching
+--8<--
+```
+
+The rows are the ones being presented and no others. A transport serving one
+page slices the result before presenting it, so `presented_rows` receives the
+page's rows rather than the whole catalogue, and the lookup is one query
+whichever page size the caller asked for:
+
+```python
+--8<--
+docs/examples/presenting_rows.py:page
+--8<--
+```
+
+Return a list with one presented value per row, in the order the rows were
+given. A selector spec's [affordances](affordances.md) are added to each
+presented row by its position, so `present` refuses an answer that is not a
+list, or whose length differs from the rows', with `ImproperlyConfigured`,
+whether or not the spec declares any. A single value, such as a retrieve's,
+still goes through `presented`; the example's `presented` hands it to
+`presented_rows` as a batch of one, with the call's context, so both render
+the same fields.
 
 ## A variant of a spec
 

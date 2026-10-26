@@ -215,6 +215,11 @@ class _AsyncPresented(Named):
         return {"name": str(value)}
 
 
+class _AsyncPresentedRows(Named):
+    async def presented_rows(self, values: Any, context: Any) -> Any:  # What a list asks for.
+        return [{"name": str(value)} for value in values]
+
+
 class TestAnAsyncPresenterIsRefused:
     """``present`` is called from sync code on both entry points and never awaited."""
 
@@ -232,6 +237,14 @@ class TestAnAsyncPresenterIsRefused:
         named = "ServiceSpec.presenter.presented is _AsyncPresented.presented, an async callable"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
             ServiceSpec(service=_service, presenter=_AsyncPresented())
+
+    def test_an_async_presented_rows_is_refused_too(self) -> None:
+        named = (
+            "ServiceSpec.presenter.presented_rows is _AsyncPresentedRows.presented_rows, "
+            "an async callable"
+        )
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            ServiceSpec(service=_service, presenter=_AsyncPresentedRows())
 
     def test_a_sync_presenter_is_accepted(self) -> None:
         presenter = Named()

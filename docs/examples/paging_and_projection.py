@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
@@ -130,8 +131,9 @@ class ChosenFields(Presenter):
         return Output(
             (
                 OutputField("id", "integer"),
-                # Left out of a row whose caller did not choose them, so a
-                # schema must not call them required.
+                # Left out of a row whose caller did not choose them. The
+                # schema of a spec declaring shapes requires no field of a row
+                # anyway, since a selection can leave out any of them.
                 OutputField("title", "string", always_present=False),
                 OutputField("price", "string", always_present=False),
             )
@@ -165,3 +167,60 @@ pick_books_spec = SelectorSpec(
     ),
 )
 # --8<-- [end:shapes]
+
+
+# --8<-- [start:shapes_seed]
+class ChosenFieldsAndAuthor(Presenter):
+    """Each book with its handle and the fields the caller chose, its author among them."""
+
+    def output(self) -> Output:
+        return Output(
+            (
+                OutputField("id", "integer"),
+                OutputField("title", "string", always_present=False),
+                OutputField("price", "string", always_present=False),
+                OutputField("author", "string", always_present=False),
+            )
+        )
+
+    def present(self, value: Book) -> dict[str, Any]:
+        return self.presented(value, None)
+
+    def presented(self, value: Book, context: PresentationContext | None) -> dict[str, Any]:
+        chosen = context.shapes.get("fields") if context is not None else None
+        fields = {
+            "title": lambda: value.title,
+            "price": lambda: str(value.price),
+            # Read only when chosen: the author is a row of its own.
+            "author": lambda: value.author.name,
+        }
+        names = fields if chosen is None else chosen  # not sent: every field
+        return {"id": value.pk, **{name: fields[name]() for name in names}}
+
+
+def catalogue_for(*, user: Any, shapes: Mapping[str, Any]) -> QuerySet[Book]:
+    books = Book.objects.order_by("pk")
+    # What the presenter will render decides what is worth joining: the
+    # author's row only when the caller chose it, or chose nothing.
+    if "author" in shapes.get("fields", ["author"]):
+        books = books.select_related("author")
+    return books
+
+
+pick_books_and_authors_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=catalogue_for,  # handed the "shapes" seed, never "fields"
+    permissions=[IsSignedIn()],
+    presenter=ChosenFieldsAndAuthor(),
+    shapes=Parameters.of(
+        Parameter(
+            "fields",
+            "array",
+            items="string",
+            choices=["title", "price", "author"],
+            required=False,
+            json_schema_extra={"uniqueItems": True},
+        )
+    ),
+)
+# --8<-- [end:shapes_seed]

@@ -117,6 +117,31 @@ def test_a_presenter_answering_with_a_coroutine_is_refused(kind: SelectorKind, v
     ]
 
 
+@pytest.mark.parametrize(
+    "rows",
+    [
+        pytest.param([Row("a"), Row("b"), Row("c")], id="every-row-a-coroutine"),
+        pytest.param([Row("a"), {"title": "b"}, Row("c")], id="a-presented-row-among-them"),
+    ],
+)
+def test_every_row_still_to_be_awaited_is_closed(rows: list[Any]) -> None:
+    """The first refused, and every other row's coroutine closed with it."""
+
+    class Mixed(Awaiting):
+        def present(self, value: Any) -> Any:
+            return value if isinstance(value, dict) else super().present(value)
+
+    presenter = Mixed()
+
+    with pytest.raises(ImproperlyConfigured):
+        present(selector_spec(LIST, presenter), DispatchResult("list", rows))
+
+    assert len(presenter.answers) == (2 if isinstance(rows[1], dict) else 3)
+    assert {inspect.getcoroutinestate(answer) for answer in presenter.answers} == {
+        inspect.CORO_CLOSED
+    }
+
+
 def test_an_instance_with_no_presenter_is_returned_as_it_is() -> None:
     row = Row("a")
 
@@ -697,3 +722,171 @@ def test_every_row_of_one_result_shares_its_call_context_and_its_shapes() -> Non
     assert rendered == [{"title": "a", "n": 1}, {"title": "b", "n": 2}]
     assert all(seen is context for seen in presenter.contexts)
     assert call_context == {"rows": 2}
+
+
+class Batching(NoteRows):
+    """Presents a list in one call: one lookup over its rows, then each row with its share.
+
+    The lookup is each title's rank among the titles it was handed, which no
+    single row can answer, so a presenter asked row by row could not give it.
+    ``answer`` replaces what is handed back, for the refusals.
+    """
+
+    def __init__(self, answer: Callable[[list[Any]], Any] | None = None) -> None:
+        self.calls: list[tuple[Any, PresentationContext | None]] = []
+        self.answer = answer
+
+    def presented_rows(self, values: Any, context: PresentationContext | None) -> Any:
+        self.calls.append((values, context))
+        rows = [self.present(value) for value in values]
+        if self.answer is not None:
+            return self.answer(rows)
+        titles = sorted(row["title"] for row in rows)
+        return [{**row, "rank": titles.index(row["title"])} for row in rows]
+
+
+MAPPING_ROWS = ({"id": 1, "title": "a"}, {"id": 2, "title": "b"})
+
+
+@pytest.mark.django_db
+class TestPresentedRows:
+    def test_a_page_is_presented_in_one_call_and_each_row_keeps_its_answers(
+        self, ada: Any, two_notes: Any
+    ) -> None:
+        live, archived = two_notes
+        Note.objects.create(owner=ada, title="past the page")
+        presenter = Batching()
+        spec = listing(presenter=presenter)
+        result = dispatch(spec, principal=ada, arguments={})
+
+        page = paginate_output(result.value, limit=2)
+        payload = present(spec, replace(result, value=page.items))
+
+        [(rows, context)] = presenter.calls
+        assert list(rows) == [live, archived]
+        assert context is result.context
+        # The ranks are the batch's answer and the affordances each row's own:
+        # "archived" ranks first among the page's titles and is the row that
+        # may not be renamed, so a payload walked against the wrong rows fails.
+        assert json.loads(json.dumps(payload)) == [
+            {
+                "id": live.pk,
+                "title": "live",
+                "rank": 1,
+                "affordances": {"rename": {"available": True}, "edit": {"available": True}},
+            },
+            {
+                "id": archived.pk,
+                "title": "archived",
+                "rank": 0,
+                "affordances": {"rename": REFUSED_ARCHIVED, "edit": {"available": True}},
+            },
+        ]
+
+    def test_the_rows_are_handed_over_as_a_tuple(self) -> None:
+        """A tuple, so an override cannot reorder the rows the answers are walked from."""
+        presenter = Batching()
+
+        present(selector_spec(LIST, presenter), DispatchResult("list", iter(MAPPING_ROWS)))
+
+        [(rows, _)] = presenter.calls
+        assert rows == MAPPING_ROWS
+
+    def test_a_page_presented_for_an_audience_is_presented_in_one_call(self, ada: Any) -> None:
+        for title in ("a", "b", "c"):
+            Note.objects.create(owner=ada, title=title)
+        presenter = Batching()
+        spec = selector_spec(LIST, presenter)
+        result = dispatch(spec, principal=ada, arguments={})
+
+        page = paginate_output(result.value, limit=2)
+        payload = present_for_audience(spec, replace(result, value=page.items))
+
+        [(rows, _)] = presenter.calls
+        assert [row.title for row in rows] == ["a", "b"]
+        assert [row["rank"] for row in payload] == [0, 1]
+
+    @pytest.mark.parametrize(
+        ("answer", "count"),
+        [(lambda rows: rows[:1], 1), (lambda rows: [*rows, rows[0]], 3)],
+        ids=["short", "long"],
+    )
+    def test_an_answer_with_a_row_too_few_or_too_many_is_refused(
+        self, answer: Callable[[list[Any]], Any], count: int
+    ) -> None:
+        """No affordances declared, so nothing downstream would notice the mismatch."""
+        spec = selector_spec(LIST, Batching(answer))
+
+        with pytest.raises(ImproperlyConfigured) as caught:
+            present(spec, DispatchResult("list", MAPPING_ROWS))
+
+        assert str(caught.value).startswith(
+            f"Batching.presented_rows answered with a list of {count} for 2 rows."
+        )
+
+    def test_a_mismatch_is_refused_before_the_answers_are_walked_against_it(
+        self, ada: Any, two_notes: Any
+    ) -> None:
+        spec = listing(presenter=Batching(lambda rows: rows[:1]))
+        result = dispatch(spec, principal=ada, arguments={})
+
+        with pytest.raises(ImproperlyConfigured) as caught:
+            present(spec, result)
+
+        # The refusal is this one, not with_affordances' strict zip, which
+        # would answer a mismatch too, as a ValueError.
+        assert str(caught.value).startswith(
+            "Batching.presented_rows answered with a list of 1 for 2 rows."
+        )
+        assert "zip()" not in str(caught.value)
+
+    @pytest.mark.parametrize(
+        ("answer", "kind"),
+        [
+            (tuple, "tuple"),
+            (lambda rows: (row for row in rows), "generator"),
+            (lambda rows: dict(enumerate(rows)), "dict"),
+        ],
+        ids=["tuple", "generator", "dict"],
+    )
+    def test_an_answer_that_is_not_a_list_is_refused(
+        self, answer: Callable[[list[Any]], Any], kind: str
+    ) -> None:
+        spec = selector_spec(LIST, Batching(answer))
+
+        with pytest.raises(ImproperlyConfigured) as caught:
+            present(spec, DispatchResult("list", MAPPING_ROWS))
+
+        assert str(caught.value).startswith(
+            f"Batching.presented_rows answered with {kind!r} where a list is expected."
+        )
+
+    def test_an_answer_still_to_be_awaited_is_refused(self) -> None:
+        answers: list[Any] = []
+
+        def awaiting(rows: list[Any]) -> Any:
+            async def presented() -> list[Any]:
+                return rows
+
+            answers.append(presented())
+            return answers[-1]
+
+        spec = selector_spec(LIST, Batching(awaiting))
+
+        with pytest.raises(ImproperlyConfigured) as caught:
+            present(spec, DispatchResult("list", MAPPING_ROWS))
+
+        assert str(caught.value).startswith(
+            "Batching.presented_rows answered with an awaitable (coroutine). A presenter is"
+        )
+        assert [inspect.getcoroutinestate(answer) for answer in answers] == [inspect.CORO_CLOSED]
+
+    def test_an_instance_is_still_presented_alone(self) -> None:
+        presenter = Batching()
+
+        rendered = present(
+            selector_spec(presenter=presenter), DispatchResult("instance", MAPPING_ROWS[0])
+        )
+
+        assert rendered == {"id": 1, "title": "a"}
+        assert presenter.calls == []

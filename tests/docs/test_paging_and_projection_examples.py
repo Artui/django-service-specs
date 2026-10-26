@@ -220,10 +220,13 @@ class TestShapes:
         assert shaped[0] == {"id": books[0].pk, "price": "9.99"}
         assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
 
-    def test_only_the_key_every_row_carries_is_required(self) -> None:
+    def test_a_shaped_list_requires_no_field_of_a_row(self) -> None:
+        # ``id`` is in every row this presenter renders, and still not
+        # promised: the kernel cannot see which keys a shape leaves out.
         schema = spec_output_schema(paging_and_projection.pick_books_spec)
         assert schema is not None
-        assert schema["items"]["required"] == ["id"]
+        assert "required" not in schema["items"]
+        assert set(schema["items"]["properties"]) == {"id", "title", "price"}
 
     def test_dispatch_hands_the_presenter_the_shapes_the_caller_sent(
         self, ada: Any, books: list[Book]
@@ -235,3 +238,29 @@ class TestShapes:
 
         assert chosen[0] == {"id": books[0].pk, "price": "9.99"}
         assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
+
+    @pytest.mark.parametrize(
+        ("arguments", "joined"),
+        [
+            ({"fields": ["author"]}, {"author": {}}),
+            ({"fields": ["title"]}, False),
+            ({}, {"author": {}}),
+        ],
+        ids=["author-chosen", "author-left-out", "nothing-chosen"],
+    )
+    def test_the_selector_joins_what_the_chosen_fields_need_and_each_page_is_one_query(
+        self,
+        ada: Any,
+        books: list[Book],
+        arguments: dict[str, Any],
+        joined: Any,
+        django_assert_num_queries: Any,
+    ) -> None:
+        """The ``shapes`` seed hands the selector what the presenter renders."""
+        spec = paging_and_projection.pick_books_and_authors_spec
+        result = dispatch(spec, principal=ada, arguments=arguments)
+        assert result.value.query.select_related == joined
+        with django_assert_num_queries(1):
+            rows = present(spec, result)
+        assert len(rows) == len(books)
+        assert set(rows[0]) == {"id", *arguments.get("fields", ["title", "price", "author"])}

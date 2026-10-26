@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
+from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -51,6 +53,14 @@ def listing(**kwargs: object) -> SelectorSpec:
 def test_a_spec_with_no_provider_owns_only_the_seeded_names() -> None:
     assert server_owned_keys(listing()) == RESERVED_POOL_SEEDS
     assert server_owned_keys(ServiceSpec(service=print)) == RESERVED_POOL_SEEDS
+
+
+def test_the_shapes_seed_is_owned_and_never_asked_of_the_caller() -> None:
+    """The seed is the server's; the shapes it carries are the caller's, by their own names."""
+    shaped = listing(shapes=Parameters.of(Parameter("query", "string")))
+    assert "shapes" in server_owned_keys(shaped)
+    assert "query" not in server_owned_keys(shaped)
+    assert set(spec_input_schema(shaped)["properties"]) == {"query"}
 
 
 def test_the_keys_a_provider_fills_are_the_server_s_and_those_it_may_decline_are_not() -> None:

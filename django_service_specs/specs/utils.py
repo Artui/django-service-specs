@@ -14,6 +14,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.types.is_async import is_async
+from django_service_specs.types.utils import SHAPES, SHAPES_RENAME
 
 # The methods dispatch reads a permission check's answer from.
 _CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
@@ -160,7 +161,7 @@ def check_permissions(
 
 
 def check_presenter(presenter: Presenter | None, *, label: str) -> None:
-    """Refuse a presenter that is not a ``Presenter`` instance, or whose ``present`` or ``presented`` is async.
+    """Refuse a presenter that is not a ``Presenter`` instance, or with an async ``present``, ``presented`` or ``presented_rows``.
 
     ``present`` is called from sync code on both entry points and never
     awaited, so an ``async def`` one would hand a transport a coroutine where
@@ -176,8 +177,9 @@ def check_presenter(presenter: Presenter | None, *, label: str) -> None:
             f"{label}.presenter is {describe(presenter)}, which is not a Presenter instance."
         )
     # Each method by name, held by its own case in TestAnAsyncPresenterIsRefused:
-    # test_on_a_service_spec and test_an_async_presented_is_refused_too.
-    for method in ("present", "presented"):
+    # test_on_a_service_spec, test_an_async_presented_is_refused_too and
+    # test_an_async_presented_rows_is_refused_too.
+    for method in ("present", "presented", "presented_rows"):
         check_callable(getattr(presenter, method), label=f"{label}.presenter.{method}", sync=True)
 
 
@@ -192,9 +194,14 @@ def check_reserved(parameters: Parameters, *, label: str) -> Parameters:
     """Refuse a parameter named after a pool seed, and return the parameters."""
     taken = sorted(parameters.names() & RESERVED_POOL_SEEDS)
     if taken:
+        # The rename only for ``shapes``, the name reserved after projects had
+        # declared it: test_a_parameter_named_shapes_is_refused_with_the_rename
+        # fails without it, and test_a_parameter_named_call_context_is_refused_without_the_shapes_rename
+        # if every refusal carries it.
+        hint = SHAPES_RENAME if SHAPES in taken else ""
         raise ImproperlyConfigured(
             f"{label} declares the parameter(s) {taken}, which dispatch seeds itself. "
-            "An argument must never outrank a seeded value; rename the parameter."
+            f"An argument must never outrank a seeded value; rename the parameter.{hint}"
         )
     return parameters
 

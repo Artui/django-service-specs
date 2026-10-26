@@ -172,6 +172,13 @@ def test_a_computed_field_is_output() -> None:
     assert DataclassPresenter(Computed).present(Computed(2)) == {"base": 2, "doubled": 4}
 
 
+def test_a_list_s_rows_are_each_presented_by_the_inherited_default() -> None:
+    assert DataclassPresenter(Computed).presented_rows((Computed(1), Computed(2)), None) == [
+        {"base": 1, "doubled": 2},
+        {"base": 2, "doubled": 4},
+    ]
+
+
 # --- present() --------------------------------------------------------------------------
 
 

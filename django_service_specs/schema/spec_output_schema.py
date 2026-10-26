@@ -82,6 +82,14 @@ def spec_output_schema(
     declaration. ``handle_description`` is the wording for a handle whose
     marking declares none, and defaults to none: what a reader should do with
     an identifier depends on the reader, and the transport is what knows.
+
+    **A spec declaring ``shapes`` promises no field of a row.** A shape
+    reaches the presenter alone, and a ``fields`` selection there leaves keys
+    out, which nothing in the presenter's declaration can say for every value
+    a caller may send. So the item lists no ``required`` at any depth, wherever
+    it sits, while the ``affordances`` object dispatch adds to each row and the
+    paging envelope keep theirs. A spec declaring none is described with the
+    ``required`` its presenter's ``always_present`` states.
     """
     # Compiled once here, so every read below - and can_present_nothing's -
     # reads the one compiled spec rather than the source's own attributes.
@@ -96,6 +104,16 @@ def spec_output_schema(
         item = (
             annotate_output_schema(item, projection, handle_description=handle_description) or item
         )
+    if compiled.shapes:
+        # After the projection, which drops a hidden field from ``required``
+        # and has nothing to drop once it is gone, and before the affordances,
+        # the array and the envelope, so each keeps its own ``required`` by
+        # construction rather than by being told apart from a presenter field.
+        # Without the guard an unshaped spec loses its promises
+        # (test_a_spec_declaring_no_shapes_keeps_every_required); inverted, a
+        # shaped one keeps them
+        # (test_every_shaped_item_requires_nothing_wherever_it_sits).
+        item = _unrequired(item)
     affordances = rendered_affordances(compiled)
     if affordances is not None:
         # After the projection, which walks declared fields and has nothing to
@@ -131,6 +149,24 @@ def spec_output_schema(
         array: dict[str, Any] = {"type": "array", "items": item}
         return _paged(array) if paginate else array
     return allow_null(item) if can_present_nothing(compiled) else item
+
+
+def _unrequired(node: dict[str, Any]) -> dict[str, Any]:
+    """``node`` and every object and array element under it, with no ``required``.
+
+    A new mapping at every level, as every node is. The walk follows the two
+    keywords ``output_schema`` nests a node under, ``properties`` and
+    ``items``, which an ``OutputField`` refuses in its ``json_schema_extra``
+    along with ``required``, so every ``required`` the builder wrote is reached.
+    """
+    cut = {key: value for key, value in node.items() if key != "required"}
+    if "properties" in node:
+        cut["properties"] = {name: _unrequired(value) for name, value in node["properties"].items()}
+    if "items" in node:
+        # A nested item's object, or a scalar element's ``{"type": t}`` or an
+        # undeclared one's ``{}``, which have nothing to cut and are copied.
+        cut["items"] = _unrequired(node["items"])
+    return cut
 
 
 def _paged(array: dict[str, Any]) -> dict[str, Any]:
