@@ -351,6 +351,12 @@ to `authorize` as `pool_seeds=`:
 
 ```python
 --8<--
+docs/examples/dispatching.py:admit_check
+--8<--
+```
+
+```python
+--8<--
 docs/examples/dispatching.py:admit
 --8<--
 ```
@@ -367,6 +373,37 @@ question names. `seeds=` is the alternative for a caller holding resolved
 values, and handing both raises `TypeError`, since one would silently outrank
 the other. A check naming a seed the registry does not hold is asked without
 it, as under `seeds=`, so its own signature decides.
+
+### Building the form before the call
+
+The page above builds its form itself, to show it, and the form's `__init__`
+takes a keyword of its own, which the spec's
+[`FormValidator`](forms.md#a-form-with-keywords-of-its-own) supplies through
+`form_kwargs` on dispatch:
+
+```python
+--8<--
+docs/examples/dispatching.py:club_form
+--8<--
+```
+
+[`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
+returns what that `form_kwargs` returns, off dispatch, so the page's GET
+builds the form as the POST's dispatch will: `ClubNoteForm(**extra)` in the
+page above. It binds `form_kwargs` from the pool dispatch would - the
+principal as `user`, the no-op reporter as `progress`, the call's context
+and the target under the name the service receives it by (`instance` or
+`collection`, nothing for a create) - and resolves only the seeds of
+`pool_seeds=` that `form_kwargs` would be handed: those it names, or every
+one for a callable taking `**kwargs`. A page hands it the `call_context=` it
+will hand dispatch, so the two calls share one dict, and the row
+[`resolve_target`](#a-target-resolved-ahead-of-the-call) found as `target=`.
+Its answer is checked as the Validator checks it: anything but a mapping,
+or a mapping returning `data`, `files` or `instance`, is refused with
+`ImproperlyConfigured`. A spec whose Validator is not a `FormValidator` is
+refused with `TypeError`, and a `FormValidator` with no `form_kwargs`
+returns `{}`. It neither authorizes nor looks the target up, and it is sync:
+an async caller hops once with `sync_to_async`.
 
 ### A target resolved ahead of the call
 

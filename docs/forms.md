@@ -273,13 +273,16 @@ So a caller of `feature_spec` names a book of their own tenant's and is
 refused one of another's in the field's own words, `invalid_choice`, though
 the row exists: the queryset the form narrowed is what matches it.
 
-Off dispatch - in
+In
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments],
 or with a
 [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
-built by hand - there are no seeds, so a callable naming one gives it a
+built by hand, there are no seeds, so a callable naming one gives it a
 default or fails with Python's own `TypeError`; `user` and `progress` are
-there still. `bind_arguments` names the `target=` it is passed as dispatch
+there still.
+[`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
+is the off-dispatch path that does resolve them: the seeds of the
+`pool_seeds=` it is handed that the callable would be handed. `bind_arguments` names the `target=` it is passed as dispatch
 would, from the spec's selectors, and a context built by hand names none.
 Under
 [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] it runs on the
@@ -293,8 +296,11 @@ one of them - naming `instance` to read the row is another matter - for a plain 
 `ImproperlyConfigured` naming the key, as is one returning anything but a
 mapping. `FormValidator(form_class, form_kwargs=...)` refuses a `form_kwargs`
 that is not callable when it is built, and keeps the callable as its
-`form_kwargs` attribute, so a transport building the form itself, for a page,
-builds it the same way.
+`form_kwargs` attribute. A transport building the form itself, for a page,
+builds it the same way with
+[`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords],
+which calls that callable from the pool dispatch would
+([building the form before the call](dispatching.md#building-the-form-before-the-call)).
 
 ## The call's context
 

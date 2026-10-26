@@ -426,7 +426,10 @@ class TestDispatching:
 
     def test_a_page_admits_by_a_seed_before_the_form(self, ada: Any, bob: Any) -> None:
         ada.groups.add(Group.objects.create(name="chess"))
-        assert dispatching.club_note_page(ada, "chess") == "the form"
+        form = dispatching.club_note_page(ada, "chess")
+        # Built with the keyword its __init__ takes, from the seed dispatch reads.
+        assert form.fields["title"].help_text == "Posted to chess."
+        assert not form.is_bound
         result = dispatching.club_note_page(ada, "chess", "Openings")
         assert result.kind == "instance" and result.value.title == "chess: Openings"
         # Refused before the form, and by the club the route names.

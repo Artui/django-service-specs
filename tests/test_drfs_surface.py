@@ -566,6 +566,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "DataclassPresenter",
         "DataclassValidator",
         "FormValidator",
+        # What a FormValidator's ``form_kwargs`` returns, for a page building
+        # the form itself: django-spec-html's, which drfs neither wraps nor
+        # re-exports.
+        "form_keywords",
         # A transport's binding of declared parameters to server values: the
         # transports that bind call these from this package, and
         # djangorestframework-services neither wraps nor re-exports them. A

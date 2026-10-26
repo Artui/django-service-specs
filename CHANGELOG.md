@@ -19,6 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the same keyword for the seeds their own question names. Handing `seeds=`
   and `pool_seeds=` together raises `TypeError`, and a call without
   `pool_seeds=` behaves as before.
+- **`form_keywords(spec, principal, *, pool_seeds=, target=, call_context=)`**,
+  what a `FormValidator`'s `form_kwargs` returns, for a transport that builds
+  the form itself before the call runs, such as a page showing it. It calls
+  `form_kwargs` from the pool dispatch would: the principal as `user`, the
+  no-op reporter as `progress`, `call_context` (the dict handed in, or a fresh
+  one), the target under the name dispatch hands it by, and only the seeds of
+  `pool_seeds=` the callable would be handed. Its answer is checked as the
+  Validator checks it. A spec whose Validator is not a `FormValidator` is
+  refused with `TypeError`, and a `FormValidator` with no `form_kwargs`
+  returns `{}`.
 
 ## [0.16.0] — 2026-10-26
 

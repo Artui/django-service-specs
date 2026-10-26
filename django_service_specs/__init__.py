@@ -3,6 +3,7 @@
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
+from django_service_specs.adapters.forms.form_keywords import form_keywords
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
 from django_service_specs.affordances.aunmet_operation_affordance import (
@@ -271,6 +272,7 @@ __all__ = [
     "delete_model",
     "delete_relations",
     "dispatch",
+    "form_keywords",
     "enforce_affordances",
     "expected_type_refusal",
     "filter_set_parameters",

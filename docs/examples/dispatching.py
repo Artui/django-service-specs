@@ -6,6 +6,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from django import forms
 from django.db.models import QuerySet
 
 from django_service_specs import (
@@ -13,6 +14,7 @@ from django_service_specs import (
     DataclassPresenter,
     DataclassValidator,
     DispatchResult,
+    FormValidator,
     Grant,
     Parameter,
     Parameters,
@@ -29,6 +31,7 @@ from django_service_specs import (
     check_call,
     check_server_arguments,
     dispatch,
+    form_keywords,
     present,
     resolve_target,
 )
@@ -197,7 +200,7 @@ def offered(schema: Mapping[str, Any], server: ServerArguments) -> list[str]:
 # --8<-- [end:server_arguments]
 
 
-# --8<-- [start:admit]
+# --8<-- [start:admit_check]
 class InClub(PermissionCheck):
     """Admits a member of the club the route names, read from a seed."""
 
@@ -207,6 +210,18 @@ class InClub(PermissionCheck):
         return principal.groups.filter(name=club).exists()
 
 
+# --8<-- [end:admit_check]
+
+
+# --8<-- [start:club_form]
+class ClubNoteForm(forms.Form):
+    title = forms.CharField()
+
+    def __init__(self, *args: Any, club: str, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields["title"].help_text = f"Posted to {club}."
+
+
 def post_to_club(*, user: Any, title: str, club: str) -> Note:
     return Note.objects.create(owner=user, title=f"{club}: {title}")
 
@@ -214,10 +229,14 @@ def post_to_club(*, user: Any, title: str, club: str) -> Note:
 club_note_spec = ServiceSpec(
     service=post_to_club,
     permissions=[InClub()],
-    validator=DataclassValidator(Rename),
+    validator=FormValidator(ClubNoteForm, form_kwargs=lambda *, club: {"club": club}),
 )
 
 
+# --8<-- [end:club_form]
+
+
+# --8<-- [start:admit]
 def club_seeds(club: str) -> PoolSeeds:
     # Built per request, from what the route captured.
     return DEFAULT_POOL_SEEDS.extend(club=lambda: club)
@@ -228,14 +247,17 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
     # Before the form: a principal the class-level check refuses never sees
     # it. NotPermitted for anyone outside the club.
     grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
-    if title is None:
-        return "the form"  # the GET
+    context: dict[str, Any] = {}  # the one dict the form and the call share
+    if title is None:  # the GET: the form, built as dispatch will build it
+        extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
+        return ClubNoteForm(**extra)
     return dispatch(
         club_note_spec,
         principal=user,
         arguments={"title": title},
         pool_seeds=pool_seeds,
         grant=grant,
+        call_context=context,
     )
 
 
