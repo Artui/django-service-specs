@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-10-27
+
 ### Added
 - **`InvalidArguments.missing`**, the sorted names of the call's top-level
   arguments that were left out: those with a message coded `required`, whoever
@@ -2100,7 +2102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Artui/django-service-specs/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Artui/django-service-specs/compare/v0.15.0...v0.16.0
