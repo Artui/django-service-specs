@@ -464,7 +464,7 @@ def _flag(row: Any, alias: str) -> Any:
     )
     if flag is _MISSING:
         raise ImproperlyConfigured(
-            f"The presented row carries no {alias!r} answer. Affordance answers are "
+            f"The row carries no {alias!r} answer. Affordance answers are "
             "computed by the selector spec that declares them; a value that did not come "
             "through that selector has none."
         )

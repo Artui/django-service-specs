@@ -199,8 +199,28 @@ class TestARowThatCarriesNoAnswer:
             row_affordance_answers(listing(affordances={"rename": RENAME}), row)
 
         assert str(caught.value).startswith(
-            "The presented row carries no 'affordance__rename__note_archived' answer."
+            "The row carries no 'affordance__rename__note_archived' answer."
         )
+
+
+class TestANameWithNoConditions:
+    def test_it_reads_no_flag_so_any_row_is_available_for_it(self) -> None:
+        # Nothing is asked of the row, so a row carrying no answers is fine; the
+        # refusal above is for a name that does declare a condition.
+        spec = listing(affordances={"edit": EDIT})
+
+        assert row_affordance_answers(spec, object()) == {"edit": {"available": True}}
+
+
+class TestAProjectBuiltFlag:
+    @pytest.mark.parametrize("flag", [0, ""], ids=["zero", "empty-string"])
+    def test_a_falsy_flag_that_is_not_false_is_unmet(self, flag: Any) -> None:
+        # A mapping row built by the project may carry 0 where dispatch writes
+        # False; an unmet condition is anything falsy, as the call reads it.
+        row = {"affordance__rename__note_archived": flag}
+        spec = listing(affordances={"rename": RENAME})
+
+        assert row_affordance_answers(spec, row)["rename"] == ARCHIVED_ANSWER
 
 
 class TestASpecThatPresentsNoAffordances:

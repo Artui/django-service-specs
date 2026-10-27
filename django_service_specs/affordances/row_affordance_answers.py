@@ -21,7 +21,7 @@ def row_affordance_answers(
 
     ``dispatch`` answers a selector's affordances for every row it returns, as
     ``affordance__<name>__<code>`` values on the row. A page that holds those
-    rows rather than presented dicts - a queryset's instances, a table's rows -
+    rows rather than presented dicts - a queryset's instances, a table's records -
     reads them here, whichever kind of spec it holds: a ``SelectorSpec``, a
     ``ServiceSpec`` (read through its output selector, whose ``affordances``
     are the ones presented), or a
@@ -42,8 +42,9 @@ def row_affordance_answers(
             spec that never declared them - the check ``present`` makes before
             adding the object. An explicit empty ``affordances`` mapping
             presents an empty object, and answers ``{}``. Or ``row`` carries
-            no answer for a declared name, because it did not come through the
-            selector declaring them.
+            no answer for a declared name that has a condition, because it did
+            not come through the selector declaring them. A name whose spec
+            declares no conditions reads no flag, and is available for any row.
     """
     spec = kernel_spec(spec)
     affordances = rendered_affordances(spec)

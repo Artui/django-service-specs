@@ -298,8 +298,8 @@ returning it and its answers being asked is `{"available": false}` with no
 no longer exists. A selector spec's `affordances` refuse nothing: the archived
 note is still listed, and says why it cannot be renamed.
 
-A page that lists rows holds them raw - a queryset's instances, the rows of a
-table - and presents nothing.
+A page that lists rows holds them raw - a queryset's instances, a table's
+records (a django-tables2 row's `record`, not the bound row) - and presents nothing.
 [`row_affordance_answers`][django_service_specs.affordances.row_affordance_answers.row_affordance_answers]
 reads one row's answers for it, the same object `present` adds to the row:
 
@@ -317,8 +317,9 @@ whether an action is available would read every action as absent from a spec
 that never declared them. A service spec's *own* `affordances` are conditions
 it is checked against and are never presented, so they count for nothing here;
 declare the mapping on the selector that returns the rows. A selector spec
-declaring an empty mapping does declare them, and answers `{}`. A row that did
-not come through the selector declaring the answers is refused too.
+declaring an empty mapping does declare them, and answers `{}`. A row that
+carries no answer for a name whose spec declares a condition is refused; a name
+with no conditions reads no flag, so every row is available for it.
 
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
 describes the object on each item, with or without a projection, and with each

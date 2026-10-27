@@ -167,8 +167,8 @@ def list_notes(user: Any) -> list[dict[str, Any]]:
 
 # --8<-- [start:row]
 def rename_offered(user: Any) -> dict[int, bool]:
-    # A page holds the rows themselves - model instances here, the rows of a
-    # table elsewhere - and reads each one's answer from the spec that
+    # A page holds the rows themselves - model instances here, a table's
+    # records elsewhere - and reads each one's answer from the spec that
     # declared it, without presenting anything.
     result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
     return {

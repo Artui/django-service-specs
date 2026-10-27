@@ -435,7 +435,7 @@ class TestAnswers:
             present(listing(), DispatchResult("list", list(notes_of(user=ada))))
 
         assert str(caught.value) == (
-            "The presented row carries no 'affordance__rename__note_archived' answer. "
+            "The row carries no 'affordance__rename__note_archived' answer. "
             "Affordance answers are computed by the selector spec that declares them; a value "
             "that did not come through that selector has none."
         )
