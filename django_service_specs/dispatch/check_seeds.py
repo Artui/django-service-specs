@@ -185,8 +185,9 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
     if positional:
         # Whatever could fill the name, since no pool fills a positional:
         # test_it_is_refused_whatever_could_fill_it_by_name. One arc; the
-        # kind is held by every case of test_a_keyword_something_fills_is_not
-        # and the default by test_one_with_a_default_is_not.
+        # kind is held by test_without_the_seed_the_read_is_the_caller_s, a
+        # keyword-only parameter with no default, and the default by
+        # test_one_with_a_default_is_not.
         problems.append(
             f"{seat.label} takes the positional-only parameter(s) {positional} with no "
             "default, which dispatch never fills: it calls every callable by keyword. Make "
@@ -235,19 +236,20 @@ def _dropped_fields(
         for name, param in params.items()
         if param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
     )
-    # ``data`` carries every field, and a ``many`` spec's every row.
-    if "data" in named:
-        return []
     fields = frozenset({spec.many_argument}) if spec.many else validator.parameters().names()
     keys = provider_keys(spec.kwargs)
     # A keyword nothing declared explains may be a field returned under a name
     # of its own, so then no field is judged; an untyped provider explains
-    # every keyword. One arc, each held by its own test:
-    # test_a_field_validated_under_its_alias_reaches_its_own_name_and_is_not
-    # and the ``untyped`` case of test_a_field_the_service_receives_is_not.
+    # every keyword. ``data`` is never among the sources subtracted, so a
+    # service taking it, which is handed every field and a ``many`` spec's
+    # every row, is never judged (the ``through-data`` case of
+    # test_a_field_the_service_receives_is_not). One arc: test_a_field_validated_under_its_alias_reaches_its_own_name_and_is_not
+    # holds the difference, and test_an_untyped_provider_may_fill_any_keyword_so_no_field_is_judged
+    # the provider; each source the difference subtracts is held by its own
+    # case of test_a_keyword_a_declared_source_explains_leaves_the_fields_judged,
+    # and the fields by test_it_is_refused.
     if keys is None or named - (
         filled
-        | {"data"}
         | target_entry(spec, None).keys()
         | spec.reads.names()
         | fields
@@ -259,7 +261,8 @@ def _dropped_fields(
     takes_all = any(param.kind is inspect.Parameter.VAR_KEYWORD for param in params.values())
     # Each part held by its own case: test_a_field_named_like_a_seed_reaches_the_service_through_data_alone
     # (``seed_named``), test_a_field_the_service_receives_is_not's ``through-kwargs``
-    # (``takes_all``) and ``by-name`` (``named``).
+    # (``takes_all``) and test_a_keyword_something_fills_is_not's
+    # ``a-validator-field`` (``named``).
     dropped = sorted(
         name for name in fields if name in seed_named or not (takes_all or name in named)
     )

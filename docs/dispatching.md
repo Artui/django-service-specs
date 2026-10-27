@@ -528,6 +528,55 @@ so it never crosses a queue. The kernel's own steps run no query. It is
 target. A `many` call's refused rows are raised by it, after the permission
 check, in the tree dispatch raises them in.
 
+## Checking a spec where it is registered
+
+Some declarations fail every call on a mount, whatever the caller sends, and
+which ones turns on the seeds that mount registers: a service requiring
+`tenant` runs where a `tenant` seed is registered and raises `TypeError`
+everywhere else. So the spec cannot refuse them when it is built, and a
+transport that lists it as a tool or a route lists something that never runs.
+[`check_seeds`][django_service_specs.dispatch.check_seeds.check_seeds] takes
+the spec and the mount's `pool_seeds` and refuses it, as one
+`ImproperlyConfigured` naming every offender in a sorted list such as
+`['tenant']`, for any of these:
+
+- a parameter a registered seed occupies, which dispatch refuses before it
+  reads the arguments, in the words it refuses it in;
+- a positional-only parameter with no default, which no pool fills;
+- a keyword the service, the selector or the target selector requires that
+  nothing fills: no read of its seat, no seed, no key a typed provider names,
+  and none of what every pool carries. A service is handed `data`, and
+  `instance` or `collection` only where a target selector resolves one; a
+  selector is handed neither, and a service none of its target selector's
+  reads or its shapes;
+- a keyword only an optional read fills, which a call leaving the read out is
+  refused for as missing;
+- a Validator field the service takes neither by name nor through `data` or
+  `**kwargs`, so its value is validated and dropped. Such a spec runs, which
+  is why this is refused here and never when the spec is built.
+
+```python
+--8<--
+docs/examples/dispatching.py:check_seeds
+--8<--
+```
+
+It runs nothing: no seed resolves and no provider is called. What it cannot
+see it leaves to dispatch: a provider that does not annotate its keys may fill
+any keyword in its seat, and a Validator may return or bind a value it does
+not declare, so neither seat is held to the keywords it requires; a Validator
+may return a field under a name other than its parameter's, as a pydantic
+field validated by its alias is, so a service taking a keyword nothing
+declared explains is held to none of its fields. An `extra_kwargs` overlay
+fills keywords it cannot see either.
+
+Two of the readers it shares with dispatch are public for a transport building
+its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters],
+the reflected reads a seed fills and the parameters dispatch refuses, and
+[`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+every parameter a provider fills or may fill, which the shape check does not
+demand of the caller.
+
 ## Arguments the server supplies
 
 A transport sometimes knows a declared parameter's value better than its
@@ -691,7 +740,7 @@ it is resolved.
 
 A registered name is **reserved**, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
-`ImproperlyConfigured`; a caller that sends it is refused like any other
+`ImproperlyConfigured`, and by `check_seeds` where a transport registers it; a caller that sends it is refused like any other
 undeclared argument; and `extend()` refuses one of the dispatcher's own names,
 or a name registered twice, with `ValueError`. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
@@ -722,11 +771,12 @@ read off the request, is `tenant=lambda *, request: request.tenant`. The three
 and the affordance functions read them off the `call_context` they are handed,
 so a page or a listing asks what dispatch would.
 
-A spec declaring a parameter named `request` or `view` is refused at dispatch
-with `ImproperlyConfigured`, on every route, and so is a `kwargs` provider or an
-`extra_kwargs` key of either name. A read reflected off a selector's own
-signature is not refused: the call's value fills it, as a registered seed fills
-one named like it. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
+A read or a shape named `request` or `view` is refused with
+`ImproperlyConfigured` when the spec is built, and a `many` spec's list of
+either name at dispatch, on every route, and so is a `kwargs` provider or an
+`extra_kwargs` key of either name. A read marked `reflected` is not refused: the
+call's value fills it, as a registered seed fills one named like it. A shape is
+refused though it is marked, since no seat fills a shape. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
 `data` while a service naming it reads the call's own. Neither name is in
 `RESERVED_POOL_SEEDS` or `PoolSeeds.reserved`, so **a mount may still register
 either** through `PoolSeeds`, by the constructor or `extend()`, as transports

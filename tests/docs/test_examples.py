@@ -482,6 +482,19 @@ class TestDispatching:
             dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
         assert len(queue) == 1
 
+    def test_a_spec_no_call_could_run_is_refused_where_it_is_registered(self) -> None:
+        # Without a seed of its name, every call would fail on ``tenant``.
+        bare = dispatching.ToolRegistry()
+        with pytest.raises(ImproperlyConfigured, match=r"\['tenant'\], which nothing fills"):
+            bare.register("tenant", dispatching.tenant_name_spec)
+        assert bare.tools == {}
+        seeded = dispatching.ToolRegistry(
+            dispatching.DEFAULT_POOL_SEEDS.extend(tenant=lambda: "acme")
+        )
+        seeded.register("tenant", dispatching.tenant_name_spec)
+        seeded.register("rename", quickstart.rename_note_spec)
+        assert set(seeded.tools) == {"tenant", "rename"}
+
     def test_a_server_argument_outranks_the_caller_and_a_withheld_one_is_never_read(
         self, ada: Any, bob: Any
     ) -> None:

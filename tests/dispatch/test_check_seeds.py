@@ -461,3 +461,20 @@ def test_it_runs_no_query(django_assert_num_queries: Any) -> None:
 def test_its_messages_name_each_offender_in_a_sorted_list() -> None:
     refused = _refusal(_service(lambda *, zed, alpha: None))
     assert re.search(r"\['alpha', 'zed'\]", refused)
+
+
+def test_no_seed_resolves_and_no_provider_is_called() -> None:
+    def _never(**_: Any) -> Any:
+        raise AssertionError("ran")
+
+    seeds = DEFAULT_POOL_SEEDS.extend(tenant=_never)
+    check_seeds(_retrieve(lambda *, tenant: tenant, kwargs=_never), pool_seeds=seeds)
+    check_seeds(
+        _service(
+            lambda *, data, tenant: data,
+            validator=DataclassValidator(_Titled),
+            input_data=_never,
+            kwargs=_never,
+        ),
+        pool_seeds=seeds,
+    )
