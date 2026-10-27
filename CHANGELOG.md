@@ -21,6 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused row, where the caller was admitted, from a refused call without asking
   the checks again. Every refusal before the check, and `dispatch`'s own refusal
   of the same rows, leaves it `False`.
+- **`checks_read_arguments(spec)`**, whether any of a spec's permission checks
+  declares `arguments` on a question asked before the call's arguments name a
+  row: every check's `has_permission`, and `has_scope_permission` too for a
+  service spec with no target selector (a create). A transport's filtered
+  listing asks the checks with no arguments, and a check that reads them cannot
+  answer there; this lets it decide without making the call and catching the
+  raise. A declaration with `as_kernel_spec()` is read as the spec it compiles
+  to, and the reading is `authorize`'s own.
 
 ### Changed
 - `audience_projection_for_spec(..., name=)` words the two-label refusal in

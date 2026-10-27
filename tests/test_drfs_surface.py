@@ -559,6 +559,9 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "UnguardedReason",
         "UnguardedSpec",
         "unguarded_specs",
+        # Whether a spec's checks need the call's arguments to answer, which a
+        # transport's filtered listing reads; drfs serves no such listing.
+        "checks_read_arguments",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.

@@ -11,6 +11,7 @@ from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.dispatch.check_server_arguments import check_server_arguments
+from django_service_specs.dispatch.checks_read_arguments import checks_read_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -38,6 +39,7 @@ __all__ = [
     "check_call",
     "check_requested_input",
     "check_server_arguments",
+    "checks_read_arguments",
     "dispatch",
     "paginate_output",
     "present",

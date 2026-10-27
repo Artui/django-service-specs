@@ -267,6 +267,15 @@ check, so a check sees the call's `reads` alone. The
 [`authorize`][django_service_specs.dispatch.authorize.authorize] functions
 take the same mapping as `arguments=` for a transport that calls them itself.
 
+A transport listing what a principal may run asks the checks with no arguments,
+and a check that reads them cannot answer there.
+[`checks_read_arguments`][django_service_specs.dispatch.checks_read_arguments.checks_read_arguments]
+says so without the call: `True` when a check declares `arguments` on the class
+question or, for a service spec with no target selector (a create), the scope
+question. The object question and a target's scope question are asked of a
+resolved row, which a listing has none of, so they are not read. The
+declaration is read as `authorize` reads it, so the two cannot disagree.
+
 **A check can read the call's context and a registered seed the same way.** A
 keyword `call_context` is handed the one dict every stage of the call shares
 ([the call's context](#the-calls-context)), and a keyword named after a seed
