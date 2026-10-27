@@ -234,3 +234,21 @@ class TestAnswersForEachRow:
         Note.objects.create(owner=ada, title="Old", archived=True)
 
         assert [row["title"] for row in affordances.list_notes(ada)] == ["Old"]
+
+
+@pytest.mark.django_db
+class TestAnswersReadOffARawRow:
+    def test_a_page_reads_the_answer_presenting_would_have_served(self, ada: Any) -> None:
+        draft = Note.objects.create(owner=ada, title="Draft")
+        old = Note.objects.create(owner=ada, title="Old", archived=True)
+
+        offered = affordances.rename_offered(ada)
+
+        assert offered == {draft.pk: True, old.pk: False}
+        served = {row["id"]: row["affordances"] for row in affordances.list_notes(ada)}
+        assert {pk: answer["rename"]["available"] for pk, answer in served.items()} == offered
+
+    def test_an_unmet_callable_makes_every_row_unavailable(self, ada: Any, read_only: None) -> None:
+        Note.objects.create(owner=ada, title="Draft")
+
+        assert set(affordances.rename_offered(ada).values()) == {False}

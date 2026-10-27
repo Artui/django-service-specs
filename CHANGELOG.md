@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`row_affordance_answers(spec, row)`**, exported from the root and from
+  `django_service_specs.affordances`: one row's affordances, read off the row
+  itself, for a page that holds raw rows - a queryset's instances, the rows of
+  a table - rather than presented dicts. It returns the object `present` adds to
+  the row, `{name: {"available": bool}}` with `code` and `reason` when
+  unavailable: the first unmet condition in declaration order, and
+  `{"available": False}` alone for a row that no longer exists. It takes a
+  `SelectorSpec`, a `ServiceSpec` (read through its output selector) or a
+  `SpecSource`, and refuses a spec that presents no affordances with
+  `ImproperlyConfigured`, naming it, so a template reading one action cannot
+  take every action for absent. `present` reads rows through the same function.
+
 ## [0.18.0] — 2026-10-26
 
 ### Added

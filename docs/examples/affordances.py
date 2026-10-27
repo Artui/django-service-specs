@@ -24,6 +24,7 @@ from django_service_specs import (
     enforce_affordances,
     present,
     resolve_callable_kwargs,
+    row_affordance_answers,
     unmet_operation_affordance,
 )
 from docs.examples.declaring import IsSignedIn, list_notes_spec
@@ -162,3 +163,18 @@ def list_notes(user: Any) -> list[dict[str, Any]]:
 
 
 # --8<-- [end:rows]
+
+
+# --8<-- [start:row]
+def rename_offered(user: Any) -> dict[int, bool]:
+    # A page holds the rows themselves - model instances here, the rows of a
+    # table elsewhere - and reads each one's answer from the spec that
+    # declared it, without presenting anything.
+    result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
+    return {
+        note.pk: row_affordance_answers(list_notes_with_answers_spec, note)["rename"]["available"]
+        for note in result.value
+    }
+
+
+# --8<-- [end:row]
