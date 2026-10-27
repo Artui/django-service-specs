@@ -18,6 +18,7 @@ from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
     callable_name,
+    check_call_seeds,
     check_callable,
     check_changes,
     check_metadata,
@@ -631,6 +632,7 @@ def _check_reads(spec: ServiceSpec) -> None:
     if not isinstance(spec.reads, Parameters):
         raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
     check_reserved(spec.reads, label="ServiceSpec.reads")
+    check_call_seeds(spec.reads, label="ServiceSpec.reads", reflected_seated=True)
     _beside_the_target(spec)
 
 
@@ -646,6 +648,7 @@ def _check_shapes(spec: ServiceSpec) -> None:
     if not isinstance(spec.shapes, Parameters):
         raise ImproperlyConfigured("ServiceSpec.shapes must be Parameters.")
     check_reserved(spec.shapes, label="ServiceSpec.shapes")
+    check_call_seeds(spec.shapes, label="ServiceSpec.shapes", reflected_seated=False)
     # Each ``+`` refuses a name both sides declare: a read or the target's
     # (test_a_shape_a_read_also_declares_is_refused,
     # test_a_shape_the_target_selector_reads_is_refused), then the list

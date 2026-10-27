@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -249,3 +250,55 @@ class TestAnAsyncPresenterIsRefused:
     def test_a_sync_presenter_is_accepted(self) -> None:
         presenter = Named()
         assert ServiceSpec(service=_service, presenter=presenter).presenter is presenter
+
+
+def _seat(where: str, name: str, *, reflected: bool = False) -> Any:
+    """A spec declaring ``name`` in ``where``, built: a read or a shape, on either spec."""
+    declared = Parameters.of(Parameter(name, "string", reflected=reflected))
+    if where == "selector-read":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=_selector, reads=declared)
+    if where == "selector-shape":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=_selector, shapes=declared)
+    if where == "service-read":
+        return ServiceSpec(service=_service, reads=declared)
+    return ServiceSpec(service=_service, shapes=declared)
+
+
+_WHERE = pytest.mark.parametrize(
+    "where", ["selector-read", "selector-shape", "service-read", "service-shape"]
+)
+
+
+class TestAParameterNamedForTheCallsOwnSeat:
+    """``request`` and ``view`` are the call's on every mount, so a read nobody marked is refused."""
+
+    @pytest.mark.parametrize("name", ["request", "view"])
+    @_WHERE
+    def test_one_nobody_marked_is_refused_when_the_spec_is_built(
+        self, where: str, name: str
+    ) -> None:
+        with pytest.raises(
+            ImproperlyConfigured, match=rf"\['{name}'\], which dispatch hands"
+        ) as refused:
+            _seat(where, name)
+        # The build's own refusal, not dispatch's on the first call, nor the reserved names'.
+        assert "registered pool seed" not in str(refused.value)
+        assert "dispatch seeds itself" not in str(refused.value)
+
+    @pytest.mark.parametrize("where", ["selector-shape", "service-shape"])
+    def test_a_reflected_shape_is_still_refused(self, where: str) -> None:
+        """No call's seat fills a shape, so ``reflected`` frees a read and never a shape.
+
+        As dispatch refuses a reflected shape named like a registered seed.
+        """
+        with pytest.raises(ImproperlyConfigured, match=r"\['request'\]") as refused:
+            _seat(where, "request", reflected=True)
+        assert "reflected=True" not in str(refused.value)
+
+    @pytest.mark.parametrize("where", ["selector-read", "service-read"])
+    def test_a_reflected_read_is_the_call_s_and_builds(self, where: str) -> None:
+        assert _seat(where, "request", reflected=True).reads.names() == {"request"}
+
+    def test_the_hint_to_mark_it_is_offered_for_a_read(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="reflected=True"):
+            _seat("service-read", "view")

@@ -40,11 +40,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SpecSource`, and refuses a spec that presents no affordances with
   `ImproperlyConfigured`, naming it, so a template reading one action cannot
   take every action for absent. `present` reads rows through the same function.
+- **`check_seeds(spec, *, pool_seeds=)`**, exported from the root: refuses,
+  as `ImproperlyConfigured` naming every offender in a sorted list, a spec
+  that no call on a mount registering `pool_seeds` could run as declared. A
+  transport calls it when it registers a spec, rather than listing a tool or
+  a route that fails on every call. It refuses a parameter a registered seed
+  occupies, in the words `dispatch` refuses it in; a positional-only
+  parameter with no default; a keyword the service, the selector or the
+  target selector requires that nothing fills (the kernel hands `data` to a
+  service only, and `instance` or `collection` only where a target selector
+  resolves one); a keyword only an optional read fills, which a call leaving
+  the read out is refused for; and a Validator field the service takes
+  neither by name nor through `data` or `**kwargs`, whose value is validated
+  and dropped. That last one runs today, and is refused only here, never
+  when the spec is built. A seat whose provider does not annotate its keys,
+  and a service beside a Validator, are not judged for the keywords they
+  require, since either may fill one this cannot see.
+- **`seed_named_parameters(spec, *, pool_seeds=)`**, exported from the root:
+  of a spec's parameters named like a registered seed or the call's
+  `request` or `view`, the `reflected` reads the seed fills and the
+  parameters `dispatch` refuses on every call. The reader `dispatch` answers
+  by, so a transport refusing the spec when it registers it cannot drift
+  from the call.
+- **`provider_reached(spec)`**, exported from the root: every top-level
+  parameter a `kwargs` or `input_data` provider fills or may fill, which the
+  shape check does not demand of the caller. A transport building a schema
+  reads it rather than restating which seat each provider reaches.
 
 ### Changed
 - `audience_projection_for_spec(..., name=)` words the two-label refusal in
   the mount's `name`, with or without `overrides`, where it said `Output`
   whatever the spec was called. Without `name` the message is unchanged.
+- **A read or a shape named `request` or `view` is refused when the spec is
+  built**, on `ServiceSpec` and `SelectorSpec` alike, unless it is a read
+  marked `reflected`, which the call's own value fills. Dispatch hands both
+  names to every callable from the call's context on every mount, so such a
+  spec was refused by `dispatch` on every call; it is now refused where it is
+  declared, naming the parameter in the form `['request']`. A reflected shape
+  is refused too, since no seat fills a shape. A top-level Validator field of
+  either name stays the caller's, as before.
 
 ## [0.18.0] — 2026-10-26
 

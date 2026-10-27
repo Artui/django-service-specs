@@ -30,6 +30,7 @@ from django_service_specs import (
     authorize,
     bind_arguments,
     check_call,
+    check_seeds,
     check_server_arguments,
     checks_read_arguments,
     dispatch,
@@ -207,6 +208,28 @@ def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
 
 
 # --8<-- [end:checks_read_arguments]
+
+
+# --8<-- [start:check_seeds]
+class ToolRegistry:
+    """A transport's registry: a spec no call could run is refused as it is registered."""
+
+    def __init__(self, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS) -> None:
+        self.pool_seeds = pool_seeds
+        self.tools: dict[str, ServiceSpec | SelectorSpec] = {}
+
+    def register(self, name: str, spec: ServiceSpec | SelectorSpec) -> None:
+        # The mount's own seeds: a keyword one mount fills, another leaves unfilled.
+        check_seeds(spec, pool_seeds=self.pool_seeds)
+        self.tools[name] = spec
+
+
+def tenant_name(*, tenant: str) -> str:
+    return tenant
+
+
+tenant_name_spec = ServiceSpec(service=tenant_name, permissions=[IsSignedIn()])
+# --8<-- [end:check_seeds]
 
 
 # --8<-- [start:server_arguments]

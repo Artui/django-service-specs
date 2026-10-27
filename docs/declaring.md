@@ -75,7 +75,11 @@ missing argument would ask for a value the caller cannot send or already
 did, and a client that reads `InvalidArguments` as its own mistake would
 send the call again. It is decided at dispatch rather than when the spec is
 declared, because a registered seed may fill such a parameter, and the seeds
-are known only then.
+are known only then. A transport that knows the seeds of its mount refuses
+such a spec where it registers it, with
+[`check_seeds`][django_service_specs.dispatch.check_seeds.check_seeds], as it
+refuses an optional read over a selector keyword with no default, which a call
+leaving the read out is refused for.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.
@@ -433,7 +437,9 @@ A provider annotated to fill a parameter declared anywhere else -
 selector's read - is refused with `ImproperlyConfigured` when the spec is
 built or, for a Validator field, when `parameters()` is assembled.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-gathers what every provider of a spec fills, with the seeds' names. None of
+gathers what every provider of a spec fills, with the seeds' names, and
+[`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
+every parameter a provider fills or may fill, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what `parameters()` lists:
 
