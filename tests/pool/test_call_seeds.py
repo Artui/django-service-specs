@@ -526,10 +526,17 @@ class TestAnArgumentNamedEither:
     def test_a_parameter_named_either_is_refused(
         self, entry: Callable[..., Any], name: str
     ) -> None:
+        """A ``many`` spec's list, the one such parameter a spec can still be built with.
+
+        A read or a shape of either name is refused when the spec is built
+        (``tests/specs/test_utils.py``'s ``TestAParameterNamedForTheCallsOwnSeat``).
+        """
         spec = ServiceSpec(
             service=lambda **_: None,
             permissions=OPEN,
-            reads=Parameters.of(Parameter(name, "string")),
+            many=True,
+            many_argument=name,
+            validator=Titled(),
         )
         with pytest.raises(ImproperlyConfigured, match=rf"\['{name}'\].*the call's own"):
             entry(spec, principal=make_user("ada"), arguments={})
@@ -782,7 +789,6 @@ class TestTheTransportFacingAnswers:
         """Dispatch fills it from the context and refuses a caller's, so no caller is asked for it."""
         assert name in server_owned_keys(_reading(name, reflected=True))
         assert name not in server_owned_keys(_reading("title", reflected=True))
-        assert name not in server_owned_keys(_reading(name, reflected=False))
 
     def test_server_owned_keys_owns_a_target_selector_s_reflected_read(self) -> None:
         target = _reading("view", reflected=True)
@@ -791,9 +797,9 @@ class TestTheTransportFacingAnswers:
         )
         assert "view" in server_owned_keys(spec)
 
-    @pytest.mark.parametrize("reflected", [False, True], ids=["a-read", "a-reflected-read"])
-    def test_server_arguments_naming_either_say_it_is_the_call_s(self, reflected: bool) -> None:
-        spec = _reading("view", reflected=reflected)
+    def test_server_arguments_naming_either_say_it_is_the_call_s(self) -> None:
+        # A reflected read: an unmarked one is refused when the spec is built.
+        spec = _reading("view", reflected=True)
         server = ServerArguments(values={"view": "grid"})
         with pytest.raises(ImproperlyConfigured, match="'request' and 'view' are the call's own"):
             check_server_arguments(spec, server)

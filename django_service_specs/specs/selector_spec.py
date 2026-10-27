@@ -18,6 +18,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.utils import (
+    check_call_seeds,
     check_callable,
     check_changes,
     check_metadata,
@@ -239,6 +240,7 @@ class SelectorSpec:
         # read named ``user`` is:
         # TestFilterSet.test_a_filter_named_after_a_reserved_seed_is_refused.
         check_reserved(self.reads, label=f"{label}.reads")
+        check_call_seeds(self.reads, label=f"{label}.reads", reflected_seated=True)
         _check_shapes(self)
         check_presenter(self.presenter, label=label)
         for name in ("select_related", "prefetch_related"):
@@ -380,6 +382,7 @@ def _check_shapes(spec: SelectorSpec) -> None:
     if not isinstance(spec.shapes, Parameters):
         raise ImproperlyConfigured("SelectorSpec.shapes must be Parameters.")
     check_reserved(spec.shapes, label="SelectorSpec.shapes")
+    check_call_seeds(spec.shapes, label="SelectorSpec.shapes", reflected_seated=False)
     # ``+`` refuses a name both declare (TestShapes.test_a_shape_a_read_also_declares_is_refused).
     spec.reads + spec.shapes
 

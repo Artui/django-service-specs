@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A read or a shape named `request` or `view` is refused when the spec is
+  built**, on `ServiceSpec` and `SelectorSpec` alike, unless it is a read
+  marked `reflected`, which the call's own value fills. Dispatch hands both
+  names to every callable from the call's context on every mount, so such a
+  spec was refused by `dispatch` on every call; it is now refused where it is
+  declared, naming the parameter in the form `['request']`. A reflected shape
+  is refused too, since no seat fills a shape. A top-level Validator field of
+  either name stays the caller's, as before.
+
 ## [0.18.0] — 2026-10-26
 
 ### Added
