@@ -34,10 +34,12 @@ SHAPES_RENAME: Final = (
 CALL_SEEDS_NOTE: Final = " 'request' and 'view' are the call's own, read off its context."
 """What a refusal of a parameter of either name adds, in one wording wherever it is refused.
 
-Dispatch's refusal on every call, a transport's server arguments and the
-refusal when a spec is built all end with it, so a consumer matching one of
-them matches each (test_one_nobody_marked_is_refused_when_the_spec_is_built
-asserts it on the build's), beside ``SHAPES_RENAME``, the other suffix a
+The refusal when a spec is built always ends with it
+(test_one_nobody_marked_is_refused_when_the_spec_is_built asserts it).
+Dispatch's refusal on every call and a transport's server arguments end
+with it only where no seed of the name is registered, since a registered
+seed is then what the parameter meets; so a consumer matching it matches
+each refusal on a mount registering neither name. It sits beside ``SHAPES_RENAME``, the other suffix a
 parameter's refusal adds.
 """
 
