@@ -109,6 +109,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 ::: django_service_specs.dispatch.check_requested_input.check_requested_input
 ::: django_service_specs.dispatch.check_call.check_call
+::: django_service_specs.dispatch.check_seeds.check_seeds
 ::: django_service_specs.dispatch.seed_named_parameters.seed_named_parameters
 ::: django_service_specs.dispatch.provider_reached.provider_reached
 ::: django_service_specs.dispatch.check_server_arguments.check_server_arguments

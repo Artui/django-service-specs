@@ -595,6 +595,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # that it refuses and relaxes what dispatch would: the transports call
         # these from this package, and djangorestframework-services neither
         # wraps nor re-exports them.
+        "check_seeds",
         "provider_reached",
         "seed_named_parameters",
         # This package's version, which no importer reads as an API.

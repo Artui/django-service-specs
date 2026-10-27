@@ -10,6 +10,7 @@ from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
+from django_service_specs.dispatch.check_seeds import check_seeds
 from django_service_specs.dispatch.check_server_arguments import check_server_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -39,6 +40,7 @@ __all__ = [
     "bind_arguments",
     "check_call",
     "check_requested_input",
+    "check_seeds",
     "check_server_arguments",
     "dispatch",
     "paginate_output",

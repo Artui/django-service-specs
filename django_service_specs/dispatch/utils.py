@@ -420,20 +420,7 @@ def open_call(
     if parameters is None:
         parameters = declared
     if taken:
-        # The dispatcher's names never get here, so a name no seed registers
-        # is one of the call's two, which dispatch fills itself
-        # (test_a_parameter_named_either_is_refused asserts the hint, and
-        # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
-        hint = (
-            ""
-            if taken <= pool_seeds.names
-            else " 'request' and 'view' are the call's own, read off its context."
-        )
-        raise ImproperlyConfigured(
-            f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
-            "registered pool seed occupies. An argument must never meet a seed in one pool; "
-            f"rename the parameter.{hint}"
-        )
+        raise ImproperlyConfigured(seed_named_refusal(spec, taken, pool_seeds))
     refuse_overlaid_parameters(spec, declared, overlay)
     if seated:
         # Out of the call's argument set, the narrowed one too, so the closed
@@ -465,6 +452,33 @@ def open_call(
                     raise InvalidArguments({name: dict(sorted(value.errors.items()))})
                 checked[name] = [value.rows[index] for index in sorted(value.rows)]
     return checked, granted
+
+
+def seed_named_refusal(
+    spec: ServiceSpec | SelectorSpec, taken: frozenset[str], pool_seeds: PoolSeeds
+) -> str:
+    """Why ``spec`` is refused for declaring ``taken``, the second set ``split_seed_named`` returns.
+
+    One wording, read by ``open_call`` on every call and by ``check_seeds``
+    at registration, so a transport refusing the spec when it registers it
+    says what dispatch would have said on its first call
+    (test_a_read_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
+    """
+    # The dispatcher's names never get here, so a name no seed registers is
+    # one of the call's two, which dispatch fills itself; a read or a shape of
+    # either is refused when the spec is built, so it is a ``many`` spec's list
+    # (test_a_parameter_named_either_is_refused asserts the hint, and
+    # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
+    hint = (
+        ""
+        if taken <= pool_seeds.names
+        else " 'request' and 'view' are the call's own, read off its context."
+    )
+    return (
+        f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
+        "registered pool seed occupies. An argument must never meet a seed in one pool; "
+        f"rename the parameter.{hint}"
+    )
 
 
 def split_seed_named(

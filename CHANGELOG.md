@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`check_seeds(spec, *, pool_seeds=)`**, exported from the root: refuses,
+  as `ImproperlyConfigured` naming every offender in a sorted list, a spec
+  that no call on a mount registering `pool_seeds` could run as declared. A
+  transport calls it when it registers a spec, rather than listing a tool or
+  a route that fails on every call. It refuses a parameter a registered seed
+  occupies, in the words `dispatch` refuses it in; a positional-only
+  parameter with no default; a keyword the service, the selector or the
+  target selector requires that nothing fills (the kernel hands `data` to a
+  service only, and `instance` or `collection` only where a target selector
+  resolves one); a keyword only an optional read fills, which a call leaving
+  the read out is refused for; and a Validator field the service takes
+  neither by name nor through `data` or `**kwargs`, whose value is validated
+  and dropped. That last one runs today, and is refused only here, never
+  when the spec is built. A seat whose provider does not annotate its keys,
+  and a service beside a Validator, are not judged for the keywords they
+  require, since either may fill one this cannot see.
 - **`seed_named_parameters(spec, *, pool_seeds=)`**, exported from the root:
   of a spec's parameters named like a registered seed or the call's
   `request` or `view`, the `reflected` reads the seed fills and the
