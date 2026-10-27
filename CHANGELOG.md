@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unavailable: the first unmet condition in declaration order, and
   `{"available": False}` alone for a row that no longer exists. It takes a
   `SelectorSpec`, a `ServiceSpec` (read through its output selector) or a
-  `SpecSource`, and refuses a spec that presents no affordances with
-  `ImproperlyConfigured`, naming it, so a template reading one action cannot
-  take every action for absent. `present` reads rows through the same function.
+  `SpecSource`. A spec that presents no affordances answers `{}`, so a caller
+  asking for a name the answer lacks must treat it as not declared. `present`
+  reads rows through the same function.
 
 ## [0.18.0] — 2026-10-26
 
