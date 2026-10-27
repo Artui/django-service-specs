@@ -16,7 +16,7 @@ import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
-from typing import Any, Literal, cast
+from typing import Any, Final, Literal, cast
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
@@ -68,7 +68,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.types.utils import CALL_CONTEXT, SHAPES
+from django_service_specs.types.utils import CALL_CONTEXT, CALL_SEEDS_NOTE, SHAPES
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -188,6 +188,17 @@ SELECTOR_SOURCE = "SelectorSpec.selector"
 INSTANCE_SOURCE = "ServiceSpec.instance_selector_spec.selector"
 COLLECTION_SOURCE = "ServiceSpec.collection_selector_spec.selector"
 OUTPUT_SOURCE = "ServiceSpec.output_selector_spec.selector"
+
+EVERY_POOL: Final = frozenset({"user", "progress", CALL_CONTEXT, SHAPES}) | CALL_SEEDS
+"""What every pool dispatch builds carries, whatever the mount registers.
+
+``base_pool``'s ``user`` and ``progress``, the call's context and the
+``shapes`` dispatch adds beside them, and the call's ``request`` and ``view``,
+handed to a callable naming either. The keywords ``check_seeds`` and
+``unreceived_fields`` count as filled on every mount
+(test_every_pool_is_base_pool_s_keys_and_the_call_s_own holds it to
+``base_pool``).
+"""
 
 
 @dataclass(frozen=True)
@@ -471,14 +482,11 @@ def seed_named_refusal(
     """
     # The dispatcher's names never get here, so a name no seed registers is
     # one of the call's two, which dispatch fills itself; a read or a shape of
-    # either is refused when the spec is built, so it is a ``many`` spec's list
+    # either on a service spec is refused when the spec is built, so it is a
+    # selector spec's own read or shape, or a ``many`` spec's list
     # (test_a_parameter_named_either_is_refused asserts the hint, and
     # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
-    hint = (
-        ""
-        if taken <= pool_seeds.names
-        else " 'request' and 'view' are the call's own, read off its context."
-    )
+    hint = "" if taken <= pool_seeds.names else CALL_SEEDS_NOTE
     return (
         f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
         "registered pool seed occupies. An argument must never meet a seed in one pool; "

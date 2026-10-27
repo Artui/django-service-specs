@@ -41,21 +41,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asking for a name the answer lacks must treat it as not declared. `present`
   reads rows through the same function.
 - **`check_seeds(spec, *, pool_seeds=)`**, exported from the root: refuses,
-  as `ImproperlyConfigured` naming every offender in a sorted list, a spec
-  that no call on a mount registering `pool_seeds` could run as declared. A
-  transport calls it when it registers a spec, rather than listing a tool or
-  a route that fails on every call. It refuses a parameter a registered seed
-  occupies, in the words `dispatch` refuses it in; a positional-only
-  parameter with no default; a keyword the service, the selector or the
-  target selector requires that nothing fills (the kernel hands `data` to a
-  service only, and `instance` or `collection` only where a target selector
-  resolves one); a keyword only an optional read fills, which a call leaving
-  the read out is refused for; and a Validator field the service takes
-  neither by name nor through `data` or `**kwargs`, whose value is validated
-  and dropped. That last one runs today, and is refused only here, never
-  when the spec is built. A seat whose provider does not annotate its keys,
-  and a service beside a Validator, are not judged for the keywords they
-  require, since either may fill one this cannot see.
+  as `ImproperlyConfigured` naming every offender in a sorted list, a
+  declaration that cannot hold as written on a mount registering
+  `pool_seeds`. A transport calls it when it registers a spec, rather than
+  listing a tool or a route whose calls fail in a way the declaration
+  already settled. It refuses a parameter a registered seed or the call's
+  own `request` or `view` would meet, which `dispatch` refuses on every
+  call, in the words `dispatch` refuses it in; a positional-only parameter
+  with no default, and a keyword the service, the selector or the target
+  selector requires that nothing fills, each of which fails every call
+  reaching the callable (the kernel hands `data` to a service only, and
+  `instance` or `collection` only where a target selector resolves one); and
+  an optional read over a keyword that requires it, so a call leaving the
+  read out, as the declaration says it may, is refused as missing. A seat
+  whose provider does not annotate its keys, and a service beside a
+  Validator, are not judged for the keywords they require, since either may
+  fill one this cannot see.
+- **`unreceived_fields(spec, *, pool_seeds=)`**, exported from the root: the
+  Validator fields a service takes neither by name, nor through `data`, nor
+  through `**kwargs`, so a value sent for one is validated and then reaches
+  the service by no route. An answer rather than a refusal, because such a
+  spec runs and may mean to: a Validator checking that `password` and
+  `confirm` agree returns `password` alone. A transport decides whether to
+  refuse, warn or advertise the field anyway. A field named like a
+  registered seed reaches the service through `data` alone; a service taking
+  a keyword nothing declared explains, or beside a `kwargs` provider that
+  does not annotate its keys, is answered for none of its fields.
 - **`seed_named_parameters(spec, *, pool_seeds=)`**, exported from the root:
   of a spec's parameters named like a registered seed or the call's
   `request` or `view`, the `reflected` reads the seed fills and the
@@ -71,14 +82,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `audience_projection_for_spec(..., name=)` words the two-label refusal in
   the mount's `name`, with or without `overrides`, where it said `Output`
   whatever the spec was called. Without `name` the message is unchanged.
-- **A read or a shape named `request` or `view` is refused when the spec is
-  built**, on `ServiceSpec` and `SelectorSpec` alike, unless it is a read
-  marked `reflected`, which the call's own value fills. Dispatch hands both
-  names to every callable from the call's context on every mount, so such a
-  spec was refused by `dispatch` on every call; it is now refused where it is
-  declared, naming the parameter in the form `['request']`. A reflected shape
-  is refused too, since no seat fills a shape. A top-level Validator field of
-  either name stays the caller's, as before.
+- **A `ServiceSpec` read, a target selector's read or a `ServiceSpec` shape
+  named `request` or `view` is refused when the spec is built**, unless it is
+  a read marked `reflected`, which the call's own value fills. Dispatch hands
+  both names to every callable from the call's context on every mount, so
+  such a spec was refused by `dispatch` on every call, with or without a seed
+  registered under the name; it is now refused where it is declared, naming
+  the parameter in the form `['request']` and ending, as dispatch's refusal
+  does, with `'request' and 'view' are the call's own, read off its context.`
+  Because building such a spec raises, so do `bind_arguments` and
+  `spec_input_schema` for it, which answered on 0.18.0 although no call to
+  the spec could run. A reflected shape is refused too, since no seat fills a
+  shape. A `SelectorSpec`'s own read or shape of either name is not refused
+  when it is built, since an output selector's reads and a FilterSet handed to
+  `shape_queryset` are no call's parameters; one dispatched on its own is
+  refused by `dispatch`, as before. A top-level Validator field of either
+  name stays the caller's, as before.
 
 ## [0.18.0] — 2026-10-26
 

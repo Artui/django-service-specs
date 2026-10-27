@@ -23,6 +23,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import CALL_SEEDS_NOTE
 
 
 def check_server_arguments(
@@ -232,4 +233,4 @@ def _call_hint(names: list[str], pool_seeds: PoolSeeds) -> str:
     """
     if set(names) <= pool_seeds.names:
         return ""
-    return " 'request' and 'view' are the call's own, read off its context."
+    return CALL_SEEDS_NOTE

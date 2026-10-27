@@ -607,6 +607,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "check_seeds",
         "provider_reached",
         "seed_named_parameters",
+        "unreceived_fields",
         # This package's version, which no importer reads as an API.
         "__version__",
     }
