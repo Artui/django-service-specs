@@ -112,6 +112,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.check_seeds.check_seeds
 ::: django_service_specs.dispatch.seed_named_parameters.seed_named_parameters
 ::: django_service_specs.dispatch.provider_reached.provider_reached
+::: django_service_specs.dispatch.unreceived_fields.unreceived_fields
 ::: django_service_specs.dispatch.check_server_arguments.check_server_arguments
 ::: django_service_specs.dispatch.apply_server_arguments.apply_server_arguments
 ::: django_service_specs.dispatch.refusals.REFUSALS

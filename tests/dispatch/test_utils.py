@@ -12,17 +12,21 @@ from django.http import Http404
 
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.utils import (
+    EVERY_POOL,
     NOT_FOUND,
     call_pool,
     reraise_unless_retrieve,
     run_preconditions,
     validate_arguments,
 )
+from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.utils import CALL_CONTEXT, SHAPES
 from tests.dispatch.utils import OPEN, PK, Record, Titled
 
 PRINCIPAL = object()
@@ -155,3 +159,8 @@ class TestAPreconditionAnsweringWithAnAwaitable:
 
     def test_any_other_answer_is_ignored(self) -> None:
         run_preconditions(self._spec(False), {}, fillable=frozenset())
+
+
+def test_every_pool_is_base_pool_s_keys_and_the_call_s_own() -> None:
+    """Held to ``base_pool``, so a seed it gains or loses moves what ``check_seeds`` counts as filled."""
+    assert frozenset(base_pool(user=None)) | {CALL_CONTEXT, SHAPES} | CALL_SEEDS == EVERY_POOL

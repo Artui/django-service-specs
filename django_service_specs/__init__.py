@@ -44,6 +44,7 @@ from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
+from django_service_specs.dispatch.unreceived_fields import unreceived_fields
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.mutations.adelete_collection import adelete_collection
@@ -315,6 +316,7 @@ __all__ = [
     "unanswered_refusals",
     "unguarded_specs",
     "unmet_operation_affordance",
+    "unreceived_fields",
     "update_from_input",
     "update_model",
 ]

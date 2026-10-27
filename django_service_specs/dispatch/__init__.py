@@ -24,6 +24,7 @@ from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
+from django_service_specs.dispatch.unreceived_fields import unreceived_fields
 
 __all__ = [
     "DEFAULT_PAGE_SIZE",
@@ -51,4 +52,5 @@ __all__ = [
     "resolve_target",
     "seed_named_parameters",
     "unanswered_refusals",
+    "unreceived_fields",
 ]

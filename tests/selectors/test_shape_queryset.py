@@ -251,8 +251,32 @@ def _filtered(
     )
 
 
+class _ByView(django_filters.FilterSet):
+    """A filter named ``view``, as a consumer's FilterSet may name one for a list's layout."""
+
+    view = django_filters.CharFilter(field_name="title")
+
+    class Meta:
+        model = Note
+        fields: ClassVar[list[str]] = []
+
+
 @pytest.mark.django_db
 class TestFilterSet:
+    def test_a_filter_named_view_builds_and_shapes(self) -> None:
+        """A selector spec is built here outside dispatch, so a filter of the call's names is a filter.
+
+        As a transport shaping its own list builds one from a consumer's
+        FilterSet: the build refuses a read of either name on a service
+        spec, where it would be a call parameter, and never on a selector
+        spec's own construction.
+        """
+        _three_notes()
+        spec = _filtered(_ByView)
+        assert "view" in spec.reads.names()
+        rows = shape_queryset(Note.objects.all(), spec, {"view": "draft"}, source_label="x")
+        assert _titles(rows) == ["draft"]
+
     def test_the_filters_read_their_arguments_from_the_pool(self) -> None:
         _three_notes()
         spec = _filtered(NoteFilters)

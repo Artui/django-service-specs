@@ -15,7 +15,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.types.is_async import is_async
-from django_service_specs.types.utils import SHAPES, SHAPES_RENAME
+from django_service_specs.types.utils import CALL_SEEDS_NOTE, SHAPES, SHAPES_RENAME
 
 # The methods dispatch reads a permission check's answer from.
 _CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
@@ -211,14 +211,27 @@ def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bo
     """Refuse a parameter named ``request`` or ``view`` that the call's seat does not fill.
 
     Dispatch hands both to every callable naming one, read off the call's
-    context, on every mount, so a read nobody marked ``reflected`` or a shape
-    of either name meets the call's value in one pool, and ``dispatch``
-    refuses it on every call whatever the caller sends. Refused here, when
-    the spec is built, because nothing about the call can change the answer:
-    the registered seeds change who fills the name, never whether it is
-    filled. Not in ``check_reserved``, which also reads the assembled
+    context, on every mount, so a service spec's read nobody marked
+    ``reflected``, its target selector's, or its shape, of either name, meets
+    the call's value in one pool, and ``dispatch`` refuses the spec on every
+    call whatever the caller sends, with or without a seed registered under
+    the name. Refused here, when the spec is built, because nothing about
+    the call can change the answer: the registered seeds change who fills
+    the name, never whether it is filled. The message ends as dispatch's
+    does, with ``CALL_SEEDS_NOTE``, so a consumer matching either matches
+    both. Not in ``check_reserved``, which also reads the assembled
     parameters, where a top-level Validator field of either name stays the
     caller's (test_a_validator_field_named_request_takes_the_seat).
+
+    Read for a ``ServiceSpec`` only, never on a ``SelectorSpec``'s own
+    construction. A selector spec is built in two places its parameters are
+    no call's: as an output selector, whose reads never reach the call's
+    arguments and whose selector is handed the call's own value by name
+    (test_an_output_selector_s_read_named_request_builds_and_runs), and
+    for ``shape_queryset`` outside dispatch, where a FilterSet's filter of
+    either name is a query parameter like any other
+    (test_a_filter_named_view_builds_and_shapes). A selector spec dispatched
+    on its own is refused by dispatch, as before, and by ``check_seeds``.
 
     ``reflected_seated`` is for a spec's reads: a ``reflected`` read is read
     off its callable's signature, so the call's seat fills it
@@ -245,8 +258,8 @@ def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bo
         )
         raise ImproperlyConfigured(
             f"{label} declares the parameter(s) {taken}, which dispatch hands every callable "
-            "from the call's own context, on every mount. An argument must never meet the "
-            f"call's value in one pool; rename the parameter.{hint}"
+            "on every mount. An argument must never meet the call's value in one pool; "
+            f"rename the parameter.{CALL_SEEDS_NOTE}{hint}"
         )
 
 

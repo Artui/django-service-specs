@@ -482,7 +482,7 @@ class TestDispatching:
             dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
         assert len(queue) == 1
 
-    def test_a_spec_no_call_could_run_is_refused_where_it_is_registered(self) -> None:
+    def test_a_spec_that_cannot_hold_is_refused_where_it_is_registered(self) -> None:
         # Without a seed of its name, every call would fail on ``tenant``.
         bare = dispatching.ToolRegistry()
         with pytest.raises(ImproperlyConfigured, match=r"\['tenant'\], which nothing fills"):
@@ -494,6 +494,23 @@ class TestDispatching:
         seeded.register("tenant", dispatching.tenant_name_spec)
         seeded.register("rename", quickstart.rename_note_spec)
         assert set(seeded.tools) == {"tenant", "rename"}
+
+    def test_a_registry_may_refuse_a_field_its_service_never_reads(self) -> None:
+        advertising = dispatching.AdvertisingToolRegistry()
+        with pytest.raises(ImproperlyConfigured, match=r"would advertise \['note'\]"):
+            advertising.register("retitle", dispatching.retitle_spec)
+        assert advertising.tools == {}
+        advertising.register("rename", quickstart.rename_note_spec)
+        # The answer is the registry's to act on: the plain one registers it, and it runs.
+        plain = dispatching.ToolRegistry()
+        plain.register("retitle", dispatching.retitle_spec)
+        assert set(plain.tools) == {"retitle"}
+        result = dispatching.dispatch(
+            dispatching.retitle_spec,
+            principal=make_user("ada"),
+            arguments={"title": "kept", "note": "dropped"},
+        )
+        assert result.value == "kept"
 
     def test_a_server_argument_outranks_the_caller_and_a_withheld_one_is_never_read(
         self, ada: Any, bob: Any

@@ -27,9 +27,10 @@ def seed_named_parameters(
       it out;
     - **the second set** is what dispatch refuses as ``ImproperlyConfigured``
       on every call: a read nobody marked, a shape, a ``many`` spec's list.
-      A read or a shape named ``request`` or ``view`` nobody marked is
-      refused when the spec is built, so of those two names only a ``many``
-      spec's list ever reaches this set;
+      A service spec's read, its target selector's or its shape named
+      ``request`` or ``view`` is refused when the spec is built, so of those
+      two names only a selector spec's own read or shape, or a ``many``
+      spec's list, ever reaches this set;
     - a top-level Validator field is the caller's, validated into ``data``,
       and in neither set.
 

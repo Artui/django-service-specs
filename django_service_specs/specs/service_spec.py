@@ -633,6 +633,20 @@ def _check_reads(spec: ServiceSpec) -> None:
         raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
     check_reserved(spec.reads, label="ServiceSpec.reads")
     check_call_seeds(spec.reads, label="ServiceSpec.reads", reflected_seated=True)
+    target = spec.target_selector_spec()
+    if target is not None:
+        # The target's reads join this spec's call parameters
+        # (``_beside_the_target``), so they are refused as the spec's own are.
+        # Its reads alone: a nested selector declaring shapes is refused by
+        # ``_check_nested`` in its own words
+        # (test_a_target_s_shape_named_request_keeps_the_nested_refusal). The
+        # output selector's reads are never call parameters, and are not read
+        # (``check_call_seeds``). The role by name, held by the collection case of
+        # test_one_nobody_marked_is_refused_when_the_spec_is_built.
+        role = "instance" if spec.instance_selector_spec is not None else "collection"
+        check_call_seeds(
+            target.reads, label=f"ServiceSpec.{role}_selector_spec.reads", reflected_seated=True
+        )
     _beside_the_target(spec)
 
 

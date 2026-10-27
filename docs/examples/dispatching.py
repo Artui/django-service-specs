@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django import forms
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import QuerySet
 
 from django_service_specs import (
@@ -36,6 +37,7 @@ from django_service_specs import (
     form_keywords,
     present,
     resolve_target,
+    unreceived_fields,
 )
 from docs.examples.declaring import IsSignedIn, NoteRow, list_notes_spec
 from docs.examples.quickstart import Rename, rename_note_spec
@@ -165,7 +167,7 @@ def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> No
 
 # --8<-- [start:check_seeds]
 class ToolRegistry:
-    """A transport's registry: a spec no call could run is refused as it is registered."""
+    """A transport's registry: a declaration that cannot hold on its mount is refused as it is registered."""
 
     def __init__(self, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS) -> None:
         self.pool_seeds = pool_seeds
@@ -183,6 +185,35 @@ def tenant_name(*, tenant: str) -> str:
 
 tenant_name_spec = ServiceSpec(service=tenant_name, permissions=[IsSignedIn()])
 # --8<-- [end:check_seeds]
+
+
+# --8<-- [start:unreceived_fields]
+class AdvertisingToolRegistry(ToolRegistry):
+    """A registry whose tools advertise every field, so a field nobody reads is refused too."""
+
+    def register(self, name: str, spec: ServiceSpec | SelectorSpec) -> None:
+        unreceived = unreceived_fields(spec, pool_seeds=self.pool_seeds)
+        if unreceived:
+            raise ImproperlyConfigured(
+                f"{name} would advertise {sorted(unreceived)}, which its service never reads."
+            )
+        super().register(name, spec)
+
+
+@dataclass
+class Retitle:
+    title: str
+    note: str = ""
+
+
+def retitle(*, title: str) -> str:
+    return title
+
+
+retitle_spec = ServiceSpec(
+    service=retitle, permissions=[IsSignedIn()], validator=DataclassValidator(Retitle)
+)
+# --8<-- [end:unreceived_fields]
 
 
 # --8<-- [start:server_arguments]
