@@ -144,6 +144,29 @@ class TestLabels:
         assert str(refused.value).startswith("Tool 'notes': both 'a' and 'b' are marked")
         assert "Output" not in str(refused.value)
 
+    def test_two_labels_in_the_declaration_are_refused_in_the_mounts_name_beside_overrides(
+        self,
+    ) -> None:
+        # The declaration's refusal comes first, so overrides on other fields do
+        # not change whose name it is worded in.
+        with pytest.raises(ImproperlyConfigured) as refused:
+            audience_projection_for_spec(
+                listing(
+                    Declares(
+                        Output(
+                            (
+                                OutputField("a", "string", marking=FieldMarking.label()),
+                                OutputField("b", "string", marking=FieldMarking.label()),
+                                OutputField("c", "string"),
+                            )
+                        )
+                    )
+                ),
+                overrides={"c": FieldMarking.hidden()},
+                name="Tool 'notes'",
+            )
+        assert str(refused.value).startswith("Tool 'notes': both 'a' and 'b' are marked")
+
     def test_two_labels_in_a_child_are_refused_by_its_path_in_the_mounts_name(self) -> None:
         child = Output(
             (
