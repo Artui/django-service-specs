@@ -29,6 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   decide without calling the check, answering what a check declares and not what
   it does with `None`. A declaration with `as_kernel_spec()` is read as the spec it compiles
   to, and the reading is `authorize`'s own.
+- **`row_affordance_answers(spec, row)`**, exported from the root and from
+  `django_service_specs.affordances`: one row's affordances, read off the row
+  itself, for a page that holds raw rows - a queryset's instances, a table's
+  records - rather than presented dicts. It returns the object `present` adds to
+  the row, `{name: {"available": bool}}` with `code` and `reason` when
+  unavailable: the first unmet condition in declaration order, and
+  `{"available": False}` alone for a row that no longer exists. It takes a
+  `SelectorSpec`, a `ServiceSpec` (read through its output selector) or a
+  `SpecSource`, and refuses a spec that presents no affordances with
+  `ImproperlyConfigured`, naming it, so a template reading one action cannot
+  take every action for absent. `present` reads rows through the same function.
 
 ### Changed
 - `audience_projection_for_spec(..., name=)` words the two-label refusal in

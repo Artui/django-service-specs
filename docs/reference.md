@@ -122,6 +122,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.affordances.operation_affordances.operation_affordances
 ::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
 ::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
+::: django_service_specs.affordances.row_affordance_answers.row_affordance_answers
 
 ## Authorization
 

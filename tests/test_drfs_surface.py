@@ -579,6 +579,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # the form itself: django-spec-html's, which drfs neither wraps nor
         # re-exports.
         "form_keywords",
+        # One row's affordance answers, for a page holding raw rows rather than
+        # presented dicts: djangorestframework-services neither wraps nor
+        # re-exports it.
+        "row_affordance_answers",
         # A transport's binding of declared parameters to server values: the
         # transports that bind call these from this package, and
         # djangorestframework-services neither wraps nor re-exports them. A

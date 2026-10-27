@@ -6,6 +6,7 @@ from django_service_specs.affordances.aunmet_operation_affordance import (
 )
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.operation_affordances import operation_affordances
+from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
@@ -15,5 +16,6 @@ __all__ = [
     "aunmet_operation_affordance",
     "enforce_affordances",
     "operation_affordances",
+    "row_affordance_answers",
     "unmet_operation_affordance",
 ]

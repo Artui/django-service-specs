@@ -417,11 +417,18 @@ def _with_answers(
             f"The presented object already has an {AFFORDANCES_KEY!r} key, which the declared "
             "affordances would overwrite. Rename the output field."
         )
-    return {**item, AFFORDANCES_KEY: _answers(row, affordances)}
+    return {**item, AFFORDANCES_KEY: answer_row_affordances(row, affordances)}
 
 
-def _answers(row: Any, affordances: Mapping[str, AffordanceDeclarer]) -> dict[str, dict[str, Any]]:
+def answer_row_affordances(
+    row: Any, affordances: Mapping[str, AffordanceDeclarer]
+) -> dict[str, dict[str, Any]]:
     """Each declared name's answer for ``row``, walking its conditions in order.
+
+    The one reading of a row's answers: ``with_affordances`` puts them on the
+    presented object, and
+    [`row_affordance_answers`][django_service_specs.affordances.row_affordance_answers.row_affordance_answers]
+    hands them to a caller that holds the raw row.
 
     ``True`` continues. ``False`` is the first unmet condition, reported with
     its code and reason. ``None`` is a condition on the row asked of a row that
@@ -457,7 +464,7 @@ def _flag(row: Any, alias: str) -> Any:
     )
     if flag is _MISSING:
         raise ImproperlyConfigured(
-            f"The presented row carries no {alias!r} answer. Affordance answers are "
+            f"The row carries no {alias!r} answer. Affordance answers are "
             "computed by the selector spec that declares them; a value that did not come "
             "through that selector has none."
         )
