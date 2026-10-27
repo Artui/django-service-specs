@@ -55,7 +55,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   registered under the name; it is now refused where it is declared, naming
   the parameter in the form `['request']` and ending, as dispatch's refusal
   does, with `'request' and 'view' are the call's own, read off its context.`
-  A reflected shape is refused too, since no seat fills a shape. A
+  Because building such a spec raises, so do `bind_arguments` and
+  `spec_input_schema` for it, which answered on 0.18.0 although no call to
+  the spec could run. A reflected shape is refused too, since no seat fills a shape. A
   `SelectorSpec`'s own read or shape of either name is not refused when it
   is built, since an output selector's reads and a FilterSet handed to
   `shape_queryset` are no call's parameters; one dispatched on its own is
