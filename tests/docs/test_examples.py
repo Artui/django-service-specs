@@ -494,6 +494,14 @@ class TestDispatching:
             )
         assert len(charged) == 2
 
+    def test_a_listing_leaves_out_the_specs_whose_checks_declare_arguments(self, ada: Any) -> None:
+        specs = [dispatching.note_spec, dispatching.owned_note_spec]
+        assert dispatching.listed_before_any_call(specs) == [dispatching.note_spec]
+        # The check does read them: with the call's, it answers.
+        note = Note.objects.create(owner=ada, title="Draft")
+        result = dispatch(dispatching.owned_note_spec, principal=ada, arguments={"pk": note.pk})
+        assert result.kind != "not_found"
+
     def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
         queue: list[Any] = []
         dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)

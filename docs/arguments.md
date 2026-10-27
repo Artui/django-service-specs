@@ -237,8 +237,9 @@ a transport reads one shape whichever of them refused.
 A transport wording "you did not send `name`" reads
 [`InvalidArguments.missing`][django_service_specs.parameters.invalid_arguments.InvalidArguments.missing]
 rather than walking the tree itself: the sorted names of the call's top-level
-arguments with a message coded `required`, whoever refused them - the shape
-check, or a selector refusing a read nothing filled.
+arguments with a message coded `required`, whoever refused them: the shape
+check, a selector refusing a read nothing filled, or a Validator adapter
+(dataclass, pydantic, forms), which code an absent field the same way.
 
 ```python
 --8<--

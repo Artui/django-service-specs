@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **`InvalidArguments.missing`**, the sorted names of the call's top-level
-  arguments that were left out: those with a message coded `required`, whether
-  the shape check or a selector refusing a read nothing filled stamped it. A
+  arguments that were left out: those with a message coded `required`, whoever
+  stamped it (the shape check, a selector, the Validator adapters). A
   nested object's field and a `many` call's row field are not arguments of the
   call and are never listed, nor is `non_field_errors`. A transport words a
   missing argument from one reading instead of walking `detail` itself.
@@ -25,9 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declares `arguments` on a question asked before the call's arguments name a
   row: every check's `has_permission`, and `has_scope_permission` too for a
   service spec with no target selector (a create). A transport's filtered
-  listing asks the checks with no arguments, and a check that reads them cannot
-  answer there; this lets it decide without making the call and catching the
-  raise. A declaration with `as_kernel_spec()` is read as the spec it compiles
+  listing has no arguments to hand a check that declares them; this lets it
+  decide without calling the check, answering what a check declares and not what
+  it does with `None`. A declaration with `as_kernel_spec()` is read as the spec it compiles
   to, and the reading is `authorize`'s own.
 
 ### Changed

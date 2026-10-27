@@ -12,12 +12,14 @@ from django_service_specs.specs.spec_source import SpecSource
 def checks_read_arguments(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool:
     """Whether one of ``spec``'s permission checks declares ``arguments`` on a question asked before any row is resolved.
 
-    A transport that lists the operations a principal may run asks the checks
-    with no arguments, because a listing has none, and a check that reads them
-    cannot answer there: it raises on their absence, and the listing has
-    hidden the operation by calling the check and catching the raise. This
-    answers without the call, so the transport can decide first (list it,
-    hide it, or ask with the arguments it does have).
+    A transport that lists the operations a principal may run has no
+    arguments to hand a check, and one that declares ``arguments`` is written
+    to be given them. This answers, without calling any check, whether one
+    does, so the transport can decide first: list the operation, hide it, or
+    leave it to the call. It answers what a check *declares*, not what it
+    does with ``None``: a check declaring ``arguments=None`` reads ``True``
+    though it answers when handed nothing
+    (test_a_check_declaring_arguments_with_a_default_still_declares_them).
 
     The questions are the two
     [`authorize`][django_service_specs.dispatch.authorize.authorize] and a

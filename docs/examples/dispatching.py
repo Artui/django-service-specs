@@ -31,6 +31,7 @@ from django_service_specs import (
     bind_arguments,
     check_call,
     check_server_arguments,
+    checks_read_arguments,
     dispatch,
     form_keywords,
     present,
@@ -181,6 +182,31 @@ def spend_a_call_on_the_admitted(
 
 
 # --8<-- [end:after_authorize]
+
+
+# --8<-- [start:checks_read_arguments]
+class OwnsTheNamedNote(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, *, arguments: Any) -> bool:
+        # Decided by what the call names, so it is asked with the call's arguments.
+        return Note.objects.filter(owner=principal, pk=arguments["pk"]).exists()
+
+
+owned_note_spec = SelectorSpec(
+    kind=SelectorKind.RETRIEVE,
+    selector=lambda *, user, pk: Note.objects.filter(owner=user, pk=pk),
+    permissions=[OwnsTheNamedNote()],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
+    # A listing has no arguments to give a check that declares them, so it
+    # neither asks that check nor guesses its answer: such a spec is decided
+    # at the call, which has them.
+    return [spec for spec in specs if not checks_read_arguments(spec)]
+
+
+# --8<-- [end:checks_read_arguments]
 
 
 # --8<-- [start:server_arguments]

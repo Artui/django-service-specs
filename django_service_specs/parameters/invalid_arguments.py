@@ -46,17 +46,18 @@ class InvalidArguments(DispatchError):
     rather than parsed from its words, so a transport wording "you did not
     send ``title``" has one reading to ask and not its own walk of ``detail``.
 
-    ``after_authorize`` says whether the class-level permission check had
-    passed when this was raised. It is ``True`` for one refusal only: the rows
-    of a ``many`` call that
-    [`check_call`][django_service_specs.dispatch.check_call.check_call] raises
-    after its fourth step. A transport that called ``check_call`` before
-    charging a rate limit reads it to tell a refused row, where the call was
-    admitted and only its rows are wrong, from a refused call, which was not
-    admitted; it need not ask the checks again to find out. Everything else,
-    including ``dispatch``'s own refusal of the same rows, leaves it
-    ``False``: it is ``check_call``'s statement about its own order of
-    steps, not a general account of where in a run the error arose.
+    ``after_authorize`` marks that
+    [`check_call`][django_service_specs.dispatch.check_call.check_call] raised
+    this after its class-level permission check passed, which it does for one
+    refusal only: the rows of a ``many`` call, raised after its fourth step. A
+    transport that called ``check_call`` before charging a rate limit reads it
+    to tell a refused row, where the call was admitted and only its rows are
+    wrong, from a refused call, which was not admitted; it need not ask the
+    checks again to find out. Every other refusal leaves it ``False``,
+    ``dispatch``'s own refusal of the same rows included, though that one too
+    is raised after its authorization: the mark is ``check_call``'s statement
+    about its own order of steps, not a general account of where in a run the
+    error arose.
     """
 
     default_message: ClassVar[str] = "Invalid arguments."
@@ -70,9 +71,10 @@ class InvalidArguments(DispatchError):
     def missing(self) -> tuple[str, ...]:
         """The top-level arguments the call left out, sorted: those with a message coded ``"required"``.
 
-        The code both the shape check and a selector refusing a read nothing
-        filled stamp on an absent argument, and the one DRF gives the same
-        mistake. An argument that was sent and was wrong is not here, nor is
+        Any refusal coded ``"required"`` counts - the shape check, a selector
+        refusing a read nothing filled, and the Validator adapters (dataclass,
+        pydantic, forms), which code it too - and it is the code DRF gives
+        the same mistake. An argument that was sent and was wrong is not here, nor is
         one whose only messages carry another code or none (a Validator's own
         plain ``str``). **Top level only**: a nested object's field and a
         ``many`` call's row field are not arguments of the call, so they are

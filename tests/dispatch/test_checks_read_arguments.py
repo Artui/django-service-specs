@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 import pytest
@@ -110,3 +111,68 @@ def test_a_declaration_is_read_as_the_spec_it_compiles_to() -> None:
 def test_a_foreign_object_with_no_spec_is_refused_as_kernel_spec_refuses_it() -> None:
     with pytest.raises(TypeError, match="as_kernel_spec"):
         checks_read_arguments(object())  # type: ignore[arg-type]
+
+
+# --- read as authorize reads a check ---------------------------------------------------------
+# Each case is one `declared_keywords` rule that a plain look at the signature
+# gets wrong, so replacing the shared reading with one fails here.
+
+
+def _forwarding(method: Any) -> Any:
+    @functools.wraps(method)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        return method(*args, **kwargs)
+
+    return wrapper
+
+
+class _Wrapped(PermissionCheck):
+    @_forwarding
+    def has_permission(self, principal: Any, spec: Any, *, arguments: Any) -> bool:
+        return True
+
+
+class _OnlyKwargs(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, **kwargs: Any) -> bool:
+        return True
+
+
+class _ArgumentsInTheSecondSlot(PermissionCheck):
+    # Filled by position with the spec, so never handed the call's arguments.
+    def has_permission(self, principal: Any, arguments: Any) -> bool:
+        return True
+
+
+def test_a_forwarding_wrapper_over_a_method_naming_arguments_reads_them() -> None:
+    # The wrapper's own signature is (*args, **kwargs); authorize hands
+    # `arguments` through it to the method it wraps.
+    assert checks_read_arguments(_create(_Wrapped())) is True
+
+
+def test_a_check_taking_only_kwargs_reads_none() -> None:
+    assert checks_read_arguments(_create(_OnlyKwargs())) is False
+
+
+def test_a_parameter_filled_by_position_is_no_opt_in_whatever_its_name() -> None:
+    assert checks_read_arguments(_create(_ArgumentsInTheSecondSlot())) is False
+
+
+def test_a_target_selector_of_either_kind_leaves_the_scope_question_out() -> None:
+    # Held by name: `target_selector_spec()` is the instance selector or the
+    # collection one; reading only the collection's would call a retrieve a create.
+    instance = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=notes_of)
+    spec = ServiceSpec(
+        service=Record(), permissions=[_OnTheScopeQuestion()], instance_selector_spec=instance
+    )
+    assert checks_read_arguments(spec) is False
+
+
+def test_a_check_declaring_arguments_with_a_default_still_declares_them() -> None:
+    # It answers "declares", not "cannot answer without": this check answers
+    # when handed None, and is still handed the call's arguments where it can.
+    assert checks_read_arguments(_create(_TakesNone())) is True
+
+
+class _TakesNone(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
+        return arguments is None or "ok" in arguments
