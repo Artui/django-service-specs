@@ -76,6 +76,20 @@ CODES = {
 # --8<-- [end:codes]
 
 
+# --8<-- [start:missing]
+def left_out(arguments: dict[str, Any]) -> tuple[str, ...]:
+    try:
+        check_arguments(AUTHOR, arguments)
+    except InvalidArguments as refused:
+        return refused.missing  # sorted names, for "you did not send ..."
+    return ()
+
+
+# left_out({"books": "x"}) == ("name",): sent and wrong is not left out.
+# left_out(ARGUMENTS) == (): the book's missing title is a row's field, not an argument.
+# --8<-- [end:missing]
+
+
 # --8<-- [start:ignore]
 def lenient(arguments: dict[str, Any]) -> dict[str, Any]:
     return check_arguments(AUTHOR, arguments, unknown_arguments=UnknownArguments.IGNORE)

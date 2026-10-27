@@ -315,7 +315,9 @@ SURFACE: dict[str, Pin] = {
     ),
     "coerce_flat": _fn("parameters.coerce_flat", "parameters, raw"),
     # The adapter subclasses it beside DRF's ValidationError, and reads its detail.
-    "InvalidArguments": _error("parameters.invalid_arguments", "detail", "DispatchError"),
+    "InvalidArguments": _error(
+        "parameters.invalid_arguments", "detail, *, after_authorize=", "DispatchError"
+    ),
     "CodedMessage": _error("parameters.coded_message", "message, code", str),
     "NON_FIELD_ERRORS": Pin("parameters.non_field_errors", value="non_field_errors"),
     # --- pool ---------------------------------------------------------------------------------
@@ -557,6 +559,9 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "UnguardedReason",
         "UnguardedSpec",
         "unguarded_specs",
+        # Whether a spec's checks need the call's arguments to answer, which a
+        # transport's filtered listing reads; drfs serves no such listing.
+        "checks_read_arguments",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.

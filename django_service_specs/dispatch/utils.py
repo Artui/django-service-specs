@@ -462,7 +462,12 @@ def open_call(
         for name, value in checked.items():
             if isinstance(value, _CheckedRows):
                 if value.errors:
-                    raise InvalidArguments({name: dict(sorted(value.errors.items()))})
+                    # After step four, which is what the mark says: the grant
+                    # ``authorize`` returned above still holds for the caller
+                    # (test_a_refused_row_is_marked_as_raised_after_the_class_level_check).
+                    raise InvalidArguments(
+                        {name: dict(sorted(value.errors.items()))}, after_authorize=True
+                    )
                 checked[name] = [value.rows[index] for index in sorted(value.rows)]
     return checked, granted
 

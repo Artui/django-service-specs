@@ -130,6 +130,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.grant.Grant
 ::: django_service_specs.dispatch.authorize.authorize
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope
+::: django_service_specs.dispatch.checks_read_arguments.checks_read_arguments
 ::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.is_deactivated.is_deactivated

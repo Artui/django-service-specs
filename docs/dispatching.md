@@ -267,6 +267,26 @@ check, so a check sees the call's `reads` alone. The
 [`authorize`][django_service_specs.dispatch.authorize.authorize] functions
 take the same mapping as `arguments=` for a transport that calls them itself.
 
+A transport listing what a principal may run has no arguments to hand a check
+that declares them.
+[`checks_read_arguments`][django_service_specs.dispatch.checks_read_arguments.checks_read_arguments]
+says whether any does, without calling a check: `True` when a check declares
+`arguments` on the class question or, for a service spec with no target
+selector (a create), the scope question. It answers what a check *declares*,
+not what it does with `None`: a check declaring `arguments=None` reads `True`
+though it answers when handed nothing. The object question and a target's scope
+question are asked of a resolved row, which a listing has none of, so they are
+not read. The declaration is read as `authorize` reads it - a forwarding
+wrapper over a method naming `arguments` counts, a check taking only `**kwargs`
+or naming `arguments` in a position the call fills does not - so the two cannot
+disagree.
+
+```python
+--8<--
+docs/examples/dispatching.py:checks_read_arguments
+--8<--
+```
+
 **A check can read the call's context and a registered seed the same way.** A
 keyword `call_context` is handed the one dict every stage of the call shares
 ([the call's context](#the-calls-context)), and a keyword named after a seed
@@ -527,6 +547,20 @@ so it never crosses a queue. The kernel's own steps run no query. It is
 `bind_arguments` validates and does not authorize, and neither resolves a
 target. A `many` call's refused rows are raised by it, after the permission
 check, in the tree dispatch raises them in.
+
+That one refusal is marked: its
+[`after_authorize`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
+is `True`, and it is `False` on every refusal before the permission check and on
+`dispatch`'s own refusal of the same rows. A transport that checks a call before
+charging a rate limit reads it to tell a refused row, where the caller was
+admitted and only its rows are wrong, from a refused call, without asking the
+checks a second time.
+
+```python
+--8<--
+docs/examples/dispatching.py:after_authorize
+--8<--
+```
 
 ## Arguments the server supplies
 

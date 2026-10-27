@@ -31,12 +31,14 @@ from django_service_specs import (
     bind_arguments,
     check_call,
     check_server_arguments,
+    checks_read_arguments,
     dispatch,
     form_keywords,
     present,
     resolve_target,
 )
 from docs.examples.declaring import IsSignedIn, NoteRow, list_notes_spec
+from docs.examples.declaring_writes import add_notes_spec
 from docs.examples.quickstart import Rename, rename_note_spec
 from tests.dispatch_app.models import Note
 
@@ -160,6 +162,51 @@ def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> No
 
 
 # --8<-- [end:check_call]
+
+
+# --8<-- [start:after_authorize]
+def spend_a_call_on_the_admitted(
+    user: Any, arguments: dict[str, Any], charge: Callable[[], None]
+) -> dict[str, Any]:
+    try:
+        checked, _ = check_call(add_notes_spec, principal=user, arguments=arguments)
+    except InvalidArguments as refused:
+        if refused.after_authorize:
+            # The class-level check passed and only rows are wrong: the caller
+            # is admitted, so the call is charged and the checks are not asked
+            # again. A refused call (anything else) was not admitted.
+            charge()
+        return refused.detail
+    charge()
+    return checked
+
+
+# --8<-- [end:after_authorize]
+
+
+# --8<-- [start:checks_read_arguments]
+class OwnsTheNamedNote(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, *, arguments: Any) -> bool:
+        # Decided by what the call names, so it is asked with the call's arguments.
+        return Note.objects.filter(owner=principal, pk=arguments["pk"]).exists()
+
+
+owned_note_spec = SelectorSpec(
+    kind=SelectorKind.RETRIEVE,
+    selector=lambda *, user, pk: Note.objects.filter(owner=user, pk=pk),
+    permissions=[OwnsTheNamedNote()],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
+    # A listing has no arguments to give a check that declares them, so it
+    # neither asks that check nor guesses its answer: such a spec is decided
+    # at the call, which has them.
+    return [spec for spec in specs if not checks_read_arguments(spec)]
+
+
+# --8<-- [end:checks_read_arguments]
 
 
 # --8<-- [start:server_arguments]
