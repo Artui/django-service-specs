@@ -796,15 +796,18 @@ so a page or a listing asks what dispatch would.
 
 A service spec's read, its target selector's or its shape named `request` or
 `view` is refused with `ImproperlyConfigured` when the spec is built. A
-selector spec's own read or shape of either name, and a `many` spec's list, is
-refused at dispatch, on every route, and so is a `kwargs` provider or an
-`extra_kwargs` key of either name: a selector spec is also built where its
-parameters are no call's, as an output selector, which is handed the call's
-own value by name, and for `shape_queryset`, where a FilterSet's filter named
-`view` is a filter like any other. A read marked `reflected` is not refused:
-the call's value fills it, as a registered seed fills one named like it. A
-shape is refused though it is marked, since no seat fills a shape. The refusal
-when the spec is built ends as dispatch's does, `'request' and 'view' are the
+selector spec dispatched on its own is refused at dispatch instead, on every
+route, for a read or a shape of either name, and so is a `many` spec's list
+of either name. A selector spec is not refused when it is built, because it
+is also built where its parameters are no call's: as an output selector,
+whose reads never become the call's arguments and whose selector is handed
+the call's own value by name, and for `shape_queryset`, where a FilterSet's
+filter named `view` is a filter like any other. A `kwargs` provider or an
+`extra_kwargs` key of either name is refused at dispatch, on every route. A
+read marked `reflected` is not refused: the call's value fills it, as a
+registered seed fills one named like it. A shape is refused though it is
+marked, since no seat fills a shape. The refusal when the spec is built ends
+as dispatch's does, `'request' and 'view' are the
 call's own, read off its context.`, so code matching one matches both. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
 `data` while a service naming it reads the call's own. Neither name is in
 `RESERVED_POOL_SEEDS` or `PoolSeeds.reserved`, so **a mount may still register

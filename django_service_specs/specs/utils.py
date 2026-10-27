@@ -259,7 +259,7 @@ def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bo
         raise ImproperlyConfigured(
             f"{label} declares the parameter(s) {taken}, which dispatch hands every callable "
             "on every mount. An argument must never meet the call's value in one pool; "
-            f"rename the parameter.{CALL_SEEDS_NOTE}{hint}"
+            f"rename the parameter.{hint}{CALL_SEEDS_NOTE}"
         )
 
 

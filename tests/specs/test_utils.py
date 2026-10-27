@@ -296,7 +296,7 @@ class TestAParameterNamedForTheCallsOwnSeat:
         message = str(refused.value)
         assert message.startswith(f"{_LABELS[where]} declares the parameter(s) ['{name}'], which")
         # Dispatch's own wording, so a consumer matching either refusal matches both.
-        assert "'request' and 'view' are the call's own, read off its context." in message
+        assert message.endswith("'request' and 'view' are the call's own, read off its context.")
         # The build's own refusal, not dispatch's on the first call, nor the reserved names'.
         assert "registered pool seed" not in message
         assert "dispatch seeds itself" not in message
