@@ -364,7 +364,7 @@ def open_call(
     the project's, so only dispatch - which is handed the registry - can see
     the name it shares. The dispatcher's own names never reach here:
     ``spec.parameters()`` refuses them as it assembles. Of the names a
-    registered seed shares (see ``seed_named_parameters``):
+    registered seed shares (see ``split_seed_named``):
 
     - **A** ``reflected`` **read**, one read off a callable's signature
       rather than written, leaves this call's argument set, and the seed
@@ -416,7 +416,7 @@ def open_call(
     # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it
     # for a field, which is outside the target's parameters).
     declared = spec.parameters()
-    seated, taken = seed_named_parameters(spec, declared, pool_seeds)
+    seated, taken = split_seed_named(spec, declared, pool_seeds)
     if parameters is None:
         parameters = declared
     if taken:
@@ -467,7 +467,7 @@ def open_call(
     return checked, granted
 
 
-def seed_named_parameters(
+def split_seed_named(
     spec: ServiceSpec | SelectorSpec, declared: Parameters, pool_seeds: PoolSeeds
 ) -> tuple[frozenset[str], frozenset[str]]:
     """Of ``declared``'s names a registered seed shares: the reads it fills, and the ones refused.
@@ -494,7 +494,7 @@ def seed_named_parameters(
     # the transports read.
     shared = declared.names() & (pool_seeds.reserved | CALL_SEEDS)
     seated = shared & frozenset(
-        param.name for _, reads in _read_seats(spec) for param in reads if param.reflected
+        param.name for _, reads in read_seats(spec) for param in reads if param.reflected
     )
     return seated, shared - seated - seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
 
@@ -537,7 +537,7 @@ def shape_check(
     are relaxed:
 
     - **A parameter a provider fills or may fill**, which is always one that
-      provider's values reach (see ``_server_filled``): not demanded of the
+      provider's values reach (see ``server_filled``): not demanded of the
       caller here, because whether the call has it is known only once the
       provider has answered. It is still required of the assembled pool,
       checked in the seat that merges the provider's answer, after
@@ -588,7 +588,7 @@ def shape_check(
     are raised here; each row's is carried to ``validate_arguments`` as
     ``_CheckedRows``, to be reported with the Validator's.
     """
-    owned, reached = _server_filled(spec)
+    owned, reached = server_filled(spec)
     # The schema relaxes ``partial`` through the same function, so the two
     # cannot disagree about which fields a partial call may leave out.
     parameters = relax_partial(spec, parameters)
@@ -597,7 +597,7 @@ def shape_check(
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        fields, fields_reached = _reach(spec.input_data, spec.validator.parameters())
+        fields, fields_reached = reach(spec.input_data, spec.validator.parameters())
         if spec.many:
             return _check_bulk(
                 _relaxed(parameters, reached),
@@ -632,7 +632,7 @@ def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
     return {name: value for name, value in checked.items() if name not in owned}
 
 
-def _server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], frozenset[str]]:
+def server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], frozenset[str]]:
     """The reads a ``kwargs`` provider fills where its values reach them, and the reads it fills or may fill.
 
     **A provider relaxes only the parameters its values reach**, so a key it
@@ -670,35 +670,14 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], fr
     """
     owned: frozenset[str] = frozenset()
     reached: frozenset[str] = frozenset()
-    for provider, reads in _read_seats(spec):
-        filled, may_fill = _reach(provider, reads)
+    for provider, reads in read_seats(spec):
+        filled, may_fill = reach(provider, reads)
         owned |= filled
         reached |= may_fill
     return owned, reached
 
 
-def provider_reached(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
-    """Every top-level parameter of ``spec`` a provider fills or may fill: what the shape check relaxes.
-
-    The reads ``_server_filled`` relaxes and, on a service spec that is not
-    ``many``, the Validator's fields ``input_data`` reaches.
-    ``check_server_arguments`` reads it, so a parameter the shape check does
-    not demand may be withheld. One arc to coverage, each conjunct held by
-    its own test: a selector spec has no Validator
-    (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld),
-    a service spec may have none
-    (test_a_service_spec_s_read_is_judged_by_its_service), and a ``many``
-    spec's row fields are no top-level parameter, though one may share a
-    read's name
-    (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).
-    """
-    reached = _server_filled(spec)[1]
-    if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        reached |= _reach(spec.input_data, spec.validator.parameters())[1]
-    return reached
-
-
-def _read_seats(
+def read_seats(
     spec: ServiceSpec | SelectorSpec,
 ) -> list[tuple[Callable[..., Any] | None, Parameters]]:
     """Each selector or service seat of ``spec``: the ``kwargs`` provider, and the reads its values reach."""
@@ -711,7 +690,7 @@ def _read_seats(
     return seats
 
 
-def _reach(
+def reach(
     provider: Callable[..., Any] | None, parameters: Parameters
 ) -> tuple[frozenset[str], frozenset[str]]:
     """The names in ``parameters`` that ``provider`` is annotated to fill, and those it fills or may fill.

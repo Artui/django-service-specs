@@ -8,12 +8,12 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.utils import (
     checked_server_values,
-    provider_reached,
-    seed_named_parameters,
     server_arguments_label,
+    split_seed_named,
 )
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
@@ -127,7 +127,7 @@ def check_server_arguments(
             f"{label}: ServerArguments has {', '.join(both)} both bound and withheld: a bound "
             "name takes the server's value and a withheld one takes none, so name each once."
         )
-    seated, taken = seed_named_parameters(spec, parameters, pool_seeds)
+    seated, taken = split_seed_named(spec, parameters, pool_seeds)
     refused = sorted(names & taken)
     if refused:
         raise ImproperlyConfigured(

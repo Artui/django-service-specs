@@ -37,9 +37,11 @@ from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.paginate_output import DEFAULT_PAGE_SIZE, paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
@@ -294,6 +296,7 @@ __all__ = [
     "present_for_audience",
     "project_payload",
     "provider_keys",
+    "provider_reached",
     "refusal_messages",
     "register_row_error",
     "relax_partial",
@@ -302,6 +305,7 @@ __all__ = [
     "resolve_target",
     "run_selector",
     "run_service",
+    "seed_named_parameters",
     "server_owned_keys",
     "shape_queryset",
     "spec_input_schema",

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`seed_named_parameters(spec, *, pool_seeds=)`**, exported from the root:
+  of a spec's parameters named like a registered seed or the call's
+  `request` or `view`, the `reflected` reads the seed fills and the
+  parameters `dispatch` refuses on every call. The reader `dispatch` answers
+  by, so a transport refusing the spec when it registers it cannot drift
+  from the call.
+- **`provider_reached(spec)`**, exported from the root: every top-level
+  parameter a `kwargs` or `input_data` provider fills or may fill, which the
+  shape check does not demand of the caller. A transport building a schema
+  reads it rather than restating which seat each provider reaches.
+
 ### Changed
 - **A read or a shape named `request` or `view` is refused when the spec is
   built**, on `ServiceSpec` and `SelectorSpec` alike, unless it is a read

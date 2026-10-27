@@ -591,6 +591,12 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "max_length_in_force",
         "refusal_messages",
         "relax_partial",
+        # What a transport registering kernel specs reads at registration, so
+        # that it refuses and relaxes what dispatch would: the transports call
+        # these from this package, and djangorestframework-services neither
+        # wraps nor re-exports them.
+        "provider_reached",
+        "seed_named_parameters",
         # This package's version, which no importer reads as an API.
         "__version__",
     }
