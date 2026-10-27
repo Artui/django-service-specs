@@ -9,6 +9,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
+from django_service_specs.affordances.utils import rendered_affordances
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -228,35 +229,25 @@ class TestASpecThatPresentsNoAffordances:
         "spec",
         [
             SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN),
-            ServiceSpec(service=Record(), permissions=OPEN, affordances=[BOOKS_CLOSED]),
             ServiceSpec(
                 service=Record(),
                 permissions=OPEN,
                 affordances=[BOOKS_CLOSED],
                 output_selector_spec=SelectorSpec(kind=SelectorKind.LIST, selector=notes_of),
             ),
+            # Its own conditions are checked against and never presented.
+            ServiceSpec(service=Record(), permissions=OPEN, affordances=[BOOKS_CLOSED]),
         ],
-        ids=["selector", "service-own-conditions-only", "output-selector-declaring-none"],
+        ids=["selector", "output-selector-declaring-none", "no-output-selector"],
     )
-    def test_it_is_refused_rather_than_answering_every_name_absent(self, spec: Any) -> None:
-        with pytest.raises(ImproperlyConfigured) as caught:
-            row_affordance_answers(spec, object())
+    def test_a_spec_presenting_none_answers_empty(self, spec: Any) -> None:
+        # No mapping at all (``None``), not an empty one: this is the arm that
+        # fails without ``or {}``, with an AttributeError rather than an answer.
+        assert rendered_affordances(spec) is None
+        assert row_affordance_answers(spec, object()) == {}
 
-        message = str(caught.value)
-        assert "presents no affordances" in message
-        assert "output_selector_spec" in message
-        assert type(spec).__name__ in message
+    def test_an_empty_mapping_answers_empty_too(self) -> None:
+        spec = listing(affordances={})
 
-    def test_the_refusal_names_the_spec_s_callable(self) -> None:
-        def archive_note() -> None: ...
-
-        spec = ServiceSpec(service=archive_note, permissions=OPEN, affordances=[BOOKS_CLOSED])
-
-        with pytest.raises(ImproperlyConfigured) as caught:
-            row_affordance_answers(spec, object())
-
-        assert "archive_note" in str(caught.value)
-
-    def test_an_empty_mapping_is_a_declaration_and_answers_empty(self) -> None:
-        # As ``present`` treats it: it adds an empty ``affordances`` object.
-        assert row_affordance_answers(listing(affordances={}), object()) == {}
+        assert rendered_affordances(spec) == {}
+        assert row_affordance_answers(spec, object()) == {}

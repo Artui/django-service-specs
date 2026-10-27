@@ -311,15 +311,14 @@ docs/examples/affordances.py:row
 
 It takes the spec the rows came through, whichever kind: a selector spec, a
 service spec (which it reads through its output selector, as `present` does) or
-anything that compiles to one. A spec that presents no affordances is refused,
-naming the spec, rather than answered with an empty object: a page asking
-whether an action is available would read every action as absent from a spec
-that never declared them. A service spec's *own* `affordances` are conditions
-it is checked against and are never presented, so they count for nothing here;
-declare the mapping on the selector that returns the rows. A selector spec
-declaring an empty mapping does declare them, and answers `{}`. A row that
-carries no answer for a name whose spec declares a condition is refused; a name
-with no conditions reads no flag, so every row is available for it.
+anything that compiles to one. A spec that presents no affordances answers `{}`,
+as `present` leaves the `affordances` key out, so a name the answer lacks is a
+name the spec does not declare, and a caller asking about one must treat it as
+not declared. A service spec's *own* `affordances` are conditions it is checked
+against and are never presented, so they count for nothing here; declare the
+mapping on the selector that returns the rows. A row that carries no answer for
+a name whose spec declares a condition is refused; a name with no conditions
+reads no flag, so every row is available for it.
 
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
 describes the object on each item, with or without a projection, and with each

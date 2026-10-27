@@ -4,14 +4,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from django.core.exceptions import ImproperlyConfigured
-
 from django_service_specs.affordances.utils import answer_row_affordances, rendered_affordances
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
-from django_service_specs.specs.utils import callable_name
 
 
 def row_affordance_answers(
@@ -35,31 +32,18 @@ def row_affordance_answers(
     stops there. It is the same reading ``present`` and ``with_affordances``
     make of a row, because they call the same function.
 
+    A spec that presents no affordances answers ``{}``, as ``present`` leaves
+    the ``affordances`` key out of what it presents. A caller asking about a name
+    the answer does not hold must treat it as not declared; the answer cannot
+    tell a name the spec never declared from a spec that declares none.
+
     Raises:
-        ImproperlyConfigured: ``spec`` presents no affordances, which is
-            refused rather than answered ``{}`` so that a page asking whether
-            an action is available cannot read every action as absent from a
-            spec that never declared them - the check ``present`` makes before
-            adding the object. An explicit empty ``affordances`` mapping
-            presents an empty object, and answers ``{}``. Or ``row`` carries
-            no answer for a declared name that has a condition, because it did
-            not come through the selector declaring them. A name whose spec
-            declares no conditions reads no flag, and is available for any row.
+        ImproperlyConfigured: ``row`` carries no answer for a declared name
+            that has a condition, because it did not come through the selector
+            declaring them. A name whose spec declares no conditions reads no
+            flag, and is available for any row.
     """
-    spec = kernel_spec(spec)
-    affordances = rendered_affordances(spec)
-    # ``None`` and not falsy, as ``present`` tests it, so a page and a
-    # presented row agree on which specs carry answers: an empty mapping is a
-    # declaration (test_an_empty_mapping_is_a_declaration_and_answers_empty).
-    if affordances is None:
-        # A service spec's own conditions are the ones it is checked against;
-        # naming that is the way out for the likeliest cause.
-        callable_of = spec.service if isinstance(spec, ServiceSpec) else spec.selector
-        raise ImproperlyConfigured(
-            f"{type(spec).__name__} for {callable_name(callable_of)} presents no affordances, "
-            "so there is no answer to read from a row. A SelectorSpec declares them in its "
-            "affordances mapping, and a ServiceSpec presents its output_selector_spec's: "
-            "the affordances a ServiceSpec declares itself are conditions it is checked "
-            "against, never presented."
-        )
-    return answer_row_affordances(row, affordances)
+    # ``or {}`` is the whole of the no-affordances case: a spec presenting none
+    # has no mapping at all, and an empty mapping is no different to a reader
+    # (test_a_spec_presenting_none_answers_empty fails without it).
+    return answer_row_affordances(row, rendered_affordances(kernel_spec(spec)) or {})
