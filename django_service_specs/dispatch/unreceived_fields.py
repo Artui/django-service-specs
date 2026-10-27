@@ -89,8 +89,11 @@ def unreceived_fields(
     # ``takes_all`` by test_a_field_the_service_receives_is_not[through-kwargs],
     # and over ``seed_named`` by TestAFieldNamedLikeASeed's
     # test_a_service_handed_data_is_not[through-kwargs]; ``seed_named`` by
-    # its test_a_service_taking_it_by_name_only_is_answered; ``named`` by
-    # test_a_field_the_service_never_takes_is_answered.
+    # its test_a_service_taking_it_by_name_only_is_answered, and its call
+    # seeds by test_a_field_named_for_the_call_s_own_is_answered_on_any_mount;
+    # ``named`` by test_a_field_the_service_never_takes_is_answered, and its
+    # positional-or-keyword kind by the ``positional-or-keyword`` case of
+    # test_a_field_the_service_receives_is_not.
     if takes_all:
         return frozenset()
     return frozenset(name for name in fields if name in seed_named or name not in named)

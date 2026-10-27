@@ -555,10 +555,11 @@ class TestAnArgumentNamedEither:
         with pytest.raises(ImproperlyConfigured, match=rf"\['{name}'\].*the call's own"):
             entry(spec, principal=make_user("ada"), arguments={})
 
+    @pytest.mark.parametrize("reflected", [False, True])
     @pytest.mark.parametrize("name", ["request", "view"])
     @_ENTRIES
     def test_an_output_selector_s_read_named_request_builds_and_runs(
-        self, entry: Callable[..., Any], name: str
+        self, entry: Callable[..., Any], name: str, reflected: bool
     ) -> None:
         """Its reads are never the call's parameters, and its selector is handed the call's own by name.
 
@@ -576,7 +577,7 @@ class TestAnArgumentNamedEither:
             kind=SelectorKind.LIST,
             selector=output,
             permissions=OPEN,
-            reads=Parameters.of(Parameter(name, "string")),
+            reads=Parameters.of(Parameter(name, "string", reflected=reflected)),
         )
         spec = ServiceSpec(service=lambda **_: None, permissions=OPEN, output_selector_spec=out)
         entry(spec, principal=make_user("ada"), arguments={}, call_context={name: marker})

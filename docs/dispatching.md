@@ -841,9 +841,11 @@ filter named `view` is a filter like any other. A `kwargs` provider or an
 read marked `reflected` is not refused: the call's value fills it, as a
 registered seed fills one named like it. A shape is refused though it is
 marked, since no seat fills a shape. The refusal when the spec is built ends
-as dispatch's does, `'request' and 'view' are the
-call's own, read off its context.`, so code matching one matches both. A top-level Validator field of either name is the caller's: it takes a registered seed's seat, as below, validating into
-`data` while a service naming it reads the call's own. Neither name is in
+with `'request' and 'view' are the call's own, read off its context.`, as
+dispatch's does on a mount registering no seed of either name; where one is
+registered, dispatch's refusal names the seed instead. A top-level Validator
+field of either name is the caller's: it takes a registered seed's seat, as
+below, validating into `data` while a service naming it reads the call's own. Neither name is in
 `RESERVED_POOL_SEEDS` or `PoolSeeds.reserved`, so **a mount may still register
 either** through `PoolSeeds`, by the constructor or `extend()`, as transports
 released before dispatch supplied them do. Such a mount keeps its own: the

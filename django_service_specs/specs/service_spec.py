@@ -643,10 +643,7 @@ def _check_reads(spec: ServiceSpec) -> None:
         # output selector's reads are never call parameters, and are not read
         # (``check_call_seeds``). The role by name, held by the collection case of
         # test_one_nobody_marked_is_refused_when_the_spec_is_built.
-        role = "instance" if spec.instance_selector_spec is not None else "collection"
-        check_call_seeds(
-            target.reads, label=f"ServiceSpec.{role}_selector_spec.reads", reflected_seated=True
-        )
+        check_call_seeds(target.reads, label=f"{_target_label(spec)}.reads", reflected_seated=True)
     _beside_the_target(spec)
 
 

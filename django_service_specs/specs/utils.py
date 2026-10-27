@@ -217,9 +217,9 @@ def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bo
     call whatever the caller sends, with or without a seed registered under
     the name. Refused here, when the spec is built, because nothing about
     the call can change the answer: the registered seeds change who fills
-    the name, never whether it is filled. The message ends as dispatch's
-    does, with ``CALL_SEEDS_NOTE``, so a consumer matching either matches
-    both. Not in ``check_reserved``, which also reads the assembled
+    the name, never whether it is filled. The message ends with
+    ``CALL_SEEDS_NOTE``, as dispatch's does on a mount registering no seed
+    of the name. Not in ``check_reserved``, which also reads the assembled
     parameters, where a top-level Validator field of either name stays the
     caller's (test_a_validator_field_named_request_takes_the_seat).
 

@@ -52,6 +52,11 @@ class _Tenanted:
     tenant: str
 
 
+@dataclass
+class _Asked:
+    request: str
+
+
 class _Aliased(BaseModel):
     title: str
     note: str = Field(default="", alias="noteText")
@@ -157,6 +162,7 @@ def test_a_keyword_a_declared_source_explains_leaves_the_fields_answered(
     "service",
     [
         pytest.param(lambda *, title, note: note, id="by-name"),
+        pytest.param(lambda title, note: note, id="positional-or-keyword"),
         pytest.param(lambda *, data: data.note, id="through-data"),
         pytest.param(lambda **kwargs: kwargs["note"], id="through-kwargs"),
     ],
@@ -204,6 +210,22 @@ class TestAFieldNamedLikeASeed:
         dispatch(spec, principal=make_user("ada"), arguments={"tenant": "sent"}, pool_seeds=_SEEDED)
         assert seen == ["acme"]
         assert unreceived_fields(spec, pool_seeds=_SEEDED) == {"tenant"}
+
+    def test_a_field_named_for_the_call_s_own_is_answered_on_any_mount(self) -> None:
+        """``request`` and ``view`` are seeded on every mount, so no registration is needed."""
+        seen: list[Any] = []
+        marker = object()
+        spec = _service(
+            lambda *, request: seen.append(request), validator=DataclassValidator(_Asked)
+        )
+        dispatch(
+            spec,
+            principal=make_user("ada"),
+            arguments={"request": "sent"},
+            call_context={"request": marker},
+        )
+        assert seen == [marker]
+        assert unreceived_fields(spec) == {"request"}
 
     @pytest.mark.parametrize(
         "service",
