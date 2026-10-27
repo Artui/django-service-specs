@@ -232,6 +232,26 @@ Each also carries a code, which the next section reads.
 answers in the same tree, and so does a relation write that refuses a row, so
 a transport reads one shape whichever of them refused.
 
+## What the call left out
+
+A transport wording "you did not send `name`" reads
+[`InvalidArguments.missing`][django_service_specs.parameters.invalid_arguments.InvalidArguments.missing]
+rather than walking the tree itself: the sorted names of the call's top-level
+arguments with a message coded `required`, whoever refused them - the shape
+check, or a selector refusing a read nothing filled.
+
+```python
+--8<--
+docs/examples/arguments.py:missing
+--8<--
+```
+
+An argument that was sent and was wrong is not listed. **Neither is anything
+below the top level**: a nested object's field and a `many` call's row field
+are not arguments of the call, so the book's missing `title` above is in the
+tree and not in `missing`. The code is what is read, so a Validator's plain
+message that says "required" in words is not listed either.
+
 ## The codes a refusal carries
 
 A message is for a person, and is translated. A program reading the tree needs

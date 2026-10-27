@@ -66,6 +66,15 @@ def check_call(
     though ``dispatch`` reports it beside the Validator's refusals of the
     other rows, and this runs no Validator.
 
+    That refusal is marked: its ``after_authorize`` is ``True``, and it is
+    ``False`` on every refusal of steps one to three and on ``dispatch``'s own
+    (test_a_refused_row_is_marked_as_raised_after_the_class_level_check,
+    test_a_failed_shape_is_not_marked_as_raised_after_the_class_level_check).
+    A transport that calls this before charging a rate limit reads it to tell
+    a refused row, which was refused after the class-level check passed, so the
+    call is admitted and only its rows are wrong, from a refused call, which
+    was not admitted. The checks are not asked again to find out.
+
     It is the complement of
     [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]:
     this authorizes and does not validate, and ``bind_arguments`` validates

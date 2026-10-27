@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.types.dispatch_error import DispatchError
 
 
@@ -40,10 +41,55 @@ class InvalidArguments(DispatchError):
     indices with ``non_field_errors``, so ``json.dumps(..., sort_keys=True)``
     over it raises ``TypeError``: it is already in reading order, and is
     written as it stands.
+
+    ``missing`` names the arguments the call left out, read off the tree
+    rather than parsed from its words, so a transport wording "you did not
+    send ``title``" has one reading to ask and not its own walk of ``detail``.
+
+    ``after_authorize`` says whether the class-level permission check had
+    passed when this was raised. It is ``True`` for one refusal only: the rows
+    of a ``many`` call that
+    [`check_call`][django_service_specs.dispatch.check_call.check_call] raises
+    after its fourth step. A transport that called ``check_call`` before
+    charging a rate limit reads it to tell a refused row, where the call was
+    admitted and only its rows are wrong, from a refused call, which was not
+    admitted; it need not ask the checks again to find out. Everything else,
+    including ``dispatch``'s own refusal of the same rows, leaves it
+    ``False``: it is ``check_call``'s statement about its own order of
+    steps, not a general account of where in a run the error arose.
     """
 
     default_message: ClassVar[str] = "Invalid arguments."
 
-    def __init__(self, detail: Mapping[Any, Any]) -> None:
+    def __init__(self, detail: Mapping[Any, Any], *, after_authorize: bool = False) -> None:
         super().__init__()
         self.detail: dict[Any, Any] = dict(detail)
+        self.after_authorize: bool = after_authorize
+
+    @property
+    def missing(self) -> tuple[str, ...]:
+        """The top-level arguments the call left out, sorted: those with a message coded ``"required"``.
+
+        The code both the shape check and a selector refusing a read nothing
+        filled stamp on an absent argument, and the one DRF gives the same
+        mistake. An argument that was sent and was wrong is not here, nor is
+        one whose only messages carry another code or none (a Validator's own
+        plain ``str``). **Top level only**: a nested object's field and a
+        ``many`` call's row field are not arguments of the call, so they are
+        never listed, and neither is ``non_field_errors``, which is a message
+        about the call and not a name in it
+        (test_missing_is_not_the_node_s_own_message fails without that
+        exclusion). A nested node is a dict, whose iteration yields keys and
+        never a message with a code, which is why a row or a nested object
+        lists nothing (test_missing_does_not_reach_into_a_nested_object_or_a_row).
+        The code is read and not the words
+        (test_missing_reads_the_code_and_not_the_words fails if the words are).
+        """
+        return tuple(
+            sorted(
+                name
+                for name, messages in self.detail.items()
+                if name != NON_FIELD_ERRORS
+                and any(getattr(message, "code", None) == "required" for message in messages)
+            )
+        )

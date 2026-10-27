@@ -528,6 +528,20 @@ so it never crosses a queue. The kernel's own steps run no query. It is
 target. A `many` call's refused rows are raised by it, after the permission
 check, in the tree dispatch raises them in.
 
+That one refusal is marked: its
+[`after_authorize`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
+is `True`, and it is `False` on every refusal before the permission check and on
+`dispatch`'s own refusal of the same rows. A transport that checks a call before
+charging a rate limit reads it to tell a refused row, where the caller was
+admitted and only its rows are wrong, from a refused call, without asking the
+checks a second time.
+
+```python
+--8<--
+docs/examples/dispatching.py:after_authorize
+--8<--
+```
+
 ## Arguments the server supplies
 
 A transport sometimes knows a declared parameter's value better than its

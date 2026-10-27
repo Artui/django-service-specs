@@ -251,7 +251,9 @@ mount only. Here a tool whose callers go on to look up the author keeps
 ```
 
 An override that leaves two fields marked as the label is refused in the
-mount's `name`.
+mount's `name`, and so is a declaration that marks two, with or without
+overrides: the refusal calls the output by `name` where it gave one, and
+`Output` where it did not.
 
 ## A caller naming no audience
 

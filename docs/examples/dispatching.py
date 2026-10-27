@@ -37,6 +37,7 @@ from django_service_specs import (
     resolve_target,
 )
 from docs.examples.declaring import IsSignedIn, NoteRow, list_notes_spec
+from docs.examples.declaring_writes import add_notes_spec
 from docs.examples.quickstart import Rename, rename_note_spec
 from tests.dispatch_app.models import Note
 
@@ -160,6 +161,26 @@ def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> No
 
 
 # --8<-- [end:check_call]
+
+
+# --8<-- [start:after_authorize]
+def spend_a_call_on_the_admitted(
+    user: Any, arguments: dict[str, Any], charge: Callable[[], None]
+) -> dict[str, Any]:
+    try:
+        checked, _ = check_call(add_notes_spec, principal=user, arguments=arguments)
+    except InvalidArguments as refused:
+        if refused.after_authorize:
+            # The class-level check passed and only rows are wrong: the caller
+            # is admitted, so the call is charged and the checks are not asked
+            # again. A refused call (anything else) was not admitted.
+            charge()
+        return refused.detail
+    charge()
+    return checked
+
+
+# --8<-- [end:after_authorize]
 
 
 # --8<-- [start:server_arguments]

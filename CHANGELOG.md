@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`InvalidArguments.missing`**, the sorted names of the call's top-level
+  arguments that were left out: those with a message coded `required`, whether
+  the shape check or a selector refusing a read nothing filled stamped it. A
+  nested object's field and a `many` call's row field are not arguments of the
+  call and are never listed, nor is `non_field_errors`. A transport words a
+  missing argument from one reading instead of walking `detail` itself.
+- **`InvalidArguments.after_authorize`**, a keyword-only constructor argument
+  (default `False`) kept as an attribute, `True` on the one refusal `check_call`
+  raises after the class-level permission check: a `many` call's refused rows.
+  A transport that called `check_call` before charging a rate limit tells a
+  refused row, where the caller was admitted, from a refused call without asking
+  the checks again. Every refusal before the check, and `dispatch`'s own refusal
+  of the same rows, leaves it `False`.
+
+### Changed
+- `audience_projection_for_spec(..., name=)` words the two-label refusal in
+  the mount's `name`, with or without `overrides`, where it said `Output`
+  whatever the spec was called. Without `name` the message is unchanged.
+
 ## [0.18.0] — 2026-10-26
 
 ### Added

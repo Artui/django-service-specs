@@ -315,7 +315,9 @@ SURFACE: dict[str, Pin] = {
     ),
     "coerce_flat": _fn("parameters.coerce_flat", "parameters, raw"),
     # The adapter subclasses it beside DRF's ValidationError, and reads its detail.
-    "InvalidArguments": _error("parameters.invalid_arguments", "detail", "DispatchError"),
+    "InvalidArguments": _error(
+        "parameters.invalid_arguments", "detail, *, after_authorize=", "DispatchError"
+    ),
     "CodedMessage": _error("parameters.coded_message", "message, code", str),
     "NON_FIELD_ERRORS": Pin("parameters.non_field_errors", value="non_field_errors"),
     # --- pool ---------------------------------------------------------------------------------
