@@ -36,6 +36,24 @@ _NAMED: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYW
 """The parameter kinds a pool fills by name, and so the only ones it can leave unfilled."""
 
 
+def required_keywords(fn: Callable[..., Any]) -> tuple[str, ...]:
+    """The parameters of ``fn`` a pool must fill, in signature order: by name, with no default.
+
+    The one reading of a callable's demands, so the call that refuses a
+    missing keyword (``call_keywords``) and the reader refusing at
+    registration a keyword nothing fills (``check_seeds``) cannot disagree
+    about which keyword a callable requires. Neither kind outside ``_NAMED``
+    is ever required: ``**kwargs`` takes whatever arrives, ``*args`` needs
+    nothing, and a positional-only parameter is never passed by name, so a
+    pool cannot fill one at all.
+    """
+    return tuple(
+        name
+        for name, param in inspect.signature(fn).parameters.items()
+        if param.kind in _NAMED and param.default is inspect.Parameter.empty
+    )
+
+
 def call_keywords(
     fn: Callable[..., Any], pool: Mapping[str, Any], *, fillable: frozenset[str]
 ) -> dict[str, Any]:
@@ -80,7 +98,8 @@ def call_keywords(
     the seat that merges the provider's answer refuses it first, whatever
     default the callable declares.
 
-    One branch to coverage, so each condition is held by its own test:
+    One branch to coverage, so each condition is held by its own test, the
+    first two in ``required_keywords``:
     test_a_callable_taking_the_whole_pool_is_never_missing_anything,
     test_a_positional_only_parameter_is_not_reported and
     test_a_var_positional_parameter_is_never_missing (the kind: ``**kwargs``
@@ -93,14 +112,7 @@ def call_keywords(
     test_a_service_parameter_no_validator_declares_is_the_author_s_error (the
     caller's reach).
     """
-    missing = [
-        name
-        for name, param in inspect.signature(fn).parameters.items()
-        if param.kind in _NAMED
-        and param.default is inspect.Parameter.empty
-        and name not in pool
-        and name in fillable
-    ]
+    missing = [name for name in required_keywords(fn) if name not in pool and name in fillable]
     if missing:
         # Translated where it is raised, spelled and coded as the shape check
         # refuses an absent required argument, so a caller reads one refusal

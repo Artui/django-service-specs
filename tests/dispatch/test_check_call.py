@@ -235,6 +235,38 @@ def test_a_many_spec_s_refused_rows_are_raised_as_dispatch_raises_them(ada: Any)
     }
 
 
+def test_a_refused_row_is_marked_as_raised_after_the_class_level_check(ada: Any) -> None:
+    # The grant ``check_call`` earned still holds when it raises a row: step
+    # four has passed. Dispatch's own refusal of the same row is unmarked, so
+    # the mark is ``check_call``'s alone.
+    arguments = {"items": [{"title": "a"}, {"title": 3}]}
+    spec = _rows(_Asked())
+
+    with pytest.raises(InvalidArguments) as by_check_call:
+        check_call(spec, principal=ada, arguments=arguments)
+    with pytest.raises(InvalidArguments) as by_dispatch:
+        dispatch(spec, principal=ada, arguments=arguments)
+
+    assert by_check_call.value.after_authorize is True
+    assert by_dispatch.value.after_authorize is False
+
+
+def test_a_failed_shape_is_not_marked_as_raised_after_the_class_level_check(ada: Any) -> None:
+    # Held by name: a ``many`` spec whose list is no list, an argument the
+    # call does not take, and a spec that is not ``many``. Each is raised
+    # before step four, so no grant exists yet.
+    asked = _Asked()
+    for spec, arguments in (
+        (_rows(asked), {"items": 3}),
+        (_rows(asked), {"items": [], "tenant": "x"}),
+        (_searching(asked), {"search": 3}),
+    ):
+        with pytest.raises(InvalidArguments) as caught:
+            check_call(spec, principal=ada, arguments=arguments)
+        assert caught.value.after_authorize is False
+    assert asked.asked == []
+
+
 def test_a_refused_principal_learns_nothing_about_the_rows_it_sent(ada: Any) -> None:
     with pytest.raises(NotPermitted):
         check_call(_rows(Refuse()), principal=ada, arguments={"items": [{"title": 3}]})

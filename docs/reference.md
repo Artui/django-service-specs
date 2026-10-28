@@ -109,6 +109,10 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 ::: django_service_specs.dispatch.check_requested_input.check_requested_input
 ::: django_service_specs.dispatch.check_call.check_call
+::: django_service_specs.dispatch.check_seeds.check_seeds
+::: django_service_specs.dispatch.seed_named_parameters.seed_named_parameters
+::: django_service_specs.dispatch.provider_reached.provider_reached
+::: django_service_specs.dispatch.unreceived_fields.unreceived_fields
 ::: django_service_specs.dispatch.check_server_arguments.check_server_arguments
 ::: django_service_specs.dispatch.apply_server_arguments.apply_server_arguments
 ::: django_service_specs.dispatch.refusals.REFUSALS
@@ -122,6 +126,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.affordances.operation_affordances.operation_affordances
 ::: django_service_specs.affordances.aenforce_affordances.aenforce_affordances
 ::: django_service_specs.affordances.aunmet_operation_affordance.aunmet_operation_affordance
+::: django_service_specs.affordances.row_affordance_answers.row_affordance_answers
 
 ## Authorization
 
@@ -130,6 +135,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.grant.Grant
 ::: django_service_specs.dispatch.authorize.authorize
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope
+::: django_service_specs.dispatch.checks_read_arguments.checks_read_arguments
 ::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.is_deactivated.is_deactivated

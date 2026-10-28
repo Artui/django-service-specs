@@ -18,6 +18,7 @@ from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
     callable_name,
+    check_call_seeds,
     check_callable,
     check_changes,
     check_metadata,
@@ -631,6 +632,18 @@ def _check_reads(spec: ServiceSpec) -> None:
     if not isinstance(spec.reads, Parameters):
         raise ImproperlyConfigured("ServiceSpec.reads must be Parameters.")
     check_reserved(spec.reads, label="ServiceSpec.reads")
+    check_call_seeds(spec.reads, label="ServiceSpec.reads", reflected_seated=True)
+    target = spec.target_selector_spec()
+    if target is not None:
+        # The target's reads join this spec's call parameters
+        # (``_beside_the_target``), so they are refused as the spec's own are.
+        # Its reads alone: a nested selector declaring shapes is refused by
+        # ``_check_nested`` in its own words
+        # (test_a_target_s_shape_named_request_keeps_the_nested_refusal). The
+        # output selector's reads are never call parameters, and are not read
+        # (``check_call_seeds``). The role by name, held by the collection case of
+        # test_one_nobody_marked_is_refused_when_the_spec_is_built.
+        check_call_seeds(target.reads, label=f"{_target_label(spec)}.reads", reflected_seated=True)
     _beside_the_target(spec)
 
 
@@ -646,6 +659,7 @@ def _check_shapes(spec: ServiceSpec) -> None:
     if not isinstance(spec.shapes, Parameters):
         raise ImproperlyConfigured("ServiceSpec.shapes must be Parameters.")
     check_reserved(spec.shapes, label="ServiceSpec.shapes")
+    check_call_seeds(spec.shapes, label="ServiceSpec.shapes", reflected_seated=False)
     # Each ``+`` refuses a name both sides declare: a read or the target's
     # (test_a_shape_a_read_also_declares_is_refused,
     # test_a_shape_the_target_selector_reads_is_refused), then the list

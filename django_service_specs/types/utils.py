@@ -31,6 +31,18 @@ SHAPES_RENAME: Final = (
     "'shapes'."
 )
 
+CALL_SEEDS_NOTE: Final = " 'request' and 'view' are the call's own, read off its context."
+"""What a refusal of a parameter of either name adds, in one wording wherever it is refused.
+
+The refusal when a spec is built always ends with it
+(test_one_nobody_marked_is_refused_when_the_spec_is_built asserts it).
+Dispatch's refusal on every call and a transport's server arguments end
+with it only where no seed of the name is registered, since a registered
+seed is then what the parameter meets; so a consumer matching it matches
+each refusal on a mount registering neither name. It sits beside ``SHAPES_RENAME``, the other suffix a
+parameter's refusal adds.
+"""
+
 # The pool names dispatch seeds per call rather than per process: the validated
 # input (``data``), the resolved target (``instance``, ``collection``), and the
 # values only a later step has - the service's return, as ``result`` and

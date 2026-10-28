@@ -46,7 +46,9 @@ def audience_projection_for_spec(
     sibling hides. The declaration stays authoritative, and an override is the
     exception rather than a second place to declare an audience. Only the
     top-level markings and the label move; the choices and the children come
-    from the declaration. ``name`` identifies the mount in the refusal below.
+    from the declaration. ``name`` identifies the mount in the refusals below,
+    the two-label one included: it replaces ``Output`` as what that message
+    calls the output, and without it the wording is unchanged.
 
     Raises:
         django.core.exceptions.ImproperlyConfigured: Two fields of one output
@@ -55,17 +57,23 @@ def audience_projection_for_spec(
             would name it by whichever came first.
     """
     output = kernel_spec(spec).output()
-    projection = AudienceProjection() if output is None else _project(output, path="")
+    projection = (
+        AudienceProjection()
+        if output is None
+        else _project(output, path="", subject=name or "Output")
+    )
     if not overrides:
         return projection
     return _with_overrides(projection, overrides, name=name or "agent projection")
 
 
-def _project(output: Output, *, path: str) -> AudienceProjection:
+def _project(output: Output, *, path: str, subject: str) -> AudienceProjection:
     """One output's markings, recursing into every child declared as an ``Output``.
 
     ``path`` is the dotted field path of a child, empty at the top, so a
-    refusal names the output it is about.
+    refusal names the output it is about, and ``subject`` is what the refusal
+    calls the output as a whole: the mount's ``name`` when it gave one, else
+    ``Output``.
     """
     marked: dict[str, FieldMarking] = {}
     choice_labels: dict[str, dict[Any, str]] = {}
@@ -76,7 +84,7 @@ def _project(output: Output, *, path: str) -> AudienceProjection:
             marked[field.name] = field.marking
             if field.marking.audience is FieldAudience.LABEL:
                 if label is not None:
-                    where = f"Output field {path!r}" if path else "Output"
+                    where = f"{subject} field {path!r}" if path else subject
                     raise ImproperlyConfigured(
                         f"{where}: both {label!r} and {field.name!r} are marked "
                         "FieldMarking.label(). A record has one name - pick the field an "
@@ -98,7 +106,9 @@ def _project(output: Output, *, path: str) -> AudienceProjection:
         # fails open: a hidden field inside the child would survive.
         child = field.fields if field.fields is not None else field.items
         if isinstance(child, Output):
-            child_projection = _project(child, path=f"{path}.{field.name}" if path else field.name)
+            child_projection = _project(
+                child, path=f"{path}.{field.name}" if path else field.name, subject=subject
+            )
             if not child_projection.is_empty():
                 nested[field.name] = child_projection
     return AudienceProjection(

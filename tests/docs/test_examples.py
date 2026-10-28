@@ -471,6 +471,37 @@ class TestDispatching:
             dispatching.bind_rename(ada, note, {"pk": note.pk})
         assert refused.value.detail == {"title": ["This field is required."]}
 
+    def test_a_charge_follows_whether_the_call_was_admitted(self, ada: Any) -> None:
+        charged: list[int] = []
+
+        def charge() -> None:
+            charged.append(1)
+
+        # Admitted and well-formed, then admitted with a refused row: both are
+        # charged. A call refused at its shape, or by a check, is not.
+        checked = dispatching.spend_a_call_on_the_admitted(ada, {"items": [{"title": "a"}]}, charge)
+        assert checked == {"items": [{"title": "a"}]}
+        refused = dispatching.spend_a_call_on_the_admitted(
+            ada, {"items": [{"title": "a"}, {"title": 3}]}, charge
+        )
+        assert refused == {"items": {1: {"title": ["Expected a string."]}}}
+        assert len(charged) == 2
+        dispatching.spend_a_call_on_the_admitted(ada, {"items": 3}, charge)
+        assert len(charged) == 2
+        with pytest.raises(NotPermitted):
+            dispatching.spend_a_call_on_the_admitted(
+                AnonymousUser(), {"items": [{"title": "a"}]}, charge
+            )
+        assert len(charged) == 2
+
+    def test_a_listing_leaves_out_the_specs_whose_checks_declare_arguments(self, ada: Any) -> None:
+        specs = [dispatching.note_spec, dispatching.owned_note_spec]
+        assert dispatching.listed_before_any_call(specs) == [dispatching.note_spec]
+        # The check does read them: with the call's, it answers.
+        note = Note.objects.create(owner=ada, title="Draft")
+        result = dispatch(dispatching.owned_note_spec, principal=ada, arguments={"pk": note.pk})
+        assert result.kind != "not_found"
+
     def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
         queue: list[Any] = []
         dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)
@@ -481,6 +512,36 @@ class TestDispatching:
         with pytest.raises(NotPermitted):
             dispatching.enqueue_rename(AnonymousUser(), {"pk": 1, "title": "Final"}, queue)
         assert len(queue) == 1
+
+    def test_a_spec_that_cannot_hold_is_refused_where_it_is_registered(self) -> None:
+        # Without a seed of its name, every call would fail on ``tenant``.
+        bare = dispatching.ToolRegistry()
+        with pytest.raises(ImproperlyConfigured, match=r"\['tenant'\], which nothing fills"):
+            bare.register("tenant", dispatching.tenant_name_spec)
+        assert bare.tools == {}
+        seeded = dispatching.ToolRegistry(
+            dispatching.DEFAULT_POOL_SEEDS.extend(tenant=lambda: "acme")
+        )
+        seeded.register("tenant", dispatching.tenant_name_spec)
+        seeded.register("rename", quickstart.rename_note_spec)
+        assert set(seeded.tools) == {"tenant", "rename"}
+
+    def test_a_registry_may_refuse_a_field_its_service_never_reads(self) -> None:
+        advertising = dispatching.AdvertisingToolRegistry()
+        with pytest.raises(ImproperlyConfigured, match=r"would advertise \['note'\]"):
+            advertising.register("retitle", dispatching.retitle_spec)
+        assert advertising.tools == {}
+        advertising.register("rename", quickstart.rename_note_spec)
+        # The answer is the registry's to act on: the plain one registers it, and it runs.
+        plain = dispatching.ToolRegistry()
+        plain.register("retitle", dispatching.retitle_spec)
+        assert set(plain.tools) == {"retitle"}
+        result = dispatching.dispatch(
+            dispatching.retitle_spec,
+            principal=make_user("ada"),
+            arguments={"title": "kept", "note": "dropped"},
+        )
+        assert result.value == "kept"
 
     def test_a_server_argument_outranks_the_caller_and_a_withheld_one_is_never_read(
         self, ada: Any, bob: Any
@@ -622,6 +683,12 @@ class TestAsyncDispatch:
 class TestArguments:
     def test_every_problem_comes_back_in_one_tree(self) -> None:
         assert arguments.refusal(arguments.ARGUMENTS) == arguments.REFUSED
+
+    def test_the_arguments_a_call_left_out_are_named_and_a_row_s_are_not(self) -> None:
+        assert arguments.left_out({"books": "x"}) == ("name",)
+        assert arguments.left_out({"name": "x", "books": "x"}) == ()
+        assert arguments.left_out(arguments.ARGUMENTS) == ()
+        assert arguments.left_out({"name": "Ursula"}) == ()
 
     def test_each_message_carries_its_code(self) -> None:
         assert arguments.codes(arguments.refusal(arguments.ARGUMENTS)) == arguments.CODES

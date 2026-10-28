@@ -16,7 +16,7 @@ import inspect
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from types import MappingProxyType
-from typing import Any, Literal, cast
+from typing import Any, Final, Literal, cast
 
 from django.core.exceptions import ImproperlyConfigured, ObjectDoesNotExist
 from django.db.models import BooleanField, Value
@@ -68,7 +68,7 @@ from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.types.utils import CALL_CONTEXT, SHAPES
+from django_service_specs.types.utils import CALL_CONTEXT, CALL_SEEDS_NOTE, SHAPES
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -188,6 +188,17 @@ SELECTOR_SOURCE = "SelectorSpec.selector"
 INSTANCE_SOURCE = "ServiceSpec.instance_selector_spec.selector"
 COLLECTION_SOURCE = "ServiceSpec.collection_selector_spec.selector"
 OUTPUT_SOURCE = "ServiceSpec.output_selector_spec.selector"
+
+EVERY_POOL: Final = frozenset({"user", "progress", CALL_CONTEXT, SHAPES}) | CALL_SEEDS
+"""What every pool dispatch builds carries, whatever the mount registers.
+
+``base_pool``'s ``user`` and ``progress``, the call's context and the
+``shapes`` dispatch adds beside them, and the call's ``request`` and ``view``,
+handed to a callable naming either. The keywords ``check_seeds`` and
+``unreceived_fields`` count as filled on every mount
+(test_every_pool_is_base_pool_s_keys_and_the_call_s_own holds it to
+``base_pool``).
+"""
 
 
 @dataclass(frozen=True)
@@ -364,7 +375,7 @@ def open_call(
     the project's, so only dispatch - which is handed the registry - can see
     the name it shares. The dispatcher's own names never reach here:
     ``spec.parameters()`` refuses them as it assembles. Of the names a
-    registered seed shares (see ``seed_named_parameters``):
+    registered seed shares (see ``split_seed_named``):
 
     - **A** ``reflected`` **read**, one read off a callable's signature
       rather than written, leaves this call's argument set, and the seed
@@ -416,24 +427,11 @@ def open_call(
     # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it
     # for a field, which is outside the target's parameters).
     declared = spec.parameters()
-    seated, taken = seed_named_parameters(spec, declared, pool_seeds)
+    seated, taken = split_seed_named(spec, declared, pool_seeds)
     if parameters is None:
         parameters = declared
     if taken:
-        # The dispatcher's names never get here, so a name no seed registers
-        # is one of the call's two, which dispatch fills itself
-        # (test_a_parameter_named_either_is_refused asserts the hint, and
-        # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
-        hint = (
-            ""
-            if taken <= pool_seeds.names
-            else " 'request' and 'view' are the call's own, read off its context."
-        )
-        raise ImproperlyConfigured(
-            f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
-            "registered pool seed occupies. An argument must never meet a seed in one pool; "
-            f"rename the parameter.{hint}"
-        )
+        raise ImproperlyConfigured(seed_named_refusal(spec, taken, pool_seeds))
     refuse_overlaid_parameters(spec, declared, overlay)
     if seated:
         # Out of the call's argument set, the narrowed one too, so the closed
@@ -462,12 +460,41 @@ def open_call(
         for name, value in checked.items():
             if isinstance(value, _CheckedRows):
                 if value.errors:
-                    raise InvalidArguments({name: dict(sorted(value.errors.items()))})
+                    # After step four, which is what the mark says: the grant
+                    # ``authorize`` returned above still holds for the caller
+                    # (test_a_refused_row_is_marked_as_raised_after_the_class_level_check).
+                    raise InvalidArguments(
+                        {name: dict(sorted(value.errors.items()))}, after_authorize=True
+                    )
                 checked[name] = [value.rows[index] for index in sorted(value.rows)]
     return checked, granted
 
 
-def seed_named_parameters(
+def seed_named_refusal(
+    spec: ServiceSpec | SelectorSpec, taken: frozenset[str], pool_seeds: PoolSeeds
+) -> str:
+    """Why ``spec`` is refused for declaring ``taken``, the second set ``split_seed_named`` returns.
+
+    One wording, read by ``open_call`` on every call and by ``check_seeds``
+    at registration, so a transport refusing the spec when it registers it
+    says what dispatch would have said on its first call
+    (test_a_read_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
+    """
+    # The dispatcher's names never get here, so a name no seed registers is
+    # one of the call's two, which dispatch fills itself; a read or a shape of
+    # either on a service spec is refused when the spec is built, so it is a
+    # selector spec's own read or shape, or a ``many`` spec's list
+    # (test_a_parameter_named_either_is_refused asserts the hint, and
+    # test_a_spec_declaring_a_registered_seed_s_name_is_refused its absence).
+    hint = "" if taken <= pool_seeds.names else CALL_SEEDS_NOTE
+    return (
+        f"{type(spec).__name__} declares the parameter(s) {sorted(taken)}, which a "
+        "registered pool seed occupies. An argument must never meet a seed in one pool; "
+        f"rename the parameter.{hint}"
+    )
+
+
+def split_seed_named(
     spec: ServiceSpec | SelectorSpec, declared: Parameters, pool_seeds: PoolSeeds
 ) -> tuple[frozenset[str], frozenset[str]]:
     """Of ``declared``'s names a registered seed shares: the reads it fills, and the ones refused.
@@ -494,7 +521,7 @@ def seed_named_parameters(
     # the transports read.
     shared = declared.names() & (pool_seeds.reserved | CALL_SEEDS)
     seated = shared & frozenset(
-        param.name for _, reads in _read_seats(spec) for param in reads if param.reflected
+        param.name for _, reads in read_seats(spec) for param in reads if param.reflected
     )
     return seated, shared - seated - seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
 
@@ -537,7 +564,7 @@ def shape_check(
     are relaxed:
 
     - **A parameter a provider fills or may fill**, which is always one that
-      provider's values reach (see ``_server_filled``): not demanded of the
+      provider's values reach (see ``server_filled``): not demanded of the
       caller here, because whether the call has it is known only once the
       provider has answered. It is still required of the assembled pool,
       checked in the seat that merges the provider's answer, after
@@ -588,7 +615,7 @@ def shape_check(
     are raised here; each row's is carried to ``validate_arguments`` as
     ``_CheckedRows``, to be reported with the Validator's.
     """
-    owned, reached = _server_filled(spec)
+    owned, reached = server_filled(spec)
     # The schema relaxes ``partial`` through the same function, so the two
     # cannot disagree about which fields a partial call may leave out.
     parameters = relax_partial(spec, parameters)
@@ -597,7 +624,7 @@ def shape_check(
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        fields, fields_reached = _reach(spec.input_data, spec.validator.parameters())
+        fields, fields_reached = reach(spec.input_data, spec.validator.parameters())
         if spec.many:
             return _check_bulk(
                 _relaxed(parameters, reached),
@@ -632,7 +659,7 @@ def _without(checked: dict[str, Any], owned: frozenset[str]) -> dict[str, Any]:
     return {name: value for name, value in checked.items() if name not in owned}
 
 
-def _server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], frozenset[str]]:
+def server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], frozenset[str]]:
     """The reads a ``kwargs`` provider fills where its values reach them, and the reads it fills or may fill.
 
     **A provider relaxes only the parameters its values reach**, so a key it
@@ -670,35 +697,14 @@ def _server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], fr
     """
     owned: frozenset[str] = frozenset()
     reached: frozenset[str] = frozenset()
-    for provider, reads in _read_seats(spec):
-        filled, may_fill = _reach(provider, reads)
+    for provider, reads in read_seats(spec):
+        filled, may_fill = reach(provider, reads)
         owned |= filled
         reached |= may_fill
     return owned, reached
 
 
-def provider_reached(spec: ServiceSpec | SelectorSpec) -> frozenset[str]:
-    """Every top-level parameter of ``spec`` a provider fills or may fill: what the shape check relaxes.
-
-    The reads ``_server_filled`` relaxes and, on a service spec that is not
-    ``many``, the Validator's fields ``input_data`` reaches.
-    ``check_server_arguments`` reads it, so a parameter the shape check does
-    not demand may be withheld. One arc to coverage, each conjunct held by
-    its own test: a selector spec has no Validator
-    (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld),
-    a service spec may have none
-    (test_a_service_spec_s_read_is_judged_by_its_service), and a ``many``
-    spec's row fields are no top-level parameter, though one may share a
-    read's name
-    (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).
-    """
-    reached = _server_filled(spec)[1]
-    if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        reached |= _reach(spec.input_data, spec.validator.parameters())[1]
-    return reached
-
-
-def _read_seats(
+def read_seats(
     spec: ServiceSpec | SelectorSpec,
 ) -> list[tuple[Callable[..., Any] | None, Parameters]]:
     """Each selector or service seat of ``spec``: the ``kwargs`` provider, and the reads its values reach."""
@@ -711,7 +717,7 @@ def _read_seats(
     return seats
 
 
-def _reach(
+def reach(
     provider: Callable[..., Any] | None, parameters: Parameters
 ) -> tuple[frozenset[str], frozenset[str]]:
     """The names in ``parameters`` that ``provider`` is annotated to fill, and those it fills or may fill.

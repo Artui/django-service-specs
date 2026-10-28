@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-10-27
+
+### Added
+- **`InvalidArguments.missing`**, the sorted names of the call's top-level
+  arguments that were left out: those with a message coded `required`, whoever
+  stamped it (the shape check, a selector, the Validator adapters). A
+  nested object's field and a `many` call's row field are not arguments of the
+  call and are never listed, nor is `non_field_errors`. A transport words a
+  missing argument from one reading instead of walking `detail` itself.
+- **`InvalidArguments.after_authorize`**, a keyword-only constructor argument
+  (default `False`) kept as an attribute, `True` on the one refusal `check_call`
+  raises after the class-level permission check: a `many` call's refused rows.
+  A transport that called `check_call` before charging a rate limit tells a
+  refused row, where the caller was admitted, from a refused call without asking
+  the checks again. Every refusal before the check, and `dispatch`'s own refusal
+  of the same rows, leaves it `False`.
+- **`checks_read_arguments(spec)`**, whether any of a spec's permission checks
+  declares `arguments` on a question asked before the call's arguments name a
+  row: every check's `has_permission`, and `has_scope_permission` too for a
+  service spec with no target selector (a create). A transport's filtered
+  listing has no arguments to hand a check that declares them; this lets it
+  decide without calling the check, answering what a check declares and not what
+  it does with `None`. A declaration with `as_kernel_spec()` is read as the spec it compiles
+  to, and the reading is `authorize`'s own.
+- **`row_affordance_answers(spec, row)`**, exported from the root and from
+  `django_service_specs.affordances`: one row's affordances, read off the row
+  itself, for a page that holds raw rows - a queryset's instances, a table's
+  records - rather than presented dicts. It returns the object `present` adds to
+  the row, `{name: {"available": bool}}` with `code` and `reason` when
+  unavailable: the first unmet condition in declaration order, and
+  `{"available": False}` alone for a row that no longer exists. It takes a
+  `SelectorSpec`, a `ServiceSpec` (read through its output selector) or a
+  `SpecSource`. A spec that presents no affordances answers `{}`, so a caller
+  asking for a name the answer lacks must treat it as not declared. `present`
+  reads rows through the same function.
+- **`check_seeds(spec, *, pool_seeds=)`**, exported from the root: refuses,
+  as `ImproperlyConfigured` naming every offender in a sorted list, a
+  declaration that cannot hold as written on a mount registering
+  `pool_seeds`. A transport calls it when it registers a spec, rather than
+  listing a tool or a route whose calls fail in a way the declaration
+  already settled. It refuses a parameter a registered seed or the call's
+  own `request` or `view` would meet, which `dispatch` refuses on every
+  call, in the words `dispatch` refuses it in; a positional-only parameter
+  with no default, and a keyword the service, the selector or the target
+  selector requires that nothing fills, each of which fails every call
+  reaching the callable (the kernel hands `data` to a service only, and
+  `instance` or `collection` only where a target selector resolves one); and
+  an optional read over a keyword that requires it, so a call leaving the
+  read out, as the declaration says it may, is refused as missing. A seat
+  whose provider does not annotate its keys, and a service beside a
+  Validator, are not judged for the keywords they require, since either may
+  fill one this cannot see.
+- **`unreceived_fields(spec, *, pool_seeds=)`**, exported from the root: the
+  Validator fields a service takes neither by name, nor through `data`, nor
+  through `**kwargs`, so a value sent for one is validated and then reaches
+  the service by no route. An answer rather than a refusal, because such a
+  spec runs and may mean to: a Validator checking that `password` and
+  `confirm` agree returns `password` alone. A transport decides whether to
+  refuse, warn or advertise the field anyway. A field named like a
+  registered seed reaches the service through `data` alone; a service taking
+  a keyword nothing declared explains, or beside a `kwargs` provider that
+  does not annotate its keys, is answered for none of its fields.
+- **`seed_named_parameters(spec, *, pool_seeds=)`**, exported from the root:
+  of a spec's parameters named like a registered seed or the call's
+  `request` or `view`, the `reflected` reads the seed fills and the
+  parameters `dispatch` refuses on every call. The reader `dispatch` answers
+  by, so a transport refusing the spec when it registers it cannot drift
+  from the call.
+- **`provider_reached(spec)`**, exported from the root: every top-level
+  parameter a `kwargs` or `input_data` provider fills or may fill, which the
+  shape check does not demand of the caller. A transport building a schema
+  reads it rather than restating which seat each provider reaches.
+
+### Changed
+- `audience_projection_for_spec(..., name=)` words the two-label refusal in
+  the mount's `name`, with or without `overrides`, where it said `Output`
+  whatever the spec was called. Without `name` the message is unchanged.
+- **A `ServiceSpec` read, a target selector's read or a `ServiceSpec` shape
+  named `request` or `view` is refused when the spec is built**, unless it is
+  a read marked `reflected`, which the call's own value fills. Dispatch hands
+  both names to every callable from the call's context on every mount, so
+  such a spec was refused by `dispatch` on every call, with or without a seed
+  registered under the name; it is now refused where it is declared, naming
+  the parameter in the form `['request']` and ending with `'request' and
+  'view' are the call's own, read off its context.`, as dispatch's refusal
+  does on a mount registering no seed of either name. Because such a spec
+  can no longer be built, every reader handed it raises where 0.18.0
+  answered, `bind_arguments`, `spec_input_schema` and `authorize` among
+  them, although no call to the spec could run, and a module declaring one
+  fails at import. A reflected shape is refused too, since no seat fills a
+  shape. A `SelectorSpec`'s own read or shape of either name is not refused
+  when it is built, since an output selector's reads and a FilterSet handed to
+  `shape_queryset` are no call's parameters; one dispatched on its own is
+  refused by `dispatch`, as before. A top-level Validator field of either
+  name stays the caller's, as before.
+
 ## [0.18.0] — 2026-10-26
 
 ### Added
@@ -2006,7 +2102,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Artui/django-service-specs/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/Artui/django-service-specs/compare/v0.15.0...v0.16.0

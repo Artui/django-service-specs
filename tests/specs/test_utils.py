@@ -9,6 +9,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -249,3 +250,89 @@ class TestAnAsyncPresenterIsRefused:
     def test_a_sync_presenter_is_accepted(self) -> None:
         presenter = Named()
         assert ServiceSpec(service=_service, presenter=presenter).presenter is presenter
+
+
+def _seat(where: str, name: str, *, reflected: bool = False) -> Any:
+    """A spec declaring ``name`` in ``where``, built: a read or a shape, on either spec or a target."""
+    declared = Parameters.of(Parameter(name, "string", reflected=reflected))
+    if where == "selector-read":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=_selector, reads=declared)
+    if where == "selector-shape":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=_selector, shapes=declared)
+    if where == "service-read":
+        return ServiceSpec(service=_service, reads=declared)
+    if where == "service-shape":
+        return ServiceSpec(service=_service, shapes=declared)
+    if where == "instance-read":
+        target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=_selector, reads=declared)
+        return ServiceSpec(service=_service, instance_selector_spec=target)
+    target = SelectorSpec(kind=SelectorKind.LIST, selector=_selector, reads=declared)
+    return ServiceSpec(service=_service, collection_selector_spec=target)
+
+
+# Where the refusal says it is, label first.
+_LABELS = {
+    "service-read": "ServiceSpec.reads",
+    "service-shape": "ServiceSpec.shapes",
+    "instance-read": "ServiceSpec.instance_selector_spec.reads",
+    "collection-read": "ServiceSpec.collection_selector_spec.reads",
+}
+
+
+class TestAParameterNamedForTheCallsOwnSeat:
+    """``request`` and ``view`` are the call's on every mount, so a service spec's unmarked one is refused.
+
+    Each refused case is one ``dispatch`` refused on every call before the
+    build did, with or without a seed registered under the name.
+    """
+
+    @pytest.mark.parametrize("name", ["request", "view"])
+    @pytest.mark.parametrize("where", list(_LABELS))
+    def test_one_nobody_marked_is_refused_when_the_spec_is_built(
+        self, where: str, name: str
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            _seat(where, name)
+        message = str(refused.value)
+        assert message.startswith(f"{_LABELS[where]} declares the parameter(s) ['{name}'], which")
+        # Dispatch's own wording, so a consumer matching either refusal matches both.
+        assert message.endswith("'request' and 'view' are the call's own, read off its context.")
+        # The build's own refusal, not dispatch's on the first call, nor the reserved names'.
+        assert "registered pool seed" not in message
+        assert "dispatch seeds itself" not in message
+
+    @pytest.mark.parametrize("name", ["request", "view"])
+    @pytest.mark.parametrize("where", ["selector-read", "selector-shape"])
+    def test_a_selector_spec_s_own_builds(self, where: str, name: str) -> None:
+        """Built as an output selector or for ``shape_queryset``, where its parameters are no call's.
+
+        Dispatched on its own it is refused by dispatch, as before
+        (``tests/pool/test_call_seeds.py``'s test_a_parameter_named_either_is_refused).
+        """
+        assert name in _seat(where, name).parameters().names()
+
+    def test_a_reflected_shape_is_still_refused(self) -> None:
+        """No call's seat fills a shape, so ``reflected`` frees a read and never a shape.
+
+        As dispatch refuses a reflected shape named like a registered seed.
+        """
+        with pytest.raises(ImproperlyConfigured, match=r"\['request'\]") as refused:
+            _seat("service-shape", "request", reflected=True)
+        assert "reflected=True" not in str(refused.value)
+
+    @pytest.mark.parametrize("where", ["service-read", "instance-read", "collection-read"])
+    def test_a_reflected_read_is_the_call_s_and_builds(self, where: str) -> None:
+        assert "request" in _seat(where, "request", reflected=True).parameters().names()
+
+    def test_the_hint_to_mark_it_is_offered_for_a_read(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="reflected=True"):
+            _seat("service-read", "view")
+
+    def test_a_target_s_shape_named_request_keeps_the_nested_refusal(self) -> None:
+        """A nested selector declaring shapes is refused in those words, whatever their names."""
+        shapes = Parameters.of(Parameter("request", "string"))
+        target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=_selector, shapes=shapes)
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=_service, instance_selector_spec=target)
+        assert "declares shapes, which a nested selector's call never carries" in str(refused.value)
+        assert "which dispatch hands" not in str(refused.value)

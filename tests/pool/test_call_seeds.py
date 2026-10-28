@@ -521,18 +521,67 @@ class _Fielded(Validator):
 class TestAnArgumentNamedEither:
     """No argument may meet the call's value in one pool, so a spec naming one is refused."""
 
+    @pytest.mark.parametrize("where", ["a-many-list", "a-selector-read", "a-selector-shape"])
     @pytest.mark.parametrize("name", ["request", "view"])
     @_ENTRIES
     def test_a_parameter_named_either_is_refused(
-        self, entry: Callable[..., Any], name: str
+        self, entry: Callable[..., Any], name: str, where: str
     ) -> None:
-        spec = ServiceSpec(
-            service=lambda **_: None,
-            permissions=OPEN,
-            reads=Parameters.of(Parameter(name, "string")),
-        )
+        """The parameters of either name a spec can still be built with, refused on every call.
+
+        A service spec's read, its target selector's or its shape of either
+        name is refused when the spec is built
+        (``tests/specs/test_utils.py``'s ``TestAParameterNamedForTheCallsOwnSeat``);
+        a selector spec's own is not, since it is also built where its
+        parameters are no call's.
+        """
+        declared = Parameters.of(Parameter(name, "string"))
+        spec: ServiceSpec | SelectorSpec
+        if where == "a-many-list":
+            spec = ServiceSpec(
+                service=lambda **_: None,
+                permissions=OPEN,
+                many=True,
+                many_argument=name,
+                validator=Titled(),
+            )
+        else:
+            spec = SelectorSpec(
+                kind=SelectorKind.LIST,
+                selector=lambda **_: Note.objects.none(),
+                permissions=OPEN,
+                **({"reads": declared} if where == "a-selector-read" else {"shapes": declared}),
+            )
         with pytest.raises(ImproperlyConfigured, match=rf"\['{name}'\].*the call's own"):
             entry(spec, principal=make_user("ada"), arguments={})
+
+    @pytest.mark.parametrize("reflected", [False, True])
+    @pytest.mark.parametrize("name", ["request", "view"])
+    @_ENTRIES
+    def test_an_output_selector_s_read_named_request_builds_and_runs(
+        self, entry: Callable[..., Any], name: str, reflected: bool
+    ) -> None:
+        """Its reads are never the call's parameters, and its selector is handed the call's own by name.
+
+        So it is neither refused when the spec is built nor at dispatch,
+        whether or not it is marked ``reflected``.
+        """
+        marker = _Marker(name)
+        seen: list[Any] = []
+
+        def output(*, request: Any, view: Any, instance: Any) -> Any:
+            seen.append(request if name == "request" else view)
+            return Note.objects.none()
+
+        out = SelectorSpec(
+            kind=SelectorKind.LIST,
+            selector=output,
+            permissions=OPEN,
+            reads=Parameters.of(Parameter(name, "string", reflected=reflected)),
+        )
+        spec = ServiceSpec(service=lambda **_: None, permissions=OPEN, output_selector_spec=out)
+        entry(spec, principal=make_user("ada"), arguments={}, call_context={name: marker})
+        assert seen == [marker]
 
     @pytest.mark.parametrize("name", ["request", "view"])
     @_ENTRIES

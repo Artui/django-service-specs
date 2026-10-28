@@ -12,9 +12,10 @@ from django.core.exceptions import ImproperlyConfigured
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.types.is_async import is_async
-from django_service_specs.types.utils import SHAPES, SHAPES_RENAME
+from django_service_specs.types.utils import CALL_SEEDS_NOTE, SHAPES, SHAPES_RENAME
 
 # The methods dispatch reads a permission check's answer from.
 _CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
@@ -204,6 +205,62 @@ def check_reserved(parameters: Parameters, *, label: str) -> Parameters:
             f"An argument must never outrank a seeded value; rename the parameter.{hint}"
         )
     return parameters
+
+
+def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bool) -> None:
+    """Refuse a parameter named ``request`` or ``view`` that the call's seat does not fill.
+
+    Dispatch hands both to every callable naming one, read off the call's
+    context, on every mount, so a service spec's read nobody marked
+    ``reflected``, its target selector's, or its shape, of either name, meets
+    the call's value in one pool, and ``dispatch`` refuses the spec on every
+    call whatever the caller sends, with or without a seed registered under
+    the name. Refused here, when the spec is built, because nothing about
+    the call can change the answer: the registered seeds change who fills
+    the name, never whether it is filled. The message ends with
+    ``CALL_SEEDS_NOTE``, as dispatch's does on a mount registering no seed
+    of the name. Not in ``check_reserved``, which also reads the assembled
+    parameters, where a top-level Validator field of either name stays the
+    caller's (test_a_validator_field_named_request_takes_the_seat).
+
+    Read for a ``ServiceSpec`` only, never on a ``SelectorSpec``'s own
+    construction. A selector spec is built in two places its parameters are
+    no call's: as an output selector, whose reads never reach the call's
+    arguments and whose selector is handed the call's own value by name
+    (test_an_output_selector_s_read_named_request_builds_and_runs), and
+    for ``shape_queryset`` outside dispatch, where a FilterSet's filter of
+    either name is a query parameter like any other
+    (test_a_filter_named_view_builds_and_shapes). A selector spec dispatched
+    on its own is refused by dispatch, as before, and by ``check_seeds``.
+
+    ``reflected_seated`` is for a spec's reads: a ``reflected`` read is read
+    off its callable's signature, so the call's seat fills it
+    (test_a_reflected_read_named_either_is_the_call_s). A shape is no read
+    any seat fills, so a reflected one is refused as an unmarked one is.
+    One arc to coverage: the read cases of
+    test_one_nobody_marked_is_refused_when_the_spec_is_built hold
+    ``param.reflected``, and test_a_reflected_shape_is_still_refused holds
+    ``reflected_seated``.
+    """
+    taken = sorted(
+        param.name
+        for param in parameters
+        if param.name in CALL_SEEDS and not (reflected_seated and param.reflected)
+    )
+    if taken:
+        # The mark is offered for a read alone, since it frees no shape:
+        # test_the_hint_to_mark_it_is_offered_for_a_read, and the negative
+        # assertion of test_a_reflected_shape_is_still_refused.
+        hint = (
+            " Mark a read reflected=True for its callable to be handed the call's own."
+            if reflected_seated
+            else ""
+        )
+        raise ImproperlyConfigured(
+            f"{label} declares the parameter(s) {taken}, which dispatch hands every callable "
+            "on every mount. An argument must never meet the call's value in one pool; "
+            f"rename the parameter.{hint}{CALL_SEEDS_NOTE}"
+        )
 
 
 def callable_name(value: Any) -> str:
