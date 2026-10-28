@@ -1243,7 +1243,11 @@ missing argument would ask for a value the caller cannot send or already
 did, and a client that reads <code>InvalidArguments</code> as its own mistake would
 send the call again. It is decided at dispatch rather than when the spec is
 declared, because a registered seed may fill such a parameter, and the seeds
-are known only then.</p>
+are known only then. A transport that knows the seeds of its mount refuses
+such a spec where it registers it, with
+<a class="autorefs autorefs-internal" title="check_seeds" href="../reference/#django_service_specs.dispatch.check_seeds.check_seeds"><code>check_seeds</code></a>, as it
+refuses an optional read over a selector keyword with no default, which a call
+leaving the read out is refused for.</p>
 <p>Four kinds of parameter are never missing: one with a default, <code>**kwargs</code>,
 <code>*args</code>, and a positional-only one, which dispatch never passes by name.
 Nothing the output selector declares is refused either: its pool carries no
@@ -1653,7 +1657,9 @@ A provider annotated to fill a parameter declared anywhere else -
 selector's read - is refused with <code>ImproperlyConfigured</code> when the spec is
 built or, for a Validator field, when <code>parameters()</code> is assembled.
 <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
-gathers what every provider of a spec fills, with the seeds' names. None of
+gathers what every provider of a spec fills, with the seeds' names, and
+<a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>
+every parameter a provider fills or may fill, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what <code>parameters()</code> lists:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Owned</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>  <span class="c1"># the keys the provider fills, readable before it runs</span>

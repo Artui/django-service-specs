@@ -1200,7 +1200,9 @@ mount only. Here a tool whose callers go on to look up the author keeps
 </span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="p">}</span>
 </span></code></pre></div>
 <p>An override that leaves two fields marked as the label is refused in the
-mount's <code>name</code>.</p>
+mount's <code>name</code>, and so is a declaration that marks two, with or without
+overrides: the refusal calls the output by <code>name</code> where it gave one, and
+<code>Output</code> where it did not.</p>
 <h2 id="a-caller-naming-no-audience">A caller naming no audience<a class="headerlink" href="#a-caller-naming-no-audience" title="Permanent link">&para;</a></h2>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">books_over_http</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="c1"># A caller naming no audience is presented every field, unprojected.</span>
