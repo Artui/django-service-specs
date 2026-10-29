@@ -217,7 +217,9 @@ class Parameter:
     ``number``, or a ``decimal`` string, which is compared as the decimal it
     spells, so ``"1E+999999999"`` is past a bound of ``1e50`` without ever
     being built as the integer it names. Each is an ``int`` or a finite
-    ``float``, a JSON number the schema can state. They exist for the bound a
+    ``float``, a JSON number. The schema states them on an ``integer`` and a
+    ``number`` and not on a decimal string, where JSON Schema gives them no
+    meaning; the shape check enforces all three. They exist for the bound a
     reader needs before any Validator runs: a filter whose form field has none
     hands the value to the database's integer conversion, which builds every
     digit. Any other bound - a string's length, a Validator's ``max_value`` -

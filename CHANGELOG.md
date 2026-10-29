@@ -37,6 +37,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `max_value` stay undeclared, because a declared bound is refused by the
   shape check before the form runs, which would replace the field's own error
   message for it and its other fields' refusals beside it.
+- **`parameters_schema` no longer states `"minimum"` and `"maximum"` on a
+  decimal string.** JSON Schema applies those keywords to a number instance
+  only, so on `{"type": "string", "format": "decimal"}` a validating client
+  ignored both and a strict validator such as Ajv could flag them as keywords
+  that do not apply. The advertised schema of every decimal changes: a
+  django-filter number filter, each side of a numeric range filter, each
+  element of a CSV number filter, and any `Parameter(..., format="decimal",
+  minimum=...)` now states `"type": "string"` and `"format": "decimal"` and
+  no bound. The
+  bounds are still enforced: the shape check refuses a decimal past
+  `minimum` or `maximum` exactly as before, and the `Parameter` still carries
+  them. An `integer` and a `number` still state theirs, scalar or array
+  element.
 
 ### Fixed
 - **`check_seeds` refuses a callable whose signature cannot be read.** A
