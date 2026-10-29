@@ -34,6 +34,7 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -284,6 +285,155 @@ class TestParameters:
         with pytest.raises(InvalidArguments) as refused:
             check_arguments(params, {"name": "Ada", "nickname": "A"})
         assert refused.value.detail == {"nickname": ["Unknown argument."]}
+
+
+def _node(form_class: type[forms.BaseForm], name: str) -> dict[str, Any]:
+    """The schema node a transport advertises for one of the form's fields."""
+    return parameters_schema(FormValidator(form_class).parameters())["properties"][name]
+
+
+def _checked_then_validated(form_class: type[forms.BaseForm], arguments: dict[str, Any]) -> Any:
+    """What a transport's call comes to: the shape check, then the form, refused by whichever answers."""
+    validator = FormValidator(form_class)
+    try:
+        checked = check_arguments(validator.parameters(), arguments)
+    except InvalidArguments as refused:
+        return ("shape check", coded(refused.detail))
+    try:
+        return ("validated", validator.validate(checked, CONTEXT))
+    except InvalidArguments as refused:
+        return ("form", coded(refused.detail))
+
+
+class TestLengths:
+    """A ``CharField``'s lengths, advertised as JSON Schema's and enforced by the form alone."""
+
+    def test_a_max_length_is_advertised_as_the_string_s_max_length(self) -> None:
+        form_class = _form("Code", code=forms.CharField(max_length=32))
+        assert _node(form_class, "code") == {"type": "string", "maxLength": 32}
+
+    def test_a_required_field_s_min_length_is_advertised_as_its_min_length(self) -> None:
+        form_class = _form("Code", code=forms.CharField(min_length=3))
+        assert _node(form_class, "code") == {"type": "string", "minLength": 3}
+
+    def test_both_are_advertised_together(self) -> None:
+        form_class = _form("Code", code=forms.CharField(min_length=3, max_length=32))
+        assert _node(form_class, "code") == {"type": "string", "minLength": 3, "maxLength": 32}
+
+    def test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string(
+        self,
+    ) -> None:
+        # Django runs no validator on an empty value, so ``""`` is taken
+        # whatever ``min_length`` says, and a ``minLength`` would tell a client
+        # to refuse what the form takes.
+        form_class = _form("Code", code=forms.CharField(min_length=3, max_length=8, required=False))
+        assert _node(form_class, "code") == {"type": ["string", "null"], "maxLength": 8}
+        assert _checked_then_validated(form_class, {"code": ""}) == ("validated", {"code": ""})
+
+    @pytest.mark.parametrize(
+        "field",
+        [
+            forms.EmailField(max_length=40, min_length=6),
+            forms.URLField(max_length=40, min_length=6),
+            forms.SlugField(max_length=40, min_length=6),
+            forms.RegexField(r"^[a-z]+$", max_length=40, min_length=6),
+        ],
+        ids=["email", "url", "slug", "regex"],
+    )
+    def test_every_char_field_subclass_carries_its_lengths(self, field: forms.Field) -> None:
+        node = _node(_form("Contact", value=field), "value")
+        assert (node.get("minLength"), node.get("maxLength")) == (6, 40)
+
+    def test_a_length_is_counted_after_the_form_strips_whitespace(self) -> None:
+        # Which a schema cannot say: the padded value is past ``maxLength`` and taken.
+        form_class = _form("Code", code=forms.CharField(max_length=4))
+        assert _node(form_class, "code")["maxLength"] == 4
+        assert _checked_then_validated(form_class, {"code": "  abcd  "}) == (
+            "validated",
+            {"code": "abcd"},
+        )
+
+    def test_a_field_with_no_length_carries_no_extra(self) -> None:
+        (code,) = FormValidator(_form("Code", code=forms.CharField())).parameters()
+        assert code.json_schema_extra is None
+        assert code == Parameter("code", "string", required=True)
+
+    def test_a_length_is_carried_as_the_int_django_enforces(self) -> None:
+        # Django keeps ``max_length`` as given and validates against ``int()``
+        # of it, so a length written as a string is the number it spells.
+        form_class = _form("Code", code=forms.CharField(max_length="32", min_length="3"))
+        assert _node(form_class, "code") == {"type": "string", "minLength": 3, "maxLength": 32}
+
+    def test_a_model_form_carries_its_column_s_max_length(self) -> None:
+        # Django puts the column's ``max_length`` on the form field it builds.
+        assert (
+            _node(Username, "username")["maxLength"] == User._meta.get_field("username").max_length
+        )
+
+    @pytest.mark.parametrize(
+        ("field", "expected"),
+        [
+            pytest.param(
+                forms.CharField(max_length=3),
+                [("Ensure this value has at most 3 characters (it has 4).", "max_length")],
+                id="django-s-words",
+            ),
+            pytest.param(
+                forms.CharField(max_length=3, error_messages={"max_length": "Too long."}),
+                [("Too long.", "max_length")],
+                id="the-form-s-own-words",
+            ),
+        ],
+    )
+    def test_an_over_long_value_is_refused_by_the_form_in_its_own_words(
+        self, field: forms.Field, expected: list[tuple[str, str]]
+    ) -> None:
+        # Advertised, not enforced by the shape check: the form answers, beside
+        # its other refusals.
+        form_class = _form("Code", code=field, email=forms.EmailField())
+        assert _checked_then_validated(form_class, {"code": "long", "email": "no"}) == (
+            "form",
+            {"code": expected, "email": [("Enter a valid email address.", "invalid")]},
+        )
+
+
+class TestANumberSBoundsStayTheForms:
+    """An ``IntegerField``'s and a ``FloatField``'s bounds are not declared.
+
+    The shape check enforces a declared ``minimum`` or ``maximum`` before the
+    form runs, in its own words, so declaring them would change two refusals.
+    """
+
+    def test_no_bound_is_declared(self) -> None:
+        form_class = _form(
+            "Measure",
+            count=forms.IntegerField(min_value=0, max_value=9),
+            ratio=forms.FloatField(min_value=0.5, max_value=1.5),
+        )
+        assert [(p.minimum, p.maximum) for p in FormValidator(form_class).parameters()] == [
+            (None, None),
+            (None, None),
+        ]
+
+    def test_a_bound_is_refused_in_the_field_s_own_error_message(self) -> None:
+        form_class = _form(
+            "Count",
+            count=forms.IntegerField(min_value=0, error_messages={"min_value": "Not below zero."}),
+        )
+        assert _checked_then_validated(form_class, {"count": -5}) == (
+            "form",
+            {"count": [("Not below zero.", "min_value")]},
+        )
+
+    def test_a_bound_is_refused_beside_the_form_s_other_refusals(self) -> None:
+        form_class = _form("Count", count=forms.IntegerField(min_value=0), email=forms.EmailField())
+        assert _checked_then_validated(form_class, {"count": -5, "email": "no"}) == (
+            "form",
+            {
+                "count": [("Ensure this value is greater than or equal to 0.", "min_value")],
+                "email": [("Enter a valid email address.", "invalid")],
+            },
+        )
 
 
 class TestChoices:

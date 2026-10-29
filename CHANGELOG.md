@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`FormValidator` advertises a `CharField`'s lengths**, so the schema a
+  transport lists for a form changes. A `CharField`, or any field extending it
+  (`EmailField`, `URLField`, `SlugField`, `RegexField` and the rest), that sets
+  `max_length` now declares it as the parameter's `json_schema_extra`
+  `maxLength`, and a required one that sets `min_length` declares `minLength`:
+  `CharField(max_length=32)` is `{"type": "string", "maxLength": 32}` in
+  `parameters_schema` and an MCP `tools/list`, where it was a bare `string`. A
+  `ModelForm` field carries its column's `max_length`. An optional field's
+  `min_length` is not declared, since the form takes `""` whatever it says.
+  Nothing about validation changes: the shape check enforces neither keyword,
+  and the form still refuses a string past one in its own words and with
+  Django's code. An `IntegerField`'s and a `FloatField`'s `min_value` and
+  `max_value` stay undeclared, because a declared bound is refused by the
+  shape check before the form runs, which would replace the field's own error
+  message for it and its other fields' refusals beside it.
+
 ### Fixed
 - **`check_seeds` refuses a callable whose signature cannot be read.** A
   service, selector or target selector such as a builtin type (`dict`) let the
