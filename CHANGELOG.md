@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-10-29
+
 ### Added
 - **`flat_arguments(parameters, source)`**, in a new opt-in subpackage
   `django_service_specs.flat`: a query string or a form's fields, a `QueryDict`
@@ -2156,7 +2158,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Artui/django-service-specs/compare/v0.16.0...v0.17.0
