@@ -7,6 +7,7 @@ message came back.
 
 from __future__ import annotations
 
+import inspect
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -387,3 +388,119 @@ def test_no_seed_resolves_and_no_provider_is_called() -> None:
         ),
         pool_seeds=seeds,
     )
+
+
+def _unreadable_by_a_bad_signature() -> Callable[..., Any]:
+    """A function whose ``__signature__`` is no ``Signature``: ``inspect.signature`` raises ``TypeError``."""
+
+    def fn(**_: Any) -> None: ...
+
+    setattr(fn, "__signature__", 3)  # noqa: B010
+    return fn
+
+
+class TestACallableWhoseSignatureCannotBeRead:
+    """A builtin type has no signature to read, and dispatch fails every call that reaches it.
+
+    The refusal is ``ImproperlyConfigured``, as every other refusal is, not
+    the ``ValueError`` ``inspect.signature`` raises. The guard in
+    ``_unfilled`` catches ``(ValueError, TypeError)``: the first is held by
+    every ``dict`` case here and the second by
+    ``test_a_signature_that_is_not_one_is_refused_alike``, which fails
+    without ``TypeError`` in the tuple.
+    """
+
+    def test_python_reads_no_signature_for_the_callable_used_here(self) -> None:
+        # Guards the tests below against passing vacuously on a Python where
+        # ``dict`` gained a signature.
+        with pytest.raises(ValueError, match="no signature found"):
+            inspect.signature(dict)
+        with pytest.raises(TypeError):
+            inspect.signature(_unreadable_by_a_bad_signature())
+
+    @pytest.mark.parametrize(
+        ("spec", "seat"),
+        [
+            pytest.param(_retrieve(dict), "SelectorSpec.selector", id="selector-spec"),
+            pytest.param(_service(dict), "ServiceSpec.service", id="service-spec"),
+            pytest.param(
+                _service(lambda: None, instance_selector_spec=_retrieve(dict)),
+                "instance_selector_spec",
+                id="instance-selector",
+            ),
+            pytest.param(
+                _service(
+                    lambda: None,
+                    collection_selector_spec=SelectorSpec(
+                        kind=SelectorKind.LIST, selector=dict, permissions=OPEN
+                    ),
+                ),
+                "collection_selector_spec",
+                id="collection-selector",
+            ),
+        ],
+    )
+    def test_it_is_refused_naming_the_seat_and_the_callable(self, spec: Any, seat: str) -> None:
+        refused = _refusal(spec)
+        assert seat in refused
+        assert repr(dict) in refused
+        assert "signature cannot be read" in refused
+        # The unreadable seat is answered by this refusal alone, not by the
+        # checks that need its signature.
+        assert _POSITIONAL not in refused
+        assert _NOTHING_FILLS not in refused
+
+    @pytest.mark.parametrize(
+        ("spec", "error"),
+        [
+            pytest.param(_retrieve(dict), ValueError, id="selector-spec"),
+            pytest.param(_service(dict), ValueError, id="service-spec"),
+            pytest.param(
+                _service(lambda: None, instance_selector_spec=_retrieve(dict, reads=PK)),
+                ValueError,
+                id="instance-selector",
+            ),
+            pytest.param(
+                _service(
+                    lambda: None,
+                    collection_selector_spec=SelectorSpec(
+                        kind=SelectorKind.LIST, selector=dict, permissions=OPEN
+                    ),
+                ),
+                ValueError,
+                id="collection-selector",
+            ),
+            pytest.param(_service(_unreadable_by_a_bad_signature()), TypeError, id="bad-signature"),
+        ],
+    )
+    def test_dispatch_fails_every_call_that_reaches_it(
+        self, spec: Any, error: type[Exception]
+    ) -> None:
+        # Holds the claim that the declaration cannot run, for each seat.
+        arguments = {"pk": 1} if getattr(spec, "instance_selector_spec", None) else {}
+        with pytest.raises(error, match="signature"):
+            dispatch(spec, principal=make_user("ada"), arguments=arguments)
+
+    def test_a_signature_that_is_not_one_is_refused_alike(self) -> None:
+        fn = _unreadable_by_a_bad_signature()
+        refused = _refusal(_service(fn))
+        assert "ServiceSpec.service" in refused
+        assert repr(fn) in refused
+
+    def test_the_other_seats_are_still_refused_in_the_same_exception(self) -> None:
+        def positional(only: Any, /, **_: Any) -> None: ...
+
+        refused = _refusal(
+            _service(positional, instance_selector_spec=_retrieve(dict, reads=PK)),
+            pool_seeds=_SEEDED,
+        )
+        assert repr(dict) in refused
+        assert "['only'] with no default" in refused
+
+    def test_a_seed_named_read_is_refused_beside_it(self) -> None:
+        refused = _refusal(
+            _retrieve(dict, reads=Parameters.of(Parameter("tenant", "string"))),
+            pool_seeds=_SEEDED,
+        )
+        assert repr(dict) in refused
+        assert "['tenant']" in refused
