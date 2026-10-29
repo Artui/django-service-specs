@@ -154,6 +154,19 @@ class FormValidator(Validator):
       ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
     - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
       ``string``.
+    - every ``CharField``, those above included, declares its ``max_length``
+      as ``json_schema_extra``'s ``maxLength``, and a required one its
+      ``min_length`` as ``minLength``, so a schema advertises them; a
+      ``ModelForm``'s carries its column's, which Django puts on the field.
+      The shape check enforces neither, and the form refuses a string past
+      one in its own words, beside its other refusals. An optional field's
+      ``min_length`` is not declared, since the form takes ``""`` whatever it
+      says, and both count after the form strips surrounding whitespace.
+    - No ``IntegerField`` or ``FloatField`` declares its ``min_value`` or
+      ``max_value``. The shape check enforces a declared ``minimum`` or
+      ``maximum`` before the form runs, in its own words, so declaring them
+      would replace a field's ``error_messages`` for the bound and keep the
+      form's other refusals from coming back beside it.
     - ``FileField`` and ``ImageField``: a ``file``, which no JSON caller can
       send. A multipart request carries one, and a Python caller hands a
       Django ``File``; the form is bound with it as its ``files``, where a
@@ -616,7 +629,37 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
         choice_labels=labels,
         required=field.required,
         nullable=not field.required,
+        json_schema_extra=_lengths(field),
     )
+
+
+def _lengths(field: forms.Field) -> dict[str, int] | None:
+    """A ``CharField``'s lengths as JSON Schema's ``minLength`` and ``maxLength``, or ``None``.
+
+    Advertised and never enforced by the shape check: ``Parameter``'s own
+    ``min_length`` and ``max_length`` count an array's elements, and the form
+    refuses a string past either in its own words, beside its other refusals.
+    Each is the ``int`` Django builds its validator from, since the field keeps
+    the value as written. ``None`` rather than an empty mapping where neither
+    is set, so a field with no length declares what it did before.
+
+    ``minLength`` only on a required field: Django runs no validator on an
+    empty value, so an optional field takes ``""`` whatever its ``min_length``,
+    and the keyword would tell a client to refuse what the form takes
+    (test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string;
+    test_a_max_length_is_advertised_as_the_string_s_max_length holds the
+    ``is not None``, a required field with no ``min_length``). A required field refuses ``""`` as ``required``.
+    Both count after the form strips surrounding whitespace, which a schema
+    cannot say, so a padded value the form takes may read as too long.
+    """
+    if not isinstance(field, forms.CharField):
+        return None
+    lengths: dict[str, int] = {}
+    if field.min_length is not None and field.required:
+        lengths["minLength"] = int(field.min_length)
+    if field.max_length is not None:
+        lengths["maxLength"] = int(field.max_length)
+    return lengths or None
 
 
 _Labels = tuple[tuple[Any, Any], ...] | None
