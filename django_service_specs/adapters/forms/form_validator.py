@@ -6,11 +6,12 @@ import copy
 import dataclasses
 from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, cast
 
 from django import forms
 from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
+from django.core.validators import BaseValidator, MaxLengthValidator, MinLengthValidator
 from django.db import models
 from django.utils.datastructures import MultiValueDict
 
@@ -91,6 +92,14 @@ _SUPPORTED = (
 )
 
 
+_LENGTH_VALIDATORS: dict[type[BaseValidator], tuple[str, Callable[[int, int], int]]] = {
+    MinLengthValidator: ("minLength", max),
+    MaxLengthValidator: ("maxLength", min),
+}
+"""The validators read as a string's length, each with its keyword and how two
+of one side combine: the larger minimum and the smaller maximum hold."""
+
+
 class FormValidator(Validator):
     """A Validator whose declaration is a Django form class.
 
@@ -154,14 +163,20 @@ class FormValidator(Validator):
       ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
     - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
       ``string``.
-    - every ``CharField``, those above included, declares its ``max_length``
-      as ``json_schema_extra``'s ``maxLength``, and a required one its
-      ``min_length`` as ``minLength``, so a schema advertises them; a
+    - every ``CharField``, those above included, declares the limit of a
+      ``MaxLengthValidator`` on it as ``json_schema_extra``'s ``maxLength``,
+      and a required one a ``MinLengthValidator``'s as ``minLength``, so a
+      schema advertises them: the validator ``max_length`` and ``min_length``
+      append, or one a project appends by hand, the tightest winning; a
       ``ModelForm``'s carries its column's, which Django puts on the field.
-      The shape check enforces neither, and the form refuses a string past
-      one in its own words, beside its other refusals. An optional field's
-      ``min_length`` is not declared, since the form takes ``""`` whatever it
-      says, and both count after the form strips surrounding whitespace.
+      Only those two are read, by exact type, so a ``SimpleArrayField``,
+      whose ``max_length`` counts its items with subclasses of them,
+      declares no length, and neither does a callable limit. The shape check
+      enforces neither, and the form refuses a string past one in its own
+      words, beside its other refusals. An optional field's minimum is not
+      declared, since the form takes ``""`` whatever it says, and a length
+      counts on the value the form cleans: stripped unless ``strip=False``,
+      and a ``URLField``'s with the scheme it adds.
     - No ``IntegerField`` or ``FloatField`` declares its ``min_value`` or
       ``max_value``. The shape check enforces a declared ``minimum`` or
       ``maximum`` before the form runs, in its own words, so declaring them
@@ -634,31 +649,63 @@ def _parameter(form_class: type[forms.BaseForm], name: str, field: forms.Field) 
 
 
 def _lengths(field: forms.Field) -> dict[str, int] | None:
-    """A ``CharField``'s lengths as JSON Schema's ``minLength`` and ``maxLength``, or ``None``.
+    """A ``CharField``'s string lengths as JSON Schema's ``minLength`` and ``maxLength``, or ``None``.
+
+    Read off the field's validators rather than its ``min_length`` and
+    ``max_length``, which a subclass may spend on something else:
+    ``SimpleArrayField`` sets them and validates the count of its items with
+    ``ArrayMinLengthValidator`` and ``ArrayMaxLengthValidator``. Those subclass
+    Django's ``MinLengthValidator`` and ``MaxLengthValidator``, so only those
+    two, matched by exact type, are read (test_an_item_count_is_not_a_string_s_length).
+    One a project appends by hand is read too, since the form enforces it as
+    it does ``max_length``'s, and where several bound one side the tightest is
+    the one that holds (test_a_length_validator_a_project_appends_is_advertised,
+    test_the_tightest_of_several_lengths_is_advertised). The field builds each
+    from ``int()`` of what it was given, so the limit is that ``int``.
 
     Advertised and never enforced by the shape check: ``Parameter``'s own
     ``min_length`` and ``max_length`` count an array's elements, and the form
     refuses a string past either in its own words, beside its other refusals.
-    Each is the ``int`` Django builds its validator from, since the field keeps
-    the value as written. ``None`` rather than an empty mapping where neither
-    is set, so a field with no length declares what it did before.
-
-    ``minLength`` only on a required field: Django runs no validator on an
-    empty value, so an optional field takes ``""`` whatever its ``min_length``,
-    and the keyword would tell a client to refuse what the form takes
-    (test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string;
-    test_a_max_length_is_advertised_as_the_string_s_max_length holds the
-    ``is not None``, a required field with no ``min_length``). A required field refuses ``""`` as ``required``.
-    Both count after the form strips surrounding whitespace, which a schema
-    cannot say, so a padded value the form takes may read as too long.
+    ``None`` rather than an empty mapping where none is set, so a field with
+    no length declares what it did before. A length is counted on the value
+    the form cleans, which a schema cannot say: stripped of surrounding
+    whitespace unless ``strip=False``, and a ``URLField``'s with the scheme it
+    adds. So a padded value may read as too long and still be taken, and a
+    URL within ``maxLength`` may still be refused
+    (test_a_length_is_counted_after_the_form_strips_whitespace,
+    test_a_url_is_counted_with_the_scheme_the_field_adds).
     """
+    # Only a string has a length to advertise: a length validator a project
+    # puts on another field would state ``maxLength`` on, say, an integer
+    # (test_a_length_validator_on_a_field_that_is_no_string_is_not_advertised).
     if not isinstance(field, forms.CharField):
         return None
     lengths: dict[str, int] = {}
-    if field.min_length is not None and field.required:
-        lengths["minLength"] = int(field.min_length)
-    if field.max_length is not None:
-        lengths["maxLength"] = int(field.max_length)
+    for validator in field.validators:
+        side = _LENGTH_VALIDATORS.get(type(validator))
+        if side is None:
+            continue
+        keyword, tightest = side
+        # Django runs no validator on an empty value, so an optional field
+        # takes ``""`` whatever its minimum, and a ``minLength`` would tell a
+        # client to refuse what the form takes; a required field refuses
+        # ``""`` as ``required``. One branch to coverage, both conditions held
+        # by test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string,
+        # which asserts its ``maxLength`` is still advertised.
+        if keyword == "minLength" and not field.required:
+            continue
+        # The lookup matched its exact type, one of the two keys, so it is a
+        # ``BaseValidator``; ``Field.validators`` is typed as plain callables.
+        limit = cast(BaseValidator, validator).limit_value
+        # A non-negative ``int`` is all JSON Schema's two keywords take: a
+        # callable limit is computed per call, ``bool`` is an ``int`` to
+        # Python and no number to JSON, which ``type() is`` keeps out. One
+        # branch to coverage, each condition held by its own case of
+        # test_a_limit_no_schema_can_state_is_not_advertised: [a-callable]
+        # and [a-bool] for the type, [negative] for the sign.
+        if type(limit) is not int or limit < 0:
+            continue
+        lengths[keyword] = tightest(lengths.get(keyword, limit), limit)
     return lengths or None
 
 

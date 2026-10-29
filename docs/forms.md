@@ -76,9 +76,12 @@ extends.
 
 ### A string's length and a number's bounds
 
-A `CharField`, or any field extending it, that sets `max_length` advertises it
-as the string's `maxLength`, and a required one that sets `min_length` advertises
-that as its `minLength`. Each goes in the parameter's `json_schema_extra`, so a
+A `CharField`, or any field extending it, whose value Django's
+`MaxLengthValidator` bounds advertises the limit as the string's `maxLength`,
+and a required one bounded by `MinLengthValidator` advertises that as its
+`minLength`. Setting `max_length` or `min_length` appends one of those, and a
+validator a project appends by hand counts the same, since the form enforces
+it alike; where several bound one side, the tightest is advertised. Each goes in the parameter's `json_schema_extra`, so a
 transport's schema states it (an MCP `tools/list` reads
 `{"type": "string", "maxLength": 32}` for `CharField(max_length=32)`) and the
 shape check does not enforce it: the form still refuses an over-long value, in
@@ -86,12 +89,22 @@ its own words and with Django's code, beside its other refusals. A `ModelForm`
 field carries its column's `max_length`, which Django puts on the form field it
 builds.
 
+Only those two validators are read, matched by exact type, rather than the
+field's `max_length` and `min_length`. `SimpleArrayField` extends `CharField`
+and spends both on how many items its list holds, validated by subclasses of
+the same two validators, so it advertises no length: a `ModelForm` over a sized
+`ArrayField` builds one. A limit no schema can state, such as a callable one,
+is not advertised either.
+
 An optional field's `min_length` is not advertised. Django runs no validator on
 an empty value, so the form takes `""` whatever its `min_length`, and a
-`minLength` would tell a client to refuse what the form takes. Both lengths
-are counted after the form strips surrounding whitespace, which a schema
-cannot say, so a value padded with spaces may read as too long to a client
-that checks the schema and still be taken.
+`minLength` would tell a client to refuse what the form takes. A length is
+counted on the value the form cleans, which a schema cannot say: stripped of
+surrounding whitespace unless the field sets `strip=False`, and a `URLField`'s
+with the scheme it adds. So a value padded with whitespace the form strips may
+read as too long to a client that checks the schema and still be taken, and a
+URL within its `maxLength` may still be refused: `URLField(max_length=20)`
+refuses the 20 characters of `"abcdefghijklmnop.com"`, counted with the scheme.
 
 An `IntegerField`'s or a `FloatField`'s `min_value` and `max_value` are not
 declared. A declared `minimum` or `maximum` is enforced by the shape check,

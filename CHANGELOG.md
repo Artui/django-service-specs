@@ -26,13 +26,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`FormValidator` advertises a `CharField`'s lengths**, so the schema a
   transport lists for a form changes. A `CharField`, or any field extending it
-  (`EmailField`, `URLField`, `SlugField`, `RegexField` and the rest), that sets
-  `max_length` now declares it as the parameter's `json_schema_extra`
-  `maxLength`, and a required one that sets `min_length` declares `minLength`:
-  `CharField(max_length=32)` is `{"type": "string", "maxLength": 32}` in
-  `parameters_schema` and an MCP `tools/list`, where it was a bare `string`. A
-  `ModelForm` field carries its column's `max_length`. An optional field's
-  `min_length` is not declared, since the form takes `""` whatever it says.
+  (`EmailField`, `URLField`, `SlugField`, `RegexField` and the rest), whose
+  value Django's `MaxLengthValidator` bounds, from `max_length` or appended by
+  hand, now declares the limit as the parameter's `json_schema_extra`
+  `maxLength`, and a required one bounded by `MinLengthValidator` declares
+  `minLength`: `CharField(max_length=32)` is
+  `{"type": "string", "maxLength": 32}` in `parameters_schema` and an MCP
+  `tools/list`, where it was a bare `string`. A `ModelForm` field carries its
+  column's `max_length`. Only those two validators are read, by exact type, so
+  a `SimpleArrayField`, whose `max_length` counts its items, declares no
+  length. An optional field's minimum is not declared, since the form takes
+  `""` whatever it says.
   Nothing about validation changes: the shape check enforces neither keyword,
   and the form still refuses a string past one in its own words and with
   Django's code. An `IntegerField`'s and a `FloatField`'s `min_value` and
