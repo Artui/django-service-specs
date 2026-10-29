@@ -121,6 +121,8 @@ row as `kind="not_found"` rather than raising: an HTTP view answers it with a
   resolved ahead of the call, the async entry point, and pool seeds.
 - [Arguments and refusals](arguments.md): the shape check, the error tree, flat
   transports, and the two error families.
+- [Reading a flat source](flat.md): a query string or a form's fields, read by
+  the declaration before `coerce_flat` types it.
 - [Affordances](affordances.md): when an operation is possible right now, the
   refusal's stable code, offering only what a call could pass, and asking for
   one more value.

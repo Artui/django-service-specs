@@ -596,6 +596,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "NON_FIELD_KEYS",
         "clean_held_to_their_columns",
         "expected_type_refusal",
+        "flat_arguments",
         "is_deactivated",
         "max_length_in_force",
         "refusal_messages",
