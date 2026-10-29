@@ -80,6 +80,13 @@ def check_seeds(
        (``call_keywords``), so a caller reading the declaration is told the
        read is optional and refused for omitting it.
 
+    **A callable whose signature cannot be read** is refused too, ahead of
+    these for its seat: a service, selector or target selector such as a
+    builtin type like ``dict``, which dispatch cannot bind a keyword to and so
+    fails on for every call reaching it. The second to fourth need that
+    signature, so such a seat is answered by this refusal alone, and the
+    other seats are still checked.
+
     A Validator field the service never receives is not among them, because
     such a spec runs and may mean to: [`unreceived_fields`][django_service_specs.dispatch.unreceived_fields.unreceived_fields]
     answers it, and the transport decides.
@@ -99,7 +106,8 @@ def check_seeds(
     it compiles to.
 
     Raises:
-        ImproperlyConfigured: any of the four, every one found.
+        ImproperlyConfigured: any of the four, or a callable whose
+            signature cannot be read, every one found.
     """
     spec = kernel_spec(spec)
     problems: list[str] = []
@@ -157,11 +165,30 @@ def _seats(spec: ServiceSpec | SelectorSpec) -> list[_Seat]:
 
 
 def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
-    """The second, third and fourth refusals, for one seat."""
+    """The second, third and fourth refusals, for one seat, or the one that precedes them."""
+    try:
+        signature = inspect.signature(seat.fn)
+    except (ValueError, TypeError):
+        # A callable with no signature to read - a builtin type such as
+        # ``dict``, or one whose ``__signature__`` is no ``Signature`` - is
+        # refused by this and answers none of the three below, which all read
+        # that signature (``required_keywords`` reads it again, and is never
+        # reached). Dispatch reads it too, so every call reaching the seat
+        # fails with the same error. Returning, not raising, leaves the other
+        # seats' refusals to be collected beside it. One arc for two
+        # exceptions, each held by its own test:
+        # test_it_is_refused_naming_the_seat_and_the_callable (``ValueError``)
+        # and test_a_signature_that_is_not_one_is_refused_alike
+        # (``TypeError``).
+        return [
+            f"{seat.label} is {seat.fn!r}, whose signature cannot be read, so dispatch can "
+            "bind no keyword to it and every call reaching it fails. Declare it as a "
+            "function that takes the keywords it needs."
+        ]
     problems: list[str] = []
     positional = sorted(
         name
-        for name, param in inspect.signature(seat.fn).parameters.items()
+        for name, param in signature.parameters.items()
         if param.kind is inspect.Parameter.POSITIONAL_ONLY
         and param.default is inspect.Parameter.empty
     )

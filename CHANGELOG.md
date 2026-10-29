@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`check_seeds` refuses a callable whose signature cannot be read.** A
+  service, selector or target selector such as a builtin type (`dict`) let the
+  `ValueError` from `inspect.signature` escape, where every other refusal it
+  makes is one `ImproperlyConfigured`. It is now refused as one, naming the
+  seat and the callable. Dispatch cannot bind a keyword to such a callable, so
+  every call reaching it fails. The seat is answered by that refusal alone
+  and the other seats are still checked, so one exception still names
+  everything the spec gets wrong.
+
 ## [0.19.0] — 2026-10-27
 
 ### Added

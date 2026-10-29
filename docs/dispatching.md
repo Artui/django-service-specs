@@ -588,7 +588,11 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   reads or its shapes;
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
-  missing.
+  missing;
+- a service, selector or target selector whose signature cannot be read, such
+  as a builtin type like `dict`: dispatch binds every callable's keywords from
+  its signature, so every call reaching it fails. That seat is refused for
+  this alone, and the other seats are still checked.
 
 ```python
 --8<--
