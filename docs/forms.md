@@ -105,6 +105,9 @@ with the scheme it adds. So a value padded with whitespace the form strips may
 read as too long to a client that checks the schema and still be taken, and a
 URL within its `maxLength` may still be refused: `URLField(max_length=20)`
 refuses the 20 characters of `"abcdefghijklmnop.com"`, counted with the scheme.
+For the same reason a `URLField`'s `min_length` is not advertised: counted with
+the scheme it adds, `"ab.co"` is taken by `URLField(min_length=12)`, and a
+`minLength` would tell a client to refuse it.
 
 An `IntegerField`'s or a `FloatField`'s `min_value` and `max_value` are not
 declared. A declared `minimum` or `maximum` is enforced by the shape check,

@@ -363,18 +363,22 @@ class TestLengths:
         assert _checked_then_validated(form_class, {"code": ""}) == ("validated", {"code": ""})
 
     @pytest.mark.parametrize(
-        "field",
+        ("field", "minimum"),
         [
-            forms.EmailField(max_length=40, min_length=6),
-            forms.URLField(max_length=40, min_length=6),
-            forms.SlugField(max_length=40, min_length=6),
-            forms.RegexField(r"^[a-z]+$", max_length=40, min_length=6),
+            (forms.EmailField(max_length=40, min_length=6), 6),
+            # Its minimum is left out: see
+            # test_a_url_s_min_length_is_not_advertised_since_the_form_counts_the_scheme.
+            (forms.URLField(max_length=40, min_length=6), None),
+            (forms.SlugField(max_length=40, min_length=6), 6),
+            (forms.RegexField(r"^[a-z]+$", max_length=40, min_length=6), 6),
         ],
         ids=["email", "url", "slug", "regex"],
     )
-    def test_every_char_field_subclass_carries_its_lengths(self, field: forms.Field) -> None:
+    def test_every_char_field_subclass_carries_its_lengths(
+        self, field: forms.Field, minimum: int | None
+    ) -> None:
         node = _node(_form("Contact", value=field), "value")
-        assert (node.get("minLength"), node.get("maxLength")) == (6, 40)
+        assert (node.get("minLength"), node.get("maxLength")) == (minimum, 40)
 
     def test_a_length_is_counted_after_the_form_strips_whitespace(self) -> None:
         # Which a schema cannot say: the padded value is past ``maxLength`` and taken.
@@ -455,6 +459,22 @@ class TestLengths:
         assert re.fullmatch(
             r"Ensure this value has at most 20 characters \(it has 2[78]\)\.", message
         )
+
+    @pytest.mark.filterwarnings("ignore:The default scheme will be changed")
+    def test_a_url_s_min_length_is_not_advertised_since_the_form_counts_the_scheme(self) -> None:
+        form_class = _form("Site", site=forms.URLField(min_length=12, max_length=40))
+        assert _node(form_class, "site") == {"type": "string", "maxLength": 40}
+        # Five characters sent, at least twelve counted once the scheme is added.
+        verdict, cleaned = _checked_then_validated(form_class, {"site": "ab.co"})
+        assert verdict == "validated"
+        assert cleaned["site"].endswith("://ab.co")
+
+    def test_a_limit_of_zero_is_advertised(self) -> None:
+        form_class = _form(
+            "Code",
+            code=forms.CharField(validators=[MinLengthValidator(0), MaxLengthValidator(0)]),
+        )
+        assert _node(form_class, "code") == {"type": "string", "minLength": 0, "maxLength": 0}
 
     def test_a_length_validator_on_a_field_that_is_no_string_is_not_advertised(self) -> None:
         form_class = _form("Count", count=forms.IntegerField(validators=[MaxLengthValidator(3)]))

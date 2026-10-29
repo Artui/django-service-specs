@@ -673,7 +673,9 @@ def _lengths(field: forms.Field) -> dict[str, int] | None:
     adds. So a padded value may read as too long and still be taken, and a
     URL within ``maxLength`` may still be refused
     (test_a_length_is_counted_after_the_form_strips_whitespace,
-    test_a_url_is_counted_with_the_scheme_the_field_adds).
+    test_a_url_is_counted_with_the_scheme_the_field_adds). A ``URLField``'s
+    minimum is left out for the same reason: counted with the scheme, a URL
+    shorter than ``minLength`` is still taken.
     """
     # Only a string has a length to advertise: a length validator a project
     # puts on another field would state ``maxLength`` on, say, an integer
@@ -693,6 +695,15 @@ def _lengths(field: forms.Field) -> dict[str, int] | None:
         # by test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string,
         # which asserts its ``maxLength`` is still advertised.
         if keyword == "minLength" and not field.required:
+            continue
+        # A ``URLField`` counts the value after adding the scheme it assumes,
+        # so ``"ab.co"`` is taken by a minimum of 12 as ``"http://ab.co"``: a
+        # ``minLength`` would refuse what the form takes, where a ``maxLength``
+        # only states a looser bound than the form's. One branch to coverage,
+        # both conditions held by
+        # test_a_url_s_min_length_is_not_advertised_since_the_form_counts_the_scheme,
+        # which asserts its ``maxLength`` is still advertised.
+        if keyword == "minLength" and isinstance(field, forms.URLField):
             continue
         # The lookup matched its exact type, one of the two keys, so it is a
         # ``BaseValidator``; ``Field.validators`` is typed as plain callables.

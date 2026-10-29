@@ -47,7 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column's `max_length`. Only those two validators are read, by exact type, so
   a `SimpleArrayField`, whose `max_length` counts its items, declares no
   length. An optional field's minimum is not declared, since the form takes
-  `""` whatever it says.
+  `""` whatever it says, and nor is a `URLField`'s, since the form counts a
+  URL with the scheme it adds and takes one shorter than the minimum.
   Nothing about validation changes: the shape check enforces neither keyword,
   and the form still refuses a string past one in its own words and with
   Django's code. An `IntegerField`'s and a `FloatField`'s `min_value` and
