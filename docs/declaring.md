@@ -206,7 +206,10 @@ reached. A CSV number filter is an array of the same bounded decimals:
 minimum=-1e50, maximum=1e50)`, whose format and bounds describe each
 element. `?pks=1,2` still splits, since no decimal holds a comma, each value
 reaches the filter with every digit it was sent with, a fraction included,
-and one past the line is refused at its index in the list.
+and one past the line is refused at its index in the list. The
+[schema](schema.md) states each decimal's format
+(`{"type": "string", "format": "decimal"}`) and no bound, since JSON
+Schema applies `minimum` and `maximum` to a number instance only.
 
 A selector spec also takes `kwargs`, `preconditions` and `progress_reporter`,
 which [a write](#providers-and-preconditions) declares the same way. Its
@@ -512,7 +515,10 @@ the same declaration.
   finite `float`, and a bound on any other type is refused where it is
   written. A decimal string is compared as the decimal it spells, by its
   exponent, so `"1E+999999999"` is refused without building the integer it
-  names. The schema states both as `"minimum"` and `"maximum"`. On an array
+  names. The schema states both as `"minimum"` and `"maximum"` on an `integer`
+  or a `number`, and on a decimal string neither, because JSON Schema applies
+  them to a number instance only: a validating client would ignore them, and
+  the shape check enforces them either way. On an array
   they bound each element, as its `format` describes each: an array of
   `integer` or `number`, or of `decimal` strings, takes them, and an element
   past one is refused at its index. The list's own count is `min_length` and

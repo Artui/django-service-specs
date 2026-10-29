@@ -169,9 +169,8 @@ contradict, and states everything the declaration knows.
   constrain each element, so they sit on `items`, and gain `null` there by
   the element's nullability alone, never by the array's. So do an array's
   `format`, `minimum` and `maximum`, which describe each element: a CSV
-  number filter's `items` are `{"type": "string", "format": "decimal",
-  "minimum": -1e+50, "maximum": 1e+50}`, and the array node states only its
-  own `"minItems"` and `"maxItems"`.
+  number filter's `items` are `{"type": "string", "format": "decimal"}`, and
+  the array node states only its own `"minItems"` and `"maxItems"`.
 - **Labelled choices are an `anyOf`** of `{"const": value, "title": label}`
   in place of the `enum`, where some label says more than its value, as the
   book's `status` above shows; labels that only repeat their values keep the
@@ -210,7 +209,7 @@ contradict, and states everything the declaration knows.
 
 What stays incomplete is only what the declaration does not carry. A
 Parameter's `minimum` and `maximum` are stated as `"minimum"` and
-`"maximum"`; a bound only the Validator holds, a `maxLength` or a form field's
+`"maximum"` on an `integer` and a `number`; a bound only the Validator holds, a `maxLength` or a form field's
 `max_value`, is not, unless the Parameter's
 [`json_schema_extra`](#keywords-no-field-spells) states it. An array's `min_length` is stated as `"minItems"`, and
 its `"maxItems"` is **the maximum in force**: the declared `max_length`, or
@@ -224,8 +223,10 @@ so building one for an array with no `max_length` reads Django's settings and
 needs them configured: outside a configured Django it raises
 `ImproperlyConfigured`, as the shape check does, rather than state the default
 when a project configured later may set another. JSON Schema reads `minimum`
-and `maximum` on a number instance alone, so on a decimal string a validating client enforces neither:
-the shape check does, and the schema tells a reader where the line is.
+and `maximum` on a number instance alone, so a decimal string states neither:
+a validating client would ignore both and a strict one may flag them as
+keywords that do not apply. The shape check enforces them all the same, so a
+decimal's bound is the one enforced without being stated.
 
 ### Keywords no field spells
 

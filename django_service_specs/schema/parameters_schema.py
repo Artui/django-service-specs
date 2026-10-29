@@ -24,7 +24,8 @@ def parameters_schema(
     adapter reads its library into [`Parameters`][django_service_specs.parameters.parameters.Parameters]
     and this reads only that. The policy is **precise**: never false, and not
     incomplete where the declaration knows. What it still leaves out is what a
-    Parameter does not carry.
+    Parameter does not carry, and a decimal's bound, which JSON Schema has no
+    way to state on a string.
 
     - **An object** is ``{"type": "object", "properties": {...}}``, with
       ``"required"`` listing, in declaration order, the names the shape check
@@ -45,7 +46,8 @@ def parameters_schema(
       that declares no ``items`` and accepts any element. The array's
       ``format`` and bounds describe each element, so they go on ``items``,
       as its choices do: a CSV number filter's are ``{"type": "string",
-      "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}``.
+      "format": "decimal"}``, and an array of ``integer`` bounded at 1 has
+      ``{"type": "integer", "minimum": 1}``.
     - **A file** is ``{}``. No JSON value is one, so any JSON type stated here
       would be false, and JSON Schema has no keyword for a multipart part.
       What is still known is the rest: whether it is required, its
@@ -65,10 +67,11 @@ def parameters_schema(
       sets another. The shape check refuses past it either way, so a client
       told nothing would send a call that cannot run; under a setting of
       ``None`` an array that declares no maximum states none.
-    - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared.
-      JSON Schema applies them to a number instance only, so on a decimal
-      string a validating client enforces neither; the shape check does, and
-      they tell a reader where the line is.
+    - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared,
+      on an ``integer`` and a ``number``. **A decimal string states neither**:
+      JSON Schema applies them to a number instance only, so on a string a
+      validating client ignores both and a strict one may flag them. The shape
+      check still enforces them, as it does for every bound.
     - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too,
       and ``items_nullable`` does the same to an array's ``items``. A file's
       node and an ``any``'s state no type, so they admit null already and
@@ -117,7 +120,8 @@ def parameters_schema(
     (``maxLength``, a Validator's ``max_value``) unless a ``json_schema_extra``
     states it, for a Validator that enforces it.
     The one stated without being declared is an array's default maximum,
-    because the shape check enforces it.
+    because the shape check enforces it. The one enforced without being
+    stated is a decimal's bound, because a string has no keyword for it.
 
     Every call builds a new schema, so a transport may add its own keys to the
     result without reaching the declaration or another transport's copy.
@@ -193,15 +197,21 @@ def _parameter_schema(param: Parameter, policy: UnknownArguments) -> dict[str, A
 def _reading(param: Parameter) -> dict[str, Any]:
     """The value's ``format`` and bounds: a scalar's own, or an array's element's.
 
-    Bounds are stated on a decimal string too, where a validating client
-    passes them by: JSON Schema reads ``minimum`` and ``maximum`` on a number
-    instance only. The shape check is what enforces them there, and a reader
-    still learns the bound. Three arcs, each held by
-    test_a_bound_is_stated_beside_the_type.
+    **A decimal string states its format and no bound.** JSON Schema reads
+    ``minimum`` and ``maximum`` on a number instance only, so on a string a
+    validating client passes them by and a strict validator may flag them as
+    keywords that do not apply. The shape check enforces them all the same, so
+    the schema is silent where it cannot be true. An ``integer`` and a
+    ``number`` state both. The early return is one arc, held by two tests: it
+    is test_a_decimal_string_states_no_bound that fails without it, and
+    test_a_bound_is_stated_beside_the_type_of_a_number that fails if it
+    returns for every format.
     """
     reading: dict[str, Any] = {}
     if param.format is not None:
         reading["format"] = param.format
+    if param.format == "decimal":
+        return reading
     if param.minimum is not None:
         reading["minimum"] = param.minimum
     if param.maximum is not None:
