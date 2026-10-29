@@ -86,6 +86,10 @@ LAYERS: dict[str, str] = {
     "adapters.dataclass": AUTHORING,
     "adapters.forms": AUTHORING,
     "adapters.pydantic": AUTHORING,
+    # The reader of a flat wire, a query string or a form's fields, which
+    # the transports reading one share so that each reads it by the same
+    # rules; core never imports it.
+    "flat": OPT_IN,
     "mutations": OPT_IN,
     "relations": OPT_IN,
     "schema": OPT_IN,

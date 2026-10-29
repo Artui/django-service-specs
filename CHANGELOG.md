@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`flat_arguments(parameters, source)`**, in a new opt-in subpackage
+  `django_service_specs.flat`: a query string or a form's fields, a `QueryDict`
+  or any `MultiValueDict`, read by the declaration into strings and lists of
+  strings. An array takes every value of a repeated key, and anything else the
+  last; an array of numbers, integers, booleans or decimal strings, or of
+  strings whose choices hold no comma, also splits a value on its commas
+  (`?ids=1,2`, `?o=title,-pk`), no further than one element past the most it
+  takes; a blank is absent unless `""` is a value the parameter can take; and
+  Django's `csrfmiddlewaretoken` is dropped. Nothing is coerced: a transport
+  merges its route's kwargs into the result and calls `coerce_flat`, so every
+  transport reading a flat wire reads it by the same rules. Dispatch never
+  imports it.
+
 ## [0.19.0] — 2026-10-27
 
 ### Added

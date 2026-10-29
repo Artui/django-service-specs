@@ -47,6 +47,7 @@ from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.dispatch.unreceived_fields import unreceived_fields
+from django_service_specs.flat.flat_arguments import flat_arguments
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.mutations.adelete_collection import adelete_collection
@@ -285,6 +286,7 @@ __all__ = [
     "enforce_affordances",
     "expected_type_refusal",
     "filter_set_parameters",
+    "flat_arguments",
     "form_keywords",
     "implements",
     "is_async",
