@@ -397,6 +397,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../flat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a flat source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../affordances/" class="md-nav__link">
         
   
@@ -1104,6 +1131,28 @@
     <span class="md-ellipsis">
       
         clean_held_to_their_columns
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#flat-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flat sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.flat.flat_arguments.flat_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flat_arguments
       
     </span>
   </a>
@@ -2277,6 +2326,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.specs.check_permissions.check_permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_permissions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.authorization.unrestricted.Unrestricted" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2375,6 +2435,17 @@
     <span class="md-ellipsis">
       
         is_deactivated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.authorization.sync_answer.sync_answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sync_answer
       
     </span>
   </a>
@@ -4505,6 +4576,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#flat-sources" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Flat sources
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.flat.flat_arguments.flat_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        flat_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#validation" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5671,6 +5764,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.specs.check_permissions.check_permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        check_permissions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.authorization.unrestricted.Unrestricted" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5769,6 +5873,17 @@
     <span class="md-ellipsis">
       
         is_deactivated
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.authorization.sync_answer.sync_answer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        sync_answer
       
     </span>
   </a>
@@ -7470,8 +7585,8 @@ output format is <code>SPEC_CLI_OUTPUT</code>, read by
   when unset; <code>None</code> bounds no array. Anything but a non-negative <code>int</code> or
   <code>None</code> is refused as <code>ImproperlyConfigured</code> where it is read. See
   <a href="../arguments/#how-long-a-list-may-be">how long a list may be</a>.
-  <a href="https://artui.github.io/django-spec-html/">django-spec-html</a>'s request
-  reader bounds a query string's lists by the same key.</li>
+  <a class="autorefs autorefs-internal" title="flat_arguments" href="#django_service_specs.flat.flat_arguments.flat_arguments"><code>flat_arguments</code></a>
+  bounds a query string's lists by the same key.</li>
 </ul>
 <h2 id="specs">Specs<a class="headerlink" href="#specs" title="Permanent link">&para;</a></h2>
 
@@ -8905,7 +9020,9 @@ tells two defaults apart.</p>
 <code>number</code>, or a <code>decimal</code> string, which is compared as the decimal it
 spells, so <code>"1E+999999999"</code> is past a bound of <code>1e50</code> without ever
 being built as the integer it names. Each is an <code>int</code> or a finite
-<code>float</code>, a JSON number the schema can state. They exist for the bound a
+<code>float</code>, a JSON number. The schema states them on an <code>integer</code> and a
+<code>number</code> and not on a decimal string, where JSON Schema gives them no
+meaning; the shape check enforces all three. They exist for the bound a
 reader needs before any Validator runs: a filter whose form field has none
 hands the value to the database's integer conversion, which builds every
 digit. Any other bound - a string's length, a Validator's <code>max_value</code> -
@@ -9841,6 +9958,63 @@ the class's or one the form carried itself. Only its errors and what it
 cleaned are new.</p>
 <p>Public so that a transport in a distribution of its own, validating a
 project's form, holds it to the same columns with the same words.</p>
+
+
+    </div>
+
+</div><h2 id="flat-sources">Flat sources<a class="headerlink" href="#flat-sources" title="Permanent link">&para;</a></h2>
+
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.flat.flat_arguments.flat_arguments" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">flat_arguments</span>
+
+
+<a href="#django_service_specs.flat.flat_arguments.flat_arguments" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">flat_arguments</span><span class="p">(</span><span class="n">parameters</span><span class="p">:</span> <span class="n">Parameters</span><span class="p">,</span> <span class="n">source</span><span class="p">:</span> <span class="n">MultiValueDict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>A flat source as strings and lists of strings, read by <code>parameters</code>, blanks read as absent.</p>
+<p>A flat source is a query string or a form's fields: Django's <code>QueryDict</code>,
+or any <code>MultiValueDict</code>, where every value is a string and a key may
+repeat. A transport reading one calls this, merges its route's kwargs into
+what comes back, and hands the result to
+<a class="autorefs autorefs-internal" title="coerce_flat" href="#django_service_specs.parameters.coerce_flat.coerce_flat"><code>coerce_flat</code></a>,
+so every transport reading a flat wire reads it by the same rules. Nothing
+is coerced here.</p>
+<p><strong>A flat source is read by the declaration.</strong> A parameter of type
+<code>array</code> takes every value its key was sent with, and anything else takes
+the last, as <code>QueryDict</code> reads a repeated key. <strong>An array of numbers,
+integers, booleans or decimal strings also reads a value holding commas
+as its elements</strong>, <code>?ids=1,2</code> as <code>["1", "2"]</code> with the space around a
+part trimmed, because a comma cannot be part of such a value and it is
+the spelling a django-filter CSV filter advertises; repeated keys and
+commas may mix. An empty part (<code>?ids=1,,2</code>) is not dropped as a blank
+element is: it is kept, for <code>coerce_flat</code> to refuse at its index as any
+malformed element is. A string array is split only where its choices
+hold no comma, as an ordering's do, so <code>?o=title,-pk</code> is
+<code>["title", "-pk"]</code>; otherwise it is never split, since a comma is part
+of a string. <strong>An array is read no further than one element past the
+most it takes</strong> - its <code>max_length</code>, or the
+<code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting's default - so <code>coerce_flat</code>
+refuses a list over it at its name as a whole, without a million commas
+becoming a million elements first; Django's
+<code>DATA_UPLOAD_MAX_NUMBER_FIELDS</code> counts keys, and a comma list is one.
+<strong>A blank value is absent unless</strong> <code>""</code> <strong>is one the parameter can
+take</strong>: a plain string can, and a number, a boolean, a date, a decimal,
+or a string whose choices leave the blank out cannot. A flat wire has no
+other spelling of "left blank", and an empty <code>?count=</code> or <code>?since=</code>
+from a filter form is not a refusal to count or a malformed date. Each
+blank element of an array is read by the same rule, the whole array
+absent once nothing is left. Django's <code>csrfmiddlewaretoken</code>, the field
+<code>{% csrf_token %}</code> renders into a form, is dropped: no Django transport
+takes it as an argument. A key <code>parameters</code> do not declare is kept as
+it is, so the closed argument set in dispatch stays the one place that
+refuses it, under the caller's policy.</p>
 
 
     </div>
@@ -11636,7 +11810,8 @@ adapter reads its library into <a class="autorefs autorefs-internal" title="Para
   " href="#django_service_specs.parameters.parameters.Parameters"><code>Parameters</code></a>
 and this reads only that. The policy is <strong>precise</strong>: never false, and not
 incomplete where the declaration knows. What it still leaves out is what a
-Parameter does not carry.</p>
+Parameter does not carry, and a decimal's bound, which JSON Schema has no
+way to state on a string.</p>
 <ul>
 <li><strong>An object</strong> is <code>{"type": "object", "properties": {...}}</code>, with
   <code>"required"</code> listing, in declaration order, the names the shape check
@@ -11657,7 +11832,8 @@ Parameter does not carry.</p>
   that declares no <code>items</code> and accepts any element. The array's
   <code>format</code> and bounds describe each element, so they go on <code>items</code>,
   as its choices do: a CSV number filter's are <code>{"type": "string",
-  "format": "decimal", "minimum": -1e+50, "maximum": 1e+50}</code>.</li>
+  "format": "decimal"}</code>, and an array of <code>integer</code> bounded at 1 has
+  <code>{"type": "integer", "minimum": 1}</code>.</li>
 <li><strong>A file</strong> is <code>{}</code>. No JSON value is one, so any JSON type stated here
   would be false, and JSON Schema has no keyword for a multipart part.
   What is still known is the rest: whether it is required, its
@@ -11677,10 +11853,11 @@ Parameter does not carry.</p>
   sets another. The shape check refuses past it either way, so a client
   told nothing would send a call that cannot run; under a setting of
   <code>None</code> an array that declares no maximum states none.</li>
-<li><strong>Bounds</strong> are <code>"minimum"</code> and <code>"maximum"</code>, inclusive, as declared.
-  JSON Schema applies them to a number instance only, so on a decimal
-  string a validating client enforces neither; the shape check does, and
-  they tell a reader where the line is.</li>
+<li><strong>Bounds</strong> are <code>"minimum"</code> and <code>"maximum"</code>, inclusive, as declared,
+  on an <code>integer</code> and a <code>number</code>. <strong>A decimal string states neither</strong>:
+  JSON Schema applies them to a number instance only, so on a string a
+  validating client ignores both and a strict one may flag them. The shape
+  check still enforces them, as it does for every bound.</li>
 <li><strong>Nullable</strong> makes the type <code>[t, "null"]</code>, on objects and arrays too,
   and <code>items_nullable</code> does the same to an array's <code>items</code>. A file's
   node and an <code>any</code>'s state no type, so they admit null already and
@@ -11729,7 +11906,8 @@ wire wants one. And no bound the shape check does not enforce
 (<code>maxLength</code>, a Validator's <code>max_value</code>) unless a <code>json_schema_extra</code>
 states it, for a Validator that enforces it.
 The one stated without being declared is an array's default maximum,
-because the shape check enforces it.</p>
+because the shape check enforces it. The one enforced without being
+stated is a decimal's bound, because a string has no keyword for it.</p>
 <p>Every call builds a new schema, so a transport may add its own keys to the
 result without reaching the declaration or another transport's copy.
 Defaults, choice values and <code>json_schema_extra</code> values are placed in it
@@ -12245,6 +12423,25 @@ shape check in front of it enforces what the declaration can see.</p>
   <code>SERVICE_SPECS_MAX_ARRAY_LENGTH</code> setting, 1000 by default.</li>
 <li>any other <code>CharField</code> (email, URL, slug, UUID, regex, IP address): a
   <code>string</code>.</li>
+<li>every <code>CharField</code>, those above included, declares the limit of a
+  <code>MaxLengthValidator</code> on it as <code>json_schema_extra</code>'s <code>maxLength</code>,
+  and a required one a <code>MinLengthValidator</code>'s as <code>minLength</code>, so a
+  schema advertises them: the validator <code>max_length</code> and <code>min_length</code>
+  append, or one a project appends by hand, the tightest winning; a
+  <code>ModelForm</code>'s carries its column's, which Django puts on the field.
+  Only those two are read, by exact type, so a <code>SimpleArrayField</code>,
+  whose <code>max_length</code> counts its items with subclasses of them,
+  declares no length, and neither does a callable limit. The shape check
+  enforces neither, and the form refuses a string past one in its own
+  words, beside its other refusals. An optional field's minimum is not
+  declared, since the form takes <code>""</code> whatever it says, and a length
+  counts on the value the form cleans: stripped unless <code>strip=False</code>,
+  and a <code>URLField</code>'s with the scheme it adds.</li>
+<li>No <code>IntegerField</code> or <code>FloatField</code> declares its <code>min_value</code> or
+  <code>max_value</code>. The shape check enforces a declared <code>minimum</code> or
+  <code>maximum</code> before the form runs, in its own words, so declaring them
+  would replace a field's <code>error_messages</code> for the bound and keep the
+  form's other refusals from coming back beside it.</li>
 <li><code>FileField</code> and <code>ImageField</code>: a <code>file</code>, which no JSON caller can
   send. A multipart request carries one, and a Python caller hands a
   Django <code>File</code>; the form is bound with it as its <code>files</code>, where a
@@ -14536,6 +14733,12 @@ offender in a sorted list such as <code>['tenant']</code>.</p>
    (<code>call_keywords</code>), so a caller reading the declaration is told the
    read is optional and refused for omitting it.</li>
 </ol>
+<p><strong>A callable whose signature cannot be read</strong> is refused too, ahead of
+these for its seat: a service, selector or target selector such as a
+builtin type like <code>dict</code>, which dispatch cannot bind a keyword to and so
+fails on for every call reaching it. The second to fourth need that
+signature, so such a seat is answered by this refusal alone, and the
+other seats are still checked.</p>
 <p>A Validator field the service never receives is not among them, because
 such a spec runs and may mean to: <a class="autorefs autorefs-internal" title="unreceived_fields" href="#django_service_specs.dispatch.unreceived_fields.unreceived_fields"><code>unreceived_fields</code></a>
 answers it, and the transport decides.</p>
@@ -14568,7 +14771,8 @@ it compiles to.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>any of the four, every one found.</p>
+                <p>any of the four, or a callable whose
+signature cannot be read, every one found.</p>
               </div>
             </td>
           </tr>
@@ -15766,6 +15970,50 @@ for a call that acts on no existing row.</p>
 
 </div>
 
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.specs.check_permissions.check_permissions" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">check_permissions</span>
+
+
+<a href="#django_service_specs.specs.check_permissions.check_permissions" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">check_permissions</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">permissions</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="n">PermissionCheck</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">PermissionCheck</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Normalize <code>permissions</code> to a tuple, refusing anything that is not a check <em>instance</em>, and an empty one.</p>
+<p>Called by <code>ServiceSpec</code> and <code>SelectorSpec</code> on their <code>permissions=</code>,
+and by a transport that accepts <code>PermissionCheck</code>s on something other
+than a spec - a prompt, a view - so that it normalizes and refuses them by
+the rules a spec's <code>permissions=</code> gets, rather than by a copy of its
+own. <code>None</code> comes back as <code>None</code>, for the caller to refuse or allow as
+its own default says. A refusal is <code>ImproperlyConfigured</code>, and <code>label</code>
+names the declaration it is raised for, as <code>Class.permissions</code>.</p>
+<p><strong>An empty sequence is refused</strong>, as <code>None</code> is refused at dispatch and
+at registration: every check passing is vacuously true of no checks, so
+<code>permissions=[]</code> would let anyone run the operation, and an empty list
+is as often computed by accident as decided. <code>Unrestricted()</code> is the
+decision, by name (test_an_empty_permissions_sequence_is_refused).</p>
+<p>A class is the likely mistake - an HTTP framework declares permission
+classes - and a class passes <code>callable()</code>, so it is refused by name here
+rather than failing at dispatch with an unbound-method error.</p>
+<p>Each of the three methods is read for truth from sync code, so an
+<code>async def</code> one - whose answer is a truthy coroutine - is refused here,
+on the bound method, as any other sync-only seat is. One case per method
+in <code>tests/specs/test_check_permissions.py</code>'s <code>TestAnAsyncPermissionCheckIsRefused</code>,
+since coverage cannot see a name dropped from <code>_CHECK_METHODS</code>. What
+construction cannot see, a plain <code>def</code> handing back a coroutine, is
+refused where the answer is read, by <code>sync_answer</code>.</p>
+
+
+    </div>
+
+</div>
+
 <div class="doc doc-object doc-class">
 
 
@@ -16350,6 +16598,46 @@ principal is whatever a transport hands over:</p>
 <code>tests/authorization/test_is_deactivated.py</code>:
 <code>test_anonymous_is_not_deactivated</code> fails without the first and
 <code>test_an_active_user_is_not_deactivated</code> without the second.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.authorization.sync_answer.sync_answer" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">sync_answer</span>
+
+
+<a href="#django_service_specs.authorization.sync_answer.sync_answer" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">sync_answer</span><span class="p">(</span><span class="n">answer</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">asked</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return a permission check's <code>answer</code>, refusing one that is still to be awaited.</p>
+<p>Read by the three <code>authorize</code> functions, so the class-level,
+object-level and scope-level checks cannot disagree about an answer that
+is not one, and by a transport that asks a check itself rather than
+through them: it reads the answer through this, so a coroutine fails
+closed there as it does in dispatch. A check is sync-only and its answer
+is read for truth. An <code>async def</code> method returns a coroutine, which is
+truthy, so read as it stands it would allow every call whatever the check
+meant. The spec refuses an <code>async def</code> method when it is built, but a
+method that hands back a coroutine from a plain <code>def</code> - a decorated
+<code>async def</code>, a partial over one - looks sync until it answers, so the
+answer is checked here, where it is read. It fails closed: the call is
+refused with <code>ImproperlyConfigured</code> and never read as a pass. Any other
+answer comes back as it is. <code>asked</code> names the method, as
+<code>Class.method</code>.</p>
+<p>A coroutine is closed first, so it is not left behind to warn that it was
+never awaited. Two disjuncts, each held in
+<code>tests/authorization/test_sync_answer.py</code>:
+<code>test_an_awaitable_that_is_not_a_coroutine_is_refused</code> fails without the
+first and <code>test_an_async_generator_is_refused</code> without the second, since
+an async generator is not awaitable and is truthy too.</p>
 
 
     </div>

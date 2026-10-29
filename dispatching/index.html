@@ -706,6 +706,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../flat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a flat source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../affordances/" class="md-nav__link">
         
   
@@ -1939,7 +1966,11 @@ the spec and the mount's <code>pool_seeds</code> and refuses it, as one
   reads or its shapes;</li>
 <li>an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
-  missing.</li>
+  missing;</li>
+<li>a service, selector or target selector whose signature cannot be read, such
+  as a builtin type like <code>dict</code>: dispatch binds every callable's keywords from
+  its signature, so every call reaching it fails. That seat is refused for
+  this alone, and the other seats are still checked.</li>
 </ul>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">ToolRegistry</span><span class="p">:</span>
 </span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="sd">"""A transport's registry: a declaration that cannot hold on its mount is refused as it is registered."""</span>

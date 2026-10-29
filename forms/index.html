@@ -399,6 +399,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../flat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a flat source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../affordances/" class="md-nav__link">
         
   
@@ -585,6 +612,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="What each field declares">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-strings-length-and-a-numbers-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A string's length and a number's bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -838,6 +882,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="What each field declares">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-strings-length-and-a-numbers-bounds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A string's length and a number's bounds
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1015,7 +1076,8 @@ view does the same with
 </span><span id="__span-1-41"><a id="__codelineno-1-41" name="__codelineno-1-41" href="#__codelineno-1-41"></a><span class="n">book_validator</span> <span class="o">=</span> <span class="n">FormValidator</span><span class="p">(</span><span class="n">BookForm</span><span class="p">)</span>
 </span></code></pre></div>
 <p>What <code>book_validator.parameters()</code> declares, then, in the form's own order:
-<code>title</code>, a required string with the help text as its <code>help</code>; <code>price</code>, a
+<code>title</code>, a required string of at most 100 characters, advertised as its
+<code>maxLength</code>, with the help text as its <code>help</code>; <code>price</code>, a
 required string in the <code>decimal</code> format; <code>status</code>, a required string with the
 choices <code>draft</code> and <code>published</code>; <code>published_on</code>, an optional, nullable string
 in the <code>date</code> format; <code>author</code>, a required integer, because authors are matched
@@ -1093,10 +1155,47 @@ extends.</p>
 </tr>
 <tr>
 <td>any other <code>CharField</code> (<code>EmailField</code>, <code>URLField</code>, <code>SlugField</code>, <code>UUIDField</code>, <code>RegexField</code>, <code>GenericIPAddressField</code>)</td>
-<td>A <code>string</code>.</td>
+<td>A <code>string</code>, with its <a href="#a-strings-length-and-a-numbers-bounds">lengths</a> advertised.</td>
 </tr>
 </tbody>
 </table>
+<h3 id="a-strings-length-and-a-numbers-bounds">A string's length and a number's bounds<a class="headerlink" href="#a-strings-length-and-a-numbers-bounds" title="Permanent link">&para;</a></h3>
+<p>A <code>CharField</code>, or any field extending it, whose value Django's
+<code>MaxLengthValidator</code> bounds advertises the limit as the string's <code>maxLength</code>,
+and a required one bounded by <code>MinLengthValidator</code> advertises that as its
+<code>minLength</code>. Setting <code>max_length</code> or <code>min_length</code> appends one of those, and a
+validator a project appends by hand counts the same, since the form enforces
+it alike; where several bound one side, the tightest is advertised. Each goes in the parameter's <code>json_schema_extra</code>, so a
+transport's schema states it (an MCP <code>tools/list</code> reads
+<code>{"type": "string", "maxLength": 32}</code> for <code>CharField(max_length=32)</code>) and the
+shape check does not enforce it: the form still refuses an over-long value, in
+its own words and with Django's code, beside its other refusals. A <code>ModelForm</code>
+field carries its column's <code>max_length</code>, which Django puts on the form field it
+builds.</p>
+<p>Only those two validators are read, matched by exact type, rather than the
+field's <code>max_length</code> and <code>min_length</code>. <code>SimpleArrayField</code> extends <code>CharField</code>
+and spends both on how many items its list holds, validated by subclasses of
+the same two validators, so it advertises no length: a <code>ModelForm</code> over a sized
+<code>ArrayField</code> builds one. A limit no schema can state, such as a callable one,
+is not advertised either.</p>
+<p>An optional field's <code>min_length</code> is not advertised. Django runs no validator on
+an empty value, so the form takes <code>""</code> whatever its <code>min_length</code>, and a
+<code>minLength</code> would tell a client to refuse what the form takes. A length is
+counted on the value the form cleans, which a schema cannot say: stripped of
+surrounding whitespace unless the field sets <code>strip=False</code>, and a <code>URLField</code>'s
+with the scheme it adds. So a value padded with whitespace the form strips may
+read as too long to a client that checks the schema and still be taken, and a
+URL within its <code>maxLength</code> may still be refused: <code>URLField(max_length=20)</code>
+refuses the 20 characters of <code>"abcdefghijklmnop.com"</code>, counted with the scheme.
+For the same reason a <code>URLField</code>'s <code>min_length</code> is not advertised: counted with
+the scheme it adds, <code>"ab.co"</code> is taken by <code>URLField(min_length=12)</code>, and a
+<code>minLength</code> would tell a client to refuse it.</p>
+<p>An <code>IntegerField</code>'s or a <code>FloatField</code>'s <code>min_value</code> and <code>max_value</code> are not
+declared. A declared <code>minimum</code> or <code>maximum</code> is enforced by the shape check,
+before the form runs and in the kernel's words, so it would replace a field's
+own <code>error_messages</code> for the bound and stop the form's other refusals coming
+back beside it. They stay the form's, and the schema carries no bound for
+either field.</p>
 <p>A key past the range of the integer column rows are matched on names no row,
 so either field refuses it as it refuses a key no row holds: <code>invalid_choice</code>,
 in its own words, beside the form's other refusals. The adapter answers it

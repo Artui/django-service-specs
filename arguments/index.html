@@ -16,7 +16,7 @@
         <link rel="prev" href="../http/">
       
       
-        <link rel="next" href="../affordances/">
+        <link rel="next" href="../flat/">
       
       
         
@@ -529,6 +529,33 @@
   
 </nav>
       
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../flat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a flat source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1417,10 +1444,11 @@ directed by the declaration.</p>
   becomes a one-element list, since a flat transport sends a one-element list
   as a bare value. <strong>An array longer than it takes is refused whole</strong>, before
   any element is parsed, by <a href="#how-long-a-list-may-be">the same length rule</a> as
-  the shape check's. A query string's <code>?ids=1,2,3</code> is split into no more
-  than one element past the most the array takes, so a value of a million
-  commas is refused without becoming a million elements first: Django's
-  <code>DATA_UPLOAD_MAX_NUMBER_FIELDS</code> counts keys, and a comma list is one.</li>
+  the shape check's. A query string's <code>?ids=1,2,3</code> is split by
+  <a href="../flat/"><code>flat_arguments</code></a> into no more than one element past the most
+  the array takes, so a value of a million commas is refused without
+  becoming a million elements first: Django's <code>DATA_UPLOAD_MAX_NUMBER_FIELDS</code>
+  counts keys, and a comma list is one.</li>
 <li><strong>A parameter with nested Parameters is refused by name</strong> - an object, or an
   array of rows, has no flat spelling - with <code>"This argument has nested
   parameters, which a flat transport cannot send."</code>, rather than passing the

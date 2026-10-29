@@ -399,6 +399,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../flat/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading a flat source
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../affordances/" class="md-nav__link">
         
   
@@ -1184,9 +1211,8 @@ contradict, and states everything the declaration knows.</p>
   constrain each element, so they sit on <code>items</code>, and gain <code>null</code> there by
   the element's nullability alone, never by the array's. So do an array's
   <code>format</code>, <code>minimum</code> and <code>maximum</code>, which describe each element: a CSV
-  number filter's <code>items</code> are <code>{"type": "string", "format": "decimal",
-  "minimum": -1e+50, "maximum": 1e+50}</code>, and the array node states only its
-  own <code>"minItems"</code> and <code>"maxItems"</code>.</li>
+  number filter's <code>items</code> are <code>{"type": "string", "format": "decimal"}</code>, and
+  the array node states only its own <code>"minItems"</code> and <code>"maxItems"</code>.</li>
 <li><strong>Labelled choices are an <code>anyOf</code></strong> of <code>{"const": value, "title": label}</code>
   in place of the <code>enum</code>, where some label says more than its value, as the
   book's <code>status</code> above shows; labels that only repeat their values keep the
@@ -1225,7 +1251,7 @@ contradict, and states everything the declaration knows.</p>
 </ul>
 <p>What stays incomplete is only what the declaration does not carry. A
 Parameter's <code>minimum</code> and <code>maximum</code> are stated as <code>"minimum"</code> and
-<code>"maximum"</code>; a bound only the Validator holds, a <code>maxLength</code> or a form field's
+<code>"maximum"</code> on an <code>integer</code> and a <code>number</code>; a bound only the Validator holds, a <code>maxLength</code> or a form field's
 <code>max_value</code>, is not, unless the Parameter's
 <a href="#keywords-no-field-spells"><code>json_schema_extra</code></a> states it. An array's <code>min_length</code> is stated as <code>"minItems"</code>, and
 its <code>"maxItems"</code> is <strong>the maximum in force</strong>: the declared <code>max_length</code>, or
@@ -1239,8 +1265,10 @@ so building one for an array with no <code>max_length</code> reads Django's sett
 needs them configured: outside a configured Django it raises
 <code>ImproperlyConfigured</code>, as the shape check does, rather than state the default
 when a project configured later may set another. JSON Schema reads <code>minimum</code>
-and <code>maximum</code> on a number instance alone, so on a decimal string a validating client enforces neither:
-the shape check does, and the schema tells a reader where the line is.</p>
+and <code>maximum</code> on a number instance alone, so a decimal string states neither:
+a validating client would ignore both and a strict one may flag them as
+keywords that do not apply. The shape check enforces them all the same, so a
+decimal's bound is the one enforced without being stated.</p>
 <h3 id="keywords-no-field-spells">Keywords no field spells<a class="headerlink" href="#keywords-no-field-spells" title="Permanent link">&para;</a></h3>
 <p>A <code>Parameter</code> and an <code>OutputField</code> each take <code>json_schema_extra</code>: a mapping of
 the JSON Schema keywords none of their fields spells, which
