@@ -217,6 +217,18 @@ SHARED_WITH_THE_KERNEL = {
         "django_service_specs.authorization.utils",
     ),
     "clean_held_to_their_columns": ("django_service_specs.adapters.forms.form_validator",),
+    # The rule a permissions declaration is held to is one function on
+    # purpose: a transport accepting checks on a prompt or a view refuses what a
+    # spec's ``permissions=`` refuses, and reads an answer as dispatch does.
+    "check_permissions": (
+        "django_service_specs.specs.selector_spec",
+        "django_service_specs.specs.service_spec",
+    ),
+    "sync_answer": (
+        "django_service_specs.dispatch.authorize",
+        "django_service_specs.dispatch.authorize_scope",
+        "django_service_specs.dispatch.authorize_target",
+    ),
 }
 
 

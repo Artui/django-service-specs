@@ -1,5 +1,6 @@
 """The two declarations: a write and a read."""
 
+from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
@@ -10,6 +11,7 @@ __all__ = [
     "SelectorSpec",
     "ServiceSpec",
     "SpecSource",
+    "check_permissions",
     "kernel_spec",
     "server_owned_keys",
 ]

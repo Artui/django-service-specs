@@ -21,8 +21,8 @@ output format is `SPEC_CLI_OUTPUT`, read by
   when unset; `None` bounds no array. Anything but a non-negative `int` or
   `None` is refused as `ImproperlyConfigured` where it is read. See
   [how long a list may be](arguments.md#how-long-a-list-may-be).
-  [django-spec-html](https://artui.github.io/django-spec-html/)'s request
-  reader bounds a query string's lists by the same key.
+  [`flat_arguments`][django_service_specs.flat.flat_arguments.flat_arguments]
+  bounds a query string's lists by the same key.
 
 ## Specs
 
@@ -45,6 +45,10 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ::: django_service_specs.parameters.expected_type_refusal.expected_type_refusal
 ::: django_service_specs.parameters.max_length_in_force.max_length_in_force
 ::: django_service_specs.parameters.clean_held_to_their_columns.clean_held_to_their_columns
+
+## Flat sources
+
+::: django_service_specs.flat.flat_arguments.flat_arguments
 
 ## Validation
 
@@ -131,6 +135,7 @@ Installed with the `pydantic` extra and imported from
 ## Authorization
 
 ::: django_service_specs.authorization.permission_check.PermissionCheck
+::: django_service_specs.specs.check_permissions.check_permissions
 ::: django_service_specs.authorization.unrestricted.Unrestricted
 ::: django_service_specs.dispatch.grant.Grant
 ::: django_service_specs.dispatch.authorize.authorize
@@ -139,6 +144,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.is_deactivated.is_deactivated
+::: django_service_specs.authorization.sync_answer.sync_answer
 ::: django_service_specs.authorization.not_permitted.NotPermitted
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
 

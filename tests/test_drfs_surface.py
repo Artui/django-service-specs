@@ -594,12 +594,15 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # kernel's, so that it refuses, relaxes and prints as they do:
         # djangorestframework-services neither wraps nor re-exports them.
         "NON_FIELD_KEYS",
+        "check_permissions",
         "clean_held_to_their_columns",
         "expected_type_refusal",
+        "flat_arguments",
         "is_deactivated",
         "max_length_in_force",
         "refusal_messages",
         "relax_partial",
+        "sync_answer",
         # What a transport registering kernel specs reads at registration, so
         # that it refuses and relaxes what dispatch would: the transports call
         # these from this package, and djangorestframework-services neither

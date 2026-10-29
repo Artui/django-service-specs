@@ -32,7 +32,8 @@ docs/examples/forms_adapter.py:form
 ```
 
 What `book_validator.parameters()` declares, then, in the form's own order:
-`title`, a required string with the help text as its `help`; `price`, a
+`title`, a required string of at most 100 characters, advertised as its
+`maxLength`, with the help text as its `help`; `price`, a
 required string in the `decimal` format; `status`, a required string with the
 choices `draft` and `published`; `published_on`, an optional, nullable string
 in the `date` format; `author`, a required integer, because authors are matched
@@ -71,7 +72,49 @@ extends.
 | `ModelChoiceField` | The JSON type of the model field rows are matched on - `to_field_name`, or the primary key - and no choices: they are rows, and listing them would query. It validates to the row. |
 | `ModelMultipleChoiceField` | An `array` of the same, so one matching rows on a `DecimalField` declares the `decimal` format for each element and `?rows=12.50,9.99` is two of them. Django matches each against the column's own spelling, `"12.50"` and not `12.5`. It validates to a queryset. |
 | `FileField`, `ImageField` | A `file`, which a multipart request carries and a Python caller hands as a Django `File`. The form is bound with it as its `files`, where a file field reads, and its own checks run on it. An optional one also declares its [clear checkbox](#clearing-a-file). |
-| any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`. |
+| any other `CharField` (`EmailField`, `URLField`, `SlugField`, `UUIDField`, `RegexField`, `GenericIPAddressField`) | A `string`, with its [lengths](#a-strings-length-and-a-numbers-bounds) advertised. |
+
+### A string's length and a number's bounds
+
+A `CharField`, or any field extending it, whose value Django's
+`MaxLengthValidator` bounds advertises the limit as the string's `maxLength`,
+and a required one bounded by `MinLengthValidator` advertises that as its
+`minLength`. Setting `max_length` or `min_length` appends one of those, and a
+validator a project appends by hand counts the same, since the form enforces
+it alike; where several bound one side, the tightest is advertised. Each goes in the parameter's `json_schema_extra`, so a
+transport's schema states it (an MCP `tools/list` reads
+`{"type": "string", "maxLength": 32}` for `CharField(max_length=32)`) and the
+shape check does not enforce it: the form still refuses an over-long value, in
+its own words and with Django's code, beside its other refusals. A `ModelForm`
+field carries its column's `max_length`, which Django puts on the form field it
+builds.
+
+Only those two validators are read, matched by exact type, rather than the
+field's `max_length` and `min_length`. `SimpleArrayField` extends `CharField`
+and spends both on how many items its list holds, validated by subclasses of
+the same two validators, so it advertises no length: a `ModelForm` over a sized
+`ArrayField` builds one. A limit no schema can state, such as a callable one,
+is not advertised either.
+
+An optional field's `min_length` is not advertised. Django runs no validator on
+an empty value, so the form takes `""` whatever its `min_length`, and a
+`minLength` would tell a client to refuse what the form takes. A length is
+counted on the value the form cleans, which a schema cannot say: stripped of
+surrounding whitespace unless the field sets `strip=False`, and a `URLField`'s
+with the scheme it adds. So a value padded with whitespace the form strips may
+read as too long to a client that checks the schema and still be taken, and a
+URL within its `maxLength` may still be refused: `URLField(max_length=20)`
+refuses the 20 characters of `"abcdefghijklmnop.com"`, counted with the scheme.
+For the same reason a `URLField`'s `min_length` is not advertised: counted with
+the scheme it adds, `"ab.co"` is taken by `URLField(min_length=12)`, and a
+`minLength` would tell a client to refuse it.
+
+An `IntegerField`'s or a `FloatField`'s `min_value` and `max_value` are not
+declared. A declared `minimum` or `maximum` is enforced by the shape check,
+before the form runs and in the kernel's words, so it would replace a field's
+own `error_messages` for the bound and stop the form's other refusals coming
+back beside it. They stay the form's, and the schema carries no bound for
+either field.
 
 A key past the range of the integer column rows are matched on names no row,
 so either field refuses it as it refuses a key no row holds: `invalid_choice`,

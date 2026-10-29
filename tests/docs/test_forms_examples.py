@@ -27,6 +27,7 @@ from django_service_specs import (
     Unrestricted,
     ValidationContext,
     dispatch,
+    parameters_schema,
     present,
 )
 from docs.examples import forms_adapter
@@ -65,6 +66,14 @@ class TestForm:
             ("author", "integer", None, None, None, True, False, None),
             ("shelves", "array", None, "string", ("fiction", "poetry"), False, True, None),
         ]
+
+    def test_the_title_s_max_length_is_advertised(self) -> None:
+        schema = parameters_schema(forms_adapter.book_validator.parameters())
+        assert schema["properties"]["title"] == {
+            "type": "string",
+            "description": "As printed on the cover.",
+            "maxLength": 100,
+        }
 
     def test_it_validates_to_what_the_form_cleans(self) -> None:
         author = Author.objects.create(name="Ada")

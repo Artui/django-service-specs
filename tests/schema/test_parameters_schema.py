@@ -15,12 +15,14 @@ from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
 
+from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
+from tests.adapters.filters.utils import NoteFilters
 from tests.schema.utils import walk
 
 PUBLISHER = Parameters.of(Parameter("name", "string", required=True))
@@ -581,24 +583,41 @@ class TestNothingElse:
         )
 
 
-def test_a_bound_is_stated_beside_the_type() -> None:
-    price = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
-    floor = Parameter("n", "integer", minimum=0, nullable=True)
-    schema = parameters_schema(Parameters.of(price, floor))
+def test_a_bound_is_stated_beside_the_type_of_a_number() -> None:
+    # Both arcs of ``_reading``'s bounds, and the format condition: a guard
+    # that skipped every bound, not only a decimal's, fails here.
+    count = Parameter("n", "integer", minimum=0, nullable=True)
+    ratio = Parameter("ratio", "number", minimum=-0.5, maximum=1.5)
+    schema = parameters_schema(Parameters.of(count, ratio))
     assert schema["properties"] == {
-        "price": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
         "n": {"type": ["integer", "null"], "minimum": 0},
+        "ratio": {"type": "number", "minimum": -0.5, "maximum": 1.5},
+    }
+
+
+def test_a_decimal_string_states_no_bound() -> None:
+    # JSON Schema applies ``minimum`` and ``maximum`` to a number instance
+    # only, so on a string a validating client ignores both and a strict
+    # validator may flag them. The shape check still enforces them: see
+    # test_a_decimal_is_compared_as_the_decimal_it_spells.
+    price = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
+    one_sided = Parameter("floor", "string", format="decimal", minimum=0)
+    assert parameters_schema(Parameters.of(price, one_sided))["properties"] == {
+        "price": {"type": "string", "format": "decimal"},
+        "floor": {"type": "string", "format": "decimal"},
     }
 
 
 def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself() -> None:
     # The shape check reads them on each element, so the array node carries
-    # neither: stated there, a reader would take ``minimum`` for a count.
+    # neither: stated there, a reader would take ``minimum`` for a count. A
+    # decimal element states its format and no bound, as a scalar does.
     pks = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
     ids = Parameter("ids", "array", items="integer", minimum=1, max_length=5, items_nullable=True)
+    ratios = Parameter("ratios", "array", items="number", minimum=0, maximum=1)
     assert one(pks) == {
         "type": "array",
-        "items": {"type": "string", "format": "decimal", "minimum": -1e50, "maximum": 1e50},
+        "items": {"type": "string", "format": "decimal"},
         "maxItems": 1000,
     }
     assert one(ids) == {
@@ -606,6 +625,39 @@ def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_its
         "items": {"type": ["integer", "null"], "minimum": 1},
         "maxItems": 5,
     }
+    assert one(ratios) == {
+        "type": "array",
+        "items": {"type": "number", "minimum": 0, "maximum": 1},
+        "maxItems": 1000,
+    }
+
+
+def test_a_bounded_decimal_filter_is_advertised_with_its_format_and_no_bound() -> None:
+    # End to end through a real django-filter FilterSet: the adapter keeps
+    # django-filter's 1e50 cost guard on the Parameter, the shape check
+    # enforces it, and the schema states none of it.
+    parameters = filter_set_parameters(NoteFilters)
+    declared = {param.name: param for param in parameters}
+    assert (declared["min_pk"].minimum, declared["min_pk"].maximum) == (-1e50, 1e50)
+
+    properties = parameters_schema(parameters)["properties"]
+    assert properties["min_pk"] == {
+        "type": "string",
+        "format": "decimal",
+        "description": "Matches `pk` with the `gte` lookup.",
+    }
+    assert properties["pks"] == {
+        "type": "array",
+        "items": {"type": "string", "format": "decimal"},
+        "maxItems": 1000,
+        "description": "Multiple values may be separated by commas.",
+    }
+    for side in ("min", "max"):
+        assert properties[f"pk_range_{side}"] == {
+            "type": "string",
+            "format": "decimal",
+            "description": f"The `{side}` bound of `pk`.",
+        }
 
 
 # --- array length ------------------------------------------------------------------------------------

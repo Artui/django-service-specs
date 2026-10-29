@@ -7,6 +7,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] — 2026-10-29
+
+### Added
+- **`flat_arguments(parameters, source)`**, in a new opt-in subpackage
+  `django_service_specs.flat`: a query string or a form's fields, a `QueryDict`
+  or any `MultiValueDict`, read by the declaration into strings and lists of
+  strings. An array takes every value of a repeated key, and anything else the
+  last; an array of numbers, integers, booleans or decimal strings, or of
+  strings whose choices hold no comma, also splits a value on its commas
+  (`?ids=1,2`, `?o=title,-pk`), no further than one element past the most it
+  takes; a blank is absent unless `""` is a value the parameter can take; and
+  Django's `csrfmiddlewaretoken` is dropped. Nothing is coerced: a transport
+  merges its route's kwargs into the result and calls `coerce_flat`, so every
+  transport reading a flat wire reads it by the same rules. Dispatch never
+  imports it.
+- **`check_permissions(permissions, *, label)` and `sync_answer(answer, *,
+  asked)` are public**, exported from the root, with the behaviour and
+  signatures they had. A transport that accepts `PermissionCheck`s on something
+  other than a spec, such as a prompt or a view, passes them through
+  `check_permissions` and gets a tuple, or `ImproperlyConfigured` naming its
+  own `label`, by the rules a spec's `permissions=` gets: an empty sequence, a
+  class, a value that is no `PermissionCheck` and an `async def` method are all
+  refused. A transport that asks a check itself reads the answer through
+  `sync_answer`, so a coroutine, another awaitable or an async generator fails
+  closed with `ImproperlyConfigured`, as it does in `authorize`, instead of
+  being read as a pass.
+
+### Changed
+- **`FormValidator` advertises a `CharField`'s lengths**, so the schema a
+  transport lists for a form changes. A `CharField`, or any field extending it
+  (`EmailField`, `URLField`, `SlugField`, `RegexField` and the rest), whose
+  value Django's `MaxLengthValidator` bounds, from `max_length` or appended by
+  hand, now declares the limit as the parameter's `json_schema_extra`
+  `maxLength`, and a required one bounded by `MinLengthValidator` declares
+  `minLength`: `CharField(max_length=32)` is
+  `{"type": "string", "maxLength": 32}` in `parameters_schema` and an MCP
+  `tools/list`, where it was a bare `string`. A `ModelForm` field carries its
+  column's `max_length`. Only those two validators are read, by exact type, so
+  a `SimpleArrayField`, whose `max_length` counts its items, declares no
+  length. An optional field's minimum is not declared, since the form takes
+  `""` whatever it says, and nor is a `URLField`'s, since the form counts a
+  URL with the scheme it adds and takes one shorter than the minimum.
+  Nothing about validation changes: the shape check enforces neither keyword,
+  and the form still refuses a string past one in its own words and with
+  Django's code. An `IntegerField`'s and a `FloatField`'s `min_value` and
+  `max_value` stay undeclared, because a declared bound is refused by the
+  shape check before the form runs, which would replace the field's own error
+  message for it and its other fields' refusals beside it.
+- **`parameters_schema` no longer states `"minimum"` and `"maximum"` on a
+  decimal string.** JSON Schema applies those keywords to a number instance
+  only, so on `{"type": "string", "format": "decimal"}` a validating client
+  ignored both and a strict validator such as Ajv could flag them as keywords
+  that do not apply. The advertised schema of every decimal changes: a
+  django-filter number filter, each side of a numeric range filter, each
+  element of a CSV number filter, and any `Parameter(..., format="decimal",
+  minimum=...)` now states `"type": "string"` and `"format": "decimal"` and
+  no bound. The
+  bounds are still enforced: the shape check refuses a decimal past
+  `minimum` or `maximum` exactly as before, and the `Parameter` still carries
+  them. An `integer` and a `number` still state theirs, scalar or array
+  element.
+
+### Fixed
+- **`check_seeds` refuses a callable whose signature cannot be read.** A
+  service, selector or target selector such as a builtin type (`dict`) let the
+  `ValueError` from `inspect.signature` escape, where every other refusal it
+  makes is one `ImproperlyConfigured`. It is now refused as one, naming the
+  seat and the callable. Dispatch cannot bind a keyword to such a callable, so
+  every call reaching it fails. The seat is answered by that refusal alone
+  and the other seats are still checked, so one exception still names
+  everything the spec gets wrong.
+
 ## [0.19.0] — 2026-10-27
 
 ### Added
@@ -2102,7 +2174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/Artui/django-service-specs/compare/v0.16.0...v0.17.0

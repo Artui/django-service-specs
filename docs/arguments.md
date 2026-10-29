@@ -367,10 +367,11 @@ docs/examples/arguments.py:flat
   becomes a one-element list, since a flat transport sends a one-element list
   as a bare value. **An array longer than it takes is refused whole**, before
   any element is parsed, by [the same length rule](#how-long-a-list-may-be) as
-  the shape check's. A query string's `?ids=1,2,3` is split into no more
-  than one element past the most the array takes, so a value of a million
-  commas is refused without becoming a million elements first: Django's
-  `DATA_UPLOAD_MAX_NUMBER_FIELDS` counts keys, and a comma list is one.
+  the shape check's. A query string's `?ids=1,2,3` is split by
+  [`flat_arguments`](flat.md) into no more than one element past the most
+  the array takes, so a value of a million commas is refused without
+  becoming a million elements first: Django's `DATA_UPLOAD_MAX_NUMBER_FIELDS`
+  counts keys, and a comma list is one.
 - **A parameter with nested Parameters is refused by name** - an object, or an
   array of rows, has no flat spelling - with `"This argument has nested
   parameters, which a flat transport cannot send."`, rather than passing the
