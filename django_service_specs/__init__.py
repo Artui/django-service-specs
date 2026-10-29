@@ -20,6 +20,7 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
+from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
@@ -133,6 +134,7 @@ from django_service_specs.services.service_error import ServiceError
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.services.service_validation_error import ServiceValidationError
 from django_service_specs.services.update_service import UpdateService
+from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
@@ -270,6 +272,7 @@ __all__ = [
     "can_present_nothing",
     "check_arguments",
     "check_call",
+    "check_permissions",
     "check_requested_input",
     "check_seeds",
     "check_server_arguments",
@@ -319,6 +322,7 @@ __all__ = [
     "shape_queryset",
     "spec_input_schema",
     "spec_output_schema",
+    "sync_answer",
     "unanswered_refusals",
     "unguarded_specs",
     "unmet_operation_affordance",

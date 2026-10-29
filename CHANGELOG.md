@@ -22,6 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   merges its route's kwargs into the result and calls `coerce_flat`, so every
   transport reading a flat wire reads it by the same rules. Dispatch never
   imports it.
+- **`check_permissions(permissions, *, label)` and `sync_answer(answer, *,
+  asked)` are public**, exported from the root, with the behaviour and
+  signatures they had. A transport that accepts `PermissionCheck`s on something
+  other than a spec, such as a prompt or a view, passes them through
+  `check_permissions` and gets a tuple, or `ImproperlyConfigured` naming its
+  own `label`, by the rules a spec's `permissions=` gets: an empty sequence, a
+  class, a value that is no `PermissionCheck` and an `async def` method are all
+  refused. A transport that asks a check itself reads the answer through
+  `sync_answer`, so a coroutine, another awaitable or an async generator fails
+  closed with `ImproperlyConfigured`, as it does in `authorize`, instead of
+  being read as a pass.
 
 ### Changed
 - **`FormValidator` advertises a `CharField`'s lengths**, so the schema a

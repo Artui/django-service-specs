@@ -6,13 +6,13 @@ from collections.abc import Mapping
 from typing import Any
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.utils import (
     OBJECT_LEVEL,
     asked_with,
     check_seed_arguments,
     offered_seeds,
     offered_to_checks,
-    sync_answer,
 )
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.pool.pool_seeds import PoolSeeds

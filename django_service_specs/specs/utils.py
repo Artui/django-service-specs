@@ -9,16 +9,12 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
-from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.utils import CALL_SEEDS_NOTE, SHAPES, SHAPES_RENAME
-
-# The methods dispatch reads a permission check's answer from.
-_CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
 
 
 def check_changes(declared: tuple[Field[Any], ...], changes: Iterable[str], *, label: str) -> None:
@@ -107,58 +103,6 @@ def check_preconditions(
     for index, precondition in enumerate(declared):
         check_callable(precondition, label=f"{label}.preconditions[{index}]", sync=True)
     return declared
-
-
-def check_permissions(
-    permissions: Sequence[PermissionCheck] | None, *, label: str
-) -> tuple[PermissionCheck, ...] | None:
-    """Normalize to a tuple, refusing anything that is not a check *instance*, and an empty one.
-
-    **An empty sequence is refused**, as ``None`` is refused at dispatch and
-    at registration: every check passing is vacuously true of no checks, so
-    ``permissions=[]`` would let anyone run the operation, and an empty list
-    is as often computed by accident as decided. ``Unrestricted()`` is the
-    decision, by name (test_an_empty_permissions_sequence_is_refused).
-
-    A class is the likely mistake - an HTTP framework declares permission
-    classes - and a class passes ``callable()``, so it is refused by name here
-    rather than failing at dispatch with an unbound-method error.
-
-    Each of the three methods is read for truth from sync code, so an
-    ``async def`` one - whose answer is a truthy coroutine - is refused here,
-    on the bound method, as any other sync-only seat is. One case per method
-    in ``tests/specs/test_utils.py``'s ``TestAnAsyncPermissionCheckIsRefused``,
-    since coverage cannot see a name dropped from ``_CHECK_METHODS``. What
-    construction cannot see, a plain ``def`` handing back a coroutine, is
-    refused where the answer is read, by ``authorization/utils.py``'s
-    ``sync_answer``.
-    """
-    if permissions is None:
-        return None
-    if isinstance(permissions, str | bytes) or not isinstance(permissions, Sequence):
-        raise ImproperlyConfigured(f"{label}.permissions must be a sequence of PermissionCheck.")
-    checks = tuple(permissions)
-    if not checks:
-        raise ImproperlyConfigured(
-            f"{label}.permissions is empty, which would let anyone run it. Declare "
-            "permissions=[Unrestricted()] to mean that."
-        )
-    for index, check in enumerate(checks):
-        if isinstance(check, type):
-            raise ImproperlyConfigured(
-                f"{label}.permissions holds the class {check.__name__}; pass an instance, "
-                f"{check.__name__}()."
-            )
-        if not isinstance(check, PermissionCheck):
-            raise ImproperlyConfigured(
-                f"{label}.permissions holds {type(check).__name__}, which is not a "
-                "PermissionCheck. Subclass PermissionCheck, or adapt it."
-            )
-        for method in _CHECK_METHODS:
-            check_callable(
-                getattr(check, method), label=f"{label}.permissions[{index}].{method}", sync=True
-            )
-    return checks
 
 
 def check_presenter(presenter: Presenter | None, *, label: str) -> None:

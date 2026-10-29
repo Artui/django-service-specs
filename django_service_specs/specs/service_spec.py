@@ -15,6 +15,7 @@ from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.provider_keys import provider_keys
+from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
     callable_name,
@@ -22,7 +23,6 @@ from django_service_specs.specs.utils import (
     check_callable,
     check_changes,
     check_metadata,
-    check_permissions,
     check_preconditions,
     check_presenter,
     check_providers,
