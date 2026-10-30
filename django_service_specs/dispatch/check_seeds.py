@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
 import types
 from collections.abc import Callable, Sequence
@@ -10,7 +11,7 @@ from typing import Any, Final, TypeVar, Union, get_args, get_origin
 
 import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
-from typing_extensions import Format, get_annotations, get_type_hints
+from typing_extensions import get_type_hints
 
 from django_service_specs.dispatch.utils import (
     COLLECTION_SOURCE,
@@ -288,7 +289,9 @@ def _untyped_elements(
     - over a keyword no seed fills (test_a_reflected_read_a_seed_fills_is_not)
       and the provider neither fills nor may decline, as the third and fourth
       read a typed provider's keys (its ``fills`` and ``may-decline`` cases);
-    - that the seat's callable takes by keyword
+    - that the seat's callable takes by keyword, keyword-only or not (the
+      ``positional-or-keyword`` case of test_it_is_refused_on_every_kind_of_callable),
+      and never positional-only
       (test_a_positional_only_parameter_the_read_never_fills_is_not), and
       only on the read's own seat
       (test_only_the_seat_the_read_fills_is_read);
@@ -303,7 +306,14 @@ def _untyped_elements(
     if keys is None:
         return []
     filled_by_provider = keys.filled | keys.declinable
-    taken = {name for name, param in signature.parameters.items() if param.kind in _BY_KEYWORD}
+    # The annotation is the signature's: what dispatch binds the keyword by,
+    # never a callable object's class fields
+    # (test_a_callable_object_s_fields_are_not_its_keywords).
+    taken = {
+        name: param.annotation
+        for name, param in signature.parameters.items()
+        if param.kind in _BY_KEYWORD
+    }
     candidates = [
         param.name
         for param in seat.reads
@@ -312,9 +322,8 @@ def _untyped_elements(
         and param.name in taken
         and param.name not in seeded | filled_by_provider
     ]
-    annotations = _annotations(seat.fn)
-    namespace = getattr(inspect.unwrap(seat.fn), "__globals__", {})
-    elements = {name: _element(_hint(annotations.get(name), namespace)) for name in candidates}
+    namespace = _namespace(seat.fn)
+    elements = {name: _element(_hint(taken[name], namespace)) for name in candidates}
     return sorted(
         name
         for name, element in elements.items()
@@ -322,15 +331,24 @@ def _untyped_elements(
     )
 
 
-def _annotations(fn: Callable[..., Any]) -> dict[str, Any]:
-    """``fn``'s annotations, unevaluated where they do not resolve, or none if it has none to read."""
-    try:
-        return dict(get_annotations(fn, format=Format.FORWARDREF))
-    except Exception:
-        # A callable whose signature reads and whose annotations do not, as
-        # an instance whose ``__annotations__`` is no dict: nothing is read as
-        # annotated (test_a_callable_whose_annotations_cannot_be_read_is_not).
-        return {}
+def _namespace(fn: Callable[..., Any]) -> dict[str, Any]:
+    """The globals of the function ``inspect.signature`` reads ``fn``'s parameters off.
+
+    Where a postponed annotation is resolved, so a name the callable's own
+    module imports resolves: a partial's function, a class's ``__init__``, a
+    callable object's ``__call__`` (the ``partial``, ``class`` and
+    ``callable-object`` cases of test_it_is_refused_on_every_kind_of_callable),
+    and under a decorator the function it wraps rather than the wrapper, whose
+    globals are the decorator's module (``decorated-elsewhere``). Something
+    with no globals answers none, so its postponed annotations do not resolve.
+    """
+    while isinstance(fn, functools.partial):
+        fn = fn.func
+    if isinstance(fn, type):
+        fn = fn.__init__
+    elif not inspect.isroutine(fn):
+        fn = type(fn).__call__
+    return getattr(inspect.unwrap(fn), "__globals__", {})
 
 
 def _hint(annotation: Any, namespace: dict[str, Any]) -> Any:
@@ -340,8 +358,8 @@ def _hint(annotation: Any, namespace: dict[str, Any]) -> Any:
     ``get_type_hints`` resolves all at once, so a hint that does not resolve
     on another keyword leaves this one readable
     (test_a_hint_that_does_not_resolve_leaves_only_its_own_keyword_alone).
-    An unannotated keyword's ``None`` reads as ``NoneType``, which is no
-    sequence (test_an_unannotated_keyword_is_not).
+    An unannotated keyword's ``inspect.Parameter.empty`` reads as itself,
+    which is no sequence (test_an_unannotated_keyword_is_not).
     """
     try:
         holder = types.SimpleNamespace(__annotations__={"value": annotation})

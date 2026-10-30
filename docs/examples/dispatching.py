@@ -231,6 +231,27 @@ def tenant_name(*, tenant: str) -> str:
 
 
 tenant_name_spec = ServiceSpec(service=tenant_name, permissions=[IsSignedIn()])
+
+
+def notes_by_pk(*, user: Any, pks: list[int]) -> QuerySet[Note]:
+    return Note.objects.filter(owner=user, pk__in=pks)
+
+
+# Refused: an array with no items takes any element, so a query string's
+# ``?pks=1,3`` would hand ``notes_by_pk`` the strings "1" and "3".
+any_pks_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_by_pk,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("pks", "array", required=True)),
+)
+# Registered: the declared element is what the shape check holds each one to.
+integer_pks_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_by_pk,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("pks", "array", required=True, items="integer")),
+)
 # --8<-- [end:check_seeds]
 
 

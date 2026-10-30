@@ -7,6 +7,7 @@ message came back.
 
 from __future__ import annotations
 
+import functools
 import inspect
 import re
 import typing
@@ -33,6 +34,7 @@ from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import OPEN, PK, Titled, make_user
+from tests.pool.utils import passthrough
 from tests.specs.utils import Foreign
 
 pytestmark = pytest.mark.django_db
@@ -377,6 +379,32 @@ def _beside_a_hidden_hint(*, pks: list[int], other: Hidden = None) -> Any:  # no
     return pks
 
 
+def _positional_or_keyword(pks: Sequence[int]) -> Any:
+    return pks
+
+
+def _with_another(*, pks: Sequence[int], other: int) -> Any:
+    return pks
+
+
+class _ClassSeat:
+    def __init__(self, *, pks: Sequence[int]) -> None:
+        self.pks = pks
+
+
+class _CallableSeat:
+    def __call__(self, *, pks: Sequence[int]) -> Any:
+        return pks
+
+
+@dataclass
+class _CallableWithFields:
+    pks: list[int]
+
+    def __call__(self, *, pks: str = "") -> Any:
+        return pks
+
+
 class _FillsPks(TypedDict):
     pks: list[int]
 
@@ -480,15 +508,26 @@ class TestAnArrayReadWithNoItems:
     def test_an_unannotated_keyword_is_not(self) -> None:
         check_seeds(_retrieve(lambda *, pks: pks, reads=Parameters.of(_PKS)))
 
-    def test_a_callable_whose_annotations_cannot_be_read_is_not(self) -> None:
-        class Selector:
-            def __call__(self, *, pks: list[int]) -> Any:
-                return pks
-
-        selector = Selector()
-        # Its signature reads, off ``__call__``, and its annotations do not.
-        setattr(selector, "__annotations__", 3)  # noqa: B010
+    def test_a_callable_object_s_fields_are_not_its_keywords(self) -> None:
+        # Dispatch binds ``__call__``'s ``pks``, a string, whatever the field says.
+        selector = _CallableWithFields(pks=[1])
         check_seeds(_retrieve(selector, reads=Parameters.of(_PKS)))
+
+    @pytest.mark.parametrize(
+        "selector",
+        [
+            _positional_or_keyword,
+            functools.partial(_with_another, other=1),
+            _ClassSeat,
+            _CallableSeat(),
+            passthrough(_postponed),
+        ],
+        ids=["positional-or-keyword", "partial", "class", "callable-object", "decorated-elsewhere"],
+    )
+    def test_it_is_refused_on_every_kind_of_callable(self, selector: Callable[..., Any]) -> None:
+        """Each annotated ``Sequence[int]``, a name only this module's globals resolve."""
+        refused = _refusal(_retrieve(selector, reads=Parameters.of(_PKS)))
+        assert re.search(_NAMES_ITEMS, refused)
 
     def test_a_declared_items_is_not(self) -> None:
         read = Parameter("pks", "array", required=True, items="integer")
