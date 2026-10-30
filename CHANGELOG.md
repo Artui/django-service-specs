@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.0] — 2026-10-30
+
 ### Added
 - **A translation catalog, and refusals that read in the active language.**
   Each refusal type's `default_message` (`ServiceError`, `ServiceNotFound`,
@@ -2233,7 +2235,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/Artui/django-service-specs/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/Artui/django-service-specs/compare/v0.17.0...v0.18.0
