@@ -518,7 +518,15 @@ handed it, and every seed resolves on each such bind, as on dispatch. A
 deactivated principal is refused with `PrincipalUnavailable` first, before the
 arguments are checked, as dispatch refuses one. Any registry counts, an empty one too, since the
 call's `request` and `view` are seeds of every pool dispatch builds. Without
-`pool_seeds=` it resolves no seed and checks every read as declared.
+`pool_seeds=` it resolves no seed and checks every read as declared. The club
+page [above](#admitting-a-request-before-the-form) checks its form as the member types,
+bound with the club seed:
+
+```python
+--8<--
+docs/examples/dispatching.py:seeded_bind
+--8<--
+```
 
 ```python
 --8<--

@@ -105,10 +105,13 @@ def bind_arguments(
     Every seed resolves on each bind of a spec with a Validator, as on
     dispatch, whether or not the Validator reads one, so a caller binding
     often, a page re-checking a form on each edit, pays each resolver per bind.
+    A spec with no Validator resolves none, since nothing it binds reads one
+    (test_a_service_spec_with_no_validator_resolves_no_seed).
     A deactivated principal is refused with ``PrincipalUnavailable`` first,
     as dispatch refuses one: before the seat refusal and the shape check, for
     every kind of spec and any registry, so no seed resolves for it
     (test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuses_it,
+    test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal,
     test_a_deactivated_principal_resolves_no_seed). Which values a service's
     pool spreads is dispatch's question.
 
@@ -158,7 +161,12 @@ def bind_arguments(
     # (test_a_seed_resolver_reads_the_dict_the_validator_is_handed).
     context = {} if call_context is None else call_context
     ambient: dict[str, Any] = {}
-    if pool_seeds is not None:
+    # Two conjuncts: without the first a bind handed no seeds would have no
+    # registry to resolve, and fail rather than bind with an empty ambient
+    # (test_the_validator_s_ambient_is_dispatch_s_with_any_registry[none]); without
+    # the second a spec with nothing to validate would run every resolver
+    # (test_a_service_spec_with_no_validator_resolves_no_seed).
+    if pool_seeds is not None and spec.validator is not None:
         ambient = seeded_base(
             principal, progress=None, pool_seeds=pool_seeds, early={}, call_context=context
         )

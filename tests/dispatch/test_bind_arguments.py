@@ -683,3 +683,23 @@ def test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuse
     # Before the shape check, which would refuse the malformed title.
     with pytest.raises(PrincipalUnavailable):
         bind_arguments(spec, malformed, principal=DORMANT, pool_seeds=seeds)
+
+
+def test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal() -> None:
+    # An unmarked read a registered seed shares: the declaration is wrong, and
+    # still a deactivated principal learns that first, as on dispatch.
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=_tenant())
+    with pytest.raises(PrincipalUnavailable):
+        bind_arguments(spec, {}, principal=DORMANT, pool_seeds=TENANT_SEEDS)
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        bind_arguments(spec, {}, principal=PRINCIPAL, pool_seeds=TENANT_SEEDS)
+
+
+def test_a_service_spec_with_no_validator_resolves_no_seed() -> None:
+    # It validates nothing, so nothing reads a seed, and a resolver that queries
+    # or raises is never run for it.
+    resolved: list[Any] = []
+    seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: resolved.append(user))
+    spec = ServiceSpec(service=service, reads=PK)
+    assert bind_arguments(spec, {"pk": 1}, principal=PRINCIPAL, pool_seeds=seeds) == {}
+    assert resolved == []

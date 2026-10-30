@@ -479,7 +479,11 @@ def seat_seed_named(
     checked, narrower for ``resolve_target``. A name ``split_seed_named``
     refuses raises ``ImproperlyConfigured``; a ``reflected`` read it seats
     leaves ``parameters``, so the closed set refuses or drops a caller's value
-    for it as for any seed's name.
+    for it as for any seed's name. The split reads ``declared`` and the
+    narrowing ``parameters``, never the other way about: a name outside what
+    this call checks is still refused or seated, and what comes back is never
+    wider than what went in
+    (test_seat_seed_named_splits_the_whole_spec_and_narrows_only_what_is_checked).
     """
     seated, taken = split_seed_named(spec, declared, pool_seeds)
     if taken:
