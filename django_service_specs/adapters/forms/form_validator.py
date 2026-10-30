@@ -421,9 +421,9 @@ class FormValidator(Validator):
                 files[name] = value
             else:
                 data[name] = value if field is None else _as_bound(field, value)
-        form, row = self._bind(
-            data, files, context.target, extra_keywords(self.form_class, self.form_kwargs, context)
-        )
+        extra = extra_keywords(self.form_class, self.form_kwargs, context)
+        data, files = self._prefixed(data, files, extra)
+        form, row = self._bind(data, files, context.target, extra)
         if context.partial:
             # Off the form rather than made optional: an optional field still
             # cleans to its empty value, runs its ``clean_<field>()`` on it and,
@@ -450,6 +450,55 @@ class FormValidator(Validator):
         if context.partial and row is not None:
             _check_unique_as_whole(row, self._names)
         return dict(form.cleaned_data)
+
+    def _prefixed(
+        self,
+        data: dict[str, Any],
+        files: MultiValueDict[str, Any],
+        extra: Mapping[str, Any],
+    ) -> tuple[dict[str, Any], MultiValueDict[str, Any]]:
+        """``data`` and ``files`` keyed as the bound form reads them.
+
+        A form class may set a ``prefix``, or be handed one through
+        ``form_kwargs``, and a bound form then reads each field under
+        ``add_prefix(name)``, and an optional file's clear checkbox under the
+        widget's name for that: bound under the bare names, every filled field
+        would be refused as required. The keys are prefixed rather than the
+        form bound with ``prefix=""``, so the form keeps the prefix it was
+        written with, and an ``add_prefix`` override, which Django invites,
+        names the keys too. The parameters stay the bare field names, since a
+        caller sends arguments, not a page's post.
+
+        The prefix is read as ``BaseForm.__init__`` reads it: a keyword that is
+        not ``None`` over the class's, so ``prefix=""`` turns a class prefix
+        off (test_an_empty_prefix_handed_through_form_kwargs_turns_it_off).
+        """
+        prefix = extra.get("prefix")
+        if prefix is None:
+            prefix = self.form_class.prefix
+        if not prefix:
+            return data, files
+        # An instance ``__init__`` has not run on, holding only the prefix:
+        # running it would build the form a second time, with whatever a
+        # form's own ``__init__`` does, to read one method.
+        keys = self.form_class.__new__(self.form_class)
+        keys.prefix = prefix
+        clears = {clear: name for name, clear in self._clears.items()}
+        widgets = {parameter.name: field.widget for parameter, field in self._declared}
+
+        def key(name: str) -> str:
+            field_name = clears.get(name)
+            if field_name is None:
+                return keys.add_prefix(name)
+            widget = widgets[field_name]
+            # Only a ``ClearableFileInput`` is ever recorded in ``_clears``.
+            assert isinstance(widget, forms.ClearableFileInput)
+            return widget.clear_checkbox_name(keys.add_prefix(field_name))
+
+        return (
+            {key(name): value for name, value in data.items()},
+            MultiValueDict({key(name): files.getlist(name) for name in files}),
+        )
 
     def _bind(
         self,

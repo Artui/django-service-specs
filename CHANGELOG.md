@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **A form class that sets a `prefix` commits.** `FormValidator` bound the
+  form's data under the bare field names, so a form with a `prefix`, set on the
+  class or handed through `form_kwargs`, looked for `entry-title`, found
+  nothing, and refused every filled field as required. The data and files are
+  now keyed by the form's own `add_prefix`, and an optional file's clear
+  checkbox by its widget's name for that, so the form keeps its prefix and an
+  `add_prefix` override is followed. The parameters stay the bare field names.
+
 ## [0.21.0] — 2026-10-30
 
 ### Added

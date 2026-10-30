@@ -2322,3 +2322,80 @@ def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None
     assert required is not None
     assert required.required
     assert validator.unsendable == frozenset()
+
+
+class _Entry(forms.Form):
+    prefix = "entry"
+
+    title = forms.CharField()
+
+
+class _Underscored(_Entry):
+    # An override Django invites, which the data keys must follow.
+    def add_prefix(self, field_name: str) -> str:
+        return f"{self.prefix}_{field_name}" if self.prefix else field_name
+
+
+class _PrefixedBook(BookForm):
+    prefix = "book"
+
+
+class _PrefixedDocument(_DocumentForm):
+    prefix = "doc"
+
+
+class TestAPrefixedForm:
+    """A form class that sets a ``prefix`` reads every field under the prefixed name."""
+
+    def test_a_filled_prefixed_form_cleans_what_it_was_sent(self) -> None:
+        assert FormValidator(_Entry).validate({"title": "Notes"}, CONTEXT) == {"title": "Notes"}
+
+    def test_an_add_prefix_override_names_the_keys(self) -> None:
+        assert FormValidator(_Underscored).validate({"title": "Notes"}, CONTEXT) == {
+            "title": "Notes"
+        }
+
+    def test_a_prefix_handed_through_form_kwargs_is_read_too(self) -> None:
+        validator = FormValidator(_Entry, form_kwargs=lambda: {"prefix": "other"})
+
+        assert validator.validate({"title": "Notes"}, CONTEXT) == {"title": "Notes"}
+
+    def test_an_empty_prefix_handed_through_form_kwargs_turns_it_off(self) -> None:
+        validator = FormValidator(_Entry, form_kwargs=lambda: {"prefix": ""})
+
+        assert validator.validate({"title": "Notes"}, CONTEXT) == {"title": "Notes"}
+
+    def test_the_parameters_keep_the_field_names(self) -> None:
+        assert [p.name for p in FormValidator(_Entry).parameters()] == ["title"]
+
+    @pytest.mark.django_db
+    def test_a_filled_prefixed_model_form_commits(self) -> None:
+        author = Author.objects.create(name="Ada")
+        spec = ServiceSpec(
+            service=lambda *, author, title, price, status: Book.objects.create(
+                author=author, title=title, price=price, status=status
+            ),
+            permissions=[Unrestricted()],
+            validator=FormValidator(_PrefixedBook),
+        )
+
+        result = dispatch(
+            spec,
+            principal=None,
+            arguments={"author": author.pk, "title": "Notes", "price": "9.50", "status": "draft"},
+        )
+
+        book = Book.objects.get()
+        assert (result.value, book.title, book.author) == (book, "Notes", author)
+
+    @pytest.mark.django_db
+    def test_a_prefixed_form_reads_its_upload_and_its_clear_checkbox(self, media: str) -> None:
+        row = _stored()
+        validator = FormValidator(_PrefixedDocument)
+        upload = SimpleUploadedFile("new.txt", b"new")
+
+        uploaded = validator.validate({"title": "Notes", "attachment": upload}, _row(row))
+        cleared = validator.validate({"title": "Notes", "attachment-clear": True}, _row(row))
+
+        assert uploaded["attachment"] is upload
+        assert cleared["attachment"] is False
