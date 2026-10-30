@@ -6,7 +6,7 @@ import inspect
 import types
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Final, Union, get_args, get_origin
+from typing import Any, Final, TypeVar, Union, get_args, get_origin
 
 import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
@@ -93,15 +93,16 @@ def check_seeds(
        element**: a read of ``type="array"`` declaring no ``items``, over
        the keyword it fills on its own seat, annotated ``list[X]``,
        ``tuple[X, ...]`` or ``Sequence[X]``, or one of those ``| None``,
-       where ``X`` is neither ``Any`` nor ``object``. Such a read takes any
+       where ``X`` is neither ``Any``, ``object`` nor a type variable. Such
+       a read takes any
        element, so a callable annotated ``pks: list[int]`` is handed a
        query string's strings, and the message says to declare ``items``.
        It derives none from the annotation: a signature is not a
-       declaration. A keyword a typed provider is annotated to fill is not
-       one, since the caller's value never reaches it; one the provider
-       may decline, or an untyped provider's, is, since the read's value
-       reaches it whenever the provider leaves it out. A keyword a seed
-       fills, as a ``reflected`` read's, is not one either.
+       declaration. As with the third and fourth, it never guesses: a
+       keyword a provider fills or may fill is not one - a typed
+       provider's key, declinable or not, and any keyword of a seat whose
+       provider is untyped - and nor is a keyword a seed fills, as a
+       ``reflected`` read's.
 
     **A callable whose signature cannot be read** is refused too, ahead of
     these for its seat: a service, selector or target selector such as a
@@ -281,11 +282,12 @@ def _untyped_elements(
 
     - an array read (test_a_read_of_another_type_is_not);
     - declaring no ``items`` (test_a_declared_items_is_not);
+    - on a seat whose provider names its keys, since an untyped one may fill
+      any (the ``untyped`` case of
+      test_a_keyword_a_provider_fills_or_may_fill_is_not);
     - over a keyword no seed fills (test_a_reflected_read_a_seed_fills_is_not)
-      and no typed provider is annotated to fill
-      (test_a_keyword_a_typed_provider_fills_is_not), where an untyped
-      provider and a key it may decline still leave the read's value to reach
-      it (test_a_keyword_a_provider_may_leave_to_the_read_is_refused);
+      and the provider neither fills nor may decline, as the third and fourth
+      read a typed provider's keys (its ``fills`` and ``may-decline`` cases);
     - that the seat's callable takes by keyword
       (test_a_positional_only_parameter_the_read_never_fills_is_not), and
       only on the read's own seat
@@ -295,9 +297,12 @@ def _untyped_elements(
       ``object`` (the ``list-of-any``, ``list-of-typing-extensions-any`` and
       ``list-of-object`` cases of test_what_it_cannot_misread_is_not; the two
       spellings of ``Any`` are one object from Python 3.11, so each of the
-      first two holds its own on 3.10 alone).
+      first two holds its own on 3.10 alone), nor a type variable, whatever
+      it stands for being no declaration (its ``type-variable`` case).
     """
-    filled_by_provider = keys.filled if keys is not None else frozenset()
+    if keys is None:
+        return []
+    filled_by_provider = keys.filled | keys.declinable
     taken = {name for name, param in signature.parameters.items() if param.kind in _BY_KEYWORD}
     candidates = [
         param.name
@@ -309,10 +314,11 @@ def _untyped_elements(
     ]
     annotations = _annotations(seat.fn)
     namespace = getattr(inspect.unwrap(seat.fn), "__globals__", {})
+    elements = {name: _element(_hint(annotations.get(name), namespace)) for name in candidates}
     return sorted(
         name
-        for name in candidates
-        if _element(_hint(annotations.get(name), namespace)) not in _ANY_ELEMENT
+        for name, element in elements.items()
+        if element not in _ANY_ELEMENT and not isinstance(element, TypeVar)
     )
 
 

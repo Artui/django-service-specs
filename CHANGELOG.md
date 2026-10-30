@@ -14,15 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one was handed a query string's strings, and on an HTTP route `?pks=1,3`
   failed inside the selector. Where the keyword the read fills on its own seat
   is annotated `list[X]`, `tuple[X, ...]` or `Sequence[X]`, or one of those
-  `| None`, and `X` is neither `Any` nor `object`, the read is now named in the
+  `| None`, and `X` is neither `Any`, `object` nor a type variable, the read is
+  now named in the
   one `ImproperlyConfigured`, beside any other refusal, with a message that
   says to declare `items`. Nothing is derived from the annotation. Each hint
   is resolved on its own, so one that does not resolve leaves only its own
-  keyword alone; a bare `list`, an unannotated keyword, and a keyword a seed or
-  a typed provider fills are not refused. A keyword an untyped provider may
-  fill, or a typed one may decline, is, because the read's value reaches it
-  whenever the provider leaves it out. Dispatch is unchanged: a spec nobody
-  checks still runs.
+  keyword alone; a bare `list`, an unannotated keyword, a keyword a seed fills
+  and one a provider fills or may fill, as the other refusals read a provider,
+  are not refused. Dispatch is unchanged: a spec nobody checks still runs.
 
 ## [0.20.0] — 2026-10-29
 

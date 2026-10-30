@@ -594,13 +594,13 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   `| None`. Such a read takes any element, so a selector annotated
   `pks: list[int]` is handed a query string's strings, and the message says to
   declare `items`, which it never derives from the annotation. An element of
-  `Any` or `object`, a bare `list`, a fixed-length `tuple`, an unannotated
-  keyword and a keyword a seed or a typed provider fills are not refused, and
-  neither is a hint that does not resolve, such as a forward reference to a
-  name not importable where the callable is defined: it is resolved on its
-  own, so it leaves the callable's other keywords readable. A keyword an
-  untyped provider may fill, or a typed one may decline, is refused, because
-  the read's value reaches it whenever the provider leaves it out;
+  `Any`, `object` or a type variable, a bare `list`, a fixed-length `tuple`,
+  an unannotated keyword, a keyword a seed fills and one a provider fills or
+  may fill - a typed provider's key, declinable or not, or any keyword of a
+  seat whose provider is untyped - are not refused, and neither is a hint that
+  does not resolve, such as a forward reference to a name not importable where
+  the callable is defined: it is resolved on its own, so it leaves the
+  callable's other keywords readable;
 - a service, selector or target selector whose signature cannot be read, such
   as a builtin type like `dict`: dispatch binds every callable's keywords from
   its signature, so every call reaching it fails. That seat is refused for

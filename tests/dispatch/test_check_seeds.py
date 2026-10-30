@@ -12,7 +12,7 @@ import re
 import typing
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, TypedDict, Union
+from typing import Any, Optional, TypedDict, TypeVar, Union
 
 import pytest
 import typing_extensions
@@ -351,6 +351,7 @@ _NO_ITEMS = "with no items"
 # the offenders and ``items`` must sit on one line of the message.
 _NAMES_ITEMS = r"\['pks'\].*items"
 _PKS = Parameter("pks", "array", required=True)
+_T = TypeVar("_T")
 
 
 def _annotated(annotation: Any, *, default: Any = inspect.Parameter.empty) -> Callable[..., Any]:
@@ -456,6 +457,7 @@ class TestAnArrayReadWithNoItems:
             list[int] | tuple[int, ...],
             int,
             dict[str, int],
+            list[_T],
         ],
         ids=[
             "list-of-any",
@@ -469,6 +471,7 @@ class TestAnArrayReadWithNoItems:
             "two-sequences",
             "not-a-sequence",
             "mapping",
+            "type-variable",
         ],
     )
     def test_what_it_cannot_misread_is_not(self, annotation: Any) -> None:
@@ -495,15 +498,15 @@ class TestAnArrayReadWithNoItems:
         read = Parameter("pks", "string", required=True)
         check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(read)))
 
-    def test_a_keyword_a_typed_provider_fills_is_not(self) -> None:
-        check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(_PKS), kwargs=_fills_pks))
-
-    @pytest.mark.parametrize("provider", [_may_fill_pks, _untyped], ids=["may-decline", "untyped"])
-    def test_a_keyword_a_provider_may_leave_to_the_read_is_refused(
+    @pytest.mark.parametrize(
+        "provider",
+        [_fills_pks, _may_fill_pks, _untyped],
+        ids=["fills", "may-decline", "untyped"],
+    )
+    def test_a_keyword_a_provider_fills_or_may_fill_is_not(
         self, provider: Callable[..., Any]
     ) -> None:
-        spec = _retrieve(_annotated(list[int]), reads=Parameters.of(_PKS), kwargs=provider)
-        assert _NO_ITEMS in _refusal(spec)
+        check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(_PKS), kwargs=provider))
 
     def test_a_reflected_read_a_seed_fills_is_not(self) -> None:
         def selector(*, tenant: list[int]) -> Any: ...
