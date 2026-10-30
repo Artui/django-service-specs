@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.21.1] — 2026-10-30
+
 ### Fixed
 - **A form class that sets a `prefix` commits.** `FormValidator` bound the
   form's data under the bare field names, so a form with a `prefix`, set on the
@@ -2244,7 +2246,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.21.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/Artui/django-service-specs/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Artui/django-service-specs/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/Artui/django-service-specs/compare/v0.18.0...v0.19.0
