@@ -17,8 +17,10 @@ from django_service_specs.dispatch.utils import (
     call_pool,
     reraise_unless_retrieve,
     run_preconditions,
+    seat_seed_named,
     validate_arguments,
 )
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.null_progress import null_progress
@@ -164,3 +166,29 @@ class TestAPreconditionAnsweringWithAnAwaitable:
 def test_every_pool_is_base_pool_s_keys_and_the_call_s_own() -> None:
     """Held to ``base_pool``, so a seed it gains or loses moves what ``check_seeds`` counts as filled."""
     assert frozenset(base_pool(user=None)) | {CALL_CONTEXT, SHAPES} | CALL_SEEDS == EVERY_POOL
+
+
+def test_seat_seed_named_splits_the_whole_spec_and_narrows_only_what_is_checked() -> None:
+    """``resolve_target`` checks its target's parameters alone, and the seat answers for the spec."""
+    seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "seeded")
+    target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=lambda **_: None, reads=PK)
+
+    def spec(tenant: Parameter) -> ServiceSpec:
+        region = Parameter("region", "string", required=True)
+        return ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            instance_selector_spec=target,
+            reads=Parameters.of(tenant, region),
+        )
+
+    # A reflected read outside the target's parameters: seated, and the
+    # narrowed set comes back as it went in, never widened to the whole spec.
+    seated = spec(Parameter("tenant", "string", required=True, reflected=True))
+    narrowed = seat_seed_named(seated, seated.parameters(), PK, seeds)
+    assert narrowed.names() == {"pk"}
+    # An unmarked one outside them is still refused: the split reads the
+    # whole declaration, not what this call checks.
+    unmarked = spec(Parameter("tenant", "string"))
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        seat_seed_named(unmarked, unmarked.parameters(), PK, seeds)

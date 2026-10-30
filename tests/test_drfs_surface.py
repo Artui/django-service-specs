@@ -157,7 +157,7 @@ SURFACE: dict[str, Pin] = {
     "check_requested_input": _fn("dispatch.check_requested_input", "spec, schema, *, pool_seeds="),
     "bind_arguments": _fn(
         "dispatch.bind_arguments",
-        "spec, arguments, *, principal, target=, unknown_arguments=, call_context=",
+        "spec, arguments, *, principal, target=, unknown_arguments=, call_context=, pool_seeds=",
     ),
     "resolve_target": _fn(
         "dispatch.resolve_target",

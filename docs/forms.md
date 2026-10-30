@@ -317,15 +317,18 @@ refused one of another's in the field's own words, `invalid_choice`, though
 the row exists: the queryset the form narrowed is what matches it.
 
 In
-[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments],
-or with a
+[`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
+handed `pool_seeds=`, the callable is handed its seeds as on dispatch: the
+Validator's pool holds every seed of the registry, resolved once for the
+principal, so a page checking a form scoped by a seed before it posts binds
+it as the post will. Handed none, or with a
 [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
 built by hand, there are no seeds, so a callable naming one gives it a
 default or fails with Python's own `TypeError`; `user` and `progress` are
 there still.
 [`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
-is the off-dispatch path that does resolve them: the seeds of the
-`pool_seeds=` it is handed that the callable would be handed. `bind_arguments` names the `target=` it is passed as dispatch
+is the off-dispatch path for building the form itself: it resolves the seeds
+of the `pool_seeds=` it is handed that the callable would be handed. `bind_arguments` names the `target=` it is passed as dispatch
 would, from the spec's selectors, and a context built by hand names none.
 Under
 [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] it runs on the

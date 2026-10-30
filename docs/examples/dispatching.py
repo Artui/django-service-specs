@@ -372,6 +372,18 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
 # --8<-- [end:admit]
 
 
+# --8<-- [start:seeded_bind]
+def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
+    # A page checking the form as the member types, before it posts: bound as
+    # dispatch will bind it, so the form's __init__ gets the club seed.
+    pool_seeds = club_seeds(club)
+    authorize(club_note_spec, user, pool_seeds=pool_seeds)
+    return bind_arguments(club_note_spec, {"title": title}, principal=user, pool_seeds=pool_seeds)
+
+
+# --8<-- [end:seeded_bind]
+
+
 # --8<-- [start:resolve_target]
 def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
     found = resolve_target(rename_note_spec, principal=user, arguments={"pk": pk})

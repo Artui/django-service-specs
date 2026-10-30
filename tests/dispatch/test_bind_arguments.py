@@ -2,17 +2,24 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from django import forms
+from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import TypedDict
 
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
+from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -384,3 +391,315 @@ def test_a_form_s_form_kwargs_is_handed_the_context_s_request_and_view() -> None
         call_context={"request": request, "view": view},
     )
     assert bound["seen"] == (request, view)
+
+
+# --- the call's seeds ----------------------------------------------------------------
+#
+# Each rule runs with the seeds and without them: without, the function is the
+# one it was before it took any, and the without case says what that was.
+
+SEEDED = "tenant-of-the-principal"
+"""What ``TENANT_SEEDS`` resolves: a value no caller here ever sends."""
+TENANT_SEEDS = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: SEEDED)
+SEEDS = pytest.mark.parametrize("seeds", [TENANT_SEEDS, None], ids=["seeds", "no-seeds"])
+REQUIRED = ["This field is required."]
+UNKNOWN = ["Unknown argument."]
+
+
+def _tenant(**kwargs: Any) -> Parameters:
+    return Parameters.of(Parameter("tenant", "string", **kwargs))
+
+
+def scope_of(*, tenant: str) -> dict[str, Any]:
+    """A ``form_kwargs`` scoping its form by the registered seed."""
+    return {"seen": tenant}
+
+
+@pytest.mark.django_db
+@SEEDS
+def test_a_form_kwargs_naming_a_registered_seed_is_handed_it(seeds: PoolSeeds | None) -> None:
+    spec = ServiceSpec(
+        service=lambda **kwargs: kwargs["seen"],
+        permissions=[Unrestricted()],
+        validator=FormValidator(_Kept, form_kwargs=scope_of),
+    )
+    if seeds is None:
+        # Without the seeds there is no ``tenant`` in the pool to hand it.
+        with pytest.raises(TypeError, match="tenant"):
+            bind_arguments(spec, {"title": "Lathe"}, principal=PRINCIPAL)
+        return
+    bound = bind_arguments(spec, {"title": "Lathe"}, principal=PRINCIPAL, pool_seeds=seeds)
+    assert bound["seen"] == SEEDED
+    # The value dispatch hands the form for the same call.
+    ran = dispatch(spec, principal=PRINCIPAL, arguments={"title": "Lathe"}, pool_seeds=seeds)
+    assert ran.value == SEEDED
+
+
+def _reflected(seat: str) -> ServiceSpec | SelectorSpec:
+    """A spec declaring a required ``tenant`` read off a callable's signature, at ``seat``."""
+    reads = _tenant(required=True, reflected=True)
+    if seat == "selector-spec":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=lambda *, tenant: [], reads=reads)
+    return ServiceSpec(service=lambda *, tenant: None, reads=reads)
+
+
+SEATS = pytest.mark.parametrize("seat", ["selector-spec", "service"])
+
+
+@SEEDS
+@SEATS
+def test_a_reflected_read_a_registered_seed_fills_is_not_demanded(
+    seeds: PoolSeeds | None, seat: str
+) -> None:
+    spec = _reflected(seat)
+    if seeds is None:
+        # As test_bind_arguments_still_demands_a_required_reflected_read holds.
+        with pytest.raises(InvalidArguments) as caught:
+            bind_arguments(spec, {}, principal=PRINCIPAL)
+        assert caught.value.detail == {"tenant": REQUIRED}
+        return
+    assert bind_arguments(spec, {}, principal=PRINCIPAL, pool_seeds=seeds) == {}
+
+
+@SEEDS
+@SEATS
+def test_the_caller_s_value_for_it_is_refused_under_reject_as_dispatch_refuses_it(
+    seeds: PoolSeeds | None, seat: str
+) -> None:
+    spec = _reflected(seat)
+    if seeds is None:
+        returned = {"tenant": "t"} if seat == "selector-spec" else {}
+        assert bind_arguments(spec, {"tenant": "t"}, principal=PRINCIPAL) == returned
+        return
+    with pytest.raises(InvalidArguments) as caught:
+        bind_arguments(spec, {"tenant": "t"}, principal=PRINCIPAL, pool_seeds=seeds)
+    assert caught.value.detail == {"tenant": UNKNOWN}
+
+
+def test_the_caller_s_value_for_it_is_dropped_under_ignore() -> None:
+    # A selector spec's, since it returns what it checked; without the seeds
+    # the value is kept, as the REJECT test's no-seeds case shows.
+    spec = _reflected("selector-spec")
+    bound = bind_arguments(
+        spec,
+        {"tenant": "t"},
+        principal=PRINCIPAL,
+        pool_seeds=TENANT_SEEDS,
+        unknown_arguments=UnknownArguments.IGNORE,
+    )
+    assert bound == {}
+
+
+class _Tenanted(Validator):
+    """Declares a ``tenant`` field, as a registered seed is named, and returns it."""
+
+    def __init__(self) -> None:
+        self.contexts: list[ValidationContext] = []
+
+    def parameters(self) -> Parameters:
+        return _tenant(required=True)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.contexts.append(context)
+        return dict(arguments)
+
+
+@SEEDS
+def test_a_validator_field_named_like_a_registered_seed_is_validated_and_returned(
+    seeds: PoolSeeds | None,
+) -> None:
+    validator = _Tenanted()
+    spec = ServiceSpec(service=service, validator=validator)
+    bound = bind_arguments(spec, {"tenant": "caller's"}, principal=PRINCIPAL, pool_seeds=seeds)
+    assert bound == {"tenant": "caller's"}
+    # The seed keeps its own value beside the field, as in dispatch's pool.
+    ambient = validator.contexts[0].ambient
+    assert ambient.get("tenant") == (None if seeds is None else SEEDED)
+
+
+@SEEDS
+def test_an_unmarked_read_named_like_a_registered_seed_is_refused_only_with_the_seeds(
+    seeds: PoolSeeds | None,
+) -> None:
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=_tenant())
+    if seeds is None:
+        assert bind_arguments(spec, {"tenant": "t"}, principal=PRINCIPAL) == {"tenant": "t"}
+        return
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        bind_arguments(spec, {"tenant": "t"}, principal=PRINCIPAL, pool_seeds=seeds)
+
+
+# An explicit registry, even one holding no seed, is dispatch's: the call's
+# ``request`` and ``view`` are seeds of every pool it builds. ``None`` is the
+# function as it was, which checks a read of either name as declared.
+REGISTRIES = pytest.mark.parametrize(
+    "seeds", [DEFAULT_POOL_SEEDS, PoolSeeds(), None], ids=["default", "empty", "none"]
+)
+
+
+@REGISTRIES
+def test_a_reflected_read_named_request_is_the_call_s_with_any_registry(
+    seeds: PoolSeeds | None,
+) -> None:
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=lambda *, request: [],
+        reads=Parameters.of(Parameter("request", "string", required=True, reflected=True)),
+    )
+    if seeds is None:
+        with pytest.raises(InvalidArguments) as demanded:
+            bind_arguments(spec, {}, principal=PRINCIPAL)
+        assert demanded.value.detail == {"request": REQUIRED}
+        return
+    assert bind_arguments(spec, {}, principal=PRINCIPAL, pool_seeds=seeds) == {}
+    with pytest.raises(InvalidArguments) as refused:
+        bind_arguments(spec, {"request": "r"}, principal=PRINCIPAL, pool_seeds=seeds)
+    assert refused.value.detail == {"request": UNKNOWN}
+
+
+@REGISTRIES
+def test_an_unmarked_read_named_request_is_refused_with_any_registry(
+    seeds: PoolSeeds | None,
+) -> None:
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=selector,
+        reads=Parameters.of(Parameter("request", "string")),
+    )
+    if seeds is None:
+        assert bind_arguments(spec, {"request": "r"}, principal=PRINCIPAL) == {"request": "r"}
+        return
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        bind_arguments(spec, {"request": "r"}, principal=PRINCIPAL, pool_seeds=seeds)
+
+
+@pytest.mark.django_db
+def test_the_validator_s_ambient_is_the_one_dispatch_hands_it() -> None:
+    bound, ran = Recording(), Recording()
+    bind_arguments(
+        ServiceSpec(service=service, validator=bound),
+        {"title": "t"},
+        principal=PRINCIPAL,
+        pool_seeds=TENANT_SEEDS,
+    )
+    dispatch(
+        ServiceSpec(service=service, permissions=[Unrestricted()], validator=ran),
+        principal=PRINCIPAL,
+        arguments={"title": "t"},
+        pool_seeds=TENANT_SEEDS,
+    )
+    ((_, off), (_, on)) = bound.calls + ran.calls
+    assert (
+        dict(off.ambient)
+        == dict(on.ambient)
+        == {
+            "user": PRINCIPAL,
+            "progress": null_progress,
+            "tenant": SEEDED,
+        }
+    )
+
+
+@REGISTRIES
+def test_the_validator_s_ambient_is_dispatch_s_with_any_registry(
+    seeds: PoolSeeds | None,
+) -> None:
+    validator = Recording()
+    spec = ServiceSpec(service=service, validator=validator)
+    bind_arguments(spec, {"title": "t"}, principal=PRINCIPAL, pool_seeds=seeds)
+    ((_, context),) = validator.calls
+    expected = {} if seeds is None else {"user": PRINCIPAL, "progress": null_progress}
+    assert dict(context.ambient) == expected
+
+
+def test_a_seed_resolver_reads_the_dict_the_validator_is_handed() -> None:
+    validator = Recording()
+    seen: list[Any] = []
+
+    def tenant(*, request: Any) -> str:
+        seen.append(request)
+        return SEEDED
+
+    request = object()
+    context: dict[str, Any] = {"request": request}
+    spec = ServiceSpec(service=service, validator=validator)
+    seeds = DEFAULT_POOL_SEEDS.extend(tenant=tenant)
+    bind_arguments(
+        spec, {"title": "t"}, principal=PRINCIPAL, pool_seeds=seeds, call_context=context
+    )
+    ((_, handed),) = validator.calls
+    assert seen == [request]
+    assert handed.call_context is context
+    assert handed.ambient["tenant"] == SEEDED
+
+
+DORMANT = SimpleNamespace(is_authenticated=True, is_active=False)
+
+
+@SEEDS
+def test_a_deactivated_principal_resolves_no_seed(seeds: PoolSeeds | None) -> None:
+    resolved: list[Any] = []
+    validator = Recording()
+    spec = ServiceSpec(service=service, validator=validator)
+    if seeds is None:
+        # Bound as before: the function never authorized, and resolves nothing.
+        bind_arguments(spec, {"title": "t"}, principal=DORMANT)
+        assert len(validator.calls) == 1
+        return
+    recording = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: resolved.append(user))
+    with pytest.raises(PrincipalUnavailable):
+        bind_arguments(spec, {"title": "t"}, principal=DORMANT, pool_seeds=recording)
+    assert resolved == []
+    assert validator.calls == []
+
+
+def _kind(kind: str) -> ServiceSpec | SelectorSpec:
+    """A spec of each kind, every one taking a string ``title``."""
+    title = Parameters.of(Parameter("title", "string", required=True))
+    if kind == "selector-spec":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=title)
+    if kind == "service-no-validator":
+        return ServiceSpec(service=service, reads=title)
+    return ServiceSpec(service=service, validator=Recording())
+
+
+KINDS = pytest.mark.parametrize("kind", ["selector-spec", "service-no-validator", "validator"])
+
+
+@KINDS
+@REGISTRIES
+def test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuses_it(
+    seeds: PoolSeeds | None, kind: str
+) -> None:
+    spec = _kind(kind)
+    malformed = {"title": 3}
+    if seeds is None:
+        # As before: no deactivation check, so the shape check answers, and a
+        # well-shaped call binds.
+        with pytest.raises(InvalidArguments):
+            bind_arguments(spec, malformed, principal=DORMANT)
+        bind_arguments(spec, {"title": "t"}, principal=DORMANT)
+        return
+    # Before the shape check, which would refuse the malformed title.
+    with pytest.raises(PrincipalUnavailable):
+        bind_arguments(spec, malformed, principal=DORMANT, pool_seeds=seeds)
+
+
+def test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal() -> None:
+    # An unmarked read a registered seed shares: the declaration is wrong, and
+    # still a deactivated principal learns that first, as on dispatch.
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=_tenant())
+    with pytest.raises(PrincipalUnavailable):
+        bind_arguments(spec, {}, principal=DORMANT, pool_seeds=TENANT_SEEDS)
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        bind_arguments(spec, {}, principal=PRINCIPAL, pool_seeds=TENANT_SEEDS)
+
+
+def test_a_service_spec_with_no_validator_resolves_no_seed() -> None:
+    # It validates nothing, so nothing reads a seed, and a resolver that queries
+    # or raises is never run for it.
+    resolved: list[Any] = []
+    seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: resolved.append(user))
+    spec = ServiceSpec(service=service, reads=PK)
+    assert bind_arguments(spec, {"pk": 1}, principal=PRINCIPAL, pool_seeds=seeds) == {}
+    assert resolved == []

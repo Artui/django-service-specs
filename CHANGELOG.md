@@ -34,6 +34,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The dataclass, form and pydantic adapters keep the empty default, since each
   declares every field it requires; an adapter whose library can require an
   undeclared field overrides it with a property.
+- **`bind_arguments(..., pool_seeds=)`** binds as dispatch binds with the call's
+  seeds. A `reflected` read a registered seed fills is no longer demanded of the
+  caller, and the caller's value for it is refused as an unknown argument under
+  `REJECT` and dropped under `IGNORE`, as dispatch refuses it; a parameter
+  dispatch refuses for sharing a seed's name raises `ImproperlyConfigured`. The
+  Validator's `ambient` is dispatch's base pool, every seed resolved once for the
+  principal against `call_context`, so a `FormValidator` whose `form_kwargs`
+  names a registered seed is handed it, where it raised `TypeError` before, and a
+  page can check a form scoped by a seed before it posts. A deactivated principal
+  is refused with `PrincipalUnavailable` first, before the arguments are
+  checked, as dispatch refuses one. Any registry
+  passed counts, an empty one too, since the call's `request` and `view` are
+  seeds of every pool dispatch builds. Without `pool_seeds` the function is
+  unchanged: no seed resolves, every read is checked as declared and `ambient`
+  is empty. It still runs no `input_data` or `kwargs` provider, and neither
+  resolves the target nor authorizes.
 
 ## [0.20.0] — 2026-10-29
 

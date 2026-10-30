@@ -36,8 +36,8 @@ class ValidationContext:
     reads what its caller registered, as a serializer reads its context's
     ``request``, finds it here rather than in an argument. It never holds an
     argument, a validated value or the target, which have seats of their
-    own. Empty for a context built by hand, and in ``bind_arguments``, which
-    is handed no seeds; it trails the others, so neither changes.
+    own. Empty for a context built by hand, and in ``bind_arguments`` handed
+    no ``pool_seeds``; it trails the others, so neither changes.
 
     ``resolved`` is the target under the pool name dispatch hands it to the
     service as, read-only: ``{"instance": row}`` for a spec with an instance
