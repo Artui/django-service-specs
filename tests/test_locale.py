@@ -44,19 +44,31 @@ SOURCE_CATALOG = PACKAGE_ROOT / "locale" / "en" / "LC_MESSAGES" / "django.po"
 # translated message can only have come from the catalog a test wrote.
 LANGUAGE = "xx"
 
-# Each refusal built with no message of its own, so it reads its default.
-DEFAULTS: list[tuple[type[Exception], Callable[[], Exception]]] = [
-    (ServiceError, ServiceError),
-    (ServiceNotFound, ServiceNotFound),
-    (ServiceConflict, ServiceConflict),
-    (ActionUnavailable, lambda: ActionUnavailable(code="closed")),
+# Each refusal built with no message of its own, so it reads its default, and
+# the English msgid it should look up. The msgids are literals rather than read
+# off the class, so a refusal writing its looked-up message back onto the class
+# fails here instead of moving the expectation along with it.
+DEFAULTS: list[tuple[type[Exception], Callable[[], Exception], str]] = [
+    (ServiceError, ServiceError, "Service error."),
+    (ServiceNotFound, ServiceNotFound, "Not found."),
+    (ServiceConflict, ServiceConflict, "Conflict."),
+    (
+        ActionUnavailable,
+        lambda: ActionUnavailable(code="closed"),
+        "This action is not available right now.",
+    ),
     # A detail that is not a message gives way to the default.
-    (ServiceValidationError, lambda: ServiceValidationError({"title": ["Too long."]})),
-    (DispatchError, DispatchError),
-    (NotPermitted, NotPermitted),
-    (PrincipalUnavailable, PrincipalUnavailable),
-    (InvalidArguments, lambda: InvalidArguments({"title": ["Too long."]})),
+    (
+        ServiceValidationError,
+        lambda: ServiceValidationError({"title": ["Too long."]}),
+        "Service validation error.",
+    ),
+    (DispatchError, DispatchError, "The operation could not be dispatched."),
+    (NotPermitted, NotPermitted, "You do not have permission to perform this action."),
+    (PrincipalUnavailable, PrincipalUnavailable, "The acting principal is unavailable."),
+    (InvalidArguments, lambda: InvalidArguments({"title": ["Too long."]}), "Invalid arguments."),
 ]
+DEFAULT_IDS = [cls.__name__ for cls, _, _ in DEFAULTS]
 
 
 def _refusal_classes() -> list[type[Exception]]:
@@ -115,7 +127,7 @@ def _translated(msgid: str) -> str:
 def _write_test_catalog(locale_dir: Path) -> None:
     _write_mo(
         locale_dir / LANGUAGE / "LC_MESSAGES" / "django.mo",
-        {msgid: _translated(msgid) for msgid in _default_messages()},
+        {msgid: _translated(msgid) for _, _, msgid in DEFAULTS},
     )
 
 
@@ -146,29 +158,39 @@ def locale_paths(tmp_path: Path) -> Iterator[None]:
         yield
 
 
-@pytest.mark.usefixtures("locale_paths")
-@pytest.mark.parametrize(("cls", "build"), DEFAULTS, ids=[cls.__name__ for cls, _ in DEFAULTS])
-def test_a_default_message_is_read_in_the_active_language(
-    cls: type[Exception], build: Callable[[], Exception]
+@pytest.mark.parametrize(("cls", "build", "msgid"), DEFAULTS, ids=DEFAULT_IDS)
+def test_each_refusal_declares_its_msgid(
+    cls: type[Exception], build: Callable[[], Exception], msgid: str
 ) -> None:
-    default = vars(cls)["default_message"]
+    # Ties the literals above to the classes, and lists every refusal that
+    # declares one, so a new member is added here rather than missed.
+    assert vars(cls)["default_message"] == msgid
+    assert sorted(c.__name__ for c in _refusal_classes() if "default_message" in vars(c)) == sorted(
+        DEFAULT_IDS
+    )
+
+
+@pytest.mark.usefixtures("locale_paths")
+@pytest.mark.parametrize(("cls", "build", "msgid"), DEFAULTS, ids=DEFAULT_IDS)
+def test_a_default_message_is_read_in_the_active_language(
+    cls: type[Exception], build: Callable[[], Exception], msgid: str
+) -> None:
     with translation.override(LANGUAGE):
         error = build()
-    assert (error.message, str(error)) == (_translated(default), _translated(default))
+    assert (error.message, str(error)) == (_translated(msgid), _translated(msgid))
 
 
 @pytest.mark.usefixtures("locale_paths")
-@pytest.mark.parametrize(("cls", "build"), DEFAULTS, ids=[cls.__name__ for cls, _ in DEFAULTS])
+@pytest.mark.parametrize(("cls", "build", "msgid"), DEFAULTS, ids=DEFAULT_IDS)
 def test_nothing_is_frozen_at_import_or_at_the_last_call(
-    cls: type[Exception], build: Callable[[], Exception]
+    cls: type[Exception], build: Callable[[], Exception], msgid: str
 ) -> None:
     # The class keeps the msgid, and each construction looks it up again: a
     # refusal built in another language before this one does not decide its words.
-    default = vars(cls)["default_message"]
     with translation.override(LANGUAGE):
         build()
-        assert vars(cls)["default_message"] == default
-    assert build().message == default
+        assert vars(cls)["default_message"] == msgid
+    assert build().message == msgid
 
 
 @pytest.mark.usefixtures("locale_paths")
@@ -216,7 +238,9 @@ def test_listing_the_app_loads_a_catalog_beside_the_package(
     monkeypatch.setattr(config, "path", str(tmp_path))
     monkeypatch.setattr(trans_real, "_translations", {})
     with translation.override(LANGUAGE):
-        assert NotPermitted().message == _translated(NotPermitted.default_message)
+        assert NotPermitted().message == _translated(
+            "You do not have permission to perform this action."
+        )
 
 
 def test_the_source_catalog_lists_every_refusal_s_default_message() -> None:
@@ -226,9 +250,11 @@ def test_the_source_catalog_lists_every_refusal_s_default_message() -> None:
 
 def test_the_source_catalog_keeps_django_rest_framework_s_msgids() -> None:
     # Spelled as DRF spells them, so a project with DRF installed keeps DRF's
-    # translation of the three.
+    # translation of the four: ``NotFound``'s and ``PermissionDenied``'s
+    # default details and ``ListField``'s two length messages.
     assert {
         "Not found.",
+        "You do not have permission to perform this action.",
         "Ensure this field has no more than {max_length} elements.",
         "Ensure this field has at least {min_length} elements.",
     } <= _msgids(SOURCE_CATALOG)
@@ -260,3 +286,9 @@ print(django_service_specs.NotPermitted("Ask the owner.").message)
     )
     assert completed.returncode == 0, completed.stderr
     assert completed.stdout == "Ask the owner.\n"
+
+
+def test_the_package_ships_the_source_language_and_no_translation() -> None:
+    # A translated language is a contribution someone can review; until one is
+    # reviewed and added, ``locale/`` holds the source catalog alone.
+    assert sorted(path.name for path in (PACKAGE_ROOT / "locale").iterdir()) == ["en"]

@@ -88,9 +88,11 @@ INSTALLED_APPS = [
 A refusal reads in the language active where it is raised. Each refusal type's
 `default_message` is a msgid, looked up with `gettext` each time a refusal is
 built with no message of its own, so nothing is fixed at import; a message the
-caller passes, `NotPermitted("Ask the owner.")`, is shown as given. Where DRF has the same message the msgid is DRF's (`Not found.`, and
-its `ListField`'s two length messages), so a project with DRF installed keeps
-DRF's translation of those three.
+caller passes, `NotPermitted("Ask the owner.")`, is shown as given. Where DRF
+has the same message the msgid is DRF's: `Not found.` and `You do not have
+permission to perform this action.`, its `NotFound` and `PermissionDenied`
+details, and its `ListField`'s two length messages. So a project with DRF
+installed keeps DRF's translation of those four.
 
 The package ships its source catalog,
 `django_service_specs/locale/en/LC_MESSAGES/django.po`: every msgid it marks,
@@ -117,7 +119,9 @@ django-admin compilemessages --locale de
 ```
 
 `msgmerge` brings back each translation the `makemessages` run had marked
-obsolete, so a msgid translated once stays translated. `--use-first` keeps the
+obsolete, so a msgid translated once stays translated. The recipe was verified
+by hand, over two runs, and the test suite does not run it, since it needs
+GNU gettext's tools. `--use-first` keeps the
 project's own header and, for a msgid both catalogs hold, the project's entry.
 
 ## Quickstart

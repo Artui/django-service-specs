@@ -15,8 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is now a msgid looked up with `gettext` each time a refusal is built with no
   message of its own, where it was the English text whatever the language. A
   message the caller passes is shown as given, and the class attribute keeps
-  the English msgid. The msgids are unchanged, DRF's included (`Not found.` and
-  `ListField`'s two length messages). The package ships its source catalog,
+  the English msgid. The msgids are unchanged, DRF's four included:
+  `Not found.`, `You do not have permission to perform this action.` and
+  `ListField`'s two length messages. The package ships its source catalog,
   `django_service_specs/locale/en/LC_MESSAGES/django.po`, and no translated
   language; CI regenerates it with `make messages-check` and fails on a
   difference. **List `"django_service_specs"` in `INSTALLED_APPS` for its
