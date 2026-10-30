@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A translation catalog, and refusals that read in the active language.**
+  Each refusal type's `default_message` (`ServiceError`, `ServiceNotFound`,
+  `ServiceConflict`, `ServiceValidationError`, `ActionUnavailable`,
+  `DispatchError`, `NotPermitted`, `PrincipalUnavailable`, `InvalidArguments`)
+  is now a msgid looked up with `gettext` each time a refusal is built with no
+  message of its own, where it was the English text whatever the language. A
+  message the caller passes is shown as given, and the class attribute keeps
+  the English msgid. The msgids are unchanged, DRF's four included:
+  `Not found.`, `You do not have permission to perform this action.` and
+  `ListField`'s two length messages. The package ships its source catalog,
+  `django_service_specs/locale/en/LC_MESSAGES/django.po`, and no translated
+  language; CI regenerates it with `make messages-check` and fails on a
+  difference. **List `"django_service_specs"` in `INSTALLED_APPS` for its
+  catalog to load**, which reverses the docs' "needs no entry": the package
+  still runs unlisted. The docs show how a project keeping one catalog merges
+  these msgids into its own with `msgcat` and `msgmerge`. Building a refusal
+  with no message now calls `gettext`, so it needs Django's settings
+  configured, as the shape check's messages already did.
+
 ## [0.20.0] — 2026-10-29
 
 ### Added

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.utils import gettext_noop
 
 
 class PrincipalUnavailable(DispatchError):
@@ -21,4 +22,4 @@ class PrincipalUnavailable(DispatchError):
     row does not come back, and a deactivated account is deactivated on purpose.
     """
 
-    default_message: ClassVar[str] = "The acting principal is unavailable."
+    default_message: ClassVar[str] = gettext_noop("The acting principal is unavailable.")

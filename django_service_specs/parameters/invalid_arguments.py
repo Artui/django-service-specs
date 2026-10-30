@@ -7,6 +7,7 @@ from typing import Any, ClassVar
 
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.utils import gettext_noop
 
 
 class InvalidArguments(DispatchError):
@@ -60,7 +61,7 @@ class InvalidArguments(DispatchError):
     error arose.
     """
 
-    default_message: ClassVar[str] = "Invalid arguments."
+    default_message: ClassVar[str] = gettext_noop("Invalid arguments.")
 
     def __init__(self, detail: Mapping[Any, Any], *, after_authorize: bool = False) -> None:
         super().__init__()

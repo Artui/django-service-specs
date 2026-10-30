@@ -32,6 +32,8 @@ it serves runs through this package's `dispatch`.
 | `make lint` | `ruff check` plus `ty check` |
 | `make format-check` | `ruff format --check --diff` (CI runs this; `make lint` does not) |
 | `make docs-build` | `mkdocs build --strict` |
+| `make messages` | Regenerate the source catalog, `locale/en/LC_MESSAGES/django.po` (needs GNU gettext) |
+| `make messages-check` | Regenerate it and fail on a difference (CI runs this in `lint`) |
 | `make release-bump VERSION=X.Y.Z` | Rewrite the version and promote the changelog section |
 
 ## Structural rules
@@ -62,7 +64,8 @@ Non-negotiable. They keep the package navigable.
    public surface in `__all__`. Internal modules import from leaf paths, never
    from the package's `__init__`.
 7. **The package root is a table of contents, not a drawer.** It holds
-   `__init__.py`, `version.py`, `settings.py`, `apps.py` and nothing else;
+   `__init__.py`, `version.py`, `settings.py`, `apps.py`, and `locale/`, the
+   source catalog, where Django looks for an app's translations, and nothing else;
    everything the package does lives in a subpackage. A subpackage is named
    for a **concern** (`parameters/`, `dispatch/`, `authorization/`) and never for
    a kind of thing - `helpers/`, `core/`, `common/` and `misc/` name nothing and

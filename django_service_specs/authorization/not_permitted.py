@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import ClassVar
 
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.utils import gettext_noop
 
 
 class NotPermitted(DispatchError):
@@ -16,4 +17,6 @@ class NotPermitted(DispatchError):
     refusal to route around keeps trying, where a denial should end the attempt.
     """
 
-    default_message: ClassVar[str] = "You do not have permission to perform this action."
+    default_message: ClassVar[str] = gettext_noop(
+        "You do not have permission to perform this action."
+    )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from django_service_specs.services.service_error import ServiceError
+from django_service_specs.types.utils import gettext_noop
 
 
 class ServiceNotFound(ServiceError):
@@ -26,4 +27,4 @@ class ServiceNotFound(ServiceError):
     check swallows it.
     """
 
-    default_message: str = "Not found."
+    default_message: str = gettext_noop("Not found.")

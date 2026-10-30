@@ -50,8 +50,10 @@ and every change is recorded in the [changelog](CHANGELOG.md).
 pip install django-service-specs
 ```
 
-The package has no models and needs no entry in `INSTALLED_APPS`. A principal
-is a user of `django.contrib.auth`, and a generic-relation write needs
+The package has no models and runs with no entry in `INSTALLED_APPS`; list
+`"django_service_specs"` there for its translations to load. It ships its
+source catalog and no translated language yet. A principal is a user of
+`django.contrib.auth`, and a generic-relation write needs
 `django.contrib.contenttypes`. Django 4.2 or later, on Python 3.10 or later.
 
 Two parts need more, and each comes with an extra: the pydantic adapter, and
