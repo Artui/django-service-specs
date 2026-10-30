@@ -457,6 +457,20 @@ class TestDispatching:
         assert form.fields["title"].help_text == "Posted to chess."
         assert contexts["form_keywords"] is contexts["dispatch"]
 
+    def test_a_page_checks_a_form_scoped_by_a_seed_before_it_posts(
+        self, ada: Any, bob: Any
+    ) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        # The form is built with the club seed; without it, its __init__ is
+        # missing the keyword and the bind raises TypeError.
+        assert dispatching.check_club_note(ada, "chess", "Openings") == {"title": "Openings"}
+        with pytest.raises(InvalidArguments) as refused:
+            dispatching.check_club_note(ada, "chess", "")
+        assert refused.value.detail == {"title": ["This field is required."]}
+        with pytest.raises(NotPermitted, match="Members of this club only."):
+            dispatching.check_club_note(bob, "chess", "Openings")
+        assert not Note.objects.exists()  # nothing ran
+
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")
         with pytest.raises(NotPermitted):
@@ -525,6 +539,14 @@ class TestDispatching:
         seeded.register("tenant", dispatching.tenant_name_spec)
         seeded.register("rename", quickstart.rename_note_spec)
         assert set(seeded.tools) == {"tenant", "rename"}
+
+    def test_an_array_read_with_no_items_over_a_typed_keyword_is_refused(self) -> None:
+        registry = dispatching.ToolRegistry()
+        with pytest.raises(ImproperlyConfigured, match=r"\['pks'\].*items"):
+            registry.register("notes", dispatching.any_pks_spec)
+        assert registry.tools == {}
+        registry.register("notes", dispatching.integer_pks_spec)
+        assert set(registry.tools) == {"notes"}
 
     def test_a_registry_may_refuse_a_field_its_service_never_reads(self) -> None:
         advertising = dispatching.AdvertisingToolRegistry()

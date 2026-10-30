@@ -507,6 +507,27 @@ It runs no provider: a field an `input_data` provider would fill passes the
 shape check and, left out, is the Validator's to refuse; a read a `kwargs`
 provider would fill passes too.
 
+**Hand it the call's seeds** with `pool_seeds=`, the registry dispatch is
+handed, and it binds as dispatch binds with them. A `reflected` read a
+registered seed fills is not demanded of the caller, and the caller's value for
+it is refused under `REJECT` and dropped under `IGNORE`; a parameter dispatch
+refuses for sharing a seed's name is refused with `ImproperlyConfigured`. The
+Validator's `ambient` is dispatch's base pool, every seed resolved once for the
+principal, so a [`FormValidator`](forms.md)'s `form_kwargs` naming a seed is
+handed it, and every seed resolves on each such bind, as on dispatch. A
+deactivated principal is refused with `PrincipalUnavailable` first, before the
+arguments are checked, as dispatch refuses one. Any registry counts, an empty one too, since the
+call's `request` and `view` are seeds of every pool dispatch builds. Without
+`pool_seeds=` it resolves no seed and checks every read as declared. The club
+page [above](#admitting-a-request-before-the-form) checks its form as the member types,
+bound with the club seed:
+
+```python
+--8<--
+docs/examples/dispatching.py:seeded_bind
+--8<--
+```
+
 ```python
 --8<--
 docs/examples/dispatching.py:bind
@@ -589,6 +610,18 @@ the spec and the mount's `pool_seeds` and refuses it, as one
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
   missing;
+- an array read with no `items` over a keyword its own seat annotates with an
+  element: `list[int]`, `tuple[int, ...]` or `Sequence[int]`, or one of those
+  `| None`. Such a read takes any element, so a selector annotated
+  `pks: list[int]` is handed a query string's strings, and the message says to
+  declare `items`, which it never derives from the annotation. An element of
+  `Any`, `object` or a type variable, a bare `list`, a fixed-length `tuple`,
+  an unannotated keyword, a keyword a seed fills and one a provider fills or
+  may fill - a typed provider's key, declinable or not, or any keyword of a
+  seat whose provider is untyped - are not refused, and neither is a hint that
+  does not resolve, such as a forward reference to a name not importable where
+  the callable is defined: it is resolved on its own, so it leaves the
+  callable's other keywords readable;
 - a service, selector or target selector whose signature cannot be read, such
   as a builtin type like `dict`: dispatch binds every callable's keywords from
   its signature, so every call reaching it fails. That seat is refused for

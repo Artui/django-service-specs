@@ -7,13 +7,16 @@ message came back.
 
 from __future__ import annotations
 
+import functools
 import inspect
 import re
-from collections.abc import Callable, Mapping
+import typing
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict, TypeVar, Union
 
 import pytest
+import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs import check_seeds as exported
@@ -31,6 +34,7 @@ from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import OPEN, PK, Titled, make_user
+from tests.pool.utils import passthrough
 from tests.specs.utils import Foreign
 
 pytestmark = pytest.mark.django_db
@@ -342,6 +346,260 @@ class TestAnOptionalReadTheCallableRequires:
         check_seeds(spec, pool_seeds=_SEEDED)
         # Without the seed it is the caller's optional read, and refused.
         assert _OPTIONAL in _refusal(spec)
+
+
+_NO_ITEMS = "with no items"
+# The words django-spec-rest's registration test matches, without DOTALL, so
+# the offenders and ``items`` must sit on one line of the message.
+_NAMES_ITEMS = r"\['pks'\].*items"
+_PKS = Parameter("pks", "array", required=True)
+_T = TypeVar("_T")
+
+
+def _annotated(annotation: Any, *, default: Any = inspect.Parameter.empty) -> Callable[..., Any]:
+    """A selector taking ``pks``, annotated afterwards, as a consumer may build one."""
+
+    def selector(*, pks: Any = default) -> Any:
+        return pks
+
+    selector.__annotations__["pks"] = annotation
+    return selector
+
+
+def _postponed(*, pks: Sequence[int]) -> Any:
+    """Annotated as a string, under this module's postponed annotations."""
+    return pks
+
+
+def _hidden_element(*, pks: list[Hidden]) -> Any:  # noqa: F821
+    return pks
+
+
+def _beside_a_hidden_hint(*, pks: list[int], other: Hidden = None) -> Any:  # noqa: F821
+    return pks
+
+
+def _positional_or_keyword(pks: Sequence[int]) -> Any:
+    return pks
+
+
+def _with_another(*, pks: Sequence[int], other: int) -> Any:
+    return pks
+
+
+class _ClassSeat:
+    def __init__(self, *, pks: Sequence[int]) -> None:
+        self.pks = pks
+
+
+class _CallableSeat:
+    def __call__(self, *, pks: Sequence[int]) -> Any:
+        return pks
+
+
+@dataclass
+class _CallableWithFields:
+    pks: list[int]
+
+    def __call__(self, *, pks: str = "") -> Any:
+        return pks
+
+
+class _FillsPks(TypedDict):
+    pks: list[int]
+
+
+def _fills_pks() -> _FillsPks:
+    return {"pks": [1]}
+
+
+class _MayFillPks(TypedDict):
+    pks: list[int] | UnsetType
+
+
+def _may_fill_pks() -> _MayFillPks:
+    return {"pks": UNSET}
+
+
+class TestAnArrayReadWithNoItems:
+    def test_dispatch_hands_the_callable_any_element(self) -> None:
+        handed: list[Any] = []
+
+        def service(*, pks: list[int]) -> None:
+            handed.append(pks)
+
+        dispatch(
+            _service(service, reads=Parameters.of(_PKS)),
+            principal=make_user("ada"),
+            arguments={"pks": ["1", "3"]},
+        )
+        assert handed == [["1", "3"]]
+
+    @pytest.mark.parametrize(
+        "annotation",
+        [
+            list[int],
+            Sequence[int],
+            tuple[int, ...],
+            list[int] | None,
+            Optional[list[int]],  # noqa: UP045 - the typing form, a distinct object up to 3.13
+            Union[None, Sequence[str]],  # noqa: UP007
+            list[int | None],
+        ],
+        ids=[
+            "list",
+            "Sequence",
+            "tuple",
+            "list-or-none",
+            "Optional",
+            "Union",
+            "nullable-element",
+        ],
+    )
+    def test_it_is_refused(self, annotation: Any) -> None:
+        refused = _refusal(_retrieve(_annotated(annotation), reads=Parameters.of(_PKS)))
+        assert re.search(_NAMES_ITEMS, refused)
+        assert f"SelectorSpec.selector reads the array(s) ['pks'] {_NO_ITEMS}" in refused
+        assert _NOTHING_FILLS not in refused
+        assert _OPTIONAL not in refused
+
+    def test_a_postponed_annotation_is_resolved(self) -> None:
+        assert _NO_ITEMS in _refusal(_retrieve(_postponed, reads=Parameters.of(_PKS)))
+
+    def test_a_hint_that_does_not_resolve_leaves_only_its_own_keyword_alone(self) -> None:
+        check_seeds(_retrieve(_hidden_element, reads=Parameters.of(_PKS)))
+        # ``other`` does not resolve either, and ``pks`` is read on its own.
+        assert _NO_ITEMS in _refusal(_retrieve(_beside_a_hidden_hint, reads=Parameters.of(_PKS)))
+
+    @pytest.mark.parametrize(
+        "annotation",
+        [
+            list[Any],
+            list[object],
+            list[typing_extensions.Any],
+            list,
+            Sequence[Any] | None,
+            tuple[int, int],
+            tuple[int],
+            typing.Sequence,
+            list[int] | tuple[int, ...],
+            int,
+            dict[str, int],
+            list[_T],
+        ],
+        ids=[
+            "list-of-any",
+            "list-of-object",
+            "list-of-typing-extensions-any",
+            "bare-list",
+            "Sequence-of-any-or-none",
+            "fixed-tuple",
+            "one-tuple",
+            "bare-typing-Sequence",
+            "two-sequences",
+            "not-a-sequence",
+            "mapping",
+            "type-variable",
+        ],
+    )
+    def test_what_it_cannot_misread_is_not(self, annotation: Any) -> None:
+        check_seeds(_retrieve(_annotated(annotation), reads=Parameters.of(_PKS)))
+
+    def test_an_unannotated_keyword_is_not(self) -> None:
+        check_seeds(_retrieve(lambda *, pks: pks, reads=Parameters.of(_PKS)))
+
+    def test_a_callable_object_s_fields_are_not_its_keywords(self) -> None:
+        # Dispatch binds ``__call__``'s ``pks``, a string, whatever the field says.
+        selector = _CallableWithFields(pks=[1])
+        check_seeds(_retrieve(selector, reads=Parameters.of(_PKS)))
+
+    @pytest.mark.parametrize(
+        "selector",
+        [
+            _positional_or_keyword,
+            functools.partial(_with_another, other=1),
+            _ClassSeat,
+            _CallableSeat(),
+            passthrough(_postponed),
+        ],
+        ids=["positional-or-keyword", "partial", "class", "callable-object", "decorated-elsewhere"],
+    )
+    def test_it_is_refused_on_every_kind_of_callable(self, selector: Callable[..., Any]) -> None:
+        """Each annotated ``Sequence[int]``, a name only this module's globals resolve."""
+        refused = _refusal(_retrieve(selector, reads=Parameters.of(_PKS)))
+        assert re.search(_NAMES_ITEMS, refused)
+
+    def test_a_declared_items_is_not(self) -> None:
+        read = Parameter("pks", "array", required=True, items="integer")
+        check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(read)))
+
+    def test_a_read_of_another_type_is_not(self) -> None:
+        read = Parameter("pks", "string", required=True)
+        check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(read)))
+
+    @pytest.mark.parametrize(
+        "provider",
+        [_fills_pks, _may_fill_pks, _untyped],
+        ids=["fills", "may-decline", "untyped"],
+    )
+    def test_a_keyword_a_provider_fills_or_may_fill_is_not(
+        self, provider: Callable[..., Any]
+    ) -> None:
+        check_seeds(_retrieve(_annotated(list[int]), reads=Parameters.of(_PKS), kwargs=provider))
+
+    def test_a_reflected_read_a_seed_fills_is_not(self) -> None:
+        def selector(*, tenant: list[int]) -> Any: ...
+
+        spec = _retrieve(
+            selector, reads=Parameters.of(Parameter("tenant", "array", reflected=True))
+        )
+        check_seeds(spec, pool_seeds=_SEEDED)
+        # Without the seed it is the caller's read, and refused.
+        assert "['tenant'] with no items" in _refusal(spec)
+
+    def test_a_positional_only_parameter_the_read_never_fills_is_not(self) -> None:
+        def positional(pks: list[int] = [], /, **_: Any) -> Any:  # noqa: B006
+            return pks
+
+        check_seeds(_retrieve(positional, reads=Parameters.of(_PKS)))
+
+    def test_on_a_target_selector_and_a_service_beside_a_validator(self) -> None:
+        def service(*, ids: list[int], data: Any) -> None: ...
+
+        spec = _service(
+            service,
+            reads=Parameters.of(Parameter("ids", "array", required=True)),
+            validator=DataclassValidator(_Titled),
+            instance_selector_spec=_retrieve(_annotated(Sequence[int]), reads=Parameters.of(_PKS)),
+        )
+        refused = _refusal(spec)
+        assert (
+            f"ServiceSpec.instance_selector_spec.selector reads the array(s) ['pks'] {_NO_ITEMS}"
+            in refused
+        )
+        assert f"ServiceSpec.service reads the array(s) ['ids'] {_NO_ITEMS}" in refused
+
+    def test_only_the_seat_the_read_fills_is_read(self) -> None:
+        """A service's read never reaches its target selector, whose keyword of that name is its own."""
+        spec = _service(
+            lambda *, pks: pks,
+            reads=Parameters.of(_PKS),
+            instance_selector_spec=_retrieve(_annotated(list[int], default=())),
+        )
+        check_seeds(spec)
+
+    def test_every_offender_is_named_in_one_sorted_list(self) -> None:
+        def selector(*, pks: list[int], ids: Sequence[int]) -> Any: ...
+
+        reads = Parameters.of(_PKS, Parameter("ids", "array", required=True))
+        assert f"['ids', 'pks'] {_NO_ITEMS}" in _refusal(_retrieve(selector, reads=reads))
+
+    def test_it_is_named_beside_another_refusal(self) -> None:
+        def selector(*, pks: list[int], missing: Any) -> Any: ...
+
+        refused = _refusal(_retrieve(selector, reads=Parameters.of(_PKS)))
+        assert f"['pks'] {_NO_ITEMS}" in refused
+        assert f"['missing'], {_NOTHING_FILLS}" in refused
 
 
 def test_a_validator_field_the_service_never_receives_is_left_to_unreceived_fields() -> None:

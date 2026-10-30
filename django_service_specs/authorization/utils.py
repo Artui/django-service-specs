@@ -5,7 +5,8 @@ class-level, object-level and scope-level checks cannot disagree about which
 check is handed the call's arguments, its context or a seed.
 ``seeds_for_checks`` is read by them and by dispatch, so a transport handing
 one ``pool_seeds`` resolves a check's seeds exactly as dispatch would, and
-``refuse_deactivated`` by them, dispatch and ``form_keywords``, so none of them
+``refuse_deactivated`` by them, dispatch, ``form_keywords`` and
+``bind_arguments`` handed ``pool_seeds``, so none of them
 runs a resolver for a principal dispatch refuses."""
 
 from __future__ import annotations

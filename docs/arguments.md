@@ -141,7 +141,10 @@ be otherwise, and an unknown key is still refused. Dispatch relaxes a
 parameter a provider is annotated to fill, so a transport checking a call as
 dispatch will calls
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
-rather than `check_arguments(partial=True)`.
+rather than `check_arguments(partial=True)`. Handed the `pool_seeds=` dispatch
+is handed, it also leaves out a `reflected` read a registered seed fills, as
+dispatch does, and refuses the caller's value for it under `REJECT`; handed
+none, it checks that read as declared.
 
 It runs before the Validator by design, so a Validator is only ever handed
 well-shaped arguments - and a test of a Validator fed a malformed argument

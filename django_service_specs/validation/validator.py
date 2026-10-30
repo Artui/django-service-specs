@@ -51,6 +51,22 @@ class Validator(abc.ABC):
     instance in ``__init__`` instead, and the spec reads the instance. The
     refusal at the call stays, for a Validator called directly.
 
+    ``unsendable`` names the fields the Validator requires that its
+    ``parameters()`` leaves out. No caller can send such a field, since a
+    transport offers only what ``parameters()`` declares, so a transport can
+    read it where it registers a spec and refuse the spec there rather than
+    on every call. Empty by default, which is the right answer for a Validator
+    that declares every field it requires, as the kernel's own adapters do. An
+    adapter whose library can require a field it does not declare, such as a
+    DRF serializer requiring one named like a seed, overrides it with a
+    property, which may read what the instance was built over. The default is
+    a property with no setter, so unlike ``supports_partial`` an instance of a
+    class that inherits it, or overrides it with a property, cannot assign it
+    (test_an_instance_cannot_assign_unsendable). A plain class attribute also
+    answers a reader, but the type checker does not hold its type, and an
+    instance can then assign it
+    (test_an_instance_can_assign_a_class_attribute_override).
+
     **Sync-only.** A Validator may query - a uniqueness check does - so dispatch
     runs it in the executor on the async path, and it must not be ``async def``.
 
@@ -87,6 +103,16 @@ class Validator(abc.ABC):
     # ``ClassVar``, so an instance may answer for itself: one adapter class
     # wraps libraries that differ here, and only ``__init__`` knows which.
     supports_partial: bool = True
+
+    @property
+    def unsendable(self) -> frozenset[str]:
+        """The required fields ``parameters()`` leaves out, which no caller can send.
+
+        Empty by default. A transport can refuse a spec over a Validator that
+        names any, where it registers the spec. An override is a property,
+        which may read what the instance was built over, or a class attribute.
+        """
+        return frozenset()
 
     @abc.abstractmethod
     def parameters(self) -> Parameters:

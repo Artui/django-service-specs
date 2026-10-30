@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -108,3 +109,64 @@ def test_by_default_a_value_one_row_binds_is_refused() -> None:
     assert str(refused.value).startswith(
         "The Validator bound the key(s) ['form'] for row 3 of a many call."
     )
+
+
+class _Bare(Validator):
+    """A Validator defining only what the ABC requires, as a third party's would."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of()
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+def test_a_validator_that_does_not_define_unsendable_answers_the_empty_default() -> None:
+    """The ABC carries it, so a reader needs no ``getattr`` fallback."""
+    assert _Bare().unsendable == frozenset()
+    assert type(_Bare().unsendable) is frozenset
+
+
+class _RequiresUser(_Bare):
+    """Requires a ``user`` field its ``parameters()`` leaves out."""
+
+    @property
+    def unsendable(self) -> frozenset[str]:
+        return frozenset({"user"})
+
+
+def test_a_property_override_is_what_a_reader_holding_the_spec_s_seat_sees() -> None:
+    spec = ServiceSpec(service=print, validator=_RequiresUser())
+
+    assert spec.validator is not None
+    assert spec.validator.unsendable == frozenset({"user"})
+
+
+class _RequiresUserByClass(_Bare):
+    unsendable = frozenset({"user"})
+
+
+def test_a_class_attribute_override_is_what_a_reader_sees() -> None:
+    seat: Validator = _RequiresUserByClass()
+
+    assert seat.unsendable == frozenset({"user"})
+
+
+@pytest.mark.parametrize("validator_class", [_Bare, _RequiresUser], ids=["inherited", "property"])
+def test_an_instance_cannot_assign_unsendable(validator_class: type[Validator]) -> None:
+    """A property with no setter, unlike ``supports_partial``: a subclass
+    answers for its instances, inherited or in a property override."""
+    validator: Any = validator_class()
+
+    with pytest.raises(AttributeError):
+        validator.unsendable = frozenset({"user"})
+
+
+def test_an_instance_can_assign_a_class_attribute_override() -> None:
+    """The caveat the docs give a plain class attribute: it is no descriptor,
+    so an instance assigning it shadows it."""
+    validator: Any = _RequiresUserByClass()
+
+    validator.unsendable = frozenset({"other"})
+
+    assert validator.unsendable == frozenset({"other"})

@@ -79,7 +79,8 @@ are known only then. A transport that knows the seeds of its mount refuses
 such a spec where it registers it, with
 [`check_seeds`][django_service_specs.dispatch.check_seeds.check_seeds], as it
 refuses an optional read over a selector keyword with no default, which a call
-leaving the read out is refused for.
+leaving the read out is refused for, and an array read with no `items` over a
+keyword annotated `list[int]`, which would hand it any element a caller sends.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.
@@ -601,7 +602,7 @@ name declared twice is refused either way.
 
 A [`Validator`][django_service_specs.validation.validator.Validator] turns
 JSON-like arguments into the values a service receives. The contract is two
-methods, and a third method and an attribute with defaults:
+methods, and two more methods, an attribute and a property with defaults:
 
 - `parameters()` declares what it takes, as `Parameters`. It must never query,
   because a transport describes a spec before any call.
@@ -641,6 +642,19 @@ methods, and a third method and an attribute with defaults:
   it as a class attribute; an adapter whose answer depends on what it was
   built over sets it on the instance in `__init__`, and the spec reads the
   instance.
+- `unsendable` names the fields the Validator requires that its
+  `parameters()` leaves out, as a `frozenset` of names. No caller can send
+  such a field, since a transport offers only what `parameters()` declares,
+  so a transport can read it where it registers a spec and refuse the spec
+  there rather than on every call. It is empty by default, and stays empty
+  on the dataclass, form and pydantic adapters, which declare every field
+  they require. An adapter whose library can require a field it does not
+  declare overrides it with a property, which may read what the instance was
+  built over. Unlike `supports_partial`, the default is a property with no
+  setter, so an instance of a class that inherits it, or overrides it with a
+  property, cannot assign it. A plain class attribute also answers a reader,
+  but the type checker does not hold its type to `frozenset[str]`, and an
+  instance can then assign it.
 
 Three things a newcomer may look for are absent on purpose:
 

@@ -26,6 +26,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   these msgids into its own with `msgcat` and `msgmerge`. Building a refusal
   with no message now calls `gettext`, so it needs Django's settings
   configured, as the shape check's messages already did.
+- **`Validator.unsendable`**, a property on the `Validator` contract returning
+  a `frozenset[str]`, empty by default: the fields the Validator requires that
+  its `parameters()` leaves out, which no caller can send. A transport can read
+  it where it registers a spec and refuse the spec there rather than on every
+  call, without a `getattr` fallback for a Validator that does not define it.
+  The dataclass, form and pydantic adapters keep the empty default, since each
+  declares every field it requires; an adapter whose library can require an
+  undeclared field overrides it with a property.
+- **`bind_arguments(..., pool_seeds=)`** binds as dispatch binds with the call's
+  seeds. A `reflected` read a registered seed fills is no longer demanded of the
+  caller, and the caller's value for it is refused as an unknown argument under
+  `REJECT` and dropped under `IGNORE`, as dispatch refuses it; a parameter
+  dispatch refuses for sharing a seed's name raises `ImproperlyConfigured`. The
+  Validator's `ambient` is dispatch's base pool, every seed resolved once for the
+  principal against `call_context`, so a `FormValidator` whose `form_kwargs`
+  names a registered seed is handed it, where it raised `TypeError` before, and a
+  page can check a form scoped by a seed before it posts. A deactivated principal
+  is refused with `PrincipalUnavailable` first, before the arguments are
+  checked, as dispatch refuses one. Any registry
+  passed counts, an empty one too, since the call's `request` and `view` are
+  seeds of every pool dispatch builds. Without `pool_seeds` the function is
+  unchanged: no seed resolves, every read is checked as declared and `ambient`
+  is empty. It still runs no `input_data` or `kwargs` provider, and neither
+  resolves the target nor authorizes.
+### Changed
+- **`check_seeds` refuses an array read with no `items` over a keyword
+  annotated with its element.** A `Parameter(..., "array")` that declares no
+  `items` takes any element, so a selector annotated `pks: list[int]` behind
+  one was handed a query string's strings, and on an HTTP route `?pks=1,3`
+  failed inside the selector. Where the keyword the read fills on its own seat
+  is annotated `list[X]`, `tuple[X, ...]` or `Sequence[X]`, or one of those
+  `| None`, and `X` is neither `Any`, `object` nor a type variable, the read is
+  now named in the
+  one `ImproperlyConfigured`, beside any other refusal, with a message that
+  says to declare `items`. Nothing is derived from the annotation. Each hint
+  is resolved on its own, so one that does not resolve leaves only its own
+  keyword alone; a bare `list`, an unannotated keyword, a keyword a seed fills
+  and one a provider fills or may fill, as the other refusals read a provider,
+  are not refused. Dispatch is unchanged: a spec nobody checks still runs.
 
 ## [0.20.0] — 2026-10-29
 

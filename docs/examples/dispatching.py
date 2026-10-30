@@ -231,6 +231,27 @@ def tenant_name(*, tenant: str) -> str:
 
 
 tenant_name_spec = ServiceSpec(service=tenant_name, permissions=[IsSignedIn()])
+
+
+def notes_by_pk(*, user: Any, pks: list[int]) -> QuerySet[Note]:
+    return Note.objects.filter(owner=user, pk__in=pks)
+
+
+# Refused: an array with no items takes any element, so a query string's
+# ``?pks=1,3`` would hand ``notes_by_pk`` the strings "1" and "3".
+any_pks_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_by_pk,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("pks", "array", required=True)),
+)
+# Registered: the declared element is what the shape check holds each one to.
+integer_pks_spec = SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=notes_by_pk,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("pks", "array", required=True, items="integer")),
+)
 # --8<-- [end:check_seeds]
 
 
@@ -370,6 +391,18 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
 
 
 # --8<-- [end:admit]
+
+
+# --8<-- [start:seeded_bind]
+def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
+    # A page checking the form as the member types, before it posts: bound as
+    # dispatch will bind it, so the form's __init__ gets the club seed.
+    pool_seeds = club_seeds(club)
+    authorize(club_note_spec, user, pool_seeds=pool_seeds)
+    return bind_arguments(club_note_spec, {"title": title}, principal=user, pool_seeds=pool_seeds)
+
+
+# --8<-- [end:seeded_bind]
 
 
 # --8<-- [start:resolve_target]

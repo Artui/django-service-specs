@@ -305,12 +305,15 @@ class FormValidator(Validator):
     neither for a create. It is the target itself, never the copy the form
     edits. ``user`` is the context's principal on every path, and
     ``progress`` is ``null_progress`` wherever the context carries no
-    reporter. In ``bind_arguments``, or with a
+    reporter. In ``bind_arguments`` handed ``pool_seeds``, it is handed
+    every seed of the registry, as on dispatch. In ``bind_arguments`` handed
+    none, or with a
     [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
     built by hand, the context holds no seeds, so a callable naming one
     gives it a default or meets Python's own ``TypeError``;
     [`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
-    is the path off dispatch that resolves the seeds it names. It is called on
+    is the path off dispatch for building the form itself, and resolves the
+    seeds it names. It is called on
     every ``validate()``, on the thread the call runs on, which under
     ``adispatch`` is the one its synchronous phases share, so it may query;
     on a ``many`` call that is once per row, so a query belongs in a seed,
