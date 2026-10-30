@@ -507,6 +507,18 @@ It runs no provider: a field an `input_data` provider would fill passes the
 shape check and, left out, is the Validator's to refuse; a read a `kwargs`
 provider would fill passes too.
 
+**Hand it the call's seeds** with `pool_seeds=`, the registry dispatch is
+handed, and it binds as dispatch binds with them. A `reflected` read a
+registered seed fills is not demanded of the caller, and the caller's value for
+it is refused under `REJECT` and dropped under `IGNORE`; a parameter dispatch
+refuses for sharing a seed's name is refused with `ImproperlyConfigured`. The
+Validator's `ambient` is dispatch's base pool, every seed resolved once for the
+principal, so a [`FormValidator`](forms.md)'s `form_kwargs` naming a seed is
+handed it. A deactivated principal is refused with `PrincipalUnavailable`
+before any seed resolves. Any registry counts, an empty one too, since the
+call's `request` and `view` are seeds of every pool dispatch builds. Without
+`pool_seeds=` it resolves no seed and checks every read as declared.
+
 ```python
 --8<--
 docs/examples/dispatching.py:bind

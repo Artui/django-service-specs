@@ -427,16 +427,10 @@ def open_call(
     # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it
     # for a field, which is outside the target's parameters).
     declared = spec.parameters()
-    seated, taken = split_seed_named(spec, declared, pool_seeds)
-    if parameters is None:
-        parameters = declared
-    if taken:
-        raise ImproperlyConfigured(seed_named_refusal(spec, taken, pool_seeds))
+    parameters = seat_seed_named(
+        spec, declared, declared if parameters is None else parameters, pool_seeds
+    )
     refuse_overlaid_parameters(spec, declared, overlay)
-    if seated:
-        # Out of the call's argument set, the narrowed one too, so the closed
-        # set refuses or drops a caller's value for it as for any seed's name.
-        parameters = Parameters.of(*(param for param in parameters if param.name not in seated))
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
     # Only the seeds a check names: another seed's resolver may read what an
     # anonymous caller lacks, and this runs before that caller is refused
@@ -470,13 +464,39 @@ def open_call(
     return checked, granted
 
 
+def seat_seed_named(
+    spec: ServiceSpec | SelectorSpec,
+    declared: Parameters,
+    parameters: Parameters,
+    pool_seeds: PoolSeeds,
+) -> Parameters:
+    """``parameters`` less the reads a registered seed fills, refusing a name no seed may share.
+
+    The rule ``open_call`` applies before it looks at the arguments, and
+    ``bind_arguments`` given ``pool_seeds`` applies before its shape check, so
+    the two answer one declaration alike. ``declared`` is the spec's whole
+    parameters, which ``split_seed_named`` reads; ``parameters`` is what is
+    checked, narrower for ``resolve_target``. A name ``split_seed_named``
+    refuses raises ``ImproperlyConfigured``; a ``reflected`` read it seats
+    leaves ``parameters``, so the closed set refuses or drops a caller's value
+    for it as for any seed's name.
+    """
+    seated, taken = split_seed_named(spec, declared, pool_seeds)
+    if taken:
+        raise ImproperlyConfigured(seed_named_refusal(spec, taken, pool_seeds))
+    if seated:
+        return Parameters.of(*(param for param in parameters if param.name not in seated))
+    return parameters
+
+
 def seed_named_refusal(
     spec: ServiceSpec | SelectorSpec, taken: frozenset[str], pool_seeds: PoolSeeds
 ) -> str:
     """Why ``spec`` is refused for declaring ``taken``, the second set ``split_seed_named`` returns.
 
-    One wording, read by ``open_call`` on every call and by ``check_seeds``
-    at registration, so a transport refusing the spec when it registers it
+    One wording, read through ``seat_seed_named`` by ``open_call`` on every
+    call and by ``bind_arguments`` given seeds, and by ``check_seeds`` at
+    registration, so a transport refusing the spec when it registers it
     says what dispatch would have said on its first call
     (test_a_read_a_registered_seed_occupies_is_refused_as_dispatch_refuses_it).
     """
@@ -557,9 +577,11 @@ def shape_check(
 
     One function for ``open_call``, ``resolve_target`` and ``bind_arguments``,
     so a transport that binds for itself relaxes what dispatch relaxes. The
-    one difference is the seeds: ``bind_arguments`` is handed none, so a
-    ``reflected`` read that a registered seed fills on dispatch is checked
-    there as declared, and a required one is demanded of the caller
+    seeds are not this function's: its caller hands it ``parameters`` less the
+    ``reflected`` reads a registered seed fills (``seat_seed_named``), as
+    ``open_call`` does and ``bind_arguments`` does when it is handed
+    ``pool_seeds``. Handed none, ``bind_arguments`` checks such a read as
+    declared, and a required one is demanded of the caller
     (test_bind_arguments_still_demands_a_required_reflected_read). Two things
     are relaxed:
 
@@ -1589,7 +1611,8 @@ def validate_arguments(
 
     ``ValidationContext.partial`` is the spec's ``partial``, and its
     ``ambient`` is ``ambient``: the call's base pool behind a read-only
-    proxy over its top level, whose values are the call's own, or empty for a caller with no seeds (``bind_arguments``).
+    proxy over its top level, whose values are the call's own, or empty for
+    ``bind_arguments`` handed no ``pool_seeds``.
     Its ``resolved`` is ``resolved``, the target under its pool name (see
     ``target_entry``), behind a read-only proxy of its own. Its
     ``call_context`` is ``call_context``, the call's own dict and never a
