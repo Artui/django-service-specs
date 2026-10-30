@@ -558,6 +558,49 @@ def test_a_reflected_read_named_request_is_the_call_s_with_any_registry(
 
 
 @REGISTRIES
+def test_an_unmarked_read_named_request_is_refused_with_any_registry(
+    seeds: PoolSeeds | None,
+) -> None:
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=selector,
+        reads=Parameters.of(Parameter("request", "string")),
+    )
+    if seeds is None:
+        assert bind_arguments(spec, {"request": "r"}, principal=PRINCIPAL) == {"request": "r"}
+        return
+    with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
+        bind_arguments(spec, {"request": "r"}, principal=PRINCIPAL, pool_seeds=seeds)
+
+
+@pytest.mark.django_db
+def test_the_validator_s_ambient_is_the_one_dispatch_hands_it() -> None:
+    bound, ran = Recording(), Recording()
+    bind_arguments(
+        ServiceSpec(service=service, validator=bound),
+        {"title": "t"},
+        principal=PRINCIPAL,
+        pool_seeds=TENANT_SEEDS,
+    )
+    dispatch(
+        ServiceSpec(service=service, permissions=[Unrestricted()], validator=ran),
+        principal=PRINCIPAL,
+        arguments={"title": "t"},
+        pool_seeds=TENANT_SEEDS,
+    )
+    ((_, off), (_, on)) = bound.calls + ran.calls
+    assert (
+        dict(off.ambient)
+        == dict(on.ambient)
+        == {
+            "user": PRINCIPAL,
+            "progress": null_progress,
+            "tenant": SEEDED,
+        }
+    )
+
+
+@REGISTRIES
 def test_the_validator_s_ambient_is_dispatch_s_with_any_registry(
     seeds: PoolSeeds | None,
 ) -> None:
