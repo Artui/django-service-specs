@@ -152,10 +152,21 @@ def test_a_class_attribute_override_is_what_a_reader_sees() -> None:
     assert seat.unsendable == frozenset({"user"})
 
 
-def test_an_instance_cannot_assign_unsendable() -> None:
+@pytest.mark.parametrize("validator_class", [_Bare, _RequiresUser], ids=["inherited", "property"])
+def test_an_instance_cannot_assign_unsendable(validator_class: type[Validator]) -> None:
     """A property with no setter, unlike ``supports_partial``: a subclass
-    answers for its instances, in a property or a class attribute."""
-    validator: Any = _Bare()
+    answers for its instances, inherited or in a property override."""
+    validator: Any = validator_class()
 
     with pytest.raises(AttributeError):
         validator.unsendable = frozenset({"user"})
+
+
+def test_an_instance_can_assign_a_class_attribute_override() -> None:
+    """The caveat the docs give a plain class attribute: it is no descriptor,
+    so an instance assigning it shadows it."""
+    validator: Any = _RequiresUserByClass()
+
+    validator.unsendable = frozenset({"other"})
+
+    assert validator.unsendable == frozenset({"other"})

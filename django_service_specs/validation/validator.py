@@ -59,11 +59,13 @@ class Validator(abc.ABC):
     that declares every field it requires, as the kernel's own adapters do. An
     adapter whose library can require a field it does not declare, such as a
     DRF serializer requiring one named like a seed, overrides it with a
-    property or a class attribute. The default is a property with no setter,
-    so unlike ``supports_partial`` an instance of a class that inherits it, or
-    overrides it with a property, cannot assign it
-    (test_an_instance_cannot_assign_unsendable): an answer that depends on
-    what the instance was built over is a property override reading that.
+    property, which may read what the instance was built over. The default is
+    a property with no setter, so unlike ``supports_partial`` an instance of a
+    class that inherits it, or overrides it with a property, cannot assign it
+    (test_an_instance_cannot_assign_unsendable). A plain class attribute also
+    answers a reader, but the type checker does not hold its type, and an
+    instance can then assign it
+    (test_an_instance_can_assign_a_class_attribute_override).
 
     **Sync-only.** A Validator may query - a uniqueness check does - so dispatch
     runs it in the executor on the async path, and it must not be ``async def``.
