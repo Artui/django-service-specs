@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Settings-free, so marking the msgid at import reads no setting.
+from django.utils.translation.trans_null import gettext_noop
+
 from django_service_specs.services.service_conflict import ServiceConflict
 
 
@@ -31,7 +34,7 @@ class ActionUnavailable(ServiceConflict):
     or ``ServiceError`` handler, or the subclass check swallows it.
     """
 
-    default_message: str = "This action is not available right now."
+    default_message: str = gettext_noop("This action is not available right now.")
 
     def __init__(self, message: str | None = None, *, code: str) -> None:
         super().__init__(message)

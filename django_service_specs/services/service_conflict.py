@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Settings-free, so marking the msgid at import reads no setting.
+from django.utils.translation.trans_null import gettext_noop
+
 from django_service_specs.services.service_error import ServiceError
 
 
@@ -23,4 +26,4 @@ class ServiceConflict(ServiceError):
     check swallows it.
     """
 
-    default_message: str = "Conflict."
+    default_message: str = gettext_noop("Conflict.")

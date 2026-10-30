@@ -62,17 +62,63 @@ and agent tools.
 pip install django-service-specs
 ```
 
-The package has no models and needs no entry in `INSTALLED_APPS`. A principal
-is a user of `django.contrib.auth`, and a generic-relation write needs
-`django.contrib.contenttypes`. Listing `"django_service_specs"` there is
-optional and adds nothing: the system check reporting every spec a management
-command serves that [authorizes nothing](registry.md#open-specs-reported) is
-django-spec-cli's.
+The package has no models and runs with no entry in `INSTALLED_APPS`. A
+principal is a user of `django.contrib.auth`, and a generic-relation write needs
+`django.contrib.contenttypes`. List `"django_service_specs"` there for its
+[translations](#translations) to load; it registers nothing else, and the system
+check reporting every spec a management command serves that
+[authorizes nothing](registry.md#open-specs-reported) is django-spec-cli's.
+
+```python
+INSTALLED_APPS = [
+    "django.contrib.contenttypes",
+    "django.contrib.auth",
+    "django_service_specs",
+    # ...
+]
+```
 
 | | Minimum |
 | --- | --- |
 | Python | 3.10 |
 | Django | 4.2 |
+
+## Translations
+
+A refusal reads in the language active where it is raised. Each refusal type's
+`default_message` is a msgid, looked up with `gettext` each time a refusal is
+built with no message of its own, so nothing is fixed at import; a message the
+caller passes, `NotPermitted("Ask the owner.")`, is shown as given. Where DRF has the same message the msgid is DRF's (`Not found.`, and
+its `ListField`'s two length messages), so a project with DRF installed keeps
+DRF's translation of those three.
+
+The package ships its source catalog,
+`django_service_specs/locale/en/LC_MESSAGES/django.po`: every msgid it marks,
+untranslated, which is what a contributed language starts from. It ships no
+translated language. Django loads a catalog only from an app in
+`INSTALLED_APPS` or from a directory in `LOCALE_PATHS`, so a language
+compiled beside that file loads once `"django_service_specs"` is listed.
+
+### Keeping one catalog
+
+A project that keeps every translation in its own catalog, under
+`LOCALE_PATHS`, cannot have `makemessages` collect these msgids: it reads the
+project's source and never `site-packages`, and it marks each msgid it did not
+find there obsolete. So combine the template it writes with the package's
+catalog, and merge that into each language, after every `makemessages` run and
+every upgrade of this package:
+
+```bash
+KERNEL_PO="$(python -c 'import importlib.util, pathlib; print(pathlib.Path(importlib.util.find_spec("django_service_specs").origin).parent / "locale/en/LC_MESSAGES/django.po")')"
+django-admin makemessages --locale de --keep-pot
+msgcat --use-first locale/django.pot "$KERNEL_PO" --output-file locale/django.pot
+msgmerge --update --backup=none locale/de/LC_MESSAGES/django.po locale/django.pot
+django-admin compilemessages --locale de
+```
+
+`msgmerge` brings back each translation the `makemessages` run had marked
+obsolete, so a msgid translated once stays translated. `--use-first` keeps the
+project's own header and, for a msgid both catalogs hold, the project's entry.
 
 ## Quickstart
 
