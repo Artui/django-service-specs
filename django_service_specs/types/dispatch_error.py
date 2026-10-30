@@ -6,12 +6,7 @@ from typing import ClassVar
 
 from django.utils.translation import gettext
 
-# The settings-free marker, the same identity ``global_settings`` defines for
-# itself: ``django.utils.translation.gettext_noop`` reads ``USE_I18N`` when it
-# is called, and it is called here at import, so importing the package would
-# need settings configured first. The marker only names a msgid for
-# ``makemessages``; the lookup is ``gettext``, made when a refusal is built.
-from django.utils.translation.trans_null import gettext_noop
+from django_service_specs.types.utils import gettext_noop
 
 
 class DispatchError(Exception):

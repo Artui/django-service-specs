@@ -4,10 +4,8 @@ from __future__ import annotations
 
 from typing import ClassVar
 
-# Settings-free, so marking the msgid at import reads no setting.
-from django.utils.translation.trans_null import gettext_noop
-
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.utils import gettext_noop
 
 
 class PrincipalUnavailable(DispatchError):

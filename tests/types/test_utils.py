@@ -22,6 +22,7 @@ from django_service_specs.types.utils import (
     PARAMETER_SCHEMA_KEYWORDS,
     PER_CALL_POOL_NAMES,
     affordance_alias,
+    gettext_noop,
     is_json_native,
     is_row_condition,
 )
@@ -115,3 +116,10 @@ class TestSchemaKeywords:
     def test_neither_table_can_be_changed_by_a_reader(self) -> None:
         with pytest.raises(TypeError):
             PARAMETER_SCHEMA_KEYWORDS["pattern"] = ("format",)  # ty: ignore[invalid-assignment]
+
+
+def test_gettext_noop_returns_the_msgid_unchanged_and_reads_no_setting() -> None:
+    # Unlike Django's public marker, which reads USE_I18N when called; the
+    # fresh-interpreter half is test_marking_a_msgid_reads_no_setting.
+    message = "Not found."
+    assert gettext_noop(message) is message

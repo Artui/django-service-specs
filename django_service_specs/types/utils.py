@@ -6,8 +6,10 @@ They live here rather than in ``affordances/`` for the reason ``types/`` exists.
 to load pull in the phase that imports it back, half-initialized. The schema
 keywords and ``is_json_native`` are here for the same reason: ``Parameter`` and
 ``OutputField`` read them at construction, and ``schema/`` imports both
-declarations, so a home there would be an import ring. Nothing here imports
-anything else in the package.
+declarations, so a home there would be an import ring. ``gettext_noop`` is
+here because every refusal marks its default message with it, and the base of
+the dispatch refusals lives in ``types/``. Nothing here imports anything else in
+the package.
 """
 
 from __future__ import annotations
@@ -15,6 +17,23 @@ from __future__ import annotations
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Final
+
+
+def gettext_noop(message: str) -> str:
+    """Mark ``message`` as a msgid and return it unchanged.
+
+    Not ``django.utils.translation.gettext_noop``: that one reads ``USE_I18N``
+    each time it is called, and a refusal's ``default_message`` is marked when
+    its class is defined, so with it the package could not be imported before a
+    project's settings are configured. Django's own ``global_settings`` defines
+    an identity of this name for the same reason. ``makemessages`` passes
+    ``--keyword=gettext_noop`` to xgettext, which matches the call by its name
+    and never by where it was imported from, so this one marks a msgid for the
+    catalog just as Django's does. The lookup is ``gettext``, made when a
+    refusal is built (test_marking_a_msgid_reads_no_setting).
+    """
+    return message
+
 
 SHAPES: Final = "shapes"
 """The pool name the call's shape values travel under: ``PresentationContext.shapes``."""

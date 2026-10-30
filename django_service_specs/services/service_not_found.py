@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-# Settings-free, so marking the msgid at import reads no setting.
-from django.utils.translation.trans_null import gettext_noop
-
 from django_service_specs.services.service_error import ServiceError
+from django_service_specs.types.utils import gettext_noop
 
 
 class ServiceNotFound(ServiceError):

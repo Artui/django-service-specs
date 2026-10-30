@@ -5,11 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, ClassVar
 
-# Settings-free, so marking the msgid at import reads no setting.
-from django.utils.translation.trans_null import gettext_noop
-
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.types.dispatch_error import DispatchError
+from django_service_specs.types.utils import gettext_noop
 
 
 class InvalidArguments(DispatchError):
