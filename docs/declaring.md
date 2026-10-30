@@ -641,6 +641,17 @@ methods, and a third method and an attribute with defaults:
   it as a class attribute; an adapter whose answer depends on what it was
   built over sets it on the instance in `__init__`, and the spec reads the
   instance.
+- `unsendable` names the fields the Validator requires that its
+  `parameters()` leaves out, as a `frozenset` of names. No caller can send
+  such a field, since a transport offers only what `parameters()` declares,
+  so a transport can read it where it registers a spec and refuse the spec
+  there rather than on every call. It is empty by default, and stays empty
+  on the dataclass, form and pydantic adapters, which declare every field
+  they require. An adapter whose library can require a field it does not
+  declare overrides it with a property or a class attribute. Unlike
+  `supports_partial`, the default is a property with no setter, so an
+  instance cannot assign it; an answer that depends on what the instance was
+  built over is a property override reading that.
 
 Three things a newcomer may look for are absent on purpose:
 

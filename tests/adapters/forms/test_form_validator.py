@@ -2313,3 +2313,12 @@ def test_form_kwargs_naming_the_shapes_is_handed_no_seed(entry: Callable[..., An
     assert result.value == "t"
     assert dict(result.context.shapes) == {"query": "name"}
     assert handed == [_NOT_HANDED]
+
+
+def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None:
+    validator = FormValidator(Everything)
+
+    required = validator.parameters().get("count")
+    assert required is not None
+    assert required.required
+    assert validator.unsendable == frozenset()

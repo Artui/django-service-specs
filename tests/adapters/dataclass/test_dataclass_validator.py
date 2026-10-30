@@ -819,3 +819,12 @@ class TestRefusalCodes:
                 raise raised
 
         assert coded(_refusal(Checked, {"title": "t"})) == {"non_field_errors": expected}
+
+
+def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None:
+    validator = DataclassValidator(Address)
+
+    required = validator.parameters().get("city")
+    assert required is not None
+    assert required.required
+    assert validator.unsendable == frozenset()

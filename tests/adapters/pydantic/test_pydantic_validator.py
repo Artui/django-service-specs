@@ -818,3 +818,12 @@ def test_its_validators_read_the_call_context_beside_the_principal_and_the_targe
         ValidationContext(principal="ada", target=target, call_context=call_context),
     )
     assert call_context == {"seen": ["New"]}
+
+
+def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None:
+    validator = PydanticValidator(_Titled)
+
+    required = validator.parameters().get("title")
+    assert required is not None
+    assert required.required
+    assert validator.unsendable == frozenset()
