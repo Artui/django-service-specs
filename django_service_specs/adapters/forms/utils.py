@@ -28,8 +28,9 @@ def extra_keywords(
 
     Its pool is the context's ``ambient`` over ``null_progress`` as
     ``progress``, so the name is in every pool, as ``base_pool`` promises,
-    with ``ambient`` empty in ``bind_arguments`` and in a context built
-    without seeds, and holding the seeds it resolved under ``form_keywords``
+    with ``ambient`` empty in ``bind_arguments`` handed no ``pool_seeds`` and
+    in a context built without seeds, holding every seed under
+    ``bind_arguments`` handed them, and the seeds it resolved under ``form_keywords``
     (test_only_the_seed_form_kwargs_names_resolves). ``user`` is laid over
     ``ambient``, so the principal is ``user`` on every path, the two being
     one object on dispatch, and the context's ``resolved`` last: its names

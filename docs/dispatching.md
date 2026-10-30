@@ -514,8 +514,9 @@ it is refused under `REJECT` and dropped under `IGNORE`; a parameter dispatch
 refuses for sharing a seed's name is refused with `ImproperlyConfigured`. The
 Validator's `ambient` is dispatch's base pool, every seed resolved once for the
 principal, so a [`FormValidator`](forms.md)'s `form_kwargs` naming a seed is
-handed it. A deactivated principal is refused with `PrincipalUnavailable`
-before any seed resolves. Any registry counts, an empty one too, since the
+handed it, and every seed resolves on each such bind, as on dispatch. A
+deactivated principal is refused with `PrincipalUnavailable` first, before the
+arguments are checked, as dispatch refuses one. Any registry counts, an empty one too, since the
 call's `request` and `view` are seeds of every pool dispatch builds. Without
 `pool_seeds=` it resolves no seed and checks every read as declared.
 

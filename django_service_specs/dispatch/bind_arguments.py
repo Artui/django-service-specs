@@ -102,10 +102,14 @@ def bind_arguments(
     field named like a registered seed is validated and returned among the
     values, as any field is, and the seed keeps its own value in ``ambient``
     (test_a_validator_field_named_like_a_registered_seed_is_validated_and_returned).
-    A deactivated principal resolves no seed: it is refused with
-    ``PrincipalUnavailable`` before the first resolver runs, by the rule
-    dispatch refuses one by
-    (test_a_deactivated_principal_resolves_no_seed). Which values a service's
+    Every seed resolves on each bind of a spec with a Validator, as on
+    dispatch, whether or not the Validator reads one, so a caller binding
+    often, a page re-checking a form on each edit, pays each resolver per bind.
+    A deactivated principal is refused with ``PrincipalUnavailable`` first,
+    as dispatch refuses one: before the seat refusal and the shape check, for
+    every kind of spec and any registry, so no seed resolves for it
+    (test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuses_it,
+    test_a_deactivated_principal_resolves_no_seed). Which values a service's
     pool spreads is dispatch's question.
 
     **Any registry is dispatch's, an empty one too**, so the call's
@@ -116,7 +120,8 @@ def bind_arguments(
     them: a ``reflected`` read is checked as declared, so a required one is
     demanded of the caller
     (test_bind_arguments_still_demands_a_required_reflected_read), no seed is
-    resolved and the Validator's ``ambient`` is empty
+    resolved, no principal is refused for being deactivated, and the
+    Validator's ``ambient`` is empty
     (test_the_validator_s_ambient_is_dispatch_s_with_any_registry).
 
     **It does not resolve or authorize.** Dispatch runs class-level
@@ -142,6 +147,8 @@ def bind_arguments(
     spec = kernel_spec(spec)
     parameters = spec.parameters()
     if pool_seeds is not None:
+        # First, as dispatch refuses one, so no resolver runs for it below.
+        refuse_deactivated(principal)
         parameters = seat_seed_named(spec, parameters, parameters, pool_seeds)
     checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
     if isinstance(spec, SelectorSpec):
@@ -152,7 +159,6 @@ def bind_arguments(
     context = {} if call_context is None else call_context
     ambient: dict[str, Any] = {}
     if pool_seeds is not None:
-        refuse_deactivated(principal)
         ambient = seeded_base(
             principal, progress=None, pool_seeds=pool_seeds, early={}, call_context=context
         )

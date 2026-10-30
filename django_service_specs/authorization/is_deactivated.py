@@ -18,8 +18,9 @@ def is_deactivated(principal: Any) -> bool:
     the principal it was handed, first and whether or not a ``Grant`` came with
     it; ``resolve_principal``, refusing the row an identifier named; and, ahead
     of the first seed resolver, the ``authorize`` functions handed
-    ``pool_seeds`` and ``form_keywords``, which refuse as dispatch does. Those
-    three read it through ``refuse_deactivated`` in ``authorization/utils.py``.
+    ``pool_seeds`` and ``form_keywords``, which refuse as dispatch does; and
+    ``bind_arguments`` handed ``pool_seeds``, first, as dispatch. Those four
+    read it through ``refuse_deactivated`` in ``authorization/utils.py``.
     It is public
     so that a transport in a distribution of its own refuses exactly the
     principals dispatch refuses, by calling this rather than restating it, as

@@ -651,3 +651,35 @@ def test_a_deactivated_principal_resolves_no_seed(seeds: PoolSeeds | None) -> No
         bind_arguments(spec, {"title": "t"}, principal=DORMANT, pool_seeds=recording)
     assert resolved == []
     assert validator.calls == []
+
+
+def _kind(kind: str) -> ServiceSpec | SelectorSpec:
+    """A spec of each kind, every one taking a string ``title``."""
+    title = Parameters.of(Parameter("title", "string", required=True))
+    if kind == "selector-spec":
+        return SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=title)
+    if kind == "service-no-validator":
+        return ServiceSpec(service=service, reads=title)
+    return ServiceSpec(service=service, validator=Recording())
+
+
+KINDS = pytest.mark.parametrize("kind", ["selector-spec", "service-no-validator", "validator"])
+
+
+@KINDS
+@REGISTRIES
+def test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuses_it(
+    seeds: PoolSeeds | None, kind: str
+) -> None:
+    spec = _kind(kind)
+    malformed = {"title": 3}
+    if seeds is None:
+        # As before: no deactivation check, so the shape check answers, and a
+        # well-shaped call binds.
+        with pytest.raises(InvalidArguments):
+            bind_arguments(spec, malformed, principal=DORMANT)
+        bind_arguments(spec, {"title": "t"}, principal=DORMANT)
+        return
+    # Before the shape check, which would refuse the malformed title.
+    with pytest.raises(PrincipalUnavailable):
+        bind_arguments(spec, malformed, principal=DORMANT, pool_seeds=seeds)

@@ -17,7 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   principal against `call_context`, so a `FormValidator` whose `form_kwargs`
   names a registered seed is handed it, where it raised `TypeError` before, and a
   page can check a form scoped by a seed before it posts. A deactivated principal
-  is refused with `PrincipalUnavailable` before any seed resolves. Any registry
+  is refused with `PrincipalUnavailable` first, before the arguments are
+  checked, as dispatch refuses one. Any registry
   passed counts, an empty one too, since the call's `request` and `view` are
   seeds of every pool dispatch builds. Without `pool_seeds` the function is
   unchanged: no seed resolves, every read is checked as declared and `ambient`
