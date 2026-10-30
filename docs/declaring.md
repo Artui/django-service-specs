@@ -79,7 +79,8 @@ are known only then. A transport that knows the seeds of its mount refuses
 such a spec where it registers it, with
 [`check_seeds`][django_service_specs.dispatch.check_seeds.check_seeds], as it
 refuses an optional read over a selector keyword with no default, which a call
-leaving the read out is refused for.
+leaving the read out is refused for, and an array read with no `items` over a
+keyword annotated `list[int]`, which would hand it any element a caller sends.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.

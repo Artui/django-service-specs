@@ -610,6 +610,18 @@ the spec and the mount's `pool_seeds` and refuses it, as one
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
   missing;
+- an array read with no `items` over a keyword its own seat annotates with an
+  element: `list[int]`, `tuple[int, ...]` or `Sequence[int]`, or one of those
+  `| None`. Such a read takes any element, so a selector annotated
+  `pks: list[int]` is handed a query string's strings, and the message says to
+  declare `items`, which it never derives from the annotation. An element of
+  `Any`, `object` or a type variable, a bare `list`, a fixed-length `tuple`,
+  an unannotated keyword, a keyword a seed fills and one a provider fills or
+  may fill - a typed provider's key, declinable or not, or any keyword of a
+  seat whose provider is untyped - are not refused, and neither is a hint that
+  does not resolve, such as a forward reference to a name not importable where
+  the callable is defined: it is resolved on its own, so it leaves the
+  callable's other keywords readable;
 - a service, selector or target selector whose signature cannot be read, such
   as a builtin type like `dict`: dispatch binds every callable's keywords from
   its signature, so every call reaching it fails. That seat is refused for

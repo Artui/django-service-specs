@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import functools
 import inspect
-from collections.abc import Callable
+import types
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Final
+from typing import Any, Final, TypeVar, Union, get_args, get_origin
 
+import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
+from typing_extensions import get_type_hints
 
 from django_service_specs.dispatch.utils import (
     COLLECTION_SOURCE,
@@ -26,9 +30,14 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.types.provider_keys import ProviderKeys
 from django_service_specs.types.unset import UNSET
 
 _SERVICE_SOURCE: Final = "ServiceSpec.service"
+_SEQUENCES: Final = (list, tuple, Sequence)
+# ``typing_extensions.Any`` is its own object before Python 3.11.
+_ANY_ELEMENT: Final = (None, Any, typing_extensions.Any, object)
+_BY_KEYWORD: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 
 
 def check_seeds(
@@ -36,12 +45,14 @@ def check_seeds(
 ) -> None:
     """Refuse a declaration that cannot hold as written on a mount registering ``pool_seeds``.
 
-    Four of them, below: a parameter a seed or the call's own value would
+    Five of them, below: a parameter a seed or the call's own value would
     meet, a positional-only parameter dispatch cannot pass, a keyword nothing
-    fills, and an optional read over a keyword that requires it. The first
-    fails every call, the second and third every call that reaches the
-    callable, and the fourth every call leaving the read out, which the
-    declaration says a caller may. Each is decided by the spec and the
+    fills, an optional read over a keyword that requires it, and an array
+    read with no ``items`` over a keyword annotated with its element. The
+    first fails every call, the second and third every call that reaches the
+    callable, the fourth every call leaving the read out, which the
+    declaration says a caller may, and the fifth hands the callable any
+    element a caller sends. Each is decided by the spec and the
     mount's registered seeds alone, so a transport registering a kernel spec
     can refuse it where it registers it rather than list a tool or a route
     whose calls fail in a way the declaration already settled. The spec does
@@ -79,11 +90,25 @@ def check_seeds(
        sending it runs, and one leaving it out is refused as missing
        (``call_keywords``), so a caller reading the declaration is told the
        read is optional and refused for omitting it.
+    5. **An array read with no ``items`` over a keyword annotated with its
+       element**: a read of ``type="array"`` declaring no ``items``, over
+       the keyword it fills on its own seat, annotated ``list[X]``,
+       ``tuple[X, ...]`` or ``Sequence[X]``, or one of those ``| None``,
+       where ``X`` is neither ``Any``, ``object`` nor a type variable. Such
+       a read takes any
+       element, so a callable annotated ``pks: list[int]`` is handed a
+       query string's strings, and the message says to declare ``items``.
+       It derives none from the annotation: a signature is not a
+       declaration. As with the third and fourth, it never guesses: a
+       keyword a provider fills or may fill is not one - a typed
+       provider's key, declinable or not, and any keyword of a seat whose
+       provider is untyped - and nor is a keyword a seed fills, as a
+       ``reflected`` read's.
 
     **A callable whose signature cannot be read** is refused too, ahead of
     these for its seat: a service, selector or target selector such as a
     builtin type like ``dict``, which dispatch cannot bind a keyword to and so
-    fails on for every call reaching it. The second to fourth need that
+    fails on for every call reaching it. The second to fifth need that
     signature, so such a seat is answered by this refusal alone, and the
     other seats are still checked.
 
@@ -93,7 +118,12 @@ def check_seeds(
 
     **What it cannot see, and so never refuses.** A provider whose return
     says nothing about its keys may fill any keyword in its seat, so that
-    seat's keywords are left to dispatch (the third and fourth). A
+    seat's keywords are left to dispatch (the third and fourth). An
+    annotation that does not resolve, as a forward reference to a name not
+    importable where the callable was defined, is not read, and leaves
+    alone only its own keyword (the fifth); so is a bare ``list``, an element
+    of ``Any`` or ``object``, a fixed-length ``tuple``, a union of two
+    sequences and an unannotated keyword. A
     Validator may return a value it does not declare, or bind one, so a
     service beside a Validator is not judged by the third and fourth either
     (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
@@ -106,7 +136,7 @@ def check_seeds(
     it compiles to.
 
     Raises:
-        ImproperlyConfigured: any of the four, or a callable whose
+        ImproperlyConfigured: any of the five, or a callable whose
             signature cannot be read, every one found.
     """
     spec = kernel_spec(spec)
@@ -165,13 +195,13 @@ def _seats(spec: ServiceSpec | SelectorSpec) -> list[_Seat]:
 
 
 def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
-    """The second, third and fourth refusals, for one seat, or the one that precedes them."""
+    """The second to fifth refusals, for one seat, or the one that precedes them."""
     try:
         signature = inspect.signature(seat.fn)
     except (ValueError, TypeError):
         # A callable with no signature to read - a builtin type such as
         # ``dict``, or one whose ``__signature__`` is no ``Signature`` - is
-        # refused by this and answers none of the three below, which all read
+        # refused by this and answers none of the four below, which all read
         # that signature (``required_keywords`` reads it again, and is never
         # reached). Dispatch reads it too, so every call reaching the seat
         # fails with the same error. Returning, not raising, leaves the other
@@ -204,6 +234,13 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
             "each one a keyword, or give it a default."
         )
     keys = provider_keys(seat.provider)
+    untyped = _untyped_elements(seat, signature, keys, filled)
+    if untyped:
+        problems.append(
+            f"{seat.label} reads the array(s) {untyped} with no items into keywords annotated "
+            "with their element type, so each is handed any element a caller sends, such as a "
+            "query string's strings. Declare each one's items."
+        )
     # A provider that says nothing about its keys may fill any of them
     # (test_a_keyword_something_fills_is_not's ``untyped`` case), and a
     # Validator may return or bind a value it never declares
@@ -234,3 +271,124 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
             "Declare the read required, or give the keyword a default."
         )
     return problems
+
+
+def _untyped_elements(
+    seat: _Seat, signature: inspect.Signature, keys: ProviderKeys | None, seeded: frozenset[str]
+) -> list[str]:
+    """The fifth refusal's offenders on one seat: its array reads with no ``items`` over a keyword annotated with its element.
+
+    Each read is one only when every condition holds, and each is held by a
+    test that fails without it:
+
+    - an array read (test_a_read_of_another_type_is_not);
+    - declaring no ``items`` (test_a_declared_items_is_not);
+    - on a seat whose provider names its keys, since an untyped one may fill
+      any (the ``untyped`` case of
+      test_a_keyword_a_provider_fills_or_may_fill_is_not);
+    - over a keyword no seed fills (test_a_reflected_read_a_seed_fills_is_not)
+      and the provider neither fills nor may decline, as the third and fourth
+      read a typed provider's keys (its ``fills`` and ``may-decline`` cases);
+    - that the seat's callable takes by keyword, keyword-only or not (the
+      ``positional-or-keyword`` case of test_it_is_refused_on_every_kind_of_callable),
+      and never positional-only
+      (test_a_positional_only_parameter_the_read_never_fills_is_not), and
+      only on the read's own seat
+      (test_only_the_seat_the_read_fills_is_read);
+    - annotated with a parametrised sequence (``_element``) whose element is
+      neither ``Any``, as ``typing`` or ``typing_extensions`` spells it, nor
+      ``object`` (the ``list-of-any``, ``list-of-typing-extensions-any`` and
+      ``list-of-object`` cases of test_what_it_cannot_misread_is_not; the two
+      spellings of ``Any`` are one object from Python 3.11, so each of the
+      first two holds its own on 3.10 alone), nor a type variable, whatever
+      it stands for being no declaration (its ``type-variable`` case).
+    """
+    if keys is None:
+        return []
+    filled_by_provider = keys.filled | keys.declinable
+    # The annotation is the signature's: what dispatch binds the keyword by,
+    # never a callable object's class fields
+    # (test_a_callable_object_s_fields_are_not_its_keywords).
+    taken = {
+        name: param.annotation
+        for name, param in signature.parameters.items()
+        if param.kind in _BY_KEYWORD
+    }
+    candidates = [
+        param.name
+        for param in seat.reads
+        if param.type == "array"
+        and param.items is None
+        and param.name in taken
+        and param.name not in seeded | filled_by_provider
+    ]
+    namespace = _namespace(seat.fn)
+    elements = {name: _element(_hint(taken[name], namespace)) for name in candidates}
+    return sorted(
+        name
+        for name, element in elements.items()
+        if element not in _ANY_ELEMENT and not isinstance(element, TypeVar)
+    )
+
+
+def _namespace(fn: Callable[..., Any]) -> dict[str, Any]:
+    """The globals of the function ``inspect.signature`` reads ``fn``'s parameters off.
+
+    Where a postponed annotation is resolved, so a name the callable's own
+    module imports resolves: a partial's function, a class's ``__init__``, a
+    callable object's ``__call__`` (the ``partial``, ``class`` and
+    ``callable-object`` cases of test_it_is_refused_on_every_kind_of_callable),
+    and under a decorator the function it wraps rather than the wrapper, whose
+    globals are the decorator's module (``decorated-elsewhere``). Something
+    with no globals answers none, so its postponed annotations do not resolve.
+    """
+    while isinstance(fn, functools.partial):
+        fn = fn.func
+    if isinstance(fn, type):
+        fn = fn.__init__
+    elif not inspect.isroutine(fn):
+        fn = type(fn).__call__
+    return getattr(inspect.unwrap(fn), "__globals__", {})
+
+
+def _hint(annotation: Any, namespace: dict[str, Any]) -> Any:
+    """``annotation`` evaluated as ``get_type_hints`` evaluates one, or ``None`` if it does not resolve.
+
+    Resolved on its own rather than with the rest of the callable's, which
+    ``get_type_hints`` resolves all at once, so a hint that does not resolve
+    on another keyword leaves this one readable
+    (test_a_hint_that_does_not_resolve_leaves_only_its_own_keyword_alone).
+    An unannotated keyword's ``inspect.Parameter.empty`` reads as itself,
+    which is no sequence (test_an_unannotated_keyword_is_not).
+    """
+    try:
+        holder = types.SimpleNamespace(__annotations__={"value": annotation})
+        return get_type_hints(holder, globalns=namespace)["value"]
+    except Exception:
+        # A forward reference to a name not importable here, or a string
+        # that is no expression: the check never guesses at it.
+        return None
+
+
+def _element(hint: Any) -> Any:
+    """The element of ``hint`` if it is a parametrised sequence, or one ``| None``; ``None`` otherwise.
+
+    Each condition is held by a case of test_it_is_refused or
+    test_what_it_cannot_misread_is_not. ``typing.Union`` and
+    ``types.UnionType`` are one object from Python 3.14, so the two are one
+    membership test rather than two branches, held on Python 3.10 by
+    ``Optional`` and ``list-or-none``. A union of two sequences answers
+    ``None`` (``two-sequences``), as does a sequence with no parameters
+    (``bare-typing-Sequence``) and a tuple of fixed length (``fixed-tuple``
+    for the ``Ellipsis``, ``one-tuple`` for the length).
+    """
+    if get_origin(hint) in (Union, types.UnionType):
+        arms = [arm for arm in get_args(hint) if arm is not type(None)]
+        hint = arms[0] if len(arms) == 1 else None
+    origin, args = get_origin(hint), get_args(hint)
+    if origin not in _SEQUENCES or not args:
+        return None
+    if origin is tuple:
+        # Only ``tuple[X, ...]`` is a sequence of one element type.
+        return args[0] if len(args) == 2 and args[1] is Ellipsis else None
+    return args[0]
