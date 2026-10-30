@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   these msgids into its own with `msgcat` and `msgmerge`. Building a refusal
   with no message now calls `gettext`, so it needs Django's settings
   configured, as the shape check's messages already did.
+- **`Validator.unsendable`**, a property on the `Validator` contract returning
+  a `frozenset[str]`, empty by default: the fields the Validator requires that
+  its `parameters()` leaves out, which no caller can send. A transport can read
+  it where it registers a spec and refuse the spec there rather than on every
+  call, without a `getattr` fallback for a Validator that does not define it.
+  The dataclass, form and pydantic adapters keep the empty default, since each
+  declares every field it requires; an adapter whose library can require an
+  undeclared field overrides it with a property.
 
 ## [0.20.0] — 2026-10-29
 
