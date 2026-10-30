@@ -1183,6 +1183,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator.Validator.unsendable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unsendable
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#django_service_specs.validation.validator.Validator.parameters" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -4619,6 +4630,17 @@
   
     <nav class="md-nav" aria-label="Validator">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator.Validator.unsendable" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        unsendable
+      
+    </span>
+  </a>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#django_service_specs.validation.validator.Validator.parameters" class="md-nav__link">
@@ -10075,6 +10097,21 @@ subclass of either that does handle a partial call sets it back. An
 adapter whose answer depends on what it was built over sets it on the
 instance in <code>__init__</code> instead, and the spec reads the instance. The
 refusal at the call stays, for a Validator called directly.</p>
+<p><code>unsendable</code> names the fields the Validator requires that its
+<code>parameters()</code> leaves out. No caller can send such a field, since a
+transport offers only what <code>parameters()</code> declares, so a transport can
+read it where it registers a spec and refuse the spec there rather than
+on every call. Empty by default, which is the right answer for a Validator
+that declares every field it requires, as the kernel's own adapters do. An
+adapter whose library can require a field it does not declare, such as a
+DRF serializer requiring one named like a seed, overrides it with a
+property, which may read what the instance was built over. The default is
+a property with no setter, so unlike <code>supports_partial</code> an instance of a
+class that inherits it, or overrides it with a property, cannot assign it
+(test_an_instance_cannot_assign_unsendable). A plain class attribute also
+answers a reader, but the type checker does not hold its type, and an
+instance can then assign it
+(test_an_instance_can_assign_a_class_attribute_override).</p>
 <p><strong>Sync-only.</strong> A Validator may query - a uniqueness check does - so dispatch
 runs it in the executor on the async path, and it must not be <code>async def</code>.</p>
 <p><code>validate()</code> receives only the arguments its own <code>parameters()</code>
@@ -10119,6 +10156,33 @@ binding one object for the call, overrides it.</p>
 
 
 
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h3 id="django_service_specs.validation.validator.Validator.unsendable" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">unsendable</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-property"><code>property</code></small>
+  </span>
+
+<a href="#django_service_specs.validation.validator.Validator.unsendable" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">unsendable</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The required fields <code>parameters()</code> leaves out, which no caller can send.</p>
+<p>Empty by default. A transport can refuse a spec over a Validator that
+names any, where it registers the spec. An override is a property,
+which may read what the instance was built over, or a class attribute.</p>
+
+    </div>
+
+</div>
 
 
 
@@ -10359,8 +10423,8 @@ halves). A library whose validation
 reads what its caller registered, as a serializer reads its context's
 <code>request</code>, finds it here rather than in an argument. It never holds an
 argument, a validated value or the target, which have seats of their
-own. Empty for a context built by hand, and in <code>bind_arguments</code>, which
-is handed no seeds; it trails the others, so neither changes.</p>
+own. Empty for a context built by hand, and in <code>bind_arguments</code> handed
+no <code>pool_seeds</code>; it trails the others, so neither changes.</p>
 <p><code>resolved</code> is the target under the pool name dispatch hands it to the
 service as, read-only: <code>{"instance": row}</code> for a spec with an instance
 selector - <code>{"instance": None}</code> when one that allows none finds no row
@@ -12573,7 +12637,9 @@ finds no row, <code>collection</code> for one with a collection selector, and
 neither for a create. It is the target itself, never the copy the form
 edits. <code>user</code> is the context's principal on every path, and
 <code>progress</code> is <code>null_progress</code> wherever the context carries no
-reporter. In <code>bind_arguments</code>, or with a
+reporter. In <code>bind_arguments</code> handed <code>pool_seeds</code>, it is handed
+every seed of the registry, as on dispatch. In <code>bind_arguments</code> handed
+none, or with a
 <a class="autorefs autorefs-internal" title="ValidationContext
 
 
@@ -12583,7 +12649,8 @@ reporter. In <code>bind_arguments</code>, or with a
 built by hand, the context holds no seeds, so a callable naming one
 gives it a default or meets Python's own <code>TypeError</code>;
 <a class="autorefs autorefs-internal" title="form_keywords" href="#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>
-is the path off dispatch that resolves the seeds it names. It is called on
+is the path off dispatch for building the form itself, and resolves the
+seeds it names. It is called on
 every <code>validate()</code>, on the thread the call runs on, which under
 <code>adispatch</code> is the one its synchronous phases share, so it may query;
 on a <code>many</code> call that is once per row, so a query belongs in a seed,
@@ -14308,7 +14375,8 @@ sequence, so there is nothing to count and nothing to slice.</p>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">target</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">unknown_arguments</span><span class="p">:</span> <span class="n">UnknownArguments</span> <span class="o">=</span> <span class="n">UnknownArguments</span><span class="o">.</span><span class="n">REJECT</span><span class="p">,</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -14370,15 +14438,49 @@ makes once the provider has answered is not made here
 (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
 fill is absent from a selector spec's checked arguments whether or not
 the caller sent it.</p>
-<p><strong>It takes no</strong> <code>pool_seeds</code>, so it refuses no registered seed's name
-and splits none: a <code>reflected</code> read is checked as declared, so a
-required one is demanded of the caller here though a registered seed
-fills it on dispatch, which refuses the caller's value for it as an
-unknown argument under <code>REJECT</code>
-(test_bind_arguments_still_demands_a_required_reflected_read), and a
-Validator field named like a registered seed is validated and returned
-among the values, as any field is. Which values a service's pool spreads
-is dispatch's question.</p>
+<p><strong>Given</strong> <code>pool_seeds</code>, <strong>it binds as dispatch binds with them.</strong> A
+<code>reflected</code> read a registered seed fills is no argument of the call, so
+it is not demanded of the caller
+(test_a_reflected_read_a_registered_seed_fills_is_not_demanded), and the
+caller's value for it is refused as an unknown argument under <code>REJECT</code>
+and dropped under <code>IGNORE</code>
+(test_the_caller_s_value_for_it_is_refused_under_reject_as_dispatch_refuses_it,
+test_the_caller_s_value_for_it_is_dropped_under_ignore). A parameter
+dispatch refuses for sharing a seed's name is refused here too, with
+<code>ImproperlyConfigured</code>
+(test_an_unmarked_read_named_like_a_registered_seed_is_refused_only_with_the_seeds).
+The Validator's <code>ambient</code> is the pool dispatch hands it: <code>user</code>,
+<code>progress</code> as the no-op reporter, since no call is running, and every
+registered seed, each resolved once for the principal against
+<code>call_context</code>, so a <code>FormValidator</code>'s <code>form_kwargs</code> naming a seed
+is handed it
+(test_a_form_kwargs_naming_a_registered_seed_is_handed_it). A Validator
+field named like a registered seed is validated and returned among the
+values, as any field is, and the seed keeps its own value in <code>ambient</code>
+(test_a_validator_field_named_like_a_registered_seed_is_validated_and_returned).
+Every seed resolves on each bind of a spec with a Validator, as on
+dispatch, whether or not the Validator reads one, so a caller binding
+often, a page re-checking a form on each edit, pays each resolver per bind.
+A spec with no Validator resolves none, since nothing it binds reads one
+(test_a_service_spec_with_no_validator_resolves_no_seed).
+A deactivated principal is refused with <code>PrincipalUnavailable</code> first,
+as dispatch refuses one: before the seat refusal and the shape check, for
+every kind of spec and any registry, so no seed resolves for it
+(test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuses_it,
+test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal,
+test_a_deactivated_principal_resolves_no_seed). Which values a service's
+pool spreads is dispatch's question.</p>
+<p><strong>Any registry is dispatch's, an empty one too</strong>, so the call's
+<code>request</code> and <code>view</code> are seeds of the bind as of every pool dispatch
+builds: a <code>reflected</code> read of either name is filled rather than
+demanded (test_a_reflected_read_named_request_is_the_call_s_with_any_registry).
+<strong>Without</strong> <code>pool_seeds</code> it is the function it was before it took
+them: a <code>reflected</code> read is checked as declared, so a required one is
+demanded of the caller
+(test_bind_arguments_still_demands_a_required_reflected_read), no seed is
+resolved, no principal is refused for being deactivated, and the
+Validator's <code>ambient</code> is empty
+(test_the_validator_s_ambient_is_dispatch_s_with_any_registry).</p>
 <p><strong>It does not resolve or authorize.</strong> Dispatch runs class-level
 authorization, target resolution and object-level authorization <em>between</em>
 these two steps, so the Validator sees the resolved row and a refused
@@ -14689,12 +14791,14 @@ included.</p>
     <div class="doc doc-contents first">
 
         <p>Refuse a declaration that cannot hold as written on a mount registering <code>pool_seeds</code>.</p>
-<p>Four of them, below: a parameter a seed or the call's own value would
+<p>Five of them, below: a parameter a seed or the call's own value would
 meet, a positional-only parameter dispatch cannot pass, a keyword nothing
-fills, and an optional read over a keyword that requires it. The first
-fails every call, the second and third every call that reaches the
-callable, and the fourth every call leaving the read out, which the
-declaration says a caller may. Each is decided by the spec and the
+fills, an optional read over a keyword that requires it, and an array
+read with no <code>items</code> over a keyword annotated with its element. The
+first fails every call, the second and third every call that reaches the
+callable, the fourth every call leaving the read out, which the
+declaration says a caller may, and the fifth hands the callable any
+element a caller sends. Each is decided by the spec and the
 mount's registered seeds alone, so a transport registering a kernel spec
 can refuse it where it registers it rather than list a tool or a route
 whose calls fail in a way the declaration already settled. The spec does
@@ -14732,11 +14836,25 @@ offender in a sorted list such as <code>['tenant']</code>.</p>
    sending it runs, and one leaving it out is refused as missing
    (<code>call_keywords</code>), so a caller reading the declaration is told the
    read is optional and refused for omitting it.</li>
+<li><strong>An array read with no <code>items</code> over a keyword annotated with its
+   element</strong>: a read of <code>type="array"</code> declaring no <code>items</code>, over
+   the keyword it fills on its own seat, annotated <code>list[X]</code>,
+   <code>tuple[X, ...]</code> or <code>Sequence[X]</code>, or one of those <code>| None</code>,
+   where <code>X</code> is neither <code>Any</code>, <code>object</code> nor a type variable. Such
+   a read takes any
+   element, so a callable annotated <code>pks: list[int]</code> is handed a
+   query string's strings, and the message says to declare <code>items</code>.
+   It derives none from the annotation: a signature is not a
+   declaration. As with the third and fourth, it never guesses: a
+   keyword a provider fills or may fill is not one - a typed
+   provider's key, declinable or not, and any keyword of a seat whose
+   provider is untyped - and nor is a keyword a seed fills, as a
+   <code>reflected</code> read's.</li>
 </ol>
 <p><strong>A callable whose signature cannot be read</strong> is refused too, ahead of
 these for its seat: a service, selector or target selector such as a
 builtin type like <code>dict</code>, which dispatch cannot bind a keyword to and so
-fails on for every call reaching it. The second to fourth need that
+fails on for every call reaching it. The second to fifth need that
 signature, so such a seat is answered by this refusal alone, and the
 other seats are still checked.</p>
 <p>A Validator field the service never receives is not among them, because
@@ -14744,7 +14862,12 @@ such a spec runs and may mean to: <a class="autorefs autorefs-internal" title="u
 answers it, and the transport decides.</p>
 <p><strong>What it cannot see, and so never refuses.</strong> A provider whose return
 says nothing about its keys may fill any keyword in its seat, so that
-seat's keywords are left to dispatch (the third and fourth). A
+seat's keywords are left to dispatch (the third and fourth). An
+annotation that does not resolve, as a forward reference to a name not
+importable where the callable was defined, is not read, and leaves
+alone only its own keyword (the fifth); so is a bare <code>list</code>, an element
+of <code>Any</code> or <code>object</code>, a fixed-length <code>tuple</code>, a union of two
+sequences and an unannotated keyword. A
 Validator may return a value it does not declare, or bind one, so a
 service beside a Validator is not judged by the third and fourth either
 (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
@@ -14771,7 +14894,7 @@ it compiles to.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>any of the four, or a callable whose
+                <p>any of the five, or a callable whose
 signature cannot be read, every one found.</p>
               </div>
             </td>
@@ -16574,8 +16697,9 @@ acts, whichever way it arrived.</p>
 the principal it was handed, first and whether or not a <code>Grant</code> came with
 it; <code>resolve_principal</code>, refusing the row an identifier named; and, ahead
 of the first seed resolver, the <code>authorize</code> functions handed
-<code>pool_seeds</code> and <code>form_keywords</code>, which refuse as dispatch does. Those
-three read it through <code>refuse_deactivated</code> in <code>authorization/utils.py</code>.
+<code>pool_seeds</code> and <code>form_keywords</code>, which refuse as dispatch does; and
+<code>bind_arguments</code> handed <code>pool_seeds</code>, first, as dispatch. Those four
+read it through <code>refuse_deactivated</code> in <code>authorization/utils.py</code>.
 It is public
 so that a transport in a distribution of its own refuses exactly the
 principals dispatch refuses, by calling this rather than restating it, as
@@ -16835,6 +16959,10 @@ without the service depending on that transport. A structured payload
 belongs to a member that declares one:
 <a class="autorefs autorefs-internal" title="ServiceValidationError" href="#django_service_specs.services.service_validation_error.ServiceValidationError"><code>ServiceValidationError</code></a>
 carries a field-keyed <code>detail</code>.</p>
+<p><code>default_message</code> is a msgid in the package's catalog, as each member's
+is, and is looked up in the active language each time a refusal is built
+with no message of its own, so it reads in the language of the request
+that raised it. A <code>message</code> the caller passes is used as given.</p>
 
 
 
@@ -22112,6 +22240,10 @@ server's answer from "invalid arguments" to a business-rule failure, which
 is exactly the distinction that server draws by type.</p>
 <p>So the pair says who refused: dispatch, before the operation ran, or the
 operation itself.</p>
+<p><code>default_message</code> is a msgid in the package's catalog, as each child's
+is, and is looked up in the active language each time a refusal is built
+with no message of its own. A <code>message</code> the caller passes is used as
+given.</p>
 
 
 

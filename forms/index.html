@@ -1436,8 +1436,11 @@ what it wants:</p>
 refused one of another's in the field's own words, <code>invalid_choice</code>, though
 the row exists: the queryset the form narrowed is what matches it.</p>
 <p>In
-<a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>,
-or with a
+<a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
+handed <code>pool_seeds=</code>, the callable is handed its seeds as on dispatch: the
+Validator's pool holds every seed of the registry, resolved once for the
+principal, so a page checking a form scoped by a seed before it posts binds
+it as the post will. Handed none, or with a
 <a class="autorefs autorefs-internal" title="ValidationContext
 
 
@@ -1448,8 +1451,8 @@ built by hand, there are no seeds, so a callable naming one gives it a
 default or fails with Python's own <code>TypeError</code>; <code>user</code> and <code>progress</code> are
 there still.
 <a class="autorefs autorefs-internal" title="form_keywords" href="../reference/#django_service_specs.adapters.forms.form_keywords.form_keywords"><code>form_keywords</code></a>
-is the off-dispatch path that does resolve them: the seeds of the
-<code>pool_seeds=</code> it is handed that the callable would be handed. <code>bind_arguments</code> names the <code>target=</code> it is passed as dispatch
+is the off-dispatch path for building the form itself: it resolves the seeds
+of the <code>pool_seeds=</code> it is handed that the callable would be handed. <code>bind_arguments</code> names the <code>target=</code> it is passed as dispatch
 would, from the spec's selectors, and a context built by hand names none.
 Under
 <a class="autorefs autorefs-internal" title="adispatch
