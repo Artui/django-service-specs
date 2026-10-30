@@ -202,6 +202,11 @@ class and narrow it in `__init__`, as
 the form in [A form with keywords of its own](#a-form-with-keywords-of-its-own)
 does.
 
+A form class that sets a `prefix`, or is handed one through `form_kwargs`, keeps
+it. The parameters are still the bare field names, and the adapter binds each
+argument under the name the form reads it by, `add_prefix(name)`, so an
+`add_prefix` override of the form's own is followed too.
+
 ## Partial updates
 
 On a [`partial`](declaring.md#partial-updates) spec's call, every field the
