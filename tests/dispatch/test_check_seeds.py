@@ -48,7 +48,7 @@ _POSITIONAL = "positional-only"
 
 def _service(service: Callable[..., Any], **declared: Any) -> ServiceSpec:
     # A selector spec nested in a ServiceSpec declares no permissions: the
-    # service's authorize, so the nested one is the derivation without them.
+    # service's checks authorize, so the nested one is the derivation without them.
     for role in ("instance", "collection", "output"):
         nested = declared.get(f"{role}_selector_spec")
         if nested is not None:
