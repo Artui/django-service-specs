@@ -331,6 +331,27 @@ class TestReads:
             {"kind": SelectorKind.LIST, "kwargs": dict},
             "ServiceSpec.output_selector_spec declares kwargs, which an output selector never runs",
         ),
+        # One case per role, since coverage cannot see a role dropped from the
+        # tuple in _check_nested. Unrestricted() is refused as any other check
+        # is: an open read is still a declaration that nothing here reads.
+        (
+            "instance_selector_spec",
+            {"kind": SelectorKind.RETRIEVE, "permissions": [Nobody()]},
+            "ServiceSpec.instance_selector_spec declares permissions, which a nested selector "
+            "never asks",
+        ),
+        (
+            "collection_selector_spec",
+            {"kind": SelectorKind.LIST, "permissions": [Unrestricted()]},
+            "ServiceSpec.collection_selector_spec declares permissions, which a nested "
+            "selector never asks",
+        ),
+        (
+            "output_selector_spec",
+            {"kind": SelectorKind.LIST, "permissions": [Nobody()]},
+            "ServiceSpec.output_selector_spec declares permissions, which a nested selector "
+            "never asks",
+        ),
     ],
 )
 def test_a_nested_selector_declaring_what_never_runs_is_refused(
@@ -1180,3 +1201,26 @@ class TestShapes:
     def test_a_derived_spec_replaces_its_shapes(self) -> None:
         base = ServiceSpec(service=print, shapes=FIELDS)
         assert base.derive(shapes=Parameters()).shapes == Parameters()
+
+
+def test_a_nested_selector_declaring_no_permissions_is_accepted() -> None:
+    # The default is None, and holds the other half of the permissions refusal:
+    # without it every nested selector would be refused.
+    nested = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list)
+    assert nested.permissions is None
+    assert (
+        ServiceSpec(service=print, instance_selector_spec=nested).instance_selector_spec is nested
+    )
+
+
+def test_a_selector_spec_with_permissions_nests_once_derived_without_them() -> None:
+    # The remedy the refusal names: a spec registered or dispatched on its own
+    # needs its permissions, and nests as its derivation with none.
+    own = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Unrestricted()])
+    nested = own.derive(permissions=None)
+    assert nested.permissions is None
+    assert own.permissions is not None
+    spec = ServiceSpec(service=print, collection_selector_spec=nested)
+    assert spec.collection_selector_spec is nested
+    with pytest.raises(ImproperlyConfigured, match=r"spec\.derive\(permissions=None\)"):
+        ServiceSpec(service=print, collection_selector_spec=own)

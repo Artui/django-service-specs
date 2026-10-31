@@ -217,12 +217,12 @@ which [a write](#providers-and-preconditions) declares the same way. Its
 `kwargs` provider is called from the base pool and its `reads`, and on a
 selector nested in a write scopes the lookup. Its preconditions run on what
 its selector found, never on a missing row. A nested selector declaring
-`preconditions` or a `progress_reporter`, or an output selector declaring
-`kwargs`, is refused when the write is built: dispatch never runs them.
-
-`permissions` is required on a spec that is dispatched or registered, and
-ignored on a selector nested inside a `ServiceSpec`: authorization belongs to
-the spec being dispatched.
+`permissions` (`Unrestricted()` included), `preconditions` or a
+`progress_reporter`, or an output selector declaring `kwargs`, is refused when
+the write is built: dispatch never runs them, and the spec being dispatched is
+what authorizes. `permissions` is required on a spec that is dispatched or
+registered, so to reuse such a selector spec as a nested one, nest
+`spec.derive(permissions=None)`.
 
 ## A write
 
