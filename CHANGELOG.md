@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.0] — 2026-10-31
+
+### Changed
+- **A `SelectorSpec` seated in a `ServiceSpec` as its `instance_selector_spec`,
+  `collection_selector_spec` or `output_selector_spec` is refused when it declares
+  `permissions`.** Dispatch never asks a nested selector's checks: the spec being
+  dispatched is what authorizes, so they guarded nothing while reading as if they
+  did. Any declared checks, `Unrestricted()` included, are refused when the
+  `ServiceSpec` is built (or derived), with `ImproperlyConfigured` naming the seat.
+  Declare the checks on the `ServiceSpec`, or nest `spec.derive(permissions=None)`
+  to reuse a selector spec that is also registered or dispatched on its own. A spec
+  that nested a selector declaring permissions now raises at construction where it
+  used to pass.
+
+### Fixed
+- **A pool seed named for a dispatcher-owned value, or registered twice, is
+  refused when the registry is built directly.** `PoolSeeds.extend` refused a
+  reserved name (`user`, `call_context`, `shapes` with its rename hint) and a name
+  registered twice, but `PoolSeeds(seeds=(("shapes", f),))` skipped both checks,
+  so a reserved seed reached dispatch and shadowed the dispatcher's own value.
+  Both checks now run when the registry is constructed, with the same
+  `ValueError` messages, and every name is checked before any resolver, so a
+  reserved name still raises `ValueError` when an async resolver is also
+  registered. `request` and `view` are not reserved and still register directly.
+
 ## [0.21.1] — 2026-10-30
 
 ### Fixed
@@ -2246,7 +2271,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.22.0...HEAD
+[0.22.0]: https://github.com/Artui/django-service-specs/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/Artui/django-service-specs/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Artui/django-service-specs/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0
