@@ -28,6 +28,39 @@ _SHAPES_SEED_HINT = (
 )
 
 
+def _refuse_unusable_names(seeds: tuple[_Seed, ...]) -> None:
+    """Refuse a registration naming a dispatcher-owned seed, or naming one twice.
+
+    Called from ``PoolSeeds.__post_init__``, which ``extend`` reaches through
+    ``replace``, so a registry built directly is refused the same way as one
+    extended. Each condition is held on both paths, in tests/pool/: the reserved
+    check by ``test_registering_a_built_in_name_is_refused`` (extend) and
+    ``test_constructing_with_a_reserved_name_is_refused`` (direct), the duplicate
+    one by ``test_registering_the_same_name_twice_is_refused`` and
+    ``test_constructing_with_a_name_twice_is_refused``. The ``shapes`` hint is
+    conditional: ``test_a_seed_named_shapes_is_refused_with_the_rename`` and
+    ``test_constructing_a_seed_named_shapes_is_refused_with_the_rename`` fail
+    without it, and ``test_a_parameter_named_call_context_is_refused_without_the_shapes_rename``
+    and ``test_constructing_with_a_reserved_name_is_refused`` fail if every
+    refusal carries it.
+    """
+    seen: set[str] = set()
+    for name, _ in seeds:
+        if name in RESERVED_POOL_SEEDS:
+            hint = _SHAPES_SEED_HINT if name == SHAPES else ""
+            raise ValueError(
+                f"{name!r} is a reserved pool seed carrying the dispatcher's own "
+                f"value; registering it would shadow what the transport resolved. "
+                f"Reserved: {sorted(RESERVED_POOL_SEEDS)}.{hint}"
+            )
+        if name in seen:
+            raise ValueError(
+                f"{name!r} is already registered on this PoolSeeds. Registering it "
+                f"twice would make which resolver wins depend on registration order."
+            )
+        seen.add(name)
+
+
 @dataclass(frozen=True)
 class PoolSeeds:
     """Names a project adds to every dispatched callable's kwargs pool.
@@ -55,6 +88,11 @@ class PoolSeeds:
     same name, and which of the two a callable receives would depend on
     spreading order; a reserved name with no value makes a callable that
     declares it fail with a ``TypeError`` instead.
+
+    **A reserved name, or one registered twice, is refused with ``ValueError``**
+    whichever way the registry is built: ``extend`` and the constructor run the
+    same check, so a registry written out as ``PoolSeeds(seeds=(...,))`` cannot
+    shadow the dispatcher's own value either.
 
     Immutable, and ``extend`` returns a **new** registry rather than mutating, so
     there is no shared global state to leak between mounts or across tests. Pass
@@ -87,8 +125,15 @@ class PoolSeeds:
     def __post_init__(self) -> None:
         # Here rather than in ``extend``, because ``extend`` builds its registry
         # through ``replace``, which runs this too, and the dataclass is public:
-        # a registry constructed directly is refused the same way. Three
-        # disjuncts between ``is_async`` and this line, each held in
+        # a registry constructed directly is refused the same way.
+        #
+        # Every name is checked before any resolver is, so a reserved name holding
+        # an async resolver, or following one, raises the ``ValueError`` ``extend``
+        # always raised, not the ``ImproperlyConfigured``:
+        # ``test_a_reserved_name_is_refused_before_an_async_resolver`` fails without
+        # that order, on both paths.
+        _refuse_unusable_names(self.seeds)
+        # Three disjuncts between ``is_async`` and this line, each held in
         # tests/pool/test_pool_seeds.py's ``TestAnAsyncResolverIsRefused``:
         # ``test_an_async_def_is_refused`` fails without the coroutine-function
         # check, ``test_an_object_whose_call_is_async_is_refused`` without the
@@ -112,29 +157,15 @@ class PoolSeeds:
                 object whose ``__call__`` is one, or an async generator
                 function. A resolver is never awaited.
             ValueError: A name is one of the dispatcher's own, or is already
-                registered here. Both are refused at **registration** rather
-                than at dispatch, because a silent last-wins is the exact
-                failure the reservation exists to prevent — and a collision
-                discovered on the hot path is one a test suite can miss.
+                registered here (the same holds for a registry built directly:
+                a name reserved, or given twice in ``seeds``). Both are refused
+                at **registration** rather than at dispatch, because a silent
+                last-wins is the exact failure the reservation exists to prevent
+                — and a collision discovered on the hot path is one a test suite
+                can miss.
         """
-        for name in seeds:
-            if name in RESERVED_POOL_SEEDS:
-                # A hint for ``shapes`` alone, the name reserved after projects had
-                # registered it: test_a_seed_named_shapes_is_refused_with_the_rename
-                # fails without it, and
-                # test_a_parameter_named_call_context_is_refused_without_the_shapes_rename
-                # if every refusal carries it.
-                hint = _SHAPES_SEED_HINT if name == SHAPES else ""
-                raise ValueError(
-                    f"{name!r} is a reserved pool seed carrying the dispatcher's own "
-                    f"value; registering it would shadow what the transport resolved. "
-                    f"Reserved: {sorted(RESERVED_POOL_SEEDS)}.{hint}"
-                )
-            if name in self.names:
-                raise ValueError(
-                    f"{name!r} is already registered on this PoolSeeds. Registering it "
-                    f"twice would make which resolver wins depend on registration order."
-                )
+        # The names are checked by ``__post_init__``, which ``replace`` runs on
+        # the combined tuple: a name already registered is a duplicate there.
         return replace(self, seeds=self.seeds + tuple(seeds.items()))
 
     @property

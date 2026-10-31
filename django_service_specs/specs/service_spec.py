@@ -64,7 +64,10 @@ class ServiceSpec(AffordanceDeclarer):
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open
             operation says ``[Unrestricted()]``. An empty sequence is refused
-            when the spec is built, since no checks would pass everyone.
+            when the spec is built, since no checks would pass everyone. This
+            spec's checks are the only ones run: a selector spec nested in
+            it, as its instance, collection or output selector, may declare
+            none, and is refused when it does.
         reads: The arguments the service, its providers and its preconditions
             read with no Validator in front of them - the ``project_pk`` a
             create's ``kwargs`` provider scopes by - as a selector spec's
@@ -764,9 +767,11 @@ def _check_nested(spec: ServiceSpec) -> None:
     """Refuse a nested selector declaring what dispatch never runs for it.
 
     A nested selector is a step of this spec's run, not a run of its own, so
-    its ``preconditions`` and ``progress_reporter`` would be skipped in
-    silence, and a guard skipped in silence is the failure a construction
-    check exists to prevent. A target selector's ``kwargs`` scope its lookup
+    its ``permissions``, ``preconditions`` and ``progress_reporter`` would be
+    skipped in silence, and a guard skipped in silence is the failure a
+    construction check exists to prevent. The permissions are refused whatever
+    they hold, ``Unrestricted()`` included: the spec being dispatched is what
+    authorizes, and a declaration that reads as a guard guards nothing. A target selector's ``kwargs`` scope its lookup
     and run; an output selector re-reads what the service produced, with no
     caller's arguments for a provider to stand beside, so its ``kwargs`` are
     refused too.
@@ -776,6 +781,18 @@ def _check_nested(spec: ServiceSpec) -> None:
         if nested is None:
             continue
         label = f"ServiceSpec.{role}_selector_spec"
+        # First, since authorization is the first concern. One case per role in
+        # test_a_nested_selector_declaring_what_never_runs_is_refused, since
+        # coverage cannot see a role dropped from the tuple, and
+        # test_a_nested_selector_declaring_no_permissions_is_accepted holds the
+        # None the default leaves, which every nested selector would otherwise fail.
+        if nested.permissions is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares permissions, which a nested selector never asks: the spec "
+                "being dispatched is what authorizes. Declare them on this ServiceSpec, and drop "
+                "them from the nested selector, or nest spec.derive(permissions=None) to reuse "
+                "a selector spec that is also registered or dispatched on its own."
+            )
         if nested.preconditions is not None:
             raise ImproperlyConfigured(
                 f"{label} declares preconditions, which are never run on a nested selector. "

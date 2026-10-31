@@ -50,8 +50,9 @@ class SelectorSpec:
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open read
             says ``[Unrestricted()]``. An empty sequence is refused when the
-            spec is built, since no checks would pass everyone. **Not read when the spec is nested**:
-            authorization belongs to the spec being dispatched.
+            spec is built, since no checks would pass everyone. **Refused when the spec is
+            nested** in a ``ServiceSpec``, whatever it holds: authorization belongs to
+            the spec being dispatched, so nest ``spec.derive(permissions=None)``.
         reads: The arguments the selector reads with no Validator in front of
             it - its filters, its ordering, the key of the row it retrieves.
             With ``shapes`` they are the spec's whole Parameters, so the closed
