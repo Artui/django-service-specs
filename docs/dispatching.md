@@ -835,8 +835,9 @@ it is resolved.
 A registered name is **reserved**, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
 `ImproperlyConfigured`, and by `check_seeds` where a transport registers it; a caller that sends it is refused like any other
-undeclared argument; and `extend()` refuses one of the dispatcher's own names,
-or a name registered twice, with `ValueError`. Either half alone is a trap: a
+undeclared argument; and `PoolSeeds` refuses one of the dispatcher's own names,
+or a name registered twice, with `ValueError`, from `extend()` and from the
+constructor alike. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.
@@ -991,8 +992,9 @@ is handed an empty mapping (see the last item below).
   parameters are first read (a transport's registration, or the first
   dispatch). Each of those refusals carries the rename in its message: name
   the parameter for what it holds, such as `fields` or `query`, and have the
-  callable that read it declare `shapes`. `PoolSeeds.extend()` refuses a seed
-  of that name, and says to register it under another.
+  callable that read it declare `shapes`. `PoolSeeds` refuses a seed of that
+  name, built directly or through `extend()`, and says to register it under
+  another.
 - **Not for an affordance condition or the Validator.** A condition naming
   `shapes` is refused when it is declared, because what the caller sent would
   decide whether the operation is available, and the Validator, which is no

@@ -45,6 +45,38 @@ def test_registering_the_same_name_twice_is_refused() -> None:
         once.extend(tenant=lambda: "other")
 
 
+def _tenant() -> str:
+    return "acme"
+
+
+def test_constructing_a_seed_named_shapes_is_refused_with_the_rename() -> None:
+    """The dataclass is public: building it directly is no way round the reservation."""
+    with pytest.raises(ValueError, match="reserved for the seed") as refused:
+        PoolSeeds(seeds=(("shapes", _tenant),))
+    assert "register the resolver under a name of its own" in str(refused.value)
+
+
+@pytest.mark.parametrize("name", ["call_context", "user"])
+def test_constructing_with_a_reserved_name_is_refused(name: str) -> None:
+    """Only ``shapes`` carries the rename hint, on this path as on ``extend``."""
+    with pytest.raises(ValueError, match=f"'{name}' is a reserved pool seed") as refused:
+        PoolSeeds(seeds=(("tenant", _tenant), (name, _tenant)))
+    assert "reserved for the seed" not in str(refused.value)
+
+
+def test_constructing_with_a_name_twice_is_refused() -> None:
+    with pytest.raises(ValueError, match="'tenant' is already registered on this PoolSeeds"):
+        PoolSeeds(seeds=(("tenant", _tenant), ("tenant", _tenant)))
+
+
+def test_a_reserved_name_is_refused_before_an_async_resolver() -> None:
+    """The name is the first refusal on both paths: ``ValueError``, not ``ImproperlyConfigured``."""
+    with pytest.raises(ValueError, match="reserved pool seed"):
+        DEFAULT_POOL_SEEDS.extend(shapes=_books_open)
+    with pytest.raises(ValueError, match="reserved pool seed"):
+        PoolSeeds(seeds=(("shapes", _books_open),))
+
+
 def test_resolvers_are_exposed_in_registration_order() -> None:
     """Stable order, so an error message or a listing is reproducible."""
     extended = PoolSeeds().extend(a=lambda: 1).extend(b=lambda: 2)
