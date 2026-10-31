@@ -71,7 +71,7 @@ def test_input_data_reaches_the_validator_s_fields_and_a_target_provider_its_rea
         permissions=OPEN,
         validator=Titled(),
         input_data=_untyped,
-        instance_selector_spec=target,
+        instance_selector_spec=target.derive(permissions=None),
     )
     assert provider_reached(spec) == {"title", "pk"}
 

@@ -41,13 +41,13 @@ ARRAY = {"type": "array", "items": ITEM}
 
 def listing(**kwargs: Any) -> SelectorSpec:
     kwargs.setdefault("selector", notes_of)
-    return SelectorSpec(kind=SelectorKind.LIST, permissions=OPEN, **kwargs)
+    kwargs.setdefault("permissions", OPEN)
+    return SelectorSpec(kind=SelectorKind.LIST, **kwargs)
 
 
 def retrieve(**kwargs: Any) -> SelectorSpec:
-    return SelectorSpec(
-        kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK, permissions=OPEN, **kwargs
-    )
+    kwargs.setdefault("permissions", OPEN)
+    return SelectorSpec(kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK, **kwargs)
 
 
 def service(**kwargs: Any) -> ServiceSpec:
@@ -78,7 +78,7 @@ def retrieve_re_read(**kwargs: Any) -> SelectorSpec:
             id="a-list-selector-allowing-none-is-an-array-never-null",
         ),
         pytest.param(
-            service(output_selector_spec=listing(selector=nothing)),
+            service(output_selector_spec=listing(selector=nothing, permissions=None)),
             None,
             id="a-service-with-no-presenter-anywhere-has-no-output-schema",
         ),
@@ -107,14 +107,20 @@ def retrieve_re_read(**kwargs: Any) -> SelectorSpec:
         # The re-read's rows are what is presented, never the service's ``None``.
         pytest.param(
             service(
-                output_selector_spec=listing(selector=nothing, presenter=NoteTitle()),
+                output_selector_spec=listing(
+                    selector=nothing, presenter=NoteTitle(), permissions=None
+                ),
                 allow_none=True,
             ),
             ARRAY,
             id="allow-none-changes-nothing-beside-a-list-re-read",
         ),
         pytest.param(
-            service(output_selector_spec=listing(selector=nothing, presenter=NoteTitle())),
+            service(
+                output_selector_spec=listing(
+                    selector=nothing, presenter=NoteTitle(), permissions=None
+                )
+            ),
             ARRAY,
             id="a-service-whose-output-selector-is-a-list-presents-an-array",
         ),
@@ -256,7 +262,7 @@ class TestPaging:
         assert spec_output_schema(listing(presenter=NoteTitle()), paginate=True) == PAGED
 
     def test_a_service_whose_output_selector_is_a_list_is_paged_the_same_way(self) -> None:
-        reread = listing(selector=nothing, presenter=NoteTitle())
+        reread = listing(selector=nothing, presenter=NoteTitle(), permissions=None)
         spec = service(output_selector_spec=reread)
 
         assert spec_output_schema(spec, paginate=True) == PAGED
@@ -472,7 +478,7 @@ class TestSources:
             pytest.param(retrieve(presenter=NoteTitle(), allow_none=True), id="retrieve"),
             pytest.param(
                 service(
-                    output_selector_spec=retrieve(presenter=NoteTitle()),
+                    output_selector_spec=retrieve(presenter=NoteTitle(), permissions=None),
                 ),
                 id="re-read",
             ),
@@ -564,7 +570,10 @@ class TestShapes:
             ),
             pytest.param(
                 service(
-                    shapes=FIELDS, output_selector_spec=listing(selector=nothing, presenter=Card())
+                    shapes=FIELDS,
+                    output_selector_spec=listing(
+                        selector=nothing, presenter=Card(), permissions=None
+                    ),
                 ),
                 True,
                 id="a-services-paged-re-read",

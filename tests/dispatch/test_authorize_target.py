@@ -45,10 +45,10 @@ def test_skips_the_checks_when_the_grant_already_checked_the_target() -> None:
 
 
 def test_no_permissions_declared_has_nothing_to_check() -> None:
-    # authorize() already refused a spec whose permissions are None before any
-    # target could be resolved, so this is reached only through a spec that
-    # declared permissions=None for a nested selector, where authorize() never
-    # looked at it at all. Nothing to check reads as pass, not refuse.
+    # Called directly: dispatch hands authorize_target the spec it dispatched,
+    # never a nested selector, and authorize() refuses one whose permissions
+    # are None before any target is resolved. Nothing to check reads as pass,
+    # not refuse.
     spec, principal, target = _spec(None), object(), object()
     grant = Grant(spec, principal)
     authorize_target(spec, principal, target, grant=grant)
