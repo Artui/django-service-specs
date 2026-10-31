@@ -1465,11 +1465,12 @@ which <a href="#providers-and-preconditions">a write</a> declares the same way. 
 <code>kwargs</code> provider is called from the base pool and its <code>reads</code>, and on a
 selector nested in a write scopes the lookup. Its preconditions run on what
 its selector found, never on a missing row. A nested selector declaring
-<code>preconditions</code> or a <code>progress_reporter</code>, or an output selector declaring
-<code>kwargs</code>, is refused when the write is built: dispatch never runs them.</p>
-<p><code>permissions</code> is required on a spec that is dispatched or registered, and
-ignored on a selector nested inside a <code>ServiceSpec</code>: authorization belongs to
-the spec being dispatched.</p>
+<code>permissions</code> (<code>Unrestricted()</code> included), <code>preconditions</code> or a
+<code>progress_reporter</code>, or an output selector declaring <code>kwargs</code>, is refused when
+the write is built: dispatch never runs them, and the spec being dispatched is
+what authorizes. <code>permissions</code> is required on a spec that is dispatched or
+registered, so to reuse such a selector spec as a nested one, nest
+<code>spec.derive(permissions=None)</code>.</p>
 <h2 id="a-write">A write<a class="headerlink" href="#a-write" title="Permanent link">&para;</a></h2>
 <p>A <code>ServiceSpec</code> names its service and, at most, one target selector:</p>
 <ul>

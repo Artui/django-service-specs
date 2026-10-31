@@ -2341,8 +2341,9 @@ it is resolved.</p>
 <p>A registered name is <strong>reserved</strong>, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
 <code>ImproperlyConfigured</code>, and by <code>check_seeds</code> where a transport registers it; a caller that sends it is refused like any other
-undeclared argument; and <code>extend()</code> refuses one of the dispatcher's own names,
-or a name registered twice, with <code>ValueError</code>. Either half alone is a trap: a
+undeclared argument; and <code>PoolSeeds</code> refuses one of the dispatcher's own names,
+or a name registered twice, with <code>ValueError</code>, from <code>extend()</code> and from the
+constructor alike. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.</p>
@@ -2544,8 +2545,9 @@ is handed an empty mapping (see the last item below).</p>
   parameters are first read (a transport's registration, or the first
   dispatch). Each of those refusals carries the rename in its message: name
   the parameter for what it holds, such as <code>fields</code> or <code>query</code>, and have the
-  callable that read it declare <code>shapes</code>. <code>PoolSeeds.extend()</code> refuses a seed
-  of that name, and says to register it under another.</li>
+  callable that read it declare <code>shapes</code>. <code>PoolSeeds</code> refuses a seed of that
+  name, built directly or through <code>extend()</code>, and says to register it under
+  another.</li>
 <li><strong>Not for an affordance condition or the Validator.</strong> A condition naming
   <code>shapes</code> is refused when it is declared, because what the caller sent would
   decide whether the operation is available, and the Validator, which is no

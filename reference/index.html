@@ -7677,7 +7677,10 @@ spread by name), the resolved target (<code>instance</code> or
                 <p>The checks a principal must pass. <code>None</code> means none were
 declared, which registration and dispatch both refuse; an open
 operation says <code>[Unrestricted()]</code>. An empty sequence is refused
-when the spec is built, since no checks would pass everyone.</p>
+when the spec is built, since no checks would pass everyone. This
+spec's checks are the only ones run: a selector spec nested in
+it, as its instance, collection or output selector, may declare
+none, and is refused when it does.</p>
               </div>
             </td>
           </tr>
@@ -8401,8 +8404,9 @@ spec's run, and the run is the one callable allowed to be.</p>
                 <p>The checks a principal must pass. <code>None</code> means none were
 declared, which registration and dispatch both refuse; an open read
 says <code>[Unrestricted()]</code>. An empty sequence is refused when the
-spec is built, since no checks would pass everyone. <strong>Not read when the spec is nested</strong>:
-authorization belongs to the spec being dispatched.</p>
+spec is built, since no checks would pass everyone. <strong>Refused when the spec is
+nested</strong> in a <code>ServiceSpec</code>, whatever it holds: authorization belongs to
+the spec being dispatched, so nest <code>spec.derive(permissions=None)</code>.</p>
               </div>
             </td>
           </tr>
@@ -17572,6 +17576,10 @@ with a value and no reservation shares the pool with an argument of the
 same name, and which of the two a callable receives would depend on
 spreading order; a reserved name with no value makes a callable that
 declares it fail with a <code>TypeError</code> instead.</p>
+<p><strong>A reserved name, or one registered twice, is refused with <code>ValueError</code></strong>
+whichever way the registry is built: <code>extend</code> and the constructor run the
+same check, so a registry written out as <code>PoolSeeds(seeds=(...,))</code> cannot
+shadow the dispatcher's own value either.</p>
 <p>Immutable, and <code>extend</code> returns a <strong>new</strong> registry rather than mutating, so
 there is no shared global state to leak between mounts or across tests. Pass
 one per dispatch rather than installing it process-wide: a project that
@@ -17732,10 +17740,12 @@ function. A resolver is never awaited.</p>
             <td>
               <div class="doc-md-description">
                 <p>A name is one of the dispatcher's own, or is already
-registered here. Both are refused at <strong>registration</strong> rather
-than at dispatch, because a silent last-wins is the exact
-failure the reservation exists to prevent — and a collision
-discovered on the hot path is one a test suite can miss.</p>
+registered here (the same holds for a registry built directly:
+a name reserved, or given twice in <code>seeds</code>). Both are refused
+at <strong>registration</strong> rather than at dispatch, because a silent
+last-wins is the exact failure the reservation exists to prevent
+— and a collision discovered on the hot path is one a test suite
+can miss.</p>
               </div>
             </td>
           </tr>
