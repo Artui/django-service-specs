@@ -75,6 +75,12 @@ def test_a_reserved_name_is_refused_before_an_async_resolver() -> None:
         DEFAULT_POOL_SEEDS.extend(shapes=_books_open)
     with pytest.raises(ValueError, match="reserved pool seed"):
         PoolSeeds(seeds=(("shapes", _books_open),))
+    # Two entries, the async resolver first: a loop that checked each entry's name
+    # and then that entry's resolver would meet the async one before the reserved name.
+    with pytest.raises(ValueError, match="reserved pool seed"):
+        DEFAULT_POOL_SEEDS.extend(tenant=_books_open, user=_tenant)
+    with pytest.raises(ValueError, match="reserved pool seed"):
+        PoolSeeds(seeds=(("tenant", _books_open), ("shapes", _tenant)))
 
 
 def test_resolvers_are_exposed_in_registration_order() -> None:

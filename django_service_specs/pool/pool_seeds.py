@@ -125,18 +125,20 @@ class PoolSeeds:
     def __post_init__(self) -> None:
         # Here rather than in ``extend``, because ``extend`` builds its registry
         # through ``replace``, which runs this too, and the dataclass is public:
-        # a registry constructed directly is refused the same way. The names are
-        # all checked before any resolver is, so a reserved name holding an async
-        # resolver raises the ``ValueError`` ``extend`` always raised, not the
-        # ``ImproperlyConfigured``: ``test_a_reserved_name_is_refused_before_an_async_resolver``
-        # fails without that order, on both paths. Three
-        # disjuncts between ``is_async`` and this line, each held in
+        # a registry constructed directly is refused the same way.
+        #
+        # Every name is checked before any resolver is, so a reserved name holding
+        # an async resolver, or following one, raises the ``ValueError`` ``extend``
+        # always raised, not the ``ImproperlyConfigured``:
+        # ``test_a_reserved_name_is_refused_before_an_async_resolver`` fails without
+        # that order, on both paths.
+        _refuse_unusable_names(self.seeds)
+        # Three disjuncts between ``is_async`` and this line, each held in
         # tests/pool/test_pool_seeds.py's ``TestAnAsyncResolverIsRefused``:
         # ``test_an_async_def_is_refused`` fails without the coroutine-function
         # check, ``test_an_object_whose_call_is_async_is_refused`` without the
         # class-level ``__call__`` one, and
         # ``test_an_async_generator_function_is_refused`` without the third.
-        _refuse_unusable_names(self.seeds)
         for name, resolver in self.seeds:
             if is_async(resolver) or inspect.isasyncgenfunction(resolver):
                 label = getattr(resolver, "__qualname__", None) or type(resolver).__name__
