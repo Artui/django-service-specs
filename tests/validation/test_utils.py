@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import functools
 import gc
+import types
 import weakref
 from collections.abc import Callable, Mapping
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest import mock
 
@@ -156,6 +158,51 @@ def test_a_parameters_with_no_signature_is_asked_as_before() -> None:
     validator = _Recording()
     cast(Any, validator).parameters = unreadable
     assert validator_parameters(validator, call_context={}) is TITLE
+
+
+def test_a_parameters_whose_signature_read_raises_value_error_is_asked_as_before(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``inspect.signature`` raises ``ValueError`` for a builtin with no signature
+    to read; which builtins vary by Python version, so the read is made to raise it.
+    A class built here, so no earlier ask has cached its answer."""
+
+    def unreadable(*args: Any, **kwargs: Any) -> Any:
+        raise ValueError("no signature found")
+
+    class Fresh(_KeywordOnly):
+        def parameters(self, *, call_context: dict[str, Any] | None = NOT_HANDED) -> Parameters:
+            return super().parameters(call_context=call_context)
+
+    monkeypatch.setattr(utils, "inspect", SimpleNamespace(signature=unreadable))
+    validator = Fresh()
+    assert validator_parameters(validator, call_context={}) is TITLE
+    assert validator.handed == [NOT_HANDED]
+
+
+def test_a_method_binding_an_unhashable_callable_is_handed_the_call_s_dict() -> None:
+    """``MethodType`` binds any callable, so ``__func__`` is not always a function
+    and not always hashable: it is read uncached, never used as a cache key."""
+
+    class Unhashable:
+        # Defining ``__eq__`` without ``__hash__`` leaves it unhashable.
+        def __init__(self) -> None:
+            self.handed: list[Any] = []
+
+        def __eq__(self, other: object) -> bool:
+            return self is other
+
+        def __call__(self, owner: Any, *, call_context: dict[str, Any] | None = None) -> Parameters:
+            self.handed.append(call_context)
+            return TITLE
+
+    bound = Unhashable()
+    validator = _Recording()
+    cast(Any, validator).parameters = types.MethodType(bound, validator)
+    context: dict[str, Any] = {}
+    assert validator_parameters(validator, call_context=context) is TITLE
+    assert len(bound.handed) == 1
+    assert bound.handed[0] is context
 
 
 def test_the_signature_is_read_once_per_function(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -52,7 +52,7 @@ def _declares(asked: Callable[..., Any]) -> bool:
     read uncached: one set on an instance or patched in is as short-lived as
     its Validator, and a callable object need not be hashable. The test is
     that ``__func__`` is a plain function, since ``MethodType`` binds any
-    callable.
+    callable (test_a_method_binding_an_unhashable_callable_is_handed_the_call_s_dict).
     """
     function = getattr(asked, "__func__", None)
     if not isinstance(function, FunctionType):
@@ -75,7 +75,9 @@ def _names_call_context(asked: Callable[..., Any]) -> bool:
     A callable with no signature to read (``ValueError`` for a builtin,
     ``TypeError`` for a ``__signature__`` that is not one) never declared the
     keyword, so it is asked as it was before
-    (test_a_parameters_with_no_signature_is_asked_as_before).
+    (test_a_parameters_with_no_signature_is_asked_as_before for ``TypeError``,
+    test_a_parameters_whose_signature_read_raises_value_error_is_asked_as_before
+    for ``ValueError``).
 
     One arc to coverage, each part held by its own test: without the first
     conjunct a ``parameters`` naming no ``call_context`` raises on ``.kind``

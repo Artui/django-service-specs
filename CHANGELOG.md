@@ -29,6 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declaring no keyword is asked as before. `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the keyword.
 
+### Changed
+- **Breaking: a subclass overriding `ServiceSpec.parameters` or
+  `SelectorSpec.parameters` must accept `call_context`.** Dispatch now passes it
+  as a keyword, so an override written `def parameters(self)` raises `TypeError`
+  (an unexpected keyword argument) under dispatch. Declare
+  `def parameters(self, *, call_context=None)` and pass it on to `super()`.
+
 ## [0.22.0] — 2026-10-31
 
 ### Changed

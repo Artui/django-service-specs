@@ -618,7 +618,9 @@ methods, and two more methods, an attribute and a property with defaults:
   `functools.wraps` wrapper that does not name the keyword itself: the
   method's own signature decides. `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
-  ignores.
+  ignores, so a subclass overriding either must accept `call_context`, which
+  dispatch now passes: an override written `parameters(self)` raises `TypeError`
+  under dispatch.
 - `validate(arguments, context)` returns the validated values keyed by name, or
   raises [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
   It receives only the arguments its own `parameters()` declare, already
