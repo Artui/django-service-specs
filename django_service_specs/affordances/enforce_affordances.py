@@ -13,7 +13,6 @@ from django_service_specs.affordances.utils import (
     answer_operation_condition,
     with_call_context,
 )
-from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -28,7 +27,7 @@ def enforce_affordances(
     pool: dict[str, Any],
     *,
     instance: Any,
-    reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    reserved: frozenset[str],
     call_context: dict[str, Any] | None = None,
 ) -> None:
     """Refuse the call if one of the spec's ``affordances`` is not met.
@@ -66,7 +65,11 @@ def enforce_affordances(
     a named parameter. ``reserved`` is this call's seed set, registered seeds
     included: ``seeds.reserved`` for the
     [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] the pool was
-    built with. A callable's result is read for truth, so one that returns
+    built with, the mount's ``pool_seeds.reserved``. It is required, with no
+    default, because a default would ask a condition with none of the registered
+    seeds, and one reading a registered seed (a tenant, a frozen flag) would fail
+    on a transport running a service without dispatch though dispatch serves it.
+    A callable's result is read for truth, so one that returns
     nothing refuses rather than allows.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the

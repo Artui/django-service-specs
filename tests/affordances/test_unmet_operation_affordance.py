@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -13,8 +13,8 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.pool.base_pool import base_pool
-from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
@@ -35,18 +35,21 @@ def opened(code: str) -> Affordance:
 
 
 def test_a_spec_declaring_nothing_is_offered() -> None:
-    assert unmet_operation_affordance(ServiceSpec(service=print), {}) is None
+    assert (
+        unmet_operation_affordance(ServiceSpec(service=print), {}, reserved=RESERVED_POOL_SEEDS)
+        is None
+    )
 
 
 def test_all_conditions_met_is_offered() -> None:
     spec = ServiceSpec(service=print, affordances=[opened("a"), opened("b")])
-    assert unmet_operation_affordance(spec, {}) is None
+    assert unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS) is None
 
 
 def test_the_first_unmet_condition_in_declaration_order_is_the_answer() -> None:
     first, second = closed("first"), closed("second")
     spec = ServiceSpec(service=print, affordances=[opened("a"), first, second])
-    assert unmet_operation_affordance(spec, {}) is first
+    assert unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS) is first
 
 
 @pytest.mark.django_db
@@ -55,13 +58,16 @@ def test_a_row_condition_is_skipped_without_a_query(
 ) -> None:
     spec = ServiceSpec(service=print, affordances=[UNAVAILABLE_ROW, opened("a")])
     with django_assert_num_queries(0):
-        assert unmet_operation_affordance(spec, {}) is None
+        assert unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS) is None
 
 
 def test_a_condition_returning_nothing_is_unmet() -> None:
     silent = Affordance(code="silent", reason="Said nothing.", when=lambda: None)
     assert (
-        unmet_operation_affordance(ServiceSpec(service=print, affordances=[silent]), {}) is silent
+        unmet_operation_affordance(
+            ServiceSpec(service=print, affordances=[silent]), {}, reserved=RESERVED_POOL_SEEDS
+        )
+        is silent
     )
 
 
@@ -71,13 +77,20 @@ def test_a_condition_that_cannot_be_answered_raises_rather_than_answering_no() -
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=broken)])
     with pytest.raises(RuntimeError, match="The flag store is down."):
-        unmet_operation_affordance(spec, {})
+        unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS)
+
+
+def test_reserved_is_required_not_defaulted() -> None:
+    """A default would ask a condition with none of the registered seeds: no default is asked."""
+    asked = cast(Any, unmet_operation_affordance)
+    with pytest.raises(TypeError, match="reserved"):
+        asked(ServiceSpec(service=print), {})
 
 
 def test_a_selector_spec_is_offered_whatever_its_mapping_holds() -> None:
     rename = ServiceSpec(service=print, affordances=[closed("frozen")])
     selector = SelectorSpec(kind=SelectorKind.LIST, selector=list, affordances={"rename": rename})
-    assert unmet_operation_affordance(selector, {}) is None
+    assert unmet_operation_affordance(selector, {}, reserved=RESERVED_POOL_SEEDS) is None
 
 
 @pytest.mark.django_db
@@ -91,22 +104,6 @@ class TestTheSeedsAConditionSees:
         pool = base_pool(user=ada, seeds=TENANT_SEEDS)
         assert unmet_operation_affordance(spec, pool, reserved=TENANT_SEEDS.reserved) is None
 
-    def test_by_default_a_registered_seed_is_withheld(self) -> None:
-        # The default is the kernel's own names, so a transport that built its
-        # pool with registered seeds and did not pass ``reserved`` asks the
-        # condition without them.
-        ada = make_user("ada")
-        seen: dict[str, Any] = {}
-
-        def when(**kwargs: Any) -> bool:
-            seen.update(kwargs)
-            return True
-
-        spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
-        pool = base_pool(user=ada, seeds=TENANT_SEEDS)
-        assert unmet_operation_affordance(spec, pool) is None
-        assert seen == {"user": ada, "progress": null_progress}
-
 
 def test_a_condition_answering_with_a_coroutine_is_refused_not_offered() -> None:
     answer = books_closed()
@@ -115,14 +112,14 @@ def test_a_condition_answering_with_a_coroutine_is_refused_not_offered() -> None
         affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
     )
     with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
-        unmet_operation_affordance(spec, {})
+        unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS)
     assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
 
 
 def test_a_foreign_declaration_answers_what_its_compiled_spec_does() -> None:
     first = closed("first")
     spec = ServiceSpec(service=print, affordances=[opened("a"), first])
-    assert unmet_operation_affordance(Foreign(spec), {}) is first
+    assert unmet_operation_affordance(Foreign(spec), {}, reserved=RESERVED_POOL_SEEDS) is first
 
 
 # The call's context: a transport asking ahead of a call has one to hand, or
@@ -146,7 +143,9 @@ def _naming_it(handed: list[Any]) -> ServiceSpec:
 def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None:
     handed: list[Any] = []
     context: dict[str, Any] = {}
-    unmet_operation_affordance(_naming_it(handed), base_pool(user=None), call_context=context)
+    unmet_operation_affordance(
+        _naming_it(handed), base_pool(user=None), call_context=context, reserved=RESERVED_POOL_SEEDS
+    )
     assert len(handed) == 2
     assert all(seen is context for seen in handed)
 
@@ -154,8 +153,8 @@ def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None
 def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
     handed: list[Any] = []
     spec = _naming_it(handed)
-    unmet_operation_affordance(spec, base_pool(user=None))
-    unmet_operation_affordance(spec, base_pool(user=None))
+    unmet_operation_affordance(spec, base_pool(user=None), reserved=RESERVED_POOL_SEEDS)
+    unmet_operation_affordance(spec, base_pool(user=None), reserved=RESERVED_POOL_SEEDS)
     first, again, second, _ = handed
     assert first == {}
     assert again is first
@@ -170,7 +169,9 @@ def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() 
         return True
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
-    unmet_operation_affordance(spec, base_pool(user=None), call_context={})
+    unmet_operation_affordance(
+        spec, base_pool(user=None), call_context={}, reserved=RESERVED_POOL_SEEDS
+    )
     assert seen == [{"user", "progress"}]
 
 
@@ -179,9 +180,13 @@ def test_the_call_context_passed_else_the_pool_s_else_a_fresh_one() -> None:
     handed: list[Any] = []
     held: dict[str, Any] = {}
     pool = {**base_pool(user=None), "call_context": held}
-    unmet_operation_affordance(_naming_it(handed), pool)
-    unmet_operation_affordance(_naming_it(handed), pool, call_context=held)
-    unmet_operation_affordance(_naming_it(handed), base_pool(user=None))
+    unmet_operation_affordance(_naming_it(handed), pool, reserved=RESERVED_POOL_SEEDS)
+    unmet_operation_affordance(
+        _naming_it(handed), pool, call_context=held, reserved=RESERVED_POOL_SEEDS
+    )
+    unmet_operation_affordance(
+        _naming_it(handed), base_pool(user=None), reserved=RESERVED_POOL_SEEDS
+    )
     from_pool, _, passed, _, fresh, _ = handed
     assert from_pool is held
     assert passed is held
@@ -194,7 +199,9 @@ def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
     handed: list[Any] = []
     pool = {**base_pool(user=None), "call_context": {}}
     with pytest.raises(ImproperlyConfigured, match="call_context"):
-        unmet_operation_affordance(_naming_it(handed), pool, call_context={})
+        unmet_operation_affordance(
+            _naming_it(handed), pool, call_context={}, reserved=RESERVED_POOL_SEEDS
+        )
     assert handed == []
 
 
@@ -212,7 +219,10 @@ class TestTheCallSRequestAndView:
         spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
         assert (
             unmet_operation_affordance(
-                spec, base_pool(user=None), call_context={"request": request}
+                spec,
+                base_pool(user=None),
+                call_context={"request": request},
+                reserved=RESERVED_POOL_SEEDS,
             )
             is None
         )

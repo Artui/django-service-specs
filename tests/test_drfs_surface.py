@@ -105,17 +105,17 @@ def _protocol(leaf: str, call: str) -> Pin:
 SURFACE: dict[str, Pin] = {
     # --- affordances --------------------------------------------------------------------------
     "enforce_affordances": _fn(
-        "affordances.enforce_affordances", "spec, pool, *, instance, reserved=, call_context="
+        "affordances.enforce_affordances", "spec, pool, *, instance, reserved, call_context="
     ),
     "aenforce_affordances": _fn(
-        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved=, call_context="
+        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved, call_context="
     ),
     "operation_affordances": _fn("affordances.operation_affordances", "spec"),
     "unmet_operation_affordance": _fn(
-        "affordances.unmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.unmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     "aunmet_operation_affordance": _fn(
-        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     # --- authorization ------------------------------------------------------------------------
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from asgiref.sync import sync_to_async
@@ -13,6 +13,7 @@ from django.db.models import Q
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -48,11 +49,19 @@ def test_the_signature_is_the_sync_one() -> None:
     assert inspect.iscoroutinefunction(aenforce_affordances)
 
 
+async def test_reserved_is_required_not_defaulted(hops: list[str]) -> None:
+    """The refusal comes at bind, before the no-affordance early return."""
+    asked = cast(Any, aenforce_affordances)
+    with pytest.raises(TypeError, match="reserved"):
+        await asked(ServiceSpec(service=print), _pool(), instance=None)
+    assert hops == []
+
+
 async def test_an_unmet_condition_refuses_with_its_code_and_reason() -> None:
     spec = ServiceSpec(service=print, affordances=[OPEN, BOOKS_CLOSED])
 
     with pytest.raises(ActionUnavailable) as caught:
-        await aenforce_affordances(spec, _pool(), instance=None)
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
 
     assert caught.value.code == "books_closed"
     assert caught.value.message == "The books are closed."
@@ -64,7 +73,10 @@ async def test_a_met_or_undeclared_condition_lets_the_call_through(
 ) -> None:
     spec = ServiceSpec(service=print, affordances=affordances)
 
-    assert await aenforce_affordances(spec, _pool(), instance=None) is None
+    assert (
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
+        is None
+    )
 
 
 @pytest.mark.parametrize("affordances", [None, []], ids=["undeclared", "empty"])
@@ -72,7 +84,10 @@ async def test_declaring_nothing_costs_no_executor_hop(
     affordances: list[Affordance] | None, hops: list[str]
 ) -> None:
     await aenforce_affordances(
-        ServiceSpec(service=print, affordances=affordances), {}, instance=None
+        ServiceSpec(service=print, affordances=affordances),
+        {},
+        instance=None,
+        reserved=RESERVED_POOL_SEEDS,
     )
 
     assert hops == []
@@ -85,7 +100,7 @@ async def test_every_condition_is_answered_in_one_hop(hops: list[str]) -> None:
     spec = ServiceSpec(service=print, affordances=[OPEN, NOT_ARCHIVED, BOOKS_CLOSED])
 
     with pytest.raises(ActionUnavailable) as caught:
-        await aenforce_affordances(spec, _pool(), instance=note)
+        await aenforce_affordances(spec, _pool(), instance=note, reserved=RESERVED_POOL_SEEDS)
 
     assert caught.value.code == "note_archived"
     assert hops == ["enforce_affordances"]
@@ -104,10 +119,13 @@ async def test_a_condition_that_queries_runs_off_the_loop() -> None:
     )
     ada = await sync_to_async(make_user)("ada")
 
-    assert await aenforce_affordances(spec, _pool(), instance=None) is None
+    assert (
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
+        is None
+    )
     await Note.objects.acreate(owner=ada, title="Old", archived=True)
     with pytest.raises(ActionUnavailable) as caught:
-        await aenforce_affordances(spec, _pool(), instance=None)
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
     assert caught.value.code == "archive_pending"
 
 
@@ -115,13 +133,15 @@ async def test_a_source_refuses_as_the_spec_it_compiles_to() -> None:
     source = Foreign(ServiceSpec(service=print, affordances=[OPEN, BOOKS_CLOSED]))
 
     with pytest.raises(ActionUnavailable) as caught:
-        await aenforce_affordances(source, _pool(), instance=None)
+        await aenforce_affordances(source, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
 
     assert caught.value.code == "books_closed"
 
 
 async def test_a_source_declaring_nothing_costs_no_executor_hop(hops: list[str]) -> None:
-    await aenforce_affordances(Foreign(ServiceSpec(service=print)), {}, instance=None)
+    await aenforce_affordances(
+        Foreign(ServiceSpec(service=print)), {}, instance=None, reserved=RESERVED_POOL_SEEDS
+    )
 
     assert hops == []
 
@@ -133,10 +153,10 @@ async def test_a_selector_spec_is_refused_as_the_sync_function_refuses_it(wrappe
     selector = SelectorSpec(kind=SelectorKind.LIST, selector=list)
     spec: Any = Foreign(selector) if wrapped else selector
     with pytest.raises(TypeError) as sync:
-        enforce_affordances(spec, _pool(), instance=None)
+        enforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
 
     with pytest.raises(TypeError) as awaited:
-        await aenforce_affordances(spec, _pool(), instance=None)
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
 
     assert str(awaited.value) == str(sync.value)
 
@@ -163,7 +183,11 @@ async def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -
     handed: list[Any] = []
     context: dict[str, Any] = {}
     await aenforce_affordances(
-        _naming_it(handed), base_pool(user=None), instance=None, call_context=context
+        _naming_it(handed),
+        base_pool(user=None),
+        instance=None,
+        call_context=context,
+        reserved=RESERVED_POOL_SEEDS,
     )
     assert len(handed) == 2
     assert all(seen is context for seen in handed)
@@ -172,8 +196,12 @@ async def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -
 async def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
     handed: list[Any] = []
     spec = _naming_it(handed)
-    await aenforce_affordances(spec, base_pool(user=None), instance=None)
-    await aenforce_affordances(spec, base_pool(user=None), instance=None)
+    await aenforce_affordances(
+        spec, base_pool(user=None), instance=None, reserved=RESERVED_POOL_SEEDS
+    )
+    await aenforce_affordances(
+        spec, base_pool(user=None), instance=None, reserved=RESERVED_POOL_SEEDS
+    )
     first, again, second, _ = handed
     assert first == {}
     assert again is first
@@ -188,5 +216,7 @@ async def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_cont
         return True
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
-    await aenforce_affordances(spec, base_pool(user=None), instance=None, call_context={})
+    await aenforce_affordances(
+        spec, base_pool(user=None), instance=None, call_context={}, reserved=RESERVED_POOL_SEEDS
+    )
     assert seen == [{"user", "progress"}]
