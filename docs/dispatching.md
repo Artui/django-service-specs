@@ -724,7 +724,19 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   and none of what every pool carries. A service is handed `data`, and
   `instance` or `collection` only where a target selector resolves one; a
   selector is handed neither, and a service none of its target selector's
-  reads or its shapes;
+  reads or its shapes. The same is asked of these callables, against what
+  dispatch hands that one: a service spec's
+  preconditions are handed the service's pool, and a selector spec's the
+  selector's with the rows as `collection` or the row as `instance`; an
+  affordance condition, the spec's own or one a selector's `affordances` maps
+  to, is handed only the call's seeds (`user`, `progress`, `call_context`,
+  `request`, `view` and those the mount registers), so a rename whose
+  condition reads `frozen` is refused on a mount registering no `frozen` seed;
+  the output selector is handed the service's return as `instance` and
+  `result` and what every pool carries, never an argument nor its own reads;
+  and an `extend_queryset` its selector's pool with the `queryset`. Each is
+  named as the spec names it, such as `ServiceSpec.affordances[0] ('frozen').when`
+  or `SelectorSpec.preconditions[0] (owns_it)`;
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
   missing;
@@ -740,10 +752,10 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   does not resolve, such as a forward reference to a name not importable where
   the callable is defined: it is resolved on its own, so it leaves the
   callable's other keywords readable;
-- a service, selector or target selector whose signature cannot be read, such
-  as a builtin type like `dict`: dispatch binds every callable's keywords from
-  its signature, so every call reaching it fails. That seat is refused for
-  this alone, and the other seats are still checked.
+- any of those callables whose signature cannot be read, such as a builtin
+  type like `dict`: dispatch binds every callable's keywords from its
+  signature, so every call reaching it fails. That seat is refused for this
+  alone, and the other seats are still checked.
 
 ```python
 --8<--
@@ -754,8 +766,17 @@ docs/examples/dispatching.py:check_seeds
 It runs nothing: no seed resolves and no provider is called. What it cannot
 see it leaves to dispatch: a provider that does not annotate its keys may fill
 any keyword in its seat, and a Validator may return or bind a value it does
-not declare, so neither seat is held to the keywords it requires. An
-`extra_kwargs` overlay fills keywords it cannot see either.
+not declare, so neither seat is held to the keywords it requires, nor is a
+precondition or an `extend_queryset` beside one. An `extra_kwargs` overlay
+fills keywords it cannot see either. A precondition, a condition, the output
+selector and an `extend_queryset` are asked only whether a keyword they
+require is unfilled, and whether their signature reads; the positional-only,
+optional-read and array checks are not run on them. A callable taking
+`**kwargs` requires nothing, so one forwarding into a stricter callable is not
+judged by what that callable requires; and a pool a transport builds itself to
+answer a condition before any call is its own, not the one this reads.
+A provider's own keywords (`kwargs`, `input_data`, `progress_reporter`), a
+`filter_set`, a form's `form_kwargs` and a seed's resolver are not read either.
 
 Two of the readers it shares with dispatch are public for a transport building
 its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters],

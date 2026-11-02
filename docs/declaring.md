@@ -81,6 +81,10 @@ such a spec where it registers it, with
 refuses an optional read over a selector keyword with no default, which a call
 leaving the read out is refused for, and an array read with no `items` over a
 keyword annotated `list[int]`, which would hand it any element a caller sends.
+It reads a precondition, an affordance condition, the output selector and an
+`extend_queryset` as well, each against what dispatch hands it: a condition is
+handed only the call's seeds, so one requiring a seed the mount does not
+register is refused there rather than failing every call.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.

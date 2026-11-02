@@ -5,24 +5,27 @@ from __future__ import annotations
 import functools
 import inspect
 import types
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any, Final, TypeVar, Union, get_args, get_origin
 
 import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import get_type_hints
 
+from django_service_specs.affordances.utils import ambient_pool
 from django_service_specs.dispatch.utils import (
     COLLECTION_SOURCE,
     EVERY_POOL,
     INSTANCE_SOURCE,
+    OUTPUT_SOURCE,
     SELECTOR_SOURCE,
     seed_named_refusal,
     split_seed_named,
     target_entry,
 )
 from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.selectors.utils import required_keywords
@@ -30,14 +33,56 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.provider_keys import ProviderKeys
+from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UNSET
+from django_service_specs.types.utils import callable_name, is_row_condition
 
 _SERVICE_SOURCE: Final = "ServiceSpec.service"
 _SEQUENCES: Final = (list, tuple, Sequence)
 # ``typing_extensions.Any`` is its own object before Python 3.11.
 _ANY_ELEMENT: Final = (None, Any, typing_extensions.Any, object)
 _BY_KEYWORD: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
+
+# The keys dispatch writes into a pool as literals, mirrored here. Each is
+# held by a test dispatching a callable that requires it and seeing it run
+# (TestWhatEachThirdOnlySeatIsHanded), so a key dispatch renames fails there.
+# The row a RETRIEVE selector spec's preconditions are handed
+# (``conclude_selector``), and the service's return in the output selector's
+# pool (``finish_service``).
+_INSTANCE: Final = "instance"
+# The rows a LIST selector spec's preconditions are handed (``conclude_selector``).
+_COLLECTION: Final = "collection"
+# The service's return in the output selector's pool (``finish_service``).
+_RESULT: Final = "result"
+# What ``extend_queryset`` shapes (``apply_shaping``).
+_QUERYSET: Final = "queryset"
+
+# The spec each selector seat belongs to, as its construction refusals name it.
+_SPEC_LABELS: Final[Mapping[str, str]] = {
+    SELECTOR_SOURCE: "SelectorSpec",
+    INSTANCE_SOURCE: "ServiceSpec.instance_selector_spec",
+    COLLECTION_SOURCE: "ServiceSpec.collection_selector_spec",
+    OUTPUT_SOURCE: "ServiceSpec.output_selector_spec",
+}
+
+# Why nothing fills a keyword, per seat: the rest of the third refusal.
+_UNDECLARED: Final = (
+    "no read or Validator field declares it, no registered seed is named so and no provider "
+    "is annotated to return it, so every call reaching it would fail. Declare it, or give it "
+    "a default."
+)
+_UNSEEDED: Final = (
+    "a condition is handed only the call's seeds - user, progress, call_context, request, "
+    "view and those this mount registers - so every call reaching it would fail. Register "
+    "the seed on the mount, or give it a default."
+)
+_UNRETURNED: Final = (
+    "an output selector is handed the service's return as instance and result and the "
+    "call's seeds, never an argument, so every call reaching it would fail. Read it from "
+    "result, register the seed on the mount, or give it a default."
+)
 
 
 def check_seeds(
@@ -82,7 +127,28 @@ def check_seeds(
        seeds ``data`` for a service only, so a selector requiring it is
        refused as any unfilled keyword is. A service is handed its spec's
        reads, never its target selector's or its shapes, which reach it as
-       ``shapes``.
+       ``shapes``. It reads these callables, each against what dispatch
+       hands that one:
+
+       - the service, the selector and the target selector, as above;
+       - a service spec's ``preconditions``, handed the service's pool, and
+         a selector spec's, handed the selector's with the rows as
+         ``collection`` (a LIST) or the row as ``instance`` (a RETRIEVE);
+       - each callable ``Affordance`` condition, the spec's own and those
+         a selector's ``affordances`` map to, handed only the call's seeds:
+         ``user``, ``progress``, ``call_context``, ``request``, ``view``
+         and a seed ``pool_seeds`` registers, never an argument
+         (``ambient_pool``); a condition on the row binds nothing;
+       - the output selector, handed the service's return as ``instance``
+         and ``result`` and what every pool carries, never an argument nor
+         its own reads;
+       - each selector's ``extend_queryset``, handed its selector's pool
+         with the ``queryset``.
+
+       Each is named as the spec names it, such as
+       ``ServiceSpec.affordances[0] ('frozen').when`` or
+       ``SelectorSpec.preconditions[0] (owns_it)``, in the order a call
+       reaches it.
     4. **A keyword the callable requires that only an optional read fills**:
        a read the shape check does not demand - declared ``required=False``,
        or declaring a ``default``, which is reported and never applied - over
@@ -106,11 +172,11 @@ def check_seeds(
        ``reflected`` read's.
 
     **A callable whose signature cannot be read** is refused too, ahead of
-    these for its seat: a service, selector or target selector such as a
-    builtin type like ``dict``, which dispatch cannot bind a keyword to and so
-    fails on for every call reaching it. The second to fifth need that
-    signature, so such a seat is answered by this refusal alone, and the
-    other seats are still checked.
+    these for its seat: any callable the third reads, such as a builtin type
+    like ``dict``, which dispatch cannot bind a keyword to and so fails on
+    for every call reaching it. The second to fifth need that signature, so
+    such a seat is answered by this refusal alone, and the other seats are
+    still checked.
 
     A Validator field the service never receives is not among them, because
     such a spec runs and may mean to: [`unreceived_fields`][django_service_specs.dispatch.unreceived_fields.unreceived_fields]
@@ -128,9 +194,19 @@ def check_seeds(
     service beside a Validator is not judged by the third and fourth either
     (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
     handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this
-    cannot see, and should not call it for such a spec. The output
-    selector, an ``extend_queryset``, the preconditions and the affordance
-    conditions are not read.
+    cannot see, and should not call it for such a spec. Only the third
+    refusal, and the unreadable signature, are run on a precondition, a
+    condition, the output selector and an ``extend_queryset``; the second,
+    fourth and fifth are not. A precondition beside a Validator, or one or an
+    ``extend_queryset`` beside an untyped provider, is left to dispatch as the
+    callable beside it is. A callable taking ``**kwargs`` requires nothing,
+    so one forwarding into a stricter callable is not judged by what that
+    callable requires. Nor is the pool a transport builds itself to answer
+    a condition at describe time (``unmet_operation_affordance``): this reads
+    the pool dispatch builds. Nor does it read a provider's own keywords
+    (``kwargs``, ``input_data``, ``progress_reporter``), a ``filter_set``, a
+    form's ``form_kwargs`` or a seed's resolver: dispatch binds each by
+    keyword, and this is not asked of any.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
@@ -144,9 +220,8 @@ def check_seeds(
     _, taken = split_seed_named(spec, spec.parameters(), pool_seeds)
     if taken:
         problems.append(seed_named_refusal(spec, taken, pool_seeds))
-    filled_everywhere = EVERY_POOL | pool_seeds.names
-    for seat in _seats(spec):
-        problems += _unfilled(seat, filled_everywhere)
+    for seat in _seats(spec, pool_seeds):
+        problems += _refusals(seat)
     if problems:
         raise ImproperlyConfigured(" ".join(problems))
 
@@ -155,47 +230,154 @@ def check_seeds(
 class _Seat:
     """A callable a call binds from its pool, and what fills that pool.
 
-    ``handed`` is what the pool carries beyond every pool's own and the
-    registered seeds; ``validated`` is whether a Validator's values join it.
+    ``fills`` is what the pool carries beyond the seat's reads and provider:
+    every pool's own names and the registered seeds for most, less for a
+    condition, more where dispatch adds an entry of its own. ``validated`` is
+    whether a Validator's values join it. ``every_check`` is false for a seat
+    only the unreadable signature and the third refusal are run on, and
+    ``unfilled`` is the third refusal's account of why nothing fills it.
     """
 
     label: str
     fn: Callable[..., Any]
     reads: Parameters
     provider: Callable[..., Any] | None
-    handed: frozenset[str] = frozenset()
+    fills: frozenset[str]
     validated: bool = False
+    every_check: bool = True
+    unfilled: str = _UNDECLARED
 
 
-def _seats(spec: ServiceSpec | SelectorSpec) -> list[_Seat]:
-    """Each callable a call binds by its pool, the target selector before the service, as a call runs them.
+def _seats(spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds) -> list[_Seat]:
+    """Each callable a call binds by its pool, in the order a call reaches them.
+
+    A selector, then the conditions its ``affordances`` map to, answered in
+    ``settle`` before the shaping, then its ``extend_queryset``; for a
+    selector spec, its preconditions last. A service spec's target selector
+    so, then its own conditions, its preconditions and its service, as
+    ``prepare_service`` runs them, then its output selector so.
 
     A target selector's pool is a selector's. A service's adds ``data`` and
     the target under the name ``target_entry`` hands it as, the rule
-    ``walk_target`` returns it by.
+    ``walk_target`` returns it by. A precondition is handed its service's or
+    its selector's pool, a selector spec's with the rows or the row beside it.
     """
+    everywhere = EVERY_POOL | pool_seeds.names
+    conditions = _condition_fills(everywhere, pool_seeds)
     if isinstance(spec, SelectorSpec):
-        return [_Seat(SELECTOR_SOURCE, spec.selector, spec.reads, spec.kwargs)]
+        own = _Seat(SELECTOR_SOURCE, spec.selector, spec.reads, spec.kwargs, everywhere)
+        row = _COLLECTION if spec.kind is SelectorKind.LIST else _INSTANCE
+        return [
+            *_selector_seats(spec, own, conditions),
+            *_preconditions(spec, "SelectorSpec", replace(own, fills=own.fills | {row})),
+        ]
     seats: list[_Seat] = []
     target = spec.target_selector_spec()
     if target is not None:
-        label = INSTANCE_SOURCE if spec.instance_selector_spec is not None else COLLECTION_SOURCE
-        seats.append(_Seat(label, target.selector, target.reads, target.kwargs))
-    seats.append(
-        _Seat(
-            _SERVICE_SOURCE,
-            spec.service,
-            spec.reads,
-            spec.kwargs,
-            handed=frozenset({"data"}) | target_entry(spec, None).keys(),
-            validated=spec.validator is not None,
-        )
+        source = INSTANCE_SOURCE if spec.instance_selector_spec is not None else COLLECTION_SOURCE
+        seat = _Seat(source, target.selector, target.reads, target.kwargs, everywhere)
+        seats += _selector_seats(target, seat, conditions)
+    service = _Seat(
+        _SERVICE_SOURCE,
+        spec.service,
+        spec.reads,
+        spec.kwargs,
+        everywhere | {"data"} | target_entry(spec, None).keys(),
+        validated=spec.validator is not None,
     )
+    seats += _conditions("ServiceSpec.affordances", spec.affordances, conditions)
+    seats += _preconditions(spec, "ServiceSpec", service)
+    seats.append(service)
+    output = spec.output_selector_spec
+    if output is not None:
+        # Never its reads, which its pool does not carry, and no provider,
+        # which it is refused when the service spec is built.
+        seat = _Seat(
+            OUTPUT_SOURCE,
+            output.selector,
+            Parameters.of(),
+            None,
+            everywhere | {_INSTANCE, _RESULT},
+            every_check=False,
+            unfilled=_UNRETURNED,
+        )
+        seats += _selector_seats(output, seat, conditions)
     return seats
 
 
-def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
-    """The second to fifth refusals, for one seat, or the one that precedes them."""
+def _condition_fills(everywhere: frozenset[str], pool_seeds: PoolSeeds) -> frozenset[str]:
+    """What a callable affordance condition is handed: ``ambient_pool``'s names, and the call's own two.
+
+    ``ambient_pool`` is asked, not retyped, so the check moves with it.
+    ``CALL_SEEDS`` join unconditionally: ``pool_kwargs`` adds them whenever
+    the pool carries ``call_context``, and ``ambient_pool`` keeps that key
+    whatever ``reserved`` names (the ``request`` and ``view`` cases of
+    TestWhatEachThirdOnlySeatIsHanded fail without them).
+    """
+    ambient = ambient_pool(dict.fromkeys(everywhere), reserved=pool_seeds.reserved)
+    return frozenset(ambient) | CALL_SEEDS
+
+
+def _selector_seats(spec: SelectorSpec, seat: _Seat, conditions: frozenset[str]) -> list[_Seat]:
+    """A selector's seat, the conditions its ``affordances`` map to, then its ``extend_queryset``'s.
+
+    Only a callable condition, which ``split_affordances`` answers against
+    the pool: a condition on the row is SQL, and binds nothing.
+    ``extend_queryset`` is handed its selector's pool with the queryset.
+    """
+    label = _SPEC_LABELS[seat.label]
+    seats = [seat]
+    for name, declarer in (spec.affordances or {}).items():
+        seats += _conditions(f"{label}.affordances[{name!r}]", declarer.affordances, conditions)
+    if spec.extend_queryset is not None:
+        seats.append(
+            replace(
+                seat,
+                label=f"{label}.extend_queryset",
+                fn=spec.extend_queryset,
+                fills=seat.fills | {_QUERYSET},
+                every_check=False,
+                unfilled=f"it is handed {_QUERYSET} beside what its selector is handed, and "
+                + seat.unfilled,
+            )
+        )
+    return seats
+
+
+def _conditions(
+    label: str, affordances: Sequence[Affordance] | None, fills: frozenset[str]
+) -> list[_Seat]:
+    """A seat for each callable condition among ``affordances``, named by index and code as the spec names one."""
+    return [
+        _Seat(
+            f"{label}[{index}] ({affordance.code!r}).when",
+            affordance.when,
+            Parameters.of(),
+            None,
+            fills,
+            every_check=False,
+            unfilled=_UNSEEDED,
+        )
+        for index, affordance in enumerate(affordances or ())
+        if not is_row_condition(affordance.when)
+    ]
+
+
+def _preconditions(spec: ServiceSpec | SelectorSpec, label: str, seat: _Seat) -> list[_Seat]:
+    """``seat`` with each precondition in its callable's place, named as dispatch names one."""
+    return [
+        replace(
+            seat,
+            label=f"{label}.preconditions[{index}] ({callable_name(precondition)})",
+            fn=precondition,
+            every_check=False,
+        )
+        for index, precondition in enumerate(spec.preconditions or ())
+    ]
+
+
+def _refusals(seat: _Seat) -> list[str]:
+    """The second to fifth refusals for one seat, or the third alone for a seat not every check reads, or the one that precedes them."""
     try:
         signature = inspect.signature(seat.fn)
     except (ValueError, TypeError):
@@ -215,6 +397,29 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
             "bind no keyword to it and every call reaching it fails. Declare it as a "
             "function that takes the keywords it needs."
         ]
+    keys = provider_keys(seat.provider)
+    if not seat.every_check:
+        return _only_the_third(seat, keys)
+    return _every_check(seat, signature, keys)
+
+
+def _only_the_third(seat: _Seat, keys: ProviderKeys | None) -> list[str]:
+    """The third refusal alone, for a condition, a precondition, an output selector or an ``extend_queryset``.
+
+    A precondition or an ``extend_queryset`` beside an untyped provider, or a
+    precondition beside a Validator, is left to dispatch as the callable it
+    stands beside is: one arc, each held by its own test,
+    test_a_selector_precondition_beside_an_untyped_provider_is_left_to_dispatch
+    and test_a_service_precondition_beside_a_validator_is_left_to_dispatch.
+    """
+    if keys is None or seat.validated:
+        return []
+    unfilled = _unfilled(seat, _required(seat, keys))
+    return [_nothing_fills(seat, unfilled)] if unfilled else []
+
+
+def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys | None) -> list[str]:
+    """The second to fifth refusals, for one seat whose signature reads."""
     problems: list[str] = []
     positional = sorted(
         name
@@ -233,8 +438,7 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
             "default, which dispatch never fills: it calls every callable by keyword. Make "
             "each one a keyword, or give it a default."
         )
-    keys = provider_keys(seat.provider)
-    untyped = _untyped_elements(seat, signature, keys, filled)
+    untyped = _untyped_elements(seat, signature, keys, seat.fills)
     if untyped:
         problems.append(
             f"{seat.label} reads the array(s) {untyped} with no items into keywords annotated "
@@ -248,22 +452,15 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
     # held by its own test.
     if keys is None or seat.validated:
         return problems
-    filled = filled | seat.handed | keys.filled | keys.declinable
-    required = [name for name in required_keywords(seat.fn) if name not in filled]
+    required = _required(seat, keys)
     # The shape check's own reading of a demanded parameter (``check_arguments``).
     demanded = frozenset(
         param.name for param in seat.reads if param.required and param.default is UNSET
     )
-    declared = seat.reads.names()
-    unfilled = sorted(name for name in required if name not in declared)
-    optional = sorted(name for name in required if name in declared - demanded)
+    unfilled = _unfilled(seat, required)
+    optional = sorted(name for name in required if name in seat.reads.names() - demanded)
     if unfilled:
-        problems.append(
-            f"{seat.label} requires the keyword(s) {unfilled}, which nothing fills: no read "
-            "or Validator field declares it, no registered seed is named so and no provider "
-            "is annotated to return it, so every call reaching it would fail. Declare it, or "
-            "give it a default."
-        )
+        problems.append(_nothing_fills(seat, unfilled))
     if optional:
         problems.append(
             f"{seat.label} requires the keyword(s) {optional}, declared as optional reads "
@@ -271,6 +468,22 @@ def _unfilled(seat: _Seat, filled: frozenset[str]) -> list[str]:
             "Declare the read required, or give the keyword a default."
         )
     return problems
+
+
+def _required(seat: _Seat, keys: ProviderKeys) -> list[str]:
+    """The keywords ``seat``'s callable requires that neither its pool's own names nor its provider fill."""
+    filled = seat.fills | keys.filled | keys.declinable
+    return [name for name in required_keywords(seat.fn) if name not in filled]
+
+
+def _unfilled(seat: _Seat, required: list[str]) -> list[str]:
+    """Those of ``required`` no read of the seat declares either, sorted: the third refusal's offenders."""
+    declared = seat.reads.names()
+    return sorted(name for name in required if name not in declared)
+
+
+def _nothing_fills(seat: _Seat, unfilled: list[str]) -> str:
+    return f"{seat.label} requires the keyword(s) {unfilled}, which nothing fills: {seat.unfilled}"
 
 
 def _untyped_elements(
