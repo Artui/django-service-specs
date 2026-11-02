@@ -115,6 +115,7 @@ def test_a_child_is_handed_only_what_it_declares() -> None:
         )
     assert [dict(a or {}) for a in arguing.handed] == [{"pk": 3}]
     assert tenanted.handed == [(context, "acme")]
+    assert tenanted.handed[0][0] is context
 
 
 def test_a_combinator_is_equal_only_to_itself() -> None:

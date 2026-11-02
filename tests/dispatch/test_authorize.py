@@ -428,6 +428,7 @@ class TestCombinators:
         )
         assert arguing.questions() == [("has_permission", {"pk": 3})]
         assert offered.asked == [("has_permission", context, "acme")]
+        assert offered.asked[0][1] is context
 
     def test_the_refusal_names_the_combinator_s_message(self) -> None:
         # Not the message of the check inside that refused: the combinator is

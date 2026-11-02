@@ -31,7 +31,8 @@ class AnyOf(_Combinator):
     question is asked again rather than remembered from the class-level call,
     so the answer holds under a grant that covered that call and asked
     nothing (test_any_of_under_a_covering_grant_still_judges_the_row), and
-    nothing is written to the call's context. A check that opts into a seed
+    nothing is written to the call's context
+    (test_any_of_writes_nothing_to_the_call_s_context). A check that opts into a seed
     or the arguments at the class-level question is handed them at the row
     and scope questions too, since it is asked there.
 

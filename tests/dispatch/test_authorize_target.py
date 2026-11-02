@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.authorize import authorize
@@ -281,6 +282,17 @@ def test_a_check_is_handed_the_context_s_request_and_view() -> None:
     assert check.seen == [("has_object_permission", request, view)]
 
 
+class _ReadsTheContext(PermissionCheck):
+    """Refuses at class level, allows any row by default, and declares the call's context."""
+
+    def __init__(self, log: list[str]) -> None:
+        self.log = log
+
+    def has_permission(self, principal: Any, spec: Any, *, call_context: Any) -> bool:
+        self.log.append("owner.has_permission")
+        return False
+
+
 class TestAnyOf:
     """At the row question a check of ``AnyOf`` counts only where it passes the class-level one too."""
 
@@ -316,6 +328,20 @@ class TestAnyOf:
         with pytest.raises(NotPermitted):
             authorize_target(spec, principal, object(), grant=grant, call_context={})
         assert "owner.has_object_permission" not in log
+
+    def test_any_of_writes_nothing_to_the_call_s_context(self) -> None:
+        # Handed the context, since a check inside it declares it, and still
+        # answering the row from the questions alone: nothing a later stage,
+        # or another transport's grant, could lack.
+        log: list[str] = []
+        context: dict[str, Any] = {}
+        spec = _spec([AnyOf(_ReadsTheContext(log), Answers("staff", log, row=False))])
+        principal = object()
+        grant = authorize(spec, principal, call_context=context)
+        with pytest.raises(NotPermitted):
+            authorize_target(spec, principal, object(), grant=grant, call_context=context)
+        assert context == {}
+        assert log.count("owner.has_permission") == 2
 
     def test_a_child_passing_both_questions_passes_the_row(self) -> None:
         log: list[str] = []
