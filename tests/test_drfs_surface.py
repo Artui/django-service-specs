@@ -112,10 +112,10 @@ SURFACE: dict[str, Pin] = {
     ),
     "operation_affordances": _fn("affordances.operation_affordances", "spec"),
     "unmet_operation_affordance": _fn(
-        "affordances.unmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.unmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     "aunmet_operation_affordance": _fn(
-        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     # --- authorization ------------------------------------------------------------------------
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
