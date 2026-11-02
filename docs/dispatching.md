@@ -347,8 +347,13 @@ docs/examples/dispatching.py:combinators
 
 A check inside a combinator is handed what it declares and nothing else - the
 call's `arguments`, its context, a seed - and a seed it names is resolved for
-the call as one the spec's own checks name would be;
-`checks_read_arguments` reads through a combinator the same way. Every answer
+the call as one the spec's own checks name would be, bar the names a
+combinator's own methods take: `principal` and `spec` at every question,
+`target` at the row one and `scope` at the scope one, as asked of the
+combinator or of a check it asks again there (`AnyOf` asks `has_permission`
+again at both). A check naming one is refused when the combinator is built,
+since a seed of that name cannot reach it through the combinator; rename the
+keyword. `checks_read_arguments` reads through a combinator the same way. Every answer
 inside one is read as an answer at the top is, so a coroutine fails closed,
 and a check that raises ends the call with its error rather than being read as
 a refusal. A refusal says the combinator's `message`, not that of a check

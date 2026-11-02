@@ -7,8 +7,13 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.all_of import AllOf
+from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
-from tests.authorization.utils import Allow, Answers
+from django_service_specs.dispatch.dispatch import dispatch
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
+from tests.authorization.utils import Allow, Answers, opting_into
 
 _PRINCIPAL, _SPEC, _ROW = object(), object(), object()
 
@@ -115,3 +120,55 @@ class TestAChildIsRefused:
         named = f"AllOf.checks[1].{method} is {type(check).__name__}.{method}, an async callable"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
             AllOf(Allow(), check)
+
+
+_HP, _HOP, _HSP = "has_permission", "has_object_permission", "has_scope_permission"
+
+
+@pytest.mark.parametrize(
+    ("asked", "name"),
+    [
+        (_HP, "principal"),
+        (_HP, "spec"),
+        (_HOP, "principal"),
+        (_HOP, "spec"),
+        (_HOP, "target"),
+        (_HSP, "principal"),
+        (_HSP, "spec"),
+        (_HSP, "scope"),
+    ],
+)
+def test_a_child_naming_a_parameter_of_all_of_is_refused(asked: str, name: str) -> None:
+    named = (
+        f"AllOf.checks[1] opts into a seed named '{name}' at {asked}, and "
+        f"AllOf.{asked} takes {name} itself, so a seed of that name cannot reach "
+        "the child through it. Rename the keyword."
+    )
+    with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+        AllOf(Allow(), opting_into(name, asked))
+
+
+def test_a_child_naming_a_parameter_of_all_of_is_refused_at_depth_two() -> None:
+    with pytest.raises(ImproperlyConfigured, match=re.escape("AllOf.checks[0] opts into")):
+        AllOf(AllOf(opting_into("scope", _HSP)))
+
+
+class _ScopeSeedAtClassLevel(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, *, scope: Any) -> bool:
+        return scope == "seeded"
+
+
+def test_a_seed_named_for_another_question_s_parameter_is_accepted_and_reaches_the_child() -> None:
+    # AllOf asks has_permission at the class-level question alone, which
+    # takes no scope, so the seed is handed through (and AnyOf, re-asking it
+    # at the scope question, would refuse the same child).
+    seeds = DEFAULT_POOL_SEEDS.extend(scope=lambda *, user: "seeded")
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=lambda: [1, 2],
+        permissions=[AllOf(_ScopeSeedAtClassLevel())],
+    )
+    assert dispatch(spec, principal=object(), arguments={}, pool_seeds=seeds).value == [1, 2]
+    other = DEFAULT_POOL_SEEDS.extend(scope=lambda *, user: "other")
+    with pytest.raises(NotPermitted):
+        dispatch(spec, principal=object(), arguments={}, pool_seeds=other)

@@ -156,7 +156,11 @@ class _Combinator(PermissionCheck):
     one of its children declares - by the ``authorize`` functions, by seed
     resolution and by ``checks_read_arguments`` alike - and each child is
     handed only what it declares itself
-    (test_a_child_is_handed_only_what_it_declares).
+    (test_a_child_is_handed_only_what_it_declares). The one thing it cannot
+    be handed is a seed named for a parameter the combinator's own method
+    takes - ``principal``, ``spec``, ``target`` at the row question,
+    ``scope`` at the scope one: a child opting into one is refused when the
+    combinator is built.
 
     Every child's answer is read through ``sync_answer``, so a plain ``def``
     handing back a coroutine fails closed inside a combinator as it does at
@@ -168,7 +172,9 @@ class _Combinator(PermissionCheck):
     own ``message`` (test_the_refusal_names_the_combinator_s_message).
 
     Refused when built, with ``ImproperlyConfigured``: no checks at all
-    (test_an_empty_combinator_is_refused), a check failing
+    (test_an_empty_combinator_is_refused), a child opting into a seed named
+    for a parameter of the combinator's own method
+    (``_refuse_seeds_named_for_its_parameters``), a check failing
     ``refuse_unusable_check`` (``TestAChildIsRefused``), and ``Unrestricted``,
     a subclass included, which stays a decision a spec makes by name
     (test_unrestricted_inside_a_combinator_is_refused). A combinator inside
@@ -198,6 +204,36 @@ class _Combinator(PermissionCheck):
                 )
         self.checks: tuple[PermissionCheck, ...] = checks
         self.message = message
+        self._refuse_seeds_named_for_its_parameters()
+
+    def _refuse_seeds_named_for_its_parameters(self) -> None:
+        """Refuse a child opting into a name this combinator's own method takes at that question.
+
+        Every question's method takes ``principal`` and ``spec`` by name, the
+        row one ``target`` and the scope one ``scope``, and a caller hands
+        what the combinator declares by keyword: a child opting into one of
+        those names makes the call fail with a duplicate argument, where the
+        same check at the top of a spec would be handed the seed. The names
+        are read off the method's own signature, so they cannot drift from
+        it. The routed questions are the ones ``declared_keywords`` unions, so
+        a nested combinator is read through what it declares and depth is
+        covered
+        (``TestAChildNamingAParameterOfItsCombinatorIsRefused`` in each
+        combinator's tests, which fail without this).
+        """
+        name = type(self).__name__
+        for method, _ in QUESTIONS:
+            own = frozenset(_function_keywords(getattr(type(self), method))[1])
+            for index, child in enumerate(self.checks):
+                for asked, filled in self._asks[method]:
+                    taken = declared_keywords(child, asked, positional=filled) & own
+                    if taken:
+                        seed = min(taken)
+                        raise ImproperlyConfigured(
+                            f"{name}.checks[{index}] opts into a seed named {seed!r} at "
+                            f"{asked}, and {name}.{method} takes {seed} itself, so a seed of "
+                            f"that name cannot reach the child through it. Rename the keyword."
+                        )
 
     def _passes(
         self,

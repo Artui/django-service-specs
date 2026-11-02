@@ -10,7 +10,12 @@ from django_service_specs.authorization.all_of import AllOf
 from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.none_of import NoneOf
 from django_service_specs.authorization.permission_check import PermissionCheck
-from tests.authorization.utils import Answers, ClassLevel, refuses
+from django_service_specs.dispatch.authorize_scope import authorize_scope
+from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.grant import Grant
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.selector_kind import SelectorKind
+from tests.authorization.utils import Answers, ClassLevel, opting_into, refuses
 
 _PRINCIPAL, _SPEC, _ROW = object(), object(), object()
 
@@ -121,3 +126,50 @@ def test_an_empty_combinator_is_refused() -> None:
     # anyone run the operation it guards.
     with pytest.raises(ImproperlyConfigured, match=r"NoneOf\.checks is empty"):
         NoneOf()
+
+
+_HP, _HOP, _HSP = "has_permission", "has_object_permission", "has_scope_permission"
+
+
+@pytest.mark.parametrize("name", ["principal", "spec"])
+def test_a_child_naming_a_parameter_of_none_of_is_refused(name: str) -> None:
+    named = (
+        f"NoneOf.checks[0] opts into a seed named '{name}' at {_HP}, and "
+        f"NoneOf.{_HP} takes {name} itself, so a seed of that name cannot reach "
+        "the child through it. Rename the keyword."
+    )
+    with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+        NoneOf(opting_into(name, _HP))
+
+
+def test_a_child_naming_a_parameter_of_none_of_is_refused_at_depth_two() -> None:
+    with pytest.raises(ImproperlyConfigured, match=re.escape("AllOf.checks[0] opts into")):
+        NoneOf(AllOf(opting_into("spec", _HP)))
+
+
+@pytest.mark.parametrize("name", ["target", "scope"])
+def test_a_seed_named_for_a_row_or_scope_parameter_is_accepted(name: str) -> None:
+    # NoneOf asks the class-level question alone and its row and scope
+    # methods take no seed of the child's, so only principal and spec collide.
+    NoneOf(opting_into(name, _HP))
+
+
+class _TenantAtClassLevel(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any, *, tenant: Any) -> bool:
+        return tenant == "suspended"
+
+
+def test_a_seed_a_child_names_at_the_class_level_is_not_handed_to_the_row_or_scope_question() -> (
+    None
+):
+    # The empty row and scope entries of NoneOf._asks: replacing either with
+    # the class-level question hands the tenant to the inherited
+    # has_object_permission or has_scope_permission, which takes no keyword,
+    # and this raises TypeError (one mutation per entry, both shown red).
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=list, permissions=[NoneOf(_TenantAtClassLevel())]
+    )
+    principal, row = object(), object()
+    seeds = {"tenant": "acme"}
+    authorize_target(spec, principal, row, grant=Grant(spec, principal), seeds=seeds)
+    authorize_scope(spec, principal, row, grant=Grant(spec, principal), seeds=seeds)
