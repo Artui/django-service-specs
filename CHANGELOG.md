@@ -52,6 +52,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   as a keyword, so an override written `def parameters(self)` raises `TypeError`
   (an unexpected keyword argument) under dispatch. Declare
   `def parameters(self, *, call_context=None)` and pass it on to `super()`.
+- **A `many` spec whose typed `kwargs` or `input_data` is annotated to fill, or may
+  fill, its `many_argument` is now refused with `ImproperlyConfigured` at
+  construction.** It built before, and `server_owned_keys` listed the list, so a
+  transport withholding those names dropped a list that dispatch still demanded.
+  No provider reaches the list, so the key is refused even when a Validator row
+  field shares its name. Rename the key or the `many_argument`.
 
 ## [0.22.0] — 2026-10-31
 

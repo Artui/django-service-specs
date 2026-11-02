@@ -439,7 +439,10 @@ service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
 A provider annotated to fill a parameter declared anywhere else -
 `input_data` naming a read, `kwargs` naming a Validator field or the target
 selector's read - is refused with `ImproperlyConfigured` when the spec is
-built or, for a Validator field, when `parameters()` is assembled.
+built or, for a Validator field, when `parameters()` is assembled. So is
+one annotated to fill a `many` spec's list, the `many_argument`, or to
+possibly fill it: no provider reaches it, and a Validator field of the same
+name does not exempt the key.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
@@ -460,8 +463,8 @@ the list's items instead.
 [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
 does both: the schema a transport advertises, less what the server fills at
 the top and in each row, with what a provider may fill left out of
-`required` at each level. The list stays offered and required whatever a
-provider is annotated to fill, as dispatch demands it of the caller.
+`required` at each level. The list stays offered and required, as dispatch
+demands it of the caller, which is why no provider may be annotated to fill it.
 
 ## Parameters
 

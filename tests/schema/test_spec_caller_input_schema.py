@@ -77,10 +77,6 @@ class _DecliningPk(TypedDict):
     pk: int | UnsetType
 
 
-class _List(TypedDict):
-    items: list[int]
-
-
 def fills_project() -> _Project:
     return {"project": 1}
 
@@ -99,10 +95,6 @@ def declines_owner() -> _DecliningOwner:
 
 def declines_pk() -> _DecliningPk:
     return {"pk": 1}
-
-
-def fills_list() -> _List:
-    return {"items": [1]}
 
 
 def untyped() -> dict[str, Any]:
@@ -235,20 +227,6 @@ MANY: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
     ),
 }
 
-# Apart from MANY, which the transports' readings are compared over: both
-# withhold a list a provider is annotated to fill, as the dispatch they
-# advertise for does not.
-FILLING_THE_LIST: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
-    "many-typed-kwargs-fills-the-list": (
-        lambda: _many(kwargs=fills_list),
-        DEFAULT_POOL_SEEDS,
-    ),
-    "many-typed-input-data-fills-the-list": (
-        lambda: _many(input_data=fills_list),
-        DEFAULT_POOL_SEEDS,
-    ),
-}
-
 
 def _build(cases: Mapping[str, Any], case: str) -> tuple[ServiceSpec | SelectorSpec, PoolSeeds]:
     factory, seeds = cases[case]
@@ -264,21 +242,33 @@ def _row(schema: Mapping[str, Any], name: str = "items") -> dict[str, Any]:
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("seat", ["kwargs", "input_data"])
-def test_a_many_spec_s_list_is_offered_and_required_whatever_a_provider_is_annotated_to_fill(
+def test_a_many_spec_s_list_is_offered_and_required_beside_an_untyped_provider(
     seat: str,
 ) -> None:
-    # Dispatch demands the list from the caller: its top level withholds only
-    # what the read seats' providers fill, and ``ServiceSpec`` does not check
-    # the list against a provider's annotation. Withholding it here would
-    # advertise a call dispatch refuses.
-    spec = _many(**{seat: fills_list})
+    # Dispatch demands the list from the caller, and no provider reaches it: a
+    # typed provider annotated to fill its name is refused when the spec is
+    # built (tests/specs), and an untyped one names no key, so the list is
+    # still offered and required.
+    spec = _many(**{seat: lambda: {"items": [1]}})
 
-    assert "items" in server_owned_keys(spec)
+    assert "items" not in server_owned_keys(spec)
     schema = spec_caller_input_schema(spec)
 
     assert "items" in schema["properties"]
     assert schema["required"] == ["items"]
     assert _refused_absent(spec, DEFAULT_POOL_SEEDS, {}) == {"items"}
+
+
+def test_a_many_spec_s_list_is_offered_where_a_mount_registers_a_seed_of_its_name() -> None:
+    # The seed makes ``server_owned_keys`` list the name, and dispatch refuses
+    # such a spec outright (a parameter must never meet a seed), so no call
+    # reaches this; the schema alone still never withholds the list for it.
+    spec = _many(many_argument="tenant")
+
+    assert "tenant" in server_owned_keys(spec, pool_seeds=TENANT_SEEDS)
+    schema = spec_caller_input_schema(spec, pool_seeds=TENANT_SEEDS)
+
+    assert schema["required"] == ["tenant"]
 
 
 def test_a_read_a_typed_kwargs_fills_is_not_offered() -> None:
@@ -529,9 +519,9 @@ def _refused_absent(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("case", [*FLAT, *MANY, *FILLING_THE_LIST])
+@pytest.mark.parametrize("case", [*FLAT, *MANY])
 def test_the_top_level_requires_exactly_what_check_call_refuses_absent(case: str) -> None:
-    cases = {**FLAT, **MANY, **FILLING_THE_LIST}
+    cases = {**FLAT, **MANY}
     spec, seeds = _build(cases, case)
 
     required = spec_caller_input_schema(spec, pool_seeds=seeds).get("required", [])
@@ -594,11 +584,11 @@ def _refused_in_row_zero(
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("policy", POLICIES)
-@pytest.mark.parametrize("case", [*MANY, *FILLING_THE_LIST])
+@pytest.mark.parametrize("case", list(MANY))
 def test_a_row_requires_exactly_what_check_call_refuses_in_row_zero(
     case: str, policy: UnknownArguments
 ) -> None:
-    spec, seeds = _build({**MANY, **FILLING_THE_LIST}, case)
+    spec, seeds = _build(MANY, case)
     assert isinstance(spec, ServiceSpec)
 
     row = _row(

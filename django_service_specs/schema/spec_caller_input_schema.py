@@ -47,8 +47,9 @@ def spec_caller_input_schema(
       not check that binding: ``check_server_arguments`` does, once, when the
       transport is built. A ``many`` spec's list is the one name
       ``server_owned_keys`` lists that is not withheld: a provider annotated
-      to fill it does not stop dispatch demanding it
-      (test_a_many_spec_s_list_is_offered_and_required_whatever_a_provider_is_annotated_to_fill).
+      to fill it is refused when the spec is built, so it is listed only
+      where a mount registers a seed of that name, which dispatch refuses
+      (test_a_many_spec_s_list_is_offered_where_a_mount_registers_a_seed_of_its_name).
     - **Offered and not required**: a parameter a provider may fill,
       [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
       the set the shape check relaxes, read seat by seat
@@ -111,13 +112,13 @@ def spec_caller_input_schema(
         owned, reached = reach(spec.input_data, validator.parameters())
         the_list = schema["properties"][spec.many_argument]
         the_list["items"] = _asked(the_list["items"], withheld=owned, relaxed=reached)
-        # The list is never the server's to fill: dispatch demands it whatever
-        # a provider is annotated to fill, since its top level withholds only
-        # what the read seats' providers fill, and ``ServiceSpec`` does not
-        # check the list against a provider's annotation. ``provider_reached``
-        # cannot name it, the reads being its only top-level seat. A list the transport
-        # binds itself is withheld below, with the rest of ``server_arguments``. Held by
-        # test_a_many_spec_s_list_is_offered_and_required_whatever_a_provider_is_annotated_to_fill.
+        # The list is never the server's to fill: dispatch demands it of the
+        # caller. ``ServiceSpec`` refuses a provider annotated to fill its name,
+        # so ``server_owned_keys`` lists it only where a mount registers a seed
+        # of that name, which dispatch refuses outright; the schema alone is
+        # held there. A list the transport binds itself is withheld below, with
+        # the rest of ``server_arguments``. Held by
+        # test_a_many_spec_s_list_is_offered_where_a_mount_registers_a_seed_of_its_name.
         withheld -= {spec.many_argument}
     if server_arguments is not None:
         withheld |= server_arguments.names()
