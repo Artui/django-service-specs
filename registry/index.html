@@ -581,6 +581,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Open specs, reported">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#describing-a-specs-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Describing a spec's checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -843,6 +860,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Open specs, reported">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#describing-a-specs-checks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Describing a spec's checks
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -937,8 +971,8 @@ object itself. <code>dispatch</code>, <code>adispatch</code>, <code>check_call</
 <code>present</code>, <code>apresent</code>, <code>present_for_audience</code>, <code>resolve_target</code>, the three
 <code>authorize</code> functions, the affordance functions and their async twins,
 <code>server_owned_keys</code>, <code>check_requested_input</code>, <code>shape_queryset</code>,
-<code>spec_input_schema</code>, <code>spec_output_schema</code>, <code>can_present_nothing</code> and
-<code>audience_projection_for_spec</code> take it as they take a spec, and
+<code>spec_input_schema</code>, <code>spec_caller_input_schema</code>, <code>spec_output_schema</code>,
+<code>can_present_nothing</code> and <code>audience_projection_for_spec</code> take it as they take a spec, and
 <a class="autorefs autorefs-internal" title="kernel_spec" href="../reference/#django_service_specs.specs.kernel_spec.kernel_spec"><code>kernel_spec</code></a> is how a
 transport reads the spec it compiles to anywhere else. It is compiled the
 first time anything reads it, and that compiled spec answers every later call
@@ -999,7 +1033,10 @@ where they are written, at import time:</p>
 <code>permissions</code>, so every registered spec declares at least one. What still
 reaches a registry open to every principal is a spec whose checks are all
 <code>Unrestricted</code>, a subclass of it included. One real check beside an
-<code>Unrestricted()</code> guards the spec, because every check must pass.</p>
+<code>Unrestricted()</code> guards the spec, because every check must pass.
+A combinator (<code>AllOf</code>, <code>AnyOf</code>, <code>NoneOf</code>) refuses <code>Unrestricted</code> inside it
+when it is built, so the explicit allow is only ever a check of the spec's
+own, where this report reads it.</p>
 <p><code>unguarded_specs(registry)</code> lists those entries, in registry order, each as an
 <code>UnguardedSpec</code> carrying its name and an <code>UnguardedReason</code>. An entry is judged
 by the spec it compiles to, the one dispatch runs, so a declaration of
@@ -1016,6 +1053,25 @@ nothing.</p>
 <p>Reporting is the whole of it: <code>unguarded_specs</code> refuses nothing, and is no
 authorization boundary. It makes the declaration visible to whoever reads
 the report.</p>
+<h3 id="describing-a-specs-checks">Describing a spec's checks<a class="headerlink" href="#describing-a-specs-checks" title="Permanent link">&para;</a></h3>
+<p>Nothing in this package emits a description of a spec's checks. A transport
+that is the first to put them in a manifest - a tool listing, a catalog -
+writes one node per check, <code>{"source": "&lt;module&gt;.&lt;qualname&gt;"}</code> of the check's
+class, and a combinator's node adds <code>"checks"</code>, the nodes of the checks it
+holds, in order and at any depth:</p>
+<div class="language-json highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">[</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="p">{</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">    </span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"django_service_specs.authorization.any_of.AnyOf"</span><span class="p">,</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">    </span><span class="nt">"checks"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">      </span><span class="p">{</span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"notes.permissions.OwnsTheNote"</span><span class="p">},</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">      </span><span class="p">{</span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"notes.permissions.IsStaff"</span><span class="p">}</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="p">]</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">  </span><span class="p">},</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">  </span><span class="p">{</span><span class="nt">"source"</span><span class="p">:</span><span class="w"> </span><span class="s2">"notes.permissions.IsSignedIn"</span><span class="p">}</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="p">]</span>
+</span></code></pre></div>
+<p>A reader that knows only <code>source</code> reads a combinator as one check by that
+name, and keeps working.</p>
 <h2 id="reading-it">Reading it<a class="headerlink" href="#reading-it" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
@@ -1076,9 +1132,9 @@ name for it. The registry holds what every transport shares; a variant shaped
 for one transport is the registered spec's own
 <a href="../declaring/#a-variant-of-a-spec"><code>derive(...)</code></a>, in the registry that
 transport is handed:</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># The command line is handed a registry with the variant under the operation's</span>
-</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># own name; every other transport keeps reading ``registry``, and the base.</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">command_line_registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">search_only</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># The command line is handed a registry with the variant under the operation's</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># own name; every other transport keeps reading ``registry``, and the base.</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">command_line_registry</span> <span class="o">=</span> <span class="n">registry</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">"list_notes"</span><span class="p">,</span> <span class="n">search_only</span><span class="p">)</span>
 </span></code></pre></div>
 <p><code>search_only</code> is the variant
 <a href="../declaring/#a-variant-of-a-spec">derived from <code>list_notes_spec</code></a>.</p>

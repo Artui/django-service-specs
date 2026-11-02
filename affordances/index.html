@@ -1051,8 +1051,9 @@ returns the conditions that would be asked, so a transport can skip building a
 pool when there are none.</p>
 <p><strong>Build the pool the way the call's would be</strong>:
 <a class="autorefs autorefs-internal" title="base_pool" href="../reference/#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a> with the same
-<code>seeds=</code>, and <code>reserved=seeds.reserved</code> beside it, or a condition reading a
-registered seed is asked without it. A condition that raises propagates: one
+<code>seeds=</code>, and <code>reserved=seeds.reserved</code> beside it, which is required: a default
+would ask a condition with none of the registered seeds, so one reading a
+registered seed would fail at describe time though dispatch serves it. A condition that raises propagates: one
 that cannot be answered is not a no.</p>
 <p><strong>The answer is advisory.</strong> An operation listed a moment before a condition
 flips is refused when it is called, with the code this would answer if asked
@@ -1095,8 +1096,10 @@ answers about each row.</p>
 <p><a class="autorefs autorefs-internal" title="enforce_affordances" href="../reference/#django_service_specs.affordances.enforce_affordances.enforce_affordances"><code>enforce_affordances</code></a>
 is that step, exported for a transport that runs a service itself. It calls it
 after authorization and validation and before the service, with the pool
-seeds' <code>reserved</code> set, or a condition the direct path refuses is skipped on
-that one, and with the call's <code>call_context=</code>, so a condition naming it is
+seeds' <code>reserved</code> set, which is required: a default would ask a condition with
+none of the registered seeds, so one reading a registered seed would fail on a
+transport running the service without dispatch though dispatch serves it. It
+also takes the call's <code>call_context=</code>, so a condition naming it is
 handed the dict the call's other stages share (the parameter, else one the
 pool carries, else a fresh one; two different dicts are refused):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_step</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">note</span><span class="p">:</span> <span class="n">Note</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Note</span><span class="p">:</span>
@@ -1116,8 +1119,9 @@ pool carries, else a fresh one; two different dicts are refused):</p>
   
       async
   " href="../reference/#django_service_specs.affordances.aenforce_affordances.aenforce_affordances"><code>aenforce_affordances</code></a>,
-which refuses and lets through as <code>enforce_affordances</code> does, answering every
-condition in one <code>sync_to_async</code> hop, and none for a spec declaring none.</p>
+which refuses and lets through as <code>enforce_affordances</code> does, <code>reserved=</code>
+required here too, answering every condition in one <code>sync_to_async</code> hop, and
+none for a spec declaring none.</p>
 <p>Declaration order decides which refusal a caller sees, and nothing after the
 first unmet condition runs. A condition on the row is read from the table, not
 from the instance in hand. Two other answers come from the row: one that

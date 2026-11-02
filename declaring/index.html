@@ -1275,7 +1275,17 @@ such a spec where it registers it, with
 <a class="autorefs autorefs-internal" title="check_seeds" href="../reference/#django_service_specs.dispatch.check_seeds.check_seeds"><code>check_seeds</code></a>, as it
 refuses an optional read over a selector keyword with no default, which a call
 leaving the read out is refused for, and an array read with no <code>items</code> over a
-keyword annotated <code>list[int]</code>, which would hand it any element a caller sends.</p>
+keyword annotated <code>list[int]</code>, which would hand it any element a caller sends.
+It reads a precondition, an affordance condition, the output selector, an
+<code>extend_queryset</code>, a <code>kwargs</code> or <code>input_data</code> provider and a
+<code>progress_reporter</code> as well, each against what dispatch hands it: a condition
+and a <code>progress_reporter</code> are handed only the call's seeds, and a provider the
+seeds and its seat's reads, never <code>data</code> nor a Validator's value, so one
+requiring a seed the mount does not register is refused there rather than
+failing every call. A positional-only parameter with no default is refused on
+each of them, and an optional read over a keyword with no default on those that
+are handed the spec's reads, a precondition, an <code>extend_queryset</code> and a
+provider; only the array check is not run on them.</p>
 <p>Four kinds of parameter are never missing: one with a default, <code>**kwargs</code>,
 <code>*args</code>, and a positional-only one, which dispatch never passes by name.
 Nothing the output selector declares is refused either: its pool carries no
@@ -1687,7 +1697,10 @@ service spec's <code>kwargs</code> its <code>reads</code>, and <code>input_data<
 A provider annotated to fill a parameter declared anywhere else -
 <code>input_data</code> naming a read, <code>kwargs</code> naming a Validator field or the target
 selector's read - is refused with <code>ImproperlyConfigured</code> when the spec is
-built or, for a Validator field, when <code>parameters()</code> is assembled.
+built or, for a Validator field, when <code>parameters()</code> is assembled. So is
+one annotated to fill a <code>many</code> spec's list, the <code>many_argument</code>, or to
+possibly fill it: no provider reaches it, and a Validator field of the same
+name does not exempt the key.
 <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
 gathers what every provider of a spec fills, with the seeds' names, and
 <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>
@@ -1724,9 +1737,14 @@ of its own subtracts the set from what <code>parameters()</code> lists:</p>
 </span><span id="__span-4-28"><a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a><span class="c1"># need not ask for it, and dispatch does not demand it of the caller.</span>
 </span></code></pre></div>
 <p>On a <code>many</code> spec, the keys an <code>input_data</code> provider fills are fields inside
-each row, merged over every row, so a transport subtracting the set from the
-top-level <code>parameters()</code> - the list and the reads - removes nothing: it hides
-them from the list's items instead.</p>
+each row, merged over every row, so subtracting the set from the top-level
+<code>parameters()</code> - the list and the reads - removes nothing: they belong out of
+the list's items instead.
+<a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>
+does both: the schema a transport advertises, less what the server fills at
+the top and in each row, with what a provider may fill left out of
+<code>required</code> at each level. The list stays offered and required, as dispatch
+demands it of the caller, which is why no provider may be annotated to fill it.</p>
 <h2 id="parameters">Parameters<a class="headerlink" href="#parameters" title="Permanent link">&para;</a></h2>
 <p><a class="autorefs autorefs-internal" title="Parameter
 
@@ -1885,7 +1903,22 @@ JSON-like arguments into the values a service receives. The contract is two
 methods, and two more methods, an attribute and a property with defaults:</p>
 <ul>
 <li><code>parameters()</code> declares what it takes, as <code>Parameters</code>. It must never query,
-  because a transport describes a spec before any call.</li>
+  because a transport describes a spec before any call. A Validator that
+  describes itself by the call it is asked for - a serializer whose fields
+  read the transport's request - opts in by declaring
+  <code>parameters(self, *, call_context=None)</code>: every ask inside a call then hands
+  it <a href="../dispatching/#the-calls-context">the call's context</a>, the same dict its
+  <code>ValidationContext</code> carries, and every ask outside one hands it <code>None</code> -
+  at registration, for a schema, and for every other reader describing the
+  spec before a call - so the declaration must hold without it. Opted in or
+  not, it never queries. A Validator declaring no keyword is asked as
+  before, as is one whose <code>parameters</code> takes only <code>**kwargs</code>, or is a
+  <code>functools.wraps</code> wrapper that does not name the keyword itself: the
+  method's own signature decides. <code>ServiceSpec.parameters()</code> and
+  <code>SelectorSpec.parameters()</code> take the same keyword, which a selector spec
+  ignores, so a subclass overriding either must accept <code>call_context</code>, which
+  dispatch now passes: an override written <code>parameters(self)</code> raises <code>TypeError</code>
+  under dispatch.</li>
 <li><code>validate(arguments, context)</code> returns the validated values keyed by name, or
   raises <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>.
   It receives only the arguments its own <code>parameters()</code> declare, already

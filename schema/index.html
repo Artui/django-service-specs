@@ -1059,6 +1059,25 @@ happened to install.</p>
   required list <code>many_argument</code> names, each row an object of the Validator's
   parameters. A spec's <code>shapes</code> are properties like any other, closed set
   included, though only the presenter reads what is sent for them.</li>
+<li><a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema(spec, *, pool_seeds=DEFAULT_POOL_SEEDS, server_arguments=None, unknown_arguments=REJECT)</code></a>
+  is the one a transport advertises: <code>spec_input_schema</code> less what the
+  server answers, so its <code>required</code> is exactly what dispatch refuses the
+  caller for leaving out. A name the server fills -
+  <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
+  for the seeds the transport dispatches with, and the <code>names()</code> of its
+  <a class="autorefs autorefs-internal" title="ServerArguments
+
+
+  
+      dataclass
+  " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a> -
+  is neither offered nor required, and a parameter a provider may fill,
+  <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>,
+  is offered and not required. A <code>many</code> spec's rows are read the same way
+  by what <code>input_data</code> reaches there, so a field it fills is not asked for
+  in any row. Its list is offered and required unless the transport binds
+  it, since dispatch demands the list of the caller whatever a provider
+  fills; a provider annotated to fill its name is refused when the spec is built.</li>
 <li><a class="autorefs autorefs-internal" title="spec_output_schema" href="../reference/#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)</code></a>
   describes what <a class="autorefs autorefs-internal" title="present" href="../reference/#django_service_specs.dispatch.present.present"><code>present</code></a>
   returns for the spec, or <code>None</code> when the spec declares no output. With
@@ -1360,18 +1379,20 @@ requires <code>title</code> and <code>body</code> has <code>"required": ["pk"]</
 <code>parameters()</code> is unchanged: it still says what a whole update needs, and
 the schema is where the relaxing happens, through the one function the shape
 check relaxes a partial call with, so the two cannot drift. A read a <code>kwargs</code>
-provider fills is still listed as declared;
-<a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
-is how a transport finds those, and the schema's <code>required</code> less that set is
-exactly what dispatch refuses when it is absent. A transport that binds or
-withholds parameters of its own subtracts its
+provider fills or may fill is still listed as declared, as <code>required</code> as its
+declaration says. What dispatch refuses the caller for leaving out is
+<a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>'s
+<code>required</code>, which composes with the partial relaxing: it withholds what the
+server fills, the names a transport binds or withholds with
 <a class="autorefs autorefs-internal" title="ServerArguments
 
 
   
       dataclass
-  " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>'
-<code>names()</code> too: see <a href="../dispatching/#arguments-the-server-supplies">arguments the server supplies</a>.</p>
+  " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>
+among them (see <a href="../dispatching/#arguments-the-server-supplies">arguments the server supplies</a>),
+and requires nothing a provider may fill, in each row of a <code>many</code> spec too.
+The list itself is never relaxed, and withheld only when the transport binds it.</p>
 <h3 id="the-decimal-convention">The decimal convention<a class="headerlink" href="#the-decimal-convention" title="Permanent link">&para;</a></h3>
 <p>A decimal is <code>{"type": "string", "format": "decimal"}</code>. The shape check also
 accepts a JSON number for one, because every decimal validator does, and the
