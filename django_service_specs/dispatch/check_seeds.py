@@ -47,7 +47,7 @@ _BY_KEYWORD: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter
 
 # The keys dispatch writes into a pool as literals, mirrored here. Each is
 # held by a test dispatching a callable that requires it and seeing it run
-# (TestWhatEachThirdOnlySeatIsHanded), so a key dispatch renames fails there.
+# (TestWhatEachSeatTheFifthSkipsIsHanded), so a key dispatch renames fails there.
 # The row a RETRIEVE selector spec's preconditions are handed
 # (``conclude_selector``), and the service's return in the output selector's
 # pool (``finish_service``).
@@ -115,8 +115,10 @@ def check_seeds(
        own read or shape of either call name is one, refused here and by
        dispatch rather than when it is built.
     2. **A positional-only parameter with no default**, of the service, the
-       selector or the target selector. Dispatch calls each by keyword, so
-       nothing fills one, a read of its name included.
+       selector or the target selector, and of each callable the third reads
+       below: a precondition, a callable condition, the output selector and
+       an ``extend_queryset``. Dispatch calls each by keyword, so nothing
+       fills one, a read of its name included.
     3. **A keyword the callable requires that nothing fills**: by name, with
        no default, and in none of the places dispatch fills a keyword from
        - what every pool carries (``user``, ``progress``, ``call_context``,
@@ -155,7 +157,11 @@ def check_seeds(
        a keyword with no default, that no seed and no provider fills. A call
        sending it runs, and one leaving it out is refused as missing
        (``call_keywords``), so a caller reading the declaration is told the
-       read is optional and refused for omitting it.
+       read is optional and refused for omitting it. It reads every callable
+       the third does that sees reads: a precondition and an
+       ``extend_queryset`` as well as the service, the selector and the target
+       selector. A condition and the output selector are handed none of their
+       spec's reads, so it finds nothing on them.
     5. **An array read with no ``items`` over a keyword annotated with its
        element**: a read of ``type="array"`` declaring no ``items``, over
        the keyword it fills on its own seat, annotated ``list[X]``,
@@ -182,31 +188,30 @@ def check_seeds(
     such a spec runs and may mean to: [`unreceived_fields`][django_service_specs.dispatch.unreceived_fields.unreceived_fields]
     answers it, and the transport decides.
 
-    **What it cannot see, and so never refuses.** A provider whose return
-    says nothing about its keys may fill any keyword in its seat, so that
-    seat's keywords are left to dispatch (the third and fourth). An
-    annotation that does not resolve, as a forward reference to a name not
-    importable where the callable was defined, is not read, and leaves
-    alone only its own keyword (the fifth); so is a bare ``list``, an element
-    of ``Any`` or ``object``, a fixed-length ``tuple``, a union of two
-    sequences and an unannotated keyword. A
-    Validator may return a value it does not declare, or bind one, so a
-    service beside a Validator is not judged by the third and fourth either
-    (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
-    handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this
-    cannot see, and should not call it for such a spec. Only the third
-    refusal, and the unreadable signature, are run on a precondition, a
-    condition, the output selector and an ``extend_queryset``; the second,
-    fourth and fifth are not. A precondition beside a Validator, or one or an
-    ``extend_queryset`` beside an untyped provider, is left to dispatch as the
-    callable beside it is. A callable taking ``**kwargs`` requires nothing,
-    so one forwarding into a stricter callable is not judged by what that
-    callable requires. Nor is the pool a transport builds itself to answer
-    a condition at describe time (``unmet_operation_affordance``): this reads
-    the pool dispatch builds. Nor does it read a provider's own keywords
-    (``kwargs``, ``input_data``, ``progress_reporter``), a ``filter_set``, a
-    form's ``form_kwargs`` or a seed's resolver: dispatch binds each by
-    keyword, and this is not asked of any.
+    **What it cannot see, and so never refuses.** A provider whose return says
+    nothing about its keys may fill any keyword in its seat, so that seat's
+    keywords are left to dispatch (the third and fourth). An annotation that
+    does not resolve, as a forward reference to a name not importable where the
+    callable was defined, is not read, and leaves alone only its own keyword
+    (the fifth); so is a bare ``list``, an element of ``Any`` or ``object``, a
+    fixed-length ``tuple``, a union of two sequences and an unannotated
+    keyword. A Validator may return a value it does not declare, or bind one,
+    so a service beside a Validator is not judged by the third and fourth
+    either (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
+    handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this cannot
+    see, and should not call it for such a spec. Only the fifth refusal is not
+    run on a precondition, a condition, the output selector or an
+    ``extend_queryset``. A precondition beside a Validator, or one or an
+    ``extend_queryset`` beside an untyped provider, is left to dispatch by the
+    third and fourth as the callable beside it is, never by the second. A
+    callable taking ``**kwargs`` requires nothing, so one forwarding into a
+    stricter callable is not judged by what that callable requires. Nor is the
+    pool a transport builds itself to answer a condition at describe time
+    (``unmet_operation_affordance``): this reads the pool dispatch builds. Nor
+    does it read a provider's own keywords (``kwargs``, ``input_data``,
+    ``progress_reporter``), a ``filter_set``, a form's ``form_kwargs`` or a
+    seed's resolver: dispatch binds each by keyword, and this is not asked of
+    any.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
@@ -233,9 +238,9 @@ class _Seat:
     ``fills`` is what the pool carries beyond the seat's reads and provider:
     every pool's own names and the registered seeds for most, less for a
     condition, more where dispatch adds an entry of its own. ``validated`` is
-    whether a Validator's values join it. ``every_check`` is false for a seat
-    only the unreadable signature and the third refusal are run on, and
-    ``unfilled`` is the third refusal's account of why nothing fills it.
+    whether a Validator's values join it. ``checks_items`` is false for a seat
+    the fifth refusal is not run on, and ``unfilled`` is the third refusal's
+    account of why nothing fills it.
     """
 
     label: str
@@ -244,7 +249,7 @@ class _Seat:
     provider: Callable[..., Any] | None
     fills: frozenset[str]
     validated: bool = False
-    every_check: bool = True
+    checks_items: bool = True
     unfilled: str = _UNDECLARED
 
 
@@ -298,7 +303,7 @@ def _seats(spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds) -> list[_Sea
             Parameters.of(),
             None,
             everywhere | {_INSTANCE, _RESULT},
-            every_check=False,
+            checks_items=False,
             unfilled=_UNRETURNED,
         )
         seats += _selector_seats(output, seat, conditions)
@@ -312,7 +317,7 @@ def _condition_fills(everywhere: frozenset[str], pool_seeds: PoolSeeds) -> froze
     ``CALL_SEEDS`` join unconditionally: ``pool_kwargs`` adds them whenever
     the pool carries ``call_context``, and ``ambient_pool`` keeps that key
     whatever ``reserved`` names (the ``request`` and ``view`` cases of
-    TestWhatEachThirdOnlySeatIsHanded fail without them).
+    TestWhatEachSeatTheFifthSkipsIsHanded fail without them).
     """
     ambient = ambient_pool(dict.fromkeys(everywhere), reserved=pool_seeds.reserved)
     return frozenset(ambient) | CALL_SEEDS
@@ -336,7 +341,7 @@ def _selector_seats(spec: SelectorSpec, seat: _Seat, conditions: frozenset[str])
                 label=f"{label}.extend_queryset",
                 fn=spec.extend_queryset,
                 fills=seat.fills | {_QUERYSET},
-                every_check=False,
+                checks_items=False,
                 unfilled=f"it is handed {_QUERYSET} beside what its selector is handed, and "
                 + seat.unfilled,
             )
@@ -355,7 +360,7 @@ def _conditions(
             Parameters.of(),
             None,
             fills,
-            every_check=False,
+            checks_items=False,
             unfilled=_UNSEEDED,
         )
         for index, affordance in enumerate(affordances or ())
@@ -370,14 +375,14 @@ def _preconditions(spec: ServiceSpec | SelectorSpec, label: str, seat: _Seat) ->
             seat,
             label=f"{label}.preconditions[{index}] ({callable_name(precondition)})",
             fn=precondition,
-            every_check=False,
+            checks_items=False,
         )
         for index, precondition in enumerate(spec.preconditions or ())
     ]
 
 
 def _refusals(seat: _Seat) -> list[str]:
-    """The second to fifth refusals for one seat, or the third alone for a seat not every check reads, or the one that precedes them."""
+    """The second to fifth refusals for one seat, or the one that precedes them."""
     try:
         signature = inspect.signature(seat.fn)
     except (ValueError, TypeError):
@@ -397,29 +402,11 @@ def _refusals(seat: _Seat) -> list[str]:
             "bind no keyword to it and every call reaching it fails. Declare it as a "
             "function that takes the keywords it needs."
         ]
-    keys = provider_keys(seat.provider)
-    if not seat.every_check:
-        return _only_the_third(seat, keys)
-    return _every_check(seat, signature, keys)
-
-
-def _only_the_third(seat: _Seat, keys: ProviderKeys | None) -> list[str]:
-    """The third refusal alone, for a condition, a precondition, an output selector or an ``extend_queryset``.
-
-    A precondition or an ``extend_queryset`` beside an untyped provider, or a
-    precondition beside a Validator, is left to dispatch as the callable it
-    stands beside is: one arc, each held by its own test,
-    test_a_selector_precondition_beside_an_untyped_provider_is_left_to_dispatch
-    and test_a_service_precondition_beside_a_validator_is_left_to_dispatch.
-    """
-    if keys is None or seat.validated:
-        return []
-    unfilled = _unfilled(seat, _required(seat, keys))
-    return [_nothing_fills(seat, unfilled)] if unfilled else []
+    return _every_check(seat, signature, provider_keys(seat.provider))
 
 
 def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys | None) -> list[str]:
-    """The second to fifth refusals, for one seat whose signature reads."""
+    """The second to fifth refusals, for one seat whose signature reads; the fifth only where ``checks_items``."""
     problems: list[str] = []
     positional = sorted(
         name
@@ -438,7 +425,13 @@ def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys |
             "default, which dispatch never fills: it calls every callable by keyword. Make "
             "each one a keyword, or give it a default."
         )
-    untyped = _untyped_elements(seat, signature, keys, seat.fills)
+    # The fifth is not run on a precondition, a condition, the output selector
+    # or an ``extend_queryset``:
+    # test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s. The
+    # flag is inert on a condition and the output selector, whose reads are
+    # ``Parameters.of()``: ``_untyped_elements`` draws its candidates from
+    # ``seat.reads`` alone, so it would find nothing there either way.
+    untyped = _untyped_elements(seat, signature, keys, seat.fills) if seat.checks_items else []
     if untyped:
         problems.append(
             f"{seat.label} reads the array(s) {untyped} with no items into keywords annotated "
