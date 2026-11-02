@@ -31,6 +31,7 @@ from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import callable_name, check_callable, is_row_condition
+from django_service_specs.validation.utils import validator_parameters
 from django_service_specs.validation.validator import Validator
 
 # The default ``many_argument``, djangorestframework-services' own, so a spec
@@ -411,7 +412,7 @@ class ServiceSpec(AffordanceDeclarer):
         """
         return self
 
-    def parameters(self) -> Parameters:
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
         """Everything this spec takes: its target selector's reads, its own, its shapes, then its Validator's.
 
         On a ``many`` spec the Validator's parameters are each row's, so the
@@ -426,8 +427,16 @@ class ServiceSpec(AffordanceDeclarer):
         is refused here, as is one dispatch seeds itself; the three that need no
         Validator, the target's reads, the spec's and its shapes, were refused
         at construction already.
+
+        ``call_context`` is the call's dict when a call asks, and ``None``
+        when a reader outside one does; it is handed on to a Validator whose
+        ``parameters`` declares the keyword (see ``Validator.parameters``).
         """
-        own = self.validator.parameters() if self.validator is not None else Parameters()
+        own = (
+            validator_parameters(self.validator, call_context=call_context)
+            if self.validator is not None
+            else Parameters()
+        )
         # Where the Validator's fields are first known, beside the clash ``+``
         # refuses below: a provider filling one its values never reach. The
         # reads again too, for a provider whose annotation resolved only after

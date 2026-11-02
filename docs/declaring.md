@@ -605,7 +605,22 @@ JSON-like arguments into the values a service receives. The contract is two
 methods, and two more methods, an attribute and a property with defaults:
 
 - `parameters()` declares what it takes, as `Parameters`. It must never query,
-  because a transport describes a spec before any call.
+  because a transport describes a spec before any call. A Validator that
+  describes itself by the call it is asked for - a serializer whose fields
+  read the transport's request - opts in by declaring
+  `parameters(self, *, call_context=None)`: every ask inside a call then hands
+  it [the call's context](dispatching.md#the-calls-context), the same dict its
+  `ValidationContext` carries, and every ask outside one hands it `None` -
+  at registration, for a schema, and for every other reader describing the
+  spec before a call - so the declaration must hold without it. Opted in or
+  not, it never queries. A Validator declaring no keyword is asked as
+  before, as is one whose `parameters` takes only `**kwargs`, or is a
+  `functools.wraps` wrapper that does not name the keyword itself: the
+  method's own signature decides. `ServiceSpec.parameters()` and
+  `SelectorSpec.parameters()` take the same keyword, which a selector spec
+  ignores, so a subclass overriding either must accept `call_context`, which
+  dispatch now passes: an override written `parameters(self)` raises `TypeError`
+  under dispatch.
 - `validate(arguments, context)` returns the validated values keyed by name, or
   raises [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
   It receives only the arguments its own `parameters()` declare, already

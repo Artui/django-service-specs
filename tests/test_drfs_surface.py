@@ -456,7 +456,7 @@ SURFACE: dict[str, Pin] = {
         "returns_many=, affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
         "progress_reporter=, metadata=",
         methods={
-            "parameters": "()",
+            "parameters": "(*, call_context=)",
             "output": "()",
             "target_selector_spec": "()",
             "presenter_for_output": "()",
@@ -467,7 +467,7 @@ SURFACE: dict[str, Pin] = {
         signature="*, kind, selector, permissions=, reads=, shapes=, presenter=, allow_none=, "
         "select_related=, prefetch_related=, annotations=, extend_queryset=, filter_set=, "
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
-        methods={"parameters": "()", "output": "()"},
+        methods={"parameters": "(*, call_context=)", "output": "()"},
     ),
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),

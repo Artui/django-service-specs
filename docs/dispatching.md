@@ -1148,6 +1148,21 @@ what the service left there.
   and store it with `call_context.setdefault(key, value)`, so the first write
   wins and every call reads one value. Fit for a value any of them would
   compute the same.
+- **The Validator's declaration is asked with it.** A Validator declaring
+  `parameters(self, *, call_context=None)` is handed the call's dict on every
+  ask of its `parameters()` inside the call - the shape check, the seed
+  check, validation and the service's keywords alike - and `None` on every
+  ask outside one, such as registration or a schema
+  ([the Validator](declaring.md#the-validator)). So a transport describing a
+  serializer under its own request can tell its own call from a `dispatch`
+  the service makes inside it, which is handed a dict of its own.
+- **An inner dispatch handed the outer dict is described as the outer call.**
+  A service that forwards its own `call_context` to a `dispatch` it makes
+  for another principal or operation has every stage of that inner call -
+  its Validator's declaration included - read what the outer call put there,
+  and a transport keyed on the dict describes the inner call as its own.
+  Hand an inner dispatch a fresh dict, or none, unless it is meant to be the
+  same call.
 
 The affordance functions a transport calls ahead of the call or in place of
 dispatch -

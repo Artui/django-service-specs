@@ -26,6 +26,7 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from tests.dispatch.utils import EVERY_ASK, TENANT_SEEDS, every_ask_case
 from tests.specs.utils import Foreign
 
 PRINCIPAL = object()
@@ -703,3 +704,23 @@ def test_a_service_spec_with_no_validator_resolves_no_seed() -> None:
     spec = ServiceSpec(service=service, reads=PK)
     assert bind_arguments(spec, {"pk": 1}, principal=PRINCIPAL, pool_seeds=seeds) == {}
     assert resolved == []
+
+
+@pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_bind_arguments_hands_every_ask_one_dict(case: str, passed: bool) -> None:
+    """The one dict the Validator is handed, on every ask of its ``parameters``,
+    the first included: handed none, the bind makes it before it asks."""
+    spec, validator, arguments, _ = every_ask_case(case)
+    passed_context: dict[str, Any] = {}
+    bind_arguments(
+        spec,
+        arguments,
+        principal=SimpleNamespace(username="ada", is_active=True),
+        call_context=passed_context if passed else None,
+        pool_seeds=TENANT_SEEDS,
+    )
+    context = validator.contexts[0].call_context
+    assert context is passed_context if passed else isinstance(context, dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []
