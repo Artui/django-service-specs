@@ -39,14 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved once rather than once by each. The carrier is bound by identity to
   the spec, principal, `call_context` dict and `pool_seeds` registry its prelude
   ran with; one for another is refused as `NotPermitted` before any seed resolves,
-  and `seeds=` without `grant=`, or anything but the carrier, is a `TypeError`. It
-  cannot be pickled. The `authorize`-first path still resolves those seeds twice.
+  and `seeds=` without `grant=`, `adispatch`'s `seeds=` with `principal_id=`, or
+  anything but the carrier, is a `TypeError`. It cannot be pickled. The `authorize`-first path still resolves those seeds twice.
 
 ### Changed
 - **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
   where each was annotated as a plain tuple. Both are still the same 2-tuple,
   `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
   neither can be copied or pickled, since the carrier they hold cannot.
+- **`adispatch(principal_id=, seeds=)` is now refused with `TypeError` at entry,
+  before any hop, rather than with `NotPermitted` inside it.** A carrier is bound
+  to the principal its prelude was handed, which a principal resolved from an
+  identifier inside the hop never is, so the pair could not be covered; pass the
+  `principal=` the prelude was handed.
 - **Breaking: a subclass overriding `ServiceSpec.parameters` or
   `SelectorSpec.parameters` must accept `call_context`.** Dispatch now passes it
   as a keyword, so an override written `def parameters(self)` raises `TypeError`

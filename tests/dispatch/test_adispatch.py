@@ -1664,7 +1664,10 @@ async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> No
     assert len(tenancy.resolved) == 1
 
 
-async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(ada: Any) -> None:
+async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(
+    ada: Any, hops: list[str]
+) -> None:
+    """A wiring mistake, refused on the loop at entry; where both mistakes are made, no grant wins."""
     tenancy = Tenancy()
     spec, context = tenancy.spec(), {}
     checked = await sync_to_async(check_call)(
@@ -1674,14 +1677,17 @@ async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(ada: Any)
         pool_seeds=tenancy.pool_seeds,
         call_context=context,
     )
+    asked = {
+        "principal_id": ada.pk,
+        "arguments": {"pk": 1},
+        "pool_seeds": tenancy.pool_seeds,
+        "call_context": context,
+    }
 
-    with pytest.raises(NotPermitted, match="^The seeds do not cover this spec"):
-        await adispatch(
-            spec,
-            principal_id=ada.pk,
-            arguments={"pk": 1},
-            grant=Grant(spec, ada),
-            seeds=checked.seeds,
-            pool_seeds=tenancy.pool_seeds,
-            call_context=context,
-        )
+    with pytest.raises(TypeError, match=r"^seeds= cannot cover a principal adispatch\(\) resolves"):
+        await adispatch(spec, grant=checked[1], seeds=checked.seeds, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= is handed on with the grant="):
+        await adispatch(spec, seeds=checked.seeds, **asked)
+
+    assert hops == []
+    assert len(tenancy.resolved) == 1
