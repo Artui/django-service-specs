@@ -6,6 +6,8 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.all_of import AllOf
+from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
@@ -413,3 +415,30 @@ class TestTheCallSRequestAndView:
             call_context={"request": "context"},
         )
         assert check.seen == [("has_permission", "registered", None)]
+
+
+class TestCombinators:
+    """A combinator is asked as any check is, and hands each check inside it what that check declares."""
+
+    def test_a_child_s_arguments_and_context_reach_it(self) -> None:
+        arguing, offered = Arguing(), Offered()
+        spec, context = _spec([AllOf(arguing, offered)]), {"seen": True}
+        authorize(
+            spec, object(), arguments={"pk": 3}, call_context=context, seeds={"tenant": "acme"}
+        )
+        assert arguing.questions() == [("has_permission", {"pk": 3})]
+        assert offered.asked == [("has_permission", context, "acme")]
+
+    def test_the_refusal_names_the_combinator_s_message(self) -> None:
+        # Not the message of the check inside that refused: the combinator is
+        # the rule the spec declares, and it is what refuses.
+        spec = _spec([AnyOf(RefuseWithMessage(), Refuse(), message="Owners or staff only.")])
+        with pytest.raises(NotPermitted) as refused:
+            authorize(spec, object())
+        assert refused.value.message == "Owners or staff only."
+
+    def test_a_combinator_with_no_message_refuses_with_the_generic_wording(self) -> None:
+        spec = _spec([AnyOf(RefuseWithMessage())])
+        with pytest.raises(NotPermitted) as refused:
+            authorize(spec, object())
+        assert refused.value.message == NotPermitted.default_message

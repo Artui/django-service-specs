@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
@@ -13,7 +14,7 @@ from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.authorization.utils import AnswersWith, SeesTheCall, refuses
+from tests.authorization.utils import Answers, AnswersWith, SeesTheCall, refuses
 from tests.dispatch.utils import (
     Arguing,
     Deactivated,
@@ -258,3 +259,16 @@ def test_a_check_is_handed_the_context_s_request_and_view() -> None:
         call_context={"request": request, "view": view},
     )
     assert check.seen == [("has_scope_permission", request, view)]
+
+
+@pytest.mark.parametrize("scope", [None, [object()]], ids=["a-create-s-none", "a-set"])
+def test_any_of_scope_question_skips_a_child_refused_at_class_level(scope: Any) -> None:
+    # As at the row question: ``owner`` refuses at class level and allows any
+    # scope by default, ``staff`` admits at class level and refuses the scope.
+    log: list[str] = []
+    owner = Answers("owner", log, permission=False)
+    staff = Answers("staff", log, scope=False)
+    spec, principal = _spec([AnyOf(owner, staff)]), object()
+    with pytest.raises(NotPermitted):
+        authorize_scope(spec, principal, scope, grant=Grant(spec, principal))
+    assert log == ["owner.has_permission", "staff.has_permission", "staff.has_scope_permission"]

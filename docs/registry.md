@@ -85,6 +85,9 @@ A registry refuses a spec that declares no check, and a spec refuses an empty
 reaches a registry open to every principal is a spec whose checks are all
 `Unrestricted`, a subclass of it included. One real check beside an
 `Unrestricted()` guards the spec, because every check must pass.
+A combinator (`AllOf`, `AnyOf`, `NoneOf`) refuses `Unrestricted` inside it
+when it is built, so the explicit allow is only ever a check of the spec's
+own, where this report reads it.
 
 `unguarded_specs(registry)` lists those entries, in registry order, each as an
 `UnguardedSpec` carrying its name and an `UnguardedReason`. An entry is judged
@@ -104,6 +107,30 @@ nothing.
 Reporting is the whole of it: `unguarded_specs` refuses nothing, and is no
 authorization boundary. It makes the declaration visible to whoever reads
 the report.
+
+### Describing a spec's checks
+
+Nothing in this package emits a description of a spec's checks. A transport
+that is the first to put them in a manifest - a tool listing, a catalog -
+writes one node per check, `{"source": "<module>.<qualname>"}` of the check's
+class, and a combinator's node adds `"checks"`, the nodes of the checks it
+holds, in order and at any depth:
+
+```json
+[
+  {
+    "source": "django_service_specs.authorization.any_of.AnyOf",
+    "checks": [
+      {"source": "notes.permissions.OwnsTheNote"},
+      {"source": "notes.permissions.IsStaff"}
+    ]
+  },
+  {"source": "notes.permissions.IsSignedIn"}
+]
+```
+
+A reader that knows only `source` reads a combinator as one check by that
+name, and keeps working.
 
 ## Reading it
 

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`AllOf`, `AnyOf` and `NoneOf` combine permission checks into one.** Each takes
+  checks and an optional `message=`, is a `PermissionCheck` like any other, and
+  nests. `AllOf` stops at the first check that fails; `AnyOf` passes at the first
+  that passes, and at the row and scope questions counts a check only where it
+  passes the class-level question too, asked again, so a check allowing every row
+  by default does not admit a principal it refused at class level, under a grant
+  as without one; `NoneOf` passes only when no check passes `has_permission` and
+  allows at the row and scope questions. A check inside one is handed only the
+  arguments, context and seeds it declares, and a seed it names is resolved as
+  one a spec's own check names is; every answer is read as one at the top is, so
+  a coroutine fails closed, and a check that raises ends the call. A refusal says
+  the combinator's `message`. Refused when built, with `ImproperlyConfigured`: no
+  checks, a check `permissions=` would refuse, `Unrestricted` or a subclass of it,
+  and, inside `NoneOf`, a check judging rows or a scope at any depth.
+
 ## [0.22.0] — 2026-10-31
 
 ### Changed

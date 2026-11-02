@@ -7,10 +7,7 @@ from collections.abc import Sequence
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.permission_check import PermissionCheck
-from django_service_specs.specs.utils import check_callable
-
-# The methods dispatch reads a permission check's answer from.
-_CHECK_METHODS = ("has_permission", "has_object_permission", "has_scope_permission")
+from django_service_specs.authorization.utils import refuse_unusable_check
 
 
 def check_permissions(
@@ -32,17 +29,10 @@ def check_permissions(
     is as often computed by accident as decided. ``Unrestricted()`` is the
     decision, by name (test_an_empty_permissions_sequence_is_refused).
 
-    A class is the likely mistake - an HTTP framework declares permission
-    classes - and a class passes ``callable()``, so it is refused by name here
-    rather than failing at dispatch with an unbound-method error.
-
-    Each of the three methods is read for truth from sync code, so an
-    ``async def`` one - whose answer is a truthy coroutine - is refused here,
-    on the bound method, as any other sync-only seat is. One case per method
-    in ``tests/specs/test_check_permissions.py``'s ``TestAnAsyncPermissionCheckIsRefused``,
-    since coverage cannot see a name dropped from ``_CHECK_METHODS``. What
-    construction cannot see, a plain ``def`` handing back a coroutine, is
-    refused where the answer is read, by ``sync_answer``.
+    Each check is held to ``refuse_unusable_check``: an instance of
+    ``PermissionCheck``, never its class, with three sync methods. A
+    combinator is one such check, whose methods are sync, so its children are
+    not walked here: it held them to the same rule when it was built.
     """
     if permissions is None:
         return None
@@ -55,18 +45,5 @@ def check_permissions(
             "permissions=[Unrestricted()] to mean that."
         )
     for index, check in enumerate(checks):
-        if isinstance(check, type):
-            raise ImproperlyConfigured(
-                f"{label}.permissions holds the class {check.__name__}; pass an instance, "
-                f"{check.__name__}()."
-            )
-        if not isinstance(check, PermissionCheck):
-            raise ImproperlyConfigured(
-                f"{label}.permissions holds {type(check).__name__}, which is not a "
-                "PermissionCheck. Subclass PermissionCheck, or adapt it."
-            )
-        for method in _CHECK_METHODS:
-            check_callable(
-                getattr(check, method), label=f"{label}.permissions[{index}].{method}", sync=True
-            )
+        refuse_unusable_check(check, label=f"{label}.permissions", index=index)
     return checks

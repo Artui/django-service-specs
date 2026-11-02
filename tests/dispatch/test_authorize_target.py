@@ -6,15 +6,18 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
+from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import (
     Allow,
+    Answers,
     AnswersWith,
     Refuse,
     RefuseWithMessage,
@@ -276,3 +279,64 @@ def test_a_check_is_handed_the_context_s_request_and_view() -> None:
         call_context={"request": request, "view": view},
     )
     assert check.seen == [("has_object_permission", request, view)]
+
+
+class TestAnyOf:
+    """At the row question a check of ``AnyOf`` counts only where it passes the class-level one too."""
+
+    def test_any_of_row_question_skips_a_child_refused_at_class_level(self) -> None:
+        # ``owner`` refuses this principal at class level and, like most
+        # checks, allows any row by default; ``staff`` admits them at class
+        # level and refuses this row. Neither passes both, so the row is refused.
+        log: list[str] = []
+        owner = Answers("owner", log, permission=False)
+        staff = Answers("staff", log, row=False)
+        spec, principal = _spec([AnyOf(owner, staff)]), object()
+        with pytest.raises(NotPermitted):
+            authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+        assert log == [
+            "owner.has_permission",
+            "staff.has_permission",
+            "staff.has_object_permission",
+        ]
+
+    def test_any_of_under_a_covering_grant_still_judges_the_row(self) -> None:
+        # A grant covering the class-level question answers it without asking
+        # any check, so nothing could have been remembered from it: the row
+        # question asks it again.
+        log: list[str] = []
+        spec, principal = (
+            _spec(
+                [AnyOf(Answers("owner", log, permission=False), Answers("staff", log, row=False))]
+            ),
+            object(),
+        )
+        grant = authorize(spec, principal, grant=Grant(spec, principal), call_context={})
+        assert log == []
+        with pytest.raises(NotPermitted):
+            authorize_target(spec, principal, object(), grant=grant, call_context={})
+        assert "owner.has_object_permission" not in log
+
+    def test_a_child_passing_both_questions_passes_the_row(self) -> None:
+        log: list[str] = []
+        spec, principal = (
+            _spec([AnyOf(Answers("owner", log, permission=False), Answers("staff", log))]),
+            object(),
+        )
+        authorize_target(spec, principal, object(), grant=Grant(spec, principal))
+        assert log[-1] == "staff.has_object_permission"
+
+    def test_authorize_target_resolves_a_child_s_class_level_seed(self) -> None:
+        # The child is asked its class-level question at the row question, so
+        # the seed that question names resolves there too.
+        check, principal = SeedPerQuestion(), "ada"
+        spec = _spec([AnyOf(check)])
+        pool_seeds, resolved = recorded_seeds()
+        authorize_target(
+            spec, principal, object(), grant=Grant(spec, principal), pool_seeds=pool_seeds
+        )
+        assert sorted(resolved) == ["club", "row_club"]
+        assert check.handed == [
+            ("has_permission", "club of ada"),
+            ("has_object_permission", "row_club of ada"),
+        ]

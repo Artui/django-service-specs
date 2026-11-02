@@ -105,3 +105,49 @@ class SeesTheCall(PermissionCheck):
     ) -> bool:
         self.seen.append(("has_scope_permission", request, view))
         return True
+
+
+class Answers(PermissionCheck):
+    """Answers each question as it was built to, writing ``name.method`` to ``log`` when asked.
+
+    The log is the caller's, so checks sharing one show the order a
+    combinator asked them in, and which it never asked.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        log: list[str],
+        *,
+        permission: Any = True,
+        row: Any = True,
+        scope: Any = True,
+    ) -> None:
+        self.name, self.log = name, log
+        self.permission, self.row, self.scope = permission, row, scope
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.log.append(f"{self.name}.has_permission")
+        return self.permission
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        self.log.append(f"{self.name}.has_object_permission")
+        return self.row
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        self.log.append(f"{self.name}.has_scope_permission")
+        return self.scope
+
+
+class ClassLevel(PermissionCheck):
+    """Answers the class-level question alone, as built, writing ``name.has_permission`` to ``log``.
+
+    Its row and scope questions are the base's, so ``NoneOf`` accepts it.
+    """
+
+    def __init__(self, name: str, log: list[str], *, permission: Any = True) -> None:
+        self.name, self.log, self.permission = name, log, permission
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.log.append(f"{self.name}.has_permission")
+        return self.permission

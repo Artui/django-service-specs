@@ -12,12 +12,14 @@ from django.db.models import QuerySet
 
 from django_service_specs import (
     DEFAULT_POOL_SEEDS,
+    AnyOf,
     DataclassPresenter,
     DataclassValidator,
     DispatchResult,
     FormValidator,
     Grant,
     InvalidArguments,
+    NoneOf,
     Parameter,
     Parameters,
     PermissionCheck,
@@ -115,6 +117,45 @@ lockable_note_spec = SelectorSpec(
 
 
 # --8<-- [end:arguments_channel]
+
+
+# --8<-- [start:combinators]
+class OwnsTheNote(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_authenticated
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        return target.owner_id == principal.pk
+
+
+class IsStaff(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_staff
+
+
+class IsSuspended(PermissionCheck):
+    def __init__(self, *usernames: str) -> None:
+        self.usernames = frozenset(usernames)
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.username in self.usernames
+
+
+open_note_spec = SelectorSpec(
+    kind=SelectorKind.RETRIEVE,
+    selector=lambda *, pk: Note.objects.filter(pk=pk),
+    permissions=[
+        # Its owner, or anyone on staff. At the row question a check counts
+        # only where it passes the class-level one too: IsStaff allows every
+        # row, but only for staff, so a signed-in stranger is refused the row.
+        AnyOf(OwnsTheNote(), IsStaff(), message="Only its owner or staff may open a note."),
+        NoneOf(IsSuspended("mallory"), message="Suspended accounts may open nothing."),
+    ],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+# --8<-- [end:combinators]
 
 
 # --8<-- [start:overlays]

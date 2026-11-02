@@ -12,6 +12,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from typing_extensions import TypedDict
 
+from django_service_specs.authorization.any_of import AnyOf
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
@@ -1224,3 +1226,23 @@ def test_a_selector_spec_with_permissions_nests_once_derived_without_them() -> N
     assert spec.collection_selector_spec is nested
     with pytest.raises(ImproperlyConfigured, match=r"spec\.derive\(permissions=None\)"):
         ServiceSpec(service=print, collection_selector_spec=own)
+
+
+class _ComparedByCodename(PermissionCheck):
+    """Equal by value with no hash, as a check declaring ``__eq__`` alone is."""
+
+    def __init__(self, codename: str) -> None:
+        self.codename = codename
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _ComparedByCodename) and other.codename == self.codename
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return True
+
+
+def test_a_spec_over_an_unhashable_child_hashes() -> None:
+    # A spec hashes its permissions; a combinator is equal only to itself, so
+    # it hashes whatever it holds.
+    spec = ServiceSpec(service=_a_service, permissions=[AnyOf(_ComparedByCodename("notes.view"))])
+    assert hash(spec) == hash(spec)

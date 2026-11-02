@@ -7,7 +7,11 @@ check is handed the call's arguments, its context or a seed.
 one ``pool_seeds`` resolves a check's seeds exactly as dispatch would, and
 ``refuse_deactivated`` by them, dispatch, ``form_keywords`` and
 ``bind_arguments`` handed ``pool_seeds``, so none of them
-runs a resolver for a principal dispatch refuses."""
+runs a resolver for a principal dispatch refuses. ``refuse_unusable_check`` is
+the rule a check is held to wherever one is declared, read by
+``check_permissions`` and by the combinators' constructors, and ``_Combinator``
+is the base those combinators share, here because ``declared_keywords`` reads
+it."""
 
 from __future__ import annotations
 
@@ -15,13 +19,19 @@ import inspect
 import weakref
 from collections.abc import Callable, Iterable, Mapping
 from types import FunctionType, MappingProxyType
-from typing import Any, Final
+from typing import Any, ClassVar, Final
+
+from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.is_deactivated import is_deactivated
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
+from django_service_specs.authorization.sync_answer import sync_answer
+from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.utils import call_entries, only_seeds
+from django_service_specs.types.utils import check_callable
 
 
 def asked_with(
@@ -97,6 +107,126 @@ CLASS_LEVEL: Final = ("has_permission", 2)
 OBJECT_LEVEL: Final = ("has_object_permission", 3)
 SCOPE_LEVEL: Final = ("has_scope_permission", 3)
 QUESTIONS: Final = (CLASS_LEVEL, OBJECT_LEVEL, SCOPE_LEVEL)
+
+
+def refuse_unusable_check(check: Any, *, label: str, index: int) -> None:
+    """Refuse ``check`` unless it is a ``PermissionCheck`` instance whose three methods are sync.
+
+    The one rule a check is held to wherever one is declared: on a spec's
+    ``permissions=`` (``check_permissions``) and inside a combinator, when it
+    is built. A refusal is ``ImproperlyConfigured``; ``label`` names the
+    declaration holding the check, as ``ServiceSpec.permissions`` or
+    ``AnyOf.checks``, and ``index`` its place there.
+
+    A class is the likely mistake - an HTTP framework declares permission
+    classes - and a class passes ``callable()``, so it is refused by name here
+    rather than failing at dispatch with an unbound-method error.
+
+    Each of the three methods is read for truth from sync code, so an
+    ``async def`` one - whose answer is a truthy coroutine - is refused here,
+    on the bound method, as any other sync-only seat is. One case per method
+    in ``tests/specs/test_check_permissions.py``'s ``TestAnAsyncPermissionCheckIsRefused``
+    and ``tests/authorization/test_all_of.py``'s ``TestAChildIsRefused``,
+    since coverage cannot see a name dropped from ``QUESTIONS``. What
+    construction cannot see, a plain ``def`` handing back a coroutine, is
+    refused where the answer is read, by ``sync_answer``.
+    """
+    if isinstance(check, type):
+        raise ImproperlyConfigured(
+            f"{label} holds the class {check.__name__}; pass an instance, {check.__name__}()."
+        )
+    if not isinstance(check, PermissionCheck):
+        raise ImproperlyConfigured(
+            f"{label} holds {type(check).__name__}, which is not a "
+            "PermissionCheck. Subclass PermissionCheck, or adapt it."
+        )
+    for method, _ in QUESTIONS:
+        check_callable(getattr(check, method), label=f"{label}[{index}].{method}", sync=True)
+
+
+class _Combinator(PermissionCheck):
+    """The base ``AllOf``, ``AnyOf`` and ``NoneOf`` share: checks asked as one, refused when built if one cannot be.
+
+    ``_asks`` maps each question the combinator is asked to the questions it
+    asks a child there, in order, each with how many parameters the call
+    fills by position. A child passes a question when it passes every one of
+    them, and its methods read the table to ask, and ``declared_keywords``
+    reads it to say what the combinator opts into: the union of its
+    children's opt-ins at those questions. So the combinator is handed what
+    one of its children declares - by the ``authorize`` functions, by seed
+    resolution and by ``checks_read_arguments`` alike - and each child is
+    handed only what it declares itself
+    (test_a_child_is_handed_only_what_it_declares).
+
+    Every child's answer is read through ``sync_answer``, so a plain ``def``
+    handing back a coroutine fails closed inside a combinator as it does at
+    the top (test_a_child_answering_a_coroutine_does_not_pass_any_of,
+    test_none_of_none_of_a_coroutine_answer_is_refused). A child that raises
+    ends the call with its error, never read as a refusal
+    (test_a_child_raising_is_not_read_as_a_refusal). Nothing inside a
+    combinator raises ``NotPermitted``: it answers, and a refusal says its
+    own ``message`` (test_the_refusal_names_the_combinator_s_message).
+
+    Refused when built, with ``ImproperlyConfigured``: no checks at all
+    (test_an_empty_combinator_is_refused), a check failing
+    ``refuse_unusable_check`` (``TestAChildIsRefused``), and ``Unrestricted``,
+    a subclass included, which stays a decision a spec makes by name
+    (test_unrestricted_inside_a_combinator_is_refused). A combinator inside
+    another was held to the same rules when it was built, so every depth is.
+
+    Equal only to itself, as any object is: a value equality would hash its
+    checks, and a spec, which hashes its permissions, could not be built over
+    an unhashable one (test_a_spec_over_an_unhashable_child_hashes).
+    """
+
+    _asks: ClassVar[Mapping[str, tuple[tuple[str, int], ...]]]
+
+    def __init__(self, *checks: PermissionCheck, message: str | None = None) -> None:
+        name = type(self).__name__
+        if not checks:
+            raise ImproperlyConfigured(
+                f"{name}.checks is empty, which decides nothing about anyone: AllOf and NoneOf "
+                "of no checks would let anyone run it. Pass the checks it combines."
+            )
+        for index, check in enumerate(checks):
+            refuse_unusable_check(check, label=f"{name}.checks", index=index)
+            if isinstance(check, Unrestricted):
+                raise ImproperlyConfigured(
+                    f"{name}.checks[{index}] is {type(check).__name__}, the explicit allow, which "
+                    "is a decision a spec makes by name. Declare permissions=[Unrestricted()] "
+                    "on the spec to mean that anyone may run it."
+                )
+        self.checks: tuple[PermissionCheck, ...] = checks
+        self.message = message
+
+    def _passes(
+        self,
+        child: PermissionCheck,
+        method: str,
+        principal: Any,
+        spec: Any,
+        at: tuple[Any, ...],
+        offered: Mapping[str, Any],
+    ) -> bool:
+        """Whether ``child`` passes every question ``method`` asks it, stopping at the first it fails.
+
+        ``at`` is what the combinator's own call filled after the spec - the
+        target or the scope - and a question is handed as much of it as it
+        fills by position, so a child's ``has_permission`` asked at the row
+        question is asked as it would be at the class-level one.
+        """
+        for asked, positional in self._asks[method]:
+            answer = getattr(child, asked)(
+                principal,
+                spec,
+                *at[: positional - 2],
+                **asked_with(
+                    child, asked, offered.get("arguments"), positional=positional, offered=offered
+                ),
+            )
+            if not sync_answer(answer, asked=f"{type(child).__qualname__}.{asked}"):
+                return False
+        return True
 
 
 def refuse_deactivated(principal: Any) -> None:
@@ -272,7 +402,22 @@ def declared_keywords(check: Any, method: str, *, positional: int) -> frozenset[
     What ``asked_with`` hands from, and what dispatch reads to decide whether
     a spec's checks opt into its seeds at all, so the two cannot disagree
     about which check declared one.
+
+    A combinator declares, at each question, what its children declare at
+    the questions it asks them there (``_Combinator._asks``), read at any
+    depth: its own methods take ``**offered`` to pass that on, and read by
+    signature they would declare nothing
+    (test_a_child_s_seed_resolves_through_a_combinator,
+    test_checks_read_arguments_sees_a_child_s_declaration).
     """
+    if isinstance(check, _Combinator):
+        return frozenset().union(
+            *(
+                declared_keywords(child, asked, positional=filled)
+                for child in check.checks
+                for asked, filled in check._asks[method]
+            )
+        )
     reached, filled = _keywords(getattr(check, method))
     return reached - frozenset(filled[:positional])
 

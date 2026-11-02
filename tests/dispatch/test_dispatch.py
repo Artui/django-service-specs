@@ -27,6 +27,7 @@ from typing_extensions import TypedDict
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
+from django_service_specs.authorization.all_of import AllOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
@@ -5761,6 +5762,26 @@ class TestSeedsAtThePermissionCheck:
             pool_seeds=events.seeds(),
         )
         assert events.log == ["resolve", "has_permission"]
+
+    @_ENTRIES
+    def test_a_child_s_seed_resolves_through_a_combinator(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A check inside ``AllOf`` names the seed; the combinator opts into it on its behalf."""
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+        check = _TenantCheck(events)
+        entry(
+            _update_and_reread(AllOf(check)),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=events.seeds(),
+        )
+        assert events.log == ["resolve", "has_permission"]
+        assert check.tenants == [
+            ("has_permission", "tenant-of-ada"),
+            ("has_object_permission", "tenant-of-ada"),
+        ]
 
     @_ENTRIES
     def test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before(
