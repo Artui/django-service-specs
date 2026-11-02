@@ -47,7 +47,7 @@ _BY_KEYWORD: Final = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter
 
 # The keys dispatch writes into a pool as literals, mirrored here. Each is
 # held by a test dispatching a callable that requires it and seeing it run
-# (TestWhatTheNewSeatsAreHanded), so a key dispatch renames fails there.
+# (TestWhatEachThirdOnlySeatIsHanded), so a key dispatch renames fails there.
 # The row a RETRIEVE selector spec's preconditions are handed
 # (``conclude_selector``), and the service's return in the output selector's
 # pool (``finish_service``).
@@ -309,7 +309,7 @@ def _condition_fills(everywhere: frozenset[str], pool_seeds: PoolSeeds) -> froze
     ``CALL_SEEDS`` join unconditionally: ``pool_kwargs`` adds them whenever
     the pool carries ``call_context``, and ``ambient_pool`` keeps that key
     whatever ``reserved`` names (the ``request`` and ``view`` cases of
-    TestWhatTheNewSeatsAreHanded fail without them).
+    TestWhatEachThirdOnlySeatIsHanded fail without them).
     """
     ambient = ambient_pool(dict.fromkeys(everywhere), reserved=pool_seeds.reserved)
     return frozenset(ambient) | CALL_SEEDS

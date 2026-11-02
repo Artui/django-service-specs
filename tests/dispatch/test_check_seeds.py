@@ -277,7 +277,7 @@ _DECLARE_TAIL = "Declare it, or give it a default."
 
 # The seats only the third refusal reads: a case each, with the keyword
 # nothing fills, the seat's label and what the message says of the seat.
-_NEW_SEATS = [
+_THIRD_ONLY_SEATS = [
     pytest.param(
         lambda: _service(lambda **_: None, affordances=_when(lambda *, tenant: True)),
         "tenant",
@@ -392,7 +392,7 @@ _NEW_SEATS = [
     ),
 ]
 
-_UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _NEW_SEATS]
+_UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _THIRD_ONLY_SEATS]
 
 
 _EVERY_POOL_S = ("user", "progress", "call_context", "shapes", "request", "view", "tenant")
@@ -486,7 +486,7 @@ _CONDITIONS_HANDED = [
 
 # Every keyword each seat only the third refusal reads is handed, as dispatch
 # hands it: each is dispatched and seen to arrive in
-# TestWhatTheNewSeatsAreHanded, and passes the check in
+# TestWhatEachThirdOnlySeatIsHanded, and passes the check in
 # test_a_keyword_something_fills_is_not.
 _HANDED = [
     *_CONDITIONS_HANDED,
@@ -591,7 +591,7 @@ class TestARequiredKeywordNothingFills:
                         lambda **_: [], extend_queryset=lambda **handed: handed["queryset"]
                     ),
                 ),
-                id="a-catch-all-on-every-new-seat",
+                id="a-catch-all-on-every-third-only-seat",
             ),
             *(
                 pytest.param(functools.partial(case.values[0], case.values[1], {}), id=case.id)
@@ -691,7 +691,7 @@ class TestAConditionReadingASeedNoMountRegisters:
 
 
 class TestTheSeatsOnlyTheThirdRefusalReads:
-    @pytest.mark.parametrize(("build", "name", "label", "tail"), _NEW_SEATS)
+    @pytest.mark.parametrize(("build", "name", "label", "tail"), _THIRD_ONLY_SEATS)
     def test_each_is_named_with_what_it_is_handed(
         self, build: Callable[[], Any], name: str, label: str, tail: str
     ) -> None:
@@ -789,8 +789,8 @@ class TestTheSeatsOnlyTheThirdRefusalReads:
         assert found == sorted(found)
 
 
-class TestWhatTheNewSeatsAreHanded:
-    """Each keyword the check counts as filled on a seat it newly reads, dispatched and seen to arrive.
+class TestWhatEachThirdOnlySeatIsHanded:
+    """Each keyword the check counts as filled on a seat only the third refusal reads, dispatched and seen to arrive.
 
     The guard against refusing a spec that runs: the check passes each of
     these (test_a_keyword_something_fills_is_not), so each must reach its
