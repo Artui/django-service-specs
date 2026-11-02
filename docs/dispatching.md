@@ -735,14 +735,28 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   condition reads `frozen` is refused on a mount registering no `frozen` seed;
   the output selector is handed the service's return as `instance` and
   `result` and what every pool carries, never an argument nor its own reads;
-  and an `extend_queryset` its selector's pool with the `queryset`. Each is
-  named as the spec names it, such as `ServiceSpec.affordances[0] ('frozen').when`
-  or `SelectorSpec.preconditions[0] (owns_it)`;
+  an `extend_queryset` its selector's pool with the `queryset`; a `kwargs`
+  provider, the spec's own or its target selector's, and a service spec's
+  `input_data` are handed what every pool carries, the mount's seeds and their
+  seat's reads less those the seat's typed `kwargs` provider fills, and for a
+  service the target as `instance` or `collection`, but never `data`, a
+  Validator's value or a provider's answer, so a `kwargs` provider requiring
+  an unregistered `tenant` is refused, whether it annotates its keys or not and
+  whether a Validator stands beside it or not; and a `progress_reporter` is handed only the call's seeds,
+  and read only where its run takes `progress`, by name or through
+  `**kwargs`, which is where dispatch may call it: before an `async def` run,
+  or on a sync run's first report. It is refused either way, though a sync run
+  that never reports never calls it. Each is named as the spec
+  names it, such as `ServiceSpec.affordances[0] ('frozen').when`,
+  `SelectorSpec.preconditions[0] (owns_it)` or
+  `ServiceSpec.instance_selector_spec.kwargs`;
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
-  missing. A precondition and an `extend_queryset` are asked this against
-  their selector's or service's reads; a condition and the output selector are
-  handed none, so it finds nothing on them;
+  missing, or on a provider fails with the provider's own `TypeError`. A
+  precondition, an `extend_queryset` and a `kwargs` or `input_data` provider
+  are asked this against the reads they are handed; a condition, the output
+  selector and a `progress_reporter` are handed none, so it finds nothing on
+  them;
 - an array read with no `items` over a keyword its own seat annotates with an
   element: `list[int]`, `tuple[int, ...]` or `Sequence[int]`, or one of those
   `| None`. Such a read takes any element, so a selector annotated
@@ -768,18 +782,23 @@ docs/examples/dispatching.py:check_seeds
 
 It runs nothing: no seed resolves and no provider is called. What it cannot
 see it leaves to dispatch: a provider that does not annotate its keys may fill
-any keyword in its seat, and a Validator may return or bind a value it does
-not declare, so neither seat is held to the keywords it requires, nor is a
+any keyword of the callable it provides for, and a Validator may return or bind
+a value it does not declare, so neither callable is held to the keywords it
+requires (a provider's own keywords are read all the same), nor is a
 precondition or an `extend_queryset` beside one, though a positional-only
 parameter is refused whatever stands beside it. An `extra_kwargs` overlay fills
-keywords it cannot see either. The array check alone is not run on a
-precondition, a condition, the output selector or an `extend_queryset`. A
+keywords it cannot see either. A read is taken as declared on a provider's
+seat: one the seat's provider may decline, or an untyped one may fill, is not
+demanded of the caller, so a provider requiring it fails a call leaving it out,
+and that is not refused. The array check alone is not run on a precondition, a
+condition, the output selector, an `extend_queryset`, a provider or a
+`progress_reporter`. A
 callable taking `**kwargs` requires nothing, so one forwarding into a stricter
 callable is not judged by what that callable requires; and a pool a transport
 builds itself to answer a condition before any call is its own, not the one
 this reads.
-A provider's own keywords (`kwargs`, `input_data`, `progress_reporter`), a
-`filter_set`, a form's `form_kwargs` and a seed's resolver are not read either.
+A `filter_set`, a form's `form_kwargs` and a seed's resolver are not read
+either.
 
 Two of the readers it shares with dispatch are public for a transport building
 its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters],
