@@ -24,6 +24,20 @@ happened to install.
   required list `many_argument` names, each row an object of the Validator's
   parameters. A spec's `shapes` are properties like any other, closed set
   included, though only the presenter reads what is sent for them.
+- [`spec_caller_input_schema(spec, *, pool_seeds=DEFAULT_POOL_SEEDS, server_arguments=None, unknown_arguments=REJECT)`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+  is the one a transport advertises: `spec_input_schema` less what the
+  server answers, so its `required` is exactly what dispatch refuses the
+  caller for leaving out. A name the server fills -
+  [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+  for the seeds the transport dispatches with, and the `names()` of its
+  [`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments] -
+  is neither offered nor required, and a parameter a provider may fill,
+  [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+  is offered and not required. A `many` spec's rows are read the same way
+  by what `input_data` reaches there, so a field it fills is not asked for
+  in any row. Its list is offered and required unless the transport binds
+  it, even where a provider is annotated to fill the name, since dispatch
+  demands the list of the caller whatever a provider fills.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
@@ -313,13 +327,15 @@ On a `many` spec the list stays required and each row requires nothing.
 `parameters()` is unchanged: it still says what a whole update needs, and
 the schema is where the relaxing happens, through the one function the shape
 check relaxes a partial call with, so the two cannot drift. A read a `kwargs`
-provider fills is still listed as declared;
-[`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
-is how a transport finds those, and the schema's `required` less that set is
-exactly what dispatch refuses when it is absent. A transport that binds or
-withholds parameters of its own subtracts its
-[`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]'
-`names()` too: see [arguments the server supplies](dispatching.md#arguments-the-server-supplies).
+provider fills or may fill is still listed as declared, as `required` as its
+declaration says. What dispatch refuses the caller for leaving out is
+[`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]'s
+`required`, which composes with the partial relaxing: it withholds what the
+server fills, the names a transport binds or withholds with
+[`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
+among them (see [arguments the server supplies](dispatching.md#arguments-the-server-supplies)),
+and requires nothing a provider may fill, in each row of a `many` spec too.
+The list itself is never relaxed, and withheld only when the transport binds it.
 
 ### The decimal convention
 
