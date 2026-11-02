@@ -148,18 +148,24 @@ def bind_arguments(
             different rows come back as one tree keyed by row index.
     """
     spec = kernel_spec(spec)
-    parameters = spec.parameters()
+    # One dict for every ask of the Validator's ``parameters``, the seeds'
+    # resolvers and the Validator, so a resolver reading ``request`` and the
+    # Validator see the same call
+    # (test_a_seed_resolver_reads_the_dict_the_validator_is_handed), and the
+    # declaration is asked as the call that validates it
+    # (test_bind_arguments_hands_every_ask_one_dict). Made before the first
+    # ask, so a bind handed none still describes itself one way.
+    context = {} if call_context is None else call_context
+    parameters = spec.parameters(call_context=context)
     if pool_seeds is not None:
         # First, as dispatch refuses one, so no resolver runs for it below.
         refuse_deactivated(principal)
-        parameters = seat_seed_named(spec, parameters, parameters, pool_seeds)
-    checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
+        parameters = seat_seed_named(spec, parameters, parameters, pool_seeds, call_context=context)
+    checked = shape_check(
+        spec, parameters, arguments, unknown_arguments=unknown_arguments, call_context=context
+    )
     if isinstance(spec, SelectorSpec):
         return checked
-    # One dict for the seeds' resolvers and the Validator, so a resolver reading
-    # ``request`` and the Validator see the same call
-    # (test_a_seed_resolver_reads_the_dict_the_validator_is_handed).
-    context = {} if call_context is None else call_context
     ambient: dict[str, Any] = {}
     # Two conjuncts: without the first a bind handed no seeds would have no
     # registry to resolve, and fail rather than bind with an empty ambient

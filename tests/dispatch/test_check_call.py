@@ -30,6 +30,7 @@ from tests.dispatch.utils import (
     Refuse,
     Scoped,
     Titled,
+    every_ask_case,
     make_user,
 )
 from tests.dispatch_app.models import Note
@@ -328,3 +329,30 @@ def test_its_checks_are_offered_the_call_context_passed_and_the_seeds_they_name(
     assert tenant == "tenant-of-ada"
     assert second == {}
     assert second is not context
+
+
+@pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
+def test_check_call_hands_every_ask_its_dict(ada: Any, passed: bool) -> None:
+    """``open_call`` asks the Validator's ``parameters`` with the dict
+    ``check_call`` was handed or made, the one its checks are offered."""
+    spec, validator, arguments, _ = every_ask_case("single")
+    offered: list[Any] = []
+
+    class Offering(PermissionCheck):
+        def has_permission(self, principal: Any, spec: Any, *, call_context: Any) -> bool:
+            offered.append(call_context)
+            return True
+
+    spec = spec.derive(permissions=[Offering()])
+    passed_context: dict[str, Any] = {}
+    check_call(
+        spec,
+        principal=ada,
+        arguments=arguments,
+        pool_seeds=TENANT_SEEDS,
+        call_context=passed_context if passed else None,
+    )
+    context = offered[0]
+    assert context is passed_context if passed else isinstance(context, dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []

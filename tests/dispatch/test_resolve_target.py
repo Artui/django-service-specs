@@ -36,6 +36,7 @@ from tests.dispatch.utils import (
     PK,
     TENANT_SEEDS,
     Arguing,
+    AskedWith,
     Offered,
     OwnerOnly,
     Record,
@@ -663,3 +664,36 @@ def test_a_target_selector_is_handed_no_shapes_on_any_route(
     assert [dict(shapes) for shapes in looked_up] == [{}]
     if route is not _resolved:
         assert [dict(shapes) for shapes in served] == [{"query": "title"}]
+
+
+@pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
+def test_resolve_target_hands_every_ask_its_dict(ada: Any, passed: bool) -> None:
+    """``open_call`` asks the Validator's ``parameters`` with the dict
+    ``resolve_target`` was handed or made, the one its lookup is handed."""
+    note = Note.objects.create(owner=ada, title="Row")
+    looked_up: list[Any] = []
+
+    def by_pk(*, pk: int, call_context: dict[str, Any]) -> Any:
+        looked_up.append(call_context)
+        return Note.objects.filter(pk=pk)
+
+    validator = AskedWith()
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=validator,
+        instance_selector_spec=SelectorSpec(kind=SelectorKind.RETRIEVE, selector=by_pk, reads=PK),
+    )
+    validator.asked.clear()
+    passed_context: dict[str, Any] = {}
+    resolve_target(
+        spec,
+        principal=ada,
+        arguments={"pk": note.pk},
+        pool_seeds=TENANT_SEEDS,
+        call_context=passed_context if passed else None,
+    )
+    context = looked_up[0]
+    assert context is passed_context if passed else isinstance(context, dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []

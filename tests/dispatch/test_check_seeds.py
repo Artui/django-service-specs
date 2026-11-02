@@ -33,7 +33,15 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
-from tests.dispatch.utils import OPEN, PK, Titled, make_user
+from tests.dispatch.utils import (
+    EVERY_ASK,
+    OPEN,
+    PK,
+    TENANT_SEEDS,
+    Titled,
+    every_ask_case,
+    make_user,
+)
 from tests.pool.utils import passthrough
 from tests.specs.utils import Foreign
 
@@ -768,3 +776,12 @@ class TestACallableWhoseSignatureCannotBeRead:
         )
         assert repr(dict) in refused
         assert "['tenant']" in refused
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_describe_time_readers_hand_none(case: str) -> None:
+    """Registration is outside any call, so it invents no dict for the Validator."""
+    spec, validator, _, _ = every_ask_case(case)
+    check_seeds(spec, pool_seeds=TENANT_SEEDS)
+    assert validator.asked
+    assert validator.asked == [None] * len(validator.asked)

@@ -301,8 +301,13 @@ class SelectorSpec:
         """
         return self
 
-    def parameters(self) -> Parameters:
-        """Everything this spec takes: its ``reads``, then its ``shapes``."""
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        """Everything this spec takes: its ``reads``, then its ``shapes``.
+
+        ``call_context`` is taken and ignored, so a reader asking a
+        ``ServiceSpec`` or a ``SelectorSpec`` asks both alike: a selector spec
+        has no Validator to hand it to.
+        """
         # The reads themselves where there are no shapes, so a spec declaring
         # none hands back the object it holds
         # (test_defaults_and_normalization), as it did before shapes existed.

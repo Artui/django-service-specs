@@ -70,6 +70,24 @@ def test_parameters_are_the_targets_reads_then_the_validators() -> None:
     assert ServiceSpec(service=print, collection_selector_spec=LIST).target_selector_spec() is LIST
 
 
+@pytest.mark.parametrize("many", [False, True], ids=["single", "many"])
+def test_parameters_hands_the_validator_the_call_context_it_is_asked_with(many: bool) -> None:
+    """The call's dict when a call asks, and no keyword at all when a reader
+    outside one does."""
+    asked: list[Any] = []
+
+    class Asked(Titled):
+        def parameters(self, *, call_context: Any = "not handed") -> Parameters:
+            asked.append(call_context)
+            return super().parameters()
+
+    spec = ServiceSpec(service=print, permissions=[Unrestricted()], validator=Asked(), many=many)
+    context: dict[str, Any] = {}
+    assert spec.parameters(call_context=context) == spec.parameters()
+    assert asked[0] is context
+    assert asked[1:] == ["not handed"]
+
+
 def test_a_name_the_target_and_the_validator_both_declare_is_refused_when_read() -> None:
     # Refused on read, not at construction: a Validator may need the app
     # registry to answer, and specs are built at import time.

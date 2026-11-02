@@ -43,6 +43,7 @@ from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
+    EVERY_ASK,
     OPEN,
     PK,
     RENAME,
@@ -55,6 +56,7 @@ from tests.dispatch.utils import (
     Scoped,
     Titled,
     Titles,
+    every_ask_case,
     make_user,
     note_by_pk,
     notes_of,
@@ -1540,3 +1542,28 @@ async def test_a_returns_many_service_presents_a_none_return_as_none() -> None:
 
     assert result.kind == "instance"
     assert await apresent(spec, result) is None
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+async def test_every_ask_in_one_adispatch_is_handed_its_own_dict(ada: Any, case: str) -> None:
+    spec, validator, arguments, service = every_ask_case(case)
+    context: dict[str, Any] = {}
+    await adispatch(
+        spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS, call_context=context
+    )
+    assert service.calls
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+async def test_an_adispatch_handed_no_dict_hands_every_ask_the_one_it_makes(
+    ada: Any, case: str
+) -> None:
+    spec, validator, arguments, _ = every_ask_case(case)
+    seen: list[Any] = []
+    spec = spec.derive(service=lambda *, call_context: seen.append(call_context))
+    await adispatch(spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS)
+    assert isinstance(seen[0], dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not seen[0]] == []

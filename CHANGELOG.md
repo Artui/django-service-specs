@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a check opting into a seed named for a parameter its combinator's own method takes
   (`principal`, `spec`, `target`, `scope`, which no seed can reach it through), and,
   inside `NoneOf`, a check judging rows or a scope at any depth.
+- **A Validator may declare `parameters(self, *, call_context=None)`** and is handed
+  the call's context on every ask inside a call, and none outside one; a Validator
+  declaring no keyword is asked as before. `ServiceSpec.parameters()` and
+  `SelectorSpec.parameters()` take the keyword.
 
 ## [0.22.0] — 2026-10-31
 
