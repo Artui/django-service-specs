@@ -54,8 +54,11 @@ def server_owned_keys(
     fields - and dispatch does not demand a parameter there that the provider
     fills. A filled key that a parameter in any other seat declares is
     refused when the spec is built, or, for a Validator field, when
-    ``parameters()`` is assembled. A key no parameter declares is the server's
-    alone.
+    ``parameters()`` is assembled. A ``many`` spec's list, named by
+    ``many_argument``, is such a seat for every provider, since dispatch
+    always demands it of the caller: a key naming it is refused, filled or
+    declinable, even beside a Validator field of that name. A key no
+    parameter declares is the server's alone.
 
     A key a provider may decline with ``UNSET`` is not here, nor is any key
     of a provider whose return says nothing about its keys, which may fill

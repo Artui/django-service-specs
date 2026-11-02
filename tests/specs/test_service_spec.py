@@ -946,6 +946,123 @@ class TestProviderReach:
             spec.parameters()
 
 
+class _FillsItems(TypedDict):
+    items: list[int]
+
+
+class _MayFillItems(TypedDict):
+    items: list[int] | UnsetType
+
+
+class _FillsRows(TypedDict):
+    rows: list[int]
+
+
+def _items() -> _FillsItems:
+    return {"items": [1]}
+
+
+def _maybe_items() -> _MayFillItems:
+    return {"items": [1]}
+
+
+def _rows() -> _FillsRows:
+    return {"rows": [1]}
+
+
+class TestManyListIsTheCallers:
+    """No provider reaches a ``many`` spec's list, so one annotated to fill it is refused.
+
+    ``server_owned_keys`` would list the name and a transport would withhold
+    it, while dispatch demands the list of the caller whatever a provider
+    answers. A ``declinable`` key is refused here too, unlike on the other
+    seats: dispatch never relaxes the list, so a transport reading it as
+    optional would advertise a list dispatch demands.
+    """
+
+    @pytest.mark.parametrize(
+        ("provider", "declaration", "key"),
+        [
+            pytest.param("ServiceSpec.kwargs", {"kwargs": _items}, "items", id="kwargs"),
+            pytest.param(
+                "ServiceSpec.input_data", {"input_data": _items}, "items", id="input-data"
+            ),
+            pytest.param(
+                "ServiceSpec.kwargs", {"kwargs": _maybe_items}, "items", id="declinable-kwargs"
+            ),
+            pytest.param(
+                "ServiceSpec.input_data",
+                {"input_data": _maybe_items},
+                "items",
+                id="declinable-input-data",
+            ),
+            pytest.param(
+                "ServiceSpec.kwargs",
+                {"kwargs": _rows, "many_argument": "rows"},
+                "rows",
+                id="renamed-list",
+            ),
+        ],
+    )
+    def test_a_provider_annotated_to_fill_the_list_is_refused_at_construction(
+        self, provider: str, declaration: dict[str, Any], key: str
+    ) -> None:
+        named = (
+            f"{provider} is annotated to fill {[key]!r}, which ServiceSpec.many_argument "
+            "declares, and its values never reach ServiceSpec.many_argument, so dispatch "
+            f"would still demand {[key]!r} of the caller. "
+            "No provider fills ServiceSpec.many_argument, which is the caller's list; rename "
+            "the key or the many_argument."
+        )
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True, validator=Titled(), **declaration)
+        assert str(refused.value) == named
+
+    def test_a_provider_annotation_resolving_after_the_build_is_refused_for_the_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The late re-check in ``parameters()`` holds the list seat too: a
+        # return annotation that reads as untyped when the spec is built and
+        # as filling ``items`` once it resolves.
+        def late() -> Any:
+            return {"items": [1]}
+
+        late.__annotations__["return"] = "_FillsItemsLater"
+        spec = ServiceSpec(service=print, many=True, validator=Titled(), kwargs=late)
+        monkeypatch.setitem(globals(), "_FillsItemsLater", _FillsItems)
+        named = "ServiceSpec.kwargs is annotated to fill ['items'], which ServiceSpec.many_argument"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            spec.parameters()
+
+    def test_a_row_field_named_like_the_list_is_refused_all_the_same(self) -> None:
+        # The key legitimately reaches the row seat, but ``server_owned_keys``
+        # would list ``items`` and so hide the list.
+        with pytest.raises(ImproperlyConfigured, match=re.escape("fill ['items'], which Serv")):
+            ServiceSpec(service=print, many=True, validator=Titled("items"), input_data=_items)
+
+    def test_a_key_the_list_is_not_named_for_is_accepted(self) -> None:
+        # Only the declared ``many_argument`` is a seat: ``items`` is no
+        # parameter of a spec whose list is ``rows``.
+        spec = ServiceSpec(
+            service=print, many=True, many_argument="rows", validator=Titled(), kwargs=_items
+        )
+        assert spec.parameters().names() == {"rows"}
+
+    def test_an_untyped_provider_is_accepted(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            many=True,
+            validator=Titled(),
+            kwargs=lambda: {"items": [1]},
+            input_data=lambda: {"items": [1]},
+        )
+        assert spec.parameters().names() == {"items"}
+
+    def test_a_spec_without_many_has_no_list_to_refuse(self) -> None:
+        spec = ServiceSpec(service=print, validator=Titled("items"), input_data=_items)
+        assert spec.parameters().names() == {"items"}
+
+
 def test_a_service_spec_compiles_to_itself() -> None:
     # What makes it a SpecSource, and how kernel_spec tells a spec from a
     # declaration that compiles to one without importing either class.
