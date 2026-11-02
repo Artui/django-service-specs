@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import (
@@ -18,6 +19,7 @@ from django_service_specs.dispatch.utils import (
     lookup,
     open_call,
     prepare_service,
+    refuse_seeds,
     refuse_target,
     selector_pool,
     shapes_sent,
@@ -39,6 +41,7 @@ def dispatch(
     principal: Any,
     arguments: Mapping[str, Any],
     grant: Grant | None = None,
+    seeds: CallSeeds | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
@@ -240,6 +243,22 @@ def dispatch(
     are resolved before step two, so the class-level check can read them, and
     every pool after takes those values as they are: each resolves once for
     the call, and the check, the selectors and the service see one object.
+    A transport that ran the prelude first, with
+    [`check_call`][django_service_specs.dispatch.check_call.check_call] or
+    [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target],
+    makes that once span the prelude too by handing on its ``.seeds`` with
+    its grant: ``seeds`` is a
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds], and its
+    values stand in for resolving those seeds here, so the prelude's checks
+    and this call's run see one value of each. Without ``seeds``, each is
+    resolved once by the prelude and once more here. A carrier is bound to
+    the spec, the principal, the ``call_context`` dict and the ``pool_seeds``
+    registry its prelude ran with, each by identity, and one that does not
+    cover this call is refused before step two, before any seed resolves.
+    So pass the same ``call_context`` dict to both: a prelude handed none ran
+    with a dict of its own, and its carrier covers no call of this function's.
+    ``authorize`` hands back no carrier, so a call authorized that way still
+    resolves the seeds its checks name twice.
     Every other seed resolves as before, once per pool and each after step
     two, as every seed does for a spec whose checks name none. A seed named
     ``arguments`` is never named this way: a check declaring ``arguments``
@@ -271,10 +290,12 @@ def dispatch(
             keyed by that parameter, and the same for a precondition's. One no caller can fill, or one the caller sent and the
             Validator did not hand back under that name, raises the
             callable's own ``TypeError``.
-        NotPermitted: step two or step four.
+        NotPermitted: step two or step four, or ``seeds`` that do not cover
+            this spec, principal, ``call_context`` and ``pool_seeds``.
         TypeError: ``target`` on a selector spec or a ``many`` spec, or
             anything but ``None`` on a service spec that declares no target
-            selector.
+            selector; ``seeds`` that are not a ``CallSeeds``, or ``seeds``
+            without ``grant``, before anything runs.
         ActionUnavailable: step six, an affordance not met.
         ServiceNotFound: step six, a condition on the row reached after the row
             was deleted.
@@ -289,6 +310,7 @@ def dispatch(
     """
     spec = kernel_spec(spec)
     refuse_target(spec, target)
+    refuse_seeds(seeds, grant)
     # Copied on entry, so a change to the caller's dict while the call runs -
     # by a check, say - reaches nothing the run sees
     # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
@@ -309,6 +331,7 @@ def dispatch(
             unknown_arguments=unknown_arguments,
             overlay=overlay,
             keywords=keywords,
+            carried=seeds,
         )
         pool = selector_pool(
             spec,
@@ -352,6 +375,7 @@ def dispatch(
         unknown_arguments=unknown_arguments,
         progress=progress,
         call_context=call_context,
+        carried=seeds,
         target=target,
         overlay=overlay,
     )

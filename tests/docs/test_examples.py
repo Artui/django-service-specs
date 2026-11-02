@@ -485,6 +485,15 @@ class TestDispatching:
             dispatching.check_club_note(bob, "chess", "Openings")
         assert not Note.objects.exists()  # nothing ran
 
+    def test_the_club_a_check_admitted_is_the_club_the_call_runs_in(self, ada: Any) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        clubs = iter(["chess", "go"])  # a second read would answer differently
+
+        result = dispatching.post_to_a_club_checked_first(ada, lambda: next(clubs), "Openings")
+
+        assert result.value.title == "chess: Openings"
+        assert next(clubs) == "go"  # asked once, by the prelude
+
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")
         with pytest.raises(NotPermitted):

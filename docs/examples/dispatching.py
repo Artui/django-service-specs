@@ -448,25 +448,60 @@ def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
 
 # --8<-- [start:resolve_target]
 def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
-    found = resolve_target(rename_note_spec, principal=user, arguments={"pk": pk})
+    context: dict[str, Any] = {}  # one dict, for the lookup and the call it checked
+    found = resolve_target(
+        rename_note_spec, principal=user, arguments={"pk": pk}, call_context=context
+    )
     if isinstance(found, DispatchResult):
         return None  # not found: the answer dispatch would give
     note, grant = found  # NotPermitted was raised already for anyone else
     if title is None:
         return note  # the GET: the row the form will act on
     # The POST acts on the row already found and checked: no second lookup,
-    # and the grant says has_object_permission was asked.
+    # the grant says has_object_permission was asked, and a seed a check named
+    # is not resolved again.
     result = dispatch(
         rename_note_spec,
         principal=user,
         arguments={"pk": pk, "title": title},
         target=note,
         grant=grant,
+        seeds=found.seeds,
+        call_context=context,
     )
     return present(rename_note_spec, result)
 
 
 # --8<-- [end:resolve_target]
+
+
+# --8<-- [start:checked_seeds]
+def post_to_a_club_checked_first(user: Any, club: Callable[[], str], title: str) -> DispatchResult:
+    # ``club`` reads the club off the request: a resolver asked twice may
+    # answer twice differently, so the call asks it once.
+    pool_seeds = DEFAULT_POOL_SEEDS.extend(club=club)
+    context: dict[str, Any] = {}  # one dict, for the prelude and the call it checked
+    checked = check_call(
+        club_note_spec,
+        principal=user,
+        arguments={"title": title},
+        pool_seeds=pool_seeds,
+        call_context=context,
+    )
+    _, grant = checked
+    # The club InClub admitted is the club the form and the service are handed.
+    return dispatch(
+        club_note_spec,
+        principal=user,
+        arguments={"title": title},
+        grant=grant,
+        seeds=checked.seeds,
+        pool_seeds=pool_seeds,
+        call_context=context,
+    )
+
+
+# --8<-- [end:checked_seeds]
 
 
 # --8<-- [start:seeds]
