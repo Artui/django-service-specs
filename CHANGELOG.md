@@ -39,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   resolved once rather than once by each. The carrier is bound by identity to
   the spec, principal, `call_context` dict and `pool_seeds` registry its prelude
   ran with; one for another is refused as `NotPermitted` before any seed resolves,
-  and `seeds=` without `grant=`, or anything but the carrier, is a `TypeError`. It
-  cannot be pickled.
+  and `seeds=` without `grant=`, `adispatch`'s `seeds=` with `principal_id=`, or
+  anything but the carrier, is a `TypeError`. It cannot be pickled.
 - **`resolve_seeds`** resolves the seeds a spec's checks name ahead of `authorize`,
   as a `CallSeeds`, and `authorize`, `authorize_scope`, `authorize_target` and
   `resolve_target` take it as `seeds=`, so a page that admits a request before it

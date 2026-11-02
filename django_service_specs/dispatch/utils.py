@@ -1630,29 +1630,38 @@ def walk_target(
     return target_entry(spec, None)
 
 
-def refuse_seeds(seeds: Any, grant: Grant | None) -> None:
+def refuse_seeds(seeds: Any, grant: Grant | None, *, principal_id: Any = None) -> None:
     """Refuse ``seeds=`` that cannot be a prelude's, before anything runs.
 
     A wiring mistake rather than a refusal of the call, so it is a
     ``TypeError`` at entry, where no later refusal can hide it. Only the
-    carrier ``check_call`` or ``resolve_target`` hands back is taken: a plain
-    mapping would be values nobody resolved for this call
+    carrier ``check_call``, ``resolve_target`` or ``resolve_seeds`` hands back is
+    taken: a plain mapping would be values nobody resolved for this call
     (test_a_plain_mapping_as_seeds_is_a_type_error). And it travels with the
     grant its prelude returned beside it: without one, dispatch would ask the
     class-level check again on values resolved for a check already asked
     (test_seeds_without_a_grant_is_a_type_error). ``adispatch`` calls this on
-    the loop, before any hop (test_seeds_are_refused_before_any_hop).
+    the loop, before any hop (test_seeds_are_refused_before_any_hop). A carrier
+    is bound to the principal its prelude was handed, which ``adispatch`` never
+    has when it resolves one from ``principal_id`` inside the hop, so that pair
+    is refused too (test_a_carrier_never_covers_a_principal_resolved_from_its_id).
     """
     if seeds is None:
         return
     if not isinstance(seeds, CallSeeds):
         raise TypeError(
             "seeds= takes the CallSeeds that check_call() or resolve_target() hands back on "
-            f".seeds; got {type(seeds).__name__}."
+            "its .seeds, or resolve_seeds() returns; "
+            f"got {type(seeds).__name__}."
         )
     if grant is None:
         raise TypeError(
             "seeds= is handed on with the grant= its prelude returned beside it; pass both."
+        )
+    if principal_id is not None:
+        raise TypeError(
+            "seeds= cannot cover a principal adispatch() resolves from principal_id=; "
+            "pass the principal= its prelude was handed."
         )
 
 
