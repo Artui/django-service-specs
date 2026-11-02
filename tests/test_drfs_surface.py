@@ -161,7 +161,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "resolve_target": _fn(
         "dispatch.resolve_target",
-        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=",
+        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=, seeds=",
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
@@ -579,6 +579,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "CallSeeds",
         "CheckedCall",
         "ResolvedTarget",
+        # What mints those seeds ahead of ``authorize``, for a transport that
+        # admits a call before it resolves the row: drfs authorizes through its
+        # own permission classes, so it neither wraps nor re-exports it.
+        "resolve_seeds",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.
