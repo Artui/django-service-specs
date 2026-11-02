@@ -81,13 +81,16 @@ such a spec where it registers it, with
 refuses an optional read over a selector keyword with no default, which a call
 leaving the read out is refused for, and an array read with no `items` over a
 keyword annotated `list[int]`, which would hand it any element a caller sends.
-It reads a precondition, an affordance condition, the output selector and an
-`extend_queryset` as well, each against what dispatch hands it: a condition is
-handed only the call's seeds, so one requiring a seed the mount does not
-register is refused there rather than failing every call. A positional-only
-parameter with no default is refused on each of them, and an optional read over
-a keyword with no default on those that are handed the spec's reads, a
-precondition and an `extend_queryset`; only the array check is not run on them.
+It reads a precondition, an affordance condition, the output selector, an
+`extend_queryset`, a `kwargs` or `input_data` provider and a
+`progress_reporter` as well, each against what dispatch hands it: a condition
+and a `progress_reporter` are handed only the call's seeds, and a provider the
+seeds and its seat's reads, never `data` nor a Validator's value, so one
+requiring a seed the mount does not register is refused there rather than
+failing every call. A positional-only parameter with no default is refused on
+each of them, and an optional read over a keyword with no default on those that
+are handed the spec's reads, a precondition, an `extend_queryset` and a
+provider; only the array check is not run on them.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.

@@ -84,6 +84,11 @@ class _Titled:
     note: str = ""
 
 
+@dataclass
+class _Untitled:
+    note: str = ""
+
+
 class _Fills(TypedDict):
     limit: int
 
@@ -191,6 +196,80 @@ def _taking(*names: str, seen: dict[str, Any], answer: Any = True) -> Callable[.
     return fn
 
 
+class _Scope(TypedDict):
+    tenant_id: str
+
+
+def _scoped_by(name: str) -> Callable[..., _Scope]:
+    """A provider typed to fill ``tenant_id`` that requires ``name``, which nothing fills."""
+
+    def provide(**handed: Any) -> _Scope:
+        return {"tenant_id": "acme"}
+
+    keyword = inspect.Parameter.KEYWORD_ONLY
+    signature = inspect.Signature([inspect.Parameter(name, keyword)], return_annotation=_Scope)
+    setattr(provide, "__signature__", signature)  # noqa: B010
+    return provide
+
+
+def _scope(*, tenant: Any) -> _Scope:
+    """A typed provider requiring the seed ``tenant``, which fills its callable's ``tenant_id``."""
+    return {"tenant_id": tenant}
+
+
+def _fills_its_own_limit(*, limit: int) -> _Fills:
+    # Typed to fill ``limit``, so the caller's value for it is dropped
+    # (``_without``) and never reaches this provider.
+    return {"limit": limit}
+
+
+def _declines_its_limit(seen: dict[str, Any]) -> Callable[..., _MayFill]:
+    """A provider that may decline ``limit``, requiring it and recording what it is handed."""
+
+    def provide(*, limit: int) -> _MayFill:
+        seen["limit"] = limit
+        return {"limit": UNSET}
+
+    return provide
+
+
+def _provides_from_limit(*, limit: int) -> dict[str, Any]:
+    return {}
+
+
+def _reports(*, progress: Any) -> None:
+    # A run reports, or a sync run's ``progress_reporter`` is never resolved.
+    progress(0.5)
+
+
+def _reports_positionally(progress: Any) -> None:
+    progress(0.5)
+
+
+async def _reports_async(*, progress: Any) -> None:
+    progress(0.5)
+
+
+def _reports_row(*, progress: Any, **_: Any) -> int:
+    progress(0.5)
+    return 1
+
+
+async def _reports_row_async(*, progress: Any, **_: Any) -> int:
+    progress(0.5)
+    return 1
+
+
+def _provider(name: str, seen: dict[str, Any]) -> Callable[..., Any]:
+    """A ``kwargs`` or ``input_data`` provider requiring ``name``, answering no key."""
+    return _taking(name, seen=seen, answer={})
+
+
+def _reporter(name: str, seen: dict[str, Any]) -> Callable[..., Any]:
+    """A ``progress_reporter`` requiring ``name``, declining to report."""
+    return _taking(name, seen=seen, answer=None)
+
+
 def test_it_is_exported_from_the_root() -> None:
     assert exported is check_seeds
 
@@ -281,6 +360,57 @@ _UNFILLED = [
         "title",
         id="a-shape-reaches-no-callable-by-name",
     ),
+    # A provider's pool is its own, not its callable's: each of these passes a
+    # check that reads a provider seat as the seat of the callable beside it.
+    pytest.param(
+        lambda: _retrieve(_found, kwargs=lambda *, tenant: {}),
+        "tenant",
+        id="an-untyped-provider-is-read-as-any-other",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, kwargs=_needs_data), "data", id="a-provider-is-no-data"
+    ),
+    pytest.param(
+        lambda: _service(_reports, progress_reporter=_needs_data),
+        "data",
+        id="a-progress-reporter-is-no-data",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, validator=Titled(), input_data=lambda *, title: {}),
+        "title",
+        id="input-data-is-handed-no-validator-field",
+    ),
+    pytest.param(
+        lambda: _service(_reports, reads=_TITLE, progress_reporter=lambda *, title: None),
+        "title",
+        id="a-progress-reporter-is-handed-no-read",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, kwargs=_needs_instance), "instance", id="a-lookup-s-provider"
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None, instance_selector_spec=_retrieve(_found, kwargs=_needs_instance)
+        ),
+        "instance",
+        id="a-target-s-provider-is-handed-no-row",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, reads=_LIMIT_REQUIRED, kwargs=_fills_its_own_limit),
+        "limit",
+        id="a-read-its-provider-is-typed-to-fill",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            reads=_LIMIT_REQUIRED,
+            kwargs=_fills_limit,
+            validator=Titled(),
+            input_data=_provides_from_limit,
+        ),
+        "limit",
+        id="input-data-and-a-read-the-spec-s-provider-is-typed-to-fill",
+    ),
 ]
 
 
@@ -288,6 +418,83 @@ _CONDITION_TAIL = "Register the seed on the mount, or give it a default."
 _OUTPUT_TAIL = "never an argument"
 _EXTEND_TAIL = "it is handed queryset beside what its selector is handed"
 _DECLARE_TAIL = "Declare it, or give it a default."
+_PROVIDER_TAIL = "a provider is handed what every pool carries"
+_REPORTER_TAIL = "a progress_reporter is handed only the call's seeds"
+
+# Each provider seat requiring the seed ``tenant``: refused where no mount
+# registers it, and passing where one does (TestAKeywordOnlyAMountsSeedFills).
+_PROVIDER_SEATS = [
+    pytest.param(
+        lambda: _service(lambda *, tenant_id: tenant_id, kwargs=_scope),
+        "tenant",
+        "ServiceSpec.kwargs",
+        _PROVIDER_TAIL,
+        id="a-service-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _retrieve(lambda *, tenant_id: tenant_id, kwargs=_scope),
+        "tenant",
+        "SelectorSpec.kwargs",
+        _PROVIDER_TAIL,
+        id="a-selector-s-kwargs",
+    ),
+    pytest.param(
+        # The Validator leaves the service to dispatch, never its input_data.
+        lambda: _service(lambda **_: None, validator=Titled(), input_data=lambda *, tenant: {}),
+        "tenant",
+        "ServiceSpec.input_data",
+        _PROVIDER_TAIL,
+        id="input-data",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            instance_selector_spec=_retrieve(lambda *, tenant_id: 1, kwargs=_scope),
+        ),
+        "tenant",
+        "ServiceSpec.instance_selector_spec.kwargs",
+        _PROVIDER_TAIL,
+        id="an-instance-target-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(lambda *, tenant_id: [], kwargs=_scope),
+        ),
+        "tenant",
+        "ServiceSpec.collection_selector_spec.kwargs",
+        _PROVIDER_TAIL,
+        id="a-collection-target-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(_reports, progress_reporter=_needs_tenant),
+        "tenant",
+        "ServiceSpec.progress_reporter",
+        _REPORTER_TAIL,
+        id="a-service-s-progress-reporter",
+    ),
+    pytest.param(
+        lambda: _service(_reports_positionally, progress_reporter=_needs_tenant),
+        "tenant",
+        "ServiceSpec.progress_reporter",
+        _REPORTER_TAIL,
+        id="a-progress-reporter-beside-a-positional-or-keyword-progress",
+    ),
+    pytest.param(
+        lambda: _service(lambda **handed: handed["progress"](0.5), progress_reporter=_needs_tenant),
+        "tenant",
+        "ServiceSpec.progress_reporter",
+        _REPORTER_TAIL,
+        id="a-progress-reporter-beside-a-catch-all-run",
+    ),
+    pytest.param(
+        lambda: _retrieve(_reports_row, progress_reporter=_needs_tenant),
+        "tenant",
+        "SelectorSpec.progress_reporter",
+        _REPORTER_TAIL,
+        id="a-selector-s-progress-reporter",
+    ),
+]
 
 # The seats the fifth refusal is not run on: a case each, with the keyword
 # nothing fills, the seat's label and what the message says of the seat.
@@ -414,6 +621,7 @@ _SEATS_WITHOUT_THE_FIFTH = [
         _OUTPUT_TAIL,
         id="an-output-s-extend-queryset",
     ),
+    *_PROVIDER_SEATS,
 ]
 
 _UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _SEATS_WITHOUT_THE_FIFTH]
@@ -422,6 +630,7 @@ _UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _SEATS_WITH
 _EVERY_POOL_S = ("user", "progress", "call_context", "shapes", "request", "view", "tenant")
 _A_CONDITION_S = ("user", "progress", "call_context", "request", "view", "tenant")
 _TITLE = Parameters.of(Parameter("title", "string", required=True))
+_LIMIT_REQUIRED = Parameters.of(Parameter("limit", "integer", required=True))
 
 
 def _filling(name: str, read: Parameters) -> dict[str, Any]:
@@ -509,6 +718,67 @@ def _async_selector_extend(name: str, seen: dict[str, Any]) -> SelectorSpec:
     return _list(_notes_async, extend_queryset=_extending(name, seen), **_filling(name, PK))
 
 
+def _providing(name: str, seen: dict[str, Any], read: Parameters) -> dict[str, Any]:
+    """A seat's ``kwargs`` requiring ``name``: its read's, or ``limit``, a read it may decline.
+
+    The declinable read is declared required, so the fourth refusal, which
+    reads a read as declared, has nothing to say of it.
+    """
+    if name == "limit":
+        return {"reads": _LIMIT_REQUIRED, "kwargs": _declines_its_limit(seen)}
+    return {"kwargs": _provider(name, seen), **({"reads": read} if name in read.names() else {})}
+
+
+def _target(name: str) -> dict[str, Any]:
+    """The target a service is handed as ``instance``, where ``name`` asks for it."""
+    return {"instance_selector_spec": _retrieve(_found)} if name == "instance" else {}
+
+
+def _service_kwargs(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    return _service(lambda **_: None, **_providing(name, seen, _TITLE), **_target(name))
+
+
+def _service_input_data(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    # A read ``limit`` the spec's ``kwargs`` may decline, so the caller's
+    # value stays in the call and reaches ``input_data``.
+    declared: dict[str, Any] = (
+        {"reads": _LIMIT_REQUIRED, "kwargs": _may_fill_limit}
+        if name == "limit"
+        else _filling(name, PK)
+    )
+    return _service(
+        lambda **_: None,
+        validator=Titled(),
+        input_data=_provider(name, seen),
+        **declared,
+        **_target(name),
+    )
+
+
+def _selector_kwargs(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _retrieve(_found, **_providing(name, seen, PK))
+
+
+def _target_kwargs(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    return _service(lambda **_: None, instance_selector_spec=_selector_kwargs(name, seen))
+
+
+def _service_reporter(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    return _service(_reports, progress_reporter=_reporter(name, seen))
+
+
+def _selector_reporter(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _retrieve(_reports_row, progress_reporter=_reporter(name, seen))
+
+
+def _async_selector_kwargs(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _retrieve(_found_async, **_providing(name, seen, PK))
+
+
+def _async_selector_reporter(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _retrieve(_reports_row_async, progress_reporter=_reporter(name, seen))
+
+
 _CONDITIONS_HANDED = [
     pytest.param(build, name, id=f"{seat}-{name}")
     for seat, build in (
@@ -560,6 +830,12 @@ _HANDED = [
                 _output_extend,
                 (*_EVERY_POOL_S, "instance", "result", "queryset"),
             ),
+            ("a-service-s-kwargs", _service_kwargs, (*_EVERY_POOL_S, "title", "limit", "instance")),
+            ("input-data", _service_input_data, (*_EVERY_POOL_S, "pk", "limit", "instance")),
+            ("a-selector-s-kwargs", _selector_kwargs, (*_EVERY_POOL_S, "pk", "limit")),
+            ("a-target-s-kwargs", _target_kwargs, (*_EVERY_POOL_S, "pk", "limit")),
+            ("a-service-s-progress-reporter", _service_reporter, _EVERY_POOL_S),
+            ("a-selector-s-progress-reporter", _selector_reporter, _EVERY_POOL_S),
         )
         for name in names
     ),
@@ -583,6 +859,16 @@ _ASYNC_HANDED = [
     *(
         pytest.param(_async_selector_extend, name, id=f"an-async-extend-queryset-{name}")
         for name in (*_EVERY_POOL_S, "pk", "limit", "queryset")
+    ),
+    *(
+        pytest.param(_async_selector_kwargs, name, id=f"an-async-selector-s-kwargs-{name}")
+        for name in (*_EVERY_POOL_S, "pk", "limit")
+    ),
+    *(
+        pytest.param(
+            _async_selector_reporter, name, id=f"an-async-selector-s-progress-reporter-{name}"
+        )
+        for name in _EVERY_POOL_S
     ),
 ]
 
@@ -678,7 +964,7 @@ def ada() -> Any:
 
 
 class TestAKeywordOnlyAMountsSeedFills:
-    """A condition or a precondition requiring a seed the mount does not register."""
+    """A condition, a precondition or a provider requiring a seed the mount does not register."""
 
     _CASES = [
         pytest.param(
@@ -696,6 +982,7 @@ class TestAKeywordOnlyAMountsSeedFills:
             "SelectorSpec.preconditions[0] (_needs_tenant)",
             id="a-selector-precondition",
         ),
+        *(pytest.param(case.values[0], case.values[2], id=case.id) for case in _PROVIDER_SEATS),
     ]
 
     @pytest.mark.parametrize(("build", "label"), _CASES)
@@ -815,14 +1102,17 @@ class TestTheSeatsTheFifthRefusalSkips:
 
     def test_a_service_spec_s_are_named_in_the_order_a_call_reaches_them(self) -> None:
         spec = _service(
-            lambda *, s3: None,
+            lambda *, s3, progress: None,
             collection_selector_spec=_list(
-                lambda *, a1: [],
+                lambda *, a1, tenant_id: [],
+                kwargs=_scoped_by("a0"),
                 affordances=_mapping(lambda *, a2: True),
                 extend_queryset=lambda *, queryset, a3: queryset,
             ),
+            kwargs=_scoped_by("k1"),
             affordances=_when(lambda *, s1: True),
             preconditions=[lambda *, s2: None],
+            progress_reporter=lambda *, r1: None,
             output_selector_spec=_list(
                 lambda *, z1: [],
                 affordances=_mapping(lambda *, z2: True),
@@ -830,19 +1120,36 @@ class TestTheSeatsTheFifthRefusalSkips:
             ),
         )
         refused = _refusal(spec)
-        order = ["a1", "a2", "a3", "s1", "s2", "s3", "z1", "z2", "z3"]
+        order = ["a0", "a1", "a2", "a3", "k1", "s1", "s2", "s3", "r1", "z1", "z2", "z3"]
         found = [refused.index(f"['{name}']") for name in order]
         assert found == sorted(found)
 
+    def test_input_data_is_named_before_the_spec_s_kwargs(self) -> None:
+        """``input_data`` runs before the Validator, and ``kwargs`` after it, before the conditions."""
+        spec = _service(
+            lambda **_: None,
+            instance_selector_spec=_retrieve(lambda *, a1, tenant_id: 1, kwargs=_scoped_by("a0")),
+            validator=Titled(),
+            input_data=lambda *, i1: {},
+            kwargs=lambda *, k1: {},
+            affordances=_when(lambda *, s1: True),
+        )
+        refused = _refusal(spec)
+        found = [refused.index(f"['{name}']") for name in ("a0", "a1", "i1", "k1", "s1")]
+        assert found == sorted(found)
+
     def test_a_selector_spec_s_are_named_in_the_order_a_call_reaches_them(self) -> None:
+        """Its ``progress_reporter`` beside its selector: resolved by the run, before ``settle``."""
         spec = _list(
-            lambda *, a1: [],
+            lambda *, a1, progress, tenant_id: [],
+            kwargs=_scoped_by("a0"),
+            progress_reporter=lambda *, r1: None,
             affordances=_mapping(lambda *, a2: True),
             extend_queryset=lambda *, queryset, a3: queryset,
             preconditions=[lambda *, a4: None],
         )
         refused = _refusal(spec)
-        found = [refused.index(f"['{name}']") for name in ("a1", "a2", "a3", "a4")]
+        found = [refused.index(f"['{name}']") for name in ("a0", "a1", "r1", "a2", "a3", "a4")]
         assert found == sorted(found)
 
 
@@ -888,6 +1195,105 @@ class TestWhatEachSeatTheFifthSkipsIsHanded:
         self, build: Callable[..., Any], name: str
     ) -> None:
         check_seeds(build(name, {}), pool_seeds=_SEEDED)
+
+
+def _unreadable_run() -> Callable[..., Any]:
+    """A run whose ``__signature__`` is no ``Signature``, for the ``TypeError`` arm."""
+
+    def run(**_: Any) -> None: ...
+
+    setattr(run, "__signature__", 3)  # noqa: B010
+    return run
+
+
+class TestAProviderSeat:
+    """A provider is bound from a pool of its own, refused as any seat is, and never derived from its callable's."""
+
+    @pytest.mark.parametrize(
+        ("build", "name"),
+        [
+            pytest.param(
+                lambda: _retrieve(_found_async, kwargs=_scope), "tenant", id="an-async-selector"
+            ),
+            pytest.param(
+                lambda: _service(_found_async, kwargs=_scope), "tenant", id="an-async-service"
+            ),
+            pytest.param(
+                lambda: _service(_reports_async, progress_reporter=_needs_tenant),
+                "tenant",
+                id="an-async-service-s-progress-reporter",
+            ),
+            pytest.param(
+                lambda: _retrieve(_reports_row_async, progress_reporter=_needs_tenant),
+                "tenant",
+                id="an-async-selector-s-progress-reporter",
+            ),
+            pytest.param(
+                lambda: _retrieve(_reports_row, progress_reporter=_needs_tenant),
+                "tenant",
+                id="a-sync-selector-s-progress-reporter",
+            ),
+        ],
+    )
+    async def test_adispatch_fails_every_call_with_it(
+        self, build: Callable[[], Any], name: str, ada: Any
+    ) -> None:
+        spec = build()
+        assert f"requires the keyword(s) ['{name}'], {_NOTHING_FILLS}" in _refusal(spec)
+        with pytest.raises(TypeError, match=name):
+            await adispatch(spec, principal=ada, arguments={})
+
+    @pytest.mark.parametrize(
+        "run",
+        [
+            pytest.param(lambda: None, id="no-progress"),
+            pytest.param(lambda *, other=1: None, id="another-keyword"),
+            pytest.param(lambda progress=None, /: None, id="a-positional-only-progress"),
+        ],
+    )
+    def test_a_progress_reporter_beside_a_run_taking_no_progress_is_not_read(
+        self, run: Callable[..., Any]
+    ) -> None:
+        """Dispatch calls it only where the run takes ``progress``, so it requires nothing of the rest.
+
+        Dispatched to hold the claim: the reporter requiring ``tenant``,
+        unregistered, is never called.
+        """
+        spec = _service(run, progress_reporter=_needs_tenant)
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={})
+
+    def test_a_selector_s_progress_reporter_beside_a_run_taking_no_progress_is_not_read(
+        self,
+    ) -> None:
+        spec = _retrieve(lambda: 1, progress_reporter=_needs_tenant)
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={})
+
+    @pytest.mark.parametrize(
+        "run",
+        [
+            pytest.param(dict, id="no-signature"),
+            pytest.param(_unreadable_run(), id="a-signature-that-is-not-one"),
+        ],
+    )
+    def test_a_run_whose_signature_cannot_be_read_is_refused_alone(
+        self, run: Callable[..., Any]
+    ) -> None:
+        """The run's own refusal answers it; whether it takes ``progress`` is not read."""
+        refused = _refusal(_service(run, progress_reporter=_needs_tenant))
+        assert "ServiceSpec.service is" in refused
+        assert "progress_reporter" not in refused
+
+    def test_a_typed_provider_is_handed_what_its_seat_names(self) -> None:
+        """The probe: refused without the seed, and the seed reaches the provider and its callable."""
+        spec = _service(lambda *, tenant_id: tenant_id, kwargs=_scope)
+        assert _refusal(spec).startswith(
+            f"ServiceSpec.kwargs requires the keyword(s) ['tenant'], {_NOTHING_FILLS}: "
+        )
+        check_seeds(spec, pool_seeds=_SEEDED)
+        result = dispatch(spec, principal=make_user("ada"), arguments={}, pool_seeds=_SEEDED)
+        assert result.value == "acme"
 
 
 class TestAPositionalOnlyParameter:
@@ -1100,6 +1506,44 @@ _POSITIONAL_SEATS = [
         "ServiceSpec.output_selector_spec.selector",
         id="an-output-selector",
     ),
+    pytest.param(
+        lambda: _service(lambda **_: None, kwargs=lambda user, /: {}),
+        "user",
+        "ServiceSpec.kwargs",
+        id="a-service-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, validator=Titled(), input_data=lambda user, /: {}),
+        "user",
+        "ServiceSpec.input_data",
+        id="input-data",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, kwargs=lambda user, /: {}),
+        "user",
+        "SelectorSpec.kwargs",
+        id="a-selector-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None, instance_selector_spec=_retrieve(_found, kwargs=lambda user, /: {})
+        ),
+        "user",
+        "ServiceSpec.instance_selector_spec.kwargs",
+        id="an-instance-target-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(_reports, progress_reporter=lambda user, /: None),
+        "user",
+        "ServiceSpec.progress_reporter",
+        id="a-service-s-progress-reporter",
+    ),
+    pytest.param(
+        lambda: _retrieve(_reports_row, progress_reporter=lambda user, /: None),
+        "user",
+        "SelectorSpec.progress_reporter",
+        id="a-selector-s-progress-reporter",
+    ),
 ]
 
 # The seats a positional-only parameter is refused on though the third
@@ -1170,26 +1614,31 @@ class TestAPositionalOnlyParameterOnTheOtherSeats:
 
 
 # An optional ``limit`` read over a keyword the callable requires, on each seat
-# that carries reads: the spec builder, the label and the arguments sent.
+# that carries reads: the spec builder, the label, and what a call leaving it
+# out raises - the shape check's refusal, or a provider's own ``TypeError``.
 _OPTIONAL_SEATS = [
     pytest.param(
         lambda: _service(lambda **_: None, reads=_LIMIT, preconditions=[_requires_limit]),
         "ServiceSpec.preconditions[0] (_requires_limit)",
+        InvalidArguments,
         id="a-service-precondition",
     ),
     pytest.param(
         lambda: _retrieve(_found, reads=_LIMIT, preconditions=[_requires_limit]),
         "SelectorSpec.preconditions[0] (_requires_limit)",
+        InvalidArguments,
         id="a-retrieve-precondition",
     ),
     pytest.param(
         lambda: _list(_none, reads=_LIMIT, preconditions=[_requires_limit]),
         "SelectorSpec.preconditions[0] (_requires_limit)",
+        InvalidArguments,
         id="a-list-precondition",
     ),
     pytest.param(
         lambda: _list(_notes, reads=_LIMIT, extend_queryset=_extends_with_limit),
         "SelectorSpec.extend_queryset",
+        InvalidArguments,
         id="a-selector-s-extend-queryset",
     ),
     pytest.param(
@@ -1200,6 +1649,7 @@ _OPTIONAL_SEATS = [
             ),
         ),
         "ServiceSpec.collection_selector_spec.extend_queryset",
+        InvalidArguments,
         id="a-target-s-extend-queryset",
     ),
     pytest.param(
@@ -1210,7 +1660,40 @@ _OPTIONAL_SEATS = [
             ),
         ),
         "ServiceSpec.instance_selector_spec.extend_queryset",
+        InvalidArguments,
         id="an-instance-target-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, reads=_LIMIT, kwargs=_provides_from_limit),
+        "ServiceSpec.kwargs",
+        TypeError,
+        id="a-service-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            reads=_LIMIT,
+            validator=DataclassValidator(_Untitled),
+            input_data=_provides_from_limit,
+        ),
+        "ServiceSpec.input_data",
+        TypeError,
+        id="input-data",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, reads=_LIMIT, kwargs=_provides_from_limit),
+        "SelectorSpec.kwargs",
+        TypeError,
+        id="a-selector-s-kwargs",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            instance_selector_spec=_retrieve(_found, reads=_LIMIT, kwargs=_provides_from_limit),
+        ),
+        "ServiceSpec.instance_selector_spec.kwargs",
+        TypeError,
+        id="an-instance-target-s-kwargs",
     ),
 ]
 
@@ -1275,13 +1758,16 @@ class TestAnOptionalReadOnTheOtherSeats:
     for it to find on them.
     """
 
-    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
+    @pytest.mark.parametrize(("build", "label", "error"), _OPTIONAL_SEATS)
     def test_dispatch_refuses_a_call_leaving_it_out(
-        self, build: Callable[[], Any], label: str
+        self, build: Callable[[], Any], label: str, error: type[Exception]
     ) -> None:
-        with pytest.raises(InvalidArguments) as refused:
+        with pytest.raises(error) as refused:
             dispatch(build(), principal=make_user("ada"), arguments={})
-        assert set(refused.value.detail) == {"limit"}
+        if isinstance(refused.value, InvalidArguments):
+            assert set(refused.value.detail) == {"limit"}
+        else:
+            assert "'limit'" in str(refused.value)
 
     @pytest.mark.parametrize(
         "build",
@@ -1311,14 +1797,25 @@ class TestAnOptionalReadOnTheOtherSeats:
         assert set(refused.value.detail) == {"limit"}
         await adispatch(spec, principal=ada, arguments={"limit": 1})
 
-    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
-    def test_a_call_sending_it_runs(self, build: Callable[[], Any], label: str) -> None:
+    @pytest.mark.parametrize(("build", "label", "error"), _OPTIONAL_SEATS)
+    def test_a_call_sending_it_runs(
+        self, build: Callable[[], Any], label: str, error: type[Exception]
+    ) -> None:
         dispatch(build(), principal=make_user("ada"), arguments={"limit": 1})
 
-    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
-    def test_it_is_refused(self, build: Callable[[], Any], label: str) -> None:
+    @pytest.mark.parametrize(("build", "label", "error"), _OPTIONAL_SEATS)
+    def test_it_is_refused(
+        self, build: Callable[[], Any], label: str, error: type[Exception]
+    ) -> None:
         refused = _refusal(build())
         assert f"{label} requires the keyword(s) ['limit'], {_OPTIONAL}" in refused
+        # What the call leaving it out meets, in the words of the seat.
+        omitted = (
+            "is refused as missing"
+            if error is InvalidArguments
+            else "fails with the provider's own TypeError"
+        )
+        assert f"so a call leaving one out {omitted}" in refused
         assert _NOTHING_FILLS not in refused
         assert _POSITIONAL not in refused
 
@@ -1712,6 +2209,24 @@ def _unreadable_by_a_bad_signature() -> Callable[..., Any]:
     return fn
 
 
+# A provider seat's callable with no signature to read, and the seat's label.
+_UNREADABLE_PROVIDERS = [
+    (_service(lambda **_: None, kwargs=dict), "ServiceSpec.kwargs"),
+    (_service(lambda **_: None, validator=Titled(), input_data=dict), "ServiceSpec.input_data"),
+    (_retrieve(_found, kwargs=dict), "SelectorSpec.kwargs"),
+    (
+        _service(lambda **_: None, instance_selector_spec=_retrieve(_found, kwargs=dict)),
+        "ServiceSpec.instance_selector_spec.kwargs",
+    ),
+    (
+        _service(lambda **_: None, collection_selector_spec=_list(_none, kwargs=dict)),
+        "ServiceSpec.collection_selector_spec.kwargs",
+    ),
+    (_service(_reports, progress_reporter=dict), "ServiceSpec.progress_reporter"),
+    (_retrieve(_reports_row, progress_reporter=dict), "SelectorSpec.progress_reporter"),
+]
+
+
 class TestACallableWhoseSignatureCannotBeRead:
     """A builtin type has no signature to read, and dispatch fails every call that reaches it.
 
@@ -1771,6 +2286,7 @@ class TestACallableWhoseSignatureCannotBeRead:
                 "SelectorSpec.extend_queryset",
                 id="extend-queryset",
             ),
+            *(pytest.param(spec, seat, id=f"{seat}") for spec, seat in _UNREADABLE_PROVIDERS),
         ],
     )
     def test_it_is_refused_naming_the_seat_and_the_callable(self, spec: Any, seat: str) -> None:
@@ -1818,13 +2334,15 @@ class TestACallableWhoseSignatureCannotBeRead:
                 id="output-selector",
             ),
             pytest.param(_list(_notes, extend_queryset=dict), ValueError, id="extend-queryset"),
+            *(pytest.param(spec, ValueError, id=f"{seat}") for spec, seat in _UNREADABLE_PROVIDERS),
         ],
     )
     def test_dispatch_fails_every_call_that_reaches_it(
         self, spec: Any, error: type[Exception]
     ) -> None:
-        # Holds the claim that the declaration cannot run, for each seat.
-        arguments = {"pk": 1} if getattr(spec, "instance_selector_spec", None) else {}
+        # Holds the claim that the declaration cannot run, for each seat:
+        # every declared argument sent, so the call reaches it.
+        arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
         with pytest.raises(error, match="signature"):
             dispatch(spec, principal=make_user("ada"), arguments=arguments)
 

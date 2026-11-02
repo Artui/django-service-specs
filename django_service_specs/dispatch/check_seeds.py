@@ -20,6 +20,7 @@ from django_service_specs.dispatch.utils import (
     INSTANCE_SOURCE,
     OUTPUT_SOURCE,
     SELECTOR_SOURCE,
+    reach,
     seed_named_refusal,
     split_seed_named,
     target_entry,
@@ -83,6 +84,23 @@ _UNRETURNED: Final = (
     "call's seeds, never an argument, so every call reaching it would fail. Read it from "
     "result, register the seed on the mount, or give it a default."
 )
+_UNPROVIDED: Final = (
+    "a provider is handed what every pool carries - user, progress, call_context, shapes, "
+    "request, view - the seeds this mount registers and its seat's reads, and for a service "
+    "the target as instance or collection; never data, a Validator's value, nor a read a "
+    "kwargs provider is typed to fill, so every call reaching it would fail. Register the "
+    "seed on the mount, declare the read, or give it a default."
+)
+_UNREPORTED: Final = (
+    "a progress_reporter is handed only the call's seeds - user, progress, call_context, "
+    "shapes, request, view and those this mount registers - so every call reaching it would "
+    "fail. Register the seed on the mount, or give it a default."
+)
+# What a call leaving out an optional read a seat requires meets: the fourth
+# refusal's account of it. A provider is bound by ``pool_kwargs``, which never
+# refuses, so the provider raises.
+_REFUSED_AS_MISSING: Final = "is refused as missing"
+_PROVIDER_RAISES: Final = "fails with the provider's own TypeError"
 
 
 def check_seeds(
@@ -116,8 +134,9 @@ def check_seeds(
        dispatch rather than when it is built.
     2. **A positional-only parameter with no default**, of the service, the
        selector or the target selector, and of each callable the third reads
-       below: a precondition, a callable condition, the output selector and
-       an ``extend_queryset``. Dispatch calls each by keyword, so nothing
+       below: a precondition, a callable condition, the output selector, an
+       ``extend_queryset``, a ``kwargs`` or ``input_data`` provider and a
+       ``progress_reporter``. Dispatch calls each by keyword, so nothing
        fills one, a read of its name included.
     3. **A keyword the callable requires that nothing fills**: by name, with
        no default, and in none of the places dispatch fills a keyword from
@@ -145,23 +164,41 @@ def check_seeds(
          and ``result`` and what every pool carries, never an argument nor
          its own reads;
        - each selector's ``extend_queryset``, handed its selector's pool
-         with the ``queryset``.
+         with the ``queryset``;
+       - each ``kwargs`` provider - the spec's own and its target
+         selector's - and a service spec's ``input_data``, handed what
+         every pool carries, a seed ``pool_seeds`` registers and its seat's
+         reads less those the seat's typed ``kwargs`` provider fills, whose
+         caller's value dispatch drops; for a service, ``instance`` or
+         ``collection`` where a target selector resolves one. Never
+         ``data``, a Validator's value or a provider's answer: ``input_data``
+         runs before the Validator, and ``kwargs`` is called from the same
+         pool. A provider's own keys fill nothing it is handed, so its seat
+         is read whether it is typed or not, and beside a Validator too;
+       - a spec's ``progress_reporter``, where its run takes ``progress`` by
+         name or through ``**kwargs``, which is when dispatch calls it,
+         handed only what every pool carries and a seed ``pool_seeds``
+         registers. A run taking no ``progress`` never calls it, so it is
+         not read there.
 
        Each is named as the spec names it, such as
-       ``ServiceSpec.affordances[0] ('frozen').when`` or
-       ``SelectorSpec.preconditions[0] (owns_it)``, in the order a call
+       ``ServiceSpec.affordances[0] ('frozen').when``,
+       ``SelectorSpec.preconditions[0] (owns_it)`` or
+       ``ServiceSpec.instance_selector_spec.kwargs``, in the order a call
        reaches it.
     4. **A keyword the callable requires that only an optional read fills**:
        a read the shape check does not demand - declared ``required=False``,
        or declaring a ``default``, which is reported and never applied - over
        a keyword with no default, that no seed and no provider fills. A call
        sending it runs, and one leaving it out is refused as missing
-       (``call_keywords``), so a caller reading the declaration is told the
-       read is optional and refused for omitting it. It reads every callable
-       the third does that sees reads: a precondition and an
-       ``extend_queryset`` as well as the service, the selector and the target
-       selector. A condition and the output selector are handed none of their
-       spec's reads, so it finds nothing on them.
+       (``call_keywords``), or on a provider fails with its own
+       ``TypeError``, so a caller reading the declaration is told the read
+       is optional and refused for omitting it. It reads every callable the
+       third does that sees reads: a precondition, an ``extend_queryset``
+       and a ``kwargs`` or ``input_data`` provider as well as the service,
+       the selector and the target selector. A condition, the output
+       selector and a ``progress_reporter`` are handed none of their spec's
+       reads, so it finds nothing on them.
     5. **An array read with no ``items`` over a keyword annotated with its
        element**: a read of ``type="array"`` declaring no ``items``, over
        the keyword it fills on its own seat, annotated ``list[X]``,
@@ -189,8 +226,13 @@ def check_seeds(
     answers it, and the transport decides.
 
     **What it cannot see, and so never refuses.** A provider whose return says
-    nothing about its keys may fill any keyword in its seat, so that seat's
-    keywords are left to dispatch (the third and fourth). An annotation that
+    nothing about its keys may fill any keyword of the callable it provides
+    for, so that callable's keywords are left to dispatch (the third and
+    fourth); the provider's own are read as any seat's. A read is taken as
+    declared on a provider's seat: one the seat's provider may decline, or
+    an untyped one may fill, is relaxed for the caller by the shape check, so
+    a provider requiring it fails a call leaving it out, which this does not
+    refuse. An annotation that
     does not resolve, as a forward reference to a name not importable where the
     callable was defined, is not read, and leaves alone only its own keyword
     (the fifth); so is a bare ``list``, an element of ``Any`` or ``object``, a
@@ -200,18 +242,16 @@ def check_seeds(
     either (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
     handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this cannot
     see, and should not call it for such a spec. Only the fifth refusal is not
-    run on a precondition, a condition, the output selector or an
-    ``extend_queryset``. A precondition beside a Validator, or one or an
+    run on a precondition, a condition, the output selector, an
+    ``extend_queryset``, a provider or a ``progress_reporter``. A precondition beside a Validator, or one or an
     ``extend_queryset`` beside an untyped provider, is left to dispatch by the
     third and fourth as the callable beside it is, never by the second. A
     callable taking ``**kwargs`` requires nothing, so one forwarding into a
     stricter callable is not judged by what that callable requires. Nor is the
     pool a transport builds itself to answer a condition at describe time
     (``unmet_operation_affordance``): this reads the pool dispatch builds. Nor
-    does it read a provider's own keywords (``kwargs``, ``input_data``,
-    ``progress_reporter``), a ``filter_set``, a form's ``form_kwargs`` or a
-    seed's resolver: dispatch binds each by keyword, and this is not asked of
-    any.
+    does it read a ``filter_set``, a form's ``form_kwargs`` or a seed's
+    resolver: dispatch binds each by keyword, and this is not asked of any.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
@@ -239,8 +279,9 @@ class _Seat:
     every pool's own names and the registered seeds for most, less for a
     condition, more where dispatch adds an entry of its own. ``validated`` is
     whether a Validator's values join it. ``checks_items`` is false for a seat
-    the fifth refusal is not run on, and ``unfilled`` is the third refusal's
-    account of why nothing fills it.
+    the fifth refusal is not run on, ``unfilled`` is the third refusal's
+    account of why nothing fills it, and ``omitted`` the fourth's of what a
+    call leaving the read out meets.
     """
 
     label: str
@@ -251,29 +292,40 @@ class _Seat:
     validated: bool = False
     checks_items: bool = True
     unfilled: str = _UNDECLARED
+    omitted: str = _REFUSED_AS_MISSING
 
 
 def _seats(spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds) -> list[_Seat]:
     """Each callable a call binds by its pool, in the order a call reaches them.
 
-    A selector, then the conditions its ``affordances`` map to, answered in
-    ``settle`` before the shaping, then its ``extend_queryset``; for a
-    selector spec, its preconditions last. A service spec's target selector
-    so, then its own conditions, its preconditions and its service, as
-    ``prepare_service`` runs them, then its output selector so.
+    A selector's ``kwargs`` provider, called before the selector
+    (``selector_pool``), then the selector, then the conditions its
+    ``affordances`` map to, answered in ``settle`` before the shaping, then
+    its ``extend_queryset``; for a selector spec, its ``progress_reporter``
+    beside its selector, whose run resolves it, and its preconditions last. A
+    service spec's target selector so, then its ``input_data``, called before
+    the Validator, and its ``kwargs``, called after it, then its own
+    conditions, its preconditions and its service, as ``prepare_service``
+    runs them, then its ``progress_reporter``, resolved by the service's run,
+    and its output selector so.
 
     A target selector's pool is a selector's. A service's adds ``data`` and
     the target under the name ``target_entry`` hands it as, the rule
     ``walk_target`` returns it by. A precondition is handed its service's or
     its selector's pool, a selector spec's with the rows or the row beside it.
+    A provider's pool is built fresh, never derived from its callable's
+    (``_provided``), and a ``progress_reporter``'s is the call's seeds
+    (``_reporting``).
     """
     everywhere = EVERY_POOL | pool_seeds.names
     conditions = _condition_fills(everywhere, pool_seeds)
     if isinstance(spec, SelectorSpec):
         own = _Seat(SELECTOR_SOURCE, spec.selector, spec.reads, spec.kwargs, everywhere)
         row = _COLLECTION if spec.kind is SelectorKind.LIST else _INSTANCE
+        reporter = _reporting("SelectorSpec", spec.progress_reporter, spec.selector, everywhere)
         return [
-            *_selector_seats(spec, own, conditions),
+            *_selector_provider(spec, own.label, everywhere),
+            *_selector_seats(spec, own, conditions, beside=reporter),
             *_preconditions(spec, "SelectorSpec", replace(own, fills=own.fills | {row})),
         ]
     seats: list[_Seat] = []
@@ -281,7 +333,16 @@ def _seats(spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds) -> list[_Sea
     if target is not None:
         source = INSTANCE_SOURCE if spec.instance_selector_spec is not None else COLLECTION_SOURCE
         seat = _Seat(source, target.selector, target.reads, target.kwargs, everywhere)
+        seats += _selector_provider(target, source, everywhere)
         seats += _selector_seats(target, seat, conditions)
+    # Both are called from ``providers_pool``: the seeds, the call's context
+    # and shapes, the spec's reads as the shape check leaves them, and the
+    # target. Never ``data`` nor the Validator's values: ``input_data`` runs
+    # before ``validate_arguments``, and ``kwargs`` from the same pool.
+    provided = everywhere | target_entry(spec, None).keys()
+    reads = _handed(spec.reads, spec.kwargs)
+    seats += _provided("ServiceSpec.input_data", spec.input_data, reads, provided)
+    seats += _provided("ServiceSpec.kwargs", spec.kwargs, reads, provided)
     service = _Seat(
         _SERVICE_SOURCE,
         spec.service,
@@ -293,6 +354,7 @@ def _seats(spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds) -> list[_Sea
     seats += _conditions("ServiceSpec.affordances", spec.affordances, conditions)
     seats += _preconditions(spec, "ServiceSpec", service)
     seats.append(service)
+    seats += _reporting("ServiceSpec", spec.progress_reporter, spec.service, everywhere)
     output = spec.output_selector_spec
     if output is not None:
         # Never its reads, which its pool does not carry, and no provider,
@@ -323,15 +385,118 @@ def _condition_fills(everywhere: frozenset[str], pool_seeds: PoolSeeds) -> froze
     return frozenset(ambient) | CALL_SEEDS
 
 
-def _selector_seats(spec: SelectorSpec, seat: _Seat, conditions: frozenset[str]) -> list[_Seat]:
-    """A selector's seat, the conditions its ``affordances`` map to, then its ``extend_queryset``'s.
+def _handed(reads: Parameters, provider: Callable[..., Any] | None) -> Parameters:
+    """``reads`` less those ``provider`` is annotated to fill: what a provider of their seat is handed.
+
+    The shape check drops the caller's value for each (``_without``), by the
+    rule ``reach`` answers, so this and dispatch move together (the
+    ``a-read-its-provider-is-typed-to-fill`` case of
+    TestARequiredKeywordNothingFills). A declinable key is kept, as
+    the caller's value is (the ``limit`` cases of
+    TestWhatEachSeatTheFifthSkipsIsHanded), and an untyped provider drops
+    none. Each read is kept as declared.
+    """
+    filled, _ = reach(provider, reads)
+    return Parameters.of(*(param for param in reads if param.name not in filled))
+
+
+def _provided(
+    label: str, provider: Callable[..., Any] | None, reads: Parameters, fills: frozenset[str]
+) -> list[_Seat]:
+    """A seat for ``provider``, handed ``fills`` and ``reads`` alone; none where it is unset.
+
+    Built fresh rather than from its callable's seat, whose pool has what a
+    provider's never does: ``data``, a Validator's values, a provider's
+    answer. So it is never ``validated``, and it names no provider, which
+    ``provider_keys`` reads as filling nothing rather than as untyped. Not
+    run by the fifth refusal.
+    """
+    if provider is None:
+        return []
+    return [
+        _Seat(
+            label,
+            provider,
+            reads,
+            None,
+            fills,
+            checks_items=False,
+            unfilled=_UNPROVIDED,
+            omitted=_PROVIDER_RAISES,
+        )
+    ]
+
+
+def _selector_provider(spec: SelectorSpec, source: str, fills: frozenset[str]) -> list[_Seat]:
+    """A selector's ``kwargs`` seat: called from its pool before the answer joins it (``selector_pool``)."""
+    label = f"{_SPEC_LABELS[source]}.kwargs"
+    return _provided(label, spec.kwargs, _handed(spec.reads, spec.kwargs), fills)
+
+
+def _reporting(
+    label: str, reporter: Callable[..., Any] | None, run: Callable[..., Any], fills: frozenset[str]
+) -> list[_Seat]:
+    """A seat for a spec's ``progress_reporter``, where dispatch may call it; none elsewhere.
+
+    Dispatch calls it only for a run handed ``progress`` (``prepare_service``,
+    ``with_run_progress``): one naming it by keyword, or taking ``**kwargs``,
+    to which ``resolve_callable_kwargs`` hands the pool. It is called from
+    the call's seeds - ``base_pool``'s, the call's context and its shapes -
+    with ``request`` and ``view`` beside them. A nested selector declares
+    none: that is refused when the service spec is built.
+
+    Each condition is held by its own test: a run taking no ``progress`` (the
+    ``no-progress`` case of
+    test_a_progress_reporter_beside_a_run_taking_no_progress_is_not_read),
+    its name (``another-keyword``) and its kind (``a-positional-only-progress``)
+    for a run naming it, and the catch-all
+    (``a-progress-reporter-beside-a-catch-all-run``).
+    """
+    if reporter is None:
+        return []
+    try:
+        parameters = inspect.signature(run).parameters.values()
+    except (ValueError, TypeError):
+        # The run is refused as unreadable on its own seat, and whether it
+        # takes ``progress`` cannot be read. One arc for two exceptions, each
+        # held by a case of
+        # test_a_run_whose_signature_cannot_be_read_is_refused_alone.
+        return []
+    takes = any(
+        param.kind is inspect.Parameter.VAR_KEYWORD
+        or (param.name == "progress" and param.kind in _BY_KEYWORD)
+        for param in parameters
+    )
+    if not takes:
+        return []
+    return [
+        _Seat(
+            f"{label}.progress_reporter",
+            reporter,
+            Parameters.of(),
+            None,
+            fills,
+            checks_items=False,
+            unfilled=_UNREPORTED,
+        )
+    ]
+
+
+def _selector_seats(
+    spec: SelectorSpec,
+    seat: _Seat,
+    conditions: frozenset[str],
+    *,
+    beside: Sequence[_Seat] = (),
+) -> list[_Seat]:
+    """A selector's seat and those ``beside`` it, the conditions its ``affordances`` map to, then its ``extend_queryset``'s.
 
     Only a callable condition, which ``split_affordances`` answers against
     the pool: a condition on the row is SQL, and binds nothing.
     ``extend_queryset`` is handed its selector's pool with the queryset.
     """
     label = _SPEC_LABELS[seat.label]
-    seats = [seat]
+    seats = [seat, *beside]
     for name, declarer in (spec.affordances or {}).items():
         seats += _conditions(f"{label}.affordances[{name!r}]", declarer.affordances, conditions)
     if spec.extend_queryset is not None:
@@ -457,7 +622,7 @@ def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys |
     if optional:
         problems.append(
             f"{seat.label} requires the keyword(s) {optional}, declared as optional reads "
-            "that nothing else fills, so a call leaving one out is refused as missing. "
+            f"that nothing else fills, so a call leaving one out {seat.omitted}. "
             "Declare the read required, or give the keyword a default."
         )
     return problems

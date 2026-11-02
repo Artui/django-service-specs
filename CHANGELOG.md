@@ -63,6 +63,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   positional-only parameter, and as missing for the keyword when the call left the
   read out. The array-read refusal is still not run on them. A positional-only
   parameter is refused beside a Validator or an untyped provider too.
+- **`check_seeds` reads the `kwargs`, `input_data` and `progress_reporter`
+  providers' signatures**, each against what dispatch hands it: a `kwargs`
+  provider, the spec's own or its target selector's, and `input_data` are handed
+  what every pool carries, the mount's seeds and their seat's reads less those
+  the seat's typed `kwargs` provider fills, and a service's the target as
+  `instance` or `collection`, never `data` or a Validator's value. A
+  `progress_reporter` is handed only the call's seeds, and is refused whenever
+  the run takes `progress`, by name or through `**kwargs`. Each seat runs the
+  unreadable-signature, positional-only, unfilled-keyword and optional-read
+  refusals, whether the provider annotates its keys or not and beside a
+  Validator too, so a spec that mounted before, such as one whose typed `kwargs`
+  provider requires a seed the mount does not register, may now be refused at
+  mount. Every call reaching such a provider failed already, with the
+  provider's own `TypeError`, and every call reaching such a `progress_reporter`
+  failed on its first report. The optional-read refusal says so for a provider:
+  a call leaving the read out fails with the provider's own `TypeError` rather
+  than being refused as missing.
 - **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
   where each was annotated as a plain tuple. Both are still the same 2-tuple,
   `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
