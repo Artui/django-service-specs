@@ -30,9 +30,11 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.dispatch import utils as dispatch_utils
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -1635,6 +1637,48 @@ async def test_adispatch_runs_on_the_carried_values(
     assert {stage for stage, _ in tenancy.seen} & {"selector", "service"}
     assert tenancy.one_value()
     assert hops[0] == hopped
+
+
+@pytest.mark.parametrize(
+    "build",
+    [Tenancy.spec, _async_service_route],
+    ids=["sync-hop", "async-non-atomic-service"],
+)
+async def test_one_resolution_from_resolve_seeds_to_adispatch(
+    ada: Any, build: Callable[[Tenancy], ServiceSpec]
+) -> None:
+    """Admitted ahead of the row, then the run on the loop: one value of ``tenant`` throughout."""
+    note = await _create(owner=ada, title="mine")
+    tenancy = Tenancy()
+    spec, context = build(tenancy), {}
+
+    carrier = await sync_to_async(resolve_seeds)(
+        spec, principal=ada, pool_seeds=tenancy.pool_seeds, call_context=context
+    )
+    grant = await sync_to_async(authorize)(
+        spec, ada, seeds=carrier, pool_seeds=tenancy.pool_seeds, call_context=context
+    )
+    result = await adispatch(
+        spec,
+        principal=ada,
+        arguments={"pk": note.pk},
+        grant=grant,
+        seeds=carrier,
+        pool_seeds=tenancy.pool_seeds,
+        call_context=context,
+    )
+
+    assert result.value == note
+    assert [stage for stage, _ in tenancy.seen] == [
+        "has_permission",
+        "instance_selector",
+        "has_object_permission",
+        "service",
+    ]
+    assert len(tenancy.resolved) == 1
+    # The service was handed the very object the prelude resolved, not a second one.
+    assert tenancy.seen[-1][1] is carrier.values["tenant"]
+    assert tenancy.one_value()
 
 
 async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> None:

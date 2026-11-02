@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import inspect
 from typing import Any
 
@@ -17,6 +18,7 @@ from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.resolve_seeds import resolve_seeds
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
+from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import (
@@ -374,18 +376,31 @@ class TestAnyOf:
 class TestCarriedSeeds:
     """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for any other."""
 
-    def test_a_carrier_for_another_principal_is_refused_before_any_check(self) -> None:
+    @pytest.mark.parametrize("other", ["principal", "spec", "call_context", "registry"])
+    def test_a_carrier_for_another_call_is_refused_before_any_check(self, other: str) -> None:
+        """Each of the four ``values_for`` is handed is held: the carrier's own would admit the call."""
         check = SeedPerQuestion()
         spec, context = _spec([check]), {}
         pool_seeds, resolved = recorded_seeds()
         carrier = resolve_seeds(spec, principal="ada", pool_seeds=pool_seeds, call_context=context)
         resolved.clear()
+        principal, asked_spec = "ada", spec
+        if other == "principal":
+            principal = "bob"
+        elif other == "spec":
+            # A frozen dataclass compares by field: only identity tells the twin apart.
+            asked_spec = dataclasses.replace(kernel_spec(spec))
+            assert asked_spec == kernel_spec(spec)
+        elif other == "call_context":
+            context = {}
+        else:
+            pool_seeds = recorded_seeds()[0]
         with pytest.raises(NotPermitted) as refused:
             authorize_target(
-                spec,
-                "bob",
+                asked_spec,
+                principal,
                 object(),
-                grant=Grant(spec, "bob"),
+                grant=Grant(asked_spec, principal, target_checked=True),
                 seeds=carrier,
                 pool_seeds=pool_seeds,
                 call_context=context,

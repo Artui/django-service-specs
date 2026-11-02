@@ -6,11 +6,12 @@ import copy
 import dataclasses
 import pickle
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -46,8 +47,23 @@ def test_it_covers_exactly_its_spec_principal_call_context_and_registry(ada: Any
     # Equal is not the same spec: a frozen dataclass compares by field, so only identity refuses it.
     assert not seeds.covers(dataclasses.replace(spec), ada, context, tenancy.pool_seeds)
     assert not seeds.covers(spec, make_user("bob"), context, tenancy.pool_seeds)
+    # Equal is not the same principal: a model compares by pk, so only identity refuses a re-fetch.
+    refetched = type(ada).objects.get(pk=ada.pk)
+    assert refetched == ada
+    assert not seeds.covers(spec, refetched, context, tenancy.pool_seeds)
     assert not seeds.covers(spec, ada, {}, tenancy.pool_seeds)
     assert not seeds.covers(spec, ada, context, DEFAULT_POOL_SEEDS.extend(tenant=tenancy.tenant))
+
+
+def test_a_carrier_built_on_no_context_covers_no_call(ada: Any) -> None:
+    """``None`` is not a dict a carrier is bound to, even where the carrier holds ``None``."""
+    tenancy = Tenancy()
+    spec, no_context = tenancy.spec(), cast(Any, None)
+    seeds = CallSeeds(spec, ada, no_context, tenancy.pool_seeds, {})
+
+    assert not seeds.covers(spec, ada, None, tenancy.pool_seeds)
+    with pytest.raises(NotPermitted):
+        seeds.values_for(spec, ada, None, tenancy.pool_seeds)
 
 
 def test_minted_for_a_source_it_covers_the_source_and_the_spec_it_compiles_to(ada: Any) -> None:

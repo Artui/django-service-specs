@@ -84,9 +84,13 @@ class CallSeeds:
         # test_a_carrier_under_another_registry_is_refused each one through
         # dispatch, and test_a_carrier_for_a_source_covers_its_compiled_spec the
         # compile, without which a carrier minted for a source covers nothing.
+        # ``call_context is not None`` holds the docstring's claim: a carrier built
+        # on a ``None`` context would otherwise cover a call handed ``None``
+        # (test_a_carrier_built_on_no_context_covers_no_call).
         return (
             kernel_spec(self.spec) is kernel_spec(spec)
             and self.principal is principal
+            and call_context is not None
             and self.call_context is call_context
             and self.pool_seeds is pool_seeds
         )

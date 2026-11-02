@@ -133,8 +133,8 @@ async def adispatch(
 
     ``seeds`` is ``dispatch``'s, handed on with the grant from ``check_call``,
     ``resolve_target`` or ``authorize`` (after ``resolve_seeds``) and taken
-    on every route, and refused as ``dispatch`` refuses it, the wrong type or no ``grant`` on the loop before
-    any hop. Like a grant, a carrier never covers a principal resolved here
+    on every route, and refused as ``dispatch`` refuses it, the wrong type or no
+    ``grant`` on the loop before any hop. Like a grant, a carrier never covers a principal resolved here
     from ``principal_id``, which is not the object its prelude was handed, so
     such a call is a ``TypeError`` on the loop too, before any hop; pass the
     ``principal`` the prelude was handed.
