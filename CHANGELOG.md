@@ -59,6 +59,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   transport withholding those names dropped a list that dispatch still demanded.
   No provider reaches the list, so the key is refused even when a Validator row
   field shares its name. Rename the key or the `many_argument`.
+- **`check_seeds` reads affordance conditions, preconditions, the output selector
+  and `extend_queryset`**, each against what dispatch hands it, so a spec that
+  mounted before may now be refused at mount with `ImproperlyConfigured`. Such a
+  spec raised `TypeError` on every call reaching that callable: a condition is
+  handed only the call's seeds, so one requiring a seed the mount does not
+  register (a rename whose condition reads `frozen`) failed every call. Only the
+  unfilled-keyword check and the unreadable-signature refusal run on these.
 
 ## [0.22.0] — 2026-10-31
 
