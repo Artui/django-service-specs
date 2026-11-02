@@ -454,9 +454,13 @@ docs/examples/declaring_writes.py:providers
 ```
 
 On a `many` spec, the keys an `input_data` provider fills are fields inside
-each row, merged over every row, so a transport subtracting the set from the
-top-level `parameters()` - the list and the reads - removes nothing: it hides
-them from the list's items instead.
+each row, merged over every row, so subtracting the set from the top-level
+`parameters()` - the list and the reads - removes nothing: they belong out of
+the list's items instead.
+[`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+does both: the schema a transport advertises, less what the server fills at
+the top and in each row, with what a provider may fill left out of
+`required` at each level.
 
 ## Parameters
 
