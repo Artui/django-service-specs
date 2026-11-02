@@ -440,7 +440,10 @@ resolves them before its own class-level check; a seed no check names there is
 never resolved, and neither is any seed when a covering grant answers first.
 The values are not carried on the grant, so the `dispatch` that follows
 resolves the seeds its checks name again, for its own call: the check
-`authorize` asked and the service may see two objects from one resolver. `authorize_target`
+`authorize` asked and the service may see two objects from one resolver.
+`authorize` hands back no values to carry, so this path still resolves twice;
+[`check_call`](#checking-a-call-before-it-runs) and
+[`resolve_target`](#a-target-resolved-ahead-of-the-call) do, on `.seeds`. `authorize_target`
 and `authorize_scope` take `pool_seeds=` the same way, for the seeds their own
 question names. `seeds=` is the alternative for a caller holding resolved
 values, and handing both raises `TypeError`, since one would silently outrank
@@ -510,7 +513,12 @@ docs/examples/dispatching.py:resolve_target
 It returns `(target, grant)`: the row, the set, or `None` for a create, and a
 grant covering the spec and the principal with `target_checked` set. Both go
 to `dispatch(..., target=, grant=)`, which then looks nothing up and asks no
-object-level or scope check again. The grant is honoured only with the
+object-level or scope check again. The pair is a
+[`ResolvedTarget`][django_service_specs.dispatch.resolved_target.ResolvedTarget],
+whose `.seeds` hold the values its checks were offered of the registered
+seeds they name; handed on as `dispatch(..., seeds=found.seeds)`, with the
+same `call_context` dict, the run takes them rather than resolving those seeds
+again, as [below](#seeds-handed-on-from-the-prelude). The grant is honoured only with the
 target it was resolved for: handed on without `target=`, dispatch looks the
 row up itself and runs the checks on it. A missing row that `allow_none` does not
 let through comes back as `DispatchResult(kind="not_found")`, so it is never
@@ -613,7 +621,9 @@ docs/examples/dispatching.py:check_call
 
 It returns the checked arguments and the grant, which `dispatch` honours for
 the same spec and principal in the same process; a grant is not serializable,
-so it never crosses a queue. The kernel's own steps run no query. It is
+so it never crosses a queue. The pair is a
+[`CheckedCall`][django_service_specs.dispatch.checked_call.CheckedCall], still
+a 2-tuple, carrying the call's seeds on `.seeds`. The kernel's own steps run no query. It is
 `bind_arguments`' complement: `check_call` authorizes and does not validate,
 `bind_arguments` validates and does not authorize, and neither resolves a
 target. A `many` call's refused rows are raised by it, after the permission
@@ -632,6 +642,37 @@ checks a second time.
 docs/examples/dispatching.py:after_authorize
 --8<--
 ```
+
+### Seeds handed on from the prelude
+
+A registered seed a permission check names is resolved before the class-level
+check. Run `check_call` or `resolve_target` and then `dispatch`, and each
+resolves it once for its own call: the check judged one value and the run
+received another, and a resolver that reads moving state - a club off the
+request, a tenant row - can answer the two differently. Both hand back the
+values their checks were offered as a
+[`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] on `.seeds`,
+and `dispatch(seeds=)` or `adispatch(seeds=)` takes them, with the grant they
+came with, in place of resolving those seeds again:
+
+```python
+--8<--
+docs/examples/dispatching.py:checked_seeds
+--8<--
+```
+
+Only the seeds a check names travel; every other seed resolves in each pool as
+it always does, from the `pool_seeds` dispatch is handed. The carrier is bound
+by identity to the spec (compared as compiled, as a grant compares it), the
+principal, the `call_context` dict and the `pool_seeds` registry its prelude
+ran with, and dispatch refuses one that does not cover its call with
+`NotPermitted`, before any seed resolves and before the class-level check. So
+hand the prelude and the call one `call_context` dict: a prelude handed none
+runs with a dict of its own, readable as `seeds.call_context`, and its carrier
+covers only a call handed that same dict: a later call that passes none, or a
+fresh one, is refused. `seeds=` that are anything but the carrier, or `seeds=` without `grant=`, raise
+`TypeError` before anything runs. Like a grant, it cannot be pickled, so it
+never crosses a queue: a worker resolves its own.
 
 ## Checking a spec where it is registered
 
@@ -856,7 +897,10 @@ docs/examples/async_dispatch.py:async
 `adispatch` takes exactly one of `principal` and `principal_id`. An identifier
 is resolved with `resolve_principal` inside the hop, since resolving it is a
 query. A grant never covers a principal resolved there, because a grant is
-bound to the principal object it was made for. A deactivated row is refused
+bound to the principal object it was made for, and neither do
+[seeds handed on from a prelude](#seeds-handed-on-from-the-prelude), which
+`adispatch(seeds=)` takes as `dispatch` does on every route, refusing a
+mistyped one or one without a grant before any hop. A deactivated row is refused
 there, with its identifier in the message.
 
 The sync `dispatch` accepts an `async def` run as well, and drives it to

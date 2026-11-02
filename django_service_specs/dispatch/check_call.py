@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from django_service_specs.dispatch.call_seeds import CallSeeds
+from django_service_specs.dispatch.checked_call import CheckedCall
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.utils import CheckKeywords, open_call
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -24,7 +26,7 @@ def check_call(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     call_context: dict[str, Any] | None = None,
-) -> tuple[dict[str, Any], Grant]:
+) -> CheckedCall:
     """``dispatch``'s prelude, run alone: the checked arguments and the grant, or its refusal.
 
     For a transport that answers a call before it runs - a task queue
@@ -60,7 +62,19 @@ def check_call(
 
     It returns the checked arguments and the grant the call ran under, which
     ``dispatch`` honours for the same spec and principal, so the
-    class-level check is not asked twice. **A** ``many`` **spec's rows** come
+    class-level check is not asked twice: a
+    [`CheckedCall`][django_service_specs.dispatch.checked_call.CheckedCall],
+    still the 2-tuple ``(arguments, grant)``. Its ``.seeds`` are the values the
+    checks were offered of each registered seed one of them names, which
+    ``dispatch(grant=grant, seeds=checked.seeds)`` takes as they are, so the
+    checks here and the run there see one value of each, resolved once
+    (test_check_call_then_dispatch_resolves_a_check_named_seed_once). The
+    carrier is bound to this call's ``call_context`` dict, so a transport
+    passes ``dispatch`` the dict it passed here; a carrier from a call
+    handed no ``call_context`` is bound to a dict only this function held,
+    readable as ``checked.seeds.call_context``, and covers only a call handed
+    that same dict: a later call that passes none, or a fresh one, is refused.
+    **A** ``many`` **spec's rows** come
     back as a list of checked rows under ``many_argument``, and a refused row
     is raised here, after step four, in the tree ``dispatch`` raises it in -
     though ``dispatch`` reports it beside the Validator's refusals of the
@@ -100,7 +114,8 @@ def check_call(
         ValueError: ``unknown_arguments`` is no policy, ``PASSTHROUGH``
             included.
     """
-    return open_call(
+    keywords = CheckKeywords({} if call_context is None else call_context)
+    checked, granted = open_call(
         kernel_spec(spec),
         principal,
         arguments,
@@ -108,5 +123,11 @@ def check_call(
         pool_seeds=pool_seeds,
         unknown_arguments=unknown_arguments,
         settle_rows=True,
-        keywords=CheckKeywords({} if call_context is None else call_context),
+        keywords=keywords,
+        carried=None,
     )
+    # Bound to ``spec`` as handed, the transport's own object, as a grant keeps
+    # it; ``covers`` compiles it, so it covers the declaration and its spec
+    # (test_minted_for_a_source_it_covers_the_source_and_the_spec_it_compiles_to).
+    seeds = CallSeeds(spec, principal, keywords.call_context, pool_seeds, keywords.seeds)
+    return CheckedCall(checked, granted, seeds)

@@ -29,6 +29,7 @@ from django_service_specs.affordances.utils import (
     rows_with_affordances,
     split_affordances,
 )
+from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.utils import (
     QUESTIONS,
     refuse_deactivated,
@@ -37,6 +38,7 @@ from django_service_specs.authorization.utils import (
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.relax_partial import relax_partial
@@ -342,6 +344,7 @@ def open_call(
     settle_rows: bool = False,
     overlay: Overlay = NO_OVERLAY,
     keywords: CheckKeywords,
+    carried: CallSeeds | None,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
@@ -418,6 +421,19 @@ def open_call(
     (test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check).
     Every entry point hands its own carrier, one per call, so the walk after
     this is offered the seeds this filled.
+
+    ``carried`` is what ``dispatch(seeds=)`` was handed: the values a prelude,
+    ``check_call`` or ``resolve_target``, resolved for the same seeds. One
+    that covers this call's spec, principal, context and registry fills
+    ``keywords.seeds`` in place of resolving them, so none of those seeds
+    resolves a second time and the prelude's checks and this call's run see
+    one value of each
+    (test_check_call_then_dispatch_resolves_a_check_named_seed_once). One
+    that does not cover it is refused as ``NotPermitted``, in the same
+    place, before the class-level check and before any resolver runs
+    (test_a_refused_carrier_resolves_nothing): values resolved for another
+    call are never read as this one's, and never quietly replaced by fresh
+    ones either.
     """
     refuse_deactivated(principal)
     # Against the spec's whole parameters, whatever ``parameters`` narrows the
@@ -442,12 +458,23 @@ def open_call(
         unknown_arguments=unknown_arguments,
         call_context=keywords.call_context,
     )
-    # Only the seeds a check names: another seed's resolver may read what an
-    # anonymous caller lacks, and this runs before that caller is refused
-    # (test_only_the_seeds_a_check_names_resolve_before_it).
-    keywords.seeds.update(
-        seeds_for_checks(spec, principal, pool_seeds, QUESTIONS, call_context=keywords.call_context)
-    )
+    if carried is None:
+        # Only the seeds a check names: another seed's resolver may read what an
+        # anonymous caller lacks, and this runs before that caller is refused
+        # (test_only_the_seeds_a_check_names_resolve_before_it).
+        keywords.seeds.update(
+            seeds_for_checks(
+                spec, principal, pool_seeds, QUESTIONS, call_context=keywords.call_context
+            )
+        )
+    elif carried.covers(spec, principal, keywords.call_context, pool_seeds):
+        # Taken as they are, so nothing the prelude's checks were handed is
+        # resolved again (test_check_call_then_dispatch_resolves_a_check_named_seed_once).
+        keywords.seeds.update(carried.values)
+    else:
+        # Fail closed, before any resolver and the class-level check
+        # (test_a_refused_carrier_resolves_nothing).
+        raise NotPermitted("The seeds do not cover this spec, principal and call context.")
     granted = authorize(
         spec,
         principal,
@@ -1602,6 +1629,32 @@ def walk_target(
     return target_entry(spec, None)
 
 
+def refuse_seeds(seeds: Any, grant: Grant | None) -> None:
+    """Refuse ``seeds=`` that cannot be a prelude's, before anything runs.
+
+    A wiring mistake rather than a refusal of the call, so it is a
+    ``TypeError`` at entry, where no later refusal can hide it. Only the
+    carrier ``check_call`` or ``resolve_target`` hands back is taken: a plain
+    mapping would be values nobody resolved for this call
+    (test_a_plain_mapping_as_seeds_is_a_type_error). And it travels with the
+    grant its prelude returned beside it: without one, dispatch would ask the
+    class-level check again on values resolved for a check already asked
+    (test_seeds_without_a_grant_is_a_type_error). ``adispatch`` calls this on
+    the loop, before any hop (test_seeds_are_refused_before_any_hop).
+    """
+    if seeds is None:
+        return
+    if not isinstance(seeds, CallSeeds):
+        raise TypeError(
+            "seeds= takes the CallSeeds that check_call() or resolve_target() hands back on "
+            f".seeds; got {type(seeds).__name__}."
+        )
+    if grant is None:
+        raise TypeError(
+            "seeds= is handed on with the grant= its prelude returned beside it; pass both."
+        )
+
+
 def refuse_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
     """Refuse ``target=`` where nothing is looked up for it to stand in for, before anything runs.
 
@@ -1797,6 +1850,7 @@ def prepare_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     call_context: dict[str, Any],
+    carried: CallSeeds | None,
     target: Any = UNSET,
     overlay: Overlay = NO_OVERLAY,
 ) -> Prepared | DispatchResult:
@@ -1866,6 +1920,7 @@ def prepare_service(
         unknown_arguments=unknown_arguments,
         overlay=overlay,
         keywords=keywords,
+        carried=carried,
     )
     resolved = walk_target(
         spec,

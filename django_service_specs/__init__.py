@@ -33,10 +33,12 @@ from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
 from django_service_specs.dispatch.bind_arguments import bind_arguments
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_requested_input import check_requested_input
 from django_service_specs.dispatch.check_seeds import check_seeds
 from django_service_specs.dispatch.check_server_arguments import check_server_arguments
+from django_service_specs.dispatch.checked_call import CheckedCall
 from django_service_specs.dispatch.checks_read_arguments import checks_read_arguments
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -48,6 +50,7 @@ from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.relax_partial import relax_partial
 from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.dispatch.resolved_target import ResolvedTarget
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.dispatch.unreceived_fields import unreceived_fields
@@ -185,7 +188,9 @@ __all__ = [
     "AnyOf",
     "AsyncSelector",
     "AudienceProjection",
+    "CallSeeds",
     "ChangeResult",
+    "CheckedCall",
     "ChildCollectionChange",
     "ChildSpec",
     "CodedMessage",
@@ -229,6 +234,7 @@ __all__ = [
     "RelationOutcome",
     "RelationPhase",
     "RelationSpec",
+    "ResolvedTarget",
     "RetrieveSelector",
     "ReverseOneToOneSpec",
     "Selector",

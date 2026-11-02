@@ -33,8 +33,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the call's context on every ask inside a call, and none outside one; a Validator
   declaring no keyword is asked as before. `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the keyword.
+- **`dispatch` and `adispatch` take `seeds=`**, the `CallSeeds` that `check_call`
+  and `resolve_target` now hand back on `.seeds`, with the grant beside them, so
+  their checks and the run see one value of each registered seed a check names,
+  resolved once rather than once by each. The carrier is bound by identity to
+  the spec, principal, `call_context` dict and `pool_seeds` registry its prelude
+  ran with; one for another is refused as `NotPermitted` before any seed resolves,
+  and `seeds=` without `grant=`, or anything but the carrier, is a `TypeError`. It
+  cannot be pickled. The `authorize`-first path still resolves those seeds twice.
 
 ### Changed
+- **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
+  where each was annotated as a plain tuple. Both are still the same 2-tuple,
+  `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
+  neither can be copied or pickled, since the carrier they hold cannot.
 - **Breaking: a subclass overriding `ServiceSpec.parameters` or
   `SelectorSpec.parameters` must accept `call_context`.** Dispatch now passes it
   as a keyword, so an override written `def parameters(self)` raises `TypeError`

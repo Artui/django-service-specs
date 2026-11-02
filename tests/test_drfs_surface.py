@@ -142,12 +142,12 @@ SURFACE: dict[str, Pin] = {
     # --- dispatch -----------------------------------------------------------------------------
     "dispatch": _fn(
         "dispatch.dispatch",
-        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, progress=, "
-        "target=, extra_kwargs=, call_context=",
+        "spec, *, principal, arguments, grant=, seeds=, pool_seeds=, unknown_arguments=, "
+        "progress=, target=, extra_kwargs=, call_context=",
     ),
     "adispatch": _fn(
         "dispatch.adispatch",
-        "spec, *, principal=, principal_id=, arguments, grant=, pool_seeds=, "
+        "spec, *, principal=, principal_id=, arguments, grant=, seeds=, pool_seeds=, "
         "unknown_arguments=, progress=, target=, extra_kwargs=, call_context=",
     ),
     "check_call": _fn(
@@ -572,6 +572,13 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "AllOf",
         "AnyOf",
         "NoneOf",
+        # The seeds a prelude hands on to the call it checked, and the tuples
+        # ``check_call`` and ``resolve_target`` return them on: a caller reads
+        # them off those returns and never builds one, and drfs re-exports
+        # none of them.
+        "CallSeeds",
+        "CheckedCall",
+        "ResolvedTarget",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.
