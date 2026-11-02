@@ -1263,6 +1263,19 @@ class TestAProviderSeat:
         check_seeds(spec)
         dispatch(spec, principal=make_user("ada"), arguments={})
 
+    def test_a_sync_run_that_never_reports_is_refused_though_it_never_calls_the_reporter(
+        self,
+    ) -> None:
+        """Refused for where dispatch may call it: a sync run resolves it on its first report."""
+
+        def run(*, progress: Any) -> str:
+            return "ran"
+
+        spec = _service(run, progress_reporter=_needs_tenant)
+        assert "ServiceSpec.progress_reporter requires the keyword(s) ['tenant']" in _refusal(spec)
+        result = dispatch(spec, principal=make_user("ada"), arguments={})
+        assert result.value == "ran"
+
     def test_a_selector_s_progress_reporter_beside_a_run_taking_no_progress_is_not_read(
         self,
     ) -> None:
@@ -1399,6 +1412,12 @@ def _pks_precondition(*, pks: list[int]) -> None: ...
 
 def _extends_with_pks(*, queryset: Any, pks: list[int]) -> Any:
     return queryset
+
+
+def _provides_with_pks(*, pks: list[int]) -> _Fills:
+    # Typed, so its seat is checked at all, and requiring ``pks`` as an
+    # annotated element, which is what the fifth refusal would read.
+    return {"limit": len(pks)}
 
 
 def _extends_with_limit(*, queryset: Any, limit: int) -> Any:
@@ -1861,7 +1880,11 @@ class TestAnOptionalReadOnTheOtherSeats:
 
 
 class TestTheFifthRefusalIsNotRunOnThem:
-    """An array read with no ``items`` is refused on the callable it fills, not on a precondition or an ``extend_queryset``."""
+    """An array read with no ``items`` is refused on the callable it fills, not on a precondition, an ``extend_queryset`` or a provider.
+
+    A ``progress_reporter`` has no case: its seat reads nothing, so the
+    refusal would find nothing on it either way.
+    """
 
     @pytest.mark.parametrize(
         "build",
@@ -1890,9 +1913,17 @@ class TestTheFifthRefusalIsNotRunOnThem:
                 ),
                 id="an-extend-queryset",
             ),
+            pytest.param(
+                lambda: _list(
+                    _notes,
+                    reads=Parameters.of(Parameter("pks", "array", required=True)),
+                    kwargs=_provides_with_pks,
+                ),
+                id="a-provider",
+            ),
         ],
     )
-    def test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s(
+    def test_a_seat_s_array_read_with_no_items_is_not_the_fifth_s(
         self, build: Callable[[], Any]
     ) -> None:
         spec = build()

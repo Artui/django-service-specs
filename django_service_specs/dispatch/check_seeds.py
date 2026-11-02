@@ -176,10 +176,12 @@ def check_seeds(
          pool. A provider's own keys fill nothing it is handed, so its seat
          is read whether it is typed or not, and beside a Validator too;
        - a spec's ``progress_reporter``, where its run takes ``progress`` by
-         name or through ``**kwargs``, which is when dispatch calls it,
-         handed only what every pool carries and a seed ``pool_seeds``
-         registers. A run taking no ``progress`` never calls it, so it is
-         not read there.
+         name or through ``**kwargs``, which is where dispatch may call it:
+         before an ``async def`` run, or on a sync run's first report. It is
+         refused either way, though a sync run that never reports never
+         calls it. It is handed only what every pool carries and a seed
+         ``pool_seeds`` registers. A run taking no ``progress`` never calls
+         it, so it is not read there.
 
        Each is named as the spec names it, such as
        ``ServiceSpec.affordances[0] ('frozen').when``,
@@ -590,11 +592,11 @@ def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys |
             "default, which dispatch never fills: it calls every callable by keyword. Make "
             "each one a keyword, or give it a default."
         )
-    # The fifth is not run on a precondition, a condition, the output selector
-    # or an ``extend_queryset``:
-    # test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s. The
-    # flag is inert on a condition and the output selector, whose reads are
-    # ``Parameters.of()``: ``_untyped_elements`` draws its candidates from
+    # The fifth is not run on a precondition, a condition, the output selector,
+    # an ``extend_queryset``, a provider or a ``progress_reporter``:
+    # test_a_seat_s_array_read_with_no_items_is_not_the_fifth_s. The
+    # flag is inert on a condition, the output selector and a
+    # ``progress_reporter``, whose reads are ``Parameters.of()``: ``_untyped_elements`` draws its candidates from
     # ``seat.reads`` alone, so it would find nothing there either way.
     untyped = _untyped_elements(seat, signature, keys, seat.fills) if seat.checks_items else []
     if untyped:

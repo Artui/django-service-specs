@@ -744,7 +744,9 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   an unregistered `tenant` is refused, whether it annotates its keys or not and
   whether a Validator stands beside it or not; and a `progress_reporter` is handed only the call's seeds,
   and read only where its run takes `progress`, by name or through
-  `**kwargs`, since dispatch calls it for no other. Each is named as the spec
+  `**kwargs`, which is where dispatch may call it: before an `async def` run,
+  or on a sync run's first report. It is refused either way, though a sync run
+  that never reports never calls it. Each is named as the spec
   names it, such as `ServiceSpec.affordances[0] ('frozen').when`,
   `SelectorSpec.preconditions[0] (owns_it)` or
   `ServiceSpec.instance_selector_spec.kwargs`;
