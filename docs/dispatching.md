@@ -670,9 +670,10 @@ ran with, and dispatch refuses one that does not cover its call with
 hand the prelude and the call one `call_context` dict: a prelude handed none
 runs with a dict of its own, readable as `seeds.call_context`, and its carrier
 covers only a call handed that same dict: a later call that passes none, or a
-fresh one, is refused. `seeds=` that are anything but the carrier, `seeds=` without `grant=`, or
-`adispatch(seeds=)` with `principal_id=`, raise `TypeError` before anything runs. Like a grant, it cannot be pickled, so it
-never crosses a queue: a worker resolves its own.
+fresh one, is refused. `seeds=` that are anything but the carrier, `seeds=`
+without `grant=`, or `adispatch(seeds=)` with `principal_id=`, raise `TypeError`
+before anything runs. Like a grant, it cannot be pickled, so it never crosses a
+queue: a worker resolves its own.
 
 ## Checking a spec where it is registered
 
@@ -903,8 +904,8 @@ bound to the principal object it was made for, and neither do
 mistyped one or one without a grant before any hop. Seeds with `principal_id=`
 are refused the same way, as a `TypeError` before any hop, since the principal
 resolved there is not the one the carrier is bound to; pass the `principal=` the
-prelude was handed. A deactivated row is refused
-there, with its identifier in the message.
+prelude was handed. A deactivated row is refused there, with its identifier in
+the message.
 
 The sync `dispatch` accepts an `async def` run as well, and drives it to
 completion, inside the transaction when the spec is atomic.

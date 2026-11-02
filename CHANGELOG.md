@@ -40,7 +40,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the spec, principal, `call_context` dict and `pool_seeds` registry its prelude
   ran with; one for another is refused as `NotPermitted` before any seed resolves,
   and `seeds=` without `grant=`, `adispatch`'s `seeds=` with `principal_id=`, or
-  anything but the carrier, is a `TypeError`. It cannot be pickled. The `authorize`-first path still resolves those seeds twice.
+  anything but the carrier, is a `TypeError`. It cannot be pickled. The
+  `authorize`-first path still resolves those seeds twice.
 
 ### Changed
 - **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
