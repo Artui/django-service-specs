@@ -419,8 +419,11 @@ only where a service spec's target was handed in as `target=`.
 A page asks the class-level check before it shows anything, so a principal
 the check refuses never sees the form. Where that check names a seed - the
 club a route captured, a tenant read off the request - the transport has the
-registry it would hand dispatch rather than the seed's value, and hands that
-to `authorize` as `pool_seeds=`:
+registry it would hand dispatch rather than the seed's value. It resolves the
+seeds the spec's checks name once, with
+[`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds],
+and hands the carrier that returns to `authorize` and then to `dispatch` as
+`seeds=`, so the check that admitted the request and the run see one value:
 
 ```python
 --8<--
@@ -434,22 +437,42 @@ docs/examples/dispatching.py:admit
 --8<--
 ```
 
-Only the seeds the spec's `has_permission` checks name are resolved, once in
-the `authorize` call, for the principal as `user`, exactly as dispatch
-resolves them before its own class-level check; a seed no check names there is
-never resolved, and neither is any seed when a covering grant answers first.
-The values are not carried on the grant, so the `dispatch` that follows
-resolves the seeds its checks name again, for its own call: the check
-`authorize` asked and the service may see two objects from one resolver.
-`authorize` hands back no values to carry, so this path still resolves twice;
-[`check_call`](#checking-a-call-before-it-runs) and
-[`resolve_target`](#a-target-resolved-ahead-of-the-call) do, on `.seeds`. `authorize_target`
-and `authorize_scope` take `pool_seeds=` the same way, for the seeds their own
-question names. `seeds=` is the alternative for a caller holding resolved
-values, and handing both raises `TypeError`, since one would silently outrank
-the other, whether or not a grant would have answered the call first. A
-deactivated principal handed with `pool_seeds=` raises
-[`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable]
+`resolve_seeds` resolves the seeds a check of the spec names at any of its
+three questions, the class-level, object-level and scope ones, for the
+principal as `user`, exactly as dispatch resolves them before its own
+class-level check; a seed no check names stays unresolved and resolves in each
+of dispatch's pools as it always does. A deactivated principal is refused
+first, as
+[`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable],
+before any seed resolves. The carrier it returns is a
+[`CallSeeds`](#seeds-handed-on-from-the-prelude), and the whole `authorize`-first
+path takes it as `seeds=`, each step resolving nothing:
+
+- a single row: `resolve_seeds`, then `authorize(seeds=)`, then
+  `resolve_target(seeds=, grant=)`, then `dispatch(seeds=found.seeds, grant=,
+  target=)`;
+- a `many` call or a create: `resolve_seeds`, then `authorize(seeds=)`, then
+  `authorize_scope(seeds=)`, then `dispatch(seeds=, grant=)`.
+
+The carrier is bound by identity to the spec, the principal, the `call_context`
+dict and the registry, and each of `authorize`, `authorize_scope`,
+`authorize_target` and `resolve_target` refuses one that does not cover its call
+with `NotPermitted`, before a grant can answer and before any check is asked.
+So hand every step one dict: a carrier minted with no `call_context` is bound
+to a fresh one, `seeds.call_context`, and an `authorize(seeds=)` handed none is
+refused. Beside a carrier, `pool_seeds=` is only the registry it is matched
+against, `DEFAULT_POOL_SEEDS` when left out.
+
+`authorize` also takes `pool_seeds=` alone, for a transport that only asks the
+class-level check: it resolves the seeds the spec's `has_permission` checks
+name, once, and no other, and nothing when a covering grant answers first. The
+values are not carried on the grant, so a `dispatch` that follows resolves them
+again for its own call. `authorize_target` and `authorize_scope` take
+`pool_seeds=` the same way, for the seeds their own question names. `seeds=` a
+mapping is the alternative for a caller holding resolved values, and handing
+one with `pool_seeds=` raises `TypeError`, since one would silently outrank the
+other, whether or not a grant would have answered the call first. A
+deactivated principal handed with `pool_seeds=` raises `PrincipalUnavailable`
 before any seed resolves, as dispatch refuses one before anything else, grant
 or no grant; without `pool_seeds=` nothing is resolved and the call is asked as
 it always was. A check naming a seed the registry does not hold is asked without
@@ -653,7 +676,10 @@ request, a tenant row - can answer the two differently. Both hand back the
 values their checks were offered as a
 [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] on `.seeds`,
 and `dispatch(seeds=)` or `adispatch(seeds=)` takes them, with the grant they
-came with, in place of resolving those seeds again:
+came with, in place of resolving those seeds again. A page that admits the
+request with `authorize` before it finds the row makes the carrier first, with
+[`resolve_seeds`](#admitting-a-request-before-the-form), and hands it to every
+step:
 
 ```python
 --8<--
@@ -670,10 +696,10 @@ ran with, and dispatch refuses one that does not cover its call with
 hand the prelude and the call one `call_context` dict: a prelude handed none
 runs with a dict of its own, readable as `seeds.call_context`, and its carrier
 covers only a call handed that same dict: a later call that passes none, or a
-fresh one, is refused. `seeds=` that are anything but the carrier, `seeds=`
-without `grant=`, or `adispatch(seeds=)` with `principal_id=`, raise `TypeError`
-before anything runs. Like a grant, it cannot be pickled, so it never crosses a
-queue: a worker resolves its own.
+fresh one, is refused. `dispatch`'s and `adispatch`'s `seeds=` that are anything
+but the carrier, `seeds=` without `grant=`, or `adispatch(seeds=)` with
+`principal_id=`, raise `TypeError` before anything runs. Like a grant, it cannot be
+pickled, so it never crosses a queue: a worker resolves its own.
 
 ## Checking a spec where it is registered
 

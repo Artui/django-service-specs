@@ -15,9 +15,11 @@ from django_service_specs.authorization.utils import (
     check_seed_arguments,
     offered_seeds,
     offered_to_checks,
+    refuse_deactivated,
 )
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.grant import Grant
-from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -31,7 +33,7 @@ def authorize(
     grant: Grant | None = None,
     arguments: Mapping[str, Any] | None = None,
     call_context: dict[str, Any] | None = None,
-    seeds: Mapping[str, Any] | None = None,
+    seeds: Mapping[str, Any] | CallSeeds | None = None,
     pool_seeds: PoolSeeds | None = None,
 ) -> Grant:
     """Run ``spec``'s class-level permission checks for ``principal``.
@@ -94,10 +96,38 @@ def authorize(
     stand in for it. Without ``pool_seeds`` nothing is resolved, and the call
     is asked exactly as before the keyword existed.
 
+    ``seeds`` may instead be a carrier: the
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] that
+    [`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds]
+    returns, or ``check_call``'s or ``resolve_target``'s ``.seeds``. Its values
+    are offered as they are and nothing is resolved here, so every step of a
+    call admitted before its row is found sees one value of each seed. It is
+    taken only for the call it
+    [`covers`][django_service_specs.dispatch.call_seeds.CallSeeds.covers]:
+    this spec, ``principal``, the very ``call_context`` dict it was bound to
+    (``None`` is never that dict: pass ``seeds.call_context``) and its
+    registry, which is ``pool_seeds`` when handed and ``DEFAULT_POOL_SEEDS``
+    otherwise; beside a carrier, ``pool_seeds`` is only the registry it is
+    matched against. One that does not cover the call raises ``NotPermitted``,
+    and a deactivated ``principal`` ``PrincipalUnavailable``, first of all,
+    before a covering ``grant`` can answer and before any check is asked.
+
     Returns:
         The grant that was honoured, or a freshly minted one covering this
         spec and principal.
     """
+    if isinstance(seeds, CallSeeds):
+        # First of all, ahead of every short cut, so a carrier for another call,
+        # or for a deactivated principal, is refused even where a grant would
+        # answer this one (TestCarriedSeeds.test_a_carrier_is_refused_before_*,
+        # test_a_deactivated_principal_is_refused_though_its_carrier_*). Beside a
+        # carrier ``pool_seeds`` is only the registry it is matched against
+        # (test_a_carrier_handed_no_pool_seeds_is_matched_against_the_default_registry),
+        # and nothing resolves (test_a_carrier_under_its_registry_resolves_nothing).
+        refuse_deactivated(principal)
+        registry = DEFAULT_POOL_SEEDS if pool_seeds is None else pool_seeds
+        seeds = seeds.values_for(spec, principal, call_context, registry)
+        pool_seeds = None
     # Ahead of every short cut below, so a call they answer is still refused
     # for both kinds, and for a deactivated principal, as dispatch refuses one
     # grant or no grant (tests: TestPoolSeeds.test_both_kinds_are_refused_*

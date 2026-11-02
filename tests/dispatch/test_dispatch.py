@@ -101,7 +101,7 @@ _SEEDS_WITHOUT_A_GRANT = (
 )
 _SEEDS_NOT_A_CARRIER = (
     "seeds= takes the CallSeeds that check_call() or resolve_target() hands back on "
-    ".seeds; got {kind}."
+    "its .seeds, or resolve_seeds() returns; got {kind}."
 )
 
 
