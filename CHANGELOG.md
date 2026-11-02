@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] — 2026-11-02
+
 ### Added
 - **`spec_caller_input_schema`, the input schema a transport advertises.** It is
   `spec_input_schema` less what the server fills, with a key a provider fills or
@@ -2378,7 +2380,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/Artui/django-service-specs/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Artui/django-service-specs/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/Artui/django-service-specs/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Artui/django-service-specs/compare/v0.20.0...v0.21.0
