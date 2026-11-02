@@ -84,7 +84,10 @@ keyword annotated `list[int]`, which would hand it any element a caller sends.
 It reads a precondition, an affordance condition, the output selector and an
 `extend_queryset` as well, each against what dispatch hands it: a condition is
 handed only the call's seeds, so one requiring a seed the mount does not
-register is refused there rather than failing every call.
+register is refused there rather than failing every call. A positional-only
+parameter with no default is refused on each of them, and an optional read over
+a keyword with no default on those that are handed the spec's reads, a
+precondition and an `extend_queryset`; only the array check is not run on them.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.

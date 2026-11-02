@@ -718,7 +718,8 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   meet, which dispatch refuses on every call before it reads the arguments,
   in the words it refuses it in;
 - a positional-only parameter with no default, which no pool fills, so every
-  call reaching the callable fails;
+  call reaching the callable fails, of any callable listed below as well as the
+  service, the selector and the target selector;
 - a keyword the service, the selector or the target selector requires that
   nothing fills: no read of its seat, no seed, no key a typed provider names,
   and none of what every pool carries. A service is handed `data`, and
@@ -739,7 +740,9 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   or `SelectorSpec.preconditions[0] (owns_it)`;
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
-  missing;
+  missing. A precondition and an `extend_queryset` are asked this against
+  their selector's or service's reads; a condition and the output selector are
+  handed none, so it finds nothing on them;
 - an array read with no `items` over a keyword its own seat annotates with an
   element: `list[int]`, `tuple[int, ...]` or `Sequence[int]`, or one of those
   `| None`. Such a read takes any element, so a selector annotated
@@ -767,12 +770,11 @@ It runs nothing: no seed resolves and no provider is called. What it cannot
 see it leaves to dispatch: a provider that does not annotate its keys may fill
 any keyword in its seat, and a Validator may return or bind a value it does
 not declare, so neither seat is held to the keywords it requires, nor is a
-precondition or an `extend_queryset` beside one. An `extra_kwargs` overlay
-fills keywords it cannot see either. A precondition, a condition, the output
-selector and an `extend_queryset` are asked only whether a keyword they
-require is unfilled, and whether their signature reads; the positional-only,
-optional-read and array checks are not run on them. A callable taking
-`**kwargs` requires nothing, so one forwarding into a stricter callable is not
+precondition or an `extend_queryset` beside one, though a positional-only
+parameter is refused whatever stands beside it. An `extra_kwargs` overlay
+fills keywords it cannot see either. The array check alone is not run on a
+precondition, a condition, the output selector or an `extend_queryset`. A
+callable taking `**kwargs` requires nothing, so one forwarding into a stricter callable is not
 judged by what that callable requires; and a pool a transport builds itself to
 answer a condition before any call is its own, not the one this reads.
 A provider's own keywords (`kwargs`, `input_data`, `progress_reporter`), a

@@ -108,6 +108,11 @@ def _found(**_: Any) -> int:
     return 1
 
 
+async def _found_async(**_: Any) -> int:
+    # The route only an ``async def`` selector takes in ``adispatch``.
+    return 1
+
+
 class _Computing(Validator):
     """Returns ``slug``, which it never declares."""
 
@@ -146,6 +151,15 @@ def _none(**_: Any) -> list[Any]:
 
 def _notes(**_: Any) -> Any:
     # A QuerySet, since ``extend_queryset`` runs on nothing else.
+    return Note.objects.all()
+
+
+async def _none_async(**_: Any) -> list[Any]:
+    return []
+
+
+async def _notes_async(**_: Any) -> Any:
+    # Not evaluated, which the executor does after the await.
     return Note.objects.all()
 
 
@@ -275,9 +289,9 @@ _OUTPUT_TAIL = "never an argument"
 _EXTEND_TAIL = "it is handed queryset beside what its selector is handed"
 _DECLARE_TAIL = "Declare it, or give it a default."
 
-# The seats only the third refusal reads: a case each, with the keyword
+# The seats the fifth refusal is not run on: a case each, with the keyword
 # nothing fills, the seat's label and what the message says of the seat.
-_THIRD_ONLY_SEATS = [
+_SEATS_WITHOUT_THE_FIFTH = [
     pytest.param(
         lambda: _service(lambda **_: None, affordances=_when(lambda *, tenant: True)),
         "tenant",
@@ -402,7 +416,7 @@ _THIRD_ONLY_SEATS = [
     ),
 ]
 
-_UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _THIRD_ONLY_SEATS]
+_UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _SEATS_WITHOUT_THE_FIFTH]
 
 
 _EVERY_POOL_S = ("user", "progress", "call_context", "shapes", "request", "view", "tenant")
@@ -483,6 +497,18 @@ def _output_extend(name: str, seen: dict[str, Any]) -> ServiceSpec:
     return _service(lambda **_: None, output_selector_spec=output)
 
 
+def _async_selector_condition(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _list(_none_async, affordances=_mapping(_taking(name, seen=seen)))
+
+
+def _async_retrieve_precondition(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _retrieve(_found_async, preconditions=[_taking(name, seen=seen)], **_filling(name, PK))
+
+
+def _async_selector_extend(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _list(_notes_async, extend_queryset=_extending(name, seen), **_filling(name, PK))
+
+
 _CONDITIONS_HANDED = [
     pytest.param(build, name, id=f"{seat}-{name}")
     for seat, build in (
@@ -494,9 +520,9 @@ _CONDITIONS_HANDED = [
     for name in _A_CONDITION_S
 ]
 
-# Every keyword each seat only the third refusal reads is handed, as dispatch
+# Every keyword each seat the fifth refusal skips is handed, as dispatch
 # hands it: each is dispatched and seen to arrive in
-# TestWhatEachThirdOnlySeatIsHanded, and passes the check in
+# TestWhatEachSeatTheFifthSkipsIsHanded, and passes the check in
 # test_a_keyword_something_fills_is_not.
 _HANDED = [
     *_CONDITIONS_HANDED,
@@ -536,6 +562,27 @@ _HANDED = [
             ),
         )
         for name in names
+    ),
+]
+
+
+# The seats an ``async def`` selector spec reaches through its own route
+# (``_open_selector``, then ``_settle_and_conclude`` after the await), which a
+# sync selector never takes: the fill sets of the seats that route runs.
+_ASYNC_HANDED = [
+    *(
+        pytest.param(_async_selector_condition, name, id=f"an-async-selector-s-condition-{name}")
+        for name in _A_CONDITION_S
+    ),
+    *(
+        pytest.param(
+            _async_retrieve_precondition, name, id=f"an-async-retrieve-precondition-{name}"
+        )
+        for name in (*_EVERY_POOL_S, "pk", "limit", "instance")
+    ),
+    *(
+        pytest.param(_async_selector_extend, name, id=f"an-async-extend-queryset-{name}")
+        for name in (*_EVERY_POOL_S, "pk", "limit", "queryset")
     ),
 ]
 
@@ -601,7 +648,7 @@ class TestARequiredKeywordNothingFills:
                         lambda **_: [], extend_queryset=lambda **handed: handed["queryset"]
                     ),
                 ),
-                id="a-catch-all-on-every-third-only-seat",
+                id="a-catch-all-on-every-seat-without-the-fifth",
             ),
             *(
                 pytest.param(functools.partial(case.values[0], case.values[1], {}), id=case.id)
@@ -700,8 +747,8 @@ class TestAConditionReadingASeedNoMountRegisters:
         dispatch(build(), principal=make_user("ada"), arguments={}, pool_seeds=_FROZEN)
 
 
-class TestTheSeatsOnlyTheThirdRefusalReads:
-    @pytest.mark.parametrize(("build", "name", "label", "tail"), _THIRD_ONLY_SEATS)
+class TestTheSeatsTheFifthRefusalSkips:
+    @pytest.mark.parametrize(("build", "name", "label", "tail"), _SEATS_WITHOUT_THE_FIFTH)
     def test_each_is_named_with_what_it_is_handed(
         self, build: Callable[[], Any], name: str, label: str, tail: str
     ) -> None:
@@ -799,8 +846,8 @@ class TestTheSeatsOnlyTheThirdRefusalReads:
         assert found == sorted(found)
 
 
-class TestWhatEachThirdOnlySeatIsHanded:
-    """Each keyword the check counts as filled on a seat only the third refusal reads, dispatched and seen to arrive.
+class TestWhatEachSeatTheFifthSkipsIsHanded:
+    """Each keyword the check counts as filled on a seat the fifth refusal skips, dispatched and seen to arrive.
 
     The guard against refusing a spec that runs: the check passes each of
     these (test_a_keyword_something_fills_is_not), so each must reach its
@@ -824,6 +871,23 @@ class TestWhatEachThirdOnlySeatIsHanded:
         seen: dict[str, Any] = {}
         await adispatch(build(name, seen), principal=ada, arguments={}, pool_seeds=_SEEDED)
         assert name in seen
+
+    @pytest.mark.parametrize(("build", "name"), _ASYNC_HANDED)
+    async def test_adispatch_hands_it_on_an_async_selector(
+        self, build: Callable[..., Any], name: str, ada: Any
+    ) -> None:
+        """Through ``_open_selector`` and ``_settle_and_conclude``, which a sync selector never reaches."""
+        seen: dict[str, Any] = {}
+        spec = build(name, seen)
+        arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
+        await adispatch(spec, principal=ada, arguments=arguments, pool_seeds=_SEEDED)
+        assert name in seen
+
+    @pytest.mark.parametrize(("build", "name"), _ASYNC_HANDED)
+    def test_check_seeds_passes_what_an_async_selector_is_handed(
+        self, build: Callable[..., Any], name: str
+    ) -> None:
+        check_seeds(build(name, {}), pool_seeds=_SEEDED)
 
 
 class TestAPositionalOnlyParameter:
@@ -910,6 +974,322 @@ class TestAnOptionalReadTheCallableRequires:
         check_seeds(spec, pool_seeds=_SEEDED)
         # Without the seed it is the caller's optional read, and refused.
         assert _OPTIONAL in _refusal(spec)
+
+
+def _positional_title(title: str, /) -> None: ...
+
+
+def _positional_pk(pk: int, /) -> None: ...
+
+
+_LIMIT = Parameters.of(Parameter("limit", "integer"))
+
+
+def _requires_limit(*, limit: int) -> None: ...
+
+
+def _pks_precondition(*, pks: list[int]) -> None: ...
+
+
+def _extends_with_pks(*, queryset: Any, pks: list[int]) -> Any:
+    return queryset
+
+
+def _extends_with_limit(*, queryset: Any, limit: int) -> Any:
+    return queryset
+
+
+# A positional-only parameter something fills by name on its seat (a read, the
+# pool's ``user``, ``queryset``, ``result``), so the third refusal has nothing
+# to say and only the second can answer. One case per place a seat is built:
+# the spec builder, the label, the arguments the call sends.
+_POSITIONAL_SEATS = [
+    pytest.param(
+        lambda: _service(lambda **_: None, reads=_TITLE, preconditions=[_positional_title]),
+        "title",
+        "ServiceSpec.preconditions[0] (_positional_title)",
+        id="a-service-precondition",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, reads=PK, preconditions=[_positional_pk]),
+        "pk",
+        "SelectorSpec.preconditions[0] (_positional_pk)",
+        id="a-retrieve-precondition",
+    ),
+    pytest.param(
+        lambda: _list(_none, reads=PK, preconditions=[_positional_pk]),
+        "pk",
+        "SelectorSpec.preconditions[0] (_positional_pk)",
+        id="a-list-precondition",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, affordances=_when(lambda user, /: True)),
+        "user",
+        "ServiceSpec.affordances[0] ('c').when",
+        id="a-service-condition",
+    ),
+    pytest.param(
+        lambda: _list(_none, affordances=_mapping(lambda user, /: True)),
+        "user",
+        "SelectorSpec.affordances['rename'][0] ('c').when",
+        id="a-selector-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(_none, affordances=_mapping(lambda user, /: True)),
+        ),
+        "user",
+        "ServiceSpec.collection_selector_spec.affordances['rename'][0] ('c').when",
+        id="a-target-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            output_selector_spec=_list(_none, affordances=_mapping(lambda user, /: True)),
+        ),
+        "user",
+        "ServiceSpec.output_selector_spec.affordances['rename'][0] ('c').when",
+        id="an-output-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _list(_notes, extend_queryset=lambda queryset, /: queryset),
+        "queryset",
+        "SelectorSpec.extend_queryset",
+        id="a-selector-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(_notes, extend_queryset=lambda queryset, /: queryset),
+        ),
+        "queryset",
+        "ServiceSpec.collection_selector_spec.extend_queryset",
+        id="a-target-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            output_selector_spec=_list(_notes, extend_queryset=lambda queryset, /: queryset),
+        ),
+        "queryset",
+        "ServiceSpec.output_selector_spec.extend_queryset",
+        id="an-output-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: "made", output_selector_spec=_retrieve(lambda result, /: 1)),
+        "result",
+        "ServiceSpec.output_selector_spec.selector",
+        id="an-output-selector",
+    ),
+]
+
+# The seats a positional-only parameter is refused on though the third
+# refusal leaves them to dispatch.
+_POSITIONAL_BESIDE = [
+    pytest.param(
+        lambda: _retrieve(_found, reads=PK, kwargs=_untyped, preconditions=[_positional_pk]),
+        "pk",
+        {"pk": 1},
+        id="a-selector-precondition-beside-an-untyped-provider",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            validator=DataclassValidator(_Titled),
+            preconditions=[_positional_title],
+        ),
+        "title",
+        {"title": "t"},
+        id="a-service-precondition-beside-a-validator",
+    ),
+]
+
+
+class TestAPositionalOnlyParameterOnTheOtherSeats:
+    """The second refusal on a precondition, a condition, the output selector and an ``extend_queryset``."""
+
+    @pytest.mark.parametrize(("build", "name", "label"), _POSITIONAL_SEATS)
+    def test_dispatch_fails_every_call_with_it(
+        self, build: Callable[[], Any], name: str, label: str
+    ) -> None:
+        spec = build()
+        arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
+        with pytest.raises(TypeError, match="positional"):
+            dispatch(spec, principal=make_user("ada"), arguments=arguments)
+
+    @pytest.mark.parametrize(("build", "name", "label"), _POSITIONAL_SEATS)
+    def test_it_is_refused_though_something_fills_it_by_name(
+        self, build: Callable[[], Any], name: str, label: str
+    ) -> None:
+        refused = _refusal(build())
+        assert f"{label} takes the {_POSITIONAL} parameter(s) ['{name}']" in refused
+        assert _NOTHING_FILLS not in refused
+
+    @pytest.mark.parametrize(("build", "name", "arguments"), _POSITIONAL_BESIDE)
+    def test_dispatch_fails_every_call_beside_what_the_third_leaves_to_it(
+        self, build: Callable[[], Any], name: str, arguments: dict[str, Any]
+    ) -> None:
+        with pytest.raises(TypeError, match="positional"):
+            dispatch(build(), principal=make_user("ada"), arguments=arguments)
+
+    @pytest.mark.parametrize(("build", "name", "arguments"), _POSITIONAL_BESIDE)
+    def test_it_is_refused_beside_a_validator_or_an_untyped_provider(
+        self, build: Callable[[], Any], name: str, arguments: dict[str, Any]
+    ) -> None:
+        refused = _refusal(build())
+        assert f"the {_POSITIONAL} parameter(s) ['{name}']" in refused
+        assert _NOTHING_FILLS not in refused
+
+    def test_one_with_a_default_is_not(self) -> None:
+        spec = _service(
+            lambda **_: None,
+            affordances=_when(lambda user=None, /: True),
+            preconditions=[lambda title=None, /: None],
+            reads=_TITLE,
+        )
+        check_seeds(spec)
+
+
+# An optional ``limit`` read over a keyword the callable requires, on each seat
+# that carries reads: the spec builder, the label and the arguments sent.
+_OPTIONAL_SEATS = [
+    pytest.param(
+        lambda: _service(lambda **_: None, reads=_LIMIT, preconditions=[_requires_limit]),
+        "ServiceSpec.preconditions[0] (_requires_limit)",
+        id="a-service-precondition",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, reads=_LIMIT, preconditions=[_requires_limit]),
+        "SelectorSpec.preconditions[0] (_requires_limit)",
+        id="a-retrieve-precondition",
+    ),
+    pytest.param(
+        lambda: _list(_none, reads=_LIMIT, preconditions=[_requires_limit]),
+        "SelectorSpec.preconditions[0] (_requires_limit)",
+        id="a-list-precondition",
+    ),
+    pytest.param(
+        lambda: _list(_notes, reads=_LIMIT, extend_queryset=_extends_with_limit),
+        "SelectorSpec.extend_queryset",
+        id="a-selector-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(
+                _notes, reads=_LIMIT, extend_queryset=_extends_with_limit
+            ),
+        ),
+        "ServiceSpec.collection_selector_spec.extend_queryset",
+        id="a-target-s-extend-queryset",
+    ),
+]
+
+
+class TestAnOptionalReadOnTheOtherSeats:
+    """The fourth refusal on a precondition and an ``extend_queryset``, the seats that are handed reads.
+
+    A condition and the output selector are handed none, so there is nothing
+    for it to find on them.
+    """
+
+    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
+    def test_dispatch_refuses_a_call_leaving_it_out(
+        self, build: Callable[[], Any], label: str
+    ) -> None:
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(build(), principal=make_user("ada"), arguments={})
+        assert set(refused.value.detail) == {"limit"}
+
+    @pytest.mark.parametrize(
+        "build",
+        [
+            pytest.param(
+                lambda: _retrieve(_found_async, reads=_LIMIT, preconditions=[_requires_limit]),
+                id="an-async-retrieve-precondition",
+            ),
+            pytest.param(
+                lambda: _list(_notes_async, reads=_LIMIT, extend_queryset=_extends_with_limit),
+                id="an-async-extend-queryset",
+            ),
+        ],
+    )
+    async def test_adispatch_refuses_a_call_leaving_it_out_on_an_async_selector(
+        self, build: Callable[[], Any], ada: Any
+    ) -> None:
+        """The same refusal through ``_settle_and_conclude``, which binds with the reads it was given."""
+        spec = build()
+        with pytest.raises(InvalidArguments) as refused:
+            await adispatch(spec, principal=ada, arguments={})
+        assert set(refused.value.detail) == {"limit"}
+        await adispatch(spec, principal=ada, arguments={"limit": 1})
+
+    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
+    def test_a_call_sending_it_runs(self, build: Callable[[], Any], label: str) -> None:
+        dispatch(build(), principal=make_user("ada"), arguments={"limit": 1})
+
+    @pytest.mark.parametrize(("build", "label"), _OPTIONAL_SEATS)
+    def test_it_is_refused(self, build: Callable[[], Any], label: str) -> None:
+        refused = _refusal(build())
+        assert f"{label} requires the keyword(s) ['limit'], {_OPTIONAL}" in refused
+        assert _NOTHING_FILLS not in refused
+        assert _POSITIONAL not in refused
+
+    @pytest.mark.parametrize(
+        ("limit", "keywords"),
+        [
+            pytest.param(Parameter("limit", "integer", required=True), {}, id="demanded"),
+            pytest.param(Parameter("limit", "integer"), {"kwargs": _fills_limit}, id="typed"),
+        ],
+    )
+    def test_one_something_else_fills_is_not(
+        self, limit: Parameter, keywords: dict[str, Any]
+    ) -> None:
+        spec = _retrieve(
+            _found, reads=Parameters.of(limit), preconditions=[_requires_limit], **keywords
+        )
+        check_seeds(spec)
+
+
+class TestTheFifthRefusalIsNotRunOnThem:
+    """An array read with no ``items`` is refused on the callable it fills, not on a precondition or an ``extend_queryset``."""
+
+    @pytest.mark.parametrize(
+        "build",
+        [
+            pytest.param(
+                lambda: _service(
+                    lambda **_: None,
+                    reads=Parameters.of(Parameter("pks", "array", required=True)),
+                    preconditions=[_pks_precondition],
+                ),
+                id="a-service-precondition",
+            ),
+            pytest.param(
+                lambda: _retrieve(
+                    _found,
+                    reads=Parameters.of(Parameter("pks", "array", required=True)),
+                    preconditions=[_pks_precondition],
+                ),
+                id="a-selector-precondition",
+            ),
+            pytest.param(
+                lambda: _list(
+                    _notes,
+                    reads=Parameters.of(Parameter("pks", "array", required=True)),
+                    extend_queryset=_extends_with_pks,
+                ),
+                id="an-extend-queryset",
+            ),
+        ],
+    )
+    def test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s(
+        self, build: Callable[[], Any]
+    ) -> None:
+        spec = build()
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={"pks": [1]})
 
 
 _NO_ITEMS = "with no items"
