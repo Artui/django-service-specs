@@ -818,14 +818,19 @@ docs/examples/dispatching.py:server_arguments
    values over the rest, as the shape check hands them on: a UUID in its
    canonical spelling. Every other key is left for the shape check, so
    `REJECT` still refuses a name nobody declared.
-3. **In the input schema the transport advertises**, it subtracts
-   `names()` - the bound and the withheld together - from the properties
-   and from `required`, beside
-   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
-   The kernel's own
+3. **In the input schema the transport advertises**, the binding is passed
+   to
+   [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+   as `server_arguments`, which leaves `names()` - the bound and the withheld
+   together - out of the properties and out of `required`, beside
+   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys],
+   less a `many` spec's list, which dispatch demands of the caller whatever a
+   provider is annotated to fill.
    [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema]
-   takes no binding: the transports build their schemas themselves, and the
-   subtraction belongs where the schema is built.
+   takes no binding and lists every parameter as declared. Only the top level
+   loses them: a binding names no row field of a `many` spec, which
+   `check_server_arguments` refuses, so a row field sharing a bound read's
+   name is still offered in each row.
 
 Dispatch itself takes no binding. The helpers are synchronous and pure, and
 the applied mapping is ordinary arguments, so `dispatch` and `adispatch`

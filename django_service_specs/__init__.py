@@ -116,6 +116,7 @@ from django_service_specs.relations.reverse_one_to_one_spec import ReverseOneToO
 from django_service_specs.schema.can_present_nothing import can_present_nothing
 from django_service_specs.schema.output_schema import output_schema
 from django_service_specs.schema.parameters_schema import parameters_schema
+from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
 from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.schema.spec_output_schema import spec_output_schema
 from django_service_specs.selectors.amaterialize_retrieve import amaterialize_retrieve
@@ -332,6 +333,7 @@ __all__ = [
     "seed_named_parameters",
     "server_owned_keys",
     "shape_queryset",
+    "spec_caller_input_schema",
     "spec_input_schema",
     "spec_output_schema",
     "sync_answer",

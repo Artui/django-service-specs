@@ -72,6 +72,7 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ## JSON Schema
 
 ::: django_service_specs.schema.spec_input_schema.spec_input_schema
+::: django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema
 ::: django_service_specs.schema.spec_output_schema.spec_output_schema
 ::: django_service_specs.schema.parameters_schema.parameters_schema
 ::: django_service_specs.schema.output_schema.output_schema
