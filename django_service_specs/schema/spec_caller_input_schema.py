@@ -91,7 +91,8 @@ def spec_caller_input_schema(
     [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
     described as the spec it compiles to
     (test_a_spec_source_is_described_as_the_spec_it_compiles_to). Read on
-    every call, as ``parameters()`` is.
+    every call, as ``parameters()`` is
+    (test_the_declaration_is_read_on_every_call).
     """
     spec = kernel_spec(spec)
     schema = spec_input_schema(spec, unknown_arguments=unknown_arguments)

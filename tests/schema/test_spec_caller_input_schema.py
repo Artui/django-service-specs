@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 import pytest
+from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.check_call import check_call
@@ -438,6 +439,36 @@ def test_spec_input_schema_still_lists_what_the_server_fills() -> None:
     spec_caller_input_schema(spec)
 
     assert spec_input_schema(spec)["required"] == ["project"]
+
+
+def test_a_many_spec_whose_input_data_fills_a_read_is_refused() -> None:
+    # Why ``server_owned_keys`` may name ``input_data``'s keys at a ``many``
+    # spec's top level: none of them can be a read there, so withholding them
+    # withholds nothing dispatch demands. Refused when the spec is built.
+    with pytest.raises(ImproperlyConfigured, match=r"input_data is annotated to fill \['owner'\]"):
+        _many(reads=OWNER, input_data=fills_owner)
+
+
+class _Counting(Fields):
+    def __init__(self, *parameters: Parameter) -> None:
+        super().__init__(*parameters)
+        self.asked = 0
+
+    def parameters(self) -> Parameters:
+        self.asked += 1
+        return super().parameters()
+
+
+def test_the_declaration_is_read_on_every_call() -> None:
+    validator = _Counting(_required("title"))
+    spec = _many(validator=validator)
+
+    spec_caller_input_schema(spec)
+    first = validator.asked
+    spec_caller_input_schema(spec)
+
+    assert first > 0
+    assert validator.asked == 2 * first
 
 
 # --- agreement with dispatch ------------------------------------------------------------
