@@ -116,7 +116,21 @@ class Validator(abc.ABC):
 
     @abc.abstractmethod
     def parameters(self) -> Parameters:
-        """What this Validator takes, as a declaration. Never queries."""
+        """What this Validator takes, as a declaration. Never queries.
+
+        A Validator may opt into the call it is asked for by declaring
+        ``parameters(self, *, call_context=None)``: every ask inside one call
+        then hands it that call's ``call_context``, the same dict its
+        ``ValidationContext`` carries, so a transport describing a serializer
+        under its own request can tell its own call from a ``dispatch`` the
+        service makes inside it. It is ``None`` outside a call - at
+        registration, for a schema, or for any other reader describing the
+        spec - and the declaration must hold there too. Opted in or not, it
+        never queries. A Validator declaring no keyword is asked as before,
+        as is one whose ``parameters`` takes only ``**kwargs`` or is a
+        ``functools.wraps`` wrapper that does not name the keyword itself:
+        the method's own signature decides.
+        """
 
     @abc.abstractmethod
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:

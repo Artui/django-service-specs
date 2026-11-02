@@ -17,7 +17,7 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
-from tests.dispatch.utils import OPEN, PK, note_by_pk, notes_of
+from tests.dispatch.utils import EVERY_ASK, OPEN, PK, every_ask_case, note_by_pk, notes_of
 from tests.specs.utils import Foreign
 
 ROW = Parameters.of(Parameter("title", "string", required=True))
@@ -365,3 +365,12 @@ def test_passthrough_is_refused() -> None:
 def test_a_foreign_declaration_is_described_as_its_compiled_spec() -> None:
     spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=note_by_pk, reads=PK)
     assert spec_input_schema(Foreign(spec)) == spec_input_schema(spec)
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_describe_time_readers_hand_none(case: str) -> None:
+    """A schema is read outside any call, so it invents no dict for the Validator."""
+    spec, validator, _, _ = every_ask_case(case)
+    spec_input_schema(spec)
+    assert validator.asked
+    assert validator.asked == [None] * len(validator.asked)

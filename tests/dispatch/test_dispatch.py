@@ -57,11 +57,13 @@ from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
+    EVERY_ASK,
     OPEN,
     OWNER_NAME,
     PK,
     TENANT_SEEDS,
     Arguing,
+    AskedWith,
     Contextual,
     Listed,
     Offered,
@@ -71,6 +73,7 @@ from tests.dispatch.utils import (
     Scoped,
     Titled,
     Titles,
+    every_ask_case,
     make_user,
     note_by_pk,
     notes_of,
@@ -6111,3 +6114,73 @@ class TestReturnsMany:
 
         assert result.kind == "list"
         assert present_for_audience(spec, result) == [PROJECTED_ROW, PROJECTED_ROW]
+
+
+# --- the call's context, handed to every ask of a Validator's parameters ---------------------
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_every_ask_in_one_dispatch_is_handed_its_own_dict(ada: Any, case: str) -> None:
+    """Every ask, not some: a Validator keyed on the dict would otherwise
+    describe one call two ways."""
+    spec, validator, arguments, service = every_ask_case(case)
+    context: dict[str, Any] = {}
+    dispatch(
+        spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS, call_context=context
+    )
+    assert service.calls
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_a_dispatch_handed_no_dict_hands_every_ask_the_one_it_makes(ada: Any, case: str) -> None:
+    spec, validator, arguments, service = every_ask_case(case)
+    seen: list[Any] = []
+    spec = spec.derive(service=lambda *, call_context: seen.append(call_context))
+    dispatch(spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS)
+    assert isinstance(seen[0], dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not seen[0]] == []
+
+
+def _nesting(inner: ServiceSpec, *, forwarding: bool) -> tuple[ServiceSpec, AskedWith]:
+    """A spec whose service dispatches ``inner`` for its own principal, forwarding its dict or not."""
+
+    def service(*, user: Any, call_context: dict[str, Any]) -> None:
+        dispatch(
+            inner,
+            principal=user,
+            arguments={"title": "inner"},
+            call_context=call_context if forwarding else None,
+        )
+
+    validator = AskedWith()
+    return ServiceSpec(service=service, permissions=OPEN, validator=validator), validator
+
+
+def test_an_inner_dispatch_is_handed_a_different_dict(ada: Any) -> None:
+    """A dispatch a service makes without a dict describes its own call, never the outer one."""
+    inner_validator = AskedWith()
+    inner = ServiceSpec(service=Record(), permissions=OPEN, validator=inner_validator)
+    outer, outer_validator = _nesting(inner, forwarding=False)
+    context: dict[str, Any] = {}
+    dispatch(outer, principal=ada, arguments={"title": "outer"}, call_context=context)
+    assert outer_validator.asked
+    assert [asked for asked in outer_validator.asked if asked is not context] == []
+    inner_context = inner_validator.asked[0]
+    assert isinstance(inner_context, dict)
+    assert inner_context is not context
+    assert [asked for asked in inner_validator.asked if asked is not inner_context] == []
+
+
+def test_an_inner_dispatch_handed_the_outer_dict_reads_it(ada: Any) -> None:
+    """The documented gap: a service forwarding its own dict to an inner
+    dispatch has that call described as the outer one. Hand it a fresh dict."""
+    inner_validator = AskedWith()
+    inner = ServiceSpec(service=Record(), permissions=OPEN, validator=inner_validator)
+    outer, _ = _nesting(inner, forwarding=True)
+    context: dict[str, Any] = {}
+    dispatch(outer, principal=ada, arguments={"title": "outer"}, call_context=context)
+    assert inner_validator.asked
+    assert [asked for asked in inner_validator.asked if asked is not context] == []
