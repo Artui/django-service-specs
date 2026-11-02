@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`spec_caller_input_schema`, the input schema a transport advertises.** It is
   `spec_input_schema` less what the server fills, with a key a provider fills or
   may fill left out of `required`. A `many` spec gets the same in each row, so a
-  field `input_data` fills is not asked for, and its list is always asked for.
+  field `input_data` fills is not asked for, while the list is, unless the
+  transport binds it.
 - **`AllOf`, `AnyOf` and `NoneOf` combine permission checks into one.** Each takes
   checks and an optional `message=`, is a `PermissionCheck` like any other, and
   nests. `AllOf` stops at the first check that fails; `AnyOf` passes at the first
