@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, NoReturn
 
 from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.grant import Grant
@@ -26,6 +26,13 @@ class ResolvedTarget(tuple[Any, Grant]):
         found = super().__new__(cls, (target, grant))
         found._seeds = seeds
         return found
+
+    def __reduce__(self) -> NoReturn:
+        # The carrier's own refusal, raised here so that ``copy.copy`` (which
+        # would rebuild a tuple subclass through ``__new__``) and pickling both
+        # say why, in the carrier's words
+        # (test_it_cannot_be_pickled_for_the_seeds_it_carries).
+        return self._seeds.__reduce__()
 
     @property
     def seeds(self) -> CallSeeds:

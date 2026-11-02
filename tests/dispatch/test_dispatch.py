@@ -6257,10 +6257,10 @@ class TestEarlySeeds:
         )
 
     @_ENTRIES
-    def test_a_carrier_from_a_prelude_handed_no_context_covers_no_later_call(
+    def test_a_carrier_from_a_prelude_handed_no_context_covers_only_its_own_dict(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """Its prelude ran with a dict of its own, which no later call is handed."""
+        """Its prelude ran with a dict of its own: a call handed none, or a fresh one, is refused."""
         note = Note.objects.create(title="n", owner=ada)
         tenancy = Tenancy()
         spec = tenancy.spec()
@@ -6277,6 +6277,29 @@ class TestEarlySeeds:
             seeds=checked.seeds,
             pool_seeds=tenancy.pool_seeds,
         )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context={},
+        )
+        # The dict it ran with is public on the carrier, and a call handed
+        # that very dict is covered and runs on the carried values.
+        entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=checked.seeds.call_context,
+        )
+        assert tenancy.one_value()
 
     @_ENTRIES
     def test_a_carrier_for_another_spec_is_refused(

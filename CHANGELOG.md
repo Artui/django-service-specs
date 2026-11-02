@@ -45,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
   where each was annotated as a plain tuple. Both are still the same 2-tuple,
-  `(arguments, grant)` and `(target, grant)`, and add only `.seeds`.
+  `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
+  neither can be copied or pickled, since the carrier they hold cannot.
 - **Breaking: a subclass overriding `ServiceSpec.parameters` or
   `SelectorSpec.parameters` must accept `call_context`.** Dispatch now passes it
   as a keyword, so an override written `def parameters(self)` raises `TypeError`

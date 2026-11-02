@@ -668,8 +668,9 @@ principal, the `call_context` dict and the `pool_seeds` registry its prelude
 ran with, and dispatch refuses one that does not cover its call with
 `NotPermitted`, before any seed resolves and before the class-level check. So
 hand the prelude and the call one `call_context` dict: a prelude handed none
-runs with a dict of its own, and its carrier covers no later call. `seeds=`
-that are anything but the carrier, or `seeds=` without `grant=`, raise
+runs with a dict of its own, readable as `seeds.call_context`, and its carrier
+covers only a call handed that same dict: a later call that passes none, or a
+fresh one, is refused. `seeds=` that are anything but the carrier, or `seeds=` without `grant=`, raise
 `TypeError` before anything runs. Like a grant, it cannot be pickled, so it
 never crosses a queue: a worker resolves its own.
 

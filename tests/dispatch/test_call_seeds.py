@@ -42,6 +42,8 @@ def test_it_covers_exactly_its_spec_principal_call_context_and_registry(ada: Any
     assert seeds.covers(spec, ada, context, tenancy.pool_seeds)
     # One arc to coverage, so each operand is held here by its own line.
     assert not seeds.covers(tenancy.spec(), ada, context, tenancy.pool_seeds)
+    # Equal is not the same spec: a frozen dataclass compares by field, so only identity refuses it.
+    assert not seeds.covers(dataclasses.replace(spec), ada, context, tenancy.pool_seeds)
     assert not seeds.covers(spec, make_user("bob"), context, tenancy.pool_seeds)
     assert not seeds.covers(spec, ada, {}, tenancy.pool_seeds)
     assert not seeds.covers(spec, ada, context, DEFAULT_POOL_SEEDS.extend(tenant=tenancy.tenant))

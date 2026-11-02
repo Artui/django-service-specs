@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import copy
 import pickle
+from collections.abc import Callable
 from typing import Any
 
 import pytest
@@ -31,7 +33,10 @@ def test_check_call_still_unpacks_to_two() -> None:
     assert checked.seeds.covers(spec, ada, checked.seeds.call_context, tenancy.pool_seeds)
 
 
-def test_it_cannot_be_pickled_for_the_seeds_it_carries() -> None:
+@pytest.mark.parametrize("serialize", [pickle.dumps, copy.copy, copy.deepcopy])
+def test_it_cannot_be_pickled_for_the_seeds_it_carries(
+    serialize: Callable[[Any], object],
+) -> None:
     ada, tenancy = make_user("ada"), Tenancy()
     checked: Any = check_call(
         tenancy.spec(), principal=ada, arguments={"pk": 1}, pool_seeds=tenancy.pool_seeds
@@ -39,4 +44,4 @@ def test_it_cannot_be_pickled_for_the_seeds_it_carries() -> None:
     assert checked.seeds is checked.seeds
 
     with pytest.raises(TypeError, match="cannot be serialized"):
-        pickle.dumps(checked)
+        serialize(checked)

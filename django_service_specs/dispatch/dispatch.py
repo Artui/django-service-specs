@@ -256,7 +256,9 @@ def dispatch(
     registry its prelude ran with, each by identity, and one that does not
     cover this call is refused before step two, before any seed resolves.
     So pass the same ``call_context`` dict to both: a prelude handed none ran
-    with a dict of its own, and its carrier covers no call of this function's.
+    with a dict of its own, readable as ``seeds.call_context``, and its carrier
+    covers only a call handed that same dict, so a call that passes none, or a
+    fresh one, is refused.
     ``authorize`` hands back no carrier, so a call authorized that way still
     resolves the seeds its checks name twice.
     Every other seed resolves as before, once per pool and each after step

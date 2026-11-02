@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import copy
+import pickle
+from collections.abc import Callable
+from typing import Any
+
 import pytest
 
 from django_service_specs.dispatch.dispatch_result import DispatchResult
@@ -71,3 +76,18 @@ def test_a_missing_row_carries_no_seeds() -> None:
 
     assert isinstance(found, DispatchResult)
     assert found.kind == "not_found"
+
+
+@pytest.mark.parametrize("serialize", [pickle.dumps, copy.copy, copy.deepcopy])
+def test_it_cannot_be_pickled_for_the_seeds_it_carries(
+    serialize: Callable[[Any], object],
+) -> None:
+    ada, tenancy = make_user("ada"), Tenancy()
+    note = Note.objects.create(title="n", owner=ada)
+    found: Any = resolve_target(
+        tenancy.spec(), principal=ada, arguments={"pk": note.pk}, pool_seeds=tenancy.pool_seeds
+    )
+    assert found.seeds is found.seeds
+
+    with pytest.raises(TypeError, match="cannot be serialized"):
+        serialize(found)

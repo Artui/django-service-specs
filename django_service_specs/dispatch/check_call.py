@@ -71,8 +71,10 @@ def check_call(
     (test_check_call_then_dispatch_resolves_a_check_named_seed_once). The
     carrier is bound to this call's ``call_context`` dict, so a transport
     passes ``dispatch`` the dict it passed here; a carrier from a call
-    handed no ``call_context`` is bound to a dict only this function held, and
-    covers no later call. **A** ``many`` **spec's rows** come
+    handed no ``call_context`` is bound to a dict only this function held,
+    readable as ``checked.seeds.call_context``, and covers only a call handed
+    that same dict: a later call that passes none, or a fresh one, is refused.
+    **A** ``many`` **spec's rows** come
     back as a list of checked rows under ``many_argument``, and a refused row
     is raised here, after step four, in the tree ``dispatch`` raises it in -
     though ``dispatch`` reports it beside the Validator's refusals of the
