@@ -1046,6 +1046,15 @@ _POSITIONAL_SEATS = [
     pytest.param(
         lambda: _service(
             lambda **_: None,
+            instance_selector_spec=_retrieve(_found, affordances=_mapping(lambda user, /: True)),
+        ),
+        "user",
+        "ServiceSpec.instance_selector_spec.affordances['rename'][0] ('c').when",
+        id="an-instance-target-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
             output_selector_spec=_list(_none, affordances=_mapping(lambda user, /: True)),
         ),
         "user",
@@ -1066,6 +1075,15 @@ _POSITIONAL_SEATS = [
         "queryset",
         "ServiceSpec.collection_selector_spec.extend_queryset",
         id="a-target-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            instance_selector_spec=_retrieve(_notes, extend_queryset=lambda queryset, /: queryset),
+        ),
+        "queryset",
+        "ServiceSpec.instance_selector_spec.extend_queryset",
+        id="an-instance-target-s-extend-queryset",
     ),
     pytest.param(
         lambda: _service(
@@ -1184,7 +1202,70 @@ _OPTIONAL_SEATS = [
         "ServiceSpec.collection_selector_spec.extend_queryset",
         id="a-target-s-extend-queryset",
     ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            instance_selector_spec=_retrieve(
+                _notes, reads=_LIMIT, extend_queryset=_extends_with_limit
+            ),
+        ),
+        "ServiceSpec.instance_selector_spec.extend_queryset",
+        id="an-instance-target-s-extend-queryset",
+    ),
 ]
+
+
+def _untyped_limit() -> dict[str, Any]:
+    return {"limit": 5}
+
+
+class _ReturnsLimit(Validator):
+    """Returns ``limit``, which it never declares."""
+
+    def parameters(self) -> Parameters:
+        return _TITLE
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return {"title": arguments["title"], "limit": 5}
+
+
+# An optional ``limit`` read the callable requires, that a provider or a
+# Validator fills beyond the read: the check cannot see what either returns,
+# so it leaves the seat to dispatch, which runs the call without ``limit``
+# sent. One case per seat the bail applies to, each with the arguments sent.
+_OPTIONAL_BESIDE = [
+    pytest.param(
+        lambda seen: _retrieve(
+            _found,
+            reads=_LIMIT,
+            kwargs=_untyped_limit,
+            preconditions=[_taking("limit", seen=seen)],
+        ),
+        {},
+        id="a-precondition-beside-an-untyped-provider",
+    ),
+    pytest.param(
+        lambda seen: _list(
+            _notes, reads=_LIMIT, kwargs=_untyped_limit, extend_queryset=_extending("limit", seen)
+        ),
+        {},
+        id="an-extend-queryset-beside-an-untyped-provider",
+    ),
+    pytest.param(
+        lambda seen: _service(
+            lambda **_: None,
+            reads=_LIMIT,
+            validator=_ReturnsLimit(),
+            preconditions=[_taking("limit", seen=seen)],
+        ),
+        {"title": "t"},
+        id="a-service-precondition-beside-a-validator",
+    ),
+]
+
+# Two optional reads a precondition requires: the offenders are all of them,
+# sorted (test_it_names_every_one_sorted).
+_TWO_OPTIONAL = Parameters.of(Parameter("limit", "integer"), Parameter("after", "integer"))
 
 
 class TestAnOptionalReadOnTheOtherSeats:
@@ -1218,7 +1299,12 @@ class TestAnOptionalReadOnTheOtherSeats:
     async def test_adispatch_refuses_a_call_leaving_it_out_on_an_async_selector(
         self, build: Callable[[], Any], ada: Any
     ) -> None:
-        """The same refusal through ``_settle_and_conclude``, which binds with the reads it was given."""
+        """The same refusal through ``_settle_and_conclude``, the route only an async selector takes.
+
+        An ``extend_queryset`` binds there with the reads ``adispatch`` was
+        given; a RETRIEVE's precondition takes its ``fillable`` from
+        ``conclude_selector``, not from ``adispatch``.
+        """
         spec = build()
         with pytest.raises(InvalidArguments) as refused:
             await adispatch(spec, principal=ada, arguments={})
@@ -1235,6 +1321,31 @@ class TestAnOptionalReadOnTheOtherSeats:
         assert f"{label} requires the keyword(s) ['limit'], {_OPTIONAL}" in refused
         assert _NOTHING_FILLS not in refused
         assert _POSITIONAL not in refused
+
+    @pytest.mark.parametrize(("build", "arguments"), _OPTIONAL_BESIDE)
+    def test_it_is_left_to_dispatch_beside_an_untyped_provider_or_a_validator(
+        self, build: Callable[[dict[str, Any]], Any], arguments: dict[str, Any]
+    ) -> None:
+        """The fourth is bailed from where the third is, though ``checks_items`` is false.
+
+        A mutant running it on these seats whatever the provider or Validator
+        may return refuses a spec whose call sends no ``limit`` and runs.
+        """
+        seen: dict[str, Any] = {}
+        spec = build(seen)
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments=arguments)
+        assert seen["limit"] == 5
+
+    def test_it_names_every_one_sorted(self) -> None:
+        """Both offenders, ``after`` before ``limit``, whichever order the callable declares them."""
+        spec = _retrieve(
+            _found,
+            reads=_TWO_OPTIONAL,
+            preconditions=[_taking("limit", "after", seen={})],
+        )
+        refused = _refusal(spec)
+        assert "requires the keyword(s) ['after', 'limit']," in refused
 
     @pytest.mark.parametrize(
         ("limit", "keywords"),

@@ -771,12 +771,13 @@ see it leaves to dispatch: a provider that does not annotate its keys may fill
 any keyword in its seat, and a Validator may return or bind a value it does
 not declare, so neither seat is held to the keywords it requires, nor is a
 precondition or an `extend_queryset` beside one, though a positional-only
-parameter is refused whatever stands beside it. An `extra_kwargs` overlay
-fills keywords it cannot see either. The array check alone is not run on a
+parameter is refused whatever stands beside it. An `extra_kwargs` overlay fills
+keywords it cannot see either. The array check alone is not run on a
 precondition, a condition, the output selector or an `extend_queryset`. A
-callable taking `**kwargs` requires nothing, so one forwarding into a stricter callable is not
-judged by what that callable requires; and a pool a transport builds itself to
-answer a condition before any call is its own, not the one this reads.
+callable taking `**kwargs` requires nothing, so one forwarding into a stricter
+callable is not judged by what that callable requires; and a pool a transport
+builds itself to answer a condition before any call is its own, not the one
+this reads.
 A provider's own keywords (`kwargs`, `input_data`, `progress_reporter`), a
 `filter_set`, a form's `form_kwargs` and a seed's resolver are not read either.
 

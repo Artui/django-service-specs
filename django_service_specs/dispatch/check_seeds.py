@@ -188,31 +188,30 @@ def check_seeds(
     such a spec runs and may mean to: [`unreceived_fields`][django_service_specs.dispatch.unreceived_fields.unreceived_fields]
     answers it, and the transport decides.
 
-    **What it cannot see, and so never refuses.** A provider whose return
-    says nothing about its keys may fill any keyword in its seat, so that
-    seat's keywords are left to dispatch (the third and fourth). An
-    annotation that does not resolve, as a forward reference to a name not
-    importable where the callable was defined, is not read, and leaves
-    alone only its own keyword (the fifth); so is a bare ``list``, an element
-    of ``Any`` or ``object``, a fixed-length ``tuple``, a union of two
-    sequences and an unannotated keyword. A
-    Validator may return a value it does not declare, or bind one, so a
-    service beside a Validator is not judged by the third and fourth either
-    (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
-    handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this
-    cannot see, and should not call it for such a spec. Only the fifth
-    refusal is not run on a precondition, a condition, the output selector or
-    an ``extend_queryset``. A precondition beside a Validator, or one or an
+    **What it cannot see, and so never refuses.** A provider whose return says
+    nothing about its keys may fill any keyword in its seat, so that seat's
+    keywords are left to dispatch (the third and fourth). An annotation that
+    does not resolve, as a forward reference to a name not importable where the
+    callable was defined, is not read, and leaves alone only its own keyword
+    (the fifth); so is a bare ``list``, an element of ``Any`` or ``object``, a
+    fixed-length ``tuple``, a union of two sequences and an unannotated
+    keyword. A Validator may return a value it does not declare, or bind one,
+    so a service beside a Validator is not judged by the third and fourth
+    either (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
+    handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this cannot
+    see, and should not call it for such a spec. Only the fifth refusal is not
+    run on a precondition, a condition, the output selector or an
+    ``extend_queryset``. A precondition beside a Validator, or one or an
     ``extend_queryset`` beside an untyped provider, is left to dispatch by the
     third and fourth as the callable beside it is, never by the second. A
-    callable taking ``**kwargs`` requires nothing,
-    so one forwarding into a stricter callable is not judged by what that
-    callable requires. Nor is the pool a transport builds itself to answer
-    a condition at describe time (``unmet_operation_affordance``): this reads
-    the pool dispatch builds. Nor does it read a provider's own keywords
-    (``kwargs``, ``input_data``, ``progress_reporter``), a ``filter_set``, a
-    form's ``form_kwargs`` or a seed's resolver: dispatch binds each by
-    keyword, and this is not asked of any.
+    callable taking ``**kwargs`` requires nothing, so one forwarding into a
+    stricter callable is not judged by what that callable requires. Nor is the
+    pool a transport builds itself to answer a condition at describe time
+    (``unmet_operation_affordance``): this reads the pool dispatch builds. Nor
+    does it read a provider's own keywords (``kwargs``, ``input_data``,
+    ``progress_reporter``), a ``filter_set``, a form's ``form_kwargs`` or a
+    seed's resolver: dispatch binds each by keyword, and this is not asked of
+    any.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
@@ -428,7 +427,10 @@ def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys |
         )
     # The fifth is not run on a precondition, a condition, the output selector
     # or an ``extend_queryset``:
-    # test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s.
+    # test_a_precondition_s_array_read_with_no_items_is_not_the_fifth_s. The
+    # flag is inert on a condition and the output selector, whose reads are
+    # ``Parameters.of()``: ``_untyped_elements`` draws its candidates from
+    # ``seat.reads`` alone, so it would find nothing there either way.
     untyped = _untyped_elements(seat, signature, keys, seat.fills) if seat.checks_items else []
     if untyped:
         problems.append(

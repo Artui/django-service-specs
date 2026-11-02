@@ -15,14 +15,15 @@ and code reading one learns that from the ``None``
 callable written for HTTP declares both, so a spec serves unchanged from every
 transport only if every stage can be handed them.
 
-**Handed by name only.** Every stage dispatch resolves - a seed's resolver,
-the selectors, the target selector on every route included, the providers, a
+**Handed by name only.** Every stage dispatch resolves - a seed's resolver, the
+selectors, the target selector on every route included, the providers, a
 ``FormValidator``'s ``form_kwargs``, the affordance conditions, an
 ``extend_queryset``, the preconditions, the run's ``progress_reporter``, the
 service and the output selector - is handed either name it declares, and so is
-every permission check that declares one. A ``**kwargs`` catch-all is handed neither, and
-neither is a pool entry, so the Validator's ``ambient`` holds neither, as the
-call's context itself is handled (test_a_catch_all_is_handed_neither,
+every permission check that declares one. A ``**kwargs`` catch-all is handed
+neither, and neither is a pool entry, so the Validator's ``ambient`` holds
+neither, as the call's context itself is handled
+(test_a_catch_all_is_handed_neither,
 test_the_validator_s_ambient_holds_neither).
 
 **Outside** ``RESERVED_POOL_SEEDS``, so ``PoolSeeds.extend`` and the

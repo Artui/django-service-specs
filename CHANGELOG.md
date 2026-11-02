@@ -50,14 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refusal is made.
 
 ### Changed
-- **`check_seeds` refuses a positional-only parameter with no default, and a keyword
-  only an optional read fills, on an affordance condition, a precondition, the output
-  selector and `extend_queryset`.** Until now it ran only the unfilled-keyword refusal
-  on them, so a spec that mounted before may now be refused at mount. Every call
-  reaching such a spec failed already: with `TypeError` for the positional-only
-  parameter, and as missing for the keyword when the call left the read out. The
-  array-read refusal is still not run on them. A positional-only parameter is refused
-  beside a Validator or an untyped provider too.
+- **`check_seeds` runs its positional-only refusal on every callable it reads, and
+  its optional-read refusal on those that are handed reads.** The positional-only
+  parameter with no default is now refused on an affordance condition, a
+  precondition, the output selector and an `extend_queryset`, as well as on the
+  service, the selector and the target selector. A keyword only an optional read
+  fills is now refused on a precondition and an `extend_queryset`, the only ones
+  of these handed the spec's reads; a condition and the output selector are handed
+  none, so it finds nothing on them. Until now it ran only the unfilled-keyword
+  refusal on these seats, so a spec that mounted before may now be refused at
+  mount. Every call reaching such a spec failed already: with `TypeError` for the
+  positional-only parameter, and as missing for the keyword when the call left the
+  read out. The array-read refusal is still not run on them. A positional-only
+  parameter is refused beside a Validator or an untyped provider too.
 - **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
   where each was annotated as a plain tuple. Both are still the same 2-tuple,
   `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
