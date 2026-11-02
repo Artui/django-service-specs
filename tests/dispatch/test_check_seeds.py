@@ -330,6 +330,16 @@ _THIRD_ONLY_SEATS = [
     pytest.param(
         lambda: _service(
             lambda **_: None,
+            instance_selector_spec=_retrieve(_found, affordances=_mapping(lambda *, frozen: True)),
+        ),
+        "frozen",
+        "ServiceSpec.instance_selector_spec.affordances['rename'][0] ('c').when",
+        _CONDITION_TAIL,
+        id="an-instance-target-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
             collection_selector_spec=_list(_none, affordances=_mapping(lambda *, frozen: True)),
         ),
         "frozen",

@@ -127,8 +127,8 @@ def check_seeds(
        seeds ``data`` for a service only, so a selector requiring it is
        refused as any unfilled keyword is. A service is handed its spec's
        reads, never its target selector's or its shapes, which reach it as
-       ``shapes``. It reads every callable a call binds by keyword, each
-       against what dispatch hands that one:
+       ``shapes``. It reads these callables, each against what dispatch
+       hands that one:
 
        - the service, the selector and the target selector, as above;
        - a service spec's ``preconditions``, handed the service's pool, and
@@ -203,7 +203,10 @@ def check_seeds(
     so one forwarding into a stricter callable is not judged by what that
     callable requires. Nor is the pool a transport builds itself to answer
     a condition at describe time (``unmet_operation_affordance``): this reads
-    the pool dispatch builds.
+    the pool dispatch builds. Nor does it read a provider's own keywords
+    (``kwargs``, ``input_data``, ``progress_reporter``), a ``filter_set``, a
+    form's ``form_kwargs`` or a seed's resolver: dispatch binds each by
+    keyword, and this is not asked of any.
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.

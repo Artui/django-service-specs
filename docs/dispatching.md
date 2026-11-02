@@ -697,8 +697,8 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   and none of what every pool carries. A service is handed `data`, and
   `instance` or `collection` only where a target selector resolves one; a
   selector is handed neither, and a service none of its target selector's
-  reads or its shapes. The same is asked of every other callable a call binds
-  by keyword, against what dispatch hands that one: a service spec's
+  reads or its shapes. The same is asked of these callables, against what
+  dispatch hands that one: a service spec's
   preconditions are handed the service's pool, and a selector spec's the
   selector's with the rows as `collection` or the row as `instance`; an
   affordance condition, the spec's own or one a selector's `affordances` maps
@@ -748,6 +748,8 @@ optional-read and array checks are not run on them. A callable taking
 `**kwargs` requires nothing, so one forwarding into a stricter callable is not
 judged by what that callable requires; and a pool a transport builds itself to
 answer a condition before any call is its own, not the one this reads.
+A provider's own keywords (`kwargs`, `input_data`, `progress_reporter`), a
+`filter_set`, a form's `form_kwargs` and a seed's resolver are not read either.
 
 Two of the readers it shares with dispatch are public for a transport building
 its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters],
