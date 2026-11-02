@@ -98,8 +98,9 @@ pool when there are none.
 
 **Build the pool the way the call's would be**:
 [`base_pool`][django_service_specs.pool.base_pool.base_pool] with the same
-`seeds=`, and `reserved=seeds.reserved` beside it, or a condition reading a
-registered seed is asked without it. A condition that raises propagates: one
+`seeds=`, and `reserved=seeds.reserved` beside it, which is required: a default
+would ask a condition with none of the registered seeds, so one reading a
+registered seed would fail at describe time though dispatch serves it. A condition that raises propagates: one
 that cannot be answered is not a no.
 
 **The answer is advisory.** An operation listed a moment before a condition

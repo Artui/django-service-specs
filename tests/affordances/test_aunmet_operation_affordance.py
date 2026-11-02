@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from asgiref.sync import sync_to_async
@@ -17,6 +17,7 @@ from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
 from django_service_specs.pool.base_pool import base_pool
+from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
@@ -55,6 +56,14 @@ def test_the_signature_is_the_sync_one() -> None:
     assert inspect.iscoroutinefunction(aunmet_operation_affordance)
 
 
+async def test_reserved_is_required_not_defaulted(hops: list[str]) -> None:
+    """The refusal comes at bind, before the no-affordance early return."""
+    asked = cast(Any, aunmet_operation_affordance)
+    with pytest.raises(TypeError, match="reserved"):
+        await asked(ServiceSpec(service=print), _pool())
+    assert hops == []
+
+
 @pytest.mark.parametrize(
     "affordances",
     [None, [ROW], [OPEN], [BOOKS_CLOSED], [ROW, OPEN, FROZEN, BOOKS_CLOSED]],
@@ -63,15 +72,15 @@ def test_the_signature_is_the_sync_one() -> None:
 async def test_the_awaited_answer_is_the_sync_answer(affordances: list[Affordance] | None) -> None:
     spec = ServiceSpec(service=print, affordances=affordances)
 
-    assert await aunmet_operation_affordance(spec, _pool()) is unmet_operation_affordance(
-        spec, _pool()
-    )
+    assert await aunmet_operation_affordance(
+        spec, _pool(), reserved=RESERVED_POOL_SEEDS
+    ) is unmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS)
 
 
 async def test_the_first_unmet_condition_is_the_answer() -> None:
     spec = ServiceSpec(service=print, affordances=[ROW, OPEN, FROZEN, BOOKS_CLOSED])
 
-    assert await aunmet_operation_affordance(spec, _pool()) is FROZEN
+    assert await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS) is FROZEN
 
 
 @pytest.mark.parametrize(
@@ -92,14 +101,17 @@ async def test_the_first_unmet_condition_is_the_answer() -> None:
 async def test_nothing_to_ask_at_list_time_costs_no_executor_hop(
     spec: Any, hops: list[str]
 ) -> None:
-    assert await aunmet_operation_affordance(spec, _pool()) is None
+    assert await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS) is None
     assert hops == []
 
 
 async def test_every_condition_to_ask_is_asked_in_one_hop(hops: list[str]) -> None:
     spec = ServiceSpec(service=print, affordances=[ROW, OPEN, BOOKS_CLOSED, FROZEN])
 
-    assert await aunmet_operation_affordance(spec, _pool()) is BOOKS_CLOSED
+    assert (
+        await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS)
+        is BOOKS_CLOSED
+    )
     assert hops == ["unmet_operation_affordance"]
 
 
@@ -116,9 +128,9 @@ async def test_a_condition_that_queries_runs_off_the_loop() -> None:
     )
     ada = await sync_to_async(make_user)("ada")
 
-    assert await aunmet_operation_affordance(spec, _pool()) is None
+    assert await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS) is None
     await Note.objects.acreate(owner=ada, title="Old", archived=True)
-    answer = await aunmet_operation_affordance(spec, _pool())
+    answer = await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS)
     assert answer is not None
     assert answer.code == "archive_pending"
 
@@ -126,7 +138,10 @@ async def test_a_condition_that_queries_runs_off_the_loop() -> None:
 async def test_a_source_answers_as_the_spec_it_compiles_to() -> None:
     source = Foreign(ServiceSpec(service=print, affordances=[OPEN, BOOKS_CLOSED]))
 
-    assert await aunmet_operation_affordance(source, _pool()) is BOOKS_CLOSED
+    assert (
+        await aunmet_operation_affordance(source, _pool(), reserved=RESERVED_POOL_SEEDS)
+        is BOOKS_CLOSED
+    )
 
 
 # The call's context: a transport asking ahead of a call has one to hand, or
@@ -151,7 +166,7 @@ async def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -
     handed: list[Any] = []
     context: dict[str, Any] = {}
     await aunmet_operation_affordance(
-        _naming_it(handed), base_pool(user=None), call_context=context
+        _naming_it(handed), base_pool(user=None), call_context=context, reserved=RESERVED_POOL_SEEDS
     )
     assert len(handed) == 2
     assert all(seen is context for seen in handed)
@@ -160,8 +175,8 @@ async def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -
 async def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
     handed: list[Any] = []
     spec = _naming_it(handed)
-    await aunmet_operation_affordance(spec, base_pool(user=None))
-    await aunmet_operation_affordance(spec, base_pool(user=None))
+    await aunmet_operation_affordance(spec, base_pool(user=None), reserved=RESERVED_POOL_SEEDS)
+    await aunmet_operation_affordance(spec, base_pool(user=None), reserved=RESERVED_POOL_SEEDS)
     first, again, second, _ = handed
     assert first == {}
     assert again is first
@@ -176,5 +191,7 @@ async def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_cont
         return True
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
-    await aunmet_operation_affordance(spec, base_pool(user=None), call_context={})
+    await aunmet_operation_affordance(
+        spec, base_pool(user=None), call_context={}, reserved=RESERVED_POOL_SEEDS
+    )
     assert seen == [{"user", "progress"}]

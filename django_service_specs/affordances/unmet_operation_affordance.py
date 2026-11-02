@@ -6,7 +6,6 @@ from typing import Any
 
 from django_service_specs.affordances.operation_affordances import operation_affordances
 from django_service_specs.affordances.utils import answer_operation_condition, with_call_context
-from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
@@ -17,7 +16,7 @@ def unmet_operation_affordance(
     spec: ServiceSpec | SelectorSpec | SpecSource,
     pool: dict[str, Any],
     *,
-    reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    reserved: frozenset[str],
     call_context: dict[str, Any] | None = None,
 ) -> Affordance | None:
     """The first of the spec's operation-scope affordances not met now, or ``None``.
@@ -45,8 +44,12 @@ def unmet_operation_affordance(
     refused by, so the two see the same names only if they are handed the same
     seeds:
     [`base_pool`][django_service_specs.pool.base_pool.base_pool] with the same
-    ``seeds=``, and ``reserved=seeds.reserved`` here, or a condition reading a
-    registered seed is asked without it.
+    ``seeds=``, and ``reserved=seeds.reserved`` here. ``reserved`` is the names a
+    condition may be handed from the pool: the mount's ``pool_seeds.reserved``,
+    the kernel's reserved names plus the seeds it registers. It is required, with
+    no default, because a default would ask a condition with none of the
+    registered seeds, and one reading a registered seed would fail at describe
+    time though dispatch serves it.
 
     **The answer is advisory.** Enforcement at the call
     ([`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances])

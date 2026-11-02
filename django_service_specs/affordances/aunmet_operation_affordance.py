@@ -10,7 +10,6 @@ from django_service_specs.affordances.operation_affordances import operation_aff
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
-from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -22,14 +21,15 @@ async def aunmet_operation_affordance(
     spec: ServiceSpec | SelectorSpec | SpecSource,
     pool: dict[str, Any],
     *,
-    reserved: frozenset[str] = RESERVED_POOL_SEEDS,
+    reserved: frozenset[str],
     call_context: dict[str, Any] | None = None,
 ) -> Affordance | None:
     """[`unmet_operation_affordance`][django_service_specs.affordances.unmet_operation_affordance.unmet_operation_affordance] for an async caller.
 
     For a transport building its list of operations on an event loop: an MCP
     server answering a tool list, an agent assembling its next step's tools.
-    It gives the sync function's answer for the same arguments.
+    It gives the sync function's answer for the same arguments, and ``reserved=``
+    is required here as there: pass the mount's ``pool_seeds.reserved``.
 
     A callable condition is user code and may query, so the conditions are
     answered in **one** ``sync_to_async(thread_sensitive=True)`` hop, as
