@@ -21,10 +21,13 @@ from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.adispatch import adispatch
+from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
 from django_service_specs.dispatch.resolve_target import resolve_target
+from django_service_specs.dispatch.resolved_target import ResolvedTarget
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
@@ -42,6 +45,7 @@ from tests.dispatch.utils import (
     Record,
     Refuse,
     Scoped,
+    Tenancy,
     Titled,
     make_user,
     note_by_pk,
@@ -697,3 +701,104 @@ def test_resolve_target_hands_every_ask_its_dict(ada: Any, passed: bool) -> None
     assert context is passed_context if passed else isinstance(context, dict)
     assert validator.asked
     assert [asked for asked in validator.asked if asked is not context] == []
+
+
+class TestCarriedSeeds:
+    """``seeds=`` a ``CallSeeds``: its values stand in for resolving, for the call it covers."""
+
+    def test_a_carrier_s_seeds_are_taken_and_resolved_nowhere_else(self, ada: Any) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        carrier = resolve_seeds(
+            spec, principal=ada, pool_seeds=tenancy.pool_seeds, call_context=context
+        )
+        grant = authorize(
+            spec, ada, seeds=carrier, pool_seeds=tenancy.pool_seeds, call_context=context
+        )
+        found = resolve_target(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=grant,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+            seeds=carrier,
+        )
+        assert isinstance(found, ResolvedTarget)
+        assert found[0] == note
+        assert [stage for stage, _ in tenancy.seen] == [
+            "has_permission",
+            "instance_selector",
+            "has_object_permission",
+        ]
+        assert tenancy.one_value()
+        assert found.seeds.values["tenant"] is tenancy.resolved[0]
+
+    def test_a_carrier_needs_no_grant(self, ada: Any) -> None:
+        """One from ``resolve_seeds`` comes with none: the class-level check is asked on its values."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        carrier = resolve_seeds(
+            spec, principal=ada, pool_seeds=tenancy.pool_seeds, call_context=context
+        )
+        resolve_target(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+            seeds=carrier,
+        )
+        assert [stage for stage, _ in tenancy.seen][0] == "has_permission"
+        assert tenancy.one_value()
+
+    @pytest.mark.parametrize("other", ["spec", "principal", "call_context", "registry"])
+    def test_a_carrier_for_another_call_is_refused_before_any_resolver_or_check(
+        self, ada: Any, bob: Any, other: str
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        carrier = resolve_seeds(
+            spec, principal=ada, pool_seeds=tenancy.pool_seeds, call_context=context
+        )
+        asked: dict[str, Any] = {
+            "principal": ada,
+            "call_context": context,
+            "pool_seeds": tenancy.pool_seeds,
+        }
+        if other == "spec":
+            spec = tenancy.spec()
+        elif other == "principal":
+            asked["principal"] = bob
+        elif other == "call_context":
+            asked["call_context"] = {}
+        else:
+            asked["pool_seeds"] = Tenancy().pool_seeds
+        with pytest.raises(NotPermitted) as refused:
+            resolve_target(spec, arguments={"pk": note.pk}, seeds=carrier, **asked)
+        assert str(refused.value) == "The seeds do not cover this spec, principal and call context."
+        assert len(tenancy.resolved) == 1
+        assert tenancy.seen == []
+
+    def test_a_plain_mapping_as_seeds_is_a_type_error(self, ada: Any) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        # Either type, so that without the refusal at entry this fails on its message
+        # rather than on the mapping meeting the carrier's own methods.
+        with pytest.raises((TypeError, AttributeError)) as refused:
+            resolve_target(
+                tenancy.spec(),
+                principal=ada,
+                arguments={"pk": note.pk},
+                pool_seeds=tenancy.pool_seeds,
+                seeds=cast(Any, {"tenant": "acme"}),
+            )
+        assert str(refused.value) == (
+            "resolve_target() takes as seeds= the CallSeeds that resolve_seeds() or "
+            "check_call() hands back; got dict."
+        )
+        assert tenancy.resolved == []
+        assert tenancy.seen == []

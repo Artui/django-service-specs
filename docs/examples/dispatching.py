@@ -39,6 +39,7 @@ from django_service_specs import (
     dispatch,
     form_keywords,
     present,
+    resolve_seeds,
     resolve_target,
     unreceived_fields,
 )
@@ -408,10 +409,16 @@ def club_seeds(club: str) -> PoolSeeds:
 
 def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
     pool_seeds = club_seeds(club)
+    context: dict[str, Any] = {}  # handed to every step, and to the form re-rendered if it refuses
+    # The club, resolved once for the call: InClub and the service see one value.
+    seeds = resolve_seeds(
+        club_note_spec, principal=user, pool_seeds=pool_seeds, call_context=context
+    )
     # Before the form: a principal the class-level check refuses never sees
     # it. NotPermitted for anyone outside the club.
-    grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
-    context: dict[str, Any] = {}  # handed to dispatch, and to the form re-rendered if it refuses
+    grant = authorize(
+        club_note_spec, user, seeds=seeds, pool_seeds=pool_seeds, call_context=context
+    )
     if title is None:  # the GET: the form, built as dispatch will build it
         extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
         return ClubNoteForm(**extra)
@@ -422,6 +429,7 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
             arguments={"title": title},
             pool_seeds=pool_seeds,
             grant=grant,
+            seeds=seeds,
             call_context=context,
         )
     except InvalidArguments:

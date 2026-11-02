@@ -24,6 +24,7 @@ from django_service_specs.dispatch.present_for_audience import present_for_audie
 from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.relax_partial import relax_partial
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
 from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.dispatch.resolved_target import ResolvedTarget
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
@@ -57,6 +58,7 @@ __all__ = [
     "present_for_audience",
     "provider_reached",
     "relax_partial",
+    "resolve_seeds",
     "resolve_target",
     "seed_named_parameters",
     "unanswered_refusals",

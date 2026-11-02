@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.kernel_spec import kernel_spec
@@ -90,3 +91,22 @@ def test_a_carrier_cannot_be_pickled(ada: Any, serialize: Callable[[Any], object
 
     with pytest.raises(TypeError, match="cannot be serialized"):
         serialize(seeds)
+
+
+def test_values_for_returns_the_values_of_a_covered_call_and_refuses_any_other(ada: Any) -> None:
+    tenancy = Tenancy()
+    spec, context = tenancy.spec(), {}
+    seeds = _minted(tenancy, spec, ada, context)
+
+    assert seeds.values_for(spec, ada, context, tenancy.pool_seeds) is seeds.values
+    refused = [
+        (dataclasses.replace(spec), ada, context, tenancy.pool_seeds),
+        (spec, make_user("bob"), context, tenancy.pool_seeds),
+        (spec, ada, {}, tenancy.pool_seeds),
+        (spec, ada, None, tenancy.pool_seeds),
+        (spec, ada, context, DEFAULT_POOL_SEEDS.extend(tenant=tenancy.tenant)),
+    ]
+    for call in refused:
+        with pytest.raises(NotPermitted) as raised:
+            seeds.values_for(*call)
+        assert str(raised.value) == "The seeds do not cover this spec, principal and call context."

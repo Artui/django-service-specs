@@ -247,7 +247,10 @@ def dispatch(
     [`check_call`][django_service_specs.dispatch.check_call.check_call] or
     [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target],
     makes that once span the prelude too by handing on its ``.seeds`` with
-    its grant: ``seeds`` is a
+    its grant, and one that admits the call with ``authorize`` before it
+    finds the row hands on the carrier
+    [`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds]
+    returned, which it handed ``authorize`` too: ``seeds`` is a
     [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds], and its
     values stand in for resolving those seeds here, so the prelude's checks
     and this call's run see one value of each. Without ``seeds``, each is
@@ -259,8 +262,6 @@ def dispatch(
     with a dict of its own, readable as ``seeds.call_context``, and its carrier
     covers only a call handed that same dict, so a call that passes none, or a
     fresh one, is refused.
-    ``authorize`` hands back no carrier, so a call authorized that way still
-    resolves the seeds its checks name twice.
     Every other seed resolves as before, once per pool and each after step
     two, as every seed does for a spec whose checks name none. A seed named
     ``arguments`` is never named this way: a check declaring ``arguments``

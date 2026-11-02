@@ -452,6 +452,25 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.club_note_page(ada, "go")
 
+    def test_a_page_admitting_by_a_seed_resolves_it_once_for_the_call(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """From the class-level check to the service: ``resolve_seeds`` resolved it, once."""
+        ada.groups.add(Group.objects.create(name="chess"))
+        asked: list[str] = []
+
+        def counted(club: str) -> Any:
+            def resolve() -> str:
+                asked.append(club)
+                return club
+
+            return dispatching.DEFAULT_POOL_SEEDS.extend(club=resolve)
+
+        monkeypatch.setattr(dispatching, "club_seeds", counted)
+        result = dispatching.club_note_page(ada, "chess", "Openings")
+        assert result.value.title == "chess: Openings"
+        assert asked == ["chess"]
+
     def test_a_post_that_fails_re_renders_the_form_with_the_dict_dispatch_ran_with(
         self, ada: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:

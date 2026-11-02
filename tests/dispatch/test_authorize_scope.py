@@ -11,7 +11,10 @@ from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.authorize_scope import authorize_scope
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
+from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.authorization.utils import Answers, AnswersWith, SeesTheCall, refuses
@@ -272,3 +275,84 @@ def test_any_of_scope_question_skips_a_child_refused_at_class_level(scope: Any) 
     with pytest.raises(NotPermitted):
         authorize_scope(spec, principal, scope, grant=Grant(spec, principal))
     assert log == ["owner.has_permission", "staff.has_permission", "staff.has_scope_permission"]
+
+
+class TestCarriedSeeds:
+    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for any other."""
+
+    def test_a_carrier_for_another_principal_is_refused_before_any_check(self) -> None:
+        check = SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        pool_seeds, resolved = recorded_seeds()
+        carrier = resolve_seeds(spec, principal="ada", pool_seeds=pool_seeds, call_context=context)
+        resolved.clear()
+        with pytest.raises(NotPermitted) as refused:
+            authorize_scope(
+                spec,
+                "bob",
+                None,
+                grant=Grant(spec, "bob"),
+                seeds=carrier,
+                pool_seeds=pool_seeds,
+                call_context=context,
+            )
+        assert str(refused.value) == "The seeds do not cover this spec, principal and call context."
+        assert resolved == []
+        assert check.handed == []
+
+    def test_a_carrier_is_refused_before_a_grant_that_checked_the_target_answers(self) -> None:
+        spec, context = _spec([SeedPerQuestion()]), {}
+        carrier = CallSeeds(spec, "ada", context, DEFAULT_POOL_SEEDS, {"scope_club": "chosen"})
+        with pytest.raises(NotPermitted, match="The seeds do not cover"):
+            authorize_scope(
+                spec,
+                "bob",
+                None,
+                grant=Grant(spec, "bob", target_checked=True),
+                seeds=carrier,
+                call_context=context,
+            )
+
+    def test_a_carrier_handed_no_pool_seeds_is_matched_against_the_default_registry(self) -> None:
+        check = SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        carrier = CallSeeds(spec, "ada", context, DEFAULT_POOL_SEEDS, {"scope_club": "chosen"})
+        authorize_scope(
+            spec, "ada", None, grant=Grant(spec, "ada"), seeds=carrier, call_context=context
+        )
+        assert check.handed == [("has_scope_permission", "chosen")]
+
+    def test_a_carrier_under_its_registry_resolves_nothing(self) -> None:
+        """``pool_seeds=`` beside a carrier is the registry it is matched against, not a resolver."""
+        check = SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        pool_seeds, resolved = recorded_seeds()
+        carrier = resolve_seeds(spec, principal="ada", pool_seeds=pool_seeds, call_context=context)
+        resolved.clear()
+        authorize_scope(
+            spec,
+            "ada",
+            None,
+            grant=Grant(spec, "ada"),
+            seeds=carrier,
+            pool_seeds=pool_seeds,
+            call_context=context,
+        )
+        assert resolved == []
+        assert check.handed == [("has_scope_permission", "scope_club of ada")]
+        assert check.handed[0][1] is carrier.values["scope_club"]
+
+    def test_a_deactivated_principal_is_refused_though_its_carrier_covers_it(self) -> None:
+        principal, check = Deactivated(), SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        carrier = CallSeeds(spec, principal, context, DEFAULT_POOL_SEEDS, {"scope_club": "chosen"})
+        with pytest.raises(PrincipalUnavailable):
+            authorize_scope(
+                spec,
+                principal,
+                None,
+                grant=Grant(spec, principal, target_checked=True),
+                seeds=carrier,
+                call_context=context,
+            )
+        assert check.handed == []
