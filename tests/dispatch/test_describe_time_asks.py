@@ -9,6 +9,8 @@ and let it answer for a call that never comes.
 ``check_seeds`` and ``spec_input_schema`` hold the half for their own asks.
 Here the readers in ``_READERS`` do the same: each row is a reader and a case
 where that reader reaches its ask, and records what the Validator was handed.
+The three readers in ``_SINGLE_ONLY`` reach no ask for a ``many`` spec, so a
+second test holds that they leave its Validator unasked.
 """
 
 from __future__ import annotations
@@ -60,7 +62,9 @@ _READERS: dict[str, Reader] = {
 }
 
 # These three read the Validator's top-level fields, which a ``many`` spec does
-# not have: its Validator's fields are each row's.
+# not have: its Validator's fields are each row's. They have no row in ``_ROWS``
+# for it; ``test_top_level_field_readers_ask_a_many_spec_nothing`` holds that
+# they leave a ``many`` spec's Validator unasked.
 _SINGLE_ONLY = ("unreceived_fields", "provider_reached", "server_owned_keys")
 
 _ROWS = [
@@ -78,3 +82,11 @@ def test_describe_time_readers_hand_none(reader: str, case: str) -> None:
     _READERS[reader](spec)
     assert validator.asked
     assert validator.asked == [None] * len(validator.asked)
+
+
+@pytest.mark.parametrize("reader", _SINGLE_ONLY)
+def test_top_level_field_readers_ask_a_many_spec_nothing(reader: str) -> None:
+    """A reader of top-level fields never asks a ``many`` spec's Validator."""
+    spec, validator, _, _ = every_ask_case("many")
+    _READERS[reader](spec)
+    assert validator.asked == []
