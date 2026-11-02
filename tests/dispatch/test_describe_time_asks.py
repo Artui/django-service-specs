@@ -7,7 +7,7 @@ exists, so a dict it invented would tell the Validator a call is under way
 and let it answer for a call that never comes.
 
 ``check_seeds`` and ``spec_input_schema`` hold the half for their own asks.
-Here the other readers that ask do the same: each row is a reader and a case
+Here the readers in ``_READERS`` do the same: each row is a reader and a case
 where that reader reaches its ask, and records what the Validator was handed.
 """
 
@@ -23,6 +23,7 @@ from django_service_specs.dispatch.check_server_arguments import check_server_ar
 from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unreceived_fields import unreceived_fields
+from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.server_arguments import ServerArguments
@@ -53,10 +54,13 @@ _READERS: dict[str, Reader] = {
     "provider_reached": lambda spec: provider_reached(spec),
     "server_owned_keys": lambda spec: server_owned_keys(spec, pool_seeds=TENANT_SEEDS),
     "seed_named_parameters": lambda spec: seed_named_parameters(spec, pool_seeds=TENANT_SEEDS),
+    "spec_caller_input_schema": lambda spec: spec_caller_input_schema(
+        spec, pool_seeds=TENANT_SEEDS
+    ),
 }
 
-# A reader that reads the Validator itself, not the spec's top level, asks only
-# a spec whose Validator's fields are top level: a ``many`` spec's are each row's.
+# These three read the Validator's top-level fields, which a ``many`` spec does
+# not have: its Validator's fields are each row's.
 _SINGLE_ONLY = ("unreceived_fields", "provider_reached", "server_owned_keys")
 
 _ROWS = [
