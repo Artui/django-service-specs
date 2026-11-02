@@ -460,7 +460,8 @@ the list's items instead.
 [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
 does both: the schema a transport advertises, less what the server fills at
 the top and in each row, with what a provider may fill left out of
-`required` at each level.
+`required` at each level. The list stays offered and required whatever a
+provider is annotated to fill, as dispatch demands it of the caller.
 
 ## Parameters
 

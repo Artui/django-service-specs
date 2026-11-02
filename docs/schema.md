@@ -35,7 +35,9 @@ happened to install.
   [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
   is offered and not required. A `many` spec's rows are read the same way
   by what `input_data` reaches there, so a field it fills is not asked for
-  in any row.
+  in any row. Its list is always offered and required, even where a
+  provider is annotated to fill the name, since dispatch demands the list
+  of the caller whatever a provider fills.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
@@ -333,6 +335,7 @@ server fills, the names a transport binds or withholds with
 [`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
 among them (see [arguments the server supplies](dispatching.md#arguments-the-server-supplies)),
 and requires nothing a provider may fill, in each row of a `many` spec too.
+The list itself is the one name it never withholds or relaxes.
 
 ### The decimal convention
 

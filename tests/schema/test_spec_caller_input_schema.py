@@ -33,6 +33,7 @@ from tests.dispatch.utils import OPEN, PK, TENANT_SEEDS, Record, make_user, note
 from tests.specs.utils import Foreign
 
 REQUIRED = ["This field is required."]
+POLICIES = [UnknownArguments.REJECT, UnknownArguments.IGNORE]
 
 
 class Fields(Validator):
@@ -76,6 +77,10 @@ class _DecliningPk(TypedDict):
     pk: int | UnsetType
 
 
+class _List(TypedDict):
+    items: list[int]
+
+
 def fills_project() -> _Project:
     return {"project": 1}
 
@@ -94,6 +99,10 @@ def declines_owner() -> _DecliningOwner:
 
 def declines_pk() -> _DecliningPk:
     return {"pk": 1}
+
+
+def fills_list() -> _List:
+    return {"items": [1]}
 
 
 def untyped() -> dict[str, Any]:
@@ -226,6 +235,20 @@ MANY: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
     ),
 }
 
+# Apart from MANY, which the transports' readings are compared over: both
+# withhold a list a provider is annotated to fill, as the dispatch they
+# advertise for does not.
+FILLING_THE_LIST: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
+    "many-typed-kwargs-fills-the-list": (
+        lambda: _many(kwargs=fills_list),
+        DEFAULT_POOL_SEEDS,
+    ),
+    "many-typed-input-data-fills-the-list": (
+        lambda: _many(input_data=fills_list),
+        DEFAULT_POOL_SEEDS,
+    ),
+}
+
 
 def _build(cases: Mapping[str, Any], case: str) -> tuple[ServiceSpec | SelectorSpec, PoolSeeds]:
     factory, seeds = cases[case]
@@ -237,6 +260,25 @@ def _row(schema: Mapping[str, Any], name: str = "items") -> dict[str, Any]:
 
 
 # --- the top level ----------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("seat", ["kwargs", "input_data"])
+def test_a_many_spec_s_list_is_offered_and_required_whatever_a_provider_is_annotated_to_fill(
+    seat: str,
+) -> None:
+    # Dispatch demands the list from the caller: its top level withholds only
+    # what the read seats' providers fill, and ``ServiceSpec`` does not check
+    # the list against a provider's annotation. Withholding it here would
+    # advertise a call dispatch refuses.
+    spec = _many(**{seat: fills_list})
+
+    assert "items" in server_owned_keys(spec)
+    schema = spec_caller_input_schema(spec)
+
+    assert "items" in schema["properties"]
+    assert schema["required"] == ["items"]
+    assert _refused_absent(spec, DEFAULT_POOL_SEEDS, {}) == {"items"}
 
 
 def test_a_read_a_typed_kwargs_fills_is_not_offered() -> None:
@@ -336,11 +378,12 @@ def test_a_validator_field_input_data_may_fill_is_offered_and_not_required(
 # --- each row of a ``many`` spec ---------------------------------------------------------
 
 
-def test_a_row_field_a_typed_input_data_fills_is_not_offered_in_any_row() -> None:
-    schema = spec_caller_input_schema(_many(input_data=fills_owner))
+@pytest.mark.parametrize("name", ["items", "rows"])
+def test_a_row_field_a_typed_input_data_fills_is_not_offered_in_any_row(name: str) -> None:
+    schema = spec_caller_input_schema(_many(input_data=fills_owner, many_argument=name))
 
-    assert list(_row(schema)["properties"]) == ["title"]
-    assert _row(schema)["required"] == ["title"]
+    assert list(_row(schema, name)["properties"]) == ["title"]
+    assert _row(schema, name)["required"] == ["title"]
 
 
 def test_a_row_field_a_typed_input_data_may_decline_is_offered_and_not_required() -> None:
@@ -486,9 +529,9 @@ def _refused_absent(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("case", [*FLAT, *MANY])
+@pytest.mark.parametrize("case", [*FLAT, *MANY, *FILLING_THE_LIST])
 def test_the_top_level_requires_exactly_what_check_call_refuses_absent(case: str) -> None:
-    cases = {**FLAT, **MANY}
+    cases = {**FLAT, **MANY, **FILLING_THE_LIST}
     spec, seeds = _build(cases, case)
 
     required = spec_caller_input_schema(spec, pool_seeds=seeds).get("required", [])
@@ -523,6 +566,47 @@ def test_a_row_omitting_a_relaxed_field_is_dispatched_and_one_omitting_a_require
         with pytest.raises(InvalidArguments) as caught:
             dispatch(spec, principal=make_user(f"bob-{name}"), arguments=arguments)
         assert caught.value.detail == {"items": {1: {name: REQUIRED}}}
+
+
+def _refused_in_row_zero(
+    spec: ServiceSpec, pool_seeds: PoolSeeds, unknown_arguments: UnknownArguments
+) -> set[str]:
+    # A row is checked once the top level passes, so the reads dispatch
+    # demands are answered (each is an integer here) and the one row is empty.
+    top = spec_caller_input_schema(spec, pool_seeds=pool_seeds).get("required", [])
+    arguments = {name: 1 for name in top if name != spec.many_argument}
+    arguments[spec.many_argument] = [{}]
+    try:
+        check_call(
+            spec,
+            principal=make_user("ada"),
+            arguments=arguments,
+            pool_seeds=pool_seeds,
+            unknown_arguments=unknown_arguments,
+        )
+    except InvalidArguments as refused:
+        rows = refused.detail[spec.many_argument]
+        assert list(rows) == [0]
+        assert all(message == REQUIRED for message in rows[0].values())
+        return set(rows[0])
+    return set()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("policy", POLICIES)
+@pytest.mark.parametrize("case", [*MANY, *FILLING_THE_LIST])
+def test_a_row_requires_exactly_what_check_call_refuses_in_row_zero(
+    case: str, policy: UnknownArguments
+) -> None:
+    spec, seeds = _build({**MANY, **FILLING_THE_LIST}, case)
+    assert isinstance(spec, ServiceSpec)
+
+    row = _row(
+        spec_caller_input_schema(spec, pool_seeds=seeds, unknown_arguments=policy),
+        spec.many_argument,
+    )
+
+    assert set(row.get("required", [])) == _refused_in_row_zero(spec, seeds, policy)
 
 
 # --- the transports' own readings -------------------------------------------------------
@@ -638,7 +722,6 @@ SERVER_ARGUMENTS = [
     pytest.param(None, id="unbound"),
     pytest.param(ServerArguments(values={"q": "x"}, withheld=frozenset({"project"})), id="bound"),
 ]
-POLICIES = [UnknownArguments.REJECT, UnknownArguments.IGNORE]
 
 
 @pytest.mark.parametrize("policy", POLICIES)

@@ -783,7 +783,9 @@ docs/examples/dispatching.py:server_arguments
    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
    as `server_arguments`, which leaves `names()` - the bound and the withheld
    together - out of the properties and out of `required`, beside
-   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
+   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys],
+   less a `many` spec's list, which dispatch demands of the caller whatever a
+   provider is annotated to fill.
    [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema]
    takes no binding and lists every parameter as declared. Only the top level
    loses them: a binding names no row field of a `many` spec, which
