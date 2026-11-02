@@ -1638,7 +1638,10 @@ async def test_adispatch_runs_on_the_carried_values(
 
 
 async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> None:
-    """Refused on the loop, so the sync route's ``dispatch`` never gets to refuse it instead."""
+    """Refused on the loop, so the sync route's ``dispatch`` never gets to refuse it instead.
+
+    The type check comes first: a mistyped carrier is named so even with no grant.
+    """
     tenancy = Tenancy()
     spec, context = tenancy.spec(), {}
     checked = await sync_to_async(check_call)(
@@ -1659,6 +1662,8 @@ async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> No
         await adispatch(spec, seeds=checked.seeds, **asked)
     with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
         await adispatch(spec, grant=checked[1], seeds={"tenant": object()}, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
+        await adispatch(spec, seeds={"tenant": object()}, **asked)
 
     assert hops == []
     assert len(tenancy.resolved) == 1
@@ -1667,7 +1672,11 @@ async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> No
 async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(
     ada: Any, hops: list[str]
 ) -> None:
-    """A wiring mistake, refused on the loop at entry; where both mistakes are made, no grant wins."""
+    """A wiring mistake, refused on the loop at entry.
+
+    Where it is made beside another, the type check wins, then no grant, then this;
+    a principal_id of 0 is still a principal_id.
+    """
     tenancy = Tenancy()
     spec, context = tenancy.spec(), {}
     checked = await sync_to_async(check_call)(
@@ -1688,6 +1697,10 @@ async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(
         await adispatch(spec, grant=checked[1], seeds=checked.seeds, **asked)
     with pytest.raises(TypeError, match=r"^seeds= is handed on with the grant="):
         await adispatch(spec, seeds=checked.seeds, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
+        await adispatch(spec, grant=checked[1], seeds={"tenant": object()}, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= cannot cover a principal adispatch\(\) resolves"):
+        await adispatch(spec, grant=checked[1], seeds=checked.seeds, **{**asked, "principal_id": 0})
 
     assert hops == []
     assert len(tenancy.resolved) == 1

@@ -904,8 +904,8 @@ bound to the principal object it was made for, and neither do
 mistyped one or one without a grant before any hop. Seeds with `principal_id=`
 are refused the same way, as a `TypeError` before any hop, since the principal
 resolved there is not the one the carrier is bound to; pass the `principal=` the
-prelude was handed. A deactivated row is refused there, with its identifier in
-the message.
+prelude was handed. A deactivated row is refused inside the hop, with its
+identifier in the message.
 
 The sync `dispatch` accepts an `async def` run as well, and drives it to
 completion, inside the transaction when the spec is atomic.
