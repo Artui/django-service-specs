@@ -137,6 +137,9 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.authorization.permission_check.PermissionCheck
 ::: django_service_specs.specs.check_permissions.check_permissions
 ::: django_service_specs.authorization.unrestricted.Unrestricted
+::: django_service_specs.authorization.all_of.AllOf
+::: django_service_specs.authorization.any_of.AnyOf
+::: django_service_specs.authorization.none_of.NoneOf
 ::: django_service_specs.dispatch.grant.Grant
 ::: django_service_specs.dispatch.authorize.authorize
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope

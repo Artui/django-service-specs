@@ -19,7 +19,6 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.utils import (
-    check_callable,
     check_changes,
     check_metadata,
     check_preconditions,
@@ -29,7 +28,7 @@ from django_service_specs.specs.utils import (
 )
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
-from django_service_specs.types.utils import affordance_alias
+from django_service_specs.types.utils import affordance_alias, check_callable
 
 
 @dataclass(frozen=True, kw_only=True)

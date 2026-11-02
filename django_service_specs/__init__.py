@@ -15,7 +15,10 @@ from django_service_specs.affordances.row_affordance_answers import row_affordan
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
 )
+from django_service_specs.authorization.all_of import AllOf
+from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.is_deactivated import is_deactivated
+from django_service_specs.authorization.none_of import NoneOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
@@ -177,6 +180,8 @@ __all__ = [
     "ActionUnavailable",
     "AdditionalInputRequired",
     "Affordance",
+    "AllOf",
+    "AnyOf",
     "AsyncSelector",
     "AudienceProjection",
     "ChangeResult",
@@ -200,6 +205,7 @@ __all__ = [
     "ListSelector",
     "ManyToManySpec",
     "NoInput",
+    "NoneOf",
     "NotPermitted",
     "Output",
     "OutputField",

@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import inspect
 from typing import Any
 
 from django_service_specs.authorization.permission_check import PermissionCheck
+from django_service_specs.authorization.utils import QUESTIONS
 
 
 class Allow(PermissionCheck):
@@ -105,3 +107,77 @@ class SeesTheCall(PermissionCheck):
     ) -> bool:
         self.seen.append(("has_scope_permission", request, view))
         return True
+
+
+class Answers(PermissionCheck):
+    """Answers each question as it was built to, writing ``name.method`` to ``log`` when asked.
+
+    The log is the caller's, so checks sharing one show the order a
+    combinator asked them in, and which it never asked.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        log: list[str],
+        *,
+        permission: Any = True,
+        row: Any = True,
+        scope: Any = True,
+    ) -> None:
+        self.name, self.log = name, log
+        self.permission, self.row, self.scope = permission, row, scope
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.log.append(f"{self.name}.has_permission")
+        return self.permission
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        self.log.append(f"{self.name}.has_object_permission")
+        return self.row
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        self.log.append(f"{self.name}.has_scope_permission")
+        return self.scope
+
+
+class ClassLevel(PermissionCheck):
+    """Answers the class-level question alone, as built, writing ``name.has_permission`` to ``log``.
+
+    Its row and scope questions are the base's, so ``NoneOf`` accepts it.
+    """
+
+    def __init__(self, name: str, log: list[str], *, permission: Any = True) -> None:
+        self.name, self.log, self.permission = name, log, permission
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        self.log.append(f"{self.name}.has_permission")
+        return self.permission
+
+
+def opting_into(name: str, method: str) -> PermissionCheck:
+    """A check passing every question, whose ``method`` declares ``*, <name>``.
+
+    ``name`` is any identifier, including ``principal`` or ``scope``, which a
+    ``def`` could not spell beside the parameter of that name, so the
+    declaration is the signature ``inspect`` reports - the one every reader of
+    a check's keywords goes by - over a method taking anything. Its
+    positionals are named ``_a``, ``_b`` and ``_c``, which no seed uses.
+    """
+    positional = dict(QUESTIONS)[method]
+
+    def declaring(self: PermissionCheck, *args: Any, **kwargs: Any) -> bool:
+        return True
+
+    parameters = [
+        inspect.Parameter("self", inspect.Parameter.POSITIONAL_OR_KEYWORD),
+        *(
+            inspect.Parameter(f"_{letter}", inspect.Parameter.POSITIONAL_OR_KEYWORD)
+            for letter in "abc"[:positional]
+        ),
+        inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY),
+    ]
+    declaring.__signature__ = inspect.Signature(parameters)
+    # has_permission is abstract, so a check declaring another still answers it.
+    namespace = {"has_permission": lambda self, principal, spec: True, method: declaring}
+    return type(f"Opts{method}", (PermissionCheck,), namespace)()

@@ -395,6 +395,20 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="That note is locked."):
             authorize(dispatching.lockable_note_spec, ada)
 
+    def test_combined_checks_admit_the_owner_or_staff_and_never_the_suspended(
+        self, ada: Any, bob: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="Mine")
+        spec, arguments = dispatching.open_note_spec, {"pk": note.pk}
+        assert dispatch(spec, principal=ada, arguments=arguments).value == note
+        with pytest.raises(NotPermitted, match="Only its owner or staff may open a note."):
+            dispatch(spec, principal=bob, arguments=arguments)
+        bob.is_staff = True
+        assert dispatch(spec, principal=bob, arguments=arguments).value == note
+        bob.username = "mallory"
+        with pytest.raises(NotPermitted, match="Suspended accounts may open nothing."):
+            dispatch(spec, principal=bob, arguments=arguments)
+
     def test_an_overlay_sits_beneath_the_spec_s_provider(self, ada: Any) -> None:
         result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})
         assert result.value == "From the caller via web on api"

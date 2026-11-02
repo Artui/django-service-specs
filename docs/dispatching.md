@@ -315,6 +315,56 @@ when it is built, with `ImproperlyConfigured` naming the method. A method that
 hands back a coroutine from a plain `def` - a decorated `async def` - is
 refused where its answer is read, so the call fails closed.
 
+**Checks combine into one.** A spec's `permissions=` passes only when every
+check passes. To say "its owner, or staff" or "anyone not suspended",
+[`AllOf`][django_service_specs.authorization.all_of.AllOf],
+[`AnyOf`][django_service_specs.authorization.any_of.AnyOf] and
+[`NoneOf`][django_service_specs.authorization.none_of.NoneOf] each take checks
+and an optional `message=`, and are a check like any other, so they nest and
+sit in `permissions=` beside other checks.
+
+```python
+--8<--
+docs/examples/dispatching.py:combinators
+--8<--
+```
+
+- **`AllOf`** asks every check each question, in order, and stops at the
+  first that fails.
+- **`AnyOf`** passes the class-level question at the first check that passes
+  it. At the row and scope questions a check counts only where it passes the
+  class-level question too, asked again, and then the row or scope question,
+  as an HTTP framework's `OR` of permission classes does: a check that allows
+  every row by default does not admit a principal it refused at class level
+  because another check admitted them there. The class-level question is asked
+  again rather than remembered, so the row is judged the same under a
+  [grant](#grants) that answered the class-level question without asking.
+- **`NoneOf`** passes only when no check passes `has_permission`. It inverts
+  that question alone and allows at the row and scope questions, so a check
+  whose `has_object_permission` or `has_scope_permission` is its own, inside it
+  at any depth, is refused when it is built: the opposite of "may act on this
+  row" is no rule.
+
+A check inside a combinator is handed what it declares and nothing else - the
+call's `arguments`, its context, a seed - and a seed it names is resolved for
+the call as one the spec's own checks name would be, bar the names a
+combinator's own methods take: `principal` and `spec` at every question,
+`target` at the row one and `scope` at the scope one, as asked of the
+combinator or of a check it asks again there (`AnyOf` asks `has_permission`
+again at both). A check naming one is refused when the combinator is built,
+since a seed of that name cannot reach it through the combinator; rename the
+keyword. `checks_read_arguments` reads through a combinator the same way. Every answer
+inside one is read as an answer at the top is, so a coroutine fails closed,
+and a check that raises ends the call with its error rather than being read as
+a refusal. A refusal says the combinator's `message`, not that of a check
+inside it, or the generic wording without one.
+
+A combinator is refused when it is built, with `ImproperlyConfigured`, when it
+holds no checks, when a check inside it would be refused in `permissions=` (a
+class, something that is not a `PermissionCheck`, an `async def` method), and
+when it holds `Unrestricted`, a subclass included: the explicit allow is a
+decision a spec makes by name. A combinator is equal only to itself.
+
 **A spec with no permission check is refused**, with `ImproperlyConfigured`, at
 dispatch and at [registration](registry.md). Off HTTP there is no view whose
 policy an undeclared operation could inherit, and running it anyway is how an

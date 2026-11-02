@@ -8,15 +8,24 @@ keywords and ``is_json_native`` are here for the same reason: ``Parameter`` and
 ``OutputField`` read them at construction, and ``schema/`` imports both
 declarations, so a home there would be an import ring. ``gettext_noop`` is
 here because every refusal marks its default message with it, and the base of
-the dispatch refusals lives in ``types/``. Nothing here imports anything else in
-the package.
+the dispatch refusals lives in ``types/``. ``check_callable`` and
+``callable_name`` are here because a spec refuses its callables with them and so
+does ``authorization/``, which holds a combinator's checks to the rule a spec's
+``permissions=`` gets: ``specs/`` imports ``authorization/``, so a home in
+``specs/`` would be an import ring. Nothing here imports anything in the package
+outside ``types/``.
 """
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any, Final
+
+from django.core.exceptions import ImproperlyConfigured
+
+from django_service_specs.types.is_async import is_async
 
 
 def gettext_noop(message: str) -> str:
@@ -77,7 +86,7 @@ parameter's refusal adds.
 # ``**kwargs``, so the two cannot disagree about what a condition may see.
 #
 # Written out rather than derived from ``RESERVED_POOL_SEEDS``, because ``types/``
-# imports nothing else in the package. The rest of the reserved names - ``user``,
+# imports nothing outside ``types/``. The rest of the reserved names - ``user``,
 # ``progress`` and ``call_context`` - are ambient, and ``tests/types/test_utils.py``
 # holds the partition, so a name reserved later has to be placed on one side of it.
 #
@@ -204,3 +213,39 @@ OUTPUT_FIELD_SCHEMA_KEYWORDS: Final[Mapping[str, tuple[str, ...]]] = MappingProx
         "title": ("label",),
     }
 )
+
+
+def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
+    """Refuse a value that is not callable, and under ``sync`` one that is ``async def``.
+
+    ``sync`` is for every seat dispatch calls from sync code and never awaits:
+    the providers, the preconditions, a selector spec's ``extend_queryset`` and
+    ``filter_set``, each method of a permission check, a Validator's
+    ``validate`` and ``validated``, and a Presenter's ``present``. Called there, an
+    ``async def`` callable returns a coroutine nobody awaits, so a precondition
+    that would have refused the call raises nothing and the call goes ahead, a
+    permission check's answer is truthy and allows it, and a provider or a
+    shaping callable hands dispatch a coroutine where its mapping, its sink or
+    its queryset should be. An async generator function is refused with them:
+    what it returns is never awaitable, never runs, and is truthy too. Refused
+    when the spec is built, naming the seat and the callable, rather than
+    found at the first call or never. The run itself - the service, or a
+    selector spec's own selector - may be ``async def``, since dispatch
+    bridges it and ``adispatch`` awaits it, so it is checked without ``sync``.
+    """
+    if not callable(value):
+        raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
+    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``,
+    # test_a_sync_provider_and_precondition_are_accepted the second, and
+    # test_an_async_generator_precondition_is_refused the third.
+    if sync and (is_async(value) or inspect.isasyncgenfunction(value)):
+        raise ImproperlyConfigured(
+            f"{label} is {callable_name(value)}, an async callable. It is called from sync code "
+            "and never awaited, on both entry points; declare it with def, since adispatch "
+            "already runs it off the event loop."
+        )
+
+
+def callable_name(value: Any) -> str:
+    """A callable's own name, or its type's for an instance or a ``functools.partial``."""
+    return getattr(value, "__qualname__", None) or type(value).__name__

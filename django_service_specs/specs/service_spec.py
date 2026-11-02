@@ -18,9 +18,7 @@ from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
-    callable_name,
     check_call_seeds,
-    check_callable,
     check_changes,
     check_metadata,
     check_preconditions,
@@ -32,7 +30,7 @@ from django_service_specs.specs.utils import (
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
-from django_service_specs.types.utils import is_row_condition
+from django_service_specs.types.utils import callable_name, check_callable, is_row_condition
 from django_service_specs.validation.validator import Validator
 
 # The default ``many_argument``, djangorestframework-services' own, so a spec
