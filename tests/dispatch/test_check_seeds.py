@@ -18,9 +18,11 @@ from typing import Any, Optional, TypedDict, TypeVar, Union
 import pytest
 import typing_extensions
 from django.core.exceptions import ImproperlyConfigured
+from django.db.models import Q
 
 from django_service_specs import check_seeds as exported
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
+from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.check_seeds import check_seeds
 from django_service_specs.dispatch.dispatch import dispatch
@@ -29,6 +31,7 @@ from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
@@ -42,6 +45,7 @@ from tests.dispatch.utils import (
     every_ask_case,
     make_user,
 )
+from tests.dispatch_app.models import Note
 from tests.pool.utils import passthrough
 from tests.specs.utils import Foreign
 
@@ -102,6 +106,75 @@ def _untyped() -> dict[str, Any]:
 
 def _found(**_: Any) -> int:
     return 1
+
+
+class _Computing(Validator):
+    """Returns ``slug``, which it never declares."""
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(Parameter("title", "string", required=True))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return {"title": arguments["title"], "slug": arguments["title"].lower()}
+
+
+def _untyped_other() -> dict[str, Any]:
+    return {"other": 2}
+
+
+def _needs_tenant(*, tenant: Any) -> None: ...
+
+
+def _needs_data(*, data: Any) -> None: ...
+
+
+def _needs_instance(*, instance: Any) -> None: ...
+
+
+def _needs_collection(*, collection: Any) -> None: ...
+
+
+def _list(selector: Callable[..., Any], **declared: Any) -> SelectorSpec:
+    return SelectorSpec(kind=SelectorKind.LIST, selector=selector, permissions=OPEN, **declared)
+
+
+def _none(**_: Any) -> list[Any]:
+    # A LIST's rows, never ``None``: settle answers no condition on a
+    # ``None`` under ``allow_none``, so a condition test returns a list.
+    return []
+
+
+def _notes(**_: Any) -> Any:
+    # A QuerySet, since ``extend_queryset`` runs on nothing else.
+    return Note.objects.all()
+
+
+def _when(condition: Any, code: str = "c") -> list[Affordance]:
+    return [Affordance(code=code, reason="Not now.", when=condition)]
+
+
+def _mapping(condition: Any) -> dict[str, ServiceSpec]:
+    """A selector's ``affordances``, mapping one operation to its condition."""
+    return {"rename": _service(lambda **_: None, affordances=_when(condition))}
+
+
+def _taking(*names: str, seen: dict[str, Any], answer: Any = True) -> Callable[..., Any]:
+    """A callable requiring each of ``names`` by keyword, recording what it is handed.
+
+    Its signature is all dispatch and ``check_seeds`` read, and the body
+    records every keyword, so a test asserts the keyword arrived rather than
+    that the call did not fail. ``answer`` is returned, or called with what
+    was handed if it is callable.
+    """
+
+    def fn(**handed: Any) -> Any:
+        seen.update(handed)
+        return answer(handed) if callable(answer) else answer
+
+    keyword = inspect.Parameter.KEYWORD_ONLY
+    signature = inspect.Signature([inspect.Parameter(name, keyword) for name in names])
+    setattr(fn, "__signature__", signature)  # noqa: B010
+    return fn
 
 
 def test_it_is_exported_from_the_root() -> None:
@@ -197,6 +270,266 @@ _UNFILLED = [
 ]
 
 
+_CONDITION_TAIL = "Register the seed on the mount, or give it a default."
+_OUTPUT_TAIL = "never an argument"
+_EXTEND_TAIL = "it is handed queryset beside what its selector is handed"
+_DECLARE_TAIL = "Declare it, or give it a default."
+
+# The seats only the third refusal reads: a case each, with the keyword
+# nothing fills, the seat's label and what the message says of the seat.
+_NEW_SEATS = [
+    pytest.param(
+        lambda: _service(lambda **_: None, affordances=_when(lambda *, tenant: True)),
+        "tenant",
+        "ServiceSpec.affordances[0] ('c').when",
+        _CONDITION_TAIL,
+        id="a-service-condition",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: None, preconditions=[_needs_tenant]),
+        "tenant",
+        "ServiceSpec.preconditions[0] (_needs_tenant)",
+        _DECLARE_TAIL,
+        id="a-service-precondition",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, preconditions=[_needs_tenant]),
+        "tenant",
+        "SelectorSpec.preconditions[0] (_needs_tenant)",
+        _DECLARE_TAIL,
+        id="a-selector-precondition",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, preconditions=[_needs_data]),
+        "data",
+        "SelectorSpec.preconditions[0] (_needs_data)",
+        _DECLARE_TAIL,
+        id="a-selector-precondition-requiring-data",
+    ),
+    pytest.param(
+        lambda: _list(_none, preconditions=[_needs_instance]),
+        "instance",
+        "SelectorSpec.preconditions[0] (_needs_instance)",
+        _DECLARE_TAIL,
+        id="a-list-precondition-requiring-the-row",
+    ),
+    pytest.param(
+        lambda: _retrieve(_found, preconditions=[_needs_collection]),
+        "collection",
+        "SelectorSpec.preconditions[0] (_needs_collection)",
+        _DECLARE_TAIL,
+        id="a-retrieve-precondition-requiring-the-rows",
+    ),
+    pytest.param(
+        lambda: _list(_none, affordances=_mapping(lambda *, frozen: True)),
+        "frozen",
+        "SelectorSpec.affordances['rename'][0] ('c').when",
+        _CONDITION_TAIL,
+        id="a-selector-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(_none, affordances=_mapping(lambda *, frozen: True)),
+        ),
+        "frozen",
+        "ServiceSpec.collection_selector_spec.affordances['rename'][0] ('c').when",
+        _CONDITION_TAIL,
+        id="a-target-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            output_selector_spec=_list(_none, affordances=_mapping(lambda *, frozen: True)),
+        ),
+        "frozen",
+        "ServiceSpec.output_selector_spec.affordances['rename'][0] ('c').when",
+        _CONDITION_TAIL,
+        id="an-output-s-mapped-condition",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: 1, output_selector_spec=_retrieve(lambda *, pk: pk, reads=PK)),
+        "pk",
+        "ServiceSpec.output_selector_spec.selector",
+        _OUTPUT_TAIL,
+        id="an-output-selector-requiring-its-own-read",
+    ),
+    pytest.param(
+        lambda: _service(lambda **_: 1, output_selector_spec=_retrieve(lambda *, data: data)),
+        "data",
+        "ServiceSpec.output_selector_spec.selector",
+        _OUTPUT_TAIL,
+        id="an-output-selector-requiring-data",
+    ),
+    pytest.param(
+        lambda: _list(_notes, extend_queryset=lambda *, queryset, data: queryset),
+        "data",
+        "SelectorSpec.extend_queryset",
+        _EXTEND_TAIL,
+        id="a-selector-s-extend-queryset-requiring-data",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            collection_selector_spec=_list(
+                _notes, extend_queryset=lambda *, queryset, tenant: queryset
+            ),
+        ),
+        "tenant",
+        "ServiceSpec.collection_selector_spec.extend_queryset",
+        _EXTEND_TAIL,
+        id="a-target-s-extend-queryset",
+    ),
+    pytest.param(
+        lambda: _service(
+            lambda **_: None,
+            output_selector_spec=_list(_notes, extend_queryset=lambda *, queryset, data: queryset),
+        ),
+        "data",
+        "ServiceSpec.output_selector_spec.extend_queryset",
+        _OUTPUT_TAIL,
+        id="an-output-s-extend-queryset",
+    ),
+]
+
+_UNFILLED += [pytest.param(*case.values[:2], id=case.id) for case in _NEW_SEATS]
+
+
+_EVERY_POOL_S = ("user", "progress", "call_context", "shapes", "request", "view", "tenant")
+_A_CONDITION_S = ("user", "progress", "call_context", "request", "view", "tenant")
+_TITLE = Parameters.of(Parameter("title", "string", required=True))
+
+
+def _filling(name: str, read: Parameters) -> dict[str, Any]:
+    """What a seat declares so that ``name`` is its read's, or its typed provider's."""
+    if name in read.names():
+        return {"reads": read}
+    if name == "limit":
+        return {"kwargs": _fills_limit}
+    return {}
+
+
+def _service_condition(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    return _service(lambda **_: None, affordances=_when(_taking(name, seen=seen)))
+
+
+def _selector_condition(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _list(_none, affordances=_mapping(_taking(name, seen=seen)))
+
+
+def _target_condition(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    target = _list(_none, affordances=_mapping(_taking(name, seen=seen)))
+    return _service(lambda **_: None, collection_selector_spec=target)
+
+
+def _output_condition(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    output = _list(_none, affordances=_mapping(_taking(name, seen=seen)))
+    return _service(lambda **_: None, output_selector_spec=output)
+
+
+def _service_precondition(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    targets: dict[str, dict[str, Any]] = {
+        "instance": {"instance_selector_spec": _retrieve(_found)},
+        "collection": {"collection_selector_spec": _list(_none)},
+    }
+    return _service(
+        lambda **_: None,
+        preconditions=[_taking(name, seen=seen)],
+        **_filling(name, _TITLE),
+        **targets.get(name, {}),
+    )
+
+
+def _retrieve_precondition(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    # A row, since a RETRIEVE's preconditions never run without one.
+    return _retrieve(_found, preconditions=[_taking(name, seen=seen)], **_filling(name, PK))
+
+
+def _list_precondition(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _list(_none, preconditions=[_taking(name, seen=seen)], **_filling(name, PK))
+
+
+def _output_selector(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    output = _retrieve(_taking(name, seen=seen, answer=1))
+    return _service(lambda **_: "made", output_selector_spec=output)
+
+
+def _extending(name: str, seen: dict[str, Any]) -> Callable[..., Any]:
+    names = dict.fromkeys(("queryset", name))
+    return _taking(*names, seen=seen, answer=lambda handed: handed["queryset"])
+
+
+def _selector_extend(name: str, seen: dict[str, Any]) -> SelectorSpec:
+    return _list(_notes, extend_queryset=_extending(name, seen), **_filling(name, PK))
+
+
+def _target_extend(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    target = _list(_notes, extend_queryset=_extending(name, seen), **_filling(name, PK))
+    return _service(lambda **_: None, collection_selector_spec=target)
+
+
+def _output_extend(name: str, seen: dict[str, Any]) -> ServiceSpec:
+    output = _list(_notes, extend_queryset=_extending(name, seen))
+    return _service(lambda **_: None, output_selector_spec=output)
+
+
+_CONDITIONS_HANDED = [
+    pytest.param(build, name, id=f"{seat}-{name}")
+    for seat, build in (
+        ("a-service-condition", _service_condition),
+        ("a-selector-s-mapped-condition", _selector_condition),
+        ("a-target-s-mapped-condition", _target_condition),
+        ("an-output-s-mapped-condition", _output_condition),
+    )
+    for name in _A_CONDITION_S
+]
+
+# Every keyword each seat only the third refusal reads is handed, as dispatch
+# hands it: each is dispatched and seen to arrive in
+# TestWhatTheNewSeatsAreHanded, and passes the check in
+# test_a_keyword_something_fills_is_not.
+_HANDED = [
+    *_CONDITIONS_HANDED,
+    *(
+        pytest.param(build, name, id=f"{seat}-{name}")
+        for seat, build, names in (
+            (
+                "a-service-precondition",
+                _service_precondition,
+                (*_EVERY_POOL_S, "title", "limit", "data", "instance", "collection"),
+            ),
+            (
+                "a-retrieve-precondition",
+                _retrieve_precondition,
+                (*_EVERY_POOL_S, "pk", "limit", "instance"),
+            ),
+            (
+                "a-list-precondition",
+                _list_precondition,
+                (*_EVERY_POOL_S, "pk", "limit", "collection"),
+            ),
+            ("an-output-selector", _output_selector, (*_EVERY_POOL_S, "instance", "result")),
+            (
+                "a-selector-s-extend-queryset",
+                _selector_extend,
+                (*_EVERY_POOL_S, "pk", "limit", "queryset"),
+            ),
+            (
+                "a-target-s-extend-queryset",
+                _target_extend,
+                (*_EVERY_POOL_S, "pk", "limit", "queryset"),
+            ),
+            (
+                "an-output-s-extend-queryset",
+                _output_extend,
+                (*_EVERY_POOL_S, "instance", "result", "queryset"),
+            ),
+        )
+        for name in names
+    ),
+]
+
+
 class TestARequiredKeywordNothingFills:
     @pytest.mark.parametrize(("build", "name"), _UNFILLED)
     def test_dispatch_fails_every_call_with_it(self, build: Callable[[], Any], name: str) -> None:
@@ -249,6 +582,21 @@ class TestARequiredKeywordNothingFills:
             pytest.param(
                 lambda: _service(lambda *, title: title, validator=Titled()), id="a-validator-field"
             ),
+            pytest.param(
+                lambda: _service(
+                    lambda **_: None,
+                    affordances=_when(lambda **_: True),
+                    preconditions=[lambda **_: None],
+                    output_selector_spec=_list(
+                        lambda **_: [], extend_queryset=lambda **handed: handed["queryset"]
+                    ),
+                ),
+                id="a-catch-all-on-every-new-seat",
+            ),
+            *(
+                pytest.param(functools.partial(case.values[0], case.values[1], {}), id=case.id)
+                for case in _HANDED
+            ),
         ],
     )
     def test_a_keyword_something_fills_is_not(self, build: Callable[[], Any]) -> None:
@@ -261,19 +609,211 @@ class TestARequiredKeywordNothingFills:
         such a Validator fills runs today.
         """
 
-        class _Computing(Validator):
-            def parameters(self) -> Parameters:
-                return Parameters.of(Parameter("title", "string", required=True))
-
-            def validate(
-                self, arguments: Mapping[str, Any], context: ValidationContext
-            ) -> dict[str, Any]:
-                return {"title": arguments["title"], "slug": arguments["title"].lower()}
-
         spec = _service(lambda *, title, slug: slug, validator=_Computing())
         check_seeds(spec)
         result = dispatch(spec, principal=make_user("ada"), arguments={"title": "Ada"})
         assert result.value == "ada"
+
+
+@pytest.fixture
+def ada() -> Any:
+    return make_user("ada")
+
+
+class TestAKeywordOnlyAMountsSeedFills:
+    """A condition or a precondition requiring a seed the mount does not register."""
+
+    _CASES = [
+        pytest.param(
+            lambda: _service(lambda **_: None, affordances=_when(lambda *, tenant: True)),
+            "ServiceSpec.affordances[0] ('c').when",
+            id="a-condition",
+        ),
+        pytest.param(
+            lambda: _service(lambda **_: None, preconditions=[_needs_tenant]),
+            "ServiceSpec.preconditions[0] (_needs_tenant)",
+            id="a-service-precondition",
+        ),
+        pytest.param(
+            lambda: _list(_none, preconditions=[_needs_tenant]),
+            "SelectorSpec.preconditions[0] (_needs_tenant)",
+            id="a-selector-precondition",
+        ),
+    ]
+
+    @pytest.mark.parametrize(("build", "label"), _CASES)
+    def test_it_is_refused_where_the_seed_is_not_registered(
+        self, build: Callable[[], Any], label: str
+    ) -> None:
+        refused = _refusal(build(), pool_seeds=DEFAULT_POOL_SEEDS)
+        assert f"{label} requires the keyword(s) ['tenant'], {_NOTHING_FILLS}" in refused
+
+    @pytest.mark.parametrize(("build", "label"), _CASES)
+    def test_it_passes_where_the_seed_is_registered(
+        self, build: Callable[[], Any], label: str
+    ) -> None:
+        check_seeds(build(), pool_seeds=_SEEDED)
+
+
+def _rename() -> ServiceSpec:
+    frozen = Affordance(
+        code="frozen", reason="The row is frozen.", when=lambda *, frozen: not frozen
+    )
+    return _service(lambda **_: "renamed", affordances=[frozen])
+
+
+_FROZEN = DEFAULT_POOL_SEEDS.extend(frozen=lambda: False)
+
+
+class TestAConditionReadingASeedNoMountRegisters:
+    """A rename whose condition reads ``frozen``, and a list answering it for each row."""
+
+    _CASES = [
+        pytest.param(_rename, id="the-operation"),
+        pytest.param(
+            lambda: _list(_none, affordances={"rename": _rename()}), id="a-list-mapping-it"
+        ),
+    ]
+
+    @pytest.mark.parametrize("build", _CASES)
+    def test_dispatch_fails_every_call_without_the_seed(self, build: Callable[[], Any]) -> None:
+        with pytest.raises(TypeError, match="frozen"):
+            dispatch(build(), principal=make_user("ada"), arguments={})
+
+    @pytest.mark.parametrize("build", _CASES)
+    def test_it_is_refused_without_the_seed(self, build: Callable[[], Any]) -> None:
+        assert f"requires the keyword(s) ['frozen'], {_NOTHING_FILLS}" in _refusal(build())
+
+    @pytest.mark.parametrize("build", _CASES)
+    def test_it_passes_and_runs_with_the_seed(self, build: Callable[[], Any]) -> None:
+        check_seeds(build(), pool_seeds=_FROZEN)
+        dispatch(build(), principal=make_user("ada"), arguments={}, pool_seeds=_FROZEN)
+
+
+class TestTheSeatsOnlyTheThirdRefusalReads:
+    @pytest.mark.parametrize(("build", "name", "label", "tail"), _NEW_SEATS)
+    def test_each_is_named_with_what_it_is_handed(
+        self, build: Callable[[], Any], name: str, label: str, tail: str
+    ) -> None:
+        refused = _refusal(build())
+        assert refused.startswith(f"{label} requires the keyword(s) ['{name}'], {_NOTHING_FILLS}: ")
+        assert tail in refused
+        # A seat that sees no reads is never told that no read declares it.
+        assert ("no read" in refused) is (tail in (_DECLARE_TAIL, _EXTEND_TAIL))
+
+    def test_a_service_precondition_beside_a_validator_is_left_to_dispatch(self) -> None:
+        seen: dict[str, Any] = {}
+        spec = _service(
+            lambda **_: None, validator=_Computing(), preconditions=[_taking("slug", seen=seen)]
+        )
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={"title": "Ada"})
+        assert seen == {"slug": "ada"}
+
+    def test_a_selector_precondition_beside_an_untyped_provider_is_left_to_dispatch(self) -> None:
+        seen: dict[str, Any] = {}
+        spec = _retrieve(_found, kwargs=_untyped_other, preconditions=[_taking("other", seen=seen)])
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={})
+        assert seen == {"other": 2}
+
+    def test_an_extend_queryset_beside_an_untyped_provider_is_left_to_dispatch(self) -> None:
+        seen: dict[str, Any] = {}
+        extend = _taking("queryset", "other", seen=seen, answer=lambda handed: handed["queryset"])
+        spec = _list(_notes, kwargs=_untyped_other, extend_queryset=extend)
+        check_seeds(spec)
+        dispatch(spec, principal=make_user("ada"), arguments={})
+        assert seen["other"] == 2
+
+    @pytest.mark.parametrize(
+        "build",
+        [
+            pytest.param(
+                lambda: _service(
+                    lambda **_: None,
+                    instance_selector_spec=_retrieve(_found),
+                    affordances=_when(Q(archived=False)),
+                ),
+                id="the-operation-s",
+            ),
+            pytest.param(
+                lambda: _list(
+                    _none,
+                    affordances={
+                        "archive": _service(
+                            lambda **_: None,
+                            instance_selector_spec=_retrieve(_found),
+                            affordances=_when(Q(archived=False)),
+                        )
+                    },
+                ),
+                id="a-mapped-one",
+            ),
+        ],
+    )
+    def test_a_condition_on_the_row_binds_nothing_and_is_not_read(
+        self, build: Callable[[], Any]
+    ) -> None:
+        check_seeds(build())
+
+    def test_a_service_spec_s_are_named_in_the_order_a_call_reaches_them(self) -> None:
+        spec = _service(
+            lambda *, s3: None,
+            collection_selector_spec=_list(
+                lambda *, a1: [],
+                affordances=_mapping(lambda *, a2: True),
+                extend_queryset=lambda *, queryset, a3: queryset,
+            ),
+            affordances=_when(lambda *, s1: True),
+            preconditions=[lambda *, s2: None],
+            output_selector_spec=_list(
+                lambda *, z1: [],
+                affordances=_mapping(lambda *, z2: True),
+                extend_queryset=lambda *, queryset, z3: queryset,
+            ),
+        )
+        refused = _refusal(spec)
+        order = ["a1", "a2", "a3", "s1", "s2", "s3", "z1", "z2", "z3"]
+        found = [refused.index(f"['{name}']") for name in order]
+        assert found == sorted(found)
+
+    def test_a_selector_spec_s_are_named_in_the_order_a_call_reaches_them(self) -> None:
+        spec = _list(
+            lambda *, a1: [],
+            affordances=_mapping(lambda *, a2: True),
+            extend_queryset=lambda *, queryset, a3: queryset,
+            preconditions=[lambda *, a4: None],
+        )
+        refused = _refusal(spec)
+        found = [refused.index(f"['{name}']") for name in ("a1", "a2", "a3", "a4")]
+        assert found == sorted(found)
+
+
+class TestWhatTheNewSeatsAreHanded:
+    """Each keyword the check counts as filled on a seat it newly reads, dispatched and seen to arrive.
+
+    The guard against refusing a spec that runs: the check passes each of
+    these (test_a_keyword_something_fills_is_not), so each must reach its
+    callable on a real call. Each fixture is sized so the seat runs: a row
+    for a RETRIEVE's precondition, a QuerySet for ``extend_queryset``, and a
+    list, never ``None``, for a selector whose conditions are answered.
+    """
+
+    @pytest.mark.parametrize(("build", "name"), _HANDED)
+    def test_dispatch_hands_it(self, build: Callable[..., Any], name: str) -> None:
+        seen: dict[str, Any] = {}
+        spec = build(name, seen)
+        arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
+        dispatch(spec, principal=make_user("ada"), arguments=arguments, pool_seeds=_SEEDED)
+        assert name in seen
+
+    @pytest.mark.parametrize(("build", "name"), _CONDITIONS_HANDED)
+    async def test_adispatch_hands_a_condition_it(
+        self, build: Callable[..., Any], name: str, ada: Any
+    ) -> None:
+        seen: dict[str, Any] = {}
+        await adispatch(build(name, seen), principal=ada, arguments={}, pool_seeds=_SEEDED)
+        assert name in seen
 
 
 class TestAPositionalOnlyParameter:
@@ -710,6 +1250,26 @@ class TestACallableWhoseSignatureCannotBeRead:
                 "collection_selector_spec",
                 id="collection-selector",
             ),
+            pytest.param(
+                _service(lambda **_: None, preconditions=[dict]),
+                "ServiceSpec.preconditions[0] (dict)",
+                id="service-precondition",
+            ),
+            pytest.param(
+                _retrieve(_found, preconditions=[dict]),
+                "SelectorSpec.preconditions[0] (dict)",
+                id="selector-precondition",
+            ),
+            pytest.param(
+                _service(lambda **_: 1, output_selector_spec=_retrieve(dict)),
+                "ServiceSpec.output_selector_spec.selector",
+                id="output-selector",
+            ),
+            pytest.param(
+                _list(_notes, extend_queryset=dict),
+                "SelectorSpec.extend_queryset",
+                id="extend-queryset",
+            ),
         ],
     )
     def test_it_is_refused_naming_the_seat_and_the_callable(self, spec: Any, seat: str) -> None:
@@ -743,6 +1303,20 @@ class TestACallableWhoseSignatureCannotBeRead:
                 id="collection-selector",
             ),
             pytest.param(_service(_unreadable_by_a_bad_signature()), TypeError, id="bad-signature"),
+            pytest.param(
+                _service(lambda **_: None, preconditions=[dict]),
+                ValueError,
+                id="service-precondition",
+            ),
+            pytest.param(
+                _retrieve(_found, preconditions=[dict]), ValueError, id="selector-precondition"
+            ),
+            pytest.param(
+                _service(lambda **_: 1, output_selector_spec=_retrieve(dict)),
+                ValueError,
+                id="output-selector",
+            ),
+            pytest.param(_list(_notes, extend_queryset=dict), ValueError, id="extend-queryset"),
         ],
     )
     def test_dispatch_fails_every_call_that_reaches_it(
