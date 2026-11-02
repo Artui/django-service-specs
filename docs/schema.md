@@ -36,8 +36,8 @@ happened to install.
   is offered and not required. A `many` spec's rows are read the same way
   by what `input_data` reaches there, so a field it fills is not asked for
   in any row. Its list is offered and required unless the transport binds
-  it, even where a provider is annotated to fill the name, since dispatch
-  demands the list of the caller whatever a provider fills.
+  it, since dispatch demands the list of the caller whatever a provider
+  fills; a provider annotated to fill its name is refused when the spec is built.
 - [`spec_output_schema(spec, *, paginate=False, projection=None, handle_description=None)`][django_service_specs.schema.spec_output_schema.spec_output_schema]
   describes what [`present`][django_service_specs.dispatch.present.present]
   returns for the spec, or `None` when the spec declares no output. With
