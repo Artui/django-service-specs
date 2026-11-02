@@ -1018,6 +1018,22 @@ class TestManyListIsTheCallers:
             ServiceSpec(service=print, many=True, validator=Titled(), **declaration)
         assert str(refused.value) == named
 
+    def test_a_provider_annotation_resolving_after_the_build_is_refused_for_the_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The late re-check in ``parameters()`` holds the list seat too: a
+        # return annotation that reads as untyped when the spec is built and
+        # as filling ``items`` once it resolves.
+        def late() -> Any:
+            return {"items": [1]}
+
+        late.__annotations__["return"] = "_FillsItemsLater"
+        spec = ServiceSpec(service=print, many=True, validator=Titled(), kwargs=late)
+        monkeypatch.setitem(globals(), "_FillsItemsLater", _FillsItems)
+        named = "ServiceSpec.kwargs is annotated to fill ['items'], which ServiceSpec.many_argument"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            spec.parameters()
+
     def test_a_row_field_named_like_the_list_is_refused_all_the_same(self) -> None:
         # The key legitimately reaches the row seat, but ``server_owned_keys``
         # would list ``items`` and so hide the list.

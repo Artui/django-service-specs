@@ -440,8 +440,8 @@ A provider annotated to fill a parameter declared anywhere else -
 `input_data` naming a read, `kwargs` naming a Validator field or the target
 selector's read - is refused with `ImproperlyConfigured` when the spec is
 built or, for a Validator field, when `parameters()` is assembled. So is
-one annotated to fill, or to may-fill, a `many` spec's list, the
-`many_argument`: no provider reaches it, and a Validator field of the same
+one annotated to fill a `many` spec's list, the `many_argument`, or to
+possibly fill it: no provider reaches it, and a Validator field of the same
 name does not exempt the key.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and

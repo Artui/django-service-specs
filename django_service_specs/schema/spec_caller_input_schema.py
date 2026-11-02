@@ -47,8 +47,9 @@ def spec_caller_input_schema(
       not check that binding: ``check_server_arguments`` does, once, when the
       transport is built. A ``many`` spec's list is the one name
       ``server_owned_keys`` lists that is not withheld: a provider annotated
-      to fill it does not stop dispatch demanding it
-      (test_a_many_spec_s_list_is_offered_and_required_whatever_a_provider_is_annotated_to_fill).
+      to fill it is refused when the spec is built, so it is listed only
+      where a mount registers a seed of that name, which dispatch refuses
+      (test_a_many_spec_s_list_is_offered_where_a_mount_registers_a_seed_of_its_name).
     - **Offered and not required**: a parameter a provider may fill,
       [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
       the set the shape check relaxes, read seat by seat
