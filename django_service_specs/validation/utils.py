@@ -76,6 +76,14 @@ def _names_call_context(asked: Callable[..., Any]) -> bool:
     ``TypeError`` for a ``__signature__`` that is not one) never declared the
     keyword, so it is asked as it was before
     (test_a_parameters_with_no_signature_is_asked_as_before).
+
+    One arc to coverage, each part held by its own test: without the first
+    conjunct a ``parameters`` naming no ``call_context`` raises on ``.kind``
+    (test_a_validator_declaring_no_call_context_is_asked_as_before); without
+    the second a positional-only one is handed a keyword it cannot take
+    (test_a_positional_only_call_context_is_handed_nothing); and a
+    positional-or-keyword one is reached as a keyword-only one is
+    (test_a_validator_declaring_call_context_is_handed_the_call_s_dict[_PositionalOrKeyword]).
     """
     try:
         parameter = inspect.signature(asked, follow_wrapped=False).parameters.get(_KEYWORD)
