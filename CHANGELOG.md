@@ -77,6 +77,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asking the conditions with the kernel's reserved seeds only, which failed a
   condition reading a registered seed (a tenant, a frozen flag) at describe time
   though dispatch serves it. Pass the mount's `pool_seeds.reserved`.
+- **Breaking: `reserved=` is now required on `enforce_affordances` and
+  `aenforce_affordances`.** A call without it raises `TypeError` rather than asking
+  the conditions with the kernel's reserved seeds only, which failed a condition
+  reading a registered seed (a tenant, a frozen flag) for a transport running a
+  service without dispatch though dispatch serves it. Pass the mount's
+  `pool_seeds.reserved`.
 
 ## [0.22.0] — 2026-10-31
 

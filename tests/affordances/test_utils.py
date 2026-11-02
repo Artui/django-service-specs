@@ -232,7 +232,9 @@ def first_unmet(row: Any) -> str | None:
 def refusal(user: Any, row: Note) -> str | None:
     """The code ``enforce_affordances`` refuses a rename of ``row`` with, if any."""
     try:
-        enforce_affordances(RENAME, base_pool(user=user), instance=row)
+        enforce_affordances(
+            RENAME, base_pool(user=user), instance=row, reserved=RESERVED_POOL_SEEDS
+        )
     except ActionUnavailable as exc:
         return exc.code
     return None
