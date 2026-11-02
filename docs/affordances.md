@@ -135,8 +135,10 @@ docs/examples/affordances.py:dispatch
 [`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances]
 is that step, exported for a transport that runs a service itself. It calls it
 after authorization and validation and before the service, with the pool
-seeds' `reserved` set, or a condition the direct path refuses is skipped on
-that one, and with the call's `call_context=`, so a condition naming it is
+seeds' `reserved` set, which is required: a default would ask a condition with
+none of the registered seeds, so one reading a registered seed would fail on a
+transport running the service without dispatch though dispatch serves it. It
+also takes the call's `call_context=`, so a condition naming it is
 handed the dict the call's other stages share (the parameter, else one the
 pool carries, else a fresh one; two different dicts are refused):
 
@@ -148,8 +150,9 @@ docs/examples/affordances.py:enforce
 
 A transport running a service from an event loop awaits
 [`aenforce_affordances`][django_service_specs.affordances.aenforce_affordances.aenforce_affordances],
-which refuses and lets through as `enforce_affordances` does, answering every
-condition in one `sync_to_async` hop, and none for a spec declaring none.
+which refuses and lets through as `enforce_affordances` does, `reserved=`
+required here too, answering every condition in one `sync_to_async` hop, and
+none for a spec declaring none.
 
 Declaration order decides which refusal a caller sees, and nothing after the
 first unmet condition runs. A condition on the row is read from the table, not

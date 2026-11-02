@@ -8,7 +8,7 @@ is what a transport running a service itself hands it.
 from __future__ import annotations
 
 import inspect
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
@@ -20,6 +20,7 @@ from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.null_progress import null_progress
+from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.service_not_found import ServiceNotFound
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -65,6 +66,13 @@ def refusal(spec: ServiceSpec, pool: dict[str, Any], instance: Any) -> ActionUna
     return refused.value
 
 
+def test_reserved_is_required_not_defaulted() -> None:
+    """A default would ask a condition with none of the registered seeds: no default is asked."""
+    asked = cast(Any, enforce_affordances)
+    with pytest.raises(TypeError, match="reserved"):
+        asked(ServiceSpec(service=print), {}, instance=None)
+
+
 @pytest.fixture
 def ada() -> Any:
     return make_user("ada")
@@ -80,20 +88,32 @@ class TestNothingDeclared:
     def test_none_costs_nothing(self, ada: Any, note: Note, django_assert_num_queries: Any) -> None:
         spec = ServiceSpec(service=print)
         with django_assert_num_queries(0):
-            assert enforce_affordances(spec, pool_for(ada, note), instance=note) is None
+            assert (
+                enforce_affordances(
+                    spec, pool_for(ada, note), instance=note, reserved=RESERVED_POOL_SEEDS
+                )
+                is None
+            )
 
     def test_an_empty_sequence_costs_nothing(
         self, ada: Any, django_assert_num_queries: Any
     ) -> None:
         # No row is needed either: ``instance`` is never looked at.
         with django_assert_num_queries(0):
-            enforce_affordances(spec_with(), pool_for(ada, None), instance=None)
+            enforce_affordances(
+                spec_with(), pool_for(ada, None), instance=None, reserved=RESERVED_POOL_SEEDS
+            )
 
 
 @pytest.mark.django_db
 class TestRowConditions:
     def test_a_met_condition_lets_the_call_through(self, ada: Any, note: Note) -> None:
-        enforce_affordances(spec_with(NOT_ARCHIVED), pool_for(ada, note), instance=note)
+        enforce_affordances(
+            spec_with(NOT_ARCHIVED),
+            pool_for(ada, note),
+            instance=note,
+            reserved=RESERVED_POOL_SEEDS,
+        )
 
     def test_an_unmet_condition_refuses_with_its_reason_and_code(self, ada: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft", archived=True)
@@ -113,12 +133,14 @@ class TestRowConditions:
     ) -> None:
         spec = spec_with(NOT_ARCHIVED, TITLED, Affordance(code="c", reason="r", when=lambda: True))
         with django_assert_num_queries(1):
-            enforce_affordances(spec, pool_for(ada, note), instance=note)
+            enforce_affordances(
+                spec, pool_for(ada, note), instance=note, reserved=RESERVED_POOL_SEEDS
+            )
 
     def test_a_condition_spans_relations_as_filter_does(self, ada: Any, note: Note) -> None:
         active_owner = Affordance(code="owner_gone", reason="r", when=Q(owner__is_active=True))
         spec = spec_with(active_owner)
-        enforce_affordances(spec, pool_for(ada, note), instance=note)
+        enforce_affordances(spec, pool_for(ada, note), instance=note, reserved=RESERVED_POOL_SEEDS)
         type(ada).objects.filter(pk=ada.pk).update(is_active=False)
         assert refusal(spec, pool_for(ada, note), note).code == "owner_gone"
 
@@ -129,19 +151,31 @@ class TestRowConditions:
         hidden = LiveNote.objects.create(owner=ada, title="Draft", archived=True)
         assert not LiveNote.objects.filter(pk=hidden.pk).exists()
         spec = spec_with(TITLED)
-        enforce_affordances(spec, pool_for(ada, hidden), instance=hidden)
+        enforce_affordances(
+            spec, pool_for(ada, hidden), instance=hidden, reserved=RESERVED_POOL_SEEDS
+        )
 
     def test_a_row_that_vanished_is_not_found(self, ada: Any, note: Note) -> None:
         Note.objects.filter(pk=note.pk).delete()
         with pytest.raises(ServiceNotFound):
-            enforce_affordances(spec_with(NOT_ARCHIVED), pool_for(ada, note), instance=note)
+            enforce_affordances(
+                spec_with(NOT_ARCHIVED),
+                pool_for(ada, note),
+                instance=note,
+                reserved=RESERVED_POOL_SEEDS,
+            )
 
     @pytest.mark.parametrize("instance", [None, {"pk": 1}], ids=["none", "mapping"])
     def test_a_target_that_is_not_a_model_instance_is_a_misconfiguration(
         self, ada: Any, instance: Any
     ) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
-            enforce_affordances(spec_with(NOT_ARCHIVED), pool_for(ada, instance), instance=instance)
+            enforce_affordances(
+                spec_with(NOT_ARCHIVED),
+                pool_for(ada, instance),
+                instance=instance,
+                reserved=RESERVED_POOL_SEEDS,
+            )
         assert str(refused.value).startswith(
             "An affordance condition on the row needs a resolved model instance, and this "
             f"dispatch resolved {type(instance).__name__}."
@@ -154,7 +188,7 @@ class TestCallableConditions:
         spec = ServiceSpec(
             service=print, affordances=[Affordance(code="c", reason="r", when=lambda: True)]
         )
-        enforce_affordances(spec, pool_for(ada, None), instance=None)
+        enforce_affordances(spec, pool_for(ada, None), instance=None, reserved=RESERVED_POOL_SEEDS)
 
     def test_an_unmet_condition_refuses_with_its_reason_and_code(self, ada: Any) -> None:
         closed = Affordance(code="books_closed", reason="The books are closed.", when=lambda: 0)
@@ -172,7 +206,9 @@ class TestCallableConditions:
             affordances=[Affordance(code="books_closed", reason="r", when=lambda: answer)],
         )
         with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
-            enforce_affordances(spec, pool_for(ada, None), instance=None)
+            enforce_affordances(
+                spec, pool_for(ada, None), instance=None, reserved=RESERVED_POOL_SEEDS
+            )
         assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
 
     def test_dispatch_does_not_run_a_service_whose_condition_answered_with_a_coroutine(
@@ -277,7 +313,12 @@ class TestDeclarationOrder:
 def test_a_foreign_declaration_is_enforced_as_its_compiled_spec(ada: Any) -> None:
     note = Note.objects.create(owner=ada, title="Draft", archived=True)
     with pytest.raises(ActionUnavailable) as refused:
-        enforce_affordances(Foreign(spec_with(NOT_ARCHIVED)), pool_for(ada, note), instance=note)
+        enforce_affordances(
+            Foreign(spec_with(NOT_ARCHIVED)),
+            pool_for(ada, note),
+            instance=note,
+            reserved=RESERVED_POOL_SEEDS,
+        )
     assert refused.value.code == "note_archived"
 
 
@@ -289,7 +330,7 @@ def test_a_selector_spec_is_refused_rather_than_its_mapping_read_as_conditions(w
         affordances={"edit": ServiceSpec(service=print)},
     )
     with pytest.raises(TypeError, match="takes a ServiceSpec; got SelectorSpec"):
-        enforce_affordances(wrap(spec), {}, instance=None)
+        enforce_affordances(wrap(spec), {}, instance=None, reserved=RESERVED_POOL_SEEDS)
 
 
 # The call's context: a transport asking ahead of a call has one to hand, or
@@ -314,7 +355,11 @@ def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None
     handed: list[Any] = []
     context: dict[str, Any] = {}
     enforce_affordances(
-        _naming_it(handed), base_pool(user=None), instance=None, call_context=context
+        _naming_it(handed),
+        base_pool(user=None),
+        instance=None,
+        call_context=context,
+        reserved=RESERVED_POOL_SEEDS,
     )
     assert len(handed) == 2
     assert all(seen is context for seen in handed)
@@ -323,8 +368,8 @@ def test_a_condition_naming_the_call_context_is_handed_the_dict_passed() -> None
 def test_with_none_passed_its_conditions_share_a_fresh_dict() -> None:
     handed: list[Any] = []
     spec = _naming_it(handed)
-    enforce_affordances(spec, base_pool(user=None), instance=None)
-    enforce_affordances(spec, base_pool(user=None), instance=None)
+    enforce_affordances(spec, base_pool(user=None), instance=None, reserved=RESERVED_POOL_SEEDS)
+    enforce_affordances(spec, base_pool(user=None), instance=None, reserved=RESERVED_POOL_SEEDS)
     first, again, second, _ = handed
     assert first == {}
     assert again is first
@@ -339,7 +384,9 @@ def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() 
         return True
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="a", reason="r", when=when)])
-    enforce_affordances(spec, base_pool(user=None), instance=None, call_context={})
+    enforce_affordances(
+        spec, base_pool(user=None), instance=None, call_context={}, reserved=RESERVED_POOL_SEEDS
+    )
     assert seen == [{"user", "progress"}]
 
 
@@ -348,9 +395,13 @@ def test_the_call_context_passed_else_the_pool_s_else_a_fresh_one() -> None:
     handed: list[Any] = []
     held: dict[str, Any] = {}
     pool = {**base_pool(user=None), "call_context": held}
-    enforce_affordances(_naming_it(handed), pool, instance=None)
-    enforce_affordances(_naming_it(handed), pool, instance=None, call_context=held)
-    enforce_affordances(_naming_it(handed), base_pool(user=None), instance=None)
+    enforce_affordances(_naming_it(handed), pool, instance=None, reserved=RESERVED_POOL_SEEDS)
+    enforce_affordances(
+        _naming_it(handed), pool, instance=None, call_context=held, reserved=RESERVED_POOL_SEEDS
+    )
+    enforce_affordances(
+        _naming_it(handed), base_pool(user=None), instance=None, reserved=RESERVED_POOL_SEEDS
+    )
     from_pool, _, passed, _, fresh, _ = handed
     assert from_pool is held
     assert passed is held
@@ -363,7 +414,9 @@ def test_a_call_context_passed_beside_another_in_the_pool_is_refused() -> None:
     handed: list[Any] = []
     pool = {**base_pool(user=None), "call_context": {}}
     with pytest.raises(ImproperlyConfigured, match="call_context"):
-        enforce_affordances(_naming_it(handed), pool, instance=None, call_context={})
+        enforce_affordances(
+            _naming_it(handed), pool, instance=None, call_context={}, reserved=RESERVED_POOL_SEEDS
+        )
     assert handed == []
 
 
@@ -377,6 +430,10 @@ def test_a_condition_reads_the_call_s_request_and_view_from_its_context() -> Non
 
     spec = ServiceSpec(service=print, affordances=[Affordance(code="c", reason="r", when=when)])
     enforce_affordances(
-        spec, base_pool(user=None), instance=None, call_context={"request": request, "view": view}
+        spec,
+        base_pool(user=None),
+        instance=None,
+        call_context={"request": request, "view": view},
+        reserved=RESERVED_POOL_SEEDS,
     )
     assert seen == [(request, view)]
