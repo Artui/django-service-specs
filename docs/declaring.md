@@ -737,6 +737,7 @@ docs/examples/declaring.py:validator
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum`'s member names and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, so each is read as a decimal is, a JSON number included, and `?prices=1.5,2.25` is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds it. |
 | a dataclass | An object, with its fields as nested Parameters. |
+| `dict[str, X]`, for any `X` above | An object with no declared fields, as the pydantic adapter declares one, since Parameters cannot say "every value is an `X`". Each value is decoded as `X` and refused under its own key: `{"scores": {"rigour": ["Expected an integer."]}}`. Only a `str` key, since a JSON object has no other. |
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 
 A field with a default or a `default_factory` is optional; one with neither is

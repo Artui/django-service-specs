@@ -14,6 +14,7 @@ from django.utils import translation
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
+from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.unset import UNSET, UnsetType
@@ -83,7 +84,7 @@ class _Defaults:
 
 @dataclass
 class _Unmappable:
-    blob: dict[str, int]
+    blob: set[int]
 
 
 # --- construction ----------------------------------------------------------------
@@ -828,3 +829,84 @@ def test_unsendable_is_empty_since_every_required_field_is_a_parameter() -> None
     assert required is not None
     assert required.required
     assert validator.unsendable == frozenset()
+
+
+@dataclass
+class _Scored:
+    scores: dict[str, int]
+    weights: dict[str, Decimal | None] | None = None
+    stops: dict[str, Address] | None = None
+
+
+class TestStrKeyedMap:
+    def test_it_is_declared_an_object_with_no_fields(self) -> None:
+        # Parameters cannot say "every value is an X", so the declaration says
+        # only what is true of the whole: an object, its keys strings.
+        assert DataclassValidator(_Scored).parameters() == Parameters(
+            (
+                Parameter("scores", "object", required=True),
+                Parameter("weights", "object", required=False, default=None, nullable=True),
+                Parameter("stops", "object", required=False, default=None, nullable=True),
+            )
+        )
+
+    def test_each_value_is_decoded_into_the_declared_type(self) -> None:
+        values = DataclassValidator(_Scored).validate(
+            {
+                "scores": {"clarity": 4, "rigour": 5},
+                "weights": {"clarity": "0.5", "rigour": None},
+                "stops": {"home": {"city": "Oslo"}},
+            },
+            CONTEXT,
+        )
+        assert values == {
+            "scores": {"clarity": 4, "rigour": 5},
+            "weights": {"clarity": Decimal("0.5"), "rigour": None},
+            "stops": {"home": Address("Oslo")},
+        }
+
+    def test_the_shape_check_passes_the_map_the_validator_takes(self) -> None:
+        arguments = {"scores": {"clarity": 4}, "stops": {"home": {"city": "Oslo"}}}
+        parameters = DataclassValidator(_Scored).parameters()
+        assert check_arguments(parameters, arguments) == arguments
+
+    def test_a_value_is_refused_at_its_key_and_only_the_values_that_failed(self) -> None:
+        # The tree pydantic's own adapter gives a str-keyed dict
+        # (test_a_dict_value_is_addressed_by_its_key), in the kernel's words.
+        detail = _refusal(
+            _Scored,
+            {
+                "scores": {"clarity": 4, "rigour": "x"},
+                "weights": {"clarity": None, "rigour": True},
+                "stops": {"home": {}, "work": 3},
+            },
+        )
+        assert coded(detail) == {
+            "scores": {"rigour": [("Expected an integer.", "invalid")]},
+            "weights": {"rigour": [("Expected a decimal string or a number.", "invalid")]},
+            "stops": {
+                "home": {"city": [(REQUIRED, "required")]},
+                # A message about an object value sits inside it, as a row's does.
+                "work": {NON_FIELD_ERRORS: [("Expected an object.", "invalid")]},
+            },
+        }
+
+    @pytest.mark.parametrize(
+        "argument",
+        [
+            [4],
+            "clarity",
+            # Only a caller skipping the shape check can send one: JSON's keys
+            # are strings, so a map with any other key is not a JSON object.
+            {1: 4},
+        ],
+    )
+    def test_a_map_that_is_not_a_json_object_is_refused(self, argument: Any) -> None:
+        detail = _refusal(_Scored, {"scores": argument})
+        assert coded(detail) == {"scores": [("Expected an object.", "invalid")]}
+
+    def test_a_null_map_is_refused_unless_it_is_nullable(self) -> None:
+        detail = _refusal(_Scored, {"scores": None})
+        assert coded(detail) == {"scores": [("This field cannot be null.", "null")]}
+        values = DataclassValidator(_Scored).validate({"scores": {}, "weights": None}, CONTEXT)
+        assert values["weights"] is None
