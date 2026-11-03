@@ -1340,7 +1340,10 @@ the async entry point:</p>
    nesting, with no query. An argument no parameter declares is refused. A
    <a href="../declaring/#partial-updates"><code>partial</code></a> write's absent Validator
    parameters are not refused, nor one its <code>input_data</code> provider is annotated
-   to fill.</li>
+   to fill. A read a provider requires itself, by name with no default, is
+   not relaxed: only the caller can send it, and a call leaving it out is
+   refused here, before any provider runs
+   (<a href="../declaring/#providers-and-preconditions">example</a>).</li>
 <li><strong>Class-level authorization</strong>: every permission check's <code>has_permission</code>,
    or the <a href="#grants">grant</a> a transport passed instead. A seed a check names
    is resolved just before it, and only such a seed
@@ -1362,7 +1365,11 @@ the async entry point:</p>
    is asked of neither.</li>
 <li><strong>Validation</strong>: a write's <code>input_data</code> provider, then its Validator on only
    the arguments it declares, with the provider's values merged over the
-   caller's, and the resolved target and <code>partial</code> in its context.</li>
+   caller's, and the resolved target and <code>partial</code> in its context. A
+   dataclass Validator decodes each value of a <code>dict[str, X]</code> field there and
+   refuses one under its own key
+   (<a href="../declaring/#the-dataclass-adapter">example</a>); the shape check sees only
+   an object.</li>
 <li><strong>Affordances, then preconditions</strong>: a write's <code>affordances</code>, in
    declaration order - the first one not met refuses the call with
    <code>ActionUnavailable</code>, carrying its <code>code</code> - then its <code>preconditions</code>, the
@@ -2311,7 +2318,8 @@ keywords it cannot see either. A read a provider requires by name is not
 refused even where that provider may fill it, as in <code>kwargs=lambda *, pk: {...}</code>
 over a required <code>pk</code>: a provider is handed the caller's reads and the seeds,
 never another provider's answer, so dispatch demands such a read of the caller
-and refuses a call leaving it out before any provider runs. The array check alone is not run on a precondition, a
+and refuses a call leaving it out before any provider runs, as
+<a href="../declaring/#providers-and-preconditions">the example</a> runs. The array check alone is not run on a precondition, a
 condition, the output selector, an <code>extend_queryset</code>, a provider or a
 <code>progress_reporter</code>. A
 callable taking <code>**kwargs</code> requires nothing, so one forwarding into a stricter
