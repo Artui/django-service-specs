@@ -30,7 +30,7 @@ reach a callable only by their names.
 | `user` | The principal | Every callable |
 | `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and its spec's callable affordance conditions' |
 | each validated value, by name | What the Validator returned | The service |
-| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` built | The service |
+| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` or a `PydanticValidator` built | The service |
 | what the Validator binds, by name | A value bound for the call, its `Validated.pool` | The service |
 | `instance` | The row an instance selector resolved | The service, its providers |
 | `collection` | The rows a collection selector resolved | The service, its providers |

@@ -87,9 +87,9 @@ class Validator(abc.ABC):
     ``validated()`` is the call's whole result, and what dispatch asks for: the
     values, the call's ``data``, and any value the Validator binds for the
     call. An adapter overrides it where its ``data`` is not the mapping
-    ``validate()`` returns, as the dataclass adapter's is its instance, or
-    where the library leaves an object the service may want; the rest need
-    not touch it.
+    ``validate()`` returns, as the dataclass and pydantic adapters' is the
+    instance they build, or where the library leaves an object the service
+    may want; the rest need not touch it.
 
     ``validated_many()`` is what dispatch asks of a ``many`` spec instead: the
     whole list at once. By default it is ``validated()`` on each row, which
