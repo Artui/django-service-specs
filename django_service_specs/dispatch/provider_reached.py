@@ -20,6 +20,10 @@ def provider_reached(spec: ServiceSpec | SelectorSpec | SpecSource) -> frozenset
     ``declinable`` alike, and one whose return says nothing about its keys
     reaches every parameter there
     ([`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]).
+    Less a read a provider requires itself, by name with no default: a
+    provider is handed the caller's reads and the seeds, never another
+    provider's answer, so the shape check demands it of the caller
+    (test_a_read_its_provider_requires_is_not_reached).
     The shape check does not demand a parameter this names, and a transport
     reading it leaves such a parameter out of the arguments its schema
     requires; one a provider is annotated to fill, and may not decline, is

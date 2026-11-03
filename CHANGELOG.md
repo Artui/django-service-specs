@@ -20,8 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `spec_caller_input_schema` keeps such a read in `required`, so a transport
     advertising it asks the caller for it.
   - `provider_reached` no longer returns it.
-  - `check_server_arguments` refuses withholding it when the transport is built,
-    where every call used to fail with that `TypeError`.
+  - `check_server_arguments` refuses a `ServerArguments` withholding it. A
+    transport calls it where it registers a spec (django-spec-mcp,
+    django-spec-agents and django-spec-html do), so such a binding now fails at
+    registration with `ImproperlyConfigured` instead of with that `TypeError` on
+    every call.
 
   A read a typed provider of its seat fills is still not demanded: the caller's
   value for it is dropped, so no provider receives it either way, and `check_seeds`
