@@ -1,4 +1,4 @@
-"""How the kernel asks a Validator what it takes, shared by ``specs/`` and ``dispatch/``."""
+"""How the kernel asks a Validator what it takes, inside a call or outside one."""
 
 from __future__ import annotations
 
@@ -27,6 +27,12 @@ def validator_parameters(
     ``call_context`` itself (``_declares``), so a Validator that never
     declared it is asked as before
     (test_a_validator_declaring_no_call_context_is_asked_as_before).
+
+    Dispatch asks every Validator through this, and so should a transport
+    that asks one itself during a call - for the names of a ``many`` spec's
+    rows, say - handing it the call's dict, so a Validator that opted in is
+    described as dispatch describes it, whoever wrote it
+    (TestThePublicName.test_an_opted_in_validator_is_handed_the_call_s_dict_through_it).
     """
     # Widened, since the base method declares no keyword and only an opted-in
     # subclass's takes one, and the keyword is passed only where ``_declares`` read it.

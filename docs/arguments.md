@@ -389,7 +389,7 @@ says **who refused**.
 
 | Family | Members | Who refused |
 | --- | --- | --- |
-| [`DispatchError`][django_service_specs.types.dispatch_error.DispatchError] | `InvalidArguments`, `NotPermitted`, `PrincipalUnavailable` | Dispatch, before the operation ran |
+| [`DispatchError`][django_service_specs.types.dispatch_error.DispatchError] | `InvalidArguments`, `NotPermitted` (a check's denial is `PermissionCheckDenied` under it), `PrincipalUnavailable` | Dispatch, before the operation ran |
 | [`ServiceError`][django_service_specs.services.service_error.ServiceError] | `ServiceValidationError`, `ServiceConflict`, `ServiceNotFound` | The operation itself |
 
 **Neither subclasses the other, and none of their members crosses over.** That

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.utils import (
     OBJECT_LEVEL,
@@ -47,8 +47,8 @@ def authorize_target(
     handed in as ``target=``, and never on a selector spec's row (see
     ``Grant``); otherwise every check's ``has_object_permission`` must pass,
     in order, and the first refusal raises
-    [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
-    with that check's own message. An answer still to be awaited raises
+    [`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+    a ``NotPermitted`` naming the check and the spec, with that check's own message. An answer still to be awaited raises
     ``ImproperlyConfigured`` rather than being read as a pass. A
     [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
     checked as the spec it compiles to.
@@ -149,4 +149,4 @@ def authorize_target(
             **asked_with(check, "has_object_permission", arguments, positional=3, offered=offered),
         )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_object_permission"):
-            raise NotPermitted(check.message)
+            raise PermissionCheckDenied(check=check, spec=spec)
