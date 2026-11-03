@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A read a provider requires itself is demanded of the caller.** A `kwargs` or
+  `input_data` provider is handed its seat's reads and the seeds, never another
+  provider's answer, so a read it takes by name with no default, such as `pk` in
+  `kwargs=lambda *, pk: {...}`, can only come from the caller. The shape check used
+  to relax such a read wherever a provider may fill it (an untyped provider, or a
+  typed one's declinable key), and a call leaving it out failed with the provider's
+  own `TypeError`. It is now refused with `InvalidArguments` naming the read, before
+  the class-level check and before any provider runs; a call sending it runs as
+  before. The same rule reaches every reader of it:
+  - `spec_caller_input_schema` keeps such a read in `required`, so a transport
+    advertising it asks the caller for it.
+  - `provider_reached` no longer returns it.
+  - `check_server_arguments` refuses withholding it when the transport is built,
+    where every call used to fail with that `TypeError`.
+
+  A read a typed provider of its seat fills is still not demanded: the caller's
+  value for it is dropped, so no provider receives it either way, and `check_seeds`
+  refuses such a spec.
+
 ## [0.24.0] — 2026-11-03
 
 ### Added

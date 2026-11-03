@@ -57,6 +57,10 @@ def spec_caller_input_schema(
       test_a_selector_spec_s_reads_beside_an_untyped_kwargs_are_offered_and_none_required,
       test_a_key_the_spec_s_kwargs_may_decline_leaves_the_target_s_read_required,
       test_a_validator_field_input_data_may_fill_is_offered_and_not_required).
+      **Not a read a provider requires itself**: a provider is handed the
+      caller's reads and the seeds, never another provider's answer, so
+      dispatch demands it of the caller and it stays in ``required``
+      (test_a_read_a_provider_requires_itself_stays_required).
 
     **On a** ``many`` **spec each row is read the same way**, by what
     ``input_data`` reaches there: it runs once per call and is merged over
@@ -88,7 +92,9 @@ def spec_caller_input_schema(
 
     Off a ``many`` spec, the reading django-spec-mcp and django-spec-agents
     made of ``spec_input_schema`` before this existed
-    (test_off_many_it_is_the_mcp_and_the_agents_reading); neither read a row
+    (test_off_many_it_is_the_mcp_and_the_agents_reading), but for a read a
+    provider requires itself, which django-spec-agents' reading relaxed;
+    neither read a row
     (test_on_a_many_spec_the_transports_readings_part_from_it_only_in_the_rows).
     ``spec_input_schema`` itself is unchanged and still lists what the server
     fills (test_spec_input_schema_still_lists_what_the_server_fills). A

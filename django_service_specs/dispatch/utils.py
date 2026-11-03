@@ -667,6 +667,10 @@ def shape_check(
       that such a value is missing
       (test_a_read_an_untyped_provider_may_fill_left_out_reaches_the_class_level_check,
       test_a_declinable_key_left_out_reaches_the_class_level_check).
+      **Except a read a provider requires itself**, which only the caller can
+      hand it: that one stays demanded here, so a call leaving it out is
+      refused before the class-level check and before any provider runs
+      (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller).
       **What the caller sends for one depends on the provider's annotation.**
       A key a typed provider is annotated to fill is the server's:
       ``server_owned_keys`` tells a transport to hide exactly such a key, and
