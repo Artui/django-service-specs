@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] — 2026-11-03
+
 ### Added
 - **`validator_parameters` is public**, from `django_service_specs.validation` and
   the root. It asks a Validator's `parameters()` as dispatch does, handing the
@@ -2400,7 +2402,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/Artui/django-service-specs/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Artui/django-service-specs/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Artui/django-service-specs/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/Artui/django-service-specs/compare/v0.21.0...v0.21.1
