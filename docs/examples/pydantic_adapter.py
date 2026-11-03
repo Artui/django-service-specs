@@ -5,7 +5,7 @@ from __future__ import annotations
 # --8<-- [start:write]
 from datetime import date
 from decimal import Decimal
-from typing import Annotated, Any
+from typing import Annotated
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -56,7 +56,7 @@ class AuthorOut(BaseModel):
     books: list[BookOut]
 
 
-def create_author(*, data: dict[str, Any]) -> ChangeResult[Author]:
+def create_author(*, data: AuthorIn) -> ChangeResult[Author]:
     return create_from_input(Author, data, relations={"books": ChildSpec(model=Book, fk="author")})
 
 
