@@ -52,6 +52,29 @@ def _category(depth: int, leaf: Any) -> dict[str, Any]:
 
 @pytest.mark.django_db
 class TestDeclaringWithModels:
+    def test_the_service_s_data_is_the_model_instance(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # What ``create_author`` is annotated with, and what the page says it
+        # receives; ``create_from_input`` reads the instance through ``__dict__``.
+        seen: list[Any] = []
+        write = pydantic_adapter.create_from_input
+
+        def recording(model: Any, data: Any, **kwargs: Any) -> Any:
+            seen.append(data)
+            return write(model, data, **kwargs)
+
+        monkeypatch.setattr(pydantic_adapter, "create_from_input", recording)
+        dispatch(
+            pydantic_adapter.create_author_spec,
+            principal=ada,
+            arguments={"name": "Ursula", "books": [{"title": "Lathe", "price": "9.99"}]},
+        )
+        (data,) = seen
+        assert isinstance(data, pydantic_adapter.AuthorIn)
+        assert data.name == "Ursula"
+        assert isinstance(data.books[0], pydantic_adapter.BookIn)
+
     def test_a_create_writes_the_author_and_its_books_and_presents_them(self, ada: Any) -> None:
         result = dispatch(
             pydantic_adapter.create_author_spec,
