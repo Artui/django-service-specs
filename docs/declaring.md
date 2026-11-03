@@ -439,7 +439,11 @@ reads them: `filled`, and `declinable` for a key whose value admits
 untyped provider's values reach, is not demanded of the caller: dispatch
 checks it once the provider has answered, after the class-level permission
 check and, for a Validator field, before the Validator runs, and refuses a
-required one nobody filled, a declined one included.
+required one nobody filled, a declined one included. The exception is a read
+a provider takes by name with no default, as `pk` in
+`kwargs=lambda *, pk: {...}`: a provider is handed the caller's reads and the
+seeds, never another provider's answer, so only the caller can supply it, and
+dispatch demands it of the caller however a provider may fill it.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
@@ -456,7 +460,8 @@ name does not exempt the key.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
-every parameter a provider fills or may fill, which the shape check relaxes. None of
+every parameter a provider fills or may fill, less a read a provider requires
+itself, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what `parameters()` lists:
 
