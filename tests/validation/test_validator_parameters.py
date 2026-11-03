@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import gc
+import importlib
 import types
 import weakref
 from collections.abc import Callable, Mapping
@@ -13,13 +14,18 @@ from unittest import mock
 
 import pytest
 
+import django_service_specs
+import django_service_specs.validation
 from django_service_specs.parameters.parameters import Parameter, Parameters
-from django_service_specs.validation import utils
-from django_service_specs.validation.utils import validator_parameters
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 TITLE = Parameters.of(Parameter("title", "string"))
+
+# By import path, because the package re-exports the function under the
+# module's own name, and attribute access on the package finds the function.
+_module = importlib.import_module("django_service_specs.validation.validator_parameters")
 
 # What a recording ``parameters`` defaults its keyword to, so a test tells a
 # keyword left out from one passed as ``None``.
@@ -174,7 +180,7 @@ def test_a_parameters_whose_signature_read_raises_value_error_is_asked_as_before
         def parameters(self, *, call_context: dict[str, Any] | None = NOT_HANDED) -> Parameters:
             return super().parameters(call_context=call_context)
 
-    monkeypatch.setattr(utils, "inspect", SimpleNamespace(signature=unreadable))
+    monkeypatch.setattr(_module, "inspect", SimpleNamespace(signature=unreadable))
     validator = Fresh()
     assert validator_parameters(validator, call_context={}) is TITLE
     assert validator.handed == [NOT_HANDED]
@@ -210,7 +216,7 @@ def test_the_signature_is_read_once_per_function(monkeypatch: pytest.MonkeyPatch
     a cache under the bound method, made afresh on each lookup, reads it on
     every ask."""
     read: list[Any] = []
-    names = utils._names_call_context
+    names = _module._names_call_context
 
     def counted(asked: Callable[..., Any]) -> bool:
         read.append(asked)
@@ -220,7 +226,7 @@ def test_the_signature_is_read_once_per_function(monkeypatch: pytest.MonkeyPatch
         def parameters(self, *, call_context: dict[str, Any] | None = NOT_HANDED) -> Parameters:
             return super().parameters(call_context=call_context)
 
-    monkeypatch.setattr(utils, "_names_call_context", counted)
+    monkeypatch.setattr(_module, "_names_call_context", counted)
     context: dict[str, Any] = {}
     validators = (Counted(), Counted())
     for validator in (*validators, *validators):
@@ -243,3 +249,28 @@ def test_a_validator_class_built_at_runtime_is_not_kept_once_asked() -> None:
     del validator
     gc.collect()
     assert held() is None
+
+
+class TestThePublicName:
+    """A transport describing a Validator per call asks it as dispatch does, through the
+    public name, so a third-party Validator that opts in is handed the call's dict too."""
+
+    @pytest.mark.parametrize("package", [django_service_specs.validation, django_service_specs])
+    def test_it_is_exported(self, package: Any) -> None:
+        assert "validator_parameters" in package.__all__
+        assert getattr(package, "validator_parameters", None) is validator_parameters
+
+    @pytest.mark.parametrize("package", [django_service_specs.validation, django_service_specs])
+    def test_an_opted_in_validator_is_handed_the_call_s_dict_through_it(self, package: Any) -> None:
+        class OptedIn(_Recording):
+            def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+                self.handed.append(call_context)
+                return TITLE
+
+        validator = OptedIn()
+        context: dict[str, Any] = {}
+        asked = getattr(package, "validator_parameters", None)
+        assert asked is not None
+        assert asked(validator, call_context=context) is TITLE
+        assert validator.handed == [context]
+        assert validator.handed[0] is context

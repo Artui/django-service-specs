@@ -54,6 +54,7 @@ output format is `SPEC_CLI_OUTPUT`, read by
 
 ::: django_service_specs.validation.validator.Validator
 ::: django_service_specs.validation.validated.Validated
+::: django_service_specs.validation.validator_parameters.validator_parameters
 
 ::: django_service_specs.validation.validation_context.ValidationContext
 

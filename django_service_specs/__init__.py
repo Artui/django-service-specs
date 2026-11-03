@@ -171,6 +171,7 @@ from django_service_specs.types.value_formatter import ValueFormatter
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 from django_service_specs.version import __version__
 
 __all__ = [
@@ -345,4 +346,5 @@ __all__ = [
     "unreceived_fields",
     "update_from_input",
     "update_model",
+    "validator_parameters",
 ]

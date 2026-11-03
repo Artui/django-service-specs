@@ -31,8 +31,8 @@ from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import callable_name, check_callable, is_row_condition
-from django_service_specs.validation.utils import validator_parameters
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 # The default ``many_argument``, djangorestframework-services' own, so a spec
 # moving between the two packages keeps the argument a caller sends.

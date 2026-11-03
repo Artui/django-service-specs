@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`validator_parameters` is public**, from `django_service_specs.validation` and
+  the root. It asks a Validator's `parameters()` as dispatch does, handing the
+  call's context only to one that declares `call_context`, so a transport asking a
+  Validator itself during a call, for a `many` spec's rows say, describes one that
+  opted in as dispatch does, whoever wrote it.
+
 ## [0.23.0] — 2026-11-02
 
 ### Added

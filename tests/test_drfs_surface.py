@@ -632,6 +632,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "provider_reached",
         "seed_named_parameters",
         "unreceived_fields",
+        # How dispatch asks a Validator what it takes, for a transport asking
+        # one itself during a call (django-spec-rest's rows of a ``many``
+        # spec): djangorestframework-services neither wraps nor re-exports it.
+        "validator_parameters",
         # This package's version, which no importer reads as an API.
         "__version__",
     }

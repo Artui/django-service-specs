@@ -634,7 +634,11 @@ methods, and two more methods, an attribute and a property with defaults:
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose `parameters` takes only `**kwargs`, or is a
   `functools.wraps` wrapper that does not name the keyword itself: the
-  method's own signature decides. `ServiceSpec.parameters()` and
+  method's own signature decides. A transport that asks a Validator itself
+  during a call asks it as dispatch does, through
+  [`validator_parameters`][django_service_specs.validation.validator_parameters.validator_parameters]
+  with the call's dict, so a Validator that opted in is handed it there too.
+  `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept `call_context`, which
   dispatch now passes: an override written `parameters(self)` raises `TypeError`

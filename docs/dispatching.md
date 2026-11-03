@@ -1277,7 +1277,10 @@ what the service left there.
   ask outside one, such as registration or a schema
   ([the Validator](declaring.md#the-validator)). So a transport describing a
   serializer under its own request can tell its own call from a `dispatch`
-  the service makes inside it, which is handed a dict of its own.
+  the service makes inside it, which is handed a dict of its own. A
+  transport asking the Validator itself during the call does so through
+  [`validator_parameters`][django_service_specs.validation.validator_parameters.validator_parameters],
+  handing it the same dict.
 - **An inner dispatch handed the outer dict is described as the outer call.**
   A service that forwards its own `call_context` to a `dispatch` it makes
   for another principal or operation has every stage of that inner call -

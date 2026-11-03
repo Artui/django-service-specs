@@ -69,10 +69,10 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
 from django_service_specs.types.utils import CALL_CONTEXT, CALL_SEEDS_NOTE, SHAPES, callable_name
-from django_service_specs.validation.utils import validator_parameters
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
