@@ -95,12 +95,16 @@ def check_server_arguments(
        a call without one is refused as missing, a client error no caller can
        fix. A Validator parameter is the shape check's alone. Each conjunct
        is held by its own test, named beside the guard. **A parameter an
-       untyped provider's values reach is never refused here**: that
+       untyped provider's values reach is not refused here**: that
        provider may fill it on any call, so a call may do without the
        caller's value, and dispatch refuses one nobody filled where the
        provider's answer is merged
        (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld,
        test_check_server_arguments_lets_a_field_an_untyped_input_data_reaches_be_withheld).
+       Less a read a provider requires itself, by name with no default: no
+       provider is handed another's answer, so only the caller can send it,
+       and withholding it is refused
+       (test_check_server_arguments_refuses_withholding_a_read_a_provider_requires).
        A typed provider's keys, filled or declinable, were refused by rule 4.
     6. **A bound value its parameter refuses**, checked as the shape check
        checks it, so a server value in its Python form - a ``uuid.UUID``, a

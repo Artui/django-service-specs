@@ -49,7 +49,9 @@ def bind_arguments(
        ``partial``, one its ``input_data`` provider fills or may fill, and a
        read the ``kwargs`` provider of the spec declaring it fills or may
        fill - a typed provider's filled and declinable keys, and every
-       parameter an untyped provider's values reach.
+       parameter an untyped provider's values reach - less a read a provider
+       requires itself, which stays demanded
+       (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller).
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
        with a Validator, ``validated()`` on only the arguments the Validator's
        own ``parameters()`` declare - never a selector's or the spec's
@@ -76,7 +78,8 @@ def bind_arguments(
     Validator, once the provider has answered, is not made here
     (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
     No ``kwargs`` provider is called either: a read one fills or
-    may fill passes the shape check absent, and the presence check dispatch
+    may fill passes the shape check absent, unless a provider requires it
+    itself, and the presence check dispatch
     makes once the provider has answered is not made here
     (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
     fill is absent from a selector spec's checked arguments whether or not

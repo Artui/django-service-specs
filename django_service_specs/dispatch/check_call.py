@@ -50,7 +50,9 @@ def check_call(
        under ``unknown_arguments``, relaxed exactly as dispatch relaxes it: a
        parameter a provider fills or may fill - a typed provider's filled and
        declinable keys, and every parameter an untyped provider's values
-       reach - and a Validator field under ``partial``. No provider runs
+       reach, less a read a provider requires itself
+       (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller) -
+       and a Validator field under ``partial``. No provider runs
        here, so a call this passes without such a value may still be refused
        by ``dispatch`` where the provider's answer is merged
        (test_check_call_relaxes_a_may_fill_read).

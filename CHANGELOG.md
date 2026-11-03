@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0] — 2026-11-03
+
+### Added
+- **`DataclassValidator` and `DataclassPresenter` read `dict[str, X]`**, for any `X`
+  the dataclass adapter reads, as an object with no declared fields, which is how
+  `PydanticValidator` declares one: the same model and dataclass now declare the
+  same parameter. Each value is decoded as `X`, and a value refused is refused
+  under its own key (`{"scores": {"rigour": ["Expected an integer."]}}`); a map
+  that is not a JSON object, a non-string key included, is refused as `"Expected
+  an object."`. The presenter encodes each value as it encodes a field. A
+  dataclass with such a field was refused at registration before.
+
+### Changed
+- **Breaking: `PydanticValidator` hands a service declaring `data` the model instance,** as
+  `DataclassValidator` hands its dataclass instance, where it handed a dict of the
+  fields. This breaks a service that reads `data["title"]` from a pydantic
+  validator: read `data.title`, or take the fields by name, which are unchanged.
+  A `many` call's `data` is a list of model instances. `validated()` is now its
+  own, so a subclass that overrides only `validate()` no longer changes what
+  dispatch hands the service, which asks `validated()`: override that as well.
+- **A read a provider requires itself is demanded of the caller.** A `kwargs` or
+  `input_data` provider is handed its seat's reads and the seeds, never another
+  provider's answer, so a read it takes by name with no default, such as `pk` in
+  `kwargs=lambda *, pk: {...}`, can only come from the caller. The shape check used
+  to relax such a read wherever a provider may fill it (an untyped provider, or a
+  typed one's declinable key), and a call leaving it out failed with the provider's
+  own `TypeError`. It is now refused with `InvalidArguments` naming the read, before
+  the class-level check and before any provider runs; a call sending it runs as
+  before. The same rule reaches every reader of it:
+  - `spec_caller_input_schema` keeps such a read in `required`, so a transport
+    advertising it asks the caller for it.
+  - `provider_reached` no longer returns it.
+  - **Breaking:** `check_server_arguments` refuses a `ServerArguments`
+    withholding it. A transport calls it where it registers a spec
+    (django-spec-mcp, django-spec-agents and django-spec-html do), so such a
+    binding now fails at registration with `ImproperlyConfigured` instead of
+    with that `TypeError` on every call.
+
+  A read a typed provider of its seat fills is still not demanded: the caller's
+  value for it is dropped, so no provider receives it either way, and `check_seeds`
+  refuses such a spec.
+
 ## [0.24.0] — 2026-11-03
 
 ### Added
@@ -2402,7 +2444,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/Artui/django-service-specs/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Artui/django-service-specs/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Artui/django-service-specs/compare/v0.22.0...v0.23.0
 [0.22.0]: https://github.com/Artui/django-service-specs/compare/v0.21.1...v0.22.0

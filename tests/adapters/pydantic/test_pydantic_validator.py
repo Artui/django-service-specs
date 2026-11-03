@@ -36,6 +36,7 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from tests.adapter_app.models import Author, Book, Status
 from tests.adapters.dataclass import utils as dataclass_models
@@ -84,6 +85,17 @@ class _Scores(BaseModel):
 
 class _Labels(BaseModel):
     labels: dict[str, str]
+
+
+class _ScoreMap(BaseModel):
+    scores: dict[str, int]
+    weights: dict[str, Decimal | None] | None = None
+
+
+@dataclass
+class _ScoreMapRow:
+    scores: dict[str, int]
+    weights: dict[str, Decimal | None] | None = None
 
 
 class _Bounded(BaseModel):
@@ -173,6 +185,16 @@ class TestParameters:
         assert PydanticValidator(Everything).parameters() == Parameters(
             p for p in by_dataclass if p.name != "bio"
         )
+
+    def test_a_str_keyed_map_declares_what_the_same_dataclass_declares(self) -> None:
+        # Both adapters read annotations from one table: a map is an object
+        # with no declared fields, whichever declared it.
+        by_dataclass = DataclassValidator(_ScoreMapRow).parameters()
+        assert PydanticValidator(_ScoreMap).parameters() == by_dataclass
+        arguments = {"scores": {"clarity": 4}, "weights": {"clarity": "0.5"}}
+        for validator in (PydanticValidator(_ScoreMap), DataclassValidator(_ScoreMapRow)):
+            values = validator.validate(arguments, CONTEXT)
+            assert values == {"scores": {"clarity": 4}, "weights": {"clarity": Decimal("0.5")}}
 
     def test_every_parameter_is_one_the_shape_check_accepts(self) -> None:
         parameters = PydanticValidator(Everything).parameters()
@@ -553,10 +575,53 @@ class TestPartial:
         assert "declares partial=True with a PydanticValidator" in message
         assert "which cannot validate a partial call" in message
 
-    def test_a_whole_call_is_the_mapping_as_its_data(self) -> None:
+    def test_a_whole_call_hands_the_model_instance_as_its_data(self) -> None:
+        # As the dataclass adapter hands its instance
+        # (test_the_call_s_data_is_the_instance_and_its_fields_are_the_values),
+        # so a service written for ``data.city`` keeps working when its
+        # Validator changes from one to the other.
         validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
+        assert isinstance(validated.data, Address)
+        assert validated.data == Address(city="Oslo")
         assert validated.values == {"city": "Oslo", "postcode": None}
-        assert validated.data is validated.values
+        # The values are the instance's own, not a second validation of it.
+        assert all(
+            validated.values[name] is getattr(validated.data, name) for name in validated.values
+        )
+        assert dict(validated.pool) == {}
+
+    def test_a_subclass_may_extend_validated_through_validate(self) -> None:
+        # Neither public method calls the other, so this does not loop.
+        class Binding(PydanticValidator):
+            def validated(self, arguments: Any, context: ValidationContext) -> Validated:
+                values = self.validate(arguments, context)
+                return Validated(values=values, data=values, pool={"bound": "yes"})
+
+        validated = Binding(Address).validated({"city": "Oslo"}, CONTEXT)
+        assert (validated.values, dict(validated.pool)) == (
+            {"city": "Oslo", "postcode": None},
+            {"bound": "yes"},
+        )
+
+    def test_overriding_validate_alone_leaves_what_validated_hands_on(self) -> None:
+        # Dispatch asks ``validated()``, so this override reaches only a caller
+        # of ``validate()`` itself; the CHANGELOG says so for the upgrade.
+        class Upper(PydanticValidator):
+            def validate(self, arguments: Any, context: ValidationContext) -> dict[str, Any]:
+                return {**super().validate(arguments, context), "city": "OSLO"}
+
+        validator = Upper(Address)
+        assert validator.validate({"city": "Oslo"}, CONTEXT)["city"] == "OSLO"
+        assert validator.validated({"city": "Oslo"}, CONTEXT).values["city"] == "Oslo"
+
+    def test_a_many_call_hands_a_list_of_model_instances_as_its_data(self) -> None:
+        validated = PydanticValidator(Address).validated_many(
+            {0: {"city": "Oslo"}, 2: {"city": "Bergen"}}, CONTEXT, many_argument="addresses"
+        )
+        assert validated.data == [Address(city="Oslo"), Address(city="Bergen")]
+        assert validated.values == {
+            "addresses": [{"city": "Oslo", "postcode": None}, {"city": "Bergen", "postcode": None}]
+        }
 
 
 class _Colour(enum.Enum):

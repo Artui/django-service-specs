@@ -36,10 +36,13 @@ docs/examples/pydantic_adapter.py:write
 --8<--
 ```
 
-`validate()` returns the values keyed by field name, with nested values left as
-model instances, which is what
+The call's `data` is the model instance pydantic built, as it is the instance
+for the dataclass adapter, so a service declaring `data` receives an
+`AuthorIn` and reads `data.name` whichever of the two validated it; one
+declaring the fields by name receives them. `validate()` returns the values
+keyed by field name, with nested values left as model instances, which is what
 [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]
-reads a row from. The presenter reads the author and its prefetched books
+reads a row from, the instance itself included. The presenter reads the author and its prefetched books
 through the related manager, validates what it read with `AuthorOut`, and
 returns `model_dump(mode="json", by_alias=True)`.
 
@@ -57,7 +60,7 @@ same parameter:
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum` and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeModel]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, as `list[Decimal]` on a dataclass does. The list's length is declared: see below. |
 | a model | An object, with its fields as nested Parameters. |
-| `dict[str, X]` | An object with no declared fields. Its values are the model's to validate. |
+| `dict[str, X]` | An object with no declared fields, as a dataclass's `dict[str, X]` is. Its values are the model's to validate. |
 
 `Annotated` is looked through, so `Annotated[str, Field(max_length=100)]`
 declares a string.

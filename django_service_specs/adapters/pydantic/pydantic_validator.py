@@ -23,6 +23,7 @@ from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 
@@ -149,8 +150,25 @@ class PydanticValidator(Validator):
         sent. ``supports_partial`` is ``False``, so a ``ServiceSpec``
         declaring ``partial=True`` over this Validator is refused when it is
         built, and this refusal answers only a caller using it directly.
-        ``validated()`` is the default: the values are the call's ``data``.
         """
+        return self._validated(arguments, context).values
+
+    def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
+        """The validated instance as the call's ``data``, and its fields as the values.
+
+        A service declaring ``data`` receives the model instance, as it
+        receives the dataclass instance from ``DataclassValidator``, so a
+        service written for ``data.title`` reads the same whichever of the two
+        validated it. One declaring the fields by name receives them, as
+        ``validate()`` returns them; they are the instance's own attributes,
+        so ``data.title`` and ``title`` are one object.
+        """
+        return self._validated(arguments, context)
+
+    def _validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
+        # Neither public method calls the other, so a subclass may extend
+        # either through the other, as one binding a value in ``pool`` on top
+        # of ``validate()`` does, without the two calling each other forever.
         if context.partial:
             raise ImproperlyConfigured(
                 f"PydanticValidator({self.model.__qualname__}) cannot validate a partial call: "
@@ -172,7 +190,8 @@ class PydanticValidator(Validator):
             )
         except ValidationError as exc:
             raise InvalidArguments(_detail(self.model, self._fields, exc)) from exc
-        return {fs.name: getattr(instance, fs.name) for fs in inputs(self._fields)}
+        values = {fs.name: getattr(instance, fs.name) for fs in inputs(self._fields)}
+        return Validated(values=values, data=instance)
 
 
 def _parameters(fields: tuple[FieldShape, ...]) -> Parameters:

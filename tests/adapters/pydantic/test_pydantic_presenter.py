@@ -14,6 +14,7 @@ from django.utils import translation
 from pydantic import BaseModel, Field, ValidationError, computed_field
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 
+from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.pydantic.pydantic_presenter import PydanticPresenter
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
 from django_service_specs.output.field_marking import FieldMarking
@@ -144,6 +145,25 @@ class TestOutput:
         assert output.get("at") == OutputField("at", "string", format="date-time")
         assert output.get("note") == OutputField("note", "string", nullable=True)
         assert output.get("tags") == OutputField("tags", "array", items="string")
+
+    def test_a_str_keyed_map_is_output_as_the_same_dataclass_outputs_it(self) -> None:
+        # One shared table: a map is an object with no declared fields going
+        # out, whichever adapter declared it.
+        @dataclasses.dataclass
+        class PricedRow:
+            prices: dict[str, Decimal]
+            notes: dict[str, str] | None = None
+
+        class PricedModel(BaseModel):
+            prices: dict[str, Decimal]
+            notes: dict[str, str] | None = None
+
+        by_dataclass = DataclassPresenter(PricedRow).output()
+        assert PydanticPresenter(PricedModel).output() == by_dataclass
+        value = SimpleNamespace(prices={"tea": Decimal("2.50")}, notes=None)
+        assert PydanticPresenter(PricedModel).present(value) == DataclassPresenter(
+            PricedRow
+        ).present(value)
 
     def test_computed_fields_follow_the_fields_and_excluded_ones_are_not_output(self) -> None:
         assert PydanticPresenter(_Invoice).output().names() == ("net", "reference", "grossAmount")

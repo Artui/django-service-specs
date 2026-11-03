@@ -230,11 +230,7 @@ def check_seeds(
     **What it cannot see, and so never refuses.** A provider whose return says
     nothing about its keys may fill any keyword of the callable it provides
     for, so that callable's keywords are left to dispatch (the third and
-    fourth); the provider's own are read as any seat's. A read is taken as
-    declared on a provider's seat: one the seat's provider may decline, or
-    an untyped one may fill, is relaxed for the caller by the shape check, so
-    a provider requiring it fails a call leaving it out, which this does not
-    refuse. An annotation that
+    fourth); the provider's own are read as any seat's. An annotation that
     does not resolve, as a forward reference to a name not importable where the
     callable was defined, is not read, and leaves alone only its own keyword
     (the fifth); so is a bare ``list``, an element of ``Any`` or ``object``, a

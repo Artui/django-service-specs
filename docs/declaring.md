@@ -30,7 +30,7 @@ reach a callable only by their names.
 | `user` | The principal | Every callable |
 | `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and its spec's callable affordance conditions' |
 | each validated value, by name | What the Validator returned | The service |
-| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` built | The service |
+| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` or a `PydanticValidator` built | The service |
 | what the Validator binds, by name | A value bound for the call, its `Validated.pool` | The service |
 | `instance` | The row an instance selector resolved | The service, its providers |
 | `collection` | The rows a collection selector resolved | The service, its providers |
@@ -288,7 +288,8 @@ parameters.
 `PATCH` does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 `ValidationContext.partial`. The spec's `reads` and its target selector's stay
-required as declared unless a `kwargs` provider fills or may fill them, so a partial
+required as declared unless a `kwargs` provider fills them, or may fill one no
+provider requires itself, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.
@@ -439,7 +440,11 @@ reads them: `filled`, and `declinable` for a key whose value admits
 untyped provider's values reach, is not demanded of the caller: dispatch
 checks it once the provider has answered, after the class-level permission
 check and, for a Validator field, before the Validator runs, and refuses a
-required one nobody filled, a declined one included.
+required one nobody filled, a declined one included. The exception is a read
+a provider takes by name with no default, as `pk` in
+`kwargs=lambda *, pk: {...}`: a provider is handed the caller's reads and the
+seeds, never another provider's answer, so only the caller can supply it, and
+dispatch demands it of the caller however a provider may fill it.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
@@ -456,7 +461,8 @@ name does not exempt the key.
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
-every parameter a provider fills or may fill, which the shape check relaxes. None of
+every parameter a provider fills or may fill, less a read a provider requires
+itself, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what `parameters()` lists:
 
@@ -732,6 +738,7 @@ docs/examples/declaring.py:validator
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum`'s member names and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, so each is read as a decimal is, a JSON number included, and `?prices=1.5,2.25` is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds it. |
 | a dataclass | An object, with its fields as nested Parameters. |
+| `dict[str, X]`, for any `X` above | An object with no declared fields, as the pydantic adapter declares one, since Parameters cannot say "every value is an `X`". Each value is decoded as `X` and refused under its own key: `{"scores": {"rigour": ["Expected an integer."]}}`. Only a `str` key, since a JSON object has no other. |
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 
 A field with a default or a `default_factory` is optional; one with neither is

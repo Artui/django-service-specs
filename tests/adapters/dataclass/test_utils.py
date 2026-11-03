@@ -35,6 +35,11 @@ class _Node:
 
 
 @dataclass
+class _Tree:
+    branches: dict[str, _Tree]
+
+
+@dataclass
 class _Ping:
     pong: _Pong | None = None
 
@@ -125,6 +130,25 @@ def test_shape_enum_is_the_enum_class_and_nothing_else() -> None:
     assert _read(str).shape.enum is None
 
 
+def test_a_str_keyed_dict_is_an_object_whose_values_keep_their_own_shape() -> None:
+    # Only a str key: a JSON object's keys are strings, and ``dict[int, int]``
+    # is refused (test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation).
+    shape = _read(dict[str, int | None] | None).shape
+    assert (shape.type, shape.python, shape.nullable, shape.fields) == ("object", dict, True, None)
+    assert shape.values is not None
+    assert (shape.values.type, shape.values.python, shape.values.nullable) == (
+        "integer",
+        int,
+        True,
+    )
+    assert shape.items is None
+
+
+def test_a_dataclass_that_contains_itself_through_a_dict_is_refused() -> None:
+    with pytest.raises(ImproperlyConfigured, match="_Tree -> _Tree: a dataclass that contains"):
+        read_fields(_Tree)
+
+
 def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
     shape = _read(Address).shape
     assert (shape.type, shape.python) == ("object", Address)
@@ -142,7 +166,10 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (bytes, "bytes"),
         # A parametrized generic as it was written, which Python 3.10 would
         # otherwise print as its bare class.
-        (dict[str, int], "dict[str, int]"),
+        (dict[int, int], "dict[int, int]"),
+        # Unparameterised, or with values of no JSON type: nothing to decode into.
+        (dict, "dict"),
+        (dict[str, typing.Any], "Any"),
         (set[int], "set[int]"),
         # Unparameterised: there is no element to declare.
         (list, "list"),
@@ -172,13 +199,15 @@ def test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation(
     # three refusals in ``_read`` raised it.
     assert message.endswith(
         "Use str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
-        "a dataclass, or a list of any of these, each optionally '| None'."
+        "a dataclass, dict[str, ...], or a list of any of these, each optionally '| None'."
     )
 
 
 def test_an_unmappable_element_is_refused_under_its_field() -> None:
     with pytest.raises(ImproperlyConfigured, match="Probe.x: .*dict.* has no JSON type"):
-        _read(list[dict[str, int]])
+        _read(list[dict[int, int]])
+    with pytest.raises(ImproperlyConfigured, match="Probe.x: set\\[int\\] has no JSON type"):
+        _read(dict[str, set[int]])
 
 
 def test_a_dataclass_that_contains_itself_is_refused() -> None:

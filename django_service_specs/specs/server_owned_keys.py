@@ -65,9 +65,13 @@ def server_owned_keys(
     any name and so names none. Dispatch does not demand either of the
     caller, since the provider may fill it, and keeps the caller's value
     beneath the provider's answer, so the caller's is the one the callable
-    receives when the provider declines. A transport that asks the caller
-    for neither reads them off ``provider_keys``: its ``declinable`` keys, or
-    every parameter in the seat of a provider it reads as ``None``.
+    receives when the provider declines. Less a read a provider requires
+    itself, by name with no default, which only the caller can send and
+    dispatch demands. A transport that asks the caller for neither reads
+    them off [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+    which leaves such a read out, or
+    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema],
+    which keeps it in ``required``.
 
     **Static per spec.** A transport that also answers some declared
     parameters itself, per mount or per toolset, describes them with a

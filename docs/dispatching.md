@@ -541,7 +541,7 @@ deactivated principal, the shape check over **the target selector's
 parameters alone**, class-level authorization, then the very lookup and checks
 dispatch runs. A Validator field is neither required nor unknown there, and a
 target read the selector's `kwargs` provider fills or may fill is not required, as in
-dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
+dispatch, unless that provider requires it itself, so a GET carrying the route's arguments resolves as a POST carrying the whole form
 does.
 
 ```python
@@ -603,7 +603,7 @@ filled keys, then the Validator on its own arguments - so a
 transport that binds for itself cannot drift from the gate dispatch applies.
 It runs no provider: a field an `input_data` provider would fill passes the
 shape check and, left out, is the Validator's to refuse; a read a `kwargs`
-provider would fill passes too.
+provider would fill passes too, unless a provider requires it itself.
 
 **Hand it the call's seeds** with `pool_seeds=`, the registry dispatch is
 handed, and it binds as dispatch binds with them. A `reflected` read a
@@ -804,10 +804,11 @@ a value it does not declare, so neither callable is held to the keywords it
 requires (a provider's own keywords are read all the same), nor is a
 precondition or an `extend_queryset` beside one, though a positional-only
 parameter is refused whatever stands beside it. An `extra_kwargs` overlay fills
-keywords it cannot see either. A read is taken as declared on a provider's
-seat: one the seat's provider may decline, or an untyped one may fill, is not
-demanded of the caller, so a provider requiring it fails a call leaving it out,
-and that is not refused. The array check alone is not run on a precondition, a
+keywords it cannot see either. A read a provider requires by name is not
+refused even where that provider may fill it, as in `kwargs=lambda *, pk: {...}`
+over a required `pk`: a provider is handed the caller's reads and the seeds,
+never another provider's answer, so dispatch demands such a read of the caller
+and refuses a call leaving it out before any provider runs. The array check alone is not run on a precondition, a
 condition, the output selector, an `extend_queryset`, a provider or a
 `progress_reporter`. A
 callable taking `**kwargs` requires nothing, so one forwarding into a stricter
@@ -822,7 +823,7 @@ its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_nam
 the reflected reads a seed fills and the parameters dispatch refuses, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
 every parameter a provider fills or may fill, which the shape check does not
-demand of the caller.
+demand of the caller, less a read a provider requires itself, which it does.
 
 A Validator field the service never receives is not among the refusals,
 because such a spec runs and may mean to: a Validator checking that
