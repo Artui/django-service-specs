@@ -288,7 +288,8 @@ parameters.
 `PATCH` does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 `ValidationContext.partial`. The spec's `reads` and its target selector's stay
-required as declared unless a `kwargs` provider fills or may fill them, so a partial
+required as declared unless a `kwargs` provider fills them, or may fill one no
+provider requires itself, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.

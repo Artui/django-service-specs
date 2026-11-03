@@ -834,10 +834,21 @@ def test_a_reflected_read_a_seed_fills_reaches_a_provider_requiring_it(
     assert calls == [SEEDED]
 
 
-def test_a_provider_whose_signature_cannot_be_read_relaxes_as_before(ada: Any) -> None:
+def _bad_signature(**_: Any) -> None: ...
+
+
+# ``inspect.signature`` raises ``ValueError`` for a builtin like ``dict`` and
+# ``TypeError`` for a ``__signature__`` that is no ``Signature``.
+setattr(_bad_signature, "__signature__", 3)  # noqa: B010
+
+
+@pytest.mark.parametrize("provider", [dict, _bad_signature], ids=["builtin", "bad-signature"])
+def test_a_provider_whose_signature_cannot_be_read_relaxes_as_before(
+    ada: Any, provider: Callable[..., Any]
+) -> None:
     # Refused by ``check_seeds``, and failing where dispatch binds it; the
     # shape check reads no demand off it.
-    spec = ServiceSpec(service=Record(), permissions=OPEN, reads=_project(), kwargs=dict)
+    spec = ServiceSpec(service=Record(), permissions=OPEN, reads=_project(), kwargs=provider)
     checked, _ = check_call(spec, principal=ada, arguments={})
     assert checked == {}
 

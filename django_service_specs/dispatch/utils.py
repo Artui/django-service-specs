@@ -689,8 +689,9 @@ def shape_check(
     - **Under** ``partial`` **an absent Validator field**, at any depth, as
       djangorestframework-services relaxes only its serializer. A ``reads``
       argument and a target selector's read, the ``pk`` among them, stay
-      required as declared unless a provider fills or may fill them: a
-      partial update still needs to say which row it updates
+      required as declared unless a provider fills them, or may fill one
+      no provider requires itself: a partial update still needs to say which
+      row it updates
       (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
 
     A present value is checked as declared either way, and an unknown key is
