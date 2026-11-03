@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that a read a provider requires itself is asked of the caller, who is refused
   with `InvalidArguments` when they leave it out, both linked from Declaring and
   Dispatching. Step 1 of `dispatch`'s docstring names that exception, as the other
-  five docstrings did in 0.25.0. The dataclass adapter's refusal test now holds
+  docstrings did in 0.25.0. The dataclass adapter's refusal test now holds
   `tuple[str, int]` and `Mapping[str, int]`, so the `dict` condition of its
   str-keyed-map branch is pinned by a test of its own.
 

@@ -444,15 +444,7 @@ required one nobody filled, a declined one included. The exception is a read
 a provider takes by name with no default, as `pk` in
 `kwargs=lambda *, pk: {...}`: a provider is handed the caller's reads and the
 seeds, never another provider's answer, so only the caller can supply it, and
-dispatch demands it of the caller however a provider may fill it, and a call
-leaving it out is refused with `InvalidArguments` before the provider runs:
-
-```python
---8<--
-docs/examples/declaring_writes.py:required_read
---8<--
-```
-
+dispatch demands it of the caller however a provider may fill it.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
@@ -466,6 +458,16 @@ built or, for a Validator field, when `parameters()` is assembled. So is
 one annotated to fill a `many` spec's list, the `many_argument`, or to
 possibly fill it: no provider reaches it, and a Validator field of the same
 name does not exempt the key.
+
+A call leaving out a read its own provider requires, though that provider may
+fill it, is refused with `InvalidArguments` before the provider runs:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:required_read
+--8<--
+```
+
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]

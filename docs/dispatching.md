@@ -27,9 +27,7 @@ the async entry point:
    to fill. A read a provider requires itself, by name with no default, is
    not relaxed: only the caller can send it, and a call leaving it out is
    refused here, before any provider runs
-   ([example](declaring.md#providers-and-preconditions)). A dataclass's
-   `dict[str, X]` field is checked value by value, and a refusal names the key
-   ([example](declaring.md#the-dataclass-adapter)).
+   ([example](declaring.md#providers-and-preconditions)).
 2. **Class-level authorization**: every permission check's `has_permission`,
    or the [grant](#grants) a transport passed instead. A seed a check names
    is resolved just before it, and only such a seed
@@ -51,7 +49,11 @@ the async entry point:
    is asked of neither.
 5. **Validation**: a write's `input_data` provider, then its Validator on only
    the arguments it declares, with the provider's values merged over the
-   caller's, and the resolved target and `partial` in its context.
+   caller's, and the resolved target and `partial` in its context. A
+   dataclass Validator decodes each value of a `dict[str, X]` field there and
+   refuses one under its own key
+   ([example](declaring.md#the-dataclass-adapter)); the shape check sees only
+   an object.
 6. **Affordances, then preconditions**: a write's `affordances`, in
    declaration order - the first one not met refuses the call with
    `ActionUnavailable`, carrying its `code` - then its `preconditions`, the
