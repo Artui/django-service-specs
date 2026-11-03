@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.1] — 2026-11-03
+
 ### Changed
 - **Documentation and tests only; no behaviour changes.** The docs gain a runnable
   example of a dataclass input carrying `dict[str, X]` and one of the 0.25.0 rule
@@ -2454,7 +2456,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/Artui/django-service-specs/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Artui/django-service-specs/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Artui/django-service-specs/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/Artui/django-service-specs/compare/v0.22.0...v0.23.0
