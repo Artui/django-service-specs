@@ -155,6 +155,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.authorization.is_deactivated.is_deactivated
 ::: django_service_specs.authorization.sync_answer.sync_answer
 ::: django_service_specs.authorization.not_permitted.NotPermitted
+::: django_service_specs.authorization.permission_check_denied.PermissionCheckDenied
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
 
 ## Services

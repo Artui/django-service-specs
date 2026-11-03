@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   call's context only to one that declares `call_context`, so a transport asking a
   Validator itself during a call, for a `many` spec's rows say, describes one that
   opted in as dispatch does, whoever wrote it.
+- **`PermissionCheckDenied`, a `NotPermitted` marking a declared check's denial.**
+  `authorize`, `authorize_target` and `authorize_scope` raise it when one of the
+  spec's checks answers `False`, carrying the `check` that answered (a
+  combinator, for a check inside one) and the `spec` it was asked about, the
+  compiled one for a declaration of another library's. The message is unchanged.
+  Every other `NotPermitted` stays bare: a grant or seeds carrier that does not
+  cover the call, a service's own refusal, and a check raising `NotPermitted`
+  itself. So a transport can answer a check's denial of an anonymous caller with
+  a challenge and every other refusal as forbidden; a denial inside a service's
+  own `dispatch` propagates out as the same class, so it compares `exc.spec` with
+  its own call's spec. It is in `REFUSALS`: a map read as ordered rows answers it
+  with its `NotPermitted` row, while one looked up by exact class now reports it
+  unanswered until it gets an entry.
 
 ## [0.23.0] — 2026-11-02
 

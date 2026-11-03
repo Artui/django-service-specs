@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.utils import (
     OBJECT_LEVEL,
@@ -149,4 +149,4 @@ def authorize_target(
             **asked_with(check, "has_object_permission", arguments, positional=3, offered=offered),
         )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_object_permission"):
-            raise NotPermitted(check.message)
+            raise PermissionCheckDenied(check=check, spec=spec)

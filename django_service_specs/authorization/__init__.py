@@ -6,6 +6,7 @@ from django_service_specs.authorization.is_deactivated import is_deactivated
 from django_service_specs.authorization.none_of import NoneOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.resolve_principal import resolve_principal
 from django_service_specs.authorization.sync_answer import sync_answer
@@ -17,6 +18,7 @@ __all__ = [
     "NoneOf",
     "NotPermitted",
     "PermissionCheck",
+    "PermissionCheckDenied",
     "PrincipalUnavailable",
     "Unrestricted",
     "is_deactivated",

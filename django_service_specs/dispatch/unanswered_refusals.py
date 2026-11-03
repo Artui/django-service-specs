@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence, Set
+from typing import Any
 
+from django_service_specs.authorization.permission_check import PermissionCheck
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.parameters.coded_message import CodedMessage
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -11,14 +14,36 @@ from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.services.service_error import ServiceError
 from django_service_specs.services.service_validation_error import ServiceValidationError
+from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.refusal_finding import RefusalFinding
 from django_service_specs.types.refusal_finding_kind import RefusalFindingKind
+from django_service_specs.types.selector_kind import SelectorKind
+
+
+class _Denies(PermissionCheck):
+    """The check a built ``PermissionCheckDenied`` names, which denies every caller."""
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return False
+
+
+def _check_denied() -> PermissionCheckDenied:
+    """A check's denial as ``authorize`` raises it, naming the check and the spec declaring it.
+
+    ``authorize`` handed the same spec denies with the same check
+    (test_a_check_s_denial_is_built_as_authorize_raises_it).
+    """
+    check = _Denies()
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
+    return PermissionCheckDenied(check=check, spec=spec)
+
 
 _BUILDERS: dict[type[BaseException], Callable[[], DispatchError | ServiceError]] = {
     InvalidArguments: lambda: InvalidArguments(
         {"title": [CodedMessage("This field is required.", "required")]}
     ),
+    PermissionCheckDenied: _check_denied,
     ServiceValidationError: lambda: ServiceValidationError("This value is invalid."),
     ActionUnavailable: lambda: ActionUnavailable(code="unavailable"),
     AdditionalInputRequired: lambda: AdditionalInputRequired("One more value is needed."),
@@ -28,7 +53,9 @@ _BUILDERS: dict[type[BaseException], Callable[[], DispatchError | ServiceError]]
 Each built as a dispatch or a service raises it, so a map reading what it
 carries - a tree, a code, a detail - reads a real one. The tree is the one the
 shape check raises for a required argument nobody sent, its message a
-``CodedMessage`` carrying ``"required"``."""
+``CodedMessage`` carrying ``"required"``. A check's denial names a check
+denying every caller and a spec declaring it, so a map comparing its spec
+with its own call's reads a denial of another call's."""
 
 
 def unanswered_refusals(

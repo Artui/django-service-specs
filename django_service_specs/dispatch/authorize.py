@@ -8,6 +8,7 @@ from typing import Any
 from django.core.exceptions import ImproperlyConfigured
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.utils import (
     CLASS_LEVEL,
@@ -165,5 +166,5 @@ def authorize(
             principal, spec, **asked_with(check, "has_permission", arguments, offered=offered)
         )
         if not sync_answer(answer, asked=f"{type(check).__qualname__}.has_permission"):
-            raise NotPermitted(check.message)
+            raise PermissionCheckDenied(check=check, spec=spec)
     return Grant(spec, principal)

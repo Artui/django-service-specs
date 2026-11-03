@@ -231,6 +231,23 @@ row reads an attribute off it and would fail on either. `message` is what
 [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
 says when the check refuses.
 
+**A check's denial is marked.** A check answering `False`, at any of the
+three questions, raises
+[`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+a `NotPermitted` carrying the `check` that answered and the `spec` it was
+asked about. Every other `NotPermitted` stays bare: a grant or a seeds carrier
+that does not cover the call, a service's own refusal, and a check that raises
+`NotPermitted` itself rather than answering. So a transport can answer a
+check's denial of an anonymous caller with an authentication challenge, as
+DRF's `permission_denied` does, and every other refusal as forbidden. A
+combinator's denial names the combinator, the rule the spec declares. A
+denial inside a `dispatch` the service makes propagates out of the outer call
+as the same class, so a transport treats it as its own call's only where
+`exc.spec is kernel_spec(spec)` for the spec it dispatched: `spec` is the
+compiled spec, the one the check was handed, and
+[`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] answers
+the same one for a declaration every time.
+
 **A check can read the call's arguments** by declaring a keyword `arguments`
 on any of its three methods. Dispatch then hands that method the call's
 shape-checked arguments as a read-only mapping - a route's captured `pk`, a

@@ -7,6 +7,7 @@ import pytest
 from django_service_specs import (
     DispatchError,
     NotPermitted,
+    PrincipalUnavailable,
     ServiceConflict,
     ServiceError,
     unanswered_refusals,
@@ -24,8 +25,8 @@ def test_it_is_what_the_check_returns_and_compares_by_value() -> None:
 
 
 def test_only_a_shadowed_row_names_the_row_above_it() -> None:
-    found = unanswered_refusals(lambda error: None if type(error) is NotPermitted else 1)
-    assert found == (RefusalFinding(NotPermitted, RefusalFindingKind.UNANSWERED),)
+    found = unanswered_refusals(lambda error: None if type(error) is PrincipalUnavailable else 1)
+    assert found == (RefusalFinding(PrincipalUnavailable, RefusalFindingKind.UNANSWERED),)
     assert found[0].shadowed_by is None
 
 

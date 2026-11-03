@@ -22,12 +22,14 @@ from django_service_specs import (
     DispatchError,
     InvalidArguments,
     NotPermitted,
+    PermissionCheckDenied,
     PrincipalUnavailable,
     ServiceConflict,
     ServiceError,
     ServiceNotFound,
     ServiceValidationError,
 )
+from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.refusals import REFUSALS
 from django_service_specs.dispatch.unanswered_refusals import unanswered_refusals
 from django_service_specs.parameters.check_arguments import check_arguments
@@ -114,7 +116,10 @@ class TestAnOrderedMap:
         def answer(error: DispatchError | ServiceError) -> object:
             return next((outcome for kind, outcome in rows if isinstance(error, kind)), None)
 
-        assert _facts(unanswered_refusals(rows)) == (_unanswered(NotPermitted),)
+        assert _facts(unanswered_refusals(rows)) == (
+            _unanswered(NotPermitted),
+            _unanswered(PermissionCheckDenied),
+        )
         assert unanswered_refusals(rows) == unanswered_refusals(answer)
 
     def test_the_first_matching_row_answers_even_when_it_answers_unanswered(self) -> None:
@@ -175,11 +180,11 @@ class TestTheBareBaseTrap:
 
     def test_a_refusal_with_nothing_under_it_is_never_called_a_base(self) -> None:
         # Holds the first conjunct of the bare-base guard: with nothing under
-        # NotPermitted, "every refusal under it" is vacuously answered.
+        # PrincipalUnavailable, "every refusal under it" is vacuously answered.
         found = unanswered_refusals(
-            lambda error: None if type(error) is NotPermitted else "answered"
+            lambda error: None if type(error) is PrincipalUnavailable else "answered"
         )
-        assert _facts(found) == (_unanswered(NotPermitted),)
+        assert _facts(found) == (_unanswered(PrincipalUnavailable),)
         assert _without(found, BARE, SHADOWED)
 
 
@@ -270,8 +275,9 @@ class TestACallable:
 
     def test_each_refusal_carries_what_a_real_map_reads(self) -> None:
         # An HTTP map reads every refusal's message, InvalidArguments' and
-        # ServiceValidationError's detail, ActionUnavailable's code and
-        # AdditionalInputRequired's schema; reading one an instance lacks
+        # ServiceValidationError's detail, ActionUnavailable's code,
+        # AdditionalInputRequired's schema and PermissionCheckDenied's check
+        # and spec; reading one an instance lacks
         # raises here. It has no unanswered value, so this proves the
         # instances, not the map's coverage.
         def answer(error: DispatchError | ServiceError) -> Any:
@@ -281,6 +287,8 @@ class TestACallable:
                 return {"detail": error.message, "code": error.code}
             if isinstance(error, AdditionalInputRequired):
                 return {"detail": error.message, "schema": error.schema}
+            if isinstance(error, PermissionCheckDenied):
+                return {"detail": error.message, "check": error.check, "spec": error.spec}
             return {"detail": error.message}
 
         assert unanswered_refusals(answer) == ()
@@ -306,6 +314,24 @@ class TestACallable:
                 (type(m), m, getattr(m, "code", None)) for m in real
             ]
         assert built.detail["title"][0].code == "required"
+
+    def test_a_check_s_denial_is_built_as_authorize_raises_it(self) -> None:
+        # Its spec declares its check, and authorize handed that spec denies
+        # with that check: the built denial is one authorize raises.
+        seen: list[PermissionCheckDenied] = []
+
+        def answer(error: DispatchError | ServiceError) -> str:
+            if isinstance(error, PermissionCheckDenied):
+                seen.append(error)
+            return "answered"
+
+        unanswered_refusals(answer)
+        (built,) = seen
+        with pytest.raises(PermissionCheckDenied) as raised:
+            authorize(built.spec, object())
+        assert raised.value.check is built.check
+        assert raised.value.spec is built.spec
+        assert raised.value.message == built.message
 
 
 def test_a_table_given_as_a_generator_is_read_as_the_same_table() -> None:

@@ -15,6 +15,10 @@ class NotPermitted(DispatchError):
     ``PermissionDenied``, which Django and DRF both own for their own
     exceptions, and not a service error: a model that reads a denial as a
     refusal to route around keeps trying, where a denial should end the attempt.
+
+    A declared check answering ``False`` raises
+    [`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+    a subclass naming the check and the spec; every other refusal is this.
     """
 
     default_message: ClassVar[str] = gettext_noop(
