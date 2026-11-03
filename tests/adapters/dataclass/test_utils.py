@@ -3,6 +3,7 @@ from __future__ import annotations
 import dataclasses
 import re
 import typing
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import Annotated, Any, Literal
@@ -171,6 +172,11 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (dict, "dict"),
         (dict[str, typing.Any], "Any"),
         (set[int], "set[int]"),
+        # A first argument of ``str`` is not enough: only a ``dict`` is one
+        # object. A tuple or a Mapping starting ``str`` reads like a str-keyed
+        # dict through its arguments alone.
+        (tuple[str, int], "tuple[str, int]"),
+        (Mapping[str, int], "Mapping[str, int]"),
         # Unparameterised: there is no element to declare.
         (list, "list"),
         (typing.List, "typing.List"),  # noqa: UP006

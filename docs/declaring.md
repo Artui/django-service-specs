@@ -444,7 +444,15 @@ required one nobody filled, a declined one included. The exception is a read
 a provider takes by name with no default, as `pk` in
 `kwargs=lambda *, pk: {...}`: a provider is handed the caller's reads and the
 seeds, never another provider's answer, so only the caller can supply it, and
-dispatch demands it of the caller however a provider may fill it.
+dispatch demands it of the caller however a provider may fill it, and a call
+leaving it out is refused with `InvalidArguments` before the provider runs:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:required_read
+--8<--
+```
+
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
@@ -742,7 +750,16 @@ docs/examples/declaring.py:validator
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 
 A field with a default or a `default_factory` is optional; one with neither is
-required. An annotation outside the table is refused, naming the field.
+required. An annotation outside the table is refused, naming the field. A
+`dict[str, X]` field is declared and refused as the table says, and only a
+`dict`: a `Mapping[str, X]` or a `tuple[str, X]` is outside the table, though
+its first argument is `str`:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:dict_input
+--8<--
+```
 
 What `DataclassValidator(AuthorIn)` declares, then: `name`, a required string,
 and `books`, an optional array whose rows take a required `title`, a required

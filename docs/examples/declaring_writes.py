@@ -86,3 +86,46 @@ create_note_spec = ServiceSpec(
 # server_owned_keys(create_note_spec) names "owner_id": a transport's schema
 # need not ask for it, and dispatch does not demand it of the caller.
 # --8<-- [end:providers]
+
+
+# --8<-- [start:dict_input]
+@dataclass
+class ReviewIn:
+    title: str
+    scores: dict[str, int]  # any criterion, each an integer
+
+
+def record_review(*, data: ReviewIn) -> ReviewIn:
+    return data
+
+
+record_review_spec = ServiceSpec(
+    service=record_review,
+    permissions=[IsSignedIn()],
+    validator=DataclassValidator(ReviewIn),
+)
+# `scores` is declared as an object with no fields; each value is decoded as an
+# int and refused under its own key: {"scores": {"rigour": ["Expected an integer."]}}.
+# --8<-- [end:dict_input]
+
+
+# --8<-- [start:required_read]
+def project_scope(*, project: str) -> dict[str, Any]:
+    # Untyped, so it may fill any key. It is handed the caller's reads and
+    # never another provider's answer, so `project` can only come from the caller.
+    return {"project": project.strip().lower()}
+
+
+def file_in_project(*, project: str) -> str:
+    return project
+
+
+file_in_project_spec = ServiceSpec(
+    service=file_in_project,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("project", "string", required=True)),
+    kwargs=project_scope,
+)
+# A call leaving `project` out is refused as InvalidArguments, before the
+# provider runs, though the provider's keys are otherwise not asked of the caller.
+# --8<-- [end:required_read]

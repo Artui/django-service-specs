@@ -320,6 +320,33 @@ class TestDeclaringWrites:
         sent = dispatch(spec, principal=ada, arguments={"title": "Also mine", "owner_id": bob.pk})
         assert sent.value.owner_id == ada.pk
 
+    def test_a_dict_input_declares_an_object_and_is_refused_under_its_key(self, ada: Any) -> None:
+        spec = declaring_writes.record_review_spec
+        scores = spec.parameters().get("scores")
+        assert scores is not None and scores.type == "object"
+        ok = dispatch(
+            spec, principal=ada, arguments={"title": "Paper", "scores": {"rigour": 4, "style": 2}}
+        )
+        assert ok.value == declaring_writes.ReviewIn("Paper", {"rigour": 4, "style": 2})
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                spec,
+                principal=ada,
+                arguments={"title": "Paper", "scores": {"rigour": "high"}},
+            )
+        assert refused.value.detail == {"scores": {"rigour": ["Expected an integer."]}}
+
+    def test_a_read_the_providers_requires_is_asked_of_the_caller(self, ada: Any) -> None:
+        spec = declaring_writes.file_in_project_spec
+        # The provider may fill `project`, yet it is handed only the caller's
+        # reads, so a call leaving it out is refused before the provider runs.
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={})
+        assert refused.value.detail == {"project": ["This field is required."]}
+        # Sent, it reaches the provider, whose answer outranks the caller's.
+        sent = dispatch(spec, principal=ada, arguments={"project": "  Apollo "})
+        assert sent.value == "apollo"
+
 
 @pytest.mark.django_db
 class TestCallContext:
