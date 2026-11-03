@@ -1175,7 +1175,7 @@ reach a callable only by their names.</p>
 </tr>
 <tr>
 <td><code>data</code></td>
-<td>The Validator's <code>data</code>: the validated values as one mapping, or the instance a <code>DataclassValidator</code> built</td>
+<td>The Validator's <code>data</code>: the validated values as one mapping, or the instance a <code>DataclassValidator</code> or a <code>PydanticValidator</code> built</td>
 <td>The service</td>
 </tr>
 <tr>
@@ -1528,7 +1528,8 @@ parameters.</p>
 <code>PATCH</code> does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 <code>ValidationContext.partial</code>. The spec's <code>reads</code> and its target selector's stay
-required as declared unless a <code>kwargs</code> provider fills or may fill them, so a partial
+required as declared unless a <code>kwargs</code> provider fills them, or may fill one no
+provider requires itself, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. <code>parameters()</code> is unchanged:
 <code>required</code> still says what a whole update needs.
@@ -1687,7 +1688,11 @@ reads them: <code>filled</code>, and <code>declinable</code> for a key whose val
 untyped provider's values reach, is not demanded of the caller: dispatch
 checks it once the provider has answered, after the class-level permission
 check and, for a Validator field, before the Validator runs, and refuses a
-required one nobody filled, a declined one included.
+required one nobody filled, a declined one included. The exception is a read
+a provider takes by name with no default, as <code>pk</code> in
+<code>kwargs=lambda *, pk: {...}</code>: a provider is handed the caller's reads and the
+seeds, never another provider's answer, so only the caller can supply it, and
+dispatch demands it of the caller however a provider may fill it.
 <a class="autorefs autorefs-internal" title="bind_arguments" href="../reference/#django_service_specs.dispatch.bind_arguments.bind_arguments"><code>bind_arguments</code></a>
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its <code>arguments</code> uses <code>.get</code>. The
@@ -1704,7 +1709,8 @@ name does not exempt the key.
 <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>
 gathers what every provider of a spec fills, with the seeds' names, and
 <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>
-every parameter a provider fills or may fill, which the shape check relaxes. None of
+every parameter a provider fills or may fill, less a read a provider requires
+itself, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what <code>parameters()</code> lists:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Owned</span><span class="p">(</span><span class="n">TypedDict</span><span class="p">):</span>  <span class="c1"># the keys the provider fills, readable before it runs</span>
@@ -1914,7 +1920,11 @@ methods, and two more methods, an attribute and a property with defaults:</p>
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose <code>parameters</code> takes only <code>**kwargs</code>, or is a
   <code>functools.wraps</code> wrapper that does not name the keyword itself: the
-  method's own signature decides. <code>ServiceSpec.parameters()</code> and
+  method's own signature decides. A transport that asks a Validator itself
+  during a call asks it as dispatch does, through
+  <a class="autorefs autorefs-internal" title="validator_parameters" href="../reference/#django_service_specs.validation.validator_parameters.validator_parameters"><code>validator_parameters</code></a>
+  with the call's dict, so a Validator that opted in is handed it there too.
+  <code>ServiceSpec.parameters()</code> and
   <code>SelectorSpec.parameters()</code> take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept <code>call_context</code>, which
   dispatch now passes: an override written <code>parameters(self)</code> raises <code>TypeError</code>
@@ -2057,6 +2067,10 @@ partial spec over it is refused when the spec is built.</p>
 <tr>
 <td>a dataclass</td>
 <td>An object, with its fields as nested Parameters.</td>
+</tr>
+<tr>
+<td><code>dict[str, X]</code>, for any <code>X</code> above</td>
+<td>An object with no declared fields, as the pydantic adapter declares one, since Parameters cannot say "every value is an <code>X</code>". Each value is decoded as <code>X</code> and refused under its own key: <code>{"scores": {"rigour": ["Expected an integer."]}}</code>. Only a <code>str</code> key, since a JSON object has no other.</td>
 </tr>
 <tr>
 <td><code>X \| UnsetType</code></td>

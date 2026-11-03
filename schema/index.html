@@ -1073,7 +1073,9 @@ happened to install.</p>
   " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a> -
   is neither offered nor required, and a parameter a provider may fill,
   <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>,
-  is offered and not required. A <code>many</code> spec's rows are read the same way
+  is offered and not required. A read a provider requires itself stays
+  required, though the provider may fill it: a provider is handed only what
+  the caller sent and the seeds, so dispatch demands it of the caller. A <code>many</code> spec's rows are read the same way
   by what <code>input_data</code> reaches there, so a field it fills is not asked for
   in any row. Its list is offered and required unless the transport binds
   it, since dispatch demands the list of the caller whatever a provider
@@ -1391,7 +1393,8 @@ server fills, the names a transport binds or withholds with
       dataclass
   " href="../reference/#django_service_specs.types.server_arguments.ServerArguments"><code>ServerArguments</code></a>
 among them (see <a href="../dispatching/#arguments-the-server-supplies">arguments the server supplies</a>),
-and requires nothing a provider may fill, in each row of a <code>many</code> spec too.
+and requires nothing a provider may fill, in each row of a <code>many</code> spec too,
+but a read a provider requires itself, which the caller alone can hand it.
 The list itself is never relaxed, and withheld only when the transport binds it.</p>
 <h3 id="the-decimal-convention">The decimal convention<a class="headerlink" href="#the-decimal-convention" title="Permanent link">&para;</a></h3>
 <p>A decimal is <code>{"type": "string", "format": "decimal"}</code>. The shape check also

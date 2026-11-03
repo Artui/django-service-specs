@@ -1579,6 +1579,22 @@ allows unless overridden too. It is a method of its own rather than
 row reads an attribute off it and would fail on either. <code>message</code> is what
 <a class="autorefs autorefs-internal" title="NotPermitted" href="../reference/#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
 says when the check refuses.</p>
+<p><strong>A check's denial is marked.</strong> A check answering <code>False</code>, at any of the
+three questions, raises
+<a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="../reference/#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
+a <code>NotPermitted</code> carrying the <code>check</code> that answered and the <code>spec</code> it was
+asked about. Every other <code>NotPermitted</code> stays bare: a grant or a seeds carrier
+that does not cover the call, a service's own refusal, and a check that raises
+<code>NotPermitted</code> itself rather than answering. So a transport can answer a
+check's denial of an anonymous caller with an authentication challenge, as
+DRF's <code>permission_denied</code> does, and every other refusal as forbidden. A
+combinator's denial names the combinator, the rule the spec declares. A
+denial inside a <code>dispatch</code> the service makes propagates out of the outer call
+as the same class, so a transport treats it as its own call's only where
+<code>exc.spec is kernel_spec(spec)</code> for the spec it dispatched: <code>spec</code> is the
+compiled spec, the one the check was handed, and
+<a class="autorefs autorefs-internal" title="kernel_spec" href="../reference/#django_service_specs.specs.kernel_spec.kernel_spec"><code>kernel_spec</code></a> answers
+the same one for a declaration every time.</p>
 <p><strong>A check can read the call's arguments</strong> by declaring a keyword <code>arguments</code>
 on any of its three methods. Dispatch then hands that method the call's
 shape-checked arguments as a read-only mapping - a route's captured <code>pk</code>, a
@@ -1962,7 +1978,7 @@ deactivated principal, the shape check over <strong>the target selector's
 parameters alone</strong>, class-level authorization, then the very lookup and checks
 dispatch runs. A Validator field is neither required nor unknown there, and a
 target read the selector's <code>kwargs</code> provider fills or may fill is not required, as in
-dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
+dispatch, unless that provider requires it itself, so a GET carrying the route's arguments resolves as a POST carrying the whole form
 does.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">rename_page</span><span class="p">(</span><span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pk</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">title</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
 </span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>    <span class="n">context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># one dict, for the lookup and the call it checked</span>
@@ -2036,7 +2052,7 @@ filled keys, then the Validator on its own arguments - so a
 transport that binds for itself cannot drift from the gate dispatch applies.
 It runs no provider: a field an <code>input_data</code> provider would fill passes the
 shape check and, left out, is the Validator's to refuse; a read a <code>kwargs</code>
-provider would fill passes too.</p>
+provider would fill passes too, unless a provider requires it itself.</p>
 <p><strong>Hand it the call's seeds</strong> with <code>pool_seeds=</code>, the registry dispatch is
 handed, and it binds as dispatch binds with them. A <code>reflected</code> read a
 registered seed fills is not demanded of the caller, and the caller's value for
@@ -2291,10 +2307,11 @@ a value it does not declare, so neither callable is held to the keywords it
 requires (a provider's own keywords are read all the same), nor is a
 precondition or an <code>extend_queryset</code> beside one, though a positional-only
 parameter is refused whatever stands beside it. An <code>extra_kwargs</code> overlay fills
-keywords it cannot see either. A read is taken as declared on a provider's
-seat: one the seat's provider may decline, or an untyped one may fill, is not
-demanded of the caller, so a provider requiring it fails a call leaving it out,
-and that is not refused. The array check alone is not run on a precondition, a
+keywords it cannot see either. A read a provider requires by name is not
+refused even where that provider may fill it, as in <code>kwargs=lambda *, pk: {...}</code>
+over a required <code>pk</code>: a provider is handed the caller's reads and the seeds,
+never another provider's answer, so dispatch demands such a read of the caller
+and refuses a call leaving it out before any provider runs. The array check alone is not run on a precondition, a
 condition, the output selector, an <code>extend_queryset</code>, a provider or a
 <code>progress_reporter</code>. A
 callable taking <code>**kwargs</code> requires nothing, so one forwarding into a stricter
@@ -2308,7 +2325,7 @@ its own answer: <a class="autorefs autorefs-internal" title="seed_named_paramete
 the reflected reads a seed fills and the parameters dispatch refuses, and
 <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>,
 every parameter a provider fills or may fill, which the shape check does not
-demand of the caller.</p>
+demand of the caller, less a read a provider requires itself, which it does.</p>
 <p>A Validator field the service never receives is not among the refusals,
 because such a spec runs and may mean to: a Validator checking that
 <code>password</code> and <code>confirm</code> agree returns <code>password</code> alone, and its service never
@@ -2957,7 +2974,10 @@ what the service left there.</p>
   ask outside one, such as registration or a schema
   (<a href="../declaring/#the-validator">the Validator</a>). So a transport describing a
   serializer under its own request can tell its own call from a <code>dispatch</code>
-  the service makes inside it, which is handed a dict of its own.</li>
+  the service makes inside it, which is handed a dict of its own. A
+  transport asking the Validator itself during the call does so through
+  <a class="autorefs autorefs-internal" title="validator_parameters" href="../reference/#django_service_specs.validation.validator_parameters.validator_parameters"><code>validator_parameters</code></a>,
+  handing it the same dict.</li>
 <li><strong>An inner dispatch handed the outer dict is described as the outer call.</strong>
   A service that forwards its own <code>call_context</code> to a <code>dispatch</code> it makes
   for another principal or operation has every stage of that inner call -

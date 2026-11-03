@@ -981,7 +981,7 @@ the only thing that needs the extra:</p>
 <p>The nested write from <a href="../relations/">Relations</a>, declared as models:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">date</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">decimal</span><span class="w"> </span><span class="kn">import</span> <span class="n">Decimal</span>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span><span class="p">,</span> <span class="n">Any</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Annotated</span>
 </span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
 </span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span><span class="p">,</span> <span class="n">Field</span><span class="p">,</span> <span class="n">model_validator</span>
 </span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>
@@ -1032,7 +1032,7 @@ the only thing that needs the extra:</p>
 </span><span id="__span-2-51"><a id="__codelineno-2-51" name="__codelineno-2-51" href="#__codelineno-2-51"></a>    <span class="n">books</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">BookOut</span><span class="p">]</span>
 </span><span id="__span-2-52"><a id="__codelineno-2-52" name="__codelineno-2-52" href="#__codelineno-2-52"></a>
 </span><span id="__span-2-53"><a id="__codelineno-2-53" name="__codelineno-2-53" href="#__codelineno-2-53"></a>
-</span><span id="__span-2-54"><a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">ChangeResult</span><span class="p">[</span><span class="n">Author</span><span class="p">]:</span>
+</span><span id="__span-2-54"><a id="__codelineno-2-54" name="__codelineno-2-54" href="#__codelineno-2-54"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_author</span><span class="p">(</span><span class="o">*</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">AuthorIn</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ChangeResult</span><span class="p">[</span><span class="n">Author</span><span class="p">]:</span>
 </span><span id="__span-2-55"><a id="__codelineno-2-55" name="__codelineno-2-55" href="#__codelineno-2-55"></a>    <span class="k">return</span> <span class="n">create_from_input</span><span class="p">(</span><span class="n">Author</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">relations</span><span class="o">=</span><span class="p">{</span><span class="s2">"books"</span><span class="p">:</span> <span class="n">ChildSpec</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="n">Book</span><span class="p">,</span> <span class="n">fk</span><span class="o">=</span><span class="s2">"author"</span><span class="p">)})</span>
 </span><span id="__span-2-56"><a id="__codelineno-2-56" name="__codelineno-2-56" href="#__codelineno-2-56"></a>
 </span><span id="__span-2-57"><a id="__codelineno-2-57" name="__codelineno-2-57" href="#__codelineno-2-57"></a>
@@ -1048,10 +1048,13 @@ the only thing that needs the extra:</p>
 </span><span id="__span-2-67"><a id="__codelineno-2-67" name="__codelineno-2-67" href="#__codelineno-2-67"></a>    <span class="p">),</span>
 </span><span id="__span-2-68"><a id="__codelineno-2-68" name="__codelineno-2-68" href="#__codelineno-2-68"></a><span class="p">)</span>
 </span></code></pre></div>
-<p><code>validate()</code> returns the values keyed by field name, with nested values left as
-model instances, which is what
+<p>The call's <code>data</code> is the model instance pydantic built, as it is the instance
+for the dataclass adapter, so a service declaring <code>data</code> receives an
+<code>AuthorIn</code> and reads <code>data.name</code> whichever of the two validated it; one
+declaring the fields by name receives them. <code>validate()</code> returns the values
+keyed by field name, with nested values left as model instances, which is what
 <a class="autorefs autorefs-internal" title="create_from_input" href="../reference/#django_service_specs.mutations.create_from_input.create_from_input"><code>create_from_input</code></a>
-reads a row from. The presenter reads the author and its prefetched books
+reads a row from, the instance itself included. The presenter reads the author and its prefetched books
 through the related manager, validates what it read with <code>AuthorOut</code>, and
 returns <code>model_dump(mode="json", by_alias=True)</code>.</p>
 <h2 id="what-a-model-declares">What a model declares<a class="headerlink" href="#what-a-model-declares" title="Permanent link">&para;</a></h2>
@@ -1092,7 +1095,7 @@ same parameter:</p>
 </tr>
 <tr>
 <td><code>dict[str, X]</code></td>
-<td>An object with no declared fields. Its values are the model's to validate.</td>
+<td>An object with no declared fields, as a dataclass's <code>dict[str, X]</code> is. Its values are the model's to validate.</td>
 </tr>
 </tbody>
 </table>

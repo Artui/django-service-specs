@@ -1254,6 +1254,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator_parameters.validator_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validator_parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.validation.validation_context.ValidationContext" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1917,6 +1928,17 @@
     <span class="md-ellipsis">
       
         validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validated
       
     </span>
   </a>
@@ -2618,6 +2640,17 @@
     <span class="md-ellipsis">
       
         NotPermitted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PermissionCheckDenied
       
     </span>
   </a>
@@ -4853,6 +4886,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.validation.validator_parameters.validator_parameters" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validator_parameters
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.validation.validation_context.ValidationContext" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -5516,6 +5560,17 @@
     <span class="md-ellipsis">
       
         validate
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validated" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        validated
       
     </span>
   </a>
@@ -6217,6 +6272,17 @@
     <span class="md-ellipsis">
       
         NotPermitted
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PermissionCheckDenied
       
     </span>
   </a>
@@ -10440,9 +10506,9 @@ mutation helpers read either.</p>
 <p><code>validated()</code> is the call's whole result, and what dispatch asks for: the
 values, the call's <code>data</code>, and any value the Validator binds for the
 call. An adapter overrides it where its <code>data</code> is not the mapping
-<code>validate()</code> returns, as the dataclass adapter's is its instance, or
-where the library leaves an object the service may want; the rest need
-not touch it.</p>
+<code>validate()</code> returns, as the dataclass and pydantic adapters' is the
+instance they build, or where the library leaves an object the service
+may want; the rest need not touch it.</p>
 <p><code>validated_many()</code> is what dispatch asks of a <code>many</code> spec instead: the
 whole list at once. By default it is <code>validated()</code> on each row, which
 serves a Validator whose library validates one row at a time. An adapter
@@ -10665,6 +10731,7 @@ spread by name, <code>data</code> under its own name, and <code>pool</code> besi
 <li><code>data</code> is the validated object as a whole, which a service declaring
   <code>data</code> receives. For a mapping Validator it is <code>values</code> itself; for
   <a class="autorefs autorefs-internal" title="DataclassValidator" href="#django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator"><code>DataclassValidator</code></a>
+  and <a class="autorefs autorefs-internal" title="PydanticValidator" href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator"><code>PydanticValidator</code></a>
   it is the instance, whose fields <code>values</code> holds.</li>
 <li><code>pool</code> is any other value the Validator binds for this one call, such
   as the bound object a library validated through, so a service can ask
@@ -10698,6 +10765,43 @@ neither belongs among the values a caller's argument names.</p>
 
 
   </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.validation.validator_parameters.validator_parameters" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validator_parameters</span>
+
+
+<a href="#django_service_specs.validation.validator_parameters.validator_parameters" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">validator_parameters</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">validator</span><span class="p">:</span> <span class="n">Validator</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Parameters</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p><code>validator.parameters()</code>, handed <code>call_context</code> where it declares the keyword.</p>
+<p>Every ask inside one call passes that call's dict, the same object, and
+every ask outside a call - registration, a schema, a describe-time
+reader - passes <code>None</code>, so a Validator keyed on the dict describes one
+call one way. Handed <code>None</code>, the Validator is asked as it always was,
+with no keyword at all
+(test_an_opted_in_validator_asked_outside_a_call_is_handed_no_keyword).
+Otherwise the keyword is passed only to a <code>parameters</code> naming
+<code>call_context</code> itself (<code>_declares</code>), so a Validator that never
+declared it is asked as before
+(test_a_validator_declaring_no_call_context_is_asked_as_before).</p>
+<p>Dispatch asks every Validator through this, and so should a transport
+that asks one itself during a call - for the names of a <code>many</code> spec's
+rows, say - handing it the call's dict, so a Validator that opted in is
+described as dispatch describes it, whoever wrote it
+(TestThePublicName.test_an_opted_in_validator_is_handed_the_call_s_dict_through_it).</p>
+
 
     </div>
 
@@ -12134,7 +12238,11 @@ exactly what dispatch refuses the caller for leaving out
   (test_a_read_a_provider_may_decline_is_offered_and_not_required,
   test_a_selector_spec_s_reads_beside_an_untyped_kwargs_are_offered_and_none_required,
   test_a_key_the_spec_s_kwargs_may_decline_leaves_the_target_s_read_required,
-  test_a_validator_field_input_data_may_fill_is_offered_and_not_required).</li>
+  test_a_validator_field_input_data_may_fill_is_offered_and_not_required).
+  <strong>Not a read a provider requires itself</strong>: a provider is handed the
+  caller's reads and the seeds, never another provider's answer, so
+  dispatch demands it of the caller and it stays in <code>required</code>
+  (test_a_read_a_provider_requires_itself_stays_required).</li>
 </ul>
 <p><strong>On a</strong> <code>many</code> <strong>spec each row is read the same way</strong>, by what
 <code>input_data</code> reaches there: it runs once per call and is merged over
@@ -12164,7 +12272,9 @@ none for a spec requiring nothing
 (test_the_unknown_argument_policy_closes_both_levels_or_neither).</p>
 <p>Off a <code>many</code> spec, the reading django-spec-mcp and django-spec-agents
 made of <code>spec_input_schema</code> before this existed
-(test_off_many_it_is_the_mcp_and_the_agents_reading); neither read a row
+(test_off_many_it_is_the_mcp_and_the_agents_reading), but for a read a
+provider requires itself, which django-spec-agents' reading relaxed;
+neither read a row
 (test_on_a_many_spec_the_transports_readings_part_from_it_only_in_the_rows).
 <code>spec_input_schema</code> itself is unchanged and still lists what the server
 fills (test_spec_input_schema_still_lists_what_the_server_fills). A
@@ -12573,6 +12683,10 @@ types and builds the instance, nested dataclasses included.</p>
   length, such as a pydantic model's <code>Field(max_length=...)</code>, or under
   a larger setting.</li>
 <li>a dataclass: an object, with its own fields as nested Parameters.</li>
+<li><code>dict[str, X]</code>, for any <code>X</code> above: an object with no declared
+  fields, as the pydantic adapter declares one, since Parameters cannot
+  say "every value is an X". Each value is decoded as <code>X</code>, and refused
+  under its own key. Only a str key, because a JSON object has no other.</li>
 <li><code>X | UnsetType</code>: the argument may be left out, with or without a
   default, and the field then holds <code>UNSET</code> rather than a value a
   service would act on. It adds no JSON type, since no wire can send it.</li>
@@ -13470,8 +13584,33 @@ the fields sent, one by one, would skip the model's own rules; a spec
 whose calls are partial uses a Validator that can return only what was
 sent. <code>supports_partial</code> is <code>False</code>, so a <code>ServiceSpec</code>
 declaring <code>partial=True</code> over this Validator is refused when it is
-built, and this refusal answers only a caller using it directly.
-<code>validated()</code> is the default: the values are the call's <code>data</code>.</p>
+built, and this refusal answers only a caller using it directly.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validated" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">validated</span>
+
+
+<a href="#django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator.validated" class="headerlink" title="Permanent link">&para;</a></h3>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">validated</span><span class="p">(</span><span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span> <span class="n">context</span><span class="p">:</span> <span class="n">ValidationContext</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Validated</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>The validated instance as the call's <code>data</code>, and its fields as the values.</p>
+<p>A service declaring <code>data</code> receives the model instance, as it
+receives the dataclass instance from <code>DataclassValidator</code>, so a
+service written for <code>data.title</code> reads the same whichever of the two
+validated it. One declaring the fields by name receives them, as
+<code>validate()</code> returns them; they are the instance's own attributes,
+so <code>data.title</code> and <code>title</code> are one object.</p>
 
 
     </div>
@@ -15069,7 +15208,9 @@ the spec it compiles to:</p>
    <code>partial</code>, one its <code>input_data</code> provider fills or may fill, and a
    read the <code>kwargs</code> provider of the spec declaring it fills or may
    fill - a typed provider's filled and declinable keys, and every
-   parameter an untyped provider's values reach.</li>
+   parameter an untyped provider's values reach - less a read a provider
+   requires itself, which stays demanded
+   (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller).</li>
 <li>For a <a class="autorefs autorefs-internal" title="ServiceSpec
 
 
@@ -15105,7 +15246,8 @@ dispatch. The presence check dispatch makes of such a field before the
 Validator, once the provider has answered, is not made here
 (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
 No <code>kwargs</code> provider is called either: a read one fills or
-may fill passes the shape check absent, and the presence check dispatch
+may fill passes the shape check absent, unless a provider requires it
+itself, and the presence check dispatch
 makes once the provider has answered is not made here
 (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
 fill is absent from a selector spec's checked arguments whether or not
@@ -15337,7 +15479,9 @@ drift apart:</p>
    under <code>unknown_arguments</code>, relaxed exactly as dispatch relaxes it: a
    parameter a provider fills or may fill - a typed provider's filled and
    declinable keys, and every parameter an untyped provider's values
-   reach - and a Validator field under <code>partial</code>. No provider runs
+   reach, less a read a provider requires itself
+   (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller) -
+   and a Validator field under <code>partial</code>. No provider runs
    here, so a call this passes without such a value may still be refused
    by <code>dispatch</code> where the provider's answer is merged
    (test_check_call_relaxes_a_may_fill_read).</li>
@@ -15683,11 +15827,7 @@ answers it, and the transport decides.</p>
 <p><strong>What it cannot see, and so never refuses.</strong> A provider whose return says
 nothing about its keys may fill any keyword of the callable it provides
 for, so that callable's keywords are left to dispatch (the third and
-fourth); the provider's own are read as any seat's. A read is taken as
-declared on a provider's seat: one the seat's provider may decline, or
-an untyped one may fill, is relaxed for the caller by the shape check, so
-a provider requiring it fails a call leaving it out, which this does not
-refuse. An annotation that
+fourth); the provider's own are read as any seat's. An annotation that
 does not resolve, as a forward reference to a name not importable where the
 callable was defined, is not read, and leaves alone only its own keyword
 (the fifth); so is a bare <code>list</code>, an element of <code>Any</code> or <code>object</code>, a
@@ -15810,6 +15950,10 @@ a typed provider reaches the keys its <code>TypedDict</code> names, <code>filled
 <code>declinable</code> alike, and one whose return says nothing about its keys
 reaches every parameter there
 (<a class="autorefs autorefs-internal" title="provider_keys" href="#django_service_specs.pool.provider_keys.provider_keys"><code>provider_keys</code></a>).
+Less a read a provider requires itself, by name with no default: a
+provider is handed the caller's reads and the seeds, never another
+provider's answer, so the shape check demands it of the caller
+(test_a_read_its_provider_requires_is_not_reached).
 The shape check does not demand a parameter this names, and a transport
 reading it leaves such a parameter out of the arguments its schema
 requires; one a provider is annotated to fill, and may not decline, is
@@ -15973,12 +16117,16 @@ every name it found, in order:</p>
    a call without one is refused as missing, a client error no caller can
    fix. A Validator parameter is the shape check's alone. Each conjunct
    is held by its own test, named beside the guard. <strong>A parameter an
-   untyped provider's values reach is never refused here</strong>: that
+   untyped provider's values reach is not refused here</strong>: that
    provider may fill it on any call, so a call may do without the
    caller's value, and dispatch refuses one nobody filled where the
    provider's answer is merged
    (test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld,
    test_check_server_arguments_lets_a_field_an_untyped_input_data_reaches_be_withheld).
+   Less a read a provider requires itself, by name with no default: no
+   provider is handed another's answer, so only the caller can send it,
+   and withholding it is refused
+   (test_check_server_arguments_refuses_withholding_a_read_a_provider_requires).
    A typed provider's keys, filled or declinable, were refused by rule 4.
 6. <strong>A bound value its parameter refuses</strong>, checked as the shape check
    checks it, so a server value in its Python form - a <code>uuid.UUID</code>, a
@@ -16121,14 +16269,15 @@ bound name the spec does not declare.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">DispatchError</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">InvalidArguments</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">NotPermitted</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">ServiceError</span><span class="p">,</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">ActionUnavailable</span><span class="p">,</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">AdditionalInputRequired</span><span class="p">,</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">ServiceValidationError</span><span class="p">,</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">PermissionCheckDenied</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">PrincipalUnavailable</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">ServiceError</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">ServiceNotFound</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="n">ServiceConflict</span><span class="p">,</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="n">ActionUnavailable</span><span class="p">,</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">AdditionalInputRequired</span><span class="p">,</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="n">ServiceValidationError</span><span class="p">,</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="p">)</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -17514,8 +17663,8 @@ undeclared spec could inherit, so an operation that means to be open says
 so with <code>permissions=[Unrestricted()]</code>.</p>
 <p>Otherwise every check's <code>has_permission</code> must pass, in order; the first
 refusal raises
-<a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
-with that check's own message, or the generic one when it declares none.
+<a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message, or the generic one when it declares none.
 An answer still to be awaited - a coroutine from a check that is not
 sync - raises <code>ImproperlyConfigured</code> rather than being read as a pass.</p>
 <p><code>arguments</code> is handed to each check's method that declares a keyword
@@ -17650,8 +17799,8 @@ before a covering <code>grant</code> can answer and before any check is asked.</
 for a call that resolves no single row: <code>scope</code> is the resolved set of a
 bulk or collection call, or <code>None</code> for a create. Every check's
 <code>has_scope_permission</code> must pass, in order, and the first refusal raises
-<a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
-with that check's own message. An answer still to be awaited raises
+<a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still to be awaited raises
 <code>ImproperlyConfigured</code> rather than being read as a pass. A
 <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> is
 checked as the spec it compiles to.</p>
@@ -17805,8 +17954,8 @@ for it twice; dispatch honours it only for a service spec's target
 handed in as <code>target=</code>, and never on a selector spec's row (see
 <code>Grant</code>); otherwise every check's <code>has_object_permission</code> must pass,
 in order, and the first refusal raises
-<a class="autorefs autorefs-internal" title="NotPermitted" href="#django_service_specs.authorization.not_permitted.NotPermitted"><code>NotPermitted</code></a>
-with that check's own message. An answer still to be awaited raises
+<a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
+a <code>NotPermitted</code> naming the check and the spec, with that check's own message. An answer still to be awaited raises
 <code>ImproperlyConfigured</code> rather than being read as a pass. A
 <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> is
 checked as the spec it compiles to.</p>
@@ -18032,6 +18181,82 @@ an async generator is not awaitable and is truthy too.</p>
 <code>PermissionDenied</code>, which Django and DRF both own for their own
 exceptions, and not a service error: a model that reads a denial as a
 refusal to route around keeps trying, where a denial should end the attempt.</p>
+<p>A declared check answering <code>False</code> raises
+<a class="autorefs autorefs-internal" title="PermissionCheckDenied" href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied"><code>PermissionCheckDenied</code></a>,
+a subclass naming the check and the spec; every other refusal is this.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.authorization.permission_check_denied.PermissionCheckDenied" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">PermissionCheckDenied</span>
+
+
+<a href="#django_service_specs.authorization.permission_check_denied.PermissionCheckDenied" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><a class="autorefs autorefs-internal" title="NotPermitted (django_service_specs.authorization.not_permitted.NotPermitted)" href="#django_service_specs.authorization.not_permitted.NotPermitted">NotPermitted</a></code></p>
+
+
+
+        <p>A permission check the spec declares answered <code>False</code>.</p>
+<p>Raised by <a class="autorefs autorefs-internal" title="authorize" href="#django_service_specs.dispatch.authorize.authorize"><code>authorize</code></a>,
+<a class="autorefs autorefs-internal" title="authorize_target" href="#django_service_specs.dispatch.authorize_target.authorize_target"><code>authorize_target</code></a>
+and <a class="autorefs autorefs-internal" title="authorize_scope" href="#django_service_specs.dispatch.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
+when one of the spec's checks answers <code>False</code>, and by nothing else. Every
+other <code>NotPermitted</code> stays bare: a grant or a seeds carrier that does not
+cover the call, a service's own refusal, and a check that raises
+<code>NotPermitted</code> itself, which propagates as raised. So a transport can
+answer a check's denial of an anonymous caller as an authentication
+challenge, as DRF's <code>permission_denied</code> does, without turning any other
+refusal into a sign-in prompt.</p>
+<p><code>check</code> is the check that answered: the combinator, for a check inside
+<a class="autorefs autorefs-internal" title="AllOf" href="#django_service_specs.authorization.all_of.AllOf"><code>AllOf</code></a>,
+<a class="autorefs autorefs-internal" title="AnyOf" href="#django_service_specs.authorization.any_of.AnyOf"><code>AnyOf</code></a> or
+<a class="autorefs autorefs-internal" title="NoneOf" href="#django_service_specs.authorization.none_of.NoneOf"><code>NoneOf</code></a>, since that is
+the rule the spec declares. The message is the check's <code>message</code>, or the
+default wording when it has none.</p>
+<p><code>spec</code> is the spec the check was asked about, as a spec of this
+package's: a declaration of another library's is named by what
+<a class="autorefs autorefs-internal" title="kernel_spec" href="#django_service_specs.specs.kernel_spec.kernel_spec"><code>kernel_spec</code></a> compiles
+it to. It is there because a denial inside a service's own <code>dispatch</code>
+propagates out of the outer call as the same class, so the class alone
+cannot say whose check refused: a transport treats a denial as its own
+call's only where <code>exc.spec is kernel_spec(spec)</code> for the spec it
+dispatched. <code>Any</code>, as <code>PermissionCheck</code> names it, because the spec
+modules import this package.</p>
 
 
 
@@ -19604,9 +19829,13 @@ of a provider whose return says nothing about its keys, which may fill
 any name and so names none. Dispatch does not demand either of the
 caller, since the provider may fill it, and keeps the caller's value
 beneath the provider's answer, so the caller's is the one the callable
-receives when the provider declines. A transport that asks the caller
-for neither reads them off <code>provider_keys</code>: its <code>declinable</code> keys, or
-every parameter in the seat of a provider it reads as <code>None</code>.</p>
+receives when the provider declines. Less a read a provider requires
+itself, by name with no default, which only the caller can send and
+dispatch demands. A transport that asks the caller for neither reads
+them off <a class="autorefs autorefs-internal" title="provider_reached" href="#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>,
+which leaves such a read out, or
+<a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>,
+which keeps it in <code>required</code>.</p>
 <p><strong>Static per spec.</strong> A transport that also answers some declared
 parameters itself, per mount or per toolset, describes them with a
 <a class="autorefs autorefs-internal" title="ServerArguments
