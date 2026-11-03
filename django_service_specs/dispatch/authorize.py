@@ -59,8 +59,8 @@ def authorize(
 
     Otherwise every check's ``has_permission`` must pass, in order; the first
     refusal raises
-    [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
-    with that check's own message, or the generic one when it declares none.
+    [`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+    a ``NotPermitted`` naming the check and the spec, with that check's own message, or the generic one when it declares none.
     An answer still to be awaited - a coroutine from a check that is not
     sync - raises ``ImproperlyConfigured`` rather than being read as a pass.
 

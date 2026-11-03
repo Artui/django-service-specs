@@ -127,13 +127,22 @@ class TestACheckSDenialIsMarked:
         assert denied.check is check
         assert denied.check is not inner
 
-    def test_a_source_s_denial_carries_the_spec_it_compiles_to(self) -> None:
+    @pytest.mark.parametrize("question", ["class", "row", "scope"])
+    def test_a_source_s_denial_carries_the_spec_it_compiles_to(self, question: str) -> None:
         # The check is asked about the compiled spec, so that is the one it
         # names; a transport holding the source compares through kernel_spec.
-        check = _Denies()
-        source = Foreign(_spec([check]))
-        denied = _denied(lambda: authorize(source, object()))
+        # Each question takes the source directly, as a transport may hand it.
+        check = _Denies() if question == "class" else _AdmitsTheClass()
+        source, principal = Foreign(_spec([check], SelectorKind.RETRIEVE)), object()
+        grant = Grant(kernel_spec(source), principal)
+        call = {
+            "class": lambda: authorize(source, principal),
+            "row": lambda: authorize_target(source, principal, object(), grant=grant),
+            "scope": lambda: authorize_scope(source, principal, [], grant=grant),
+        }[question]
+        denied = _denied(call)
         assert isinstance(denied, PermissionCheckDenied)
+        assert denied.check is check
         assert denied.spec is kernel_spec(source)
         assert denied.spec is not source
 

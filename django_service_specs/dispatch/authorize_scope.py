@@ -42,8 +42,8 @@ def authorize_scope(
     for a call that resolves no single row: ``scope`` is the resolved set of a
     bulk or collection call, or ``None`` for a create. Every check's
     ``has_scope_permission`` must pass, in order, and the first refusal raises
-    [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
-    with that check's own message. An answer still to be awaited raises
+    [`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+    a ``NotPermitted`` naming the check and the spec, with that check's own message. An answer still to be awaited raises
     ``ImproperlyConfigured`` rather than being read as a pass. A
     [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
     checked as the spec it compiles to.
