@@ -60,7 +60,7 @@ from django_service_specs.pool.utils import (
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
 from django_service_specs.selectors.run_selector import run_selector
-from django_service_specs.selectors.utils import apply_shaping, call_keywords
+from django_service_specs.selectors.utils import apply_shaping, call_keywords, required_keywords
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.is_async import is_async
@@ -784,14 +784,51 @@ def server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], fro
     (test_a_may_fill_read_the_provider_answers_reaches_the_service): those
     are relaxed and kept as the caller's
     (test_a_declinable_key_stays_the_caller_s).
+
+    **Less a read a provider requires itself.** A provider is handed its
+    seat's reads and the pool's seeds, never another provider's answer, so a
+    read it takes by name with no default can only ever come from the
+    caller: relaxed, a call leaving it out would reach the provider and fail
+    with its own ``TypeError``. So it stays demanded however a provider may
+    fill it - a seat's ``kwargs``, the target selector's, and a service
+    spec's ``input_data``, handed the spec's reads as ``kwargs`` is
+    (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller,
+    test_a_read_input_data_requires_is_demanded_beside_an_untyped_kwargs).
+    Only a read the provider is handed: one its seat's typed provider fills
+    is dropped from the caller's arguments, so demanding it would ask for a
+    value no provider receives (test_a_read_a_typed_provider_fills_stays_relaxed_though_a_provider_requires_it),
+    which ``check_seeds`` refuses instead. A ``reflected`` read a registered
+    seed fills is out of the parameters before any relaxing.
     """
     owned: frozenset[str] = frozenset()
     reached: frozenset[str] = frozenset()
+    demanded: frozenset[str] = frozenset()
     for provider, reads in read_seats(spec):
         filled, may_fill = reach(provider, reads)
         owned |= filled
         reached |= may_fill
-    return owned, reached
+        demanded |= (reads.names() - filled) & _requires(provider)
+    if isinstance(spec, ServiceSpec):
+        # ``input_data`` is called from the pool ``kwargs`` is: the spec's
+        # reads, less those ``kwargs`` fills.
+        filled, _ = reach(spec.kwargs, spec.reads)
+        demanded |= (spec.reads.names() - filled) & _requires(spec.input_data)
+    return owned, reached - demanded
+
+
+def _requires(provider: Callable[..., Any] | None) -> frozenset[str]:
+    """The keywords ``provider`` takes by name with no default; none for no provider or one whose signature cannot be read.
+
+    An unreadable one is refused by ``check_seeds`` and fails where dispatch
+    binds it, so the shape check and the schema leave it to that
+    (test_a_provider_whose_signature_cannot_be_read_relaxes_as_before).
+    """
+    if provider is None:
+        return frozenset()
+    try:
+        return frozenset(required_keywords(provider))
+    except (ValueError, TypeError):
+        return frozenset()
 
 
 def read_seats(

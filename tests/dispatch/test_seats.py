@@ -665,6 +665,193 @@ def test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_fiel
         check_server_arguments(spec, ServerArguments(withheld=frozenset({"project_pk"})))
 
 
+# --- a read a provider requires itself --------------------------------------------------
+
+
+class _DecliningTenant(TypedDict):
+    tenant: str | UnsetType
+
+
+class _Tenant(TypedDict):
+    tenant: str
+
+
+def _requiring(calls: list[str]) -> Callable[..., Any]:
+    """An untyped provider that takes ``tenant`` by name, recording each value it is handed."""
+
+    def server(*, tenant: str) -> dict[str, Any]:
+        calls.append(tenant)
+        return {}
+
+    return server
+
+
+def _requiring_declinable(calls: list[str]) -> Callable[..., _DecliningTenant]:
+    """A typed provider that may decline ``tenant``, and takes it by name."""
+
+    def server(*, tenant: str) -> _DecliningTenant:
+        calls.append(tenant)
+        return {"tenant": UNSET}
+
+    return server
+
+
+def _requiring_spec(seat: str, calls: list[str]) -> ServiceSpec | SelectorSpec:
+    """A spec refused at class level whose provider in ``seat`` requires the read ``tenant``."""
+    reads = _tenant(required=True)
+    if seat == "selector-spec":
+        return SelectorSpec(
+            kind=RETRIEVE,
+            selector=lambda **_: Note.objects.none(),
+            permissions=[Refuse()],
+            reads=reads,
+            kwargs=_requiring(calls),
+        )
+    if seat == "target-selector":
+        target = SelectorSpec(
+            kind=RETRIEVE,
+            selector=lambda **_: Note.objects.none(),
+            reads=reads,
+            kwargs=_requiring(calls),
+        )
+        return ServiceSpec(service=Record(), permissions=[Refuse()], instance_selector_spec=target)
+    if seat == "service-spec":
+        return ServiceSpec(
+            service=Record(), permissions=[Refuse()], reads=reads, kwargs=_requiring(calls)
+        )
+    return ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=reads,
+        kwargs=_requiring_declinable(calls),
+    )
+
+
+REQUIRING_SEATS = pytest.mark.parametrize(
+    "seat", ["selector-spec", "target-selector", "service-spec", "a-declinable-key"]
+)
+
+
+@ENTRIES
+@REQUIRING_SEATS
+def test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller(
+    ada: Any, entry: Any, seat: str
+) -> None:
+    # The provider may fill ``tenant``, but it is handed the caller's reads
+    # and never its own answer: relaxed, every call leaving the read out
+    # reached the provider's ``TypeError``. Refused by the shape check, so
+    # before the class-level check that refuses everyone here, and before any
+    # provider runs.
+    calls: list[str] = []
+    with pytest.raises(InvalidArguments) as caught:
+        entry(_requiring_spec(seat, calls), principal=ada, arguments={})
+    assert caught.value.detail == {"tenant": REQUIRED}
+    assert calls == []
+
+
+@ENTRIES
+def test_a_read_input_data_requires_is_demanded_beside_an_untyped_kwargs(
+    ada: Any, entry: Any
+) -> None:
+    # ``kwargs`` may fill ``tenant``, but ``input_data`` is called from the
+    # same pool, before ``kwargs`` answers: only the caller can hand it.
+    calls: list[str] = []
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=[Refuse()],
+        reads=_tenant(required=True),
+        kwargs=lambda: {},
+        validator=FormValidator(_TitleForm),
+        input_data=_requiring(calls),
+    )
+    with pytest.raises(InvalidArguments) as caught:
+        entry(spec, principal=ada, arguments={"title": "Row"})
+    assert caught.value.detail == {"tenant": REQUIRED}
+    assert calls == []
+
+
+@ENTRIES
+def test_a_provider_requiring_its_read_runs_when_the_caller_sends_it(ada: Any, entry: Any) -> None:
+    # The common shape: ``kwargs=lambda *, pk: {...}`` over a required ``pk``.
+    note = Note.objects.create(owner=ada, title="Row")
+
+    def by_pk(*, pk: int, title: str) -> Any:
+        return Note.objects.filter(pk=pk, title=title)
+
+    spec = SelectorSpec(
+        kind=RETRIEVE,
+        selector=by_pk,
+        permissions=OPEN,
+        reads=PK,
+        kwargs=lambda *, pk: {"title": "Row"},
+    )
+    assert entry(spec, principal=ada, arguments={"pk": note.pk}).value == note
+
+
+@pytest.mark.parametrize("provider", ["kwargs", "input_data"])
+def test_a_read_a_typed_provider_fills_stays_relaxed_though_a_provider_requires_it(
+    ada: Any, provider: str
+) -> None:
+    # The caller's value for a read ``kwargs`` is typed to fill is dropped, so
+    # no provider is ever handed it; demanding it would ask the caller for a
+    # value nothing reads. ``check_seeds`` refuses such a spec instead.
+    def fills(*, tenant: str) -> _Tenant:
+        return {"tenant": tenant}
+
+    def fills_freely() -> _Tenant:
+        return {"tenant": "server's"}
+
+    declared: dict[str, Any] = (
+        {"kwargs": fills}
+        if provider == "kwargs"
+        else {
+            "kwargs": fills_freely,
+            "validator": FormValidator(_TitleForm),
+            "input_data": _requiring([]),
+        }
+    )
+    spec = ServiceSpec(service=Record(), permissions=OPEN, reads=_tenant(required=True), **declared)
+    arguments = {} if provider == "kwargs" else {"title": "Row"}
+    checked, _ = check_call(spec, principal=ada, arguments=arguments)
+    assert "tenant" not in checked
+
+
+@ENTRIES
+def test_a_reflected_read_a_seed_fills_reaches_a_provider_requiring_it(
+    ada: Any, entry: Any
+) -> None:
+    # Out of the call's parameters before anything is relaxed or demanded, so
+    # the caller is asked for nothing and the provider is handed the seed.
+    calls: list[str] = []
+    spec = SelectorSpec(
+        kind=LIST,
+        selector=lambda *, tenant: [tenant],
+        permissions=OPEN,
+        reads=_tenant(required=True, reflected=True),
+        kwargs=_requiring(calls),
+    )
+    assert entry(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS).value == [SEEDED]
+    assert calls == [SEEDED]
+
+
+def test_a_provider_whose_signature_cannot_be_read_relaxes_as_before(ada: Any) -> None:
+    # Refused by ``check_seeds``, and failing where dispatch binds it; the
+    # shape check reads no demand off it.
+    spec = ServiceSpec(service=Record(), permissions=OPEN, reads=_project(), kwargs=dict)
+    checked, _ = check_call(spec, principal=ada, arguments={})
+    assert checked == {}
+
+
+@pytest.mark.parametrize("seat", ["selector-spec", "target-selector", "service-spec"])
+def test_check_server_arguments_refuses_withholding_a_read_a_provider_requires(seat: str) -> None:
+    # A typed provider's key, declinable or not, is refused binding or
+    # withholding outright, before this is read.
+    with pytest.raises(ImproperlyConfigured, match="which no call could then do without"):
+        check_server_arguments(
+            _requiring_spec(seat, []), ServerArguments(withheld=frozenset({"tenant"}))
+        )
+
+
 # --- a registered seed fills a reflected read -------------------------------------------
 
 

@@ -102,6 +102,16 @@ def untyped() -> dict[str, Any]:
     return {}
 
 
+def requires_project(*, project: int) -> dict[str, Any]:
+    """An untyped provider taking the read ``project`` by name, which only the caller can hand it."""
+    return {}
+
+
+def requires_pk(*, pk: int) -> dict[str, Any]:
+    """An untyped provider taking the read ``pk`` by name, which only the caller can hand it."""
+    return {}
+
+
 PROJECT = Parameters.of(_required("project", "integer"))
 OWNER = Parameters.of(_required("owner", "integer"))
 
@@ -228,6 +238,39 @@ MANY: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
 }
 
 
+# A provider requiring a read it may fill. Kept out of ``FLAT`` and ``MANY``,
+# which the transports' readings from before they adopted this are held to:
+# django-spec-agents' relaxed such a read.
+REQUIRING: dict[str, tuple[Callable[[], ServiceSpec | SelectorSpec], PoolSeeds]] = {
+    "selector-kwargs-requires-its-read": (
+        lambda: SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=note_by_pk,
+            permissions=OPEN,
+            reads=PK,
+            kwargs=requires_pk,
+        ),
+        DEFAULT_POOL_SEEDS,
+    ),
+    "target-kwargs-requires-its-read": (
+        lambda: _service(
+            reads=PROJECT, kwargs=untyped, instance_selector_spec=_target(kwargs=requires_pk)
+        ),
+        DEFAULT_POOL_SEEDS,
+    ),
+    "input-data-requires-a-read-beside-an-untyped-kwargs": (
+        lambda: _service(
+            reads=PROJECT, kwargs=untyped, validator=_title_and_owner(), input_data=requires_project
+        ),
+        DEFAULT_POOL_SEEDS,
+    ),
+    "many-untyped-kwargs-requires-its-read": (
+        lambda: _many(reads=PROJECT, kwargs=requires_project),
+        DEFAULT_POOL_SEEDS,
+    ),
+}
+
+
 def _build(cases: Mapping[str, Any], case: str) -> tuple[ServiceSpec | SelectorSpec, PoolSeeds]:
     factory, seeds = cases[case]
     return factory(), seeds
@@ -332,6 +375,27 @@ def test_a_selector_spec_s_reads_beside_an_untyped_kwargs_are_offered_and_none_r
 
     assert list(schema["properties"]) == ["pk"]
     assert "required" not in schema
+
+
+@pytest.mark.parametrize(
+    ("case", "required"),
+    [
+        pytest.param("selector-kwargs-requires-its-read", ["pk"], id="selector-spec"),
+        pytest.param("target-kwargs-requires-its-read", ["pk"], id="target-selector"),
+        pytest.param(
+            "input-data-requires-a-read-beside-an-untyped-kwargs", ["project"], id="input-data"
+        ),
+        pytest.param("many-untyped-kwargs-requires-its-read", ["items", "project"], id="many"),
+    ],
+)
+def test_a_read_a_provider_requires_itself_stays_required(case: str, required: list[str]) -> None:
+    # The provider may fill it, but is handed only the caller's reads, so the
+    # caller is asked for it. Beside it, what the provider is not handed stays
+    # relaxed: the spec's ``project`` an untyped ``kwargs`` may fill, and the
+    # Validator's fields an untyped ``input_data`` may.
+    spec, seeds = _build(REQUIRING, case)
+
+    assert sorted(spec_caller_input_schema(spec, pool_seeds=seeds)["required"]) == required
 
 
 def test_a_key_the_spec_s_kwargs_may_decline_leaves_the_target_s_read_required() -> None:
@@ -519,9 +583,9 @@ def _refused_absent(
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("case", [*FLAT, *MANY])
+@pytest.mark.parametrize("case", [*FLAT, *MANY, *REQUIRING])
 def test_the_top_level_requires_exactly_what_check_call_refuses_absent(case: str) -> None:
-    cases = {**FLAT, **MANY}
+    cases = {**FLAT, **MANY, **REQUIRING}
     spec, seeds = _build(cases, case)
 
     required = spec_caller_input_schema(spec, pool_seeds=seeds).get("required", [])
