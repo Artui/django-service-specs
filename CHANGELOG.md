@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`DataclassValidator` and `DataclassPresenter` read `dict[str, X]`**, for any `X`
+  the dataclass adapter reads, as an object with no declared fields, which is how
+  `PydanticValidator` declares one: the same model and dataclass now declare the
+  same parameter. Each value is decoded as `X`, and a value refused is refused
+  under its own key (`{"scores": {"rigour": ["Expected an integer."]}}`); a map
+  that is not a JSON object, a non-string key included, is refused as `"Expected
+  an object."`. The presenter encodes each value as it encodes a field. A
+  dataclass with such a field was refused at registration before.
+
+### Changed
+- **`PydanticValidator` hands a service declaring `data` the model instance,** as
+  `DataclassValidator` hands its dataclass instance, where it handed a dict of the
+  fields. This breaks a service that reads `data["title"]` from a pydantic
+  validator: read `data.title`, or take the fields by name, which are unchanged.
+  A `many` call's `data` is a list of model instances. `validated()` is now its
+  own, so a subclass that overrides only `validate()` no longer changes what
+  dispatch hands the service, which asks `validated()`: override that as well.
+
 ## [0.24.0] — 2026-11-03
 
 ### Added
