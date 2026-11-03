@@ -579,7 +579,11 @@ class TestAnArgumentNamedEither:
             permissions=OPEN,
             reads=Parameters.of(Parameter(name, "string", reflected=reflected)),
         )
-        spec = ServiceSpec(service=lambda **_: None, permissions=OPEN, output_selector_spec=out)
+        spec = ServiceSpec(
+            service=lambda **_: None,
+            permissions=OPEN,
+            output_selector_spec=out.derive(permissions=None),
+        )
         entry(spec, principal=make_user("ada"), arguments={}, call_context={name: marker})
         assert seen == [marker]
 
@@ -836,7 +840,9 @@ class TestTheTransportFacingAnswers:
     def test_server_owned_keys_owns_a_target_selector_s_reflected_read(self) -> None:
         target = _reading("view", reflected=True)
         spec = ServiceSpec(
-            service=lambda **_: None, permissions=OPEN, collection_selector_spec=target
+            service=lambda **_: None,
+            permissions=OPEN,
+            collection_selector_spec=target.derive(permissions=None),
         )
         assert "view" in server_owned_keys(spec)
 

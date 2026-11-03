@@ -5,6 +5,8 @@ from typing import Any
 
 import pytest
 
+from django_service_specs.authorization.any_of import AnyOf
+from django_service_specs.authorization.none_of import NoneOf
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.dispatch.checks_read_arguments import checks_read_arguments
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -176,3 +178,21 @@ def test_a_check_declaring_arguments_with_a_default_still_declares_them() -> Non
 class _TakesNone(PermissionCheck):
     def has_permission(self, principal: Any, spec: Any, *, arguments: Any = None) -> bool:
         return arguments is None or "ok" in arguments
+
+
+def test_checks_read_arguments_sees_a_child_s_declaration() -> None:
+    # Read through the combinator, at any depth: its own methods take
+    # ``**offered`` and, read by signature, declare nothing.
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST,
+        selector=notes_of,
+        permissions=[AnyOf(_Plain(), NoneOf(_OnTheClassQuestion()))],
+    )
+    assert checks_read_arguments(spec) is True
+
+
+def test_a_combinator_of_checks_declaring_nothing_reads_no_arguments() -> None:
+    spec = SelectorSpec(
+        kind=SelectorKind.LIST, selector=notes_of, permissions=[AnyOf(_Plain(), _Plain())]
+    )
+    assert checks_read_arguments(spec) is False

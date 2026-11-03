@@ -77,6 +77,10 @@ class DataclassValidator(Validator):
       length, such as a pydantic model's ``Field(max_length=...)``, or under
       a larger setting.
     - a dataclass: an object, with its own fields as nested Parameters.
+    - ``dict[str, X]``, for any ``X`` above: an object with no declared
+      fields, as the pydantic adapter declares one, since Parameters cannot
+      say "every value is an X". Each value is decoded as ``X``, and refused
+      under its own key. Only a str key, because a JSON object has no other.
     - ``X | UnsetType``: the argument may be left out, with or without a
       default, and the field then holds ``UNSET`` rather than a value a
       service would act on. It adds no JSON type, since no wire can send it.
@@ -286,29 +290,39 @@ def _decode(shape: Shape, value: Any) -> Any:
     if shape.items is not None:
         if not isinstance(value, list):
             raise _Refused(expected_type_refusal("array"))
-        return _decode_rows(shape.items, value)
+        return list(_decode_members(shape.items, dict(enumerate(value))).values())
+    if shape.values is not None:
+        # A key that is not a string is not a JSON object's, whatever its
+        # values; only a caller skipping the shape check can send one. Each
+        # condition is held by its own case of
+        # test_a_map_that_is_not_a_json_object_is_refused.
+        if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
+            raise _Refused(expected_type_refusal("object"))
+        return _decode_members(shape.values, value)
     if shape.choices is not None:
         return _decode_choice(shape, shape.choices, value)
     return _decode_scalar(shape, value)
 
 
-def _decode_rows(items: Shape, rows: list[Any]) -> list[Any]:
-    decoded: list[Any] = []
-    found: dict[int, Any] = {}
-    for index, row in enumerate(rows):
+def _decode_members(shape: Shape, members: Mapping[Any, Any]) -> dict[Any, Any]:
+    """Each member of a list, by index, or of a dict, by key, decoded as ``shape``."""
+    decoded: dict[Any, Any] = {}
+    found: dict[Any, Any] = {}
+    for key, member in members.items():
         try:
-            decoded.append(_decode(items, row))
+            decoded[key] = _decode(shape, member)
         except InvalidArguments as exc:
-            found[index] = exc.detail
+            found[key] = exc.detail
         except _Refused as exc:
-            # A message about a row of objects is about the row itself, so it
-            # sits inside the row; a scalar element has no inside.
-            found[index] = (
-                {NON_FIELD_ERRORS: [exc.message]} if items.fields is not None else [exc.message]
+            # A message about a member that is an object is about the object
+            # itself, so it sits inside it; a scalar member has no inside.
+            found[key] = (
+                {NON_FIELD_ERRORS: [exc.message]} if shape.fields is not None else [exc.message]
             )
     if found:
-        # Keyed by index, and only the rows that failed, so a transport can
-        # point at row 1 without the caller counting empty entries.
+        # Keyed by index or key, and only the members that failed, so a
+        # transport can point at row 1 without the caller counting empty
+        # entries.
         raise InvalidArguments(found)
     return decoded
 

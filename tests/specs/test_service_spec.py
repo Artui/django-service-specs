@@ -12,6 +12,8 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
 from typing_extensions import TypedDict
 
+from django_service_specs.authorization.any_of import AnyOf
+from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.dispatch import dispatch
@@ -66,6 +68,24 @@ def test_parameters_are_the_targets_reads_then_the_validators() -> None:
     assert [p.name for p in spec.parameters()] == ["pk", "title"]
     assert spec.target_selector_spec() is RETRIEVE
     assert ServiceSpec(service=print, collection_selector_spec=LIST).target_selector_spec() is LIST
+
+
+@pytest.mark.parametrize("many", [False, True], ids=["single", "many"])
+def test_parameters_hands_the_validator_the_call_context_it_is_asked_with(many: bool) -> None:
+    """The call's dict when a call asks, and no keyword at all when a reader
+    outside one does."""
+    asked: list[Any] = []
+
+    class Asked(Titled):
+        def parameters(self, *, call_context: Any = "not handed") -> Parameters:
+            asked.append(call_context)
+            return super().parameters()
+
+    spec = ServiceSpec(service=print, permissions=[Unrestricted()], validator=Asked(), many=many)
+    context: dict[str, Any] = {}
+    assert spec.parameters(call_context=context) == spec.parameters()
+    assert asked[0] is context
+    assert asked[1:] == ["not handed"]
 
 
 def test_a_name_the_target_and_the_validator_both_declare_is_refused_when_read() -> None:
@@ -330,6 +350,27 @@ class TestReads:
             "output_selector_spec",
             {"kind": SelectorKind.LIST, "kwargs": dict},
             "ServiceSpec.output_selector_spec declares kwargs, which an output selector never runs",
+        ),
+        # One case per role, since coverage cannot see a role dropped from the
+        # tuple in _check_nested. Unrestricted() is refused as any other check
+        # is: an open read is still a declaration that nothing here reads.
+        (
+            "instance_selector_spec",
+            {"kind": SelectorKind.RETRIEVE, "permissions": [Nobody()]},
+            "ServiceSpec.instance_selector_spec declares permissions, which a nested selector "
+            "never asks",
+        ),
+        (
+            "collection_selector_spec",
+            {"kind": SelectorKind.LIST, "permissions": [Unrestricted()]},
+            "ServiceSpec.collection_selector_spec declares permissions, which a nested "
+            "selector never asks",
+        ),
+        (
+            "output_selector_spec",
+            {"kind": SelectorKind.LIST, "permissions": [Nobody()]},
+            "ServiceSpec.output_selector_spec declares permissions, which a nested selector "
+            "never asks",
         ),
     ],
 )
@@ -905,6 +946,123 @@ class TestProviderReach:
             spec.parameters()
 
 
+class _FillsItems(TypedDict):
+    items: list[int]
+
+
+class _MayFillItems(TypedDict):
+    items: list[int] | UnsetType
+
+
+class _FillsRows(TypedDict):
+    rows: list[int]
+
+
+def _items() -> _FillsItems:
+    return {"items": [1]}
+
+
+def _maybe_items() -> _MayFillItems:
+    return {"items": [1]}
+
+
+def _rows() -> _FillsRows:
+    return {"rows": [1]}
+
+
+class TestManyListIsTheCallers:
+    """No provider reaches a ``many`` spec's list, so one annotated to fill it is refused.
+
+    ``server_owned_keys`` would list the name and a transport would withhold
+    it, while dispatch demands the list of the caller whatever a provider
+    answers. A ``declinable`` key is refused here too, unlike on the other
+    seats: dispatch never relaxes the list, so a transport reading it as
+    optional would advertise a list dispatch demands.
+    """
+
+    @pytest.mark.parametrize(
+        ("provider", "declaration", "key"),
+        [
+            pytest.param("ServiceSpec.kwargs", {"kwargs": _items}, "items", id="kwargs"),
+            pytest.param(
+                "ServiceSpec.input_data", {"input_data": _items}, "items", id="input-data"
+            ),
+            pytest.param(
+                "ServiceSpec.kwargs", {"kwargs": _maybe_items}, "items", id="declinable-kwargs"
+            ),
+            pytest.param(
+                "ServiceSpec.input_data",
+                {"input_data": _maybe_items},
+                "items",
+                id="declinable-input-data",
+            ),
+            pytest.param(
+                "ServiceSpec.kwargs",
+                {"kwargs": _rows, "many_argument": "rows"},
+                "rows",
+                id="renamed-list",
+            ),
+        ],
+    )
+    def test_a_provider_annotated_to_fill_the_list_is_refused_at_construction(
+        self, provider: str, declaration: dict[str, Any], key: str
+    ) -> None:
+        named = (
+            f"{provider} is annotated to fill {[key]!r}, which ServiceSpec.many_argument "
+            "declares, and its values never reach ServiceSpec.many_argument, so dispatch "
+            f"would still demand {[key]!r} of the caller. "
+            "No provider fills ServiceSpec.many_argument, which is the caller's list; rename "
+            "the key or the many_argument."
+        )
+        with pytest.raises(ImproperlyConfigured) as refused:
+            ServiceSpec(service=print, many=True, validator=Titled(), **declaration)
+        assert str(refused.value) == named
+
+    def test_a_provider_annotation_resolving_after_the_build_is_refused_for_the_list(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The late re-check in ``parameters()`` holds the list seat too: a
+        # return annotation that reads as untyped when the spec is built and
+        # as filling ``items`` once it resolves.
+        def late() -> Any:
+            return {"items": [1]}
+
+        late.__annotations__["return"] = "_FillsItemsLater"
+        spec = ServiceSpec(service=print, many=True, validator=Titled(), kwargs=late)
+        monkeypatch.setitem(globals(), "_FillsItemsLater", _FillsItems)
+        named = "ServiceSpec.kwargs is annotated to fill ['items'], which ServiceSpec.many_argument"
+        with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
+            spec.parameters()
+
+    def test_a_row_field_named_like_the_list_is_refused_all_the_same(self) -> None:
+        # The key legitimately reaches the row seat, but ``server_owned_keys``
+        # would list ``items`` and so hide the list.
+        with pytest.raises(ImproperlyConfigured, match=re.escape("fill ['items'], which Serv")):
+            ServiceSpec(service=print, many=True, validator=Titled("items"), input_data=_items)
+
+    def test_a_key_the_list_is_not_named_for_is_accepted(self) -> None:
+        # Only the declared ``many_argument`` is a seat: ``items`` is no
+        # parameter of a spec whose list is ``rows``.
+        spec = ServiceSpec(
+            service=print, many=True, many_argument="rows", validator=Titled(), kwargs=_items
+        )
+        assert spec.parameters().names() == {"rows"}
+
+    def test_an_untyped_provider_is_accepted(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            many=True,
+            validator=Titled(),
+            kwargs=lambda: {"items": [1]},
+            input_data=lambda: {"items": [1]},
+        )
+        assert spec.parameters().names() == {"items"}
+
+    def test_a_spec_without_many_has_no_list_to_refuse(self) -> None:
+        spec = ServiceSpec(service=print, validator=Titled("items"), input_data=_items)
+        assert spec.parameters().names() == {"items"}
+
+
 def test_a_service_spec_compiles_to_itself() -> None:
     # What makes it a SpecSource, and how kernel_spec tells a spec from a
     # declaration that compiles to one without importing either class.
@@ -1180,3 +1338,46 @@ class TestShapes:
     def test_a_derived_spec_replaces_its_shapes(self) -> None:
         base = ServiceSpec(service=print, shapes=FIELDS)
         assert base.derive(shapes=Parameters()).shapes == Parameters()
+
+
+def test_a_nested_selector_declaring_no_permissions_is_accepted() -> None:
+    # The default is None, and holds the other half of the permissions refusal:
+    # without it every nested selector would be refused.
+    nested = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list)
+    assert nested.permissions is None
+    assert (
+        ServiceSpec(service=print, instance_selector_spec=nested).instance_selector_spec is nested
+    )
+
+
+def test_a_selector_spec_with_permissions_nests_once_derived_without_them() -> None:
+    # The remedy the refusal names: a spec registered or dispatched on its own
+    # needs its permissions, and nests as its derivation with none.
+    own = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Unrestricted()])
+    nested = own.derive(permissions=None)
+    assert nested.permissions is None
+    assert own.permissions is not None
+    spec = ServiceSpec(service=print, collection_selector_spec=nested)
+    assert spec.collection_selector_spec is nested
+    with pytest.raises(ImproperlyConfigured, match=r"spec\.derive\(permissions=None\)"):
+        ServiceSpec(service=print, collection_selector_spec=own)
+
+
+class _ComparedByCodename(PermissionCheck):
+    """Equal by value with no hash, as a check declaring ``__eq__`` alone is."""
+
+    def __init__(self, codename: str) -> None:
+        self.codename = codename
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _ComparedByCodename) and other.codename == self.codename
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return True
+
+
+def test_a_spec_over_an_unhashable_child_hashes() -> None:
+    # A spec hashes its permissions; a combinator is equal only to itself, so
+    # it hashes whatever it holds.
+    spec = ServiceSpec(service=_a_service, permissions=[AnyOf(_ComparedByCodename("notes.view"))])
+    assert hash(spec) == hash(spec)

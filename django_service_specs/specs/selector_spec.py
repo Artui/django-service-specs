@@ -19,7 +19,6 @@ from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.utils import (
-    check_callable,
     check_changes,
     check_metadata,
     check_preconditions,
@@ -29,7 +28,7 @@ from django_service_specs.specs.utils import (
 )
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
-from django_service_specs.types.utils import affordance_alias
+from django_service_specs.types.utils import affordance_alias, check_callable
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -50,8 +49,9 @@ class SelectorSpec:
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open read
             says ``[Unrestricted()]``. An empty sequence is refused when the
-            spec is built, since no checks would pass everyone. **Not read when the spec is nested**:
-            authorization belongs to the spec being dispatched.
+            spec is built, since no checks would pass everyone. **Refused when the spec is
+            nested** in a ``ServiceSpec``, whatever it holds: authorization belongs to
+            the spec being dispatched, so nest ``spec.derive(permissions=None)``.
         reads: The arguments the selector reads with no Validator in front of
             it - its filters, its ordering, the key of the row it retrieves.
             With ``shapes`` they are the spec's whole Parameters, so the closed
@@ -301,8 +301,13 @@ class SelectorSpec:
         """
         return self
 
-    def parameters(self) -> Parameters:
-        """Everything this spec takes: its ``reads``, then its ``shapes``."""
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        """Everything this spec takes: its ``reads``, then its ``shapes``.
+
+        ``call_context`` is taken and ignored, so a reader asking a
+        ``ServiceSpec`` or a ``SelectorSpec`` asks both alike: a selector spec
+        has no Validator to hand it to.
+        """
         # The reads themselves where there are no shapes, so a spec declaring
         # none hands back the object it holds
         # (test_defaults_and_normalization), as it did before shapes existed.

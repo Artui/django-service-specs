@@ -27,16 +27,19 @@ from typing_extensions import TypedDict
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.forms.form_validator import FormValidator
 from django_service_specs.adapters.pydantic.pydantic_validator import PydanticValidator
+from django_service_specs.authorization.all_of import AllOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.authorize import authorize
+from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.expected_type_refusal import expected_type_refusal
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -56,11 +59,13 @@ from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
+    EVERY_ASK,
     OPEN,
     OWNER_NAME,
     PK,
     TENANT_SEEDS,
     Arguing,
+    AskedWith,
     Contextual,
     Listed,
     Offered,
@@ -68,8 +73,10 @@ from tests.dispatch.utils import (
     Record,
     Refuse,
     Scoped,
+    Tenancy,
     Titled,
     Titles,
+    every_ask_case,
     make_user,
     note_by_pk,
     notes_of,
@@ -86,6 +93,16 @@ LIST = SelectorKind.LIST
 RETRIEVE = SelectorKind.RETRIEVE
 
 pytestmark = pytest.mark.django_db
+
+# What dispatch says of seeds handed on from a prelude that are not this call's.
+_SEEDS_DO_NOT_COVER = "The seeds do not cover this spec, principal and call context."
+_SEEDS_WITHOUT_A_GRANT = (
+    "seeds= is handed on with the grant= its prelude returned beside it; pass both."
+)
+_SEEDS_NOT_A_CARRIER = (
+    "seeds= takes the CallSeeds that check_call() or resolve_target() hands back on "
+    "its .seeds, or resolve_seeds() returns; got {kind}."
+)
 
 
 @pytest.fixture
@@ -5763,6 +5780,26 @@ class TestSeedsAtThePermissionCheck:
         assert events.log == ["resolve", "has_permission"]
 
     @_ENTRIES
+    def test_a_child_s_seed_resolves_through_a_combinator(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A check inside ``AllOf`` names the seed; the combinator opts into it on its behalf."""
+        note = Note.objects.create(title="n", owner=ada)
+        events = _Events()
+        check = _TenantCheck(events)
+        entry(
+            _update_and_reread(AllOf(check)),
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=events.seeds(),
+        )
+        assert events.log == ["resolve", "has_permission"]
+        assert check.tenants == [
+            ("has_permission", "tenant-of-ada"),
+            ("has_object_permission", "tenant-of-ada"),
+        ]
+
+    @_ENTRIES
     def test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
@@ -6015,6 +6052,407 @@ class TestEarlySeeds:
         assert all(handed is context for _, handed, _ in check.asked)
         assert [tenant for _, _, tenant in check.asked] == ["tenant-of-ada", "tenant-of-ada"]
 
+    # --- seeds handed on from the prelude -------------------------------------------------------
+    # Every carrier here is minted and dispatched with one shared ``call_context``:
+    # a carrier binds the dict its prelude ran with, and ``None`` binds a private one.
+
+    @_ENTRIES
+    def test_check_call_then_dispatch_resolves_a_check_named_seed_once(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        checked = check_call(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        _, grant = checked
+        entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=grant,
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        assert [stage for stage, _ in tenancy.seen] == [
+            "has_permission",
+            "instance_selector",
+            "has_object_permission",
+            "service",
+        ]
+        assert tenancy.one_value()
+
+    @_ENTRIES
+    def test_resolve_target_then_dispatch_resolves_it_once(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        found = resolve_target(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        assert not isinstance(found, DispatchResult)
+        target, grant = found
+        result = entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            target=target,
+            grant=grant,
+            seeds=found.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        assert result.value == note
+        assert [stage for stage, _ in tenancy.seen] == [
+            "has_permission",
+            "instance_selector",
+            "has_object_permission",
+            "service",
+        ]
+        assert tenancy.one_value()
+
+    @_ENTRIES
+    def test_a_selector_spec_runs_on_the_carried_values(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """A sync selector spec, on dispatch's own path and on adispatch's one hop."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        seen = tenancy.seen
+
+        def selector(*, pk: int, tenant: object) -> Any:
+            seen.append(("selector", tenant))
+            return Note.objects.filter(pk=pk)
+
+        spec = SelectorSpec(
+            kind=RETRIEVE, selector=selector, reads=PK, permissions=(tenancy.check(),)
+        )
+        context: dict[str, Any] = {}
+        checked = check_call(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        result = entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        assert result.value == note
+        assert [stage for stage, _ in tenancy.seen] == [
+            "has_permission",
+            "selector",
+            "has_object_permission",
+        ]
+        assert tenancy.one_value()
+
+    @_ENTRIES
+    def test_a_carrier_for_a_source_covers_its_compiled_spec(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Minted for the declaration, it covers the declaration and the spec it compiles to."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        source, context = Foreign(tenancy.spec()), {}
+        checked = check_call(
+            source,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        for spec in (source, kernel_spec(source)):
+            entry(
+                spec,
+                principal=ada,
+                arguments={"pk": note.pk},
+                grant=checked[1],
+                seeds=checked.seeds,
+                pool_seeds=tenancy.pool_seeds,
+                call_context=context,
+            )
+        assert tenancy.one_value()
+
+    def _refused(
+        self,
+        entry: Callable[..., Any],
+        spec: ServiceSpec,
+        tenancy: Tenancy,
+        principal: Any,
+        note: Note,
+        **call: Any,
+    ) -> None:
+        """Dispatch ``call`` and assert the carrier refused it before anything resolved or ran."""
+        resolved, seen = len(tenancy.resolved), len(tenancy.seen)
+        with pytest.raises(NotPermitted) as caught:
+            entry(spec, principal=principal, arguments={"pk": note.pk}, **call)
+        assert str(caught.value) == _SEEDS_DO_NOT_COVER
+        assert len(tenancy.resolved) == resolved
+        assert len(tenancy.seen) == seen
+
+    @_ENTRIES
+    def test_a_carrier_for_another_principal_is_refused(
+        self, entry: Callable[..., Any], ada: Any, bob: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        asked = {"arguments": {"pk": note.pk}, "pool_seeds": tenancy.pool_seeds}
+        _, grant = check_call(spec, principal=ada, call_context=context, **asked)
+        bobs = check_call(spec, principal=bob, call_context=context, **asked).seeds
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=grant,
+            seeds=bobs,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+
+    @_ENTRIES
+    def test_a_carrier_from_another_call_is_refused(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec = tenancy.spec()
+        checked = check_call(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context={},
+        )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context={},
+        )
+
+    @_ENTRIES
+    def test_a_carrier_from_a_prelude_handed_no_context_covers_only_its_own_dict(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Its prelude ran with a dict of its own: a call handed none, or a fresh one, is refused."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec = tenancy.spec()
+        checked = check_call(
+            spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=tenancy.pool_seeds
+        )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+        )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context={},
+        )
+        # The dict it ran with is public on the carrier, and a call handed
+        # that very dict is covered and runs on the carried values.
+        entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=checked.seeds.call_context,
+        )
+        assert tenancy.one_value()
+
+    @_ENTRIES
+    def test_a_carrier_for_another_spec_is_refused(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, other, context = tenancy.spec(), tenancy.spec(), {}
+        asked = {"arguments": {"pk": note.pk}, "pool_seeds": tenancy.pool_seeds}
+        _, grant = check_call(spec, principal=ada, call_context=context, **asked)
+        others = check_call(other, principal=ada, call_context=context, **asked).seeds
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=grant,
+            seeds=others,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+
+    @_ENTRIES
+    def test_a_carrier_under_another_registry_is_refused(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        checked = check_call(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(tenant=tenancy.tenant),
+            call_context=context,
+        )
+
+    @_ENTRIES
+    def test_a_refused_carrier_resolves_nothing(self, entry: Callable[..., Any], ada: Any) -> None:
+        """Refused before the class-level check: the grant, which covers nothing here, is never read."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        spec, other, context = tenancy.spec(), tenancy.spec(), {}
+        others = check_call(
+            other,
+            principal=ada,
+            arguments={"pk": note.pk},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        self._refused(
+            entry,
+            spec,
+            tenancy,
+            ada,
+            note,
+            grant=others[1],
+            seeds=others.seeds,
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+
+    @_ENTRIES
+    def test_a_seed_no_check_names_still_resolves_per_pool(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Only the seeds a check names travel; another resolves in the run's pool, as before."""
+        note = Note.objects.create(title="n", owner=ada)
+        tenancy = Tenancy()
+        regions: list[str] = []
+
+        def region() -> str:
+            regions.append("eu")
+            return "eu"
+
+        spec = tenancy.spec(service=lambda *, instance, tenant, region: (tenant, region))
+        seeds, context = tenancy.pool_seeds.extend(region=region), {}
+        checked = check_call(
+            spec, principal=ada, arguments={"pk": note.pk}, pool_seeds=seeds, call_context=context
+        )
+        assert set(checked.seeds.values) == {"tenant"}
+        assert regions == []
+        result = entry(
+            spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            grant=checked[1],
+            seeds=checked.seeds,
+            pool_seeds=seeds,
+            call_context=context,
+        )
+        assert result.value == (tenancy.resolved[0], "eu")
+        assert tenancy.one_value()
+        assert len(regions) >= 1
+
+    @_ENTRIES
+    def test_seeds_without_a_grant_is_a_type_error(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        tenancy = Tenancy()
+        spec, context = tenancy.spec(), {}
+        checked = check_call(
+            spec,
+            principal=ada,
+            arguments={"pk": 1},
+            pool_seeds=tenancy.pool_seeds,
+            call_context=context,
+        )
+        with pytest.raises(TypeError) as caught:
+            entry(
+                spec,
+                principal=ada,
+                arguments={"pk": 1},
+                seeds=checked.seeds,
+                pool_seeds=tenancy.pool_seeds,
+                call_context=context,
+            )
+        assert str(caught.value) == _SEEDS_WITHOUT_A_GRANT
+        assert len(tenancy.resolved) == 1
+
+    @_ENTRIES
+    def test_a_plain_mapping_as_seeds_is_a_type_error(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        tenancy = Tenancy()
+        spec = tenancy.spec()
+        _, grant = check_call(
+            spec, principal=ada, arguments={"pk": 1}, pool_seeds=tenancy.pool_seeds
+        )
+        with pytest.raises(TypeError) as caught:
+            entry(
+                spec,
+                principal=ada,
+                arguments={"pk": 1},
+                grant=grant,
+                seeds={"tenant": object()},
+                pool_seeds=tenancy.pool_seeds,
+            )
+        assert str(caught.value) == _SEEDS_NOT_A_CARRIER.format(kind="dict")
+        assert len(tenancy.resolved) == 1
+
 
 class TestReturnsMany:
     """``returns_many``: a service's own return dispatched and presented as a list, row by row.
@@ -6090,3 +6528,73 @@ class TestReturnsMany:
 
         assert result.kind == "list"
         assert present_for_audience(spec, result) == [PROJECTED_ROW, PROJECTED_ROW]
+
+
+# --- the call's context, handed to every ask of a Validator's parameters ---------------------
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_every_ask_in_one_dispatch_is_handed_its_own_dict(ada: Any, case: str) -> None:
+    """Every ask, not some: a Validator keyed on the dict would otherwise
+    describe one call two ways."""
+    spec, validator, arguments, service = every_ask_case(case)
+    context: dict[str, Any] = {}
+    dispatch(
+        spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS, call_context=context
+    )
+    assert service.calls
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+def test_a_dispatch_handed_no_dict_hands_every_ask_the_one_it_makes(ada: Any, case: str) -> None:
+    spec, validator, arguments, service = every_ask_case(case)
+    seen: list[Any] = []
+    spec = spec.derive(service=lambda *, call_context: seen.append(call_context))
+    dispatch(spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS)
+    assert isinstance(seen[0], dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not seen[0]] == []
+
+
+def _nesting(inner: ServiceSpec, *, forwarding: bool) -> tuple[ServiceSpec, AskedWith]:
+    """A spec whose service dispatches ``inner`` for its own principal, forwarding its dict or not."""
+
+    def service(*, user: Any, call_context: dict[str, Any]) -> None:
+        dispatch(
+            inner,
+            principal=user,
+            arguments={"title": "inner"},
+            call_context=call_context if forwarding else None,
+        )
+
+    validator = AskedWith()
+    return ServiceSpec(service=service, permissions=OPEN, validator=validator), validator
+
+
+def test_an_inner_dispatch_is_handed_a_different_dict(ada: Any) -> None:
+    """A dispatch a service makes without a dict describes its own call, never the outer one."""
+    inner_validator = AskedWith()
+    inner = ServiceSpec(service=Record(), permissions=OPEN, validator=inner_validator)
+    outer, outer_validator = _nesting(inner, forwarding=False)
+    context: dict[str, Any] = {}
+    dispatch(outer, principal=ada, arguments={"title": "outer"}, call_context=context)
+    assert outer_validator.asked
+    assert [asked for asked in outer_validator.asked if asked is not context] == []
+    inner_context = inner_validator.asked[0]
+    assert isinstance(inner_context, dict)
+    assert inner_context is not context
+    assert [asked for asked in inner_validator.asked if asked is not inner_context] == []
+
+
+def test_an_inner_dispatch_handed_the_outer_dict_reads_it(ada: Any) -> None:
+    """The documented gap: a service forwarding its own dict to an inner
+    dispatch has that call described as the outer one. Hand it a fresh dict."""
+    inner_validator = AskedWith()
+    inner = ServiceSpec(service=Record(), permissions=OPEN, validator=inner_validator)
+    outer, _ = _nesting(inner, forwarding=True)
+    context: dict[str, Any] = {}
+    dispatch(outer, principal=ada, arguments={"title": "outer"}, call_context=context)
+    assert inner_validator.asked
+    assert [asked for asked in inner_validator.asked if asked is not context] == []

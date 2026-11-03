@@ -49,7 +49,9 @@ def bind_arguments(
        ``partial``, one its ``input_data`` provider fills or may fill, and a
        read the ``kwargs`` provider of the spec declaring it fills or may
        fill - a typed provider's filled and declinable keys, and every
-       parameter an untyped provider's values reach.
+       parameter an untyped provider's values reach - less a read a provider
+       requires itself, which stays demanded
+       (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller).
     2. For a [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec]
        with a Validator, ``validated()`` on only the arguments the Validator's
        own ``parameters()`` declare - never a selector's or the spec's
@@ -76,7 +78,8 @@ def bind_arguments(
     Validator, once the provider has answered, is not made here
     (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
     No ``kwargs`` provider is called either: a read one fills or
-    may fill passes the shape check absent, and the presence check dispatch
+    may fill passes the shape check absent, unless a provider requires it
+    itself, and the presence check dispatch
     makes once the provider has answered is not made here
     (test_bind_arguments_relaxes_a_may_fill_read). A read one is annotated to
     fill is absent from a selector spec's checked arguments whether or not
@@ -148,18 +151,24 @@ def bind_arguments(
             different rows come back as one tree keyed by row index.
     """
     spec = kernel_spec(spec)
-    parameters = spec.parameters()
+    # One dict for every ask of the Validator's ``parameters``, the seeds'
+    # resolvers and the Validator, so a resolver reading ``request`` and the
+    # Validator see the same call
+    # (test_a_seed_resolver_reads_the_dict_the_validator_is_handed), and the
+    # declaration is asked as the call that validates it
+    # (test_bind_arguments_hands_every_ask_one_dict). Made before the first
+    # ask, so a bind handed none still describes itself one way.
+    context = {} if call_context is None else call_context
+    parameters = spec.parameters(call_context=context)
     if pool_seeds is not None:
         # First, as dispatch refuses one, so no resolver runs for it below.
         refuse_deactivated(principal)
-        parameters = seat_seed_named(spec, parameters, parameters, pool_seeds)
-    checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
+        parameters = seat_seed_named(spec, parameters, parameters, pool_seeds, call_context=context)
+    checked = shape_check(
+        spec, parameters, arguments, unknown_arguments=unknown_arguments, call_context=context
+    )
     if isinstance(spec, SelectorSpec):
         return checked
-    # One dict for the seeds' resolvers and the Validator, so a resolver reading
-    # ``request`` and the Validator see the same call
-    # (test_a_seed_resolver_reads_the_dict_the_validator_is_handed).
-    context = {} if call_context is None else call_context
     ambient: dict[str, Any] = {}
     # Two conjuncts: without the first a bind handed no seeds would have no
     # registry to resolve, and fail rather than bind with an empty ambient

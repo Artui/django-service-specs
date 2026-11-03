@@ -20,6 +20,7 @@ class Validated:
     - ``data`` is the validated object as a whole, which a service declaring
       ``data`` receives. For a mapping Validator it is ``values`` itself; for
       [`DataclassValidator`][django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator]
+      and [`PydanticValidator`][django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator]
       it is the instance, whose fields ``values`` holds.
     - ``pool`` is any other value the Validator binds for this one call, such
       as the bound object a library validated through, so a service can ask

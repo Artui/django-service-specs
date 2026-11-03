@@ -105,17 +105,17 @@ def _protocol(leaf: str, call: str) -> Pin:
 SURFACE: dict[str, Pin] = {
     # --- affordances --------------------------------------------------------------------------
     "enforce_affordances": _fn(
-        "affordances.enforce_affordances", "spec, pool, *, instance, reserved=, call_context="
+        "affordances.enforce_affordances", "spec, pool, *, instance, reserved, call_context="
     ),
     "aenforce_affordances": _fn(
-        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved=, call_context="
+        "affordances.aenforce_affordances", "spec, pool, *, instance, reserved, call_context="
     ),
     "operation_affordances": _fn("affordances.operation_affordances", "spec"),
     "unmet_operation_affordance": _fn(
-        "affordances.unmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.unmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     "aunmet_operation_affordance": _fn(
-        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved=, call_context="
+        "affordances.aunmet_operation_affordance", "spec, pool, *, reserved, call_context="
     ),
     # --- authorization ------------------------------------------------------------------------
     "resolve_principal": _fn("authorization.resolve_principal", "identifier"),
@@ -142,12 +142,12 @@ SURFACE: dict[str, Pin] = {
     # --- dispatch -----------------------------------------------------------------------------
     "dispatch": _fn(
         "dispatch.dispatch",
-        "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, progress=, "
-        "target=, extra_kwargs=, call_context=",
+        "spec, *, principal, arguments, grant=, seeds=, pool_seeds=, unknown_arguments=, "
+        "progress=, target=, extra_kwargs=, call_context=",
     ),
     "adispatch": _fn(
         "dispatch.adispatch",
-        "spec, *, principal=, principal_id=, arguments, grant=, pool_seeds=, "
+        "spec, *, principal=, principal_id=, arguments, grant=, seeds=, pool_seeds=, "
         "unknown_arguments=, progress=, target=, extra_kwargs=, call_context=",
     ),
     "check_call": _fn(
@@ -161,7 +161,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "resolve_target": _fn(
         "dispatch.resolve_target",
-        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=",
+        "spec, *, principal, arguments, grant=, pool_seeds=, call_context=, seeds=",
     ),
     "present": _fn("dispatch.present", "spec, result"),
     "apresent": _fn("dispatch.apresent", "spec, result"),
@@ -414,6 +414,10 @@ SURFACE: dict[str, Pin] = {
     "can_present_nothing": _fn("schema.can_present_nothing", "spec"),
     "output_schema": _fn("schema.output_schema", "output"),
     "parameters_schema": _fn("schema.parameters_schema", "parameters, *, unknown_arguments="),
+    "spec_caller_input_schema": _fn(
+        "schema.spec_caller_input_schema",
+        "spec, *, pool_seeds=, server_arguments=, unknown_arguments=",
+    ),
     "spec_input_schema": _fn("schema.spec_input_schema", "spec, *, unknown_arguments="),
     "spec_output_schema": _fn(
         "schema.spec_output_schema", "spec, *, paginate=, projection=, handle_description="
@@ -456,7 +460,7 @@ SURFACE: dict[str, Pin] = {
         "returns_many=, affordances=, atomic=, idempotent=, preconditions=, kwargs=, input_data=, "
         "progress_reporter=, metadata=",
         methods={
-            "parameters": "()",
+            "parameters": "(*, call_context=)",
             "output": "()",
             "target_selector_spec": "()",
             "presenter_for_output": "()",
@@ -467,7 +471,7 @@ SURFACE: dict[str, Pin] = {
         signature="*, kind, selector, permissions=, reads=, shapes=, presenter=, allow_none=, "
         "select_related=, prefetch_related=, annotations=, extend_queryset=, filter_set=, "
         "affordances=, kwargs=, preconditions=, progress_reporter=, metadata=",
-        methods={"parameters": "()", "output": "()"},
+        methods={"parameters": "(*, call_context=)", "output": "()"},
     ),
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),
@@ -562,6 +566,23 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # Whether a spec's checks need the call's arguments to answer, which a
         # transport's filtered listing reads; drfs serves no such listing.
         "checks_read_arguments",
+        # Permission checks combined as one: a check like any other, which a
+        # project's spec declares under any transport, so drfs neither wraps
+        # nor re-exports them.
+        "AllOf",
+        "AnyOf",
+        "NoneOf",
+        # The seeds a prelude hands on to the call it checked, and the tuples
+        # ``check_call`` and ``resolve_target`` return them on: a caller reads
+        # them off those returns and never builds one, and drfs re-exports
+        # none of them.
+        "CallSeeds",
+        "CheckedCall",
+        "ResolvedTarget",
+        # What mints those seeds ahead of ``authorize``, for a transport that
+        # admits a call before it resolves the row: drfs authorizes through its
+        # own permission classes, so it neither wraps nor re-exports it.
+        "resolve_seeds",
         # The shared check that a transport's refusal map answers every kernel
         # refusal, and the findings it returns: a transport's own suite reads
         # these from the kernel, and a drfs consumer writes no refusal map.
@@ -611,6 +632,14 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "provider_reached",
         "seed_named_parameters",
         "unreceived_fields",
+        # How dispatch asks a Validator what it takes, for a transport asking
+        # one itself during a call (django-spec-rest's rows of a ``many``
+        # spec): djangorestframework-services neither wraps nor re-exports it.
+        "validator_parameters",
+        # A check's denial, marked so a transport can answer it with a
+        # challenge: the transports that do read it from this package, and
+        # djangorestframework-services neither wraps nor re-exports it.
+        "PermissionCheckDenied",
         # This package's version, which no importer reads as an API.
         "__version__",
     }

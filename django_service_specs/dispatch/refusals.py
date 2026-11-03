@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django_service_specs.authorization.not_permitted import NotPermitted
+from django_service_specs.authorization.permission_check_denied import PermissionCheckDenied
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -17,6 +18,7 @@ REFUSALS: tuple[type[DispatchError] | type[ServiceError], ...] = (
     DispatchError,
     InvalidArguments,
     NotPermitted,
+    PermissionCheckDenied,
     PrincipalUnavailable,
     ServiceError,
     ServiceNotFound,

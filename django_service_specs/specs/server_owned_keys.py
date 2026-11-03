@@ -54,17 +54,24 @@ def server_owned_keys(
     fields - and dispatch does not demand a parameter there that the provider
     fills. A filled key that a parameter in any other seat declares is
     refused when the spec is built, or, for a Validator field, when
-    ``parameters()`` is assembled. A key no parameter declares is the server's
-    alone.
+    ``parameters()`` is assembled. A ``many`` spec's list, named by
+    ``many_argument``, is such a seat for every provider, since dispatch
+    always demands it of the caller: a key naming it is refused, filled or
+    declinable, even beside a Validator field of that name. A key no
+    parameter declares is the server's alone.
 
     A key a provider may decline with ``UNSET`` is not here, nor is any key
     of a provider whose return says nothing about its keys, which may fill
     any name and so names none. Dispatch does not demand either of the
     caller, since the provider may fill it, and keeps the caller's value
     beneath the provider's answer, so the caller's is the one the callable
-    receives when the provider declines. A transport that asks the caller
-    for neither reads them off ``provider_keys``: its ``declinable`` keys, or
-    every parameter in the seat of a provider it reads as ``None``.
+    receives when the provider declines. Less a read a provider requires
+    itself, by name with no default, which only the caller can send and
+    dispatch demands. A transport that asks the caller for neither reads
+    them off [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+    which leaves such a read out, or
+    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema],
+    which keeps it in ``required``.
 
     **Static per spec.** A transport that also answers some declared
     parameters itself, per mount or per toolset, describes them with a

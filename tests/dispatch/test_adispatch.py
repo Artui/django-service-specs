@@ -30,8 +30,12 @@ from django_service_specs.authorization.principal_unavailable import PrincipalUn
 from django_service_specs.dispatch import utils as dispatch_utils
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apresent import apresent
+from django_service_specs.dispatch.authorize import authorize
+from django_service_specs.dispatch.check_call import check_call
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
+from django_service_specs.dispatch.resolve_target import resolve_target
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -43,6 +47,7 @@ from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import (
     EDIT,
+    EVERY_ASK,
     OPEN,
     PK,
     RENAME,
@@ -53,8 +58,10 @@ from tests.dispatch.utils import (
     Record,
     Refuse,
     Scoped,
+    Tenancy,
     Titled,
     Titles,
+    every_ask_case,
     make_user,
     note_by_pk,
     notes_of,
@@ -1540,3 +1547,204 @@ async def test_a_returns_many_service_presents_a_none_return_as_none() -> None:
 
     assert result.kind == "instance"
     assert await apresent(spec, result) is None
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+async def test_every_ask_in_one_adispatch_is_handed_its_own_dict(ada: Any, case: str) -> None:
+    spec, validator, arguments, service = every_ask_case(case)
+    context: dict[str, Any] = {}
+    await adispatch(
+        spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS, call_context=context
+    )
+    assert service.calls
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not context] == []
+
+
+@pytest.mark.parametrize("case", EVERY_ASK)
+async def test_an_adispatch_handed_no_dict_hands_every_ask_the_one_it_makes(
+    ada: Any, case: str
+) -> None:
+    spec, validator, arguments, _ = every_ask_case(case)
+    seen: list[Any] = []
+    spec = spec.derive(service=lambda *, call_context: seen.append(call_context))
+    await adispatch(spec, principal=ada, arguments=arguments, pool_seeds=TENANT_SEEDS)
+    assert isinstance(seen[0], dict)
+    assert validator.asked
+    assert [asked for asked in validator.asked if asked is not seen[0]] == []
+
+
+# --- seeds handed on from the prelude, on every route ---------------------------------------
+
+
+def _async_selector_route(tenancy: Tenancy) -> SelectorSpec:
+    seen = tenancy.seen
+
+    async def selector(*, pk: int, tenant: object) -> Any:
+        seen.append(("selector", tenant))
+        return Note.objects.filter(pk=pk)
+
+    return SelectorSpec(kind=RETRIEVE, selector=selector, reads=PK, permissions=(tenancy.check(),))
+
+
+def _async_service_route(tenancy: Tenancy) -> ServiceSpec:
+    seen = tenancy.seen
+
+    async def service(*, instance: Note, tenant: object) -> Note:
+        seen.append(("service", tenant))
+        return instance
+
+    return tenancy.spec(service=service, atomic=False)
+
+
+@pytest.mark.parametrize(
+    ("route", "build", "hopped"),
+    [
+        ("async selector", _async_selector_route, "_open_selector"),
+        ("async service", _async_service_route, "_prepare"),
+        ("sync", Tenancy.spec, "_dispatch"),
+    ],
+    ids=["async-selector", "async-non-atomic-service", "sync-hop"],
+)
+async def test_adispatch_runs_on_the_carried_values(
+    ada: Any,
+    hops: list[str],
+    route: str,
+    build: Callable[[Tenancy], ServiceSpec | SelectorSpec],
+    hopped: str,
+) -> None:
+    """Each route hands the carrier on, and the service routes take ``target=`` beside it."""
+    note = await _create(owner=ada, title="mine")
+    tenancy = Tenancy()
+    spec, context = build(tenancy), {}
+    asked = {
+        "principal": ada,
+        "arguments": {"pk": note.pk},
+        "pool_seeds": tenancy.pool_seeds,
+        "call_context": context,
+    }
+    if isinstance(spec, SelectorSpec):
+        found: Any = await sync_to_async(check_call)(spec, **asked)
+        handed: dict[str, Any] = {}
+    else:
+        found = await sync_to_async(resolve_target)(spec, **asked)
+        handed = {"target": found[0]}
+
+    result = await adispatch(spec, grant=found[1], seeds=found.seeds, **asked, **handed)
+
+    assert result.value == note
+    # The run was handed the value too, not only the checks before it.
+    assert {stage for stage, _ in tenancy.seen} & {"selector", "service"}
+    assert tenancy.one_value()
+    assert hops[0] == hopped
+
+
+@pytest.mark.parametrize(
+    "build",
+    [Tenancy.spec, _async_service_route],
+    ids=["sync-hop", "async-non-atomic-service"],
+)
+async def test_one_resolution_from_resolve_seeds_to_adispatch(
+    ada: Any, build: Callable[[Tenancy], ServiceSpec]
+) -> None:
+    """Admitted ahead of the row, then the run on the loop: one value of ``tenant`` throughout."""
+    note = await _create(owner=ada, title="mine")
+    tenancy = Tenancy()
+    spec, context = build(tenancy), {}
+
+    carrier = await sync_to_async(resolve_seeds)(
+        spec, principal=ada, pool_seeds=tenancy.pool_seeds, call_context=context
+    )
+    grant = await sync_to_async(authorize)(
+        spec, ada, seeds=carrier, pool_seeds=tenancy.pool_seeds, call_context=context
+    )
+    result = await adispatch(
+        spec,
+        principal=ada,
+        arguments={"pk": note.pk},
+        grant=grant,
+        seeds=carrier,
+        pool_seeds=tenancy.pool_seeds,
+        call_context=context,
+    )
+
+    assert result.value == note
+    assert [stage for stage, _ in tenancy.seen] == [
+        "has_permission",
+        "instance_selector",
+        "has_object_permission",
+        "service",
+    ]
+    assert len(tenancy.resolved) == 1
+    # The service was handed the very object the prelude resolved, not a second one.
+    assert tenancy.seen[-1][1] is carrier.values["tenant"]
+    assert tenancy.one_value()
+
+
+async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> None:
+    """Refused on the loop, so the sync route's ``dispatch`` never gets to refuse it instead.
+
+    The type check comes first: a mistyped carrier is named so even with no grant.
+    """
+    tenancy = Tenancy()
+    spec, context = tenancy.spec(), {}
+    checked = await sync_to_async(check_call)(
+        spec,
+        principal=ada,
+        arguments={"pk": 1},
+        pool_seeds=tenancy.pool_seeds,
+        call_context=context,
+    )
+    asked = {
+        "principal": ada,
+        "arguments": {"pk": 1},
+        "pool_seeds": tenancy.pool_seeds,
+        "call_context": context,
+    }
+
+    with pytest.raises(TypeError, match=r"^seeds= is handed on with the grant="):
+        await adispatch(spec, seeds=checked.seeds, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
+        await adispatch(spec, grant=checked[1], seeds={"tenant": object()}, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
+        await adispatch(spec, seeds={"tenant": object()}, **asked)
+
+    assert hops == []
+    assert len(tenancy.resolved) == 1
+
+
+async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(
+    ada: Any, hops: list[str]
+) -> None:
+    """A wiring mistake, refused on the loop at entry.
+
+    Where it is made beside another, the type check wins, then no grant, then this;
+    a principal_id of 0 is still a principal_id.
+    """
+    tenancy = Tenancy()
+    spec, context = tenancy.spec(), {}
+    checked = await sync_to_async(check_call)(
+        spec,
+        principal=ada,
+        arguments={"pk": 1},
+        pool_seeds=tenancy.pool_seeds,
+        call_context=context,
+    )
+    asked = {
+        "principal_id": ada.pk,
+        "arguments": {"pk": 1},
+        "pool_seeds": tenancy.pool_seeds,
+        "call_context": context,
+    }
+
+    with pytest.raises(TypeError, match=r"^seeds= cannot cover a principal adispatch\(\) resolves"):
+        await adispatch(spec, grant=checked[1], seeds=checked.seeds, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= is handed on with the grant="):
+        await adispatch(spec, seeds=checked.seeds, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= takes the CallSeeds .* got dict\.$"):
+        await adispatch(spec, grant=checked[1], seeds={"tenant": object()}, **asked)
+    with pytest.raises(TypeError, match=r"^seeds= cannot cover a principal adispatch\(\) resolves"):
+        await adispatch(spec, grant=checked[1], seeds=checked.seeds, **{**asked, "principal_id": 0})
+
+    assert hops == []
+    assert len(tenancy.resolved) == 1

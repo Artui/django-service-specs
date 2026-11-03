@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import Field
 from typing import Any
@@ -13,8 +12,12 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
-from django_service_specs.types.is_async import is_async
-from django_service_specs.types.utils import CALL_SEEDS_NOTE, SHAPES, SHAPES_RENAME
+from django_service_specs.types.utils import (
+    CALL_SEEDS_NOTE,
+    SHAPES,
+    SHAPES_RENAME,
+    check_callable,
+)
 
 
 def check_changes(declared: tuple[Field[Any], ...], changes: Iterable[str], *, label: str) -> None:
@@ -34,37 +37,6 @@ def check_changes(declared: tuple[Field[Any], ...], changes: Iterable[str], *, l
     if unknown:
         named = ", ".join(repr(name) for name in unknown)
         raise TypeError(f"{label}.derive() takes the spec's own fields, and not {named}.")
-
-
-def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
-    """Refuse a value that is not callable, and under ``sync`` one that is ``async def``.
-
-    ``sync`` is for every seat dispatch calls from sync code and never awaits:
-    the providers, the preconditions, a selector spec's ``extend_queryset`` and
-    ``filter_set``, each method of a permission check, a Validator's
-    ``validate`` and ``validated``, and a Presenter's ``present``. Called there, an
-    ``async def`` callable returns a coroutine nobody awaits, so a precondition
-    that would have refused the call raises nothing and the call goes ahead, a
-    permission check's answer is truthy and allows it, and a provider or a
-    shaping callable hands dispatch a coroutine where its mapping, its sink or
-    its queryset should be. An async generator function is refused with them:
-    what it returns is never awaitable, never runs, and is truthy too. Refused
-    when the spec is built, naming the seat and the callable, rather than
-    found at the first call or never. The run itself - the service, or a
-    selector spec's own selector - may be ``async def``, since dispatch
-    bridges it and ``adispatch`` awaits it, so it is checked without ``sync``.
-    """
-    if not callable(value):
-        raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
-    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``,
-    # test_a_sync_provider_and_precondition_are_accepted the second, and
-    # test_an_async_generator_precondition_is_refused the third.
-    if sync and (is_async(value) or inspect.isasyncgenfunction(value)):
-        raise ImproperlyConfigured(
-            f"{label} is {callable_name(value)}, an async callable. It is called from sync code "
-            "and never awaited, on both entry points; declare it with def, since adispatch "
-            "already runs it off the event loop."
-        )
 
 
 def check_providers(spec: Any, names: tuple[str, ...], *, label: str) -> None:
@@ -205,11 +177,6 @@ def check_call_seeds(parameters: Parameters, *, label: str, reflected_seated: bo
             "on every mount. An argument must never meet the call's value in one pool; "
             f"rename the parameter.{hint}{CALL_SEEDS_NOTE}"
         )
-
-
-def callable_name(value: Any) -> str:
-    """A callable's own name, or its type's for an instance or a ``functools.partial``."""
-    return getattr(value, "__qualname__", None) or type(value).__name__
 
 
 def describe(value: Any) -> str:

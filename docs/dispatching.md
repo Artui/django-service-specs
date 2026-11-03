@@ -24,7 +24,10 @@ the async entry point:
    nesting, with no query. An argument no parameter declares is refused. A
    [`partial`](declaring.md#partial-updates) write's absent Validator
    parameters are not refused, nor one its `input_data` provider is annotated
-   to fill.
+   to fill. A read a provider requires itself, by name with no default, is
+   not relaxed: only the caller can send it, and a call leaving it out is
+   refused here, before any provider runs
+   ([example](declaring.md#providers-and-preconditions)).
 2. **Class-level authorization**: every permission check's `has_permission`,
    or the [grant](#grants) a transport passed instead. A seed a check names
    is resolved just before it, and only such a seed
@@ -46,7 +49,11 @@ the async entry point:
    is asked of neither.
 5. **Validation**: a write's `input_data` provider, then its Validator on only
    the arguments it declares, with the provider's values merged over the
-   caller's, and the resolved target and `partial` in its context.
+   caller's, and the resolved target and `partial` in its context. A
+   dataclass Validator decodes each value of a `dict[str, X]` field there and
+   refuses one under its own key
+   ([example](declaring.md#the-dataclass-adapter)); the shape check sees only
+   an object.
 6. **Affordances, then preconditions**: a write's `affordances`, in
    declaration order - the first one not met refuses the call with
    `ActionUnavailable`, carrying its `code` - then its `preconditions`, the
@@ -231,6 +238,23 @@ row reads an attribute off it and would fail on either. `message` is what
 [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
 says when the check refuses.
 
+**A check's denial is marked.** A check answering `False`, at any of the
+three questions, raises
+[`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+a `NotPermitted` carrying the `check` that answered and the `spec` it was
+asked about. Every other `NotPermitted` stays bare: a grant or a seeds carrier
+that does not cover the call, a service's own refusal, and a check that raises
+`NotPermitted` itself rather than answering. So a transport can answer a
+check's denial of an anonymous caller with an authentication challenge, as
+DRF's `permission_denied` does, and every other refusal as forbidden. A
+combinator's denial names the combinator, the rule the spec declares. A
+denial inside a `dispatch` the service makes propagates out of the outer call
+as the same class, so a transport treats it as its own call's only where
+`exc.spec is kernel_spec(spec)` for the spec it dispatched: `spec` is the
+compiled spec, the one the check was handed, and
+[`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec] answers
+the same one for a declaration every time.
+
 **A check can read the call's arguments** by declaring a keyword `arguments`
 on any of its three methods. Dispatch then hands that method the call's
 shape-checked arguments as a read-only mapping - a route's captured `pk`, a
@@ -315,6 +339,56 @@ when it is built, with `ImproperlyConfigured` naming the method. A method that
 hands back a coroutine from a plain `def` - a decorated `async def` - is
 refused where its answer is read, so the call fails closed.
 
+**Checks combine into one.** A spec's `permissions=` passes only when every
+check passes. To say "its owner, or staff" or "anyone not suspended",
+[`AllOf`][django_service_specs.authorization.all_of.AllOf],
+[`AnyOf`][django_service_specs.authorization.any_of.AnyOf] and
+[`NoneOf`][django_service_specs.authorization.none_of.NoneOf] each take checks
+and an optional `message=`, and are a check like any other, so they nest and
+sit in `permissions=` beside other checks.
+
+```python
+--8<--
+docs/examples/dispatching.py:combinators
+--8<--
+```
+
+- **`AllOf`** asks every check each question, in order, and stops at the
+  first that fails.
+- **`AnyOf`** passes the class-level question at the first check that passes
+  it. At the row and scope questions a check counts only where it passes the
+  class-level question too, asked again, and then the row or scope question,
+  as an HTTP framework's `OR` of permission classes does: a check that allows
+  every row by default does not admit a principal it refused at class level
+  because another check admitted them there. The class-level question is asked
+  again rather than remembered, so the row is judged the same under a
+  [grant](#grants) that answered the class-level question without asking.
+- **`NoneOf`** passes only when no check passes `has_permission`. It inverts
+  that question alone and allows at the row and scope questions, so a check
+  whose `has_object_permission` or `has_scope_permission` is its own, inside it
+  at any depth, is refused when it is built: the opposite of "may act on this
+  row" is no rule.
+
+A check inside a combinator is handed what it declares and nothing else - the
+call's `arguments`, its context, a seed - and a seed it names is resolved for
+the call as one the spec's own checks name would be, bar the names a
+combinator's own methods take: `principal` and `spec` at every question,
+`target` at the row one and `scope` at the scope one, as asked of the
+combinator or of a check it asks again there (`AnyOf` asks `has_permission`
+again at both). A check naming one is refused when the combinator is built,
+since a seed of that name cannot reach it through the combinator; rename the
+keyword. `checks_read_arguments` reads through a combinator the same way. Every answer
+inside one is read as an answer at the top is, so a coroutine fails closed,
+and a check that raises ends the call with its error rather than being read as
+a refusal. A refusal says the combinator's `message`, not that of a check
+inside it, or the generic wording without one.
+
+A combinator is refused when it is built, with `ImproperlyConfigured`, when it
+holds no checks, when a check inside it would be refused in `permissions=` (a
+class, something that is not a `PermissionCheck`, an `async def` method), and
+when it holds `Unrestricted`, a subclass included: the explicit allow is a
+decision a spec makes by name. A combinator is equal only to itself.
+
 **A spec with no permission check is refused**, with `ImproperlyConfigured`, at
 dispatch and at [registration](registry.md). Off HTTP there is no view whose
 policy an undeclared operation could inherit, and running it anyway is how an
@@ -369,8 +443,11 @@ only where a service spec's target was handed in as `target=`.
 A page asks the class-level check before it shows anything, so a principal
 the check refuses never sees the form. Where that check names a seed - the
 club a route captured, a tenant read off the request - the transport has the
-registry it would hand dispatch rather than the seed's value, and hands that
-to `authorize` as `pool_seeds=`:
+registry it would hand dispatch rather than the seed's value. It resolves the
+seeds the spec's checks name once, with
+[`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds],
+and hands the carrier that returns to `authorize` and then to `dispatch` as
+`seeds=`, so the check that admitted the request and the run see one value:
 
 ```python
 --8<--
@@ -384,19 +461,42 @@ docs/examples/dispatching.py:admit
 --8<--
 ```
 
-Only the seeds the spec's `has_permission` checks name are resolved, once in
-the `authorize` call, for the principal as `user`, exactly as dispatch
-resolves them before its own class-level check; a seed no check names there is
-never resolved, and neither is any seed when a covering grant answers first.
-The values are not carried on the grant, so the `dispatch` that follows
-resolves the seeds its checks name again, for its own call: the check
-`authorize` asked and the service may see two objects from one resolver. `authorize_target`
-and `authorize_scope` take `pool_seeds=` the same way, for the seeds their own
-question names. `seeds=` is the alternative for a caller holding resolved
-values, and handing both raises `TypeError`, since one would silently outrank
-the other, whether or not a grant would have answered the call first. A
-deactivated principal handed with `pool_seeds=` raises
-[`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable]
+`resolve_seeds` resolves the seeds a check of the spec names at any of its
+three questions, the class-level, object-level and scope ones, for the
+principal as `user`, exactly as dispatch resolves them before its own
+class-level check; a seed no check names stays unresolved and resolves in each
+of dispatch's pools as it always does. A deactivated principal is refused
+first, as
+[`PrincipalUnavailable`][django_service_specs.authorization.principal_unavailable.PrincipalUnavailable],
+before any seed resolves. The carrier it returns is a
+[`CallSeeds`](#seeds-handed-on-from-the-prelude), and the whole `authorize`-first
+path takes it as `seeds=`, each step resolving nothing:
+
+- a single row: `resolve_seeds`, then `authorize(seeds=)`, then
+  `resolve_target(seeds=, grant=)`, then `dispatch(seeds=found.seeds, grant=,
+  target=)`;
+- a `many` call or a create: `resolve_seeds`, then `authorize(seeds=)`, then
+  `authorize_scope(seeds=)`, then `dispatch(seeds=, grant=)`.
+
+The carrier is bound by identity to the spec, the principal, the `call_context`
+dict and the registry, and each of `authorize`, `authorize_scope`,
+`authorize_target` and `resolve_target` refuses one that does not cover its call
+with `NotPermitted`, before a grant can answer and before any check is asked.
+So hand every step one dict: a carrier minted with no `call_context` is bound
+to a fresh one, `seeds.call_context`, and an `authorize(seeds=)` handed none is
+refused. Beside a carrier, `pool_seeds=` is only the registry it is matched
+against, `DEFAULT_POOL_SEEDS` when left out.
+
+`authorize` also takes `pool_seeds=` alone, for a transport that only asks the
+class-level check: it resolves the seeds the spec's `has_permission` checks
+name, once, and no other, and nothing when a covering grant answers first. The
+values are not carried on the grant, so a `dispatch` that follows resolves them
+again for its own call. `authorize_target` and `authorize_scope` take
+`pool_seeds=` the same way, for the seeds their own question names. `seeds=` a
+mapping is the alternative for a caller holding resolved values, and handing
+one with `pool_seeds=` raises `TypeError`, since one would silently outrank the
+other, whether or not a grant would have answered the call first. A
+deactivated principal handed with `pool_seeds=` raises `PrincipalUnavailable`
 before any seed resolves, as dispatch refuses one before anything else, grant
 or no grant; without `pool_seeds=` nothing is resolved and the call is asked as
 it always was. A check naming a seed the registry does not hold is asked without
@@ -448,7 +548,7 @@ deactivated principal, the shape check over **the target selector's
 parameters alone**, class-level authorization, then the very lookup and checks
 dispatch runs. A Validator field is neither required nor unknown there, and a
 target read the selector's `kwargs` provider fills or may fill is not required, as in
-dispatch, so a GET carrying the route's arguments resolves as a POST carrying the whole form
+dispatch, unless that provider requires it itself, so a GET carrying the route's arguments resolves as a POST carrying the whole form
 does.
 
 ```python
@@ -460,7 +560,12 @@ docs/examples/dispatching.py:resolve_target
 It returns `(target, grant)`: the row, the set, or `None` for a create, and a
 grant covering the spec and the principal with `target_checked` set. Both go
 to `dispatch(..., target=, grant=)`, which then looks nothing up and asks no
-object-level or scope check again. The grant is honoured only with the
+object-level or scope check again. The pair is a
+[`ResolvedTarget`][django_service_specs.dispatch.resolved_target.ResolvedTarget],
+whose `.seeds` hold the values its checks were offered of the registered
+seeds they name; handed on as `dispatch(..., seeds=found.seeds)`, with the
+same `call_context` dict, the run takes them rather than resolving those seeds
+again, as [below](#seeds-handed-on-from-the-prelude). The grant is honoured only with the
 target it was resolved for: handed on without `target=`, dispatch looks the
 row up itself and runs the checks on it. A missing row that `allow_none` does not
 let through comes back as `DispatchResult(kind="not_found")`, so it is never
@@ -505,7 +610,7 @@ filled keys, then the Validator on its own arguments - so a
 transport that binds for itself cannot drift from the gate dispatch applies.
 It runs no provider: a field an `input_data` provider would fill passes the
 shape check and, left out, is the Validator's to refuse; a read a `kwargs`
-provider would fill passes too.
+provider would fill passes too, unless a provider requires it itself.
 
 **Hand it the call's seeds** with `pool_seeds=`, the registry dispatch is
 handed, and it binds as dispatch binds with them. A `reflected` read a
@@ -563,7 +668,9 @@ docs/examples/dispatching.py:check_call
 
 It returns the checked arguments and the grant, which `dispatch` honours for
 the same spec and principal in the same process; a grant is not serializable,
-so it never crosses a queue. The kernel's own steps run no query. It is
+so it never crosses a queue. The pair is a
+[`CheckedCall`][django_service_specs.dispatch.checked_call.CheckedCall], still
+a 2-tuple, carrying the call's seeds on `.seeds`. The kernel's own steps run no query. It is
 `bind_arguments`' complement: `check_call` authorizes and does not validate,
 `bind_arguments` validates and does not authorize, and neither resolves a
 target. A `many` call's refused rows are raised by it, after the permission
@@ -583,6 +690,41 @@ docs/examples/dispatching.py:after_authorize
 --8<--
 ```
 
+### Seeds handed on from the prelude
+
+A registered seed a permission check names is resolved before the class-level
+check. Run `check_call` or `resolve_target` and then `dispatch`, and each
+resolves it once for its own call: the check judged one value and the run
+received another, and a resolver that reads moving state - a club off the
+request, a tenant row - can answer the two differently. Both hand back the
+values their checks were offered as a
+[`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] on `.seeds`,
+and `dispatch(seeds=)` or `adispatch(seeds=)` takes them, with the grant they
+came with, in place of resolving those seeds again. A page that admits the
+request with `authorize` before it finds the row makes the carrier first, with
+[`resolve_seeds`](#admitting-a-request-before-the-form), and hands it to every
+step:
+
+```python
+--8<--
+docs/examples/dispatching.py:checked_seeds
+--8<--
+```
+
+Only the seeds a check names travel; every other seed resolves in each pool as
+it always does, from the `pool_seeds` dispatch is handed. The carrier is bound
+by identity to the spec (compared as compiled, as a grant compares it), the
+principal, the `call_context` dict and the `pool_seeds` registry its prelude
+ran with, and dispatch refuses one that does not cover its call with
+`NotPermitted`, before any seed resolves and before the class-level check. So
+hand the prelude and the call one `call_context` dict: a prelude handed none
+runs with a dict of its own, readable as `seeds.call_context`, and its carrier
+covers only a call handed that same dict: a later call that passes none, or a
+fresh one, is refused. `dispatch`'s and `adispatch`'s `seeds=` that are anything
+but the carrier, `seeds=` without `grant=`, or `adispatch(seeds=)` with
+`principal_id=`, raise `TypeError` before anything runs. Like a grant, it cannot be
+pickled, so it never crosses a queue: a worker resolves its own.
+
 ## Checking a spec where it is registered
 
 Some declarations cannot hold as written on a mount, and which ones turns on
@@ -600,16 +742,45 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   meet, which dispatch refuses on every call before it reads the arguments,
   in the words it refuses it in;
 - a positional-only parameter with no default, which no pool fills, so every
-  call reaching the callable fails;
+  call reaching the callable fails, of any callable listed below as well as the
+  service, the selector and the target selector;
 - a keyword the service, the selector or the target selector requires that
   nothing fills: no read of its seat, no seed, no key a typed provider names,
   and none of what every pool carries. A service is handed `data`, and
   `instance` or `collection` only where a target selector resolves one; a
   selector is handed neither, and a service none of its target selector's
-  reads or its shapes;
+  reads or its shapes. The same is asked of these callables, against what
+  dispatch hands that one: a service spec's
+  preconditions are handed the service's pool, and a selector spec's the
+  selector's with the rows as `collection` or the row as `instance`; an
+  affordance condition, the spec's own or one a selector's `affordances` maps
+  to, is handed only the call's seeds (`user`, `progress`, `call_context`,
+  `request`, `view` and those the mount registers), so a rename whose
+  condition reads `frozen` is refused on a mount registering no `frozen` seed;
+  the output selector is handed the service's return as `instance` and
+  `result` and what every pool carries, never an argument nor its own reads;
+  an `extend_queryset` its selector's pool with the `queryset`; a `kwargs`
+  provider, the spec's own or its target selector's, and a service spec's
+  `input_data` are handed what every pool carries, the mount's seeds and their
+  seat's reads less those the seat's typed `kwargs` provider fills, and for a
+  service the target as `instance` or `collection`, but never `data`, a
+  Validator's value or a provider's answer, so a `kwargs` provider requiring
+  an unregistered `tenant` is refused, whether it annotates its keys or not and
+  whether a Validator stands beside it or not; and a `progress_reporter` is handed only the call's seeds,
+  and read only where its run takes `progress`, by name or through
+  `**kwargs`, which is where dispatch may call it: before an `async def` run,
+  or on a sync run's first report. It is refused either way, though a sync run
+  that never reports never calls it. Each is named as the spec
+  names it, such as `ServiceSpec.affordances[0] ('frozen').when`,
+  `SelectorSpec.preconditions[0] (owns_it)` or
+  `ServiceSpec.instance_selector_spec.kwargs`;
 - an optional read over a keyword that requires it: a call sending the read
   runs, and one leaving it out, as the declaration says it may, is refused as
-  missing;
+  missing, or on a provider fails with the provider's own `TypeError`. A
+  precondition, an `extend_queryset` and a `kwargs` or `input_data` provider
+  are asked this against the reads they are handed; a condition, the output
+  selector and a `progress_reporter` are handed none, so it finds nothing on
+  them;
 - an array read with no `items` over a keyword its own seat annotates with an
   element: `list[int]`, `tuple[int, ...]` or `Sequence[int]`, or one of those
   `| None`. Such a read takes any element, so a selector annotated
@@ -622,10 +793,10 @@ the spec and the mount's `pool_seeds` and refuses it, as one
   does not resolve, such as a forward reference to a name not importable where
   the callable is defined: it is resolved on its own, so it leaves the
   callable's other keywords readable;
-- a service, selector or target selector whose signature cannot be read, such
-  as a builtin type like `dict`: dispatch binds every callable's keywords from
-  its signature, so every call reaching it fails. That seat is refused for
-  this alone, and the other seats are still checked.
+- any of those callables whose signature cannot be read, such as a builtin
+  type like `dict`: dispatch binds every callable's keywords from its
+  signature, so every call reaching it fails. That seat is refused for this
+  alone, and the other seats are still checked.
 
 ```python
 --8<--
@@ -635,16 +806,32 @@ docs/examples/dispatching.py:check_seeds
 
 It runs nothing: no seed resolves and no provider is called. What it cannot
 see it leaves to dispatch: a provider that does not annotate its keys may fill
-any keyword in its seat, and a Validator may return or bind a value it does
-not declare, so neither seat is held to the keywords it requires. An
-`extra_kwargs` overlay fills keywords it cannot see either.
+any keyword of the callable it provides for, and a Validator may return or bind
+a value it does not declare, so neither callable is held to the keywords it
+requires (a provider's own keywords are read all the same), nor is a
+precondition or an `extend_queryset` beside one, though a positional-only
+parameter is refused whatever stands beside it. An `extra_kwargs` overlay fills
+keywords it cannot see either. A read a provider requires by name is not
+refused even where that provider may fill it, as in `kwargs=lambda *, pk: {...}`
+over a required `pk`: a provider is handed the caller's reads and the seeds,
+never another provider's answer, so dispatch demands such a read of the caller
+and refuses a call leaving it out before any provider runs, as
+[the example](declaring.md#providers-and-preconditions) runs. The array check alone is not run on a precondition, a
+condition, the output selector, an `extend_queryset`, a provider or a
+`progress_reporter`. A
+callable taking `**kwargs` requires nothing, so one forwarding into a stricter
+callable is not judged by what that callable requires; and a pool a transport
+builds itself to answer a condition before any call is its own, not the one
+this reads.
+A `filter_set`, a form's `form_kwargs` and a seed's resolver are not read
+either.
 
 Two of the readers it shares with dispatch are public for a transport building
 its own answer: [`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters],
 the reflected reads a seed fills and the parameters dispatch refuses, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
 every parameter a provider fills or may fill, which the shape check does not
-demand of the caller.
+demand of the caller, less a read a provider requires itself, which it does.
 
 A Validator field the service never receives is not among the refusals,
 because such a spec runs and may mean to: a Validator checking that
@@ -728,14 +915,19 @@ docs/examples/dispatching.py:server_arguments
    values over the rest, as the shape check hands them on: a UUID in its
    canonical spelling. Every other key is left for the shape check, so
    `REJECT` still refuses a name nobody declared.
-3. **In the input schema the transport advertises**, it subtracts
-   `names()` - the bound and the withheld together - from the properties
-   and from `required`, beside
-   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
-   The kernel's own
+3. **In the input schema the transport advertises**, the binding is passed
+   to
+   [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+   as `server_arguments`, which leaves `names()` - the bound and the withheld
+   together - out of the properties and out of `required`, beside
+   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys],
+   less a `many` spec's list, which dispatch demands of the caller whatever a
+   provider is annotated to fill.
    [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema]
-   takes no binding: the transports build their schemas themselves, and the
-   subtraction belongs where the schema is built.
+   takes no binding and lists every parameter as declared. Only the top level
+   loses them: a binding names no row field of a `many` spec, which
+   `check_server_arguments` refuses, so a row field sharing a bound read's
+   name is still offered in each row.
 
 Dispatch itself takes no binding. The helpers are synchronous and pure, and
 the applied mapping is ordinary arguments, so `dispatch` and `adispatch`
@@ -801,8 +993,14 @@ docs/examples/async_dispatch.py:async
 `adispatch` takes exactly one of `principal` and `principal_id`. An identifier
 is resolved with `resolve_principal` inside the hop, since resolving it is a
 query. A grant never covers a principal resolved there, because a grant is
-bound to the principal object it was made for. A deactivated row is refused
-there, with its identifier in the message.
+bound to the principal object it was made for, and neither do
+[seeds handed on from a prelude](#seeds-handed-on-from-the-prelude), which
+`adispatch(seeds=)` takes as `dispatch` does on every route, refusing a
+mistyped one or one without a grant before any hop. Seeds with `principal_id=`
+are refused the same way, as a `TypeError` before any hop, since the principal
+resolved there is not the one the carrier is bound to; pass the `principal=` the
+prelude was handed. A deactivated row is refused inside the hop, with its
+identifier in the message.
 
 The sync `dispatch` accepts an `async def` run as well, and drives it to
 completion, inside the transaction when the spec is atomic.
@@ -835,8 +1033,9 @@ it is resolved.
 A registered name is **reserved**, and that is half of what registering does.
 A spec that declares a parameter by that name is refused at dispatch with
 `ImproperlyConfigured`, and by `check_seeds` where a transport registers it; a caller that sends it is refused like any other
-undeclared argument; and `extend()` refuses one of the dispatcher's own names,
-or a name registered twice, with `ValueError`. Either half alone is a trap: a
+undeclared argument; and `PoolSeeds` refuses one of the dispatcher's own names,
+or a name registered twice, with `ValueError`, from `extend()` and from the
+constructor alike. Either half alone is a trap: a
 value with no reservation would share the pool with an argument of the same
 name, and a reservation with no value would fail the callable that declares
 it.
@@ -991,8 +1190,9 @@ is handed an empty mapping (see the last item below).
   parameters are first read (a transport's registration, or the first
   dispatch). Each of those refusals carries the rename in its message: name
   the parameter for what it holds, such as `fields` or `query`, and have the
-  callable that read it declare `shapes`. `PoolSeeds.extend()` refuses a seed
-  of that name, and says to register it under another.
+  callable that read it declare `shapes`. `PoolSeeds` refuses a seed of that
+  name, built directly or through `extend()`, and says to register it under
+  another.
 - **Not for an affordance condition or the Validator.** A condition naming
   `shapes` is refused when it is declared, because what the caller sent would
   decide whether the operation is available, and the Validator, which is no
@@ -1096,6 +1296,24 @@ what the service left there.
   and store it with `call_context.setdefault(key, value)`, so the first write
   wins and every call reads one value. Fit for a value any of them would
   compute the same.
+- **The Validator's declaration is asked with it.** A Validator declaring
+  `parameters(self, *, call_context=None)` is handed the call's dict on every
+  ask of its `parameters()` inside the call - the shape check, the seed
+  check, validation and the service's keywords alike - and `None` on every
+  ask outside one, such as registration or a schema
+  ([the Validator](declaring.md#the-validator)). So a transport describing a
+  serializer under its own request can tell its own call from a `dispatch`
+  the service makes inside it, which is handed a dict of its own. A
+  transport asking the Validator itself during the call does so through
+  [`validator_parameters`][django_service_specs.validation.validator_parameters.validator_parameters],
+  handing it the same dict.
+- **An inner dispatch handed the outer dict is described as the outer call.**
+  A service that forwards its own `call_context` to a `dispatch` it makes
+  for another principal or operation has every stage of that inner call -
+  its Validator's declaration included - read what the outer call put there,
+  and a transport keyed on the dict describes the inner call as its own.
+  Hand an inner dispatch a fresh dict, or none, unless it is meant to be the
+  same call.
 
 The affordance functions a transport calls ahead of the call or in place of
 dispatch -

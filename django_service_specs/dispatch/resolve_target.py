@@ -7,8 +7,10 @@ from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolved_target import ResolvedTarget
 from django_service_specs.dispatch.utils import CheckKeywords, open_call, walk_target
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
@@ -26,7 +28,8 @@ def resolve_target(
     grant: Grant | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     call_context: dict[str, Any] | None = None,
-) -> tuple[Any, Grant] | DispatchResult:
+    seeds: CallSeeds | None = None,
+) -> ResolvedTarget | DispatchResult:
     """Find and check ``spec``'s target as ``dispatch`` would, without running anything else.
 
     For a page that shows the row before the call acts on it - the form in
@@ -51,17 +54,39 @@ def resolve_target(
        empty or not, and on ``None`` - a create, which resolves nothing, and
        a missing row the instance selector's ``allow_none`` lets through.
 
-    Returns ``(target, grant)``: the row, the set, or ``None``, and a grant
+    Returns ``(target, grant)``, a
+    [`ResolvedTarget`][django_service_specs.dispatch.resolved_target.ResolvedTarget]:
+    the row, the set, or ``None``, and a grant
     covering ``spec`` and ``principal`` with ``target_checked`` set, which
     is what ``dispatch(spec, ..., target=target, grant=grant)`` takes. So a
     call resolved here looks nothing up again and asks no object-level or
-    scope check twice. The grant vouches for that target alone: handed to
+    scope check twice. Its ``.seeds`` are the values every check here was
+    offered of each registered seed one names; handed on as
+    ``dispatch(..., seeds=found.seeds)``, the run takes them as they are and
+    resolves none of them again
+    (test_resolve_target_then_dispatch_resolves_it_once). Like the grant they
+    are bound to this call, ``call_context`` included: pass dispatch the dict
+    passed here. The grant vouches for that target alone: handed to
     dispatch without ``target=``, it covers the class-level check and nothing
     else, and dispatch checks the row its own lookup finds. A
     ``target_checked`` grant handed *in* here is read the same way, since
     this function looks its target up itself. A missing row ``allow_none`` does not let through
     returns ``DispatchResult(kind="not_found")``, dispatch's own answer, so it
     is never mistaken for the ``None`` it lets through.
+
+    ``seeds`` is a carrier of values already resolved for this call: the
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] that
+    [`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds]
+    returns, for a page that ran ``authorize(seeds=)`` before it resolved the
+    row, or ``check_call``'s ``.seeds``. Its values stand in for resolving
+    the seeds a check names, so the class-level check, the object or scope
+    check and the ``.seeds`` handed back carry one value of each, resolved
+    nowhere here (test_a_carrier_s_seeds_are_taken_and_resolved_nowhere_else).
+    It needs no ``grant``: without one the class-level check is asked on its
+    values. One that does not cover this spec, principal, ``call_context``
+    dict and ``pool_seeds`` registry is refused as ``NotPermitted`` before any
+    resolver runs and before any check is asked; pass the dict the carrier
+    was bound to, ``seeds.call_context``.
 
     ``call_context`` is the call's context, as ``dispatch`` takes it: the
     transport's dict, handed as the same object to the target selector and to
@@ -77,7 +102,8 @@ def resolve_target(
     Raises:
         PrincipalUnavailable: a deactivated principal.
         InvalidArguments: a target read the arguments leave out or get wrong.
-        NotPermitted: the class-level, object-level or scope check.
+        NotPermitted: the class-level, object-level or scope check, or
+            ``seeds`` that do not cover this call.
         ImproperlyConfigured: as ``dispatch``, for a spec declaring no
             permissions or a parameter a registered seed occupies that is
             neither a ``reflected`` read nor a top-level Validator field,
@@ -86,7 +112,22 @@ def resolve_target(
             its rows are the call's arguments, and none is found ahead of it.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than
             a lookup in front of one.
+        TypeError: ``seeds`` that are anything but a ``CallSeeds``.
     """
+    # A wiring mistake, so at entry, before anything runs. Not through
+    # ``refuse_seeds``: no grant is required beside a carrier here, since one
+    # from ``resolve_seeds`` has none and the class-level check is asked on
+    # its values. ``seeds is not None`` is held by every call handed none, and
+    # the ``isinstance`` by test_a_carrier_s_seeds_are_taken_and_resolved_nowhere_else
+    # (test_a_plain_mapping_as_seeds_is_a_type_error holds the refusal).
+    if seeds is not None and not isinstance(seeds, CallSeeds):
+        raise TypeError(
+            "resolve_target() takes as seeds= the CallSeeds that resolve_seeds() or "
+            f"check_call() hands back; got {type(seeds).__name__}."
+        )
+    # Kept as handed for the carrier, the transport's own object, as a grant
+    # keeps it (test_its_seeds_keep_the_declaration_they_were_handed).
+    handed = spec
     compiled = kernel_spec(spec)
     if not isinstance(compiled, ServiceSpec):
         raise TypeError(
@@ -122,10 +163,17 @@ def resolve_target(
         unknown_arguments=UnknownArguments.REJECT,
         parameters=parameters,
         keywords=keywords,
+        carried=seeds,
     )
     resolved = walk_target(
         spec, principal, checked, grant=granted, pool_seeds=pool_seeds, keywords=keywords
     )
     if isinstance(resolved, DispatchResult):
         return resolved
-    return next(iter(resolved.values()), None), Grant(spec, principal, target_checked=True)
+    # After the walk, from the one carrier both steps were offered: the object
+    # or scope check was handed these very values.
+    return ResolvedTarget(
+        next(iter(resolved.values()), None),
+        Grant(spec, principal, target_checked=True),
+        CallSeeds(handed, principal, keywords.call_context, pool_seeds, keywords.seeds),
+    )

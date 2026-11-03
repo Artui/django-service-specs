@@ -135,11 +135,7 @@ def test_a_field_consumed_on_purpose_is_answered_and_the_spec_runs() -> None:
         pytest.param(lambda *, title, tenant: title, {}, id="a-registered-seed"),
         pytest.param(
             lambda *, title, instance: title,
-            {
-                "instance_selector_spec": SelectorSpec(
-                    kind=SelectorKind.RETRIEVE, selector=_found, permissions=OPEN
-                )
-            },
+            {"instance_selector_spec": SelectorSpec(kind=SelectorKind.RETRIEVE, selector=_found)},
             id="the-target",
         ),
         pytest.param(

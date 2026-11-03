@@ -10,6 +10,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.http import Http404
 
 from django_service_specs.authorization.resolve_principal import resolve_principal
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
@@ -23,6 +24,7 @@ from django_service_specs.dispatch.utils import (
     finish_service,
     open_call,
     prepare_service,
+    refuse_seeds,
     refuse_target,
     reraise_unless_retrieve,
     selector_pool,
@@ -51,6 +53,7 @@ async def adispatch(
     principal_id: Any = None,
     arguments: Mapping[str, Any],
     grant: Grant | None = None,
+    seeds: CallSeeds | None = None,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     progress: ProgressReporter | None = None,
@@ -128,12 +131,21 @@ async def adispatch(
     every hop; with none, one fresh dict for the call, made here on entry, so
     the stages of each hop share it.
 
+    ``seeds`` is ``dispatch``'s, handed on with the grant from ``check_call``,
+    ``resolve_target`` or ``authorize`` (after ``resolve_seeds``) and taken
+    on every route, and refused as ``dispatch`` refuses it, the wrong type or no
+    ``grant`` on the loop before any hop. Like a grant, a carrier never covers a principal resolved here
+    from ``principal_id``, which is not the object its prelude was handed, so
+    such a call is a ``TypeError`` on the loop too, before any hop; pass the
+    ``principal`` the prelude was handed.
+
     A ``many`` spec checks, validates and writes its rows as ``dispatch``
     does, every row inside the one hop.
 
     Raises:
         TypeError: both or neither of ``principal`` and ``principal_id``;
-            ``target`` where ``dispatch`` refuses it.
+            ``target`` or ``seeds`` where ``dispatch`` refuses it, or ``seeds``
+            with ``principal_id``.
         PrincipalUnavailable: ``principal_id`` names no principal who may act,
             or ``principal`` is deactivated.
         InvalidArguments, NotPermitted, ImproperlyConfigured: as ``dispatch``.
@@ -148,6 +160,9 @@ async def adispatch(
     # Compiled on the loop, before the branch that reads which kind of spec it is.
     spec = kernel_spec(spec)
     refuse_target(spec, target)
+    # On the loop, so the sync route's ``dispatch`` is never the one to refuse
+    # it inside a hop (test_seeds_are_refused_before_any_hop).
+    refuse_seeds(seeds, grant, principal_id=principal_id)
     # Copied here, on the loop, so a caller changing its dict while the call
     # is in a hop changes nothing the run sees
     # (test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing).
@@ -166,6 +181,7 @@ async def adispatch(
         progress,
         overlay,
         call_context,
+        seeds,
     )
     if isinstance(spec, SelectorSpec):
         if is_async(spec.selector):
@@ -193,6 +209,7 @@ def _dispatch(
     progress: ProgressReporter | None,
     overlay: Overlay,
     call_context: dict[str, Any],
+    seeds: CallSeeds | None,
     target: Any,
 ) -> DispatchResult:
     """The whole of ``dispatch``, the principal resolved first: the one-hop case."""
@@ -207,6 +224,7 @@ def _dispatch(
         target=target,
         extra_kwargs=overlay.kwargs,
         call_context=call_context,
+        seeds=seeds,
     )
 
 
@@ -221,6 +239,7 @@ def _prepare(
     progress: ProgressReporter | None,
     overlay: Overlay,
     call_context: dict[str, Any],
+    seeds: CallSeeds | None,
     target: Any,
 ) -> Prepared | DispatchResult:
     return prepare_service(
@@ -232,6 +251,7 @@ def _prepare(
         unknown_arguments=unknown_arguments,
         progress=progress,
         call_context=call_context,
+        carried=seeds,
         target=target,
         overlay=overlay,
     )
@@ -248,6 +268,7 @@ async def _await_service(
     progress: ProgressReporter | None,
     overlay: Overlay,
     call_context: dict[str, Any],
+    seeds: CallSeeds | None,
     target: Any,
 ) -> DispatchResult:
     """A non-atomic ``async def`` service: the prelude's hop, the await, then the output selector's."""
@@ -262,6 +283,7 @@ async def _await_service(
         progress,
         overlay,
         call_context,
+        seeds,
         target,
     )
     if isinstance(prepared, DispatchResult):
@@ -289,6 +311,7 @@ def _open_selector(
     progress: ProgressReporter | None,
     overlay: Overlay,
     call_context: dict[str, Any],
+    seeds: CallSeeds | None,
 ) -> tuple[Any, Grant, dict[str, Any], dict[str, Any], dict[str, Any], CheckKeywords]:
     """Steps one and two, the selector's pool, and its keywords, in the one sync hop.
 
@@ -307,6 +330,7 @@ def _open_selector(
         unknown_arguments=unknown_arguments,
         overlay=overlay,
         keywords=keywords,
+        carried=seeds,
     )
     pool = selector_pool(
         spec,
@@ -364,6 +388,7 @@ async def _await_selector(
     progress: ProgressReporter | None,
     overlay: Overlay,
     call_context: dict[str, Any],
+    seeds: CallSeeds | None,
 ) -> DispatchResult:
     """An ``async def`` selector spec: steps one and two, the await, then shaping and step four.
 
@@ -388,6 +413,7 @@ async def _await_selector(
         progress,
         overlay,
         call_context,
+        seeds,
     )
     try:
         raw = await spec.selector(**kwargs)

@@ -12,12 +12,14 @@ from django.db.models import QuerySet
 
 from django_service_specs import (
     DEFAULT_POOL_SEEDS,
+    AnyOf,
     DataclassPresenter,
     DataclassValidator,
     DispatchResult,
     FormValidator,
     Grant,
     InvalidArguments,
+    NoneOf,
     Parameter,
     Parameters,
     PermissionCheck,
@@ -37,6 +39,7 @@ from django_service_specs import (
     dispatch,
     form_keywords,
     present,
+    resolve_seeds,
     resolve_target,
     unreceived_fields,
 )
@@ -115,6 +118,45 @@ lockable_note_spec = SelectorSpec(
 
 
 # --8<-- [end:arguments_channel]
+
+
+# --8<-- [start:combinators]
+class OwnsTheNote(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_authenticated
+
+    def has_object_permission(self, principal: Any, spec: Any, target: Any) -> bool:
+        return target.owner_id == principal.pk
+
+
+class IsStaff(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_staff
+
+
+class IsSuspended(PermissionCheck):
+    def __init__(self, *usernames: str) -> None:
+        self.usernames = frozenset(usernames)
+
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.username in self.usernames
+
+
+open_note_spec = SelectorSpec(
+    kind=SelectorKind.RETRIEVE,
+    selector=lambda *, pk: Note.objects.filter(pk=pk),
+    permissions=[
+        # Its owner, or anyone on staff. At the row question a check counts
+        # only where it passes the class-level one too: IsStaff allows every
+        # row, but only for staff, so a signed-in stranger is refused the row.
+        AnyOf(OwnsTheNote(), IsStaff(), message="Only its owner or staff may open a note."),
+        NoneOf(IsSuspended("mallory"), message="Suspended accounts may open nothing."),
+    ],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+# --8<-- [end:combinators]
 
 
 # --8<-- [start:overlays]
@@ -367,10 +409,16 @@ def club_seeds(club: str) -> PoolSeeds:
 
 def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
     pool_seeds = club_seeds(club)
+    context: dict[str, Any] = {}  # handed to every step, and to the form re-rendered if it refuses
+    # The club, resolved once for the call: InClub and the service see one value.
+    seeds = resolve_seeds(
+        club_note_spec, principal=user, pool_seeds=pool_seeds, call_context=context
+    )
     # Before the form: a principal the class-level check refuses never sees
     # it. NotPermitted for anyone outside the club.
-    grant = authorize(club_note_spec, user, pool_seeds=pool_seeds)
-    context: dict[str, Any] = {}  # handed to dispatch, and to the form re-rendered if it refuses
+    grant = authorize(
+        club_note_spec, user, seeds=seeds, pool_seeds=pool_seeds, call_context=context
+    )
     if title is None:  # the GET: the form, built as dispatch will build it
         extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
         return ClubNoteForm(**extra)
@@ -381,6 +429,7 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
             arguments={"title": title},
             pool_seeds=pool_seeds,
             grant=grant,
+            seeds=seeds,
             call_context=context,
         )
     except InvalidArguments:
@@ -407,25 +456,60 @@ def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
 
 # --8<-- [start:resolve_target]
 def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
-    found = resolve_target(rename_note_spec, principal=user, arguments={"pk": pk})
+    context: dict[str, Any] = {}  # one dict, for the lookup and the call it checked
+    found = resolve_target(
+        rename_note_spec, principal=user, arguments={"pk": pk}, call_context=context
+    )
     if isinstance(found, DispatchResult):
         return None  # not found: the answer dispatch would give
     note, grant = found  # NotPermitted was raised already for anyone else
     if title is None:
         return note  # the GET: the row the form will act on
     # The POST acts on the row already found and checked: no second lookup,
-    # and the grant says has_object_permission was asked.
+    # the grant says has_object_permission was asked, and a seed a check named
+    # is not resolved again.
     result = dispatch(
         rename_note_spec,
         principal=user,
         arguments={"pk": pk, "title": title},
         target=note,
         grant=grant,
+        seeds=found.seeds,
+        call_context=context,
     )
     return present(rename_note_spec, result)
 
 
 # --8<-- [end:resolve_target]
+
+
+# --8<-- [start:checked_seeds]
+def post_to_a_club_checked_first(user: Any, club: Callable[[], str], title: str) -> DispatchResult:
+    # ``club`` reads the club off the request: a resolver asked twice may
+    # answer twice differently, so the call asks it once.
+    pool_seeds = DEFAULT_POOL_SEEDS.extend(club=club)
+    context: dict[str, Any] = {}  # one dict, for the prelude and the call it checked
+    checked = check_call(
+        club_note_spec,
+        principal=user,
+        arguments={"title": title},
+        pool_seeds=pool_seeds,
+        call_context=context,
+    )
+    _, grant = checked
+    # The club InClub admitted is the club the form and the service are handed.
+    return dispatch(
+        club_note_spec,
+        principal=user,
+        arguments={"title": title},
+        grant=grant,
+        seeds=checked.seeds,
+        pool_seeds=pool_seeds,
+        call_context=context,
+    )
+
+
+# --8<-- [end:checked_seeds]
 
 
 # --8<-- [start:seeds]

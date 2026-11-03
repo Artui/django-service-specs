@@ -39,14 +39,13 @@ def spec_input_schema(
     ``parameters()`` itself is unchanged and still says what a whole call
     needs. Nothing else is relaxed: a read a ``kwargs`` provider fills or may
     fill is listed as declared, ``required`` meaning the call needs the value
-    from someone - the caller, or a provider that may fill it - and
-    ``server_owned_keys`` is how a transport finds the keys a provider fills;
-    ``provider_keys`` gives the ones it may decline, or ``None`` for a
-    provider that names none. A ``reflected`` read and a Validator field
-    named like a registered seed are listed as declared too.
-    Nor is anything a transport binds or withholds: this takes no
-    ``ServerArguments``, and a transport subtracts its ``names()`` in the
-    schema it builds, as it subtracts ``server_owned_keys``.
+    from someone - the caller, or a provider that may fill it. A
+    ``reflected`` read and a Validator field named like a registered seed are
+    listed as declared too, and so is anything a transport binds or
+    withholds: this takes no ``ServerArguments``. The schema a transport
+    advertises, less what the server fills and with nothing a provider may
+    fill required, at the top and in each row of a ``many`` spec, is
+    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema].
 
     Read on every call, as ``parameters()`` is, so a Validator reading a
     model-backed declaration is asked only once the app registry is ready.

@@ -30,7 +30,7 @@ reach a callable only by their names.
 | `user` | The principal | Every callable |
 | `progress` | The transport's progress reporter, or `null_progress` | Every callable; the caller's reporter only in the run's pool and its spec's callable affordance conditions' |
 | each validated value, by name | What the Validator returned | The service |
-| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` built | The service |
+| `data` | The Validator's `data`: the validated values as one mapping, or the instance a `DataclassValidator` or a `PydanticValidator` built | The service |
 | what the Validator binds, by name | A value bound for the call, its `Validated.pool` | The service |
 | `instance` | The row an instance selector resolved | The service, its providers |
 | `collection` | The rows a collection selector resolved | The service, its providers |
@@ -81,6 +81,16 @@ such a spec where it registers it, with
 refuses an optional read over a selector keyword with no default, which a call
 leaving the read out is refused for, and an array read with no `items` over a
 keyword annotated `list[int]`, which would hand it any element a caller sends.
+It reads a precondition, an affordance condition, the output selector, an
+`extend_queryset`, a `kwargs` or `input_data` provider and a
+`progress_reporter` as well, each against what dispatch hands it: a condition
+and a `progress_reporter` are handed only the call's seeds, and a provider the
+seeds and its seat's reads, never `data` nor a Validator's value, so one
+requiring a seed the mount does not register is refused there rather than
+failing every call. A positional-only parameter with no default is refused on
+each of them, and an optional read over a keyword with no default on those that
+are handed the spec's reads, a precondition, an `extend_queryset` and a
+provider; only the array check is not run on them.
 
 Four kinds of parameter are never missing: one with a default, `**kwargs`,
 `*args`, and a positional-only one, which dispatch never passes by name.
@@ -217,12 +227,12 @@ which [a write](#providers-and-preconditions) declares the same way. Its
 `kwargs` provider is called from the base pool and its `reads`, and on a
 selector nested in a write scopes the lookup. Its preconditions run on what
 its selector found, never on a missing row. A nested selector declaring
-`preconditions` or a `progress_reporter`, or an output selector declaring
-`kwargs`, is refused when the write is built: dispatch never runs them.
-
-`permissions` is required on a spec that is dispatched or registered, and
-ignored on a selector nested inside a `ServiceSpec`: authorization belongs to
-the spec being dispatched.
+`permissions` (`Unrestricted()` included), `preconditions` or a
+`progress_reporter`, or an output selector declaring `kwargs`, is refused when
+the write is built: dispatch never runs them, and the spec being dispatched is
+what authorizes. `permissions` is required on a spec that is dispatched or
+registered, so to reuse such a selector spec as a nested one, nest
+`spec.derive(permissions=None)`.
 
 ## A write
 
@@ -278,7 +288,8 @@ parameters.
 `PATCH` does. Dispatch does not refuse an absent Validator parameter of such a
 call, at any depth, and tells the Validator through
 `ValidationContext.partial`. The spec's `reads` and its target selector's stay
-required as declared unless a `kwargs` provider fills or may fill them, so a partial
+required as declared unless a `kwargs` provider fills them, or may fill one no
+provider requires itself, so a partial
 update still names its row, and a value
 that is sent is checked as on a whole call. `parameters()` is unchanged:
 `required` still says what a whole update needs.
@@ -429,7 +440,11 @@ reads them: `filled`, and `declinable` for a key whose value admits
 untyped provider's values reach, is not demanded of the caller: dispatch
 checks it once the provider has answered, after the class-level permission
 check and, for a Validator field, before the Validator runs, and refuses a
-required one nobody filled, a declined one included.
+required one nobody filled, a declined one included. The exception is a read
+a provider takes by name with no default, as `pk` in
+`kwargs=lambda *, pk: {...}`: a provider is handed the caller's reads and the
+seeds, never another provider's answer, so only the caller can supply it, and
+dispatch demands it of the caller however a provider may fill it.
 [`bind_arguments`][django_service_specs.dispatch.bind_arguments.bind_arguments]
 runs no provider, so it leaves that check to the Validator. So a
 permission check reading such a key from its `arguments` uses `.get`. The
@@ -439,11 +454,25 @@ service spec's `kwargs` its `reads`, and `input_data` its Validator's fields.
 A provider annotated to fill a parameter declared anywhere else -
 `input_data` naming a read, `kwargs` naming a Validator field or the target
 selector's read - is refused with `ImproperlyConfigured` when the spec is
-built or, for a Validator field, when `parameters()` is assembled.
+built or, for a Validator field, when `parameters()` is assembled. So is
+one annotated to fill a `many` spec's list, the `many_argument`, or to
+possibly fill it: no provider reaches it, and a Validator field of the same
+name does not exempt the key.
+
+A call leaving out a read its own provider requires, though that provider may
+fill it, is refused with `InvalidArguments` before the provider runs:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:required_read
+--8<--
+```
+
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
-every parameter a provider fills or may fill, which the shape check relaxes. None of
+every parameter a provider fills or may fill, less a read a provider requires
+itself, which the shape check relaxes. None of
 them is a parameter dispatch demands, so a transport building an input schema
 of its own subtracts the set from what `parameters()` lists:
 
@@ -454,9 +483,14 @@ docs/examples/declaring_writes.py:providers
 ```
 
 On a `many` spec, the keys an `input_data` provider fills are fields inside
-each row, merged over every row, so a transport subtracting the set from the
-top-level `parameters()` - the list and the reads - removes nothing: it hides
-them from the list's items instead.
+each row, merged over every row, so subtracting the set from the top-level
+`parameters()` - the list and the reads - removes nothing: they belong out of
+the list's items instead.
+[`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+does both: the schema a transport advertises, less what the server fills at
+the top and in each row, with what a provider may fill left out of
+`required` at each level. The list stays offered and required, as dispatch
+demands it of the caller, which is why no provider may be annotated to fill it.
 
 ## Parameters
 
@@ -605,7 +639,26 @@ JSON-like arguments into the values a service receives. The contract is two
 methods, and two more methods, an attribute and a property with defaults:
 
 - `parameters()` declares what it takes, as `Parameters`. It must never query,
-  because a transport describes a spec before any call.
+  because a transport describes a spec before any call. A Validator that
+  describes itself by the call it is asked for - a serializer whose fields
+  read the transport's request - opts in by declaring
+  `parameters(self, *, call_context=None)`: every ask inside a call then hands
+  it [the call's context](dispatching.md#the-calls-context), the same dict its
+  `ValidationContext` carries, and every ask outside one hands it `None` -
+  at registration, for a schema, and for every other reader describing the
+  spec before a call - so the declaration must hold without it. Opted in or
+  not, it never queries. A Validator declaring no keyword is asked as
+  before, as is one whose `parameters` takes only `**kwargs`, or is a
+  `functools.wraps` wrapper that does not name the keyword itself: the
+  method's own signature decides. A transport that asks a Validator itself
+  during a call asks it as dispatch does, through
+  [`validator_parameters`][django_service_specs.validation.validator_parameters.validator_parameters]
+  with the call's dict, so a Validator that opted in is handed it there too.
+  `ServiceSpec.parameters()` and
+  `SelectorSpec.parameters()` take the same keyword, which a selector spec
+  ignores, so a subclass overriding either must accept `call_context`, which
+  dispatch now passes: an override written `parameters(self)` raises `TypeError`
+  under dispatch.
 - `validate(arguments, context)` returns the validated values keyed by name, or
   raises [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
   It receives only the arguments its own `parameters()` declare, already
@@ -695,10 +748,20 @@ docs/examples/declaring.py:validator
 | `Literal[...]`, an `Enum` (Django's `TextChoices` and `IntegerChoices` included) | Choices. An `Enum` decodes to the member. A Django `Choices` enum's labels are its `choice_labels`; a plain `Enum`'s member names and a `Literal` label nothing. |
 | `list[X]` | An array. `list[SomeDataclass]` is an array of rows, each declared as nested Parameters. `list[Decimal]` declares the `decimal` format for each element, so each is read as a decimal is, a JSON number included, and `?prices=1.5,2.25` is two of them; a list of dates or date-times is an array of strings, since an element takes no other format. A list declares no length, so the `SERVICE_SPECS_MAX_ARRAY_LENGTH` setting bounds it. |
 | a dataclass | An object, with its fields as nested Parameters. |
+| `dict[str, X]`, for any `X` above | An object with no declared fields, as the pydantic adapter declares one, since Parameters cannot say "every value is an `X`". Each value is decoded as `X` and refused under its own key: `{"scores": {"rigour": ["Expected an integer."]}}`. Only a `str` key, since a JSON object has no other. |
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 
 A field with a default or a `default_factory` is optional; one with neither is
-required. An annotation outside the table is refused, naming the field.
+required. An annotation outside the table is refused, naming the field. A
+`dict[str, X]` field is declared and refused as the table says, and only a
+`dict`: a `Mapping[str, X]` or a `tuple[str, X]` is outside the table, though
+its first argument is `str`:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:dict_input
+--8<--
+```
 
 What `DataclassValidator(AuthorIn)` declares, then: `name`, a required string,
 and `books`, an optional array whose rows take a required `title`, a required

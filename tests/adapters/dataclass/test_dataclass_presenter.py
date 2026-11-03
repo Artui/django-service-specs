@@ -285,6 +285,26 @@ def test_parameters_and_output_agree_field_for_field() -> None:
     agree(parameters, output)
 
 
+@dataclass
+class _Priced:
+    prices: dict[str, Decimal]
+    colours: dict[str, Colour | None] | None = None
+
+
+def test_a_str_keyed_map_is_an_object_whose_values_are_encoded() -> None:
+    presenter = DataclassPresenter(_Priced)
+    assert presenter.output().get("prices") == OutputField("prices", "object")
+    assert presenter.output().get("colours") == OutputField("colours", "object", nullable=True)
+    agree(DataclassValidator(_Priced).parameters(), presenter.output())
+    # Each value as JSON writes it, a Decimal as its string and an Enum as its
+    # value, read off a plain object as any other field is.
+    value = SimpleNamespace(prices={"tea": Decimal("2.50")}, colours={"a": Colour.RED, "b": None})
+    assert presenter.present(value) == {
+        "prices": {"tea": "2.50"},
+        "colours": {"a": "red", "b": None},
+    }
+
+
 def test_they_differ_where_the_dataclass_computes_a_field() -> None:
     # A computed field comes out and never goes in.
     assert set(DataclassPresenter(Computed).output().names()) - DataclassValidator(

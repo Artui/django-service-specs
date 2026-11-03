@@ -54,6 +54,7 @@ output format is `SPEC_CLI_OUTPUT`, read by
 
 ::: django_service_specs.validation.validator.Validator
 ::: django_service_specs.validation.validated.Validated
+::: django_service_specs.validation.validator_parameters.validator_parameters
 
 ::: django_service_specs.validation.validation_context.ValidationContext
 
@@ -72,6 +73,7 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ## JSON Schema
 
 ::: django_service_specs.schema.spec_input_schema.spec_input_schema
+::: django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema
 ::: django_service_specs.schema.spec_output_schema.spec_output_schema
 ::: django_service_specs.schema.parameters_schema.parameters_schema
 ::: django_service_specs.schema.output_schema.output_schema
@@ -108,11 +110,14 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.apresent.apresent
 ::: django_service_specs.dispatch.present_for_audience.present_for_audience
 ::: django_service_specs.dispatch.resolve_target.resolve_target
+::: django_service_specs.dispatch.resolved_target.ResolvedTarget
+::: django_service_specs.dispatch.resolve_seeds.resolve_seeds
 ::: django_service_specs.dispatch.paginate_output.paginate_output
 ::: django_service_specs.dispatch.paginate_output.DEFAULT_PAGE_SIZE
 ::: django_service_specs.dispatch.bind_arguments.bind_arguments
 ::: django_service_specs.dispatch.check_requested_input.check_requested_input
 ::: django_service_specs.dispatch.check_call.check_call
+::: django_service_specs.dispatch.checked_call.CheckedCall
 ::: django_service_specs.dispatch.check_seeds.check_seeds
 ::: django_service_specs.dispatch.seed_named_parameters.seed_named_parameters
 ::: django_service_specs.dispatch.provider_reached.provider_reached
@@ -137,7 +142,11 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.authorization.permission_check.PermissionCheck
 ::: django_service_specs.specs.check_permissions.check_permissions
 ::: django_service_specs.authorization.unrestricted.Unrestricted
+::: django_service_specs.authorization.all_of.AllOf
+::: django_service_specs.authorization.any_of.AnyOf
+::: django_service_specs.authorization.none_of.NoneOf
 ::: django_service_specs.dispatch.grant.Grant
+::: django_service_specs.dispatch.call_seeds.CallSeeds
 ::: django_service_specs.dispatch.authorize.authorize
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope
 ::: django_service_specs.dispatch.checks_read_arguments.checks_read_arguments
@@ -146,6 +155,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.authorization.is_deactivated.is_deactivated
 ::: django_service_specs.authorization.sync_answer.sync_answer
 ::: django_service_specs.authorization.not_permitted.NotPermitted
+::: django_service_specs.authorization.permission_check_denied.PermissionCheckDenied
 ::: django_service_specs.authorization.principal_unavailable.PrincipalUnavailable
 
 ## Services

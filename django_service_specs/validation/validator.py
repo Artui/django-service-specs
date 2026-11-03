@@ -87,9 +87,9 @@ class Validator(abc.ABC):
     ``validated()`` is the call's whole result, and what dispatch asks for: the
     values, the call's ``data``, and any value the Validator binds for the
     call. An adapter overrides it where its ``data`` is not the mapping
-    ``validate()`` returns, as the dataclass adapter's is its instance, or
-    where the library leaves an object the service may want; the rest need
-    not touch it.
+    ``validate()`` returns, as the dataclass and pydantic adapters' is the
+    instance they build, or where the library leaves an object the service
+    may want; the rest need not touch it.
 
     ``validated_many()`` is what dispatch asks of a ``many`` spec instead: the
     whole list at once. By default it is ``validated()`` on each row, which
@@ -116,7 +116,21 @@ class Validator(abc.ABC):
 
     @abc.abstractmethod
     def parameters(self) -> Parameters:
-        """What this Validator takes, as a declaration. Never queries."""
+        """What this Validator takes, as a declaration. Never queries.
+
+        A Validator may opt into the call it is asked for by declaring
+        ``parameters(self, *, call_context=None)``: every ask inside one call
+        then hands it that call's ``call_context``, the same dict its
+        ``ValidationContext`` carries, so a transport describing a serializer
+        under its own request can tell its own call from a ``dispatch`` the
+        service makes inside it. It is ``None`` outside a call - at
+        registration, for a schema, or for any other reader describing the
+        spec - and the declaration must hold there too. Opted in or not, it
+        never queries. A Validator declaring no keyword is asked as before,
+        as is one whose ``parameters`` takes only ``**kwargs`` or is a
+        ``functools.wraps`` wrapper that does not name the keyword itself:
+        the method's own signature decides.
+        """
 
     @abc.abstractmethod
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:

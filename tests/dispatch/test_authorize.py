@@ -1,18 +1,23 @@
 from __future__ import annotations
 
+import dataclasses
 import inspect
 from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from django_service_specs.authorization.all_of import AllOf
+from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.not_permitted import NotPermitted
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.unrestricted import Unrestricted
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.authorize import authorize
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.grant import Grant
+from django_service_specs.dispatch.resolve_seeds import resolve_seeds
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
@@ -413,3 +418,137 @@ class TestTheCallSRequestAndView:
             call_context={"request": "context"},
         )
         assert check.seen == [("has_permission", "registered", None)]
+
+
+class TestCombinators:
+    """A combinator is asked as any check is, and hands each check inside it what that check declares."""
+
+    def test_a_child_s_arguments_and_context_reach_it(self) -> None:
+        arguing, offered = Arguing(), Offered()
+        spec, context = _spec([AllOf(arguing, offered)]), {"seen": True}
+        authorize(
+            spec, object(), arguments={"pk": 3}, call_context=context, seeds={"tenant": "acme"}
+        )
+        assert arguing.questions() == [("has_permission", {"pk": 3})]
+        assert offered.asked == [("has_permission", context, "acme")]
+        assert offered.asked[0][1] is context
+
+    def test_the_refusal_names_the_combinator_s_message(self) -> None:
+        # Not the message of the check inside that refused: the combinator is
+        # the rule the spec declares, and it is what refuses.
+        spec = _spec([AnyOf(RefuseWithMessage(), Refuse(), message="Owners or staff only.")])
+        with pytest.raises(NotPermitted) as refused:
+            authorize(spec, object())
+        assert refused.value.message == "Owners or staff only."
+
+    def test_a_combinator_with_no_message_refuses_with_the_generic_wording(self) -> None:
+        spec = _spec([AnyOf(RefuseWithMessage())])
+        with pytest.raises(NotPermitted) as refused:
+            authorize(spec, object())
+        assert refused.value.message == NotPermitted.default_message
+
+
+SEEDS_REFUSED = "The seeds do not cover this spec, principal and call context."
+
+
+class TestCarriedSeeds:
+    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for any other."""
+
+    def _minted(self) -> tuple[Any, SeedPerQuestion, Any, list[str], dict[str, Any]]:
+        check = SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        pool_seeds, resolved = recorded_seeds()
+        carrier = resolve_seeds(spec, principal="ada", pool_seeds=pool_seeds, call_context=context)
+        resolved.clear()
+        return spec, check, carrier, resolved, context
+
+    def test_a_covering_carrier_s_values_are_handed_to_the_check(self) -> None:
+        spec, check, carrier, resolved, context = self._minted()
+        grant = authorize(
+            spec, "ada", seeds=carrier, pool_seeds=carrier.pool_seeds, call_context=context
+        )
+        assert grant.covers(spec, "ada")
+        assert check.handed == [("has_permission", "club of ada")]
+
+    def test_a_carrier_under_its_registry_resolves_nothing(self) -> None:
+        """``pool_seeds=`` beside a carrier is the registry it is matched against, not a resolver."""
+        spec, check, carrier, resolved, context = self._minted()
+        authorize(spec, "ada", seeds=carrier, pool_seeds=carrier.pool_seeds, call_context=context)
+        assert resolved == []
+        assert check.handed[0][1] is carrier.values["club"]
+
+    @pytest.mark.parametrize("other", ["principal", "call_context", "registry"])
+    def test_a_carrier_for_another_call_is_refused_before_any_check(self, other: str) -> None:
+        spec, check, carrier, resolved, context = self._minted()
+        asked: dict[str, Any] = {
+            "principal": "ada",
+            "call_context": context,
+            "pool_seeds": carrier.pool_seeds,
+        }
+        if other == "principal":
+            asked["principal"] = "bob"
+        elif other == "call_context":
+            asked["call_context"] = {}
+        else:
+            asked["pool_seeds"] = recorded_seeds()[0]
+        principal = asked.pop("principal")
+        with pytest.raises(NotPermitted) as refused:
+            authorize(spec, principal, seeds=carrier, **asked)
+        assert str(refused.value) == SEEDS_REFUSED
+        assert resolved == []
+        assert check.handed == []
+
+    def test_an_equal_but_distinct_spec_is_refused(self) -> None:
+        """A frozen dataclass compares by field: only identity tells the two apart."""
+        spec, check, carrier, _, context = self._minted()
+        twin = dataclasses.replace(kernel_spec(spec))
+        assert twin == kernel_spec(spec)
+        with pytest.raises(NotPermitted, match=SEEDS_REFUSED):
+            authorize(
+                twin, "ada", seeds=carrier, pool_seeds=carrier.pool_seeds, call_context=context
+            )
+        assert check.handed == []
+
+    def test_a_carrier_for_a_source_covers_its_compiled_spec(self) -> None:
+        check = SeedPerQuestion()
+        source, context = Foreign(_spec([check])), {}
+        pool_seeds, _ = recorded_seeds()
+        carrier = resolve_seeds(
+            source, principal="ada", pool_seeds=pool_seeds, call_context=context
+        )
+        for spec in (source, kernel_spec(source)):
+            authorize(spec, "ada", seeds=carrier, pool_seeds=pool_seeds, call_context=context)
+        assert check.handed == [("has_permission", "club of ada")] * 2
+
+    def test_a_carrier_is_refused_before_a_covering_grant_answers(self) -> None:
+        spec, check, carrier, _, context = self._minted()
+        with pytest.raises(NotPermitted) as refused:
+            authorize(
+                spec,
+                "bob",
+                grant=Grant(spec, "bob"),
+                seeds=carrier,
+                pool_seeds=carrier.pool_seeds,
+                call_context=context,
+            )
+        # The seeds' refusal, not the grant's: the grant covers this call.
+        assert str(refused.value) == SEEDS_REFUSED
+
+    def test_a_carrier_handed_no_pool_seeds_is_matched_against_the_default_registry(self) -> None:
+        check = SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        carrier = CallSeeds(spec, "ada", context, DEFAULT_POOL_SEEDS, {"club": "chosen"})
+        authorize(spec, "ada", seeds=carrier, call_context=context)
+        assert check.handed == [("has_permission", "chosen")]
+
+    def test_a_deactivated_principal_is_refused_though_its_carrier_and_grant_cover_it(
+        self,
+    ) -> None:
+        principal, check = Deactivated(), SeedPerQuestion()
+        spec, context = _spec([check]), {}
+        carrier = CallSeeds(spec, principal, context, DEFAULT_POOL_SEEDS, {"club": "chosen"})
+        with pytest.raises(PrincipalUnavailable):
+            authorize(
+                spec, principal, grant=Grant(spec, principal), seeds=carrier, call_context=context
+            )
+        assert check.handed == []

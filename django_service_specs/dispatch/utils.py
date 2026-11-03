@@ -37,6 +37,7 @@ from django_service_specs.authorization.utils import (
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.grant import Grant
 from django_service_specs.dispatch.relax_partial import relax_partial
@@ -59,19 +60,19 @@ from django_service_specs.pool.utils import (
 from django_service_specs.selectors.is_queryset import is_queryset
 from django_service_specs.selectors.materialize_retrieve import materialize_retrieve
 from django_service_specs.selectors.run_selector import run_selector
-from django_service_specs.selectors.utils import apply_shaping, call_keywords
+from django_service_specs.selectors.utils import apply_shaping, call_keywords, required_keywords
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
-from django_service_specs.specs.utils import callable_name
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.progress_reporter import ProgressReporter
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET
-from django_service_specs.types.utils import CALL_CONTEXT, CALL_SEEDS_NOTE, SHAPES
+from django_service_specs.types.utils import CALL_CONTEXT, CALL_SEEDS_NOTE, SHAPES, callable_name
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 NOT_FOUND = DispatchResult(kind="not_found")
 """A required row that does not exist. Frozen, so one instance serves every call."""
@@ -342,6 +343,7 @@ def open_call(
     settle_rows: bool = False,
     overlay: Overlay = NO_OVERLAY,
     keywords: CheckKeywords,
+    carried: CallSeeds | None,
 ) -> tuple[dict[str, Any], Grant]:
     """Steps one and two: the checked arguments, and the grant the call runs under.
 
@@ -418,6 +420,21 @@ def open_call(
     (test_a_seed_raising_principal_unavailable_ends_the_call_before_its_check).
     Every entry point hands its own carrier, one per call, so the walk after
     this is offered the seeds this filled.
+
+    ``carried`` is what ``dispatch(seeds=)`` or ``resolve_target(seeds=)`` was
+    handed: the values a prelude - ``check_call``, ``resolve_target`` or
+    ``resolve_seeds`` - resolved for the same seeds. One
+    that covers this call's spec, principal, context and registry fills
+    ``keywords.seeds`` in place of resolving them, so none of those seeds
+    resolves a second time and the prelude's checks and this call's run see
+    one value of each
+    (test_check_call_then_dispatch_resolves_a_check_named_seed_once). One
+    that does not cover it is refused as ``NotPermitted``, in the same
+    place, before the class-level check and before any resolver runs
+    (test_a_refused_carrier_resolves_nothing): values resolved for another
+    call are never read as this one's, and never quietly replaced by fresh
+    ones either. ``CallSeeds.values_for`` makes that refusal, as it does for
+    the three ``authorize`` functions.
     """
     refuse_deactivated(principal)
     # Against the spec's whole parameters, whatever ``parameters`` narrows the
@@ -426,18 +443,39 @@ def open_call(
     # (test_resolve_target_and_check_call_split_as_dispatch_does, and
     # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it
     # for a field, which is outside the target's parameters).
-    declared = spec.parameters()
+    declared = spec.parameters(call_context=keywords.call_context)
     parameters = seat_seed_named(
-        spec, declared, declared if parameters is None else parameters, pool_seeds
+        spec,
+        declared,
+        declared if parameters is None else parameters,
+        pool_seeds,
+        call_context=keywords.call_context,
     )
     refuse_overlaid_parameters(spec, declared, overlay)
-    checked = shape_check(spec, parameters, arguments, unknown_arguments=unknown_arguments)
-    # Only the seeds a check names: another seed's resolver may read what an
-    # anonymous caller lacks, and this runs before that caller is refused
-    # (test_only_the_seeds_a_check_names_resolve_before_it).
-    keywords.seeds.update(
-        seeds_for_checks(spec, principal, pool_seeds, QUESTIONS, call_context=keywords.call_context)
+    checked = shape_check(
+        spec,
+        parameters,
+        arguments,
+        unknown_arguments=unknown_arguments,
+        call_context=keywords.call_context,
     )
+    if carried is None:
+        # Only the seeds a check names: another seed's resolver may read what an
+        # anonymous caller lacks, and this runs before that caller is refused
+        # (test_only_the_seeds_a_check_names_resolve_before_it).
+        keywords.seeds.update(
+            seeds_for_checks(
+                spec, principal, pool_seeds, QUESTIONS, call_context=keywords.call_context
+            )
+        )
+    else:
+        # Taken as they are, so nothing the prelude's checks were handed is
+        # resolved again (test_check_call_then_dispatch_resolves_a_check_named_seed_once),
+        # and a carrier that does not cover this call fails closed, before any
+        # resolver and the class-level check (test_a_refused_carrier_resolves_nothing).
+        keywords.seeds.update(
+            carried.values_for(spec, principal, keywords.call_context, pool_seeds)
+        )
     granted = authorize(
         spec,
         principal,
@@ -469,6 +507,8 @@ def seat_seed_named(
     declared: Parameters,
     parameters: Parameters,
     pool_seeds: PoolSeeds,
+    *,
+    call_context: dict[str, Any] | None = None,
 ) -> Parameters:
     """``parameters`` less the reads a registered seed fills, refusing a name no seed may share.
 
@@ -484,8 +524,10 @@ def seat_seed_named(
     this call checks is still refused or seated, and what comes back is never
     wider than what went in
     (test_seat_seed_named_splits_the_whole_spec_and_narrows_only_what_is_checked).
+    ``call_context`` is the call's dict, handed on to the Validator's
+    ``parameters`` (see ``seed_named_fields``).
     """
-    seated, taken = split_seed_named(spec, declared, pool_seeds)
+    seated, taken = split_seed_named(spec, declared, pool_seeds, call_context=call_context)
     if taken:
         raise ImproperlyConfigured(seed_named_refusal(spec, taken, pool_seeds))
     if seated:
@@ -519,7 +561,11 @@ def seed_named_refusal(
 
 
 def split_seed_named(
-    spec: ServiceSpec | SelectorSpec, declared: Parameters, pool_seeds: PoolSeeds
+    spec: ServiceSpec | SelectorSpec,
+    declared: Parameters,
+    pool_seeds: PoolSeeds,
+    *,
+    call_context: dict[str, Any] | None = None,
 ) -> tuple[frozenset[str], frozenset[str]]:
     """Of ``declared``'s names a registered seed shares: the reads it fills, and the ones refused.
 
@@ -547,10 +593,20 @@ def split_seed_named(
     seated = shared & frozenset(
         param.name for _, reads in read_seats(spec) for param in reads if param.reflected
     )
-    return seated, shared - seated - seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
+    return (
+        seated,
+        shared
+        - seated
+        - seed_named_fields(spec, pool_seeds.names | CALL_SEEDS, call_context=call_context),
+    )
 
 
-def seed_named_fields(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -> frozenset[str]:
+def seed_named_fields(
+    spec: ServiceSpec | SelectorSpec,
+    names: frozenset[str],
+    *,
+    call_context: dict[str, Any] | None = None,
+) -> frozenset[str]:
     """The top-level Validator fields of ``spec`` named in ``names``: the caller's, and never the pool's.
 
     ``names`` is the registered seeds' names; the dispatcher's own never name
@@ -564,9 +620,12 @@ def seed_named_fields(spec: ServiceSpec | SelectorSpec, names: frozenset[str]) -
     and a ``many`` spec's row field shares a name with an unmarked read, which
     stays refused
     (test_a_spec_declaring_a_registered_seed_s_name_is_refused[a-many-spec-s-read-a-row-field-shares]).
+    ``call_context`` is the call's dict inside a call and ``None`` outside
+    one, handed to the Validator's ``parameters`` as ``validator_parameters``
+    hands it.
     """
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        return spec.validator.parameters().names() & names
+        return validator_parameters(spec.validator, call_context=call_context).names() & names
     return frozenset()
 
 
@@ -576,6 +635,7 @@ def shape_check(
     arguments: Mapping[str, Any],
     *,
     unknown_arguments: UnknownArguments,
+    call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """``check_arguments`` over ``parameters``, leaving out what the server fills or may fill.
 
@@ -586,8 +646,10 @@ def shape_check(
     ``open_call`` does and ``bind_arguments`` does when it is handed
     ``pool_seeds``. Handed none, ``bind_arguments`` checks such a read as
     declared, and a required one is demanded of the caller
-    (test_bind_arguments_still_demands_a_required_reflected_read). Two things
-    are relaxed:
+    (test_bind_arguments_still_demands_a_required_reflected_read).
+    ``call_context`` is the call's dict, handed to the Validator's
+    ``parameters`` where its fields are read for what a provider reaches. Two
+    things are relaxed:
 
     - **A parameter a provider fills or may fill**, which is always one that
       provider's values reach (see ``server_filled``): not demanded of the
@@ -605,6 +667,10 @@ def shape_check(
       that such a value is missing
       (test_a_read_an_untyped_provider_may_fill_left_out_reaches_the_class_level_check,
       test_a_declinable_key_left_out_reaches_the_class_level_check).
+      **Except a read a provider requires itself**, which only the caller can
+      hand it: that one stays demanded here, so a call leaving it out is
+      refused before the class-level check and before any provider runs
+      (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller).
       **What the caller sends for one depends on the provider's annotation.**
       A key a typed provider is annotated to fill is the server's:
       ``server_owned_keys`` tells a transport to hide exactly such a key, and
@@ -623,8 +689,9 @@ def shape_check(
     - **Under** ``partial`` **an absent Validator field**, at any depth, as
       djangorestframework-services relaxes only its serializer. A ``reads``
       argument and a target selector's read, the ``pk`` among them, stay
-      required as declared unless a provider fills or may fill them: a
-      partial update still needs to say which row it updates
+      required as declared unless a provider fills them, or may fill one
+      no provider requires itself: a partial update still needs to say which
+      row it updates
       (test_a_partial_call_omitting_the_target_s_pk_is_refused_at_the_shape_check).
 
     A present value is checked as declared either way, and an unknown key is
@@ -650,7 +717,9 @@ def shape_check(
     # spec has no ``validator``) and
     # test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing.
     if isinstance(spec, ServiceSpec) and spec.validator is not None:
-        fields, fields_reached = reach(spec.input_data, spec.validator.parameters())
+        fields, fields_reached = reach(
+            spec.input_data, validator_parameters(spec.validator, call_context=call_context)
+        )
         if spec.many:
             return _check_bulk(
                 _relaxed(parameters, reached),
@@ -720,14 +789,51 @@ def server_filled(spec: ServiceSpec | SelectorSpec) -> tuple[frozenset[str], fro
     (test_a_may_fill_read_the_provider_answers_reaches_the_service): those
     are relaxed and kept as the caller's
     (test_a_declinable_key_stays_the_caller_s).
+
+    **Less a read a provider requires itself.** A provider is handed its
+    seat's reads and the pool's seeds, never another provider's answer, so a
+    read it takes by name with no default can only ever come from the
+    caller: relaxed, a call leaving it out would reach the provider and fail
+    with its own ``TypeError``. So it stays demanded however a provider may
+    fill it - a seat's ``kwargs``, the target selector's, and a service
+    spec's ``input_data``, handed the spec's reads as ``kwargs`` is
+    (test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller,
+    test_a_read_input_data_requires_is_demanded_beside_an_untyped_kwargs).
+    Only a read the provider is handed: one its seat's typed provider fills
+    is dropped from the caller's arguments, so demanding it would ask for a
+    value no provider receives (test_a_read_a_typed_provider_fills_stays_relaxed_though_a_provider_requires_it),
+    which ``check_seeds`` refuses instead. A ``reflected`` read a registered
+    seed fills is out of the parameters before any relaxing.
     """
     owned: frozenset[str] = frozenset()
     reached: frozenset[str] = frozenset()
+    demanded: frozenset[str] = frozenset()
     for provider, reads in read_seats(spec):
         filled, may_fill = reach(provider, reads)
         owned |= filled
         reached |= may_fill
-    return owned, reached
+        demanded |= (reads.names() - filled) & _requires(provider)
+    if isinstance(spec, ServiceSpec):
+        # ``input_data`` is called from the pool ``kwargs`` is: the spec's
+        # reads, less those ``kwargs`` fills.
+        filled, _ = reach(spec.kwargs, spec.reads)
+        demanded |= (spec.reads.names() - filled) & _requires(spec.input_data)
+    return owned, reached - demanded
+
+
+def _requires(provider: Callable[..., Any] | None) -> frozenset[str]:
+    """The keywords ``provider`` takes by name with no default; none for no provider or one whose signature cannot be read.
+
+    An unreadable one is refused by ``check_seeds`` and fails where dispatch
+    binds it, so the shape check and the schema leave it to that
+    (test_a_provider_whose_signature_cannot_be_read_relaxes_as_before).
+    """
+    if provider is None:
+        return frozenset()
+    try:
+        return frozenset(required_keywords(provider))
+    except (ValueError, TypeError):
+        return frozenset()
 
 
 def read_seats(
@@ -1566,6 +1672,41 @@ def walk_target(
     return target_entry(spec, None)
 
 
+def refuse_seeds(seeds: Any, grant: Grant | None, *, principal_id: Any = None) -> None:
+    """Refuse ``seeds=`` that cannot be a prelude's, before anything runs.
+
+    A wiring mistake rather than a refusal of the call, so it is a
+    ``TypeError`` at entry, where no later refusal can hide it. Only the
+    carrier ``check_call``, ``resolve_target`` or ``resolve_seeds`` hands back is
+    taken: a plain mapping would be values nobody resolved for this call
+    (test_a_plain_mapping_as_seeds_is_a_type_error). And it travels with the
+    grant its prelude returned beside it: without one, dispatch would ask the
+    class-level check again on values resolved for a check already asked
+    (test_seeds_without_a_grant_is_a_type_error). ``adispatch`` calls this on
+    the loop, before any hop (test_seeds_are_refused_before_any_hop). A carrier
+    is bound to the principal its prelude was handed, which ``adispatch`` never
+    has when it resolves one from ``principal_id`` inside the hop, so that pair
+    is refused too (test_a_carrier_never_covers_a_principal_resolved_from_its_id).
+    """
+    if seeds is None:
+        return
+    if not isinstance(seeds, CallSeeds):
+        raise TypeError(
+            "seeds= takes the CallSeeds that check_call() or resolve_target() hands back on "
+            "its .seeds, or resolve_seeds() returns; "
+            f"got {type(seeds).__name__}."
+        )
+    if grant is None:
+        raise TypeError(
+            "seeds= is handed on with the grant= its prelude returned beside it; pass both."
+        )
+    if principal_id is not None:
+        raise TypeError(
+            "seeds= cannot cover a principal adispatch() resolves from principal_id=; "
+            "pass the principal= its prelude was handed."
+        )
+
+
 def refuse_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
     """Refuse ``target=`` where nothing is looked up for it to stand in for, before anything runs.
 
@@ -1638,7 +1779,7 @@ def validate_arguments(
     validator = spec.validator
     if validator is None:
         return Validated(values={}, data={})
-    declared = validator.parameters().names()
+    declared = validator_parameters(validator, call_context=call_context).names()
     context = ValidationContext(
         principal,
         target,
@@ -1660,7 +1801,11 @@ def validate_arguments(
     # Not made when no provider ran - ``bind_arguments`` - where an absent
     # field the provider would fill is the Validator's to refuse
     # (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
-    relaxed = relax_partial(spec, spec.parameters()) if provider_answered else Parameters.of()
+    relaxed = (
+        relax_partial(spec, spec.parameters(call_context=call_context))
+        if provider_answered
+        else Parameters.of()
+    )
     if spec.many:
         the_list = next((param for param in relaxed if param.name == spec.many_argument), None)
         return _validate_rows(
@@ -1696,7 +1841,7 @@ def _validate_rows(
     row the shape check refused is, and never reaches the Validator
     (test_a_many_row_field_nobody_filled_is_refused_in_its_row).
     """
-    declared = validator.parameters().names()
+    declared = validator_parameters(validator, call_context=context.call_context).names()
     errors = dict(checked.errors)
     rows: dict[int, dict[str, Any]] = {}
     for index, row in checked.rows.items():
@@ -1757,6 +1902,7 @@ def prepare_service(
     unknown_arguments: UnknownArguments,
     progress: ProgressReporter | None,
     call_context: dict[str, Any],
+    carried: CallSeeds | None,
     target: Any = UNSET,
     overlay: Overlay = NO_OVERLAY,
 ) -> Prepared | DispatchResult:
@@ -1826,6 +1972,7 @@ def prepare_service(
         unknown_arguments=unknown_arguments,
         overlay=overlay,
         keywords=keywords,
+        carried=carried,
     )
     resolved = walk_target(
         spec,
@@ -1894,7 +2041,7 @@ def prepare_service(
     # hands one dict as ``values`` and ``data``, so a pop would drop the field
     # from ``data`` too
     # (test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_keeps_the_seed).
-    fields = seed_named_fields(spec, pool_seeds.names | CALL_SEEDS)
+    fields = seed_named_fields(spec, pool_seeds.names | CALL_SEEDS, call_context=call_context)
     spread = {name: value for name, value in values.items() if name not in fields}
     # A Validator returning ``user`` is a bug, and letting its value outrank the
     # seed silently would be the worse one: the service would act as whoever
@@ -1920,7 +2067,7 @@ def prepare_service(
     # ``a-validated-value`` names a parameter too) and
     # test_a_bound_value_naming_a_parameter_is_refused (``a-read``, ``a-field-left-out``),
     # and the call's names by test_a_validator_binding_either_is_refused.
-    named = provided | values.keys() | spec.parameters().names()
+    named = provided | values.keys() | spec.parameters(call_context=call_context).names()
     bound = sorted(validated.pool.keys() & named)
     if bound:
         raise ImproperlyConfigured(
@@ -1986,7 +2133,7 @@ def prepare_service(
     # holds the third.
     validator = spec.validator
     asked = (
-        validator.parameters().names()
+        validator_parameters(validator, call_context=call_context).names()
         if validator is not None and not spec.partial and not spec.many
         else frozenset()
     )

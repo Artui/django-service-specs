@@ -561,3 +561,13 @@ class _FillsPk(TypedDict):
 
 def _pk() -> _FillsPk:
     return {"pk": 1}
+
+
+def test_selector_spec_parameters_takes_and_ignores_call_context() -> None:
+    """So a reader asks a ``ServiceSpec`` or a ``SelectorSpec`` alike; a
+    selector spec has no Validator to hand it to."""
+    shapes = Parameters.of(Parameter("q", "string"))
+    spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=PK, shapes=shapes)
+    assert spec.parameters(call_context={}) == spec.parameters() == PK + shapes
+    bare = SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=PK)
+    assert bare.parameters(call_context={}) is bare.reads

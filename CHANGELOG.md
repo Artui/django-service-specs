@@ -7,6 +7,216 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.1] — 2026-11-03
+
+### Changed
+- **Documentation and tests only; no behaviour changes.** The docs gain a runnable
+  example of a dataclass input carrying `dict[str, X]` and one of the 0.25.0 rule
+  that a read a provider requires itself is asked of the caller, who is refused
+  with `InvalidArguments` when they leave it out, both linked from Declaring and
+  Dispatching. Step 1 of `dispatch`'s docstring names that exception, as the other
+  docstrings did in 0.25.0. The dataclass adapter's refusal test now holds
+  `tuple[str, int]` and `Mapping[str, int]`, so the `dict` condition of its
+  str-keyed-map branch is pinned by a test of its own.
+
+## [0.25.0] — 2026-11-03
+
+### Added
+- **`DataclassValidator` and `DataclassPresenter` read `dict[str, X]`**, for any `X`
+  the dataclass adapter reads, as an object with no declared fields, which is how
+  `PydanticValidator` declares one: the same model and dataclass now declare the
+  same parameter. Each value is decoded as `X`, and a value refused is refused
+  under its own key (`{"scores": {"rigour": ["Expected an integer."]}}`); a map
+  that is not a JSON object, a non-string key included, is refused as `"Expected
+  an object."`. The presenter encodes each value as it encodes a field. A
+  dataclass with such a field was refused at registration before.
+
+### Changed
+- **Breaking: `PydanticValidator` hands a service declaring `data` the model instance,** as
+  `DataclassValidator` hands its dataclass instance, where it handed a dict of the
+  fields. This breaks a service that reads `data["title"]` from a pydantic
+  validator: read `data.title`, or take the fields by name, which are unchanged.
+  A `many` call's `data` is a list of model instances. `validated()` is now its
+  own, so a subclass that overrides only `validate()` no longer changes what
+  dispatch hands the service, which asks `validated()`: override that as well.
+- **A read a provider requires itself is demanded of the caller.** A `kwargs` or
+  `input_data` provider is handed its seat's reads and the seeds, never another
+  provider's answer, so a read it takes by name with no default, such as `pk` in
+  `kwargs=lambda *, pk: {...}`, can only come from the caller. The shape check used
+  to relax such a read wherever a provider may fill it (an untyped provider, or a
+  typed one's declinable key), and a call leaving it out failed with the provider's
+  own `TypeError`. It is now refused with `InvalidArguments` naming the read, before
+  the class-level check and before any provider runs; a call sending it runs as
+  before. The same rule reaches every reader of it:
+  - `spec_caller_input_schema` keeps such a read in `required`, so a transport
+    advertising it asks the caller for it.
+  - `provider_reached` no longer returns it.
+  - **Breaking:** `check_server_arguments` refuses a `ServerArguments`
+    withholding it. A transport calls it where it registers a spec
+    (django-spec-mcp, django-spec-agents and django-spec-html do), so such a
+    binding now fails at registration with `ImproperlyConfigured` instead of
+    with that `TypeError` on every call.
+
+  A read a typed provider of its seat fills is still not demanded: the caller's
+  value for it is dropped, so no provider receives it either way, and `check_seeds`
+  refuses such a spec.
+
+## [0.24.0] — 2026-11-03
+
+### Added
+- **`validator_parameters` is public**, from `django_service_specs.validation` and
+  the root. It asks a Validator's `parameters()` as dispatch does, handing the
+  call's context only to one that declares `call_context`, so a transport asking a
+  Validator itself during a call, for a `many` spec's rows say, describes one that
+  opted in as dispatch does, whoever wrote it.
+- **`PermissionCheckDenied`, a `NotPermitted` marking a declared check's denial.**
+  `authorize`, `authorize_target` and `authorize_scope` raise it when one of the
+  spec's checks answers `False`, carrying the `check` that answered (a
+  combinator, for a check inside one) and the `spec` it was asked about, the
+  compiled one for a declaration of another library's. The message is unchanged.
+  Every other `NotPermitted` stays bare: a grant or seeds carrier that does not
+  cover the call, a service's own refusal, and a check raising `NotPermitted`
+  itself. So a transport can answer a check's denial of an anonymous caller with
+  a challenge and every other refusal as forbidden; a denial inside a service's
+  own `dispatch` propagates out as the same class, so it compares `exc.spec` with
+  its own call's spec. It is in `REFUSALS`: a map read as ordered rows answers it
+  with its `NotPermitted` row, while one looked up by exact class now reports it
+  unanswered until it gets an entry.
+
+## [0.23.0] — 2026-11-02
+
+### Added
+- **`spec_caller_input_schema`, the input schema a transport advertises.** It is
+  `spec_input_schema` less what the server fills, with a key a provider fills or
+  may fill left out of `required`. A `many` spec gets the same in each row, so a
+  field `input_data` fills is not asked for, while the list is, unless the
+  transport binds it.
+- **`AllOf`, `AnyOf` and `NoneOf` combine permission checks into one.** Each takes
+  checks and an optional `message=`, is a `PermissionCheck` like any other, and
+  nests. `AllOf` stops at the first check that fails; `AnyOf` passes at the first
+  that passes, and at the row and scope questions counts a check only where it
+  passes the class-level question too, asked again, so a check allowing every row
+  by default does not admit a principal it refused at class level, under a grant
+  as without one; `NoneOf` passes only when no check passes `has_permission` and
+  allows at the row and scope questions. A check inside one is handed only the
+  arguments, context and seeds it declares, and a seed it names is resolved as
+  one a spec's own check names is; every answer is read as one at the top is, so
+  a coroutine fails closed, and a check that raises ends the call. A refusal says
+  the combinator's `message`. Refused when built, with `ImproperlyConfigured`: no
+  checks, a check `permissions=` would refuse, `Unrestricted` or a subclass of it,
+  a check opting into a seed named for a parameter its combinator's own method takes
+  (`principal`, `spec`, `target`, `scope`, which no seed can reach it through), and,
+  inside `NoneOf`, a check judging rows or a scope at any depth.
+- **A Validator may declare `parameters(self, *, call_context=None)`** and is handed
+  the call's context on every ask inside a call, and none outside one; a Validator
+  declaring no keyword is asked as before. `ServiceSpec.parameters()` and
+  `SelectorSpec.parameters()` take the keyword.
+- **`dispatch` and `adispatch` take `seeds=`**, the `CallSeeds` that `check_call`
+  and `resolve_target` now hand back on `.seeds`, with the grant beside them, so
+  their checks and the run see one value of each registered seed a check names,
+  resolved once rather than once by each. The carrier is bound by identity to
+  the spec, principal, `call_context` dict and `pool_seeds` registry its prelude
+  ran with; one for another is refused as `NotPermitted` before any seed resolves,
+  and `seeds=` without `grant=`, `adispatch`'s `seeds=` with `principal_id=`, or
+  anything but the carrier, is a `TypeError`. It cannot be pickled.
+- **`resolve_seeds`** resolves the seeds a spec's checks name ahead of `authorize`,
+  as a `CallSeeds`, and `authorize`, `authorize_scope`, `authorize_target` and
+  `resolve_target` take it as `seeds=`, so a page that admits a request before it
+  resolves the row holds one value of each from the class-level check to the run;
+  a carrier for another spec, principal, call context or registry is refused as
+  `NotPermitted` before any check. `CallSeeds.values_for` is the one place that
+  refusal is made.
+
+### Changed
+- **`check_seeds` runs its positional-only refusal on every callable it reads, and
+  its optional-read refusal on those that are handed reads.** The positional-only
+  parameter with no default is now refused on an affordance condition, a
+  precondition, the output selector and an `extend_queryset`, as well as on the
+  service, the selector and the target selector. A keyword only an optional read
+  fills is now refused on a precondition and an `extend_queryset`, the only ones
+  of these handed the spec's reads; a condition and the output selector are handed
+  none, so it finds nothing on them. Until now it ran only the unfilled-keyword
+  refusal on these seats, so a spec that mounted before may now be refused at
+  mount. Every call reaching such a spec failed already: with `TypeError` for the
+  positional-only parameter, and as missing for the keyword when the call left the
+  read out. The array-read refusal is still not run on them. A positional-only
+  parameter is refused beside a Validator or an untyped provider too.
+- **`check_seeds` reads the `kwargs`, `input_data` and `progress_reporter`
+  providers' signatures**, each against what dispatch hands it: a `kwargs`
+  provider, the spec's own or its target selector's, and `input_data` are handed
+  what every pool carries, the mount's seeds and their seat's reads less those
+  the seat's typed `kwargs` provider fills, and a service's the target as
+  `instance` or `collection`, never `data` or a Validator's value. A
+  `progress_reporter` is handed only the call's seeds, and is read whenever the
+  run takes `progress`, by name or through `**kwargs`. Each seat runs the
+  unreadable-signature, positional-only, unfilled-keyword and optional-read
+  refusals, whether the provider annotates its keys or not and beside a
+  Validator too, so a spec that mounted before, such as one whose typed `kwargs`
+  provider requires a seed the mount does not register, may now be refused at
+  mount. Every call reaching such a provider failed already, with the
+  provider's own `TypeError`, and every call reaching such a `progress_reporter`
+  failed on its first report, or before an `async def` run. The optional-read refusal says so for a provider:
+  a call leaving the read out fails with the provider's own `TypeError` rather
+  than being refused as missing.
+- **`check_call` returns a `CheckedCall` and `resolve_target` a `ResolvedTarget`**
+  where each was annotated as a plain tuple. Both are still the same 2-tuple,
+  `(arguments, grant)` and `(target, grant)`, and add only `.seeds`. Like a grant,
+  neither can be copied or pickled, since the carrier they hold cannot.
+- **Breaking: a subclass overriding `ServiceSpec.parameters` or
+  `SelectorSpec.parameters` must accept `call_context`.** Dispatch now passes it
+  as a keyword, so an override written `def parameters(self)` raises `TypeError`
+  (an unexpected keyword argument) under dispatch. Declare
+  `def parameters(self, *, call_context=None)` and pass it on to `super()`.
+- **A `many` spec whose typed `kwargs` or `input_data` is annotated to fill, or may
+  fill, its `many_argument` is now refused with `ImproperlyConfigured` at
+  construction.** It built before, and `server_owned_keys` listed the list, so a
+  transport withholding those names dropped a list that dispatch still demanded.
+  No provider reaches the list, so the key is refused even when a Validator row
+  field shares its name. Rename the key or the `many_argument`.
+- **`check_seeds` reads affordance conditions, preconditions, the output selector
+  and `extend_queryset`**, each against what dispatch hands it, so a spec that
+  mounted before may now be refused at mount with `ImproperlyConfigured`. Such a
+  spec raised `TypeError` on every call reaching that callable: a condition is
+  handed only the call's seeds, so one requiring a seed the mount does not
+  register (a rename whose condition reads `frozen`) failed every call. Only the
+  unfilled-keyword check and the unreadable-signature refusal run on these.
+- **Breaking: `reserved=` is now required on `unmet_operation_affordance` and
+  `aunmet_operation_affordance`.** A call without it raises `TypeError` rather than
+  asking the conditions with the kernel's reserved seeds only, which failed a
+  condition reading a registered seed (a tenant, a frozen flag) at describe time
+  though dispatch serves it. Pass the mount's `pool_seeds.reserved`.
+- **Breaking: `reserved=` is now required on `enforce_affordances` and
+  `aenforce_affordances`.** A call without it raises `TypeError` rather than asking
+  the conditions with the kernel's reserved seeds only, which failed a condition
+  reading a registered seed (a tenant, a frozen flag) for a transport running a
+  service without dispatch though dispatch serves it. Pass the mount's
+  `pool_seeds.reserved`.
+
+## [0.22.0] — 2026-10-31
+
+### Changed
+- **A `SelectorSpec` seated in a `ServiceSpec` as its `instance_selector_spec`,
+  `collection_selector_spec` or `output_selector_spec` is refused when it declares
+  `permissions`.** Dispatch never asks a nested selector's checks: the spec being
+  dispatched is what authorizes, so they guarded nothing while reading as if they
+  did. Any declared checks, `Unrestricted()` included, are refused when the
+  `ServiceSpec` is built (or derived), with `ImproperlyConfigured` naming the seat.
+  Declare the checks on the `ServiceSpec`, or nest `spec.derive(permissions=None)`
+  to reuse a selector spec that is also registered or dispatched on its own. A spec
+  that nested a selector declaring permissions now raises at construction where it
+  used to pass.
+
+### Fixed
+- **A pool seed named for a dispatcher-owned value, or registered twice, is
+  refused when the registry is built directly.** `PoolSeeds.extend` refused a
+  reserved name (`user`, `call_context`, `shapes` with its rename hint) and a name
+  registered twice, but `PoolSeeds(seeds=(("shapes", f),))` skipped both checks,
+  so a reserved seed reached dispatch and shadowed the dispatcher's own value.
+  Both checks now run when the registry is constructed, with the same
+  `ValueError` messages, and every name is checked before any resolver, so a
+  reserved name still raises `ValueError` when an async resolver is also
+  registered. `request` and `view` are not reserved and still register directly.
+
 ## [0.21.1] — 2026-10-30
 
 ### Fixed
@@ -2246,7 +2456,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.21.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/Artui/django-service-specs/compare/v0.25.0...v0.25.1
+[0.25.0]: https://github.com/Artui/django-service-specs/compare/v0.24.0...v0.25.0
+[0.24.0]: https://github.com/Artui/django-service-specs/compare/v0.23.0...v0.24.0
+[0.23.0]: https://github.com/Artui/django-service-specs/compare/v0.22.0...v0.23.0
+[0.22.0]: https://github.com/Artui/django-service-specs/compare/v0.21.1...v0.22.0
 [0.21.1]: https://github.com/Artui/django-service-specs/compare/v0.21.0...v0.21.1
 [0.21.0]: https://github.com/Artui/django-service-specs/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/Artui/django-service-specs/compare/v0.19.0...v0.20.0

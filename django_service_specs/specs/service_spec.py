@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, fields, replace
-from typing import Any
+from typing import Any, NamedTuple
 
 from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import Self
@@ -18,9 +18,7 @@ from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.utils import (
-    callable_name,
     check_call_seeds,
-    check_callable,
     check_changes,
     check_metadata,
     check_preconditions,
@@ -32,8 +30,9 @@ from django_service_specs.specs.utils import (
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
-from django_service_specs.types.utils import is_row_condition
+from django_service_specs.types.utils import callable_name, check_callable, is_row_condition
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 # The default ``many_argument``, djangorestframework-services' own, so a spec
 # moving between the two packages keeps the argument a caller sends.
@@ -64,7 +63,10 @@ class ServiceSpec(AffordanceDeclarer):
         permissions: The checks a principal must pass. ``None`` means none were
             declared, which registration and dispatch both refuse; an open
             operation says ``[Unrestricted()]``. An empty sequence is refused
-            when the spec is built, since no checks would pass everyone.
+            when the spec is built, since no checks would pass everyone. This
+            spec's checks are the only ones run: a selector spec nested in
+            it, as its instance, collection or output selector, may declare
+            none, and is refused when it does.
         reads: The arguments the service, its providers and its preconditions
             read with no Validator in front of them - the ``project_pk`` a
             create's ``kwargs`` provider scopes by - as a selector spec's
@@ -410,7 +412,7 @@ class ServiceSpec(AffordanceDeclarer):
         """
         return self
 
-    def parameters(self) -> Parameters:
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
         """Everything this spec takes: its target selector's reads, its own, its shapes, then its Validator's.
 
         On a ``many`` spec the Validator's parameters are each row's, so the
@@ -425,15 +427,24 @@ class ServiceSpec(AffordanceDeclarer):
         is refused here, as is one dispatch seeds itself; the three that need no
         Validator, the target's reads, the spec's and its shapes, were refused
         at construction already.
+
+        ``call_context`` is the call's dict when a call asks, and ``None``
+        when a reader outside one does; it is handed on to a Validator whose
+        ``parameters`` declares the keyword (see ``Validator.parameters``).
         """
-        own = self.validator.parameters() if self.validator is not None else Parameters()
+        own = (
+            validator_parameters(self.validator, call_context=call_context)
+            if self.validator is not None
+            else Parameters()
+        )
         # Where the Validator's fields are first known, beside the clash ``+``
         # refuses below: a provider filling one its values never reach. The
         # reads again too, for a provider whose annotation resolved only after
         # the spec was built
         # (test_a_provider_annotation_resolving_after_the_build_is_refused_here).
         _check_reach(
-            self, [*_read_seats(self), ("ServiceSpec.validator", own, "ServiceSpec.input_data")]
+            self,
+            [*_read_seats(self), _Seat("ServiceSpec.validator", own, "ServiceSpec.input_data")],
         )
         if self.many:
             own = Parameters.of(_the_list(self, items=own))
@@ -669,24 +680,45 @@ def _check_shapes(spec: ServiceSpec) -> None:
         beside + Parameters.of(_the_list(spec))
 
 
-_Seat = tuple[str, Parameters, str | None]
-"""Where parameters are declared, what declares them, and the one provider whose values reach them, if any."""
+class _Seat(NamedTuple):
+    """Where parameters are declared, what declares them, and the one provider whose values reach them, if any."""
+
+    where: str
+    declared: Parameters
+    reaching: str | None
+    # The list alone: dispatch never relaxes it, so a ``declinable`` key is as
+    # wrong there as a ``filled`` one, and no key can be filled there, only
+    # renamed. Every other seat is relaxed by the provider that reaches it, and
+    # a ``declinable`` key stays the caller's.
+    callers_list: bool = False
 
 
 def _read_seats(spec: ServiceSpec) -> list[_Seat]:
-    """The spec's ``reads``, its target selector's and its ``shapes``: the seats known at construction.
+    """The spec's ``reads``, its target selector's, its ``shapes`` and a ``many`` spec's list: the seats known at construction.
 
     No provider's values reach the shapes, which the presenter and the
-    ``shapes`` seed read.
+    ``shapes`` seed read, nor the list, which is the caller's and which
+    dispatch demands whatever a provider answers. ``_check_many`` has refused
+    a list that cannot be built before this is asked, so ``_the_list`` cannot
+    raise here.
     """
     seats: list[_Seat] = [
-        ("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs"),
-        ("ServiceSpec.shapes", spec.shapes, None),
+        _Seat("ServiceSpec.reads", spec.reads, "ServiceSpec.kwargs"),
+        _Seat("ServiceSpec.shapes", spec.shapes, None),
     ]
+    if spec.many:
+        seats.append(
+            _Seat(
+                "ServiceSpec.many_argument",
+                Parameters.of(_the_list(spec)),
+                None,
+                callers_list=True,
+            )
+        )
     target = spec.target_selector_spec()
     if target is not None:
         label = _target_label(spec)
-        seats.append((f"{label}.reads", target.reads, f"{label}.kwargs"))
+        seats.append(_Seat(f"{label}.reads", target.reads, f"{label}.kwargs"))
     return seats
 
 
@@ -707,7 +739,10 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
     still be demanded of the caller, while ``server_owned_keys`` tells a
     transport to hide it, so it is refused as the authoring error it is. That
     is what makes ``server_owned_keys`` exact: none of its names is a
-    parameter dispatch demands.
+    parameter dispatch demands. A ``many`` spec's list, named by
+    ``many_argument``, is one of those seats, and no provider reaches it: the
+    list is the caller's, and a Validator field of its name does not exempt
+    the key, which ``server_owned_keys`` would list all the same.
 
     The ``reads`` seats are compared when the spec is built, so the error
     sits beside the declaration. Every seat, the Validator's fields with
@@ -716,8 +751,10 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
     also where a provider whose return annotation named a type defined after
     the spec, unreadable at the build, is read and refused.
 
-    Only a ``filled`` key of a provider whose return names its keys: a
-    ``declinable`` one stays the caller's, and an untyped provider names none
+    Only a ``filled`` key of a provider whose return names its keys, except
+    for the list: a ``declinable`` one stays the caller's, since the provider
+    that reaches the seat relaxes it, while dispatch never relaxes the list,
+    so a ``declinable`` key is refused there too. An untyped provider names none
     (test_a_key_it_does_not_fill_naming_a_parameter_it_never_reaches_is_accepted,
     its ``declinable`` and ``untyped`` cases),
     and a key no parameter declares is the callable's to take by name
@@ -736,8 +773,14 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
         keys = provider_keys(provider)
         if keys is None:
             continue
-        for where, declared, reaching in seats:
-            stray = sorted(keys.filled & declared.names())
+        for where, declared, reaching, callers_list in seats:
+            # Only the list also refuses a ``declinable`` key
+            # (test_a_provider_annotated_to_fill_the_list_is_refused_at_construction,
+            # its declinable cases; the accepted ``declinable`` case of
+            # test_a_key_it_does_not_fill_naming_a_parameter_it_never_reaches_is_accepted
+            # holds the other seats to ``filled``).
+            held = keys.filled | keys.declinable if callers_list else keys.filled
+            stray = sorted(held & declared.names())
             # One arc to coverage, so each conjunct is held by its own test:
             # test_a_key_no_parameter_declares_is_accepted the first (a spec
             # with no provider reads as one filling nothing, so every spec
@@ -745,14 +788,21 @@ def _check_reach(spec: ServiceSpec, seats: list[_Seat]) -> None:
             # test_a_provider_filling_the_parameters_its_values_reach_is_accepted
             # the second.
             if stray and name != reaching:
-                # A seat with no provider of its own, the shapes, says so
-                # (test_the_refusal_says_no_provider_fills_a_shape).
-                remedy = (
-                    f"Only {reaching} fills {where}; fill the key there, or rename it."
-                    if reaching is not None
-                    else f"No provider fills {where}, whose values reach only the presenter; "
-                    "rename the key."
-                )
+                # A seat with no provider of its own says so: the shapes
+                # (test_the_refusal_says_no_provider_fills_a_shape) and the
+                # list, which has its own remedy.
+                if reaching is not None:
+                    remedy = f"Only {reaching} fills {where}; fill the key there, or rename it."
+                elif callers_list:
+                    remedy = (
+                        f"No provider fills {where}, which is the caller's list; rename the "
+                        "key or the many_argument."
+                    )
+                else:
+                    remedy = (
+                        f"No provider fills {where}, whose values reach only the presenter; "
+                        "rename the key."
+                    )
                 raise ImproperlyConfigured(
                     f"{name} is annotated to fill {stray}, which {where} declares, and its "
                     f"values never reach {where}, so dispatch would still demand {stray} of "
@@ -764,9 +814,11 @@ def _check_nested(spec: ServiceSpec) -> None:
     """Refuse a nested selector declaring what dispatch never runs for it.
 
     A nested selector is a step of this spec's run, not a run of its own, so
-    its ``preconditions`` and ``progress_reporter`` would be skipped in
-    silence, and a guard skipped in silence is the failure a construction
-    check exists to prevent. A target selector's ``kwargs`` scope its lookup
+    its ``permissions``, ``preconditions`` and ``progress_reporter`` would be
+    skipped in silence, and a guard skipped in silence is the failure a
+    construction check exists to prevent. The permissions are refused whatever
+    they hold, ``Unrestricted()`` included: the spec being dispatched is what
+    authorizes, and a declaration that reads as a guard guards nothing. A target selector's ``kwargs`` scope its lookup
     and run; an output selector re-reads what the service produced, with no
     caller's arguments for a provider to stand beside, so its ``kwargs`` are
     refused too.
@@ -776,6 +828,18 @@ def _check_nested(spec: ServiceSpec) -> None:
         if nested is None:
             continue
         label = f"ServiceSpec.{role}_selector_spec"
+        # First, since authorization is the first concern. One case per role in
+        # test_a_nested_selector_declaring_what_never_runs_is_refused, since
+        # coverage cannot see a role dropped from the tuple, and
+        # test_a_nested_selector_declaring_no_permissions_is_accepted holds the
+        # None the default leaves, which every nested selector would otherwise fail.
+        if nested.permissions is not None:
+            raise ImproperlyConfigured(
+                f"{label} declares permissions, which a nested selector never asks: the spec "
+                "being dispatched is what authorizes. Declare them on this ServiceSpec, and drop "
+                "them from the nested selector, or nest spec.derive(permissions=None) to reuse "
+                "a selector spec that is also registered or dispatched on its own."
+            )
         if nested.preconditions is not None:
             raise ImproperlyConfigured(
                 f"{label} declares preconditions, which are never run on a nested selector. "

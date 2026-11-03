@@ -320,6 +320,33 @@ class TestDeclaringWrites:
         sent = dispatch(spec, principal=ada, arguments={"title": "Also mine", "owner_id": bob.pk})
         assert sent.value.owner_id == ada.pk
 
+    def test_a_dict_input_declares_an_object_and_is_refused_under_its_key(self, ada: Any) -> None:
+        spec = declaring_writes.record_review_spec
+        scores = spec.parameters().get("scores")
+        assert scores is not None and scores.type == "object"
+        ok = dispatch(
+            spec, principal=ada, arguments={"title": "Paper", "scores": {"rigour": 4, "style": 2}}
+        )
+        assert ok.value == declaring_writes.ReviewIn("Paper", {"rigour": 4, "style": 2})
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(
+                spec,
+                principal=ada,
+                arguments={"title": "Paper", "scores": {"rigour": "high"}},
+            )
+        assert refused.value.detail == {"scores": {"rigour": ["Expected an integer."]}}
+
+    def test_a_read_the_providers_requires_is_asked_of_the_caller(self, ada: Any) -> None:
+        spec = declaring_writes.file_in_project_spec
+        # The provider may fill `project`, yet it is handed only the caller's
+        # reads, so a call leaving it out is refused before the provider runs.
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(spec, principal=ada, arguments={})
+        assert refused.value.detail == {"project": ["This field is required."]}
+        # Sent, it reaches the provider, whose answer outranks the caller's.
+        sent = dispatch(spec, principal=ada, arguments={"project": "  Apollo "})
+        assert sent.value == "apollo"
+
 
 @pytest.mark.django_db
 class TestCallContext:
@@ -395,6 +422,20 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="That note is locked."):
             authorize(dispatching.lockable_note_spec, ada)
 
+    def test_combined_checks_admit_the_owner_or_staff_and_never_the_suspended(
+        self, ada: Any, bob: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="Mine")
+        spec, arguments = dispatching.open_note_spec, {"pk": note.pk}
+        assert dispatch(spec, principal=ada, arguments=arguments).value == note
+        with pytest.raises(NotPermitted, match="Only its owner or staff may open a note."):
+            dispatch(spec, principal=bob, arguments=arguments)
+        bob.is_staff = True
+        assert dispatch(spec, principal=bob, arguments=arguments).value == note
+        bob.username = "mallory"
+        with pytest.raises(NotPermitted, match="Suspended accounts may open nothing."):
+            dispatch(spec, principal=bob, arguments=arguments)
+
     def test_an_overlay_sits_beneath_the_spec_s_provider(self, ada: Any) -> None:
         result = dispatching.stamp_from_a_view(ada, {"title": "From the caller"})
         assert result.value == "From the caller via web on api"
@@ -438,6 +479,25 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.club_note_page(ada, "go")
 
+    def test_a_page_admitting_by_a_seed_resolves_it_once_for_the_call(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """From the class-level check to the service: ``resolve_seeds`` resolved it, once."""
+        ada.groups.add(Group.objects.create(name="chess"))
+        asked: list[str] = []
+
+        def counted(club: str) -> Any:
+            def resolve() -> str:
+                asked.append(club)
+                return club
+
+            return dispatching.DEFAULT_POOL_SEEDS.extend(club=resolve)
+
+        monkeypatch.setattr(dispatching, "club_seeds", counted)
+        result = dispatching.club_note_page(ada, "chess", "Openings")
+        assert result.value.title == "chess: Openings"
+        assert asked == ["chess"]
+
     def test_a_post_that_fails_re_renders_the_form_with_the_dict_dispatch_ran_with(
         self, ada: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -470,6 +530,15 @@ class TestDispatching:
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.check_club_note(bob, "chess", "Openings")
         assert not Note.objects.exists()  # nothing ran
+
+    def test_the_club_a_check_admitted_is_the_club_the_call_runs_in(self, ada: Any) -> None:
+        ada.groups.add(Group.objects.create(name="chess"))
+        clubs = iter(["chess", "go"])  # a second read would answer differently
+
+        result = dispatching.post_to_a_club_checked_first(ada, lambda: next(clubs), "Openings")
+
+        assert result.value.title == "chess: Openings"
+        assert next(clubs) == "go"  # asked once, by the prelude
 
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")

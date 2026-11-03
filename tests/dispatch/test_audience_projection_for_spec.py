@@ -103,7 +103,9 @@ def test_a_child_with_nothing_to_project_is_left_out() -> None:
 
 def test_a_service_reads_the_presenter_it_is_presented_with() -> None:
     reread = listing(InvoicePresenter())
-    spec = ServiceSpec(service=write, permissions=OPEN, output_selector_spec=reread)
+    spec = ServiceSpec(
+        service=write, permissions=OPEN, output_selector_spec=reread.derive(permissions=None)
+    )
 
     assert audience_projection_for_spec(spec) == audience_projection_for_spec(reread)
 

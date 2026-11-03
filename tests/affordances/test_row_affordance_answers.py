@@ -116,7 +116,7 @@ class TestARowDispatchAnswered:
             service=lambda: [live.pk, archived.pk],
             permissions=OPEN,
             affordances=[BOOKS_OPEN],
-            output_selector_spec=output,
+            output_selector_spec=output.derive(permissions=None),
         )
         _, archived_row = dispatch(spec, principal=ada, arguments={}).value
 

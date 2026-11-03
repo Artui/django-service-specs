@@ -34,7 +34,7 @@ from django_service_specs.types.unset import UNSET
 
 _SUPPORTED = (
     "str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
-    "a dataclass, or a list of any of these, each optionally '| None'"
+    "a dataclass, dict[str, ...], or a list of any of these, each optionally '| None'"
 )
 
 
@@ -43,8 +43,11 @@ class Shape:
     """What one annotation means, once ``Annotated``, ``None`` and ``UnsetType`` are off it.
 
     ``python`` is what a value decodes into: the scalar class, the ``Enum``
-    class, or the dataclass. It is ``None`` for a ``Literal``, whose values are
-    already what the field holds, and for a list, which is ``items``.
+    class, the dataclass, or ``dict``. It is ``None`` for a ``Literal``, whose
+    values are already what the field holds, and for a list, which is ``items``.
+
+    ``values`` is a str-keyed dict's value, read as any annotation is. It is
+    not ``items``, which everything reading a shape takes to mean an array.
     """
 
     type: str
@@ -54,6 +57,7 @@ class Shape:
     choices: tuple[Any, ...] | None = None
     items: Shape | None = None
     fields: tuple[FieldShape, ...] | None = None
+    values: Shape | None = None
 
     @property
     def enum(self) -> type[Enum] | None:
@@ -159,6 +163,8 @@ def encode(shape: Shape, value: Any) -> Any:
         return encode_fields(shape.fields, value)
     if shape.items is not None:
         return [encode(shape.items, row) for row in rows_of(value)]
+    if shape.values is not None:
+        return {key: encode(shape.values, item) for key, item in value.items()}
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Decimal):
@@ -208,6 +214,16 @@ def _read(
         # means nothing for one element of a list.
         items, _, _ = _read(args[0], where=where, stack=stack)
         shape = Shape("array", nullable=nullable, items=items)
+    elif origin is dict and args[:1] == (str,):
+        # JSON object keys are strings, so only a str-keyed dict crosses a
+        # wire as one; ``dict[int, int]`` is refused
+        # (test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation).
+        # Parameters has no way to declare "every value is an X", so the
+        # declaration is an object with no fields, as the pydantic adapter's
+        # is, and each value is decoded here as the shape read off it says.
+        # The value drops a marking and ``UnsetType`` as a list's element does.
+        values, _, _ = _read(args[1], where=where, stack=stack)
+        shape = Shape("object", python=dict, nullable=nullable, values=values)
     elif isinstance(base, type) and issubclass(base, Enum):
         values = tuple(member.value for member in base)
         shape = Shape(

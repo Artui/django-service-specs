@@ -54,6 +54,14 @@ def test_an_untyped_provider_reaches_every_read_in_its_seat() -> None:
     assert provider_reached(_listing(kwargs=_untyped)) == {"club", "locale", "page"}
 
 
+def test_a_read_its_provider_requires_is_not_reached() -> None:
+    # Handed only what the caller sent, so the shape check demands it.
+    def requires_page(*, page: int) -> dict[str, Any]:
+        return {}
+
+    assert provider_reached(_listing(kwargs=requires_page)) == {"club", "locale"}
+
+
 def test_no_provider_reaches_nothing() -> None:
     assert provider_reached(_listing()) == frozenset()
 
@@ -71,7 +79,7 @@ def test_input_data_reaches_the_validator_s_fields_and_a_target_provider_its_rea
         permissions=OPEN,
         validator=Titled(),
         input_data=_untyped,
-        instance_selector_spec=target,
+        instance_selector_spec=target.derive(permissions=None),
     )
     assert provider_reached(spec) == {"title", "pk"}
 

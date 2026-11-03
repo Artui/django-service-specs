@@ -16,8 +16,11 @@ from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.non_field_errors import NON_FIELD_ERRORS
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
+from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.unset import UNSET
 from django_service_specs.validation.validated import Validated
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
@@ -405,3 +408,119 @@ def returning_many(rows: Any, presenter: Any) -> tuple[ServiceSpec, Record]:
 def two_notes() -> list[Note]:
     ada = make_user("ada")
     return [Note.objects.create(owner=ada, title=title) for title in ("First", "Second")]
+
+
+class AskedWith(Validator):
+    """Declares ``fields`` and opts into ``call_context``, recording what every ask of ``parameters`` was handed.
+
+    A required ``title`` unless given ``fields``. Validates nothing: each
+    argument comes back as it went in, and the context it came with is kept.
+    """
+
+    def __init__(self, *fields: Parameter) -> None:
+        self.fields = fields or (Parameter("title", "string", required=True),)
+        self.asked: list[dict[str, Any] | None] = []
+        self.contexts: list[ValidationContext] = []
+
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        self.asked.append(call_context)
+        return Parameters.of(*self.fields)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        self.contexts.append(context)
+        return dict(arguments)
+
+
+EVERY_ASK = ("single", "many")
+"""The two cases that between them run every ask of a Validator's ``parameters`` inside a call.
+
+``single`` has a provider and a field named like ``TENANT_SEEDS``' seed, so
+the seed-named and provider paths ask; ``many`` asks for its rows. Every
+service spec's call is prepared, so both run ``prepare_service``'s asks.
+"""
+
+
+def every_ask_case(case: str) -> tuple[ServiceSpec, AskedWith, dict[str, Any], Record]:
+    """A spec for ``case``, its ``AskedWith``, the arguments it is called with, and its service.
+
+    Called with ``pool_seeds=TENANT_SEEDS``. The Validator's record is empty
+    when it comes back, so what it holds was asked by the call.
+    """
+    service = Record()
+    if case == "single":
+        validator = AskedWith(
+            Parameter("title", "string", required=True), Parameter("tenant", "string")
+        )
+        spec = ServiceSpec(
+            service=service,
+            permissions=OPEN,
+            validator=validator,
+            input_data=lambda: {"title": UNSET},
+        )
+        arguments: dict[str, Any] = {"title": "Dune", "tenant": "caller's"}
+    else:
+        validator = AskedWith()
+        spec = ServiceSpec(service=service, permissions=OPEN, validator=validator, many=True)
+        arguments = {spec.many_argument: [{"title": "Dune"}, {"title": "Emma"}]}
+    validator.asked.clear()
+    return spec, validator, arguments, service
+
+
+class Tenancy:
+    """A ``tenant`` seed counting its resolutions, and a spec whose check names it.
+
+    Every stage of ``spec()`` that names ``tenant`` records what it was handed,
+    so a test can tell one resolved value from two. ``pool_seeds`` is this
+    object's own registry: two ``Tenancy`` objects are two registries.
+    """
+
+    def __init__(self) -> None:
+        self.resolved: list[object] = []
+        self.seen: list[tuple[str, object]] = []
+        self.pool_seeds = DEFAULT_POOL_SEEDS.extend(tenant=self.tenant)
+
+    def tenant(self) -> object:
+        self.resolved.append(object())
+        return self.resolved[-1]
+
+    def check(self) -> PermissionCheck:
+        """Admits everyone, at the class level and on the row, recording the tenant each time."""
+        seen = self.seen
+
+        class _TenantCheck(PermissionCheck):
+            def has_permission(self, principal: Any, spec: Any, *, tenant: object) -> bool:
+                seen.append(("has_permission", tenant))
+                return True
+
+            def has_object_permission(
+                self, principal: Any, spec: Any, target: Any, *, tenant: object
+            ) -> bool:
+                seen.append(("has_object_permission", tenant))
+                return True
+
+        return _TenantCheck()
+
+    def spec(self, **extra: Any) -> ServiceSpec:
+        """A service acting on the note named by ``pk``, each stage naming ``tenant``."""
+        seen = self.seen
+
+        def instance(*, pk: int, tenant: object) -> QuerySet[Note]:
+            seen.append(("instance_selector", tenant))
+            return Note.objects.filter(pk=pk)
+
+        def service(*, instance: Note, tenant: object) -> Note:
+            seen.append(("service", tenant))
+            return instance
+
+        return ServiceSpec(
+            service=extra.pop("service", service),
+            permissions=(self.check(),),
+            instance_selector_spec=SelectorSpec(
+                kind=SelectorKind.RETRIEVE, selector=instance, reads=PK
+            ),
+            **extra,
+        )
+
+    def one_value(self) -> bool:
+        """Whether the seed resolved once and every stage was handed that very object."""
+        return len(self.resolved) == 1 and all(value is self.resolved[0] for _, value in self.seen)
