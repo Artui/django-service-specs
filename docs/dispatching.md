@@ -24,7 +24,10 @@ the async entry point:
    nesting, with no query. An argument no parameter declares is refused. A
    [`partial`](declaring.md#partial-updates) write's absent Validator
    parameters are not refused, nor one its `input_data` provider is annotated
-   to fill.
+   to fill. A read a provider requires itself, by name with no default, is
+   not relaxed: only the caller can send it, and a call leaving it out is
+   refused here, before any provider runs
+   ([example](declaring.md#providers-and-preconditions)).
 2. **Class-level authorization**: every permission check's `has_permission`,
    or the [grant](#grants) a transport passed instead. A seed a check names
    is resolved just before it, and only such a seed
@@ -46,7 +49,11 @@ the async entry point:
    is asked of neither.
 5. **Validation**: a write's `input_data` provider, then its Validator on only
    the arguments it declares, with the provider's values merged over the
-   caller's, and the resolved target and `partial` in its context.
+   caller's, and the resolved target and `partial` in its context. A
+   dataclass Validator decodes each value of a `dict[str, X]` field there and
+   refuses one under its own key
+   ([example](declaring.md#the-dataclass-adapter)); the shape check sees only
+   an object.
 6. **Affordances, then preconditions**: a write's `affordances`, in
    declaration order - the first one not met refuses the call with
    `ActionUnavailable`, carrying its `code` - then its `preconditions`, the
@@ -808,7 +815,8 @@ keywords it cannot see either. A read a provider requires by name is not
 refused even where that provider may fill it, as in `kwargs=lambda *, pk: {...}`
 over a required `pk`: a provider is handed the caller's reads and the seeds,
 never another provider's answer, so dispatch demands such a read of the caller
-and refuses a call leaving it out before any provider runs. The array check alone is not run on a precondition, a
+and refuses a call leaving it out before any provider runs, as
+[the example](declaring.md#providers-and-preconditions) runs. The array check alone is not run on a precondition, a
 condition, the output selector, an `extend_queryset`, a provider or a
 `progress_reporter`. A
 callable taking `**kwargs` requires nothing, so one forwarding into a stricter

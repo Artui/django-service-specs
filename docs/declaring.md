@@ -458,6 +458,16 @@ built or, for a Validator field, when `parameters()` is assembled. So is
 one annotated to fill a `many` spec's list, the `many_argument`, or to
 possibly fill it: no provider reaches it, and a Validator field of the same
 name does not exempt the key.
+
+A call leaving out a read its own provider requires, though that provider may
+fill it, is refused with `InvalidArguments` before the provider runs:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:required_read
+--8<--
+```
+
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]
@@ -742,7 +752,16 @@ docs/examples/declaring.py:validator
 | `X \| UnsetType` | The argument may be left out, and the field then holds `UNSET`. |
 
 A field with a default or a `default_factory` is optional; one with neither is
-required. An annotation outside the table is refused, naming the field.
+required. An annotation outside the table is refused, naming the field. A
+`dict[str, X]` field is declared and refused as the table says, and only a
+`dict`: a `Mapping[str, X]` or a `tuple[str, X]` is outside the table, though
+its first argument is `str`:
+
+```python
+--8<--
+docs/examples/declaring_writes.py:dict_input
+--8<--
+```
 
 What `DataclassValidator(AuthorIn)` declares, then: `name`, a required string,
 and `books`, an optional array whose rows take a required `title`, a required

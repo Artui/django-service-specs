@@ -69,7 +69,8 @@ def dispatch(
        provider fills or may fill - a read the ``kwargs`` of the spec
        declaring it reaches, a Validator field ``input_data`` reaches, where
        the provider is annotated to fill the key, may decline it, or names
-       no keys at all. Such a parameter is still required of the call: once
+       no keys at all, less a read a provider requires itself, which stays
+       demanded of the caller. A parameter so relaxed is still required of the call: once
        the provider has answered, a read declared required that nobody
        filled is refused where the answer is merged, in the shape check's
        words (step three for a selector's read, before the affordances for a
