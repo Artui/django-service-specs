@@ -16,16 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `parameters(self, *, call_context=None)` that declares a bound key, an asked key
   or a field named like a registered seed only to a call is now checked against
   that declaration: the bound value binds, the question can be asked, and the
-  field stays the caller's. Each defaults to `None`, which reads the declaration
+  field stays the caller's. A bound value is checked against the call's own
+  declaration, so a value the declaration made to no call accepts and the
+  call's refuses is refused. Each defaults to `None`, which reads the declaration
   made to no call, as before. A transport calling them per request should hand
   them the call's dict.
 
 ### Changed
-- **The readers that check or describe a spec where a transport is built say
-  they are describe-time**: `check_server_arguments`, `check_seeds`,
-  `seed_named_parameters`, `unreceived_fields`, `provider_reached`,
-  `spec_input_schema` and `spec_caller_input_schema` read the declaration a
-  spec makes to no call, and take no `call_context`. So `check_server_arguments`
+- **The readers that check or describe a spec say they are describe-time**:
+  `check_server_arguments`, `check_seeds`, `seed_named_parameters`,
+  `unreceived_fields`, `provider_reached`, `spec_input_schema` and
+  `spec_caller_input_schema` read the declaration a spec makes to no call,
+  wherever they are called, and take no `call_context`. A transport may still
+  call one during a call, as when it checks a binding again against the seeds
+  that call adds; it reads the same declaration there. So `check_server_arguments`
   refuses a name a Validator declares only to a call; declare the field to no
   call too. No behaviour changes.
 

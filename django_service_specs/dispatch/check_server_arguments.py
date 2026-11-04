@@ -112,12 +112,14 @@ def check_server_arguments(
        fails here rather than on every call. Held by
        test_a_bound_value_its_parameter_refuses_fails_at_construction.
 
-    **Describe-time**: run with no call under way, it reads the spec as it
-    declares itself to no call, handing a Validator that declares
-    ``call_context`` ``None``
+    **Describe-time**: wherever it is called - where a transport is built,
+    or where one checks a binding again against the seeds a single call
+    adds - it reads the spec as it declares itself to no call, handing a
+    Validator that declares ``call_context`` ``None``
     (test_describe_time_readers_hand_none). So a name such a Validator
-    declares only to a call is refused here by rule 1, before any call could
-    bind it: declare the field to no call too, and each call's
+    declares only to a call is refused here by rule 1
+    (test_a_name_a_validator_declares_only_to_a_call_is_undeclared): declare
+    the field to no call too, and each call's
     [`apply_server_arguments`][django_service_specs.dispatch.apply_server_arguments.apply_server_arguments],
     handed that call's dict, checks the value against what the call declares.
 

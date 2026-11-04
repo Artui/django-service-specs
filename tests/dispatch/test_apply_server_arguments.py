@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from types import MappingProxyType
 from typing import Any
 
@@ -18,6 +19,8 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unknown_arguments import UnknownArguments
+from django_service_specs.validation.validation_context import ValidationContext
+from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import A_CALL, OPEN, DeclaredToACall, Record, make_user
 from tests.dispatch_app.models import Note
 
@@ -274,3 +277,25 @@ class TestAKeyDeclaredOnlyToACall:
         # describe-time reader, and a transport that hands no context, refuse it.
         with pytest.raises(ImproperlyConfigured, match="project_pk"):
             apply_server_arguments(self.spec(), {"title": "t"}, ServerArguments({"project_pk": 7}))
+
+
+class TypedByTheCall(Validator):
+    """Declares ``project_pk`` a string to no call, and an integer to a marked one."""
+
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        marked = call_context is not None and call_context.get("marked")
+        return Parameters.of(Parameter("project_pk", "integer" if marked else "string"))
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+def test_a_bound_value_is_checked_against_the_call_s_own_declaration() -> None:
+    # The case a transport can reach: ``check_server_arguments`` reads the
+    # declaration made to no call, which names the key and takes the value, and
+    # the call's own declares it otherwise, so the call refuses what the build passed.
+    spec = ServiceSpec(service=Record(), permissions=OPEN, validator=TypedByTheCall())
+    server = ServerArguments({"project_pk": "x"})
+    assert apply_server_arguments(spec, {}, server) == {"project_pk": "x"}
+    with pytest.raises(ImproperlyConfigured, match="binds a value its parameter refuses"):
+        apply_server_arguments(spec, {}, server, call_context=A_CALL)

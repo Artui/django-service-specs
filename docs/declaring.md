@@ -659,10 +659,11 @@ methods, and two more methods, an attribute and a property with defaults:
   [`check_requested_input`][django_service_specs.dispatch.check_requested_input.check_requested_input]
   and
   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
-  Those that check or describe a spec where a transport is built -
-  `check_server_arguments`, `check_seeds`, `seed_named_parameters`,
-  `unreceived_fields`, `provider_reached` and the two input schemas - are
-  describe-time, and read the declaration it makes to no call.
+  Those that check or describe a spec - `check_server_arguments`,
+  `check_seeds`, `seed_named_parameters`, `unreceived_fields`,
+  `provider_reached` and the two input schemas - are describe-time, and read
+  the declaration it makes to no call wherever they are called, a
+  transport's check of a binding against one call's seeds included.
   `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept `call_context`, which
