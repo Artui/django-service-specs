@@ -915,7 +915,7 @@ docs/examples/dispatching.py:server_arguments
    values over the rest, as the shape check hands them on: a UUID in its
    canonical spelling. Every other key is left for the shape check, so
    `REJECT` still refuses a name nobody declared. Hand it the
-   `call_context=` the call is dispatched with, and the bound values are
+   `call_context=` the call is dispatched with, as the snippet does, and the bound values are
    checked against what the spec declares to that call, as a Validator that
    [opted into the call](declaring.md#the-validator) describes itself there.
    Step 1 has no call to read, so a name such a Validator declares only to a

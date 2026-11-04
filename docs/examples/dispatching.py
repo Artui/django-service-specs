@@ -351,8 +351,9 @@ def notes_tool(user: Any) -> Callable[[Mapping[str, Any]], DispatchResult]:
     check_server_arguments(notes_by_spec, server)
 
     def call(arguments: Mapping[str, Any]) -> DispatchResult:
-        applied = apply_server_arguments(notes_by_spec, arguments, server)
-        return dispatch(notes_by_spec, principal=user, arguments=applied)
+        context: dict[str, Any] = {}  # this call's, handed to the binding and to dispatch alike
+        applied = apply_server_arguments(notes_by_spec, arguments, server, call_context=context)
+        return dispatch(notes_by_spec, principal=user, arguments=applied, call_context=context)
 
     return call
 
