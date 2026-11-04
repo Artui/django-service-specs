@@ -649,6 +649,21 @@ class TestDispatching:
             tool({"rogue": 1})
         assert refused.value.detail == {"rogue": ["Unknown argument."]}
 
+    def test_the_tool_hands_binding_and_dispatch_the_one_dict_of_the_call(
+        self, ada: Any, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        contexts: dict[str, Any] = {}
+        for name in ("apply_server_arguments", "dispatch"):
+            real = getattr(dispatching, name)
+
+            def record(*args: Any, _name: str = name, _real: Any = real, **kwargs: Any) -> Any:
+                contexts[_name] = kwargs["call_context"]
+                return _real(*args, **kwargs)
+
+            monkeypatch.setattr(dispatching, name, record)
+        dispatching.notes_tool(ada)({"search": "be"})
+        assert contexts["apply_server_arguments"] is contexts["dispatch"]
+
     def test_the_caller_is_offered_only_what_the_server_does_not_answer(self, ada: Any) -> None:
         server = ServerArguments(values={"author_pk": ada.pk}, withheld=frozenset({"ordering"}))
         schema = spec_input_schema(dispatching.notes_by_spec)
