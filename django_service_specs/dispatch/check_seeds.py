@@ -251,6 +251,11 @@ def check_seeds(
     does it read a ``filter_set``, a form's ``form_kwargs`` or a seed's
     resolver: dispatch binds each by keyword, and this is not asked of any.
 
+    **Describe-time**: run where a transport registers the spec, it reads
+    the spec as it declares itself to no call, handing a Validator that
+    declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none).
+
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
 

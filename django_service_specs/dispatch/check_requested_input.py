@@ -40,6 +40,7 @@ def check_requested_input(
     schema: Mapping[str, Any] | None,
     *,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> None:
     """Refuse an ``AdditionalInputRequired.schema`` some route could not ask, or could not hear answered.
 
@@ -89,6 +90,15 @@ def check_requested_input(
       is compared and nothing finer: a ``format``, ``choices`` or a bound the
       parameter declares still checks the answer when it arrives.
 
+    ``call_context`` is the dict of the call whose service raised: the spec's
+    parameters and the keys the server owns are read as the spec declares
+    itself to that call, so a Validator declaring an asked key only to a call
+    can ask for it
+    (test_handed_the_call_s_context_the_key_is_answerable, and
+    test_the_server_owned_keys_are_read_with_the_call_s_context_too for the
+    keys owned). Left ``None``, both are read as the spec declares itself to
+    no call.
+
     A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
     read as the spec it compiles to.
 
@@ -104,8 +114,8 @@ def check_requested_input(
             f"AdditionalInputRequired.schema is a {type(schema).__name__}, not a mapping of "
             "argument names to schema fragments."
         )
-    parameters = spec.parameters()
-    owned = server_owned_keys(spec, pool_seeds=pool_seeds)
+    parameters = spec.parameters(call_context=call_context)
+    owned = server_owned_keys(spec, pool_seeds=pool_seeds, call_context=call_context)
     for name, fragment in schema.items():
         declared = parameters.get(name)
         if declared is None:

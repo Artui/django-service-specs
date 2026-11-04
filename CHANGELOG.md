@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.0] — 2026-11-04
+
+### Added
+- **`apply_server_arguments`, `check_requested_input` and `server_owned_keys` take
+  `call_context=`**, the dict the call is dispatched with, and read the spec as it
+  declares itself to that call. A Validator declaring
+  `parameters(self, *, call_context=None)` that declares a bound key, an asked key
+  or a field named like a registered seed only to a call is now checked against
+  that declaration: the bound value binds, the question can be asked, and the
+  field stays the caller's. A bound value is checked against the call's own
+  declaration, so a value the declaration made to no call accepts and the
+  call's refuses is refused. Each defaults to `None`, which reads the declaration
+  made to no call, as before. A transport calling them per request should hand
+  them the call's dict.
+
+### Changed
+- **The readers that check or describe a spec say they are describe-time**:
+  `check_server_arguments`, `check_seeds`, `seed_named_parameters`,
+  `unreceived_fields`, `provider_reached`, `spec_input_schema` and
+  `spec_caller_input_schema` read the declaration a spec makes to no call,
+  wherever they are called, and take no `call_context`. A transport may still
+  call one during a call, as when it checks a binding again against the seeds
+  that call adds; it reads the same declaration there. So `check_server_arguments`
+  refuses a name a Validator declares only to a call; declare the field to no
+  call too. No behaviour changes.
+
 ## [0.25.1] — 2026-11-03
 
 ### Changed
@@ -2456,7 +2482,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/Artui/django-service-specs/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/Artui/django-service-specs/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/Artui/django-service-specs/compare/v0.24.0...v0.25.0
 [0.24.0]: https://github.com/Artui/django-service-specs/compare/v0.23.0...v0.24.0

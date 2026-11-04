@@ -212,6 +212,9 @@ transport cannot render, and for a `type` the declared parameter does not
 take. A declared key the server fills - one a provider is annotated to fill,
 or a seed the call's `pool_seeds` registers - is refused too, because
 dispatch drops the caller's value for it and the answer would never arrive.
+Hand it the `call_context=` of the call whose service raised, and both are
+read as the spec declares itself to that call, so a Validator that declares
+the asked key only to a call can ask for it.
 The narrowest renderer is an MCP elicitation form: a `string`, `number`,
 `integer` or `boolean`, or an `array` whose `items` list enum values. On a
 `many` spec the top level is the list and the spec's `reads`, so a

@@ -12,6 +12,7 @@ from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UnsetType
+from tests.dispatch.utils import A_CALL, TENANT_SEEDS, DeclaredToACall
 from tests.specs.utils import PK, Bare, Foreign
 
 
@@ -104,3 +105,14 @@ def test_a_source_owns_what_the_spec_it_compiles_to_owns() -> None:
 
     assert server_owned_keys(Foreign(spec)) == server_owned_keys(spec)
     assert server_owned_keys(Foreign(spec)) > RESERVED_POOL_SEEDS
+
+
+def test_a_seed_named_field_declared_only_to_a_call_is_the_caller_s_in_that_call() -> None:
+    # Owned by the seed in the declaration made to no call, which has no such
+    # field, and the caller's in the call whose context the Validator declares it to.
+    spec = ServiceSpec(
+        service=print,
+        validator=DeclaredToACall(Parameter("tenant", "string")),
+    )
+    assert "tenant" in server_owned_keys(spec, pool_seeds=TENANT_SEEDS)
+    assert "tenant" not in server_owned_keys(spec, pool_seeds=TENANT_SEEDS, call_context=A_CALL)

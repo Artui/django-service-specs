@@ -17,6 +17,8 @@ def apply_server_arguments(
     spec: ServiceSpec | SelectorSpec | SpecSource,
     arguments: Mapping[str, Any],
     server: ServerArguments,
+    *,
+    call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """``arguments`` as dispatch should receive them under ``server``: a new dict, the input untouched.
 
@@ -60,6 +62,15 @@ def apply_server_arguments(
     Every refusal names the spec's kind and its callable, so a transport
     binding many tools can say which one is misconfigured.
 
+    ``call_context`` is the call's dict, the one the transport hands
+    ``dispatch``: the bound values are checked against what the spec declares
+    to that call, so a Validator declaring a bound key only to a call binds it
+    (test_handed_the_call_s_context_the_key_is_bound), and a value its
+    declaration to no call takes is refused where the call's does not
+    (test_a_bound_value_is_checked_against_the_call_s_own_declaration). Left ``None``, they are
+    checked against the declaration the spec makes to no call, as
+    ``check_server_arguments`` reads it.
+
     Raises:
         ImproperlyConfigured: a bound value that fails its declaration, or a
             bound name the spec does not declare.
@@ -68,5 +79,7 @@ def apply_server_arguments(
     applied = {key: value for key, value in arguments.items() if key not in names}
     if server.values:
         spec = kernel_spec(spec)
-        applied.update(checked_server_values(spec, spec.parameters(), server.values))
+        applied.update(
+            checked_server_values(spec, spec.parameters(call_context=call_context), server.values)
+        )
     return applied

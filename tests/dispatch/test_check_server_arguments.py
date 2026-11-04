@@ -21,7 +21,7 @@ from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unset import UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
-from tests.dispatch.utils import OPEN, TENANT_SEEDS
+from tests.dispatch.utils import OPEN, TENANT_SEEDS, DeclaredToACall, Record
 from tests.dispatch_app.models import Note
 
 pytestmark = pytest.mark.django_db
@@ -444,3 +444,15 @@ def test_each_refusal_names_the_callable_whose_spec_it_is(check: Check) -> None:
         service=write, validator=Declaring(Parameter("title", "string")), permissions=OPEN
     )
     assert "ServiceSpec for write" in refusal(check, spec, ServerArguments(values={"title": 1}))
+
+
+def test_a_name_a_validator_declares_only_to_a_call_is_undeclared() -> None:
+    # Read as the spec declares itself to no call, wherever it is called, so
+    # rule 1 refuses a binding of a field the Validator declares only to one.
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        validator=DeclaredToACall(Parameter("project_pk", "integer", required=True)),
+    )
+    with pytest.raises(ImproperlyConfigured, match="project_pk, which the spec does not declare"):
+        check_server_arguments(spec, ServerArguments({"project_pk": 7}))

@@ -45,6 +45,12 @@ def unreceived_fields(
     every keyword the same way. Nothing runs: no seed resolves and no
     provider is called.
 
+    **Describe-time**: for a transport registering the spec, it reads the
+    Validator's fields as it declares them to no call, handing one that
+    declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none), so a field declared only to a
+    call is not answered.
+
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to; a selector spec, and a service spec with no Validator,
     have no fields, and are answered with none.

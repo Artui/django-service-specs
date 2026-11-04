@@ -17,6 +17,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
+from tests.dispatch.utils import A_CALL, TENANT_SEEDS, DeclaredToACall
 from tests.specs.utils import Foreign
 
 pytestmark = pytest.mark.django_db
@@ -198,6 +199,34 @@ class TestServerOwned:
             with pytest.raises(ImproperlyConfigured) as raised:
                 check_requested_input(spec, schema, pool_seeds=seeds)
         assert SERVER_OWNED in str(raised.value)
+
+
+class TestAKeyDeclaredOnlyToACall:
+    """A Validator declaring an asked key only to a call is read as it declares itself to that call."""
+
+    def test_handed_the_call_s_context_the_key_is_answerable(self) -> None:
+        spec = declaring_to_a_call(Parameter("confirm", "boolean"))
+        check_requested_input(spec, {"confirm": {"type": "boolean"}}, call_context=A_CALL)
+
+    def test_handed_none_the_key_is_refused_as_undeclared(self, check: Check) -> None:
+        spec = declaring_to_a_call(Parameter("confirm", "boolean"))
+        message = refusal(check, spec, {"confirm": {"type": "boolean"}})
+        assert "'confirm'" in message
+        assert UNDECLARED in message
+
+    def test_the_server_owned_keys_are_read_with_the_call_s_context_too(self) -> None:
+        # A field named like a registered seed is the caller's when the
+        # Validator declares it, and to no call it does not: read without the
+        # call's context, the seed would own the key, and an asked field the
+        # parameters declare would be refused as the server's.
+        spec = declaring_to_a_call(Parameter("tenant", "string"))
+        schema = {"tenant": {"type": "string"}}
+        check_requested_input(spec, schema, pool_seeds=TENANT_SEEDS, call_context=A_CALL)
+
+
+def declaring_to_a_call(extra: Parameter) -> ServiceSpec:
+    """A service spec whose Validator declares ``extra`` only to a marked call."""
+    return ServiceSpec(service=service, validator=DeclaredToACall(extra))
 
 
 class TestNotASchema:

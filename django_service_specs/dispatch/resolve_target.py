@@ -141,6 +141,8 @@ def resolve_target(
             "rows are the call's arguments, and there is no target to find ahead of it."
         )
     target_spec = spec.target_selector_spec()
+    # A selector spec has no Validator, and its ``parameters`` ignores
+    # ``call_context``, so the target's are the same to every call.
     parameters = target_spec.parameters() if target_spec is not None else Parameters()
     names = parameters.names()
     # Arguments that are no mapping go to the shape check whole, which refuses
