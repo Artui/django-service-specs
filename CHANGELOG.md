@@ -13,8 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation and tests only; no behaviour changes.** The Dispatching page's
   server-arguments example now hands `apply_server_arguments` the `call_context=`
   the call is dispatched with, the one dict both receive, as step 2 says a
-  transport should; a test holds that the two are handed one object. This is also
-  the release that puts 0.26.0's docs on the site.
+  transport should; a test holds that the two are handed one object.
 
 ## [0.26.0] — 2026-11-04
 

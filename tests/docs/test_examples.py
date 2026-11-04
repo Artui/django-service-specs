@@ -662,6 +662,8 @@ class TestDispatching:
 
             monkeypatch.setattr(dispatching, name, record)
         dispatching.notes_tool(ada)({"search": "be"})
+        # A dict, not two Nones: each helper would mint its own for a call handed none.
+        assert isinstance(contexts["dispatch"], dict)
         assert contexts["apply_server_arguments"] is contexts["dispatch"]
 
     def test_the_caller_is_offered_only_what_the_server_does_not_answer(self, ada: Any) -> None:
