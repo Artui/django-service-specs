@@ -2465,7 +2465,12 @@ provider. The binding is a value, and a transport puts it to work at three point
    refuse the call, <code>"null"</code> for an integer included. It then lays the bound
    values over the rest, as the shape check hands them on: a UUID in its
    canonical spelling. Every other key is left for the shape check, so
-   <code>REJECT</code> still refuses a name nobody declared.</li>
+   <code>REJECT</code> still refuses a name nobody declared. Hand it the
+   <code>call_context=</code> the call is dispatched with, and the bound values are
+   checked against what the spec declares to that call, as a Validator that
+   <a href="../declaring/#the-validator">opted into the call</a> describes itself there.
+   Step 1 has no call to read, so a name such a Validator declares only to a
+   call is refused there: declare it to no call too.</li>
 <li><strong>In the input schema the transport advertises</strong>, the binding is passed
    to
    <a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>

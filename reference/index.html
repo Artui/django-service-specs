@@ -10592,7 +10592,10 @@ spec - and the declaration must hold there too. Opted in or not, it
 never queries. A Validator declaring no keyword is asked as before,
 as is one whose <code>parameters</code> takes only <code>**kwargs</code> or is a
 <code>functools.wraps</code> wrapper that does not name the keyword itself:
-the method's own signature decides.</p>
+the method's own signature decides. The helpers a transport calls
+during a call - <code>apply_server_arguments</code>,
+<code>check_requested_input</code>, <code>server_owned_keys</code> - take the call's
+dict as <code>call_context=</code> and ask with it.</p>
 
 
     </div>
@@ -12183,7 +12186,10 @@ advertises, less what the server fills and with nothing a provider may
 fill required, at the top and in each row of a <code>many</code> spec, is
 <a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>.</p>
 <p>Read on every call, as <code>parameters()</code> is, so a Validator reading a
-model-backed declaration is asked only once the app registry is ready.</p>
+model-backed declaration is asked only once the app registry is ready.
+<strong>Describe-time</strong>: a schema describes the spec outside any call, so a
+Validator that declares <code>call_context</code> is handed <code>None</code>
+(test_describe_time_readers_hand_none).</p>
 
 
     </div>
@@ -12282,7 +12288,11 @@ fills (test_spec_input_schema_still_lists_what_the_server_fills). A
 described as the spec it compiles to
 (test_a_spec_source_is_described_as_the_spec_it_compiles_to). Read on
 every call, as <code>parameters()</code> is
-(test_the_declaration_is_read_on_every_call).</p>
+(test_the_declaration_is_read_on_every_call). <strong>Describe-time</strong>, as
+<code>spec_input_schema</code> is: a Validator that declares <code>call_context</code> is
+handed <code>None</code>, and <code>server_owned_keys</code> and <code>provider_reached</code> are
+read with no call's context
+(test_describe_time_readers_hand_none).</p>
 
 
     </div>
@@ -15353,7 +15363,8 @@ different rows come back as one tree keyed by row index.</p>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">schema</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -15404,6 +15415,14 @@ query and returns nothing. Each key is refused, by name, with
   is compared and nothing finer: a <code>format</code>, <code>choices</code> or a bound the
   parameter declares still checks the answer when it arrives.</li>
 </ul>
+<p><code>call_context</code> is the dict of the call whose service raised: the spec's
+parameters and the keys the server owns are read as the spec declares
+itself to that call, so a Validator declaring an asked key only to a call
+can ask for it
+(test_handed_the_call_s_context_the_key_is_answerable, and
+test_the_server_owned_keys_are_read_with_the_call_s_context_too for the
+keys owned). Left <code>None</code>, both are read as the spec declares itself to
+no call.</p>
 <p>A <a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a> is
 read as the spec it compiles to.</p>
 
@@ -15848,6 +15867,10 @@ pool a transport builds itself to answer a condition at describe time
 (<code>unmet_operation_affordance</code>): this reads the pool dispatch builds. Nor
 does it read a <code>filter_set</code>, a form's <code>form_kwargs</code> or a seed's
 resolver: dispatch binds each by keyword, and this is not asked of any.</p>
+<p><strong>Describe-time</strong>: run where a transport registers the spec, it reads
+the spec as it declares itself to no call, handing a Validator that
+declares <code>call_context</code> <code>None</code>
+(test_describe_time_readers_hand_none).</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the spec
 it compiles to.</p>
 
@@ -15921,6 +15944,12 @@ hands every callable from the call's context. Of those names:</p>
 (test_it_is_the_answer_dispatch_gives), so the two cannot drift.
 <a class="autorefs autorefs-internal" title="check_seeds" href="#django_service_specs.dispatch.check_seeds.check_seeds"><code>check_seeds</code></a>
 refuses the second set, beside the other declarations no call can run.</p>
+<p><strong>Describe-time</strong>: it reads the spec as it declares itself to no call,
+handing a Validator that declares <code>call_context</code> <code>None</code>
+(test_describe_time_readers_hand_none). Dispatch answers each call over
+the parameters it assembles for that call, so a Validator field declared
+only to a call is answered there and not here; since such a field is in
+neither set, the two answers agree.</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the spec
 it compiles to.</p>
 
@@ -15972,6 +16001,11 @@ a service spec may have none
 spec's row fields are no top-level parameter, though one may share a
 read's name
 (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).</p>
+<p><strong>Describe-time</strong>: for a schema or a check made where a transport is
+built, it reads the Validator's fields as it declares them to no call,
+handing one that declares <code>call_context</code> <code>None</code>
+(test_describe_time_readers_hand_none). The shape check relaxes each call
+by the parameters that call declares.</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the spec
 it compiles to.</p>
 
@@ -16021,6 +16055,11 @@ fields
 A <code>kwargs</code> provider whose return says nothing about its keys explains
 every keyword the same way. Nothing runs: no seed resolves and no
 provider is called.</p>
+<p><strong>Describe-time</strong>: for a transport registering the spec, it reads the
+Validator's fields as it declares them to no call, handing one that
+declares <code>call_context</code> <code>None</code>
+(test_describe_time_readers_hand_none), so a field declared only to a
+call is not answered.</p>
 <p><code>spec</code> may be a declaration with <code>as_kernel_spec()</code>, read as the spec
 it compiles to; a selector spec, and a service spec with no Validator,
 have no fields, and are answered with none.</p>
@@ -16134,6 +16173,16 @@ every name it found, in order:</p>
    <code>date</code>, a <code>Decimal</code> - for a parameter that takes the wire's string
    fails here rather than on every call. Held by
    test_a_bound_value_its_parameter_refuses_fails_at_construction.</p>
+<p><strong>Describe-time</strong>: wherever it is called - where a transport is built,
+or where one checks a binding again against the seeds a single call
+adds - it reads the spec as it declares itself to no call, handing a
+Validator that declares <code>call_context</code> <code>None</code>
+(test_describe_time_readers_hand_none). So a name such a Validator
+declares only to a call is refused here by rule 1
+(test_a_name_a_validator_declares_only_to_a_call_is_undeclared): declare
+the field to no call too, and each call's
+<a class="autorefs autorefs-internal" title="apply_server_arguments" href="#django_service_specs.dispatch.apply_server_arguments.apply_server_arguments"><code>apply_server_arguments</code></a>,
+handed that call's dict, checks the value against what the call declares.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -16175,7 +16224,9 @@ every name it found, in order:</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">arguments</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">server</span><span class="p">:</span> <span class="n">ServerArguments</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -16223,6 +16274,14 @@ declare, which
 refuses when the transport is built, is refused here the same way.</p>
 <p>Every refusal names the spec's kind and its callable, so a transport
 binding many tools can say which one is misconfigured.</p>
+<p><code>call_context</code> is the call's dict, the one the transport hands
+<code>dispatch</code>: the bound values are checked against what the spec declares
+to that call, so a Validator declaring a bound key only to a call binds it
+(test_handed_the_call_s_context_the_key_is_bound), and a value its
+declaration to no call takes is refused where the call's does not
+(test_a_bound_value_is_checked_against_the_call_s_own_declaration). Left <code>None</code>, they are
+checked against the declaration the spec makes to no call, as
+<code>check_server_arguments</code> reads it.</p>
 
 
 <p><span class="doc-section-title">Raises:</span></p>
@@ -19779,7 +19838,8 @@ was meant to decide, such as a tenant.</p>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
 </span></code></pre></div>
 
     <div class="doc doc-contents first">
@@ -19837,7 +19897,13 @@ them off <a class="autorefs autorefs-internal" title="provider_reached" href="#d
 which leaves such a read out, or
 <a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>,
 which keeps it in <code>required</code>.</p>
-<p><strong>Static per spec.</strong> A transport that also answers some declared
+<p><strong>Static per spec, but for the Validator's fields.</strong> Those are read as
+the Validator declares them to <code>call_context</code>: a transport subtracting
+this set during a call hands the call's dict, so a seed-named field the
+Validator declares only to that call is still asked for
+(test_a_seed_named_field_declared_only_to_a_call_is_the_caller_s_in_that_call),
+and a reader describing the spec outside any call leaves it <code>None</code>. A
+transport that also answers some declared
 parameters itself, per mount or per toolset, describes them with a
 <a class="autorefs autorefs-internal" title="ServerArguments
 
