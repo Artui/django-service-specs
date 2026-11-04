@@ -43,6 +43,12 @@ def provider_reached(spec: ServiceSpec | SelectorSpec | SpecSource) -> frozenset
     read's name
     (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).
 
+    **Describe-time**: for a schema or a check made where a transport is
+    built, it reads the Validator's fields as it declares them to no call,
+    handing one that declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none). The shape check relaxes each call
+    by the parameters that call declares.
+
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
     """

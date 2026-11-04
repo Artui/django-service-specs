@@ -49,6 +49,9 @@ def spec_input_schema(
 
     Read on every call, as ``parameters()`` is, so a Validator reading a
     model-backed declaration is asked only once the app registry is ready.
+    **Describe-time**: a schema describes the spec outside any call, so a
+    Validator that declares ``call_context`` is handed ``None``
+    (test_describe_time_readers_hand_none).
     """
     # Relaxed by the shape check's own reading of ``partial``, so the schema
     # requires exactly what dispatch refuses absent, less what a provider fills

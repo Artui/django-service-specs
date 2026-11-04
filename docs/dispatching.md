@@ -914,7 +914,12 @@ docs/examples/dispatching.py:server_arguments
    refuse the call, `"null"` for an integer included. It then lays the bound
    values over the rest, as the shape check hands them on: a UUID in its
    canonical spelling. Every other key is left for the shape check, so
-   `REJECT` still refuses a name nobody declared.
+   `REJECT` still refuses a name nobody declared. Hand it the
+   `call_context=` the call is dispatched with, and the bound values are
+   checked against what the spec declares to that call, as a Validator that
+   [opted into the call](declaring.md#the-validator) describes itself there.
+   Step 1 has no call to read, so a name such a Validator declares only to a
+   call is refused there: declare it to no call too.
 3. **In the input schema the transport advertises**, the binding is passed
    to
    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]

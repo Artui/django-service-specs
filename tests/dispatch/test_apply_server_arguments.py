@@ -14,10 +14,11 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unknown_arguments import UnknownArguments
-from tests.dispatch.utils import OPEN, make_user
+from tests.dispatch.utils import A_CALL, OPEN, DeclaredToACall, Record, make_user
 from tests.dispatch_app.models import Note
 
 pytestmark = pytest.mark.django_db
@@ -253,3 +254,23 @@ async def test_adispatch_answers_as_dispatch_does(ada: Any) -> None:
     assert async_seen.selector == sync_seen.selector
     assert async_seen.permission == sync_seen.permission
     assert async_seen.selector == [{"project_pk": 7, "draw_request_pk": ABSENT, "status": "closed"}]
+
+
+class TestAKeyDeclaredOnlyToACall:
+    """A Validator declaring a bound key only to a call is checked against what it declares to that call."""
+
+    def spec(self) -> ServiceSpec:
+        extra = Parameter("project_pk", "integer", required=True)
+        return ServiceSpec(service=Record(), permissions=OPEN, validator=DeclaredToACall(extra))
+
+    def test_handed_the_call_s_context_the_key_is_bound(self) -> None:
+        applied = apply_server_arguments(
+            self.spec(), {"title": "t"}, ServerArguments({"project_pk": 7}), call_context=A_CALL
+        )
+        assert applied == {"title": "t", "project_pk": 7}
+
+    def test_handed_none_the_key_is_refused_as_undeclared(self) -> None:
+        # The declaration the Validator makes to no call has no such key, so a
+        # describe-time reader, and a transport that hands no context, refuse it.
+        with pytest.raises(ImproperlyConfigured, match="project_pk"):
+            apply_server_arguments(self.spec(), {"title": "t"}, ServerArguments({"project_pk": 7}))

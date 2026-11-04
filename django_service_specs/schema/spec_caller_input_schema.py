@@ -102,7 +102,11 @@ def spec_caller_input_schema(
     described as the spec it compiles to
     (test_a_spec_source_is_described_as_the_spec_it_compiles_to). Read on
     every call, as ``parameters()`` is
-    (test_the_declaration_is_read_on_every_call).
+    (test_the_declaration_is_read_on_every_call). **Describe-time**, as
+    ``spec_input_schema`` is: a Validator that declares ``call_context`` is
+    handed ``None``, and ``server_owned_keys`` and ``provider_reached`` are
+    read with no call's context
+    (test_describe_time_readers_hand_none).
     """
     spec = kernel_spec(spec)
     schema = spec_input_schema(spec, unknown_arguments=unknown_arguments)

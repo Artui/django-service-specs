@@ -154,7 +154,9 @@ SURFACE: dict[str, Pin] = {
         "dispatch.check_call",
         "spec, *, principal, arguments, grant=, pool_seeds=, unknown_arguments=, call_context=",
     ),
-    "check_requested_input": _fn("dispatch.check_requested_input", "spec, schema, *, pool_seeds="),
+    "check_requested_input": _fn(
+        "dispatch.check_requested_input", "spec, schema, *, pool_seeds=, call_context="
+    ),
     "bind_arguments": _fn(
         "dispatch.bind_arguments",
         "spec, arguments, *, principal, target=, unknown_arguments=, call_context=, pool_seeds=",
@@ -475,7 +477,7 @@ SURFACE: dict[str, Pin] = {
     ),
     "SpecSource": Pin("specs.spec_source", methods={"as_kernel_spec": "()"}),
     "kernel_spec": _fn("specs.kernel_spec", "spec"),
-    "server_owned_keys": _fn("specs.server_owned_keys", "spec, *, pool_seeds="),
+    "server_owned_keys": _fn("specs.server_owned_keys", "spec, *, pool_seeds=, call_context="),
     # --- types --------------------------------------------------------------------------------
     "DispatchError": _error("types.dispatch_error", "message=", Exception),
     "Affordance": Pin("types.affordance", signature="code, reason, when"),

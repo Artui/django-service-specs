@@ -129,7 +129,10 @@ class Validator(abc.ABC):
         never queries. A Validator declaring no keyword is asked as before,
         as is one whose ``parameters`` takes only ``**kwargs`` or is a
         ``functools.wraps`` wrapper that does not name the keyword itself:
-        the method's own signature decides.
+        the method's own signature decides. The helpers a transport calls
+        during a call - ``apply_server_arguments``,
+        ``check_requested_input``, ``server_owned_keys`` - take the call's
+        dict as ``call_context=`` and ask with it.
         """
 
     @abc.abstractmethod

@@ -654,6 +654,15 @@ methods, and two more methods, an attribute and a property with defaults:
   during a call asks it as dispatch does, through
   [`validator_parameters`][django_service_specs.validation.validator_parameters.validator_parameters]
   with the call's dict, so a Validator that opted in is handed it there too.
+  The helpers a transport calls during a call take the same `call_context=`:
+  [`apply_server_arguments`][django_service_specs.dispatch.apply_server_arguments.apply_server_arguments],
+  [`check_requested_input`][django_service_specs.dispatch.check_requested_input.check_requested_input]
+  and
+  [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
+  Those that check or describe a spec where a transport is built -
+  `check_server_arguments`, `check_seeds`, `seed_named_parameters`,
+  `unreceived_fields`, `provider_reached` and the two input schemas - are
+  describe-time, and read the declaration it makes to no call.
   `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept `call_context`, which

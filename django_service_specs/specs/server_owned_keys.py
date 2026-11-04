@@ -12,10 +12,14 @@ from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 
 def server_owned_keys(
-    spec: ServiceSpec | SelectorSpec | SpecSource, *, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
+    spec: ServiceSpec | SelectorSpec | SpecSource,
+    *,
+    pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
+    call_context: dict[str, Any] | None = None,
 ) -> frozenset[str]:
     """Every name ``spec``'s dispatch fills from the server, whatever the caller sends.
 
@@ -73,7 +77,13 @@ def server_owned_keys(
     [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema],
     which keeps it in ``required``.
 
-    **Static per spec.** A transport that also answers some declared
+    **Static per spec, but for the Validator's fields.** Those are read as
+    the Validator declares them to ``call_context``: a transport subtracting
+    this set during a call hands the call's dict, so a seed-named field the
+    Validator declares only to that call is still asked for
+    (test_a_seed_named_field_declared_only_to_a_call_is_the_caller_s_in_that_call),
+    and a reader describing the spec outside any call leaves it ``None``. A
+    transport that also answers some declared
     parameters itself, per mount or per toolset, describes them with a
     [`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
     and subtracts its ``names()`` beside this set: those are parameters the
@@ -94,7 +104,8 @@ def server_owned_keys(
     # One arc to coverage, each conjunct held by a case of
     # test_server_owned_keys_still_lists_a_seed_no_top_level_field_takes.
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        owned -= spec.validator.parameters().names() & pool_seeds.names
+        declared = validator_parameters(spec.validator, call_context=call_context)
+        owned -= declared.names() & pool_seeds.names
     providers: list[Callable[..., Any] | None] = [spec.kwargs]
     reads = [spec.reads]
     if isinstance(spec, ServiceSpec):

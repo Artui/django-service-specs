@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`apply_server_arguments`, `check_requested_input` and `server_owned_keys` take
+  `call_context=`**, the dict the call is dispatched with, and read the spec as it
+  declares itself to that call. A Validator declaring
+  `parameters(self, *, call_context=None)` that declares a bound key, an asked key
+  or a field named like a registered seed only to a call is now checked against
+  that declaration: the bound value binds, the question can be asked, and the
+  field stays the caller's. Each defaults to `None`, which reads the declaration
+  made to no call, as before. A transport calling them per request should hand
+  them the call's dict.
+
+### Changed
+- **The readers that check or describe a spec where a transport is built say
+  they are describe-time**: `check_server_arguments`, `check_seeds`,
+  `seed_named_parameters`, `unreceived_fields`, `provider_reached`,
+  `spec_input_schema` and `spec_caller_input_schema` read the declaration a
+  spec makes to no call, and take no `call_context`. So `check_server_arguments`
+  refuses a name a Validator declares only to a call; declare the field to no
+  call too. No behaviour changes.
+
 ## [0.25.1] — 2026-11-03
 
 ### Changed

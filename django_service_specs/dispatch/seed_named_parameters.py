@@ -39,6 +39,13 @@ def seed_named_parameters(
     [`check_seeds`][django_service_specs.dispatch.check_seeds.check_seeds]
     refuses the second set, beside the other declarations no call can run.
 
+    **Describe-time**: it reads the spec as it declares itself to no call,
+    handing a Validator that declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none). Dispatch answers each call over
+    the parameters it assembles for that call, so a Validator field declared
+    only to a call is answered there and not here; since such a field is in
+    neither set, the two answers agree.
+
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
     """

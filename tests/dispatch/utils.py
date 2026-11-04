@@ -431,6 +431,31 @@ class AskedWith(Validator):
         return dict(arguments)
 
 
+A_CALL: dict[str, Any] = {"marked": True}
+"""A call's context that ``DeclaredToACall`` declares its extra field to."""
+
+
+class DeclaredToACall(Validator):
+    """Declares ``title``, and ``extra`` only to a call whose ``call_context`` is marked.
+
+    Keyed on what the dict carries, not on its being there, so a test reading
+    the extra field proves the call's own dict reached the ask, and that a
+    reader handing none, or a dict of its own, describes the spec without it.
+    """
+
+    def __init__(self, extra: Parameter) -> None:
+        self.extra = extra
+
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        title = Parameter("title", "string")
+        if call_context is not None and call_context.get("marked"):
+            return Parameters.of(title, self.extra)
+        return Parameters.of(title)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
 EVERY_ASK = ("single", "many")
 """The two cases that between them run every ask of a Validator's ``parameters`` inside a call.
 

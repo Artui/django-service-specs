@@ -55,6 +55,9 @@ def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> P
         return Parameters.of(
             *(_below(param) if param.name == spec.many_argument else param for param in parameters)
         )
+    # The target's names are the same to every call: a selector spec has no
+    # Validator, and its ``parameters`` ignores ``call_context``. The caller's
+    # ``parameters`` carry the call's context where there is one.
     target = spec.target_selector_spec()
     kept = (
         spec.reads.names()
