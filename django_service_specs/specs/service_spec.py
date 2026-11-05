@@ -165,7 +165,9 @@ class ServiceSpec(AffordanceDeclarer):
             one set of arguments and hands back rows. The output half of
             ``many``, and it leaves the input alone: the call's arguments are
             declared as they would be without it. Dispatch presents a return
-            that is not ``None`` as a list, row by row, and
+            that is not ``None`` as a list, row by row (a return that is not
+            rows, such as a mapping, ``str``, ``bytes`` or a non-iterable, is
+            ``ImproperlyConfigured`` after the service has run), and
             [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
             describes an array of the item, never paged. A ``None`` return
             stays one value, presented as ``None``, as a ``many`` service's

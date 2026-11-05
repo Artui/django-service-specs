@@ -25,9 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A `many` or `returns_many` service returning one value, not rows, is refused
   where it returns.** With no output selector the service's own return is what
   is presented as a list, so a `dict`, a model row, a `str` or `bytes`, or
-  anything else that does not iterate used to reach `present` as one and fail
-  there on an unrelated error (the item presenter's `AttributeError`, or
-  iteration by key or character). Dispatch now raises `ImproperlyConfigured`
+  anything else that does not iterate used to come back as a `kind="list"`
+  result, which `present` then failed on with an unrelated error (the item
+  presenter's `AttributeError`, or iteration by key or character). Dispatch now raises `ImproperlyConfigured`
   naming the service and what it returned, and the fix: return the rows, or for
   `returns_many` drop it to present one value. It is the author's error, not a
   refusal, because the service has already run and its write stands. A `None`
