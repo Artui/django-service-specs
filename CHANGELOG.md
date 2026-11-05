@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`is_supplied` and `supplied_fields`**, readers of a partial input.
+  `is_supplied(value)` returns whether a value is anything but `UNSET`, `None`
+  included, as a `TypeIs`, so a type checker narrows `str | None | UnsetType` to
+  `str | None` where it holds; `value is not UNSET` narrows nothing, because
+  `UNSET` is a value. `supplied_fields(data)` returns the fields of a dataclass
+  instance (its `__init__` fields, as the mutation helpers read it) or of a
+  mapping whose value is not `UNSET`, in order, `None` kept. It is shallow: a
+  nested input, a list of rows or a model instance is returned as the caller's
+  own object. Anything else raises `TypeError`. The mutation helpers already
+  drop `UNSET`, so neither is needed to call them.
+
 ## [0.26.1] — 2026-11-04
 
 ### Changed
