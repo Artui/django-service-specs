@@ -1490,7 +1490,7 @@ checks and the Validator read the same value.</p>
 <tbody>
 <tr>
 <td><code>"list"</code></td>
-<td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> or <code>returns_many</code> write with no output selector whose service returned something</td>
+<td>A <code>LIST</code> read, a write whose output selector is a <code>LIST</code>, or a <code>many</code> or <code>returns_many</code> write with no output selector whose service returned something that is a set of rows (a mapping, <code>str</code>, <code>bytes</code> or non-iterable is <code>ImproperlyConfigured</code>, after the write)</td>
 <td>The rows, a queryset when the selector returned one, <code>[]</code> when a selector declaring <code>allow_none</code> returned <code>None</code></td>
 </tr>
 <tr>

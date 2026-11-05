@@ -3694,6 +3694,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.types.is_supplied.is_supplied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_supplied
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.supplied_fields.supplied_fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        supplied_fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.types.affordance.Affordance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7326,6 +7348,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.types.is_supplied.is_supplied" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        is_supplied
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.supplied_fields.supplied_fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        supplied_fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.types.affordance.Affordance" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -8315,7 +8359,9 @@ rows, each presented by the <code>presenter</code>, for a service that takes
 one set of arguments and hands back rows. The output half of
 <code>many</code>, and it leaves the input alone: the call's arguments are
 declared as they would be without it. Dispatch presents a return
-that is not <code>None</code> as a list, row by row, and
+that is not <code>None</code> as a list, row by row (a return that is not
+rows, such as a mapping, <code>str</code>, <code>bytes</code> or a non-iterable, is
+<code>ImproperlyConfigured</code> after the service has run), and
 <a class="autorefs autorefs-internal" title="spec_output_schema" href="#django_service_specs.schema.spec_output_schema.spec_output_schema"><code>spec_output_schema</code></a>
 describes an array of the item, never paged. A <code>None</code> return
 stays one value, presented as <code>None</code>, as a <code>many</code> service's
@@ -14013,7 +14059,8 @@ selector is handed an empty mapping, as under <code>resolve_target</code>; see
 <code>RESERVED_POOL_SEEDS</code>).</p>
 <p><code>kind</code> is <code>"list"</code> for a LIST selector spec, a service whose output
 selector is a LIST, or a <code>many</code> or <code>returns_many</code> service with no
-output selector that returned something, and <code>"instance"</code> otherwise. Nothing is presented here;
+output selector that returned something that is a set of rows, and
+<code>"instance"</code> otherwise. Nothing is presented here;
 <a class="autorefs autorefs-internal" title="present" href="#django_service_specs.dispatch.present.present"><code>present</code></a> does that, so a
 transport that hands the object to a template never pays for rendering it.</p>
 
@@ -14112,7 +14159,11 @@ value named after a validated one, any value bound for a row of a
 parameter, shaping declared on a
 selector that returned something other than a queryset, a
 condition on the row with no row to answer it for, or a
-precondition answering with a coroutine or an async generator.</p>
+precondition answering with a coroutine or an async generator,
+or a <code>many</code> or <code>returns_many</code> service with no output selector
+returning something other than rows (a mapping, <code>str</code>,
+<code>bytes</code> or a non-iterable), after the service has run, so its
+write stands.</p>
               </div>
             </td>
           </tr>
@@ -23888,6 +23939,80 @@ you compare against and <code>UnsetType</code> is only useful as a type annotati
 
 
   </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.types.is_supplied.is_supplied" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">is_supplied</span>
+
+
+<a href="#django_service_specs.types.is_supplied.is_supplied" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">is_supplied</span><span class="p">(</span><span class="n">value</span><span class="p">:</span> <span class="n">T</span> <span class="o">|</span> <span class="n">UnsetType</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">TypeIs</span><span class="p">[</span><span class="n">T</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return True if <code>value</code> is anything but <code>UNSET</code>, <code>None</code> included.</p>
+<p>A type checker narrows <code>value</code> to <code>T</code> where this returns True: a
+<code>str | None | UnsetType</code> becomes <code>str | None</code>, an attribute read
+(<code>patch.bio</code>) included. Where it returns False the value is <code>UNSET</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.types.supplied_fields.supplied_fields" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">supplied_fields</span>
+
+
+<a href="#django_service_specs.types.supplied_fields.supplied_fields" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">supplied_fields</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">_DataclassInstance</span> <span class="o">|</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">object</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return <code>data</code>'s fields whose value is not <code>UNSET</code>, in their order.</p>
+<p><code>data</code> is a dataclass instance or a mapping. A dataclass gives its
+<code>__init__</code> fields only, as the mutation helpers read it: a field declared
+<code>init=False</code> is the dataclass's to compute, never the caller's to send.
+<code>None</code> is a supplied value and is kept.</p>
+<p>Shallow: a value is returned as it is, so a nested dataclass, a list of
+rows or a model instance is the caller's own object, its <code>UNSET</code> fields
+untouched. The values are typed <code>Any</code> because each is its own field's
+type, which no dict annotation can spell per key.</p>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="TypeError">TypeError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p><code>data</code> is neither, a dataclass class among them.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
+
 
     </div>
 
