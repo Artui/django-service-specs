@@ -280,7 +280,8 @@ def dispatch(
 
     ``kind`` is ``"list"`` for a LIST selector spec, a service whose output
     selector is a LIST, or a ``many`` or ``returns_many`` service with no
-    output selector that returned something, and ``"instance"`` otherwise. Nothing is presented here;
+    output selector that returned something that is a set of rows, and
+    ``"instance"`` otherwise. Nothing is presented here;
     [`present`][django_service_specs.dispatch.present.present] does that, so a
     transport that hands the object to a template never pays for rendering it.
 
@@ -310,7 +311,11 @@ def dispatch(
             parameter, shaping declared on a
             selector that returned something other than a queryset, a
             condition on the row with no row to answer it for, or a
-            precondition answering with a coroutine or an async generator.
+            precondition answering with a coroutine or an async generator,
+            or a ``many`` or ``returns_many`` service with no output selector
+            returning something other than rows (a mapping, ``str``,
+            ``bytes`` or a non-iterable), after the service has run, so its
+            write stands.
     """
     spec = kernel_spec(spec)
     refuse_target(spec, target)

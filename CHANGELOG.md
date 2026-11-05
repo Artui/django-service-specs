@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] — 2026-11-05
+
+### Added
+- **`is_supplied` and `supplied_fields`**, readers of a partial input.
+  `is_supplied(value)` returns whether a value is anything but `UNSET`, `None`
+  included, as a `TypeIs`, so a type checker narrows `str | None | UnsetType` to
+  `str | None` where it holds; `value is not UNSET` narrows nothing, because
+  `UNSET` is a value. `supplied_fields(data)` returns the fields of a dataclass
+  instance (its `__init__` fields, as the mutation helpers read it) or of a
+  mapping whose value is not `UNSET`, in order, `None` kept. It is shallow: a
+  nested input, a list of rows or a model instance is returned as the caller's
+  own object. Anything else raises `TypeError`. The mutation helpers already
+  drop `UNSET`, so neither is needed to call them.
+
+### Changed
+- **`UnsetType` is final.** `UNSET` is its only value, and a type checker now
+  knows it, so where `is_supplied` returns False a `str | None | UnsetType`
+  narrows to `UnsetType` itself. A subclass of `UnsetType` is now a type error;
+  none was ever meant, since `UnsetType()` returns the one `UNSET`.
+
+### Fixed
+- **A `many` or `returns_many` service returning one value, not rows, is refused
+  where it returns.** With no output selector the service's own return is what
+  is presented as a list, so a `dict`, a model row, a `str` or `bytes`, or
+  anything else that does not iterate used to come back as a `kind="list"`
+  result, which `present` then failed on with an unrelated error (the item
+  presenter's `AttributeError`, or iteration by key or character). Dispatch now
+  raises `ImproperlyConfigured` naming the service and what it returned, and the
+  fix: return the rows, or for `returns_many` drop it to present one value. It
+  is the author's error, not a refusal, because the service has already run and
+  its write stands. A `None` return still presents `None`, and a spec with an
+  output selector is unaffected, since the return is then only what the selector
+  re-reads.
+
 ## [0.26.1] — 2026-11-04
 
 ### Changed
@@ -2490,7 +2524,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.26.1...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/Artui/django-service-specs/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/Artui/django-service-specs/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/Artui/django-service-specs/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/Artui/django-service-specs/compare/v0.25.0...v0.25.1

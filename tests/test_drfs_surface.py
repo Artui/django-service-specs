@@ -642,6 +642,11 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # challenge: the transports that do read it from this package, and
         # djangorestframework-services neither wraps nor re-exports it.
         "PermissionCheckDenied",
+        # Readers of a partial input, for a service's own code: the mutation
+        # helpers already drop UNSET, and djangorestframework-services neither
+        # wraps nor re-exports them.
+        "is_supplied",
+        "supplied_fields",
         # This package's version, which no importer reads as an API.
         "__version__",
     }
