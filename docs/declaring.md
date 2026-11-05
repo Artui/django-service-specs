@@ -802,6 +802,23 @@ Two rules on that example are easy to miss:
   `AuthorPatch` declares every field `X | UnsetType = UNSET`, so a field the
   caller left out arrives as `UNSET`, and the mutation helpers leave it alone.
 
+The mutation helpers drop `UNSET` themselves, so a partial input goes to them as
+it is. Code that reads one itself has two helpers.
+[`is_supplied`][django_service_specs.types.is_supplied.is_supplied] is
+`value is not UNSET` as a type checker reads it: `UNSET` is a value, so the
+identity check narrows nothing, and `is_supplied(patch.title)` narrows
+`str | UnsetType` to `str`.
+[`supplied_fields`][django_service_specs.types.supplied_fields.supplied_fields]
+returns the fields of a dataclass instance or a mapping that are not `UNSET`,
+`None` kept. It is shallow: a nested input, a list of rows or a model instance
+is returned as the caller's own object.
+
+```python
+--8<--
+docs/examples/supplied.py:supplied
+--8<--
+```
+
 An offset-less date-time is made aware in the current time zone when `USE_TZ`
 is on, as Django's forms do, so a date-time means the same instant whichever
 library validated it. Every failure is reported at once, as one
