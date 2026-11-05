@@ -21,18 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own object. Anything else raises `TypeError`. The mutation helpers already
   drop `UNSET`, so neither is needed to call them.
 
+### Changed
+- **`UnsetType` is final.** `UNSET` is its only value, and a type checker now
+  knows it, so where `is_supplied` returns False a `str | None | UnsetType`
+  narrows to `UnsetType` itself. A subclass of `UnsetType` is now a type error;
+  none was ever meant, since `UnsetType()` returns the one `UNSET`.
+
 ### Fixed
 - **A `many` or `returns_many` service returning one value, not rows, is refused
   where it returns.** With no output selector the service's own return is what
   is presented as a list, so a `dict`, a model row, a `str` or `bytes`, or
   anything else that does not iterate used to come back as a `kind="list"`
   result, which `present` then failed on with an unrelated error (the item
-  presenter's `AttributeError`, or iteration by key or character). Dispatch now raises `ImproperlyConfigured`
-  naming the service and what it returned, and the fix: return the rows, or for
-  `returns_many` drop it to present one value. It is the author's error, not a
-  refusal, because the service has already run and its write stands. A `None`
-  return still presents `None`, and a spec with an output selector is unaffected,
-  since the return is then only what the selector re-reads.
+  presenter's `AttributeError`, or iteration by key or character). Dispatch now
+  raises `ImproperlyConfigured` naming the service and what it returned, and the
+  fix: return the rows, or for `returns_many` drop it to present one value. It
+  is the author's error, not a refusal, because the service has already run and
+  its write stands. A `None` return still presents `None`, and a spec with an
+  output selector is unaffected, since the return is then only what the selector
+  re-reads.
 
 ## [0.26.1] — 2026-11-04
 

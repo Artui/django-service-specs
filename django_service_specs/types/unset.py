@@ -17,7 +17,13 @@ e.g. ``bio: str | None | UnsetType``.
 
 from __future__ import annotations
 
+from typing import final
 
+
+# Final so a type checker knows ``UNSET`` is the only value of this type: the
+# branch where ``is_supplied`` returns False then narrows to ``UnsetType``
+# itself rather than to ``UnsetType`` minus the other members of the union.
+@final
 class UnsetType:
     """Singleton sentinel type. Always falsy; identity-equal to itself only.
 

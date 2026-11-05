@@ -10,10 +10,12 @@ from pathlib import Path
 from django_service_specs.types.is_supplied import is_supplied
 from django_service_specs.types.unset import UNSET
 
-# Every ``assert_type`` here holds only if ``is_supplied`` narrows. ``plain`` is
-# the same predicate returning ``bool``, which is what ``value is not UNSET``
-# amounts to for a type checker: the line marked ``# drift`` is the one ty must
-# report, so a narrowing that stopped working fails the test from both sides.
+# Every ``assert_type`` here holds only if ``is_supplied`` narrows, and those in
+# the ``else`` branches only if ``UnsetType`` is final, so that nothing but
+# ``UNSET`` is left there. ``plain`` is the same predicate returning ``bool``,
+# which is what ``value is not UNSET`` amounts to for a type checker: the line
+# marked ``# drift`` is the one ty must report, so a narrowing that stopped
+# working fails the test from both sides.
 _SOURCE = """\
 from __future__ import annotations
 
@@ -42,10 +44,12 @@ def read(name: str | UnsetType, bio: str | None | UnsetType, patch: Patch) -> No
         assert_type(name, str)
     if is_supplied(bio):
         assert_type(bio, str | None)
+    else:
+        assert_type(bio, UnsetType)
     if is_supplied(patch.bio):
         assert_type(patch.bio, str | None)
     else:
-        left_out: UnsetType = patch.bio
+        assert_type(patch.bio, UnsetType)
     if plain(name):
         assert_type(name, str)  # drift
 
