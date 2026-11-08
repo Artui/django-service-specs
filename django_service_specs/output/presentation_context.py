@@ -40,7 +40,7 @@ class PresentationContext:
       the presenter's to read and write; the kernel writes nothing to it. A
       context built by hand gets an empty dict of its own. Its
       ``"transport"`` key, where stamped, names the transport that built the
-      context: a family convention the kernel neither writes nor reads, so
+      context: a family convention dispatch neither writes nor reads, so
       read it with
       [`call_transport`][django_service_specs.types.call_transport.call_transport].
     - ``shapes`` is what the caller sent for the spec's declared ``shapes``,

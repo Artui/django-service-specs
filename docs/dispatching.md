@@ -1332,19 +1332,8 @@ docs/examples/dispatching.py:call_transport
 --8<--
 ```
 
-Each family package stamps one plain string, owns that value and states it in its own
-documentation as it adopts the key, so a new transport needs no kernel release:
-
-| Value | Package |
-| --- | --- |
-| `"rest"` | django-spec-rest |
-| `"html"` | django-spec-html |
-| `"mcp"` | django-spec-mcp |
-| `"agent"` | django-spec-agents |
-| `"cli"` | django-spec-cli |
-
-Only django-spec-agents stamps today; the rest are the values each package will stamp
-as it adopts the key.
+Each transport package owns the string it stamps and states it in its own
+documentation, so a new transport needs no kernel release.
 
 The contract, for a transport writing it and a stage reading it:
 
@@ -1365,14 +1354,14 @@ The contract, for a transport writing it and a stage reading it:
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
   handed no dict.
-- **A transport stamps from the release that adopts the key.** django-spec-agents
-  already does. Until another transport adopts it, that transport's calls read as
-  missing too, and a stage cannot tell them from an in-process caller, so check the
-  release of each transport you run before branching on `None`.
+- **A transport stamps from the release that adopts the key.** Until a transport's
+  release does, its calls read as missing too, and a stage cannot tell them from an
+  in-process caller, so check the release of each transport you run before branching
+  on `None`.
 - **The values are not a closed set.** A third-party transport stamps a string of its
   own, and the reader hands back whatever was stamped, so a stage compares a stamp to
   the strings it cares about and treats any other as a transport it does not know.
-- **The kernel neither writes nor reads it.** Dispatch runs the same with the key or
+- **Dispatch neither writes nor reads it.** It runs the same with the key or
   without, and it is not a reserved name: a seed or an argument may be called `transport`,
   in a different namespace from this dict.
 
