@@ -12,6 +12,7 @@ from django.db.models import QuerySet
 
 from django_service_specs import (
     DEFAULT_POOL_SEEDS,
+    TRANSPORT_KEY,
     AnyOf,
     DataclassPresenter,
     DataclassValidator,
@@ -29,9 +30,11 @@ from django_service_specs import (
     SelectorSpec,
     ServerArguments,
     ServiceSpec,
+    Transport,
     apply_server_arguments,
     authorize,
     bind_arguments,
+    call_transport,
     check_call,
     check_seeds,
     check_server_arguments,
@@ -651,3 +654,31 @@ def archive_from_back_office(user: Any, pk: int) -> dict[str, Any]:
 
 
 # --8<-- [end:call_context]
+
+
+# --8<-- [start:call_transport]
+def note_heading(*, user: Any, pk: int, call_context: dict[str, Any]) -> str:
+    note = Note.objects.get(owner=user, pk=pk)
+    # A missing key reads as ``None``, so a caller in process gets the full heading.
+    if call_transport(call_context) == Transport.AGENT:
+        return note.title
+    return f"Note: {note.title}"
+
+
+note_heading_spec = ServiceSpec(
+    service=note_heading,
+    permissions=[IsSignedIn()],
+    reads=Parameters.of(Parameter("pk", "integer", required=True)),
+)
+
+
+def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
+    # What a transport does as it builds the call's context: its own name goes
+    # in last, as the plain string, over anything already there.
+    context: dict[str, Any] = {"client": "back-office"}
+    context[TRANSPORT_KEY] = Transport.AGENT.value
+    result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
+    return result.value, context
+
+
+# --8<-- [end:call_transport]

@@ -52,6 +52,7 @@ from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.selector_kind import SelectorKind
+from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validated import Validated
@@ -4906,6 +4907,38 @@ class _ContextValidator(Titled):
         return super().validate(arguments, context)
 
 
+class _WatchedForTheTransportKey(dict[str, Any]):
+    """A call's dict that records every keyed access to ``TRANSPORT_KEY``."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.touches: list[str] = []
+
+    def _note(self, operation: str, key: Any) -> None:
+        if key == TRANSPORT_KEY:
+            self.touches.append(operation)
+
+    def __contains__(self, key: object) -> bool:
+        self._note("in", key)
+        return super().__contains__(key)
+
+    def __getitem__(self, key: str) -> Any:
+        self._note("getitem", key)
+        return super().__getitem__(key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._note("setitem", key)
+        super().__setitem__(key, value)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        self._note("get", key)
+        return super().get(key, default)
+
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        self._note("setdefault", key)
+        return super().setdefault(key, default)
+
+
 def _every_stage(saw: _Saw, presenter: Any) -> ServiceSpec:
     """An update declaring every stage dispatch resolves, each recording the context it is handed."""
 
@@ -5011,6 +5044,33 @@ class TestTheCallContext:
 
         assert saw.all_are(call_context)
         assert call_context == {"transport": "agent"}
+
+    @_ENTRIES
+    def test_no_stage_of_the_kernel_touches_the_transport_key(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Dispatch and presenting run the same with the key absent, and never look it up.
+
+        The two tests above see only what the dict holds afterwards; a read
+        leaves no mark there, and a kernel that branched on a transport would
+        pass both.
+        """
+        note = Note.objects.create(title="n", owner=ada)
+        saw = _Saw()
+        presenter = Contextual()
+        call_context = _WatchedForTheTransportKey()
+        result = entry(
+            _every_stage(saw, presenter),
+            principal=ada,
+            arguments={"pk": note.pk, "title": "t"},
+            call_context=call_context,
+        )
+        present(_every_stage(saw, presenter), result)
+        saw("presenter", presenter.contexts[0].call_context)
+
+        assert saw.all_are(call_context)
+        assert call_context.touches == []
+        assert TRANSPORT_KEY not in dict(call_context)
 
     @_ENTRIES
     def test_a_selector_spec_s_stages_are_handed_the_very_dict_passed(

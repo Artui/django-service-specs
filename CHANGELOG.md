@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`TRANSPORT_KEY`, `Transport` and `call_transport`**, the kernel's names for
+  the call context's transport key. `TRANSPORT_KEY` is `"transport"`; `Transport`
+  is a `str` enum of the family's known values, `REST`, `HTML`, `MCP`, `AGENT` and
+  `CLI`, one per package; `call_transport(call_context)` returns what was stamped, a
+  known value or a third-party transport's own string, or `None` when the key is
+  missing or there is no dict. The contract is in the dispatching guide: the
+  transport that builds a context stamps its own name last, as the plain string, a
+  missing key means an in-process caller, and the known values are not a closed set.
+  The kernel still neither writes nor reads the key. Each transport adopts it in its
+  own release; until then only django-spec-agents stamps.
+
+### Changed
+- **`"http"` is no longer a documented value of `call_context["transport"]`.** It
+  was ambiguous, since django-spec-rest, django-spec-html and django-spec-mcp all
+  arrive over HTTP, and no package ever stamped it. Each package now stamps its own
+  name. The dispatching guide and the `ValidationContext` and `PresentationContext`
+  docstrings say so.
+
 ## [0.27.0] — 2026-11-05
 
 ### Added

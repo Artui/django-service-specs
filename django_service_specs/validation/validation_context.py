@@ -62,10 +62,10 @@ class ValidationContext:
     another, so a Validator that writes to it needs no guard for a call that
     was handed none. It trails every other field, so no existing
     construction changes. One key is the family's rather than any one
-    transport's: ``"transport"`` names the transport serving the call
-    (``"agent"``, ``"http"``, ``"mcp"``), set by that transport, by
-    convention only - the kernel neither sets nor checks it, so read it with
-    ``.get``.
+    transport's: ``"transport"``, where stamped, names the transport that built
+    the context, by convention only - the kernel neither writes nor reads it,
+    so read it with
+    [`call_transport`][django_service_specs.types.call_transport.call_transport].
     """
 
     principal: Any

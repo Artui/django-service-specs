@@ -150,6 +150,7 @@ from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.is_async import is_async
@@ -167,6 +168,8 @@ from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.supplied_fields import supplied_fields
+from django_service_specs.types.transport import Transport
+from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
@@ -185,6 +188,7 @@ __all__ = [
     "NON_FIELD_KEYS",
     "REFUSALS",
     "RESERVED_POOL_SEEDS",
+    "TRANSPORT_KEY",
     "UNSET",
     "ActionUnavailable",
     "AdditionalInputRequired",
@@ -254,6 +258,7 @@ __all__ = [
     "ServiceValidationError",
     "SpecRegistry",
     "SpecSource",
+    "Transport",
     "UnguardedReason",
     "UnguardedSpec",
     "UnknownArguments",
@@ -288,6 +293,7 @@ __all__ = [
     "authorize_target",
     "base_pool",
     "bind_arguments",
+    "call_transport",
     "can_present_nothing",
     "check_arguments",
     "check_call",

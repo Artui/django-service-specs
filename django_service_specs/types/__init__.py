@@ -1,9 +1,10 @@
 """Value-shape carriers shared across the package, the root of its refusals, and
-the sync/async predicate every bridge between the two reads, and the readers of
-what an input supplied.
+the sync/async predicate every bridge between the two reads, the readers of what
+an input supplied, and the names a call's context carries its transport under.
 """
 
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
 from django_service_specs.types.is_async import is_async
@@ -21,12 +22,15 @@ from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.supplied_fields import supplied_fields
+from django_service_specs.types.transport import Transport
+from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.types.value_formatter import ValueFormatter
 
 __all__ = [
+    "TRANSPORT_KEY",
     "UNSET",
     "Affordance",
     "DispatchError",
@@ -43,10 +47,12 @@ __all__ = [
     "RelationPhase",
     "SelectorKind",
     "ServerArguments",
+    "Transport",
     "UnguardedReason",
     "UnknownArguments",
     "UnsetType",
     "ValueFormatter",
+    "call_transport",
     "is_async",
     "is_supplied",
     "supplied_fields",
