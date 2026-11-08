@@ -10,7 +10,8 @@ class Transport(str, Enum):
 
     One value per package, and the package that builds the call's context stamps
     its own: an MCP call that django-spec-agents proxies in process reads ``MCP``,
-    because django-spec-mcp's handler builds that context.
+    because django-spec-mcp's handler builds that context. Each package stamps from
+    the release that adopts the key.
 
     Not a closed set. A third-party transport stamps its own string, so read a
     stamp by comparing it to a member rather than converting it to one, which

@@ -10,5 +10,6 @@ TRANSPORT_KEY: Final = "transport"
 The transport stamps it last, over anything already there, as the plain string,
 so ``call_context["transport"] == "agent"`` holds with nothing imported. The kernel
 neither writes nor reads it, and it is not a reserved name: a seed or an argument
-may be called ``transport``. A missing key means an in-process caller. See
+may be called ``transport``. A missing key means an in-process caller, or a
+transport on a release that has not adopted the key yet. See
 [reading which transport is calling](dispatching.md#reading-which-transport-is-calling)."""

@@ -1335,7 +1335,7 @@ docs/examples/dispatching.py:call_transport
 [`Transport`][django_service_specs.types.transport.Transport] lists the family's
 values, one per package:
 
-| Value | Stamped by |
+| Value | Package |
 | --- | --- |
 | `Transport.REST`, `"rest"` | django-spec-rest |
 | `Transport.HTML`, `"html"` | django-spec-html |
@@ -1357,13 +1357,17 @@ The contract, for a transport writing it and a stage reading it:
 - **A stamp is the plain string**, `Transport.AGENT.value`, never the member. So
   `call_context["transport"] == "agent"` holds with nothing imported, and the value
   serializes as itself. A member equals its string, so compare with `==`; `str()` of a
-  member is its qualified name, not its value.
+  member is its qualified name, not its value, and how an f-string formats a member
+  varies by Python version, so use `.value` to get the string.
 - **A missing key means an in-process caller**: a `dispatch` made directly, from a
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
-  handed no dict. Before this release only django-spec-agents stamped, so under an
-  older release of another transport the key is missing too.
+  handed no dict.
+- **A transport stamps from the release that adopts the key.** django-spec-agents
+  already does. Until another transport adopts it, that transport's calls read as
+  missing too, and a stage cannot tell them from an in-process caller, so check the
+  release of each transport you run before branching on `None`.
 - **The known values are not a closed set.** A third-party transport stamps a string of
   its own, and the reader hands back whatever was stamped. Compare a stamp to a member
   rather than converting it: `Transport("worker")` raises.

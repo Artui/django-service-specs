@@ -5073,6 +5073,51 @@ class TestTheCallContext:
         assert TRANSPORT_KEY not in dict(call_context)
 
     @_ENTRIES
+    def test_no_stage_of_a_selector_spec_touches_the_transport_key(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """The selector branch is a path of its own through both entry points."""
+        call_context = _WatchedForTheTransportKey()
+
+        entry(
+            SelectorSpec(kind=LIST, selector=lambda *, call_context: [], permissions=OPEN),
+            principal=ada,
+            arguments={},
+            call_context=call_context,
+        )
+
+        assert call_context.touches == []
+
+    @_ENTRIES
+    def test_a_seed_and_an_argument_may_be_named_transport(
+        self, entry: Callable[..., Any], ada: Any
+    ) -> None:
+        """Not a reserved name: the pool is one namespace, and this dict another."""
+        call_context: dict[str, Any] = {TRANSPORT_KEY: "agent"}
+
+        seeded = entry(
+            SelectorSpec(kind=LIST, selector=lambda *, transport: [transport], permissions=OPEN),
+            principal=ada,
+            arguments={},
+            pool_seeds=DEFAULT_POOL_SEEDS.extend(transport=lambda *, user: "seeded"),
+            call_context=call_context,
+        )
+        argued = entry(
+            ServiceSpec(
+                service=lambda *, transport: transport,
+                permissions=OPEN,
+                reads=Parameters.of(Parameter("transport", "string", required=True)),
+            ),
+            principal=ada,
+            arguments={"transport": "client"},
+            call_context=call_context,
+        )
+
+        assert seeded.value == ["seeded"]
+        assert argued.value == "client"
+        assert call_context == {TRANSPORT_KEY: "agent"}
+
+    @_ENTRIES
     def test_a_selector_spec_s_stages_are_handed_the_very_dict_passed(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:

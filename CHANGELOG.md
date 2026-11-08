@@ -24,17 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`"http"` is no longer a documented value of `call_context["transport"]`.** It
   was ambiguous, since django-spec-rest, django-spec-html and django-spec-mcp all
-  arrive over HTTP, and no package ever stamped it. Each package now stamps its own
-  name. The dispatching guide and the `ValidationContext` and `PresentationContext`
+  arrive over HTTP, and no package stamps it. Each package stamps its own name as it
+  adopts the key. The dispatching guide and the `ValidationContext` and `PresentationContext`
   docstrings say so.
 
 ### Removed
 - **`RegisteredSpec.agent_contract`** (breaking, in a 0.x minor). The read-only
   property asked the registered object for a contract built by
-  djangorestframework-services; no package of the family reads it, and an off-HTTP
-  declaration now lives on the spec itself, never on the registry entry. Nothing
-  replaces it here: a registration still takes only a name, a spec and tags, and the
-  docs page and example that showed the property are gone with it.
+  djangorestframework-services; no live package of the family reads it, and an
+  off-HTTP declaration now lives on the spec itself, never on the registry entry.
+  Nothing replaces it here: a registration still takes only a name, a spec and tags,
+  and the docs page and example that showed the property are gone with it. One
+  archived package does read it: the final djangorestframework-pydantic-ai 0.36.x,
+  whose `SpecToolset` raises `AttributeError` when handed a `SpecRegistry` on this
+  release. A project still on it pins `django-service-specs<0.28`, or moves to
+  django-spec-agents.
 
 ## [0.27.0] — 2026-11-05
 
