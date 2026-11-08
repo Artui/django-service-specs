@@ -311,6 +311,26 @@ docs/examples/dispatching.py:checks_read_arguments
 --8<--
 ```
 
+To ask the checks rather than read their declarations,
+[`authorize_without_arguments`][django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments]
+asks a spec what a call with no arguments is asked: `authorize`, then, for a
+service spec with no target selector (a create), `authorize_scope` of `None`.
+That is the same rule `checks_read_arguments` reads, so the two agree on which
+questions there are. Each question is handed `arguments=None`, and `grant=`,
+`call_context=` and `pool_seeds=` as `authorize` takes them; a grant's
+`target_checked` does not answer a create's scope question here, since no target
+is handed in. It returns the grant `authorize` returned. **It catches
+nothing**: a refusal, `PrincipalUnavailable`, a configuration error and a check
+that cannot answer without the arguments it reads each reach the caller as they
+were raised, because what each means for a listing, an OPTIONS answer or a call
+whose arguments failed their shape is the transport's decision:
+
+```python
+--8<--
+docs/examples/dispatching.py:authorize_without_arguments
+--8<--
+```
+
 **A check can read the call's context and a registered seed the same way.** A
 keyword `call_context` is handed the one dict every stage of the call shares
 ([the call's context](#the-calls-context)), and a keyword named after a seed

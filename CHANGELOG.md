@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is copied shallowly and never changed. A `None` entry binds as a missing one, so a
   callable declaring `request` is handed `None` either way. Dispatch still neither
   writes nor reads the transport key.
+- **`authorize_without_arguments(spec, principal, *, grant=None, call_context=None,
+  pool_seeds=None)`**, from the package root and `django_service_specs.dispatch`, asks
+  a spec's permission checks what a call with no arguments is asked, for a transport
+  answering before it has a call's arguments or without them: a filtered listing, an
+  OPTIONS answer, a call whose arguments failed their shape. It asks `authorize`, then,
+  for a service spec with no target selector, `authorize_scope` of `None`, each with
+  `arguments=None`, and returns the grant `authorize` returned. It catches nothing: a
+  refusal, a configuration error and a check that cannot answer without its arguments
+  each reach the caller as raised, for the transport to decide what each means. A
+  grant's `target_checked` does not answer the scope question here, since no target is
+  handed in. A deactivated principal raises `PrincipalUnavailable` when `pool_seeds` is
+  handed, as `authorize` does. `checks_read_arguments` now reads the same rule for
+  which questions are asked, so the two cannot disagree; its answers are unchanged.
 
 ### Removed
 - **`Transport`, the enum of the family's transport names, is gone** from the package

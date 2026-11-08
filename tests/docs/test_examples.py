@@ -632,6 +632,18 @@ class TestDispatching:
         result = dispatch(dispatching.owned_note_spec, principal=ada, arguments={"pk": note.pk})
         assert result.kind != "not_found"
 
+    def test_a_listing_hides_what_a_call_with_no_arguments_is_refused(self, ada: Any) -> None:
+        specs = [dispatching.note_spec, dispatching.owned_note_spec, dispatching.add_note_spec]
+        assert dispatching.offered_to(ada, specs) == specs
+        # Refused the class question; the spec whose check reads the arguments
+        # is left to the call.
+        assert dispatching.offered_to(AnonymousUser(), specs) == [dispatching.owned_note_spec]
+        # The create's scope question of nothing refuses at the quota, as its call does.
+        Note.objects.bulk_create(Note(owner=ada, title=title) for title in "abc")
+        assert dispatching.offered_to(ada, specs) == specs[:2]
+        with pytest.raises(NotPermitted):
+            dispatch(dispatching.add_note_spec, principal=ada, arguments={})
+
     def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
         queue: list[Any] = []
         dispatching.enqueue_rename(ada, {"pk": 1, "title": "Final"}, queue)

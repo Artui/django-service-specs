@@ -21,10 +21,12 @@ from django_service_specs import (
     Grant,
     InvalidArguments,
     NoneOf,
+    NotPermitted,
     Parameter,
     Parameters,
     PermissionCheck,
     PoolSeeds,
+    PrincipalUnavailable,
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
@@ -32,6 +34,7 @@ from django_service_specs import (
     ServiceSpec,
     apply_server_arguments,
     authorize,
+    authorize_without_arguments,
     bind_arguments,
     build_call_context,
     call_transport,
@@ -255,6 +258,41 @@ def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
 
 
 # --8<-- [end:checks_read_arguments]
+
+
+# --8<-- [start:authorize_without_arguments]
+class UnderQuota(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_authenticated
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        # A create's scope is nothing (None): may one more note be made?
+        return Note.objects.filter(owner=principal).count() < 3
+
+
+def add_untitled_note(*, user: Any) -> Note:
+    return Note.objects.create(owner=user, title="Untitled")
+
+
+add_note_spec = ServiceSpec(service=add_untitled_note, permissions=[UnderQuota()])
+
+
+def offered_to(principal: Any, specs: list[Any]) -> list[Any]:
+    # Each spec is asked what a call with no arguments is asked. The kernel
+    # catches nothing: hiding a refused operation is this listing's policy,
+    # and a spec whose checks read the arguments is left to the call.
+    offered = []
+    for spec in specs:
+        if not checks_read_arguments(spec):
+            try:
+                authorize_without_arguments(spec, principal, pool_seeds=DEFAULT_POOL_SEEDS)
+            except (NotPermitted, PrincipalUnavailable):
+                continue
+        offered.append(spec)
+    return offered
+
+
+# --8<-- [end:authorize_without_arguments]
 
 
 # --8<-- [start:check_seeds]

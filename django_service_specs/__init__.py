@@ -33,6 +33,7 @@ from django_service_specs.dispatch.audience_projection_for_spec import audience_
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.authorize_without_arguments import authorize_without_arguments
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.check_call import check_call
@@ -290,6 +291,7 @@ __all__ = [
     "authorize",
     "authorize_scope",
     "authorize_target",
+    "authorize_without_arguments",
     "base_pool",
     "bind_arguments",
     "build_call_context",
