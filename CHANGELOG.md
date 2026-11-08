@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-11-08
+
 ### Removed
 - **`Transport`, the enum of the family's transport names, is gone** from the package
   root and from `django_service_specs.types`. It was published in 0.28.0 and no
@@ -2567,7 +2569,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/Artui/django-service-specs/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Artui/django-service-specs/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Artui/django-service-specs/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/Artui/django-service-specs/compare/v0.26.0...v0.26.1
