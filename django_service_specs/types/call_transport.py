@@ -16,9 +16,8 @@ def call_transport(call_context: Mapping[str, Any] | None) -> str | None:
     a Validator's ``parameters()`` asked outside a call, which is handed no dict at
     all.
 
-    The stamp comes back as it was written, a known value or a third-party
-    transport's own string, so compare it to a
-    [`Transport`][django_service_specs.types.transport.Transport] member.
+    The stamp comes back as it was written, whatever string the transport chose,
+    so compare it to a plain string: ``call_transport(call_context) == "rest"``.
     """
     if call_context is None:
         return None

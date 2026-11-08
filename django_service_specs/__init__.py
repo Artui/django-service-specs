@@ -168,7 +168,6 @@ from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.supplied_fields import supplied_fields
-from django_service_specs.types.transport import Transport
 from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
@@ -258,7 +257,6 @@ __all__ = [
     "ServiceValidationError",
     "SpecRegistry",
     "SpecSource",
-    "Transport",
     "UnguardedReason",
     "UnguardedSpec",
     "UnknownArguments",

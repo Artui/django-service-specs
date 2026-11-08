@@ -1332,16 +1332,19 @@ docs/examples/dispatching.py:call_transport
 --8<--
 ```
 
-[`Transport`][django_service_specs.types.transport.Transport] lists the family's
-values, one per package:
+The family's packages each stamp one plain string. Each package owns its value and
+states it in its own documentation, so a new transport needs no kernel release:
 
 | Value | Package |
 | --- | --- |
-| `Transport.REST`, `"rest"` | django-spec-rest |
-| `Transport.HTML`, `"html"` | django-spec-html |
-| `Transport.MCP`, `"mcp"` | django-spec-mcp |
-| `Transport.AGENT`, `"agent"` | django-spec-agents |
-| `Transport.CLI`, `"cli"` | django-spec-cli |
+| `"rest"` | django-spec-rest |
+| `"html"` | django-spec-html |
+| `"mcp"` | django-spec-mcp |
+| `"agent"` | django-spec-agents |
+| `"cli"` | django-spec-cli |
+
+Only django-spec-agents stamps today; the rest are the values each package will stamp
+as it adopts the key.
 
 The contract, for a transport writing it and a stage reading it:
 
@@ -1354,11 +1357,9 @@ The contract, for a transport writing it and a stage reading it:
 - **Nothing a client sends reaches it.** A transport builds the dict on the server and
   stamps it last, so an entry a caller smuggled in would be overwritten, and a stage may
   branch on what it reads.
-- **A stamp is the plain string**, `Transport.AGENT.value`, never the member. So
+- **A stamp is the plain string**, `"agent"` and not a wrapper of it. So
   `call_context["transport"] == "agent"` holds with nothing imported, and the value
-  serializes as itself. A member equals its string, so compare with `==`; `str()` of a
-  member is its qualified name, not its value, and how an f-string formats a member
-  varies by Python version, so use `.value` to get the string.
+  serializes as itself. Compare it with `==`.
 - **A missing key means an in-process caller**: a `dispatch` made directly, from a
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
@@ -1368,9 +1369,9 @@ The contract, for a transport writing it and a stage reading it:
   already does. Until another transport adopts it, that transport's calls read as
   missing too, and a stage cannot tell them from an in-process caller, so check the
   release of each transport you run before branching on `None`.
-- **The known values are not a closed set.** A third-party transport stamps a string of
-  its own, and the reader hands back whatever was stamped. Compare a stamp to a member
-  rather than converting it: `Transport("worker")` raises.
+- **The values are not a closed set.** A third-party transport stamps a string of its
+  own, and the reader hands back whatever was stamped, so a stage compares a stamp to
+  the strings it cares about and treats any other as a transport it does not know.
 - **The kernel neither writes nor reads it.** Dispatch runs the same with the key or
   without, and it is not a reserved name: a seed or an argument may be called `transport`,
   in a different namespace from this dict.

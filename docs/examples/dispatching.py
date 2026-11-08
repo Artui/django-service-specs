@@ -30,7 +30,6 @@ from django_service_specs import (
     SelectorSpec,
     ServerArguments,
     ServiceSpec,
-    Transport,
     apply_server_arguments,
     authorize,
     bind_arguments,
@@ -660,7 +659,7 @@ def archive_from_back_office(user: Any, pk: int) -> dict[str, Any]:
 def note_heading(*, user: Any, pk: int, call_context: dict[str, Any]) -> str:
     note = Note.objects.get(owner=user, pk=pk)
     # A missing key reads as ``None``, so a caller in process gets the full heading.
-    if call_transport(call_context) == Transport.AGENT:
+    if call_transport(call_context) == "agent":
         return note.title
     return f"Note: {note.title}"
 
@@ -676,7 +675,7 @@ def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
     # What a transport does as it builds the call's context: its own name goes
     # in last, as the plain string, over anything already there.
     context: dict[str, Any] = {"client": "back-office"}
-    context[TRANSPORT_KEY] = Transport.AGENT.value
+    context[TRANSPORT_KEY] = "agent"
     result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
     return result.value, context
 

@@ -642,12 +642,11 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # wraps nor re-exports them.
         "is_supplied",
         "supplied_fields",
-        # The call context's transport key, its known values and its reader, for
-        # a transport to stamp and a stage to read: the transports use them from
+        # The call context's transport key and its reader, for a transport to
+        # stamp and a stage to read: the transports use them from
         # this package, and djangorestframework-services neither wraps nor
         # re-exports them.
         "TRANSPORT_KEY",
-        "Transport",
         "call_transport",
         # This package's version, which no importer reads as an API.
         "__version__",

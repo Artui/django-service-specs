@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **`Transport`, the enum of the family's transport names, is gone** from the package
+  root and from `django_service_specs.types`. It was published in 0.28.0 and no
+  transport had adopted it: the kernel is the base layer and should not list the
+  packages built on it, and a new transport should not need a kernel release to be
+  named. Each transport package owns the string it stamps and states it in its own
+  documentation. `TRANSPORT_KEY` and `call_transport` are unchanged; compare the stamp
+  with a plain string, for example `call_transport(ctx) == "rest"`. A migration is to
+  replace `Transport.REST` with `"rest"`, and `Transport.REST.value` with the same.
+
 ## [0.28.0] — 2026-11-08
 
 ### Added

@@ -5,17 +5,16 @@ from __future__ import annotations
 from types import MappingProxyType
 
 from django_service_specs.types.call_transport import call_transport
-from django_service_specs.types.transport import Transport
 from django_service_specs.types.transport_key import TRANSPORT_KEY
 
 
 def test_it_returns_a_known_transport_s_stamp() -> None:
-    assert call_transport({TRANSPORT_KEY: Transport.REST.value}) == Transport.REST
+    assert call_transport({TRANSPORT_KEY: "rest"}) == "rest"
 
 
 def test_it_returns_a_third_party_transport_s_own_string_unconverted() -> None:
-    # The known values are not a closed set: converting to ``Transport`` here
-    # would raise for a stamp the docs say is allowed.
+    # The values are not a closed set: the reader must not narrow a stamp to a
+    # list it knows, since the docs allow a transport's own string.
     assert call_transport({TRANSPORT_KEY: "worker"}) == "worker"
 
 
