@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] — 2026-11-08
+
+### Added
+- **`TRANSPORT_KEY`, `Transport` and `call_transport`**, the kernel's names for
+  the call context's transport key. `TRANSPORT_KEY` is `"transport"`; `Transport`
+  is a `str` enum of the family's known values, `REST`, `HTML`, `MCP`, `AGENT` and
+  `CLI`, one per package; `call_transport(call_context)` returns what was stamped, a
+  known value or a third-party transport's own string, or `None` when the key is
+  missing or there is no dict. The contract is in the dispatching guide: the
+  transport that builds a context stamps its own name last, as the plain string, a
+  missing key means an in-process caller, and the known values are not a closed set.
+  The kernel still neither writes nor reads the key. Each transport adopts it in its
+  own release; until then only django-spec-agents stamps.
+
+### Changed
+- **`"http"` is no longer a documented value of `call_context["transport"]`.** It
+  was ambiguous, since django-spec-rest, django-spec-html and django-spec-mcp all
+  arrive over HTTP, and no package stamps it. Each package stamps its own name as it
+  adopts the key. The dispatching guide and the `ValidationContext` and `PresentationContext`
+  docstrings say so.
+
+### Removed
+- **`RegisteredSpec.agent_contract`** (breaking, in a 0.x minor). The read-only
+  property asked the registered object for a contract built by
+  djangorestframework-services; no live package of the family reads it, and an
+  off-HTTP declaration now lives on the spec itself, never on the registry entry.
+  Nothing replaces it here: a registration still takes only a name, a spec and tags,
+  and the docs page and example that showed the property are gone with it. One
+  archived package does read it: the final djangorestframework-pydantic-ai 0.36.x,
+  whose `SpecToolset` raises `AttributeError` when handed a non-empty `SpecRegistry`
+  on this release. A project still on it pins `django-service-specs<0.28`, or moves to
+  django-spec-agents.
+
 ## [0.27.0] — 2026-11-05
 
 ### Added
@@ -2524,7 +2557,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.27.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.28.0...HEAD
+[0.28.0]: https://github.com/Artui/django-service-specs/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Artui/django-service-specs/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/Artui/django-service-specs/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/Artui/django-service-specs/compare/v0.25.1...v0.26.0

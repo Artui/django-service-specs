@@ -1283,18 +1283,8 @@ what the service left there.
   The kernel writes nothing and keeps nothing across calls. It reads two
   keys, `request` and `view`, for a callable naming one
   ([the call's `request` and `view`](#the-calls-request-and-view)).
-- **`transport` names the transport, across the family.** One key is reserved
-  for every transport rather than left to each: a transport sets
-  `call_context["transport"]` to name itself, so a stage that answers one
-  transport differently from another - a condition, a provider, a presenter -
-  reads one key whichever transport it runs under. The values are `"agent"`,
-  which django-spec-agents sets on every call, and `"http"` and `"mcp"`, kept
-  for an HTTP and an MCP transport. The transport serving the call sets it,
-  replacing an entry already there: an agent run that arrived over HTTP and
-  carries its request is still an agent's call when the agent's tools serve it.
-  It is a convention, not a check: the kernel neither sets nor reads it, no
-  name is refused for it, and a dict built by hand or handed to `dispatch`
-  directly has none, so read it with `call_context.get("transport")`.
+  One more key is the family's: `transport`, which names the transport that built
+  the dict ([reading which transport is calling](#reading-which-transport-is-calling)).
 - **Calls sharing one dict.** The stages of one call run in sequence. A
   transport handing one dict to calls on several threads should have them
   write by compute-if-absent: read with `get`, and on a miss compute the value
@@ -1328,6 +1318,62 @@ and their async twins - take `call_context=` too, for a condition that names
 it: the dict passed, else the one the pool carries, else a fresh one. Handed
 one dict as the parameter and a different one in the pool, they refuse with
 `ImproperlyConfigured` rather than choose.
+
+### Reading which transport is calling
+
+A stage that answers one transport differently from another - a condition, a
+provider, a presenter - reads one key whichever transport it runs under:
+[`TRANSPORT_KEY`][django_service_specs.types.transport_key.TRANSPORT_KEY], read with
+[`call_transport`][django_service_specs.types.call_transport.call_transport].
+
+```python
+--8<--
+docs/examples/dispatching.py:call_transport
+--8<--
+```
+
+[`Transport`][django_service_specs.types.transport.Transport] lists the family's
+values, one per package:
+
+| Value | Package |
+| --- | --- |
+| `Transport.REST`, `"rest"` | django-spec-rest |
+| `Transport.HTML`, `"html"` | django-spec-html |
+| `Transport.MCP`, `"mcp"` | django-spec-mcp |
+| `Transport.AGENT`, `"agent"` | django-spec-agents |
+| `Transport.CLI`, `"cli"` | django-spec-cli |
+
+The contract, for a transport writing it and a stage reading it:
+
+- **The transport that builds a context stamps it, last.** Its own name is the last
+  thing it writes to the dict, replacing any entry there, on every call it builds. So
+  the key names who built this call's context and not how the call arrived: an agent
+  run that came over HTTP and carries its request reads `"agent"` when the agent's
+  tools serve it, and an MCP call django-spec-agents proxies in process reads `"mcp"`,
+  because django-spec-mcp's handler builds that context.
+- **Nothing a client sends reaches it.** A transport builds the dict on the server and
+  stamps it last, so an entry a caller smuggled in would be overwritten, and a stage may
+  branch on what it reads.
+- **A stamp is the plain string**, `Transport.AGENT.value`, never the member. So
+  `call_context["transport"] == "agent"` holds with nothing imported, and the value
+  serializes as itself. A member equals its string, so compare with `==`; `str()` of a
+  member is its qualified name, not its value, and how an f-string formats a member
+  varies by Python version, so use `.value` to get the string.
+- **A missing key means an in-process caller**: a `dispatch` made directly, from a
+  script, a shell or a test, or by a service handing an inner call a dict of its own.
+  [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
+  `None` there, and for a Validator's `parameters()` asked outside a call, which is
+  handed no dict.
+- **A transport stamps from the release that adopts the key.** django-spec-agents
+  already does. Until another transport adopts it, that transport's calls read as
+  missing too, and a stage cannot tell them from an in-process caller, so check the
+  release of each transport you run before branching on `None`.
+- **The known values are not a closed set.** A third-party transport stamps a string of
+  its own, and the reader hands back whatever was stamped. Compare a stamp to a member
+  rather than converting it: `Transport("worker")` raises.
+- **The kernel neither writes nor reads it.** Dispatch runs the same with the key or
+  without, and it is not a reserved name: a seed or an argument may be called `transport`,
+  in a different namespace from this dict.
 
 ## Answering every refusal
 

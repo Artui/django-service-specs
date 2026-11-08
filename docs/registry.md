@@ -52,11 +52,6 @@ from it can dispatch that object or the spec it compiles to under the same
 grant. Each permission check is asked about the compiled spec, the same object
 `dispatch` hands it for that declaration.
 
-The entry answers a read-only `agent_contract`: the registered object's own
-`agent_contract()` when it has one, and `None` otherwise, which is every
-`ServiceSpec` and `SelectorSpec`. It is asked, never passed: `register()` takes
-no `agent_contract=`.
-
 ```python
 --8<--
 docs/examples/registry.py:source

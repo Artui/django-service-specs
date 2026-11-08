@@ -364,6 +364,36 @@ class TestCallContext:
         with pytest.raises(NotPermitted, match="Only the back office"):
             dispatch(dispatching.archive_note_spec, principal=ada, arguments={"pk": note.pk})
 
+    def test_a_stage_reads_the_stamp_and_a_stamp_goes_in_as_the_plain_string(
+        self, ada: Any
+    ) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+
+        heading, context = dispatching.heading_for_an_agent(ada, note.pk)
+
+        assert heading == "Old"
+        assert type(context["transport"]) is str
+        assert context == {"client": "back-office", "transport": "agent"}
+
+    def test_a_caller_that_stamps_nothing_reads_as_in_process(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+
+        result = dispatch(dispatching.note_heading_spec, principal=ada, arguments={"pk": note.pk})
+
+        assert result.value == "Note: Old"
+
+    def test_a_third_party_transport_stamps_its_own_string(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+
+        result = dispatch(
+            dispatching.note_heading_spec,
+            principal=ada,
+            arguments={"pk": note.pk},
+            call_context={"transport": "worker"},
+        )
+
+        assert result.value == "Note: Old"
+
     def test_a_catch_all_is_never_handed_it(self, ada: Any) -> None:
         seen: dict[str, Any] = {}
         spec = ServiceSpec(
@@ -1167,7 +1197,6 @@ class TestRegistry:
         assert registry.entry.spec is registry.listing
         assert kernel_spec(registry.listing) is registry.compiled
         assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
-        assert registry.contracts == [{"ordering": "title"}, None]
 
     def test_a_variant_replaces_the_base_s_reads_and_leaves_the_base_alone(self) -> None:
         assert registry.search_only.parameters().names() == {"search"}

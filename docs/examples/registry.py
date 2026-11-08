@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from django_service_specs import (
     Parameter,
@@ -36,13 +35,8 @@ command_line = registry.subset("create_author", "list_notes")  # in the order na
 class OtherLibrarysListing:
     """A read declared in another library's vocabulary, compiled on demand."""
 
-    ordering: str = "title"
-
     def as_kernel_spec(self) -> SelectorSpec:
         return SelectorSpec(kind=SelectorKind.LIST, selector=notes_of, permissions=[IsSignedIn()])
-
-    def agent_contract(self) -> dict[str, Any]:
-        return {"ordering": self.ordering}
 
 
 listing = OtherLibrarysListing()
@@ -53,7 +47,6 @@ mixed.register("list_notes", list_notes_spec, tags=("notes", "read"))
 entry = mixed.get("legacy_notes")
 assert entry is not None and entry.spec is listing  # kept as registered
 compiled = kernel_spec(listing)  # compiled once; the same object every time
-contracts = [e.agent_contract for e in mixed]  # [{"ordering": "title"}, None]
 # --8<-- [end:source]
 
 

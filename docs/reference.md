@@ -245,6 +245,9 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.unset.UnsetType
 ::: django_service_specs.types.is_supplied.is_supplied
 ::: django_service_specs.types.supplied_fields.supplied_fields
+::: django_service_specs.types.transport_key.TRANSPORT_KEY
+::: django_service_specs.types.transport.Transport
+::: django_service_specs.types.call_transport.call_transport
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
 ::: django_service_specs.types.provider_keys.ProviderKeys
