@@ -2592,6 +2592,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        authorize_without_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.dispatch.authorize_target.authorize_target" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3710,10 +3721,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#django_service_specs.types.transport.Transport" class="md-nav__link">
+  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transport
+        call_transport
       
     </span>
   </a>
@@ -3721,10 +3732,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
+  <a href="#django_service_specs.types.build_call_context.build_call_context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        call_transport
+        build_call_context
       
     </span>
   </a>
@@ -6262,6 +6273,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        authorize_without_arguments
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.dispatch.authorize_target.authorize_target" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -7380,10 +7402,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#django_service_specs.types.transport.Transport" class="md-nav__link">
+  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Transport
+        call_transport
       
     </span>
   </a>
@@ -7391,10 +7413,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
+  <a href="#django_service_specs.types.build_call_context.build_call_context" class="md-nav__link">
     <span class="md-ellipsis">
       
-        call_transport
+        build_call_context
       
     </span>
   </a>
@@ -10955,7 +10977,7 @@ another, so a Validator that writes to it needs no guard for a call that
 was handed none. It trails every other field, so no existing
 construction changes. One key is the family's rather than any one
 transport's: <code>"transport"</code>, where stamped, names the transport that built
-the context, by convention only - the kernel neither writes nor reads it,
+the context, by convention only - dispatch neither writes nor reads it,
 so read it with
 <a class="autorefs autorefs-internal" title="call_transport" href="#django_service_specs.types.call_transport.call_transport"><code>call_transport</code></a>.</p>
 
@@ -11226,7 +11248,7 @@ read the call it is rendering for.</p>
   the presenter's to read and write; the kernel writes nothing to it. A
   context built by hand gets an empty dict of its own. Its
   <code>"transport"</code> key, where stamped, names the transport that built the
-  context: a family convention the kernel neither writes nor reads, so
+  context: a family convention dispatch neither writes nor reads, so
   read it with
   <a class="autorefs autorefs-internal" title="call_transport" href="#django_service_specs.types.call_transport.call_transport"><code>call_transport</code></a>.</li>
 <li><code>shapes</code> is what the caller sent for the spec's declared <code>shapes</code>,
@@ -18055,10 +18077,133 @@ question (test_a_check_declaring_arguments_on_the_class_question_reads_them),
 a create's scope question
 (test_a_check_declaring_arguments_only_on_the_scope_question_reads_them_in_a_create),
 and the scope question left out beside a target selector or on a selector
-spec, one arc to coverage with two conjuncts
+spec, the predicate <code>asks_scope_of_nothing</code> that
+<a class="autorefs autorefs-internal" title="authorize_without_arguments" href="#django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments"><code>authorize_without_arguments</code></a>
+reads too, one arc to coverage with two conjuncts
 (test_the_scope_question_is_not_asked_where_a_target_or_a_selector_stands
 holds the target selector's; the selector spec's, which has no
 <code>target_selector_spec</code>, is held by every <code>_listing</code> case).</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">authorize_without_arguments</span>
+
+
+<a href="#django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">authorize_without_arguments</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">spec</span><span class="p">:</span> <span class="n">ServiceSpec</span> <span class="o">|</span> <span class="n">SelectorSpec</span> <span class="o">|</span> <span class="n">SpecSource</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">principal</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">grant</span><span class="p">:</span> <span class="n">Grant</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">pool_seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Grant</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Ask <code>spec</code>'s permission checks for <code>principal</code> as a call with no arguments would.</p>
+<p>For a transport that has to answer before it has a call's arguments, or
+without them: a listing filtered by permission, an OPTIONS answer, a
+completion, a call whose arguments failed their shape. Two questions, the
+two dispatch asks before the arguments name a row or a set:
+<a class="autorefs autorefs-internal" title="authorize" href="#django_service_specs.dispatch.authorize.authorize"><code>authorize</code></a>, the
+class-level one, and, for a <code>ServiceSpec</code> with no target selector (a
+create),
+<a class="autorefs autorefs-internal" title="authorize_scope" href="#django_service_specs.dispatch.authorize_scope.authorize_scope"><code>authorize_scope</code></a>
+of <code>None</code>. Any other spec's scope question is of a row or a set only the
+arguments name, and stays unasked. The rule is the one
+<a class="autorefs autorefs-internal" title="checks_read_arguments" href="#django_service_specs.dispatch.checks_read_arguments.checks_read_arguments"><code>checks_read_arguments</code></a>
+reads a spec's declarations by, so a check it says declares <code>arguments</code>
+is a check this asks. Each question is handed <code>arguments=None</code>, the
+kernel's word for a call with none to hand.</p>
+<p><strong>Nothing is caught.</strong> What either question raises reaches the caller as
+it was raised: a refusal (<code>NotPermitted</code>, a check's own exception), a
+configuration error (<code>ImproperlyConfigured</code>: a spec declaring no
+permissions and no <code>grant</code>, a check left awaiting its answer), and a
+check that cannot answer without the arguments it reads
+(<code>arguments["owner"]</code> on <code>None</code> raises <code>TypeError</code>). Which of those
+is a refusal, which hides an operation and which waits for the call is the
+transport's policy, so the transport wraps this in its own <code>try</code>.</p>
+<p><code>grant</code>, <code>call_context</code> and <code>pool_seeds</code> are handed to both questions
+as <code>authorize</code> takes them: a covering grant answers the class-level
+question and a grant for another spec or principal is refused; both
+questions are handed the one <code>call_context</code> dict; and each question
+resolves from <code>pool_seeds</code> the seeds its own checks name. A deactivated
+principal handed with <code>pool_seeds</code> raises <code>PrincipalUnavailable</code> before
+any check is asked, as dispatch refuses one; without <code>pool_seeds</code> it is
+asked exactly as <code>authorize</code> asks it. A grant's <code>target_checked</code> does
+not answer the scope question here: it covers a target handed to dispatch
+as <code>target=</code>, and a call with no arguments hands none, so dispatch would
+ask it.</p>
+<p><code>spec</code> may be a
+<a class="autorefs autorefs-internal" title="SpecSource" href="#django_service_specs.specs.spec_source.SpecSource"><code>SpecSource</code></a>, asked as
+the spec it compiles to.</p>
+
+
+    <p><span class="doc-section-title">Returns:</span></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Grant
+
+
+  
+      dataclass
+   (django_service_specs.dispatch.grant.Grant)" href="#django_service_specs.dispatch.grant.Grant">Grant</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>The grant <code>authorize</code> returned: the covering <code>grant</code> handed in,</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Grant
+
+
+  
+      dataclass
+   (django_service_specs.dispatch.grant.Grant)" href="#django_service_specs.dispatch.grant.Grant">Grant</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>unchanged, or a fresh one for the spec and <code>principal</code>, which claims</p>
+              </div>
+            </td>
+          </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><a class="autorefs autorefs-internal" title="Grant
+
+
+  
+      dataclass
+   (django_service_specs.dispatch.grant.Grant)" href="#django_service_specs.dispatch.grant.Grant">Grant</a></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>no target, so a <code>dispatch</code> handed it still asks the scope question.</p>
+              </div>
+            </td>
+          </tr>
+      </tbody>
+    </table>
 
 
     </div>
@@ -24039,69 +24184,11 @@ type, which no dict annotation can spell per key.</p>
 
         <p>The <code>call_context</code> key that names the transport which built the call's context.</p>
 <p>The transport stamps it last, over anything already there, as the plain string,
-so <code>call_context["transport"] == "agent"</code> holds with nothing imported. The kernel
+so <code>call_context["transport"] == "agent"</code> holds with nothing imported. Dispatch
 neither writes nor reads it, and it is not a reserved name: a seed or an argument
 may be called <code>transport</code>. A missing key means an in-process caller, or a
 transport on a release that has not adopted the key yet. See
 <a href="../dispatching/#reading-which-transport-is-calling">reading which transport is calling</a>.</p>
-
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-class">
-
-
-
-<h2 id="django_service_specs.types.transport.Transport" class="doc doc-heading">
-            <span class="doc doc-object-name doc-class-name">Transport</span>
-
-
-<a href="#django_service_specs.types.transport.Transport" class="headerlink" title="Permanent link">&para;</a></h2>
-
-
-    <div class="doc doc-contents first">
-            <p class="doc doc-class-bases">
-              Bases: <code><span title="str">str</span></code>, <code><span title="enum.Enum">Enum</span></code></p>
-
-
-
-        <p>The name each of the family's transports stamps under <code>TRANSPORT_KEY</code>.</p>
-<p>One value per package, and the package that builds the call's context stamps
-its own: an MCP call that django-spec-agents proxies in process reads <code>MCP</code>,
-because django-spec-mcp's handler builds that context. Each package stamps from
-the release that adopts the key.</p>
-<p>Not a closed set. A third-party transport stamps its own string, so read a
-stamp by comparing it to a member rather than converting it to one, which
-raises for a string that is not listed here.</p>
-<p>Inheriting from <code>str</code> makes a member equal to its plain string, the form a
-transport stamps with <code>.value</code>. <code>str()</code> of a member is its qualified name
-rather than its value, which is why a stamp is never the member itself.</p>
-
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-
-
-  </div>
 
     </div>
 
@@ -24125,9 +24212,55 @@ rather than its value, which is why a stamp is never the member itself.</p>
 has no such key, a transport on a release that has not adopted the key yet, or
 a Validator's <code>parameters()</code> asked outside a call, which is handed no dict at
 all.</p>
-<p>The stamp comes back as it was written, a known value or a third-party
-transport's own string, so compare it to a
-<a class="autorefs autorefs-internal" title="Transport" href="#django_service_specs.types.transport.Transport"><code>Transport</code></a> member.</p>
+<p>The stamp comes back as it was written, whatever string the transport chose,
+so compare it to a plain string: <code>call_transport(call_context) == "rest"</code>.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.types.build_call_context.build_call_context" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">build_call_context</span>
+
+
+<a href="#django_service_specs.types.build_call_context.build_call_context" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">build_call_context</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">transport</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">base</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">request</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">view</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="nb">format</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">action</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return a new <code>call_context</code> for one call, stamped with <code>transport</code>.</p>
+<p>The dict holds every entry of <code>base</code> and the four standard entries,
+<code>request</code>, <code>view</code>, <code>format</code> and <code>action</code>, each <code>None</code> where
+neither <code>base</code> nor an argument gave one, so a stage reading
+<code>call_context["action"]</code> gets <code>None</code> rather than a <code>KeyError</code> on any
+transport that builds through this
+(test_every_standard_entry_is_there_and_none_where_nothing_gave_one).
+Dispatch hands a callable declaring <code>request</code> or <code>view</code> <code>None</code> for a
+<code>None</code> entry, exactly as for a missing one, so filling them changes no
+binding (test_with_every_standard_key_none_every_stage_is_handed_none).</p>
+<p>Each layer wins over the one before it: the <code>None</code> defaults, then
+<code>base</code>, then each argument that is not <code>None</code>, then <code>transport</code>,
+written last so it replaces a <code>transport</code> entry <code>base</code> carried. An
+argument left at <code>None</code> is not given, so it leaves <code>base</code>'s entry
+(test_a_none_argument_leaves_base_s_entry); to clear one, edit the result.</p>
+<p><code>base</code> is copied, shallowly and never mutated: its values are the very
+objects it held, so a request is the request. The result is a plain <code>dict</code>,
+a fresh one on every call and the caller's to keep: a transport that hands
+one dict to every callable of a request builds it once and passes the same
+object each time.</p>
 
 
     </div>
