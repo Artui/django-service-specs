@@ -5088,6 +5088,43 @@ class TestTheCallContext:
 
         assert call_context.touches == []
 
+    def test_no_stage_of_an_async_selector_touches_the_transport_key(self, ada: Any) -> None:
+        """``adispatch`` opens an ``async def`` selector on a path nothing else takes."""
+
+        async def rows(*, call_context: Any) -> list[Any]:
+            return []
+
+        call_context = _WatchedForTheTransportKey()
+
+        async_to_sync(adispatch)(
+            SelectorSpec(kind=LIST, selector=rows, permissions=OPEN),
+            principal=ada,
+            arguments={},
+            call_context=call_context,
+        )
+
+        assert call_context.touches == []
+
+    def test_no_stage_of_a_non_atomic_async_service_touches_the_transport_key(
+        self, ada: Any
+    ) -> None:
+        """``adispatch`` awaits one on a path of its own: an atomic one joins the prelude's hop."""
+
+        async def service(*, call_context: Any) -> str:
+            return "ran"
+
+        call_context = _WatchedForTheTransportKey()
+
+        result = async_to_sync(adispatch)(
+            ServiceSpec(service=service, permissions=OPEN, atomic=False),
+            principal=ada,
+            arguments={},
+            call_context=call_context,
+        )
+
+        assert result.value == "ran"
+        assert call_context.touches == []
+
     @_ENTRIES
     def test_a_seed_and_an_argument_may_be_named_transport(
         self, entry: Callable[..., Any], ada: Any

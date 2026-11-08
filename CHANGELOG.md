@@ -36,8 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing replaces it here: a registration still takes only a name, a spec and tags,
   and the docs page and example that showed the property are gone with it. One
   archived package does read it: the final djangorestframework-pydantic-ai 0.36.x,
-  whose `SpecToolset` raises `AttributeError` when handed a `SpecRegistry` on this
-  release. A project still on it pins `django-service-specs<0.28`, or moves to
+  whose `SpecToolset` raises `AttributeError` when handed a non-empty `SpecRegistry`
+  on this release. A project still on it pins `django-service-specs<0.28`, or moves to
   django-spec-agents.
 
 ## [0.27.0] — 2026-11-05
