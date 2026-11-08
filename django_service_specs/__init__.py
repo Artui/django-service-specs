@@ -150,6 +150,7 @@ from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.build_call_context import build_call_context
 from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
@@ -291,6 +292,7 @@ __all__ = [
     "authorize_target",
     "base_pool",
     "bind_arguments",
+    "build_call_context",
     "call_transport",
     "can_present_nothing",
     "check_arguments",

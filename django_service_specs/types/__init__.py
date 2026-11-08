@@ -1,9 +1,11 @@
 """Value-shape carriers shared across the package, the root of its refusals, and
 the sync/async predicate every bridge between the two reads, the readers of what
-an input supplied, and the names a call's context carries its transport under.
+an input supplied, the names a call's context carries its transport under, and
+the builder a transport makes that context with.
 """
 
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.build_call_context import build_call_context
 from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
@@ -50,6 +52,7 @@ __all__ = [
     "UnknownArguments",
     "UnsetType",
     "ValueFormatter",
+    "build_call_context",
     "call_transport",
     "is_async",
     "is_supplied",

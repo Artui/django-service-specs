@@ -1365,6 +1365,24 @@ The contract, for a transport writing it and a stage reading it:
   without, and it is not a reserved name: a seed or an argument may be called `transport`,
   in a different namespace from this dict.
 
+A transport builds the dict with
+[`build_call_context`][django_service_specs.types.build_call_context.build_call_context],
+which keeps that contract in one place. It returns a new dict holding every entry of the
+`base` it is handed, such as an agent run's own dict, and the four standard entries,
+`request`, `view`, `format` and `action`, each `None` where nothing gave one, so
+`call_context["action"]` never raises on a transport that builds through it. An argument
+wins over the entry of its name in `base`, an argument left at `None` leaves that entry,
+and the transport's string goes in last, over any `transport` the `base` carried. `base`
+is never changed, and the result is a fresh plain dict for the transport to keep: one that
+hands every callable of a request the same dict builds it once. A `None` entry binds as a
+missing one, so a callable declaring `request` is handed `None` either way.
+
+```python
+--8<--
+docs/examples/dispatching.py:build_call_context
+--8<--
+```
+
 ## Answering every refusal
 
 Dispatch refuses in two families, and a transport answers each refusal in its

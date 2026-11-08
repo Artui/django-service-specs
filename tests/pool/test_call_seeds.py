@@ -213,6 +213,26 @@ class TestEveryStage:
         assert saw.all_are(None, None)
 
     @_ENTRIES
+    def test_with_every_standard_key_none_every_stage_is_handed_none(
+        self, entry: Callable[..., Any]
+    ) -> None:
+        # A ``None`` entry binds as a missing one, so a transport that fills the
+        # four standard keys with ``None`` (``build_call_context``) hands every
+        # stage what one that sets none of them does, and no stage that runs
+        # without the keys is refused with them.
+        ada = make_user("ada")
+        note = Note.objects.create(title="n", owner=ada)
+        saw = _Saw()
+        entry(
+            _every_stage(saw),
+            principal=ada,
+            arguments={"pk": note.pk, "title": "t"},
+            call_context={"request": None, "view": None, "format": None, "action": None},
+        )
+        assert set(saw.seen) == _SERVICE_STAGES
+        assert saw.all_are(None, None)
+
+    @_ENTRIES
     def test_a_selector_spec_s_stages_are_handed_them(self, entry: Callable[..., Any]) -> None:
         saw = _Saw()
 

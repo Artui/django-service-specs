@@ -394,6 +394,23 @@ class TestCallContext:
 
         assert result.value == "Note: Old"
 
+    def test_a_built_context_holds_every_standard_key_and_the_stamp_wins(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+        run_context = {"client": "back-office", "transport": "rest"}
+
+        heading, context = dispatching.heading_for_a_tool_call(ada, note.pk, run_context)
+
+        assert heading == "Old"
+        assert context == {
+            "request": None,
+            "view": None,
+            "format": None,
+            "action": "note_heading",
+            "client": "back-office",
+            "transport": "agent",
+        }
+        assert run_context == {"client": "back-office", "transport": "rest"}
+
     def test_a_catch_all_is_never_handed_it(self, ada: Any) -> None:
         seen: dict[str, Any] = {}
         spec = ServiceSpec(

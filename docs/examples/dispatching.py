@@ -33,6 +33,7 @@ from django_service_specs import (
     apply_server_arguments,
     authorize,
     bind_arguments,
+    build_call_context,
     call_transport,
     check_call,
     check_seeds,
@@ -681,3 +682,17 @@ def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
 
 
 # --8<-- [end:call_transport]
+
+
+# --8<-- [start:build_call_context]
+def heading_for_a_tool_call(
+    user: Any, pk: int, run_context: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
+    # One new dict per call: the run's entries, what the transport knows of this
+    # call, and its own name stamped last, over a ``transport`` the run carried.
+    context = build_call_context("agent", base=run_context, action="note_heading")
+    result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
+    return result.value, context
+
+
+# --8<-- [end:build_call_context]

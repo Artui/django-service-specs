@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.29.0] — 2026-11-08
 
+### Added
+- **`build_call_context(transport, *, base=None, request=None, view=None, format=None,
+  action=None)`**, from the package root and `django_service_specs.types`, for a
+  transport to build a call's context in one call. It returns a new plain dict with
+  every entry of `base`, the four standard entries `request`, `view`, `format` and
+  `action`, each `None` where nothing gave one, and `transport` stamped last under
+  `TRANSPORT_KEY`, over any `transport` the `base` carried. An argument wins over the
+  entry of its name in `base`, and an argument left at `None` leaves that entry. `base`
+  is copied shallowly and never changed. A `None` entry binds as a missing one, so a
+  callable declaring `request` is handed `None` either way. Dispatch still neither
+  writes nor reads the transport key.
+
 ### Removed
 - **`Transport`, the enum of the family's transport names, is gone** from the package
   root and from `django_service_specs.types`. It was published in 0.28.0 and no
