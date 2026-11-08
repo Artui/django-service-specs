@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The kernel still neither writes nor reads the key. Each transport adopts it in its
   own release; until then only django-spec-agents stamps.
 
+### Changed
+- **`"http"` is no longer a documented value of `call_context["transport"]`.** It
+  was ambiguous, since django-spec-rest, django-spec-html and django-spec-mcp all
+  arrive over HTTP, and no package ever stamped it. Each package now stamps its own
+  name. The dispatching guide and the `ValidationContext` and `PresentationContext`
+  docstrings say so.
+
 ### Removed
 - **`RegisteredSpec.agent_contract`** (breaking, in a 0.x minor). The read-only
   property asked the registered object for a contract built by
@@ -26,13 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   declaration now lives on the spec itself, never on the registry entry. Nothing
   replaces it here: a registration still takes only a name, a spec and tags, and the
   docs page and example that showed the property are gone with it.
-
-### Changed
-- **`"http"` is no longer a documented value of `call_context["transport"]`.** It
-  was ambiguous, since django-spec-rest, django-spec-html and django-spec-mcp all
-  arrive over HTTP, and no package ever stamped it. Each package now stamps its own
-  name. The dispatching guide and the `ValidationContext` and `PresentationContext`
-  docstrings say so.
 
 ## [0.27.0] — 2026-11-05
 

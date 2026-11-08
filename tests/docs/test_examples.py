@@ -1197,7 +1197,6 @@ class TestRegistry:
         assert registry.entry.spec is registry.listing
         assert kernel_spec(registry.listing) is registry.compiled
         assert [e.name for e in registry.mixed.queries()] == ["legacy_notes", "list_notes"]
-        assert registry.contracts == [{"ordering": "title"}, None]
 
     def test_a_variant_replaces_the_base_s_reads_and_leaves_the_base_alone(self) -> None:
         assert registry.search_only.parameters().names() == {"search"}
