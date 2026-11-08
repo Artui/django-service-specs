@@ -1332,8 +1332,8 @@ docs/examples/dispatching.py:call_transport
 --8<--
 ```
 
-The family's packages each stamp one plain string. Each package owns its value and
-states it in its own documentation, so a new transport needs no kernel release:
+Each family package stamps one plain string, owns that value and states it in its own
+documentation as it adopts the key, so a new transport needs no kernel release:
 
 | Value | Package |
 | --- | --- |
