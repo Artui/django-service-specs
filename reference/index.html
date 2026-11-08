@@ -3487,23 +3487,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="RegisteredSpec">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#django_service_specs.registry.registered_spec.RegisteredSpec.agent_contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        agent_contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -3709,6 +3692,39 @@
     <span class="md-ellipsis">
       
         supplied_fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.transport_key.TRANSPORT_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TRANSPORT_KEY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.transport.Transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transport
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        call_transport
       
     </span>
   </a>
@@ -7141,23 +7157,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="RegisteredSpec">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#django_service_specs.registry.registered_spec.RegisteredSpec.agent_contract" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        agent_contract
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -7363,6 +7362,39 @@
     <span class="md-ellipsis">
       
         supplied_fields
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.transport_key.TRANSPORT_KEY" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TRANSPORT_KEY
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.transport.Transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Transport
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#django_service_specs.types.call_transport.call_transport" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        call_transport
       
     </span>
   </a>
@@ -10922,10 +10954,10 @@ built by hand gets an empty dict of its own, never one shared with
 another, so a Validator that writes to it needs no guard for a call that
 was handed none. It trails every other field, so no existing
 construction changes. One key is the family's rather than any one
-transport's: <code>"transport"</code> names the transport serving the call
-(<code>"agent"</code>, <code>"http"</code>, <code>"mcp"</code>), set by that transport, by
-convention only - the kernel neither sets nor checks it, so read it with
-<code>.get</code>.</p>
+transport's: <code>"transport"</code>, where stamped, names the transport that built
+the context, by convention only - the kernel neither writes nor reads it,
+so read it with
+<a class="autorefs autorefs-internal" title="call_transport" href="#django_service_specs.types.call_transport.call_transport"><code>call_transport</code></a>.</p>
 
 
 
@@ -11193,9 +11225,10 @@ read the call it is rendering for.</p>
   handed the same context - reuses what an earlier stage put there. It is
   the presenter's to read and write; the kernel writes nothing to it. A
   context built by hand gets an empty dict of its own. Its
-  <code>"transport"</code> key, where set, names the transport serving the call
-  (<code>"agent"</code>, <code>"http"</code>, <code>"mcp"</code>): a family convention the kernel
-  neither sets nor checks, so read it with <code>.get</code>.</li>
+  <code>"transport"</code> key, where stamped, names the transport that built the
+  context: a family convention the kernel neither writes nor reads, so
+  read it with
+  <a class="autorefs autorefs-internal" title="call_transport" href="#django_service_specs.types.call_transport.call_transport"><code>call_transport</code></a>.</li>
 <li><code>shapes</code> is what the caller sent for the spec's declared <code>shapes</code>,
   the arguments that shape the output - which fields, a query over the
   rows - by name, read-only. An argument the caller left out is absent
@@ -23168,38 +23201,6 @@ configures it, not here.</p>
 
 
 
-<div class="doc doc-object doc-attribute">
-
-
-
-<h3 id="django_service_specs.registry.registered_spec.RegisteredSpec.agent_contract" class="doc doc-heading">
-            <span class="doc doc-object-name doc-attribute-name">agent_contract</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-property"><code>property</code></small>
-  </span>
-
-<a href="#django_service_specs.registry.registered_spec.RegisteredSpec.agent_contract" class="headerlink" title="Permanent link">&para;</a></h3>
-<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">agent_contract</span><span class="p">:</span> <span class="n">Any</span>
-</span></code></pre></div>
-
-    <div class="doc doc-contents ">
-
-        <p>The registered object's own <code>agent_contract()</code>, or <code>None</code> when it has none.</p>
-<p>Read-only, and never a field: a declaration lives on the spec, never
-on the registry entry, so nothing is passed here and the entry only
-asks. A <code>ServiceSpec</code> or <code>SelectorSpec</code> has none and answers
-<code>None</code>; an object registered from djangorestframework-services
-answers the contract its current release builds from what the spec
-declares, for the transports published against that release. Typed
-<code>Any</code> because the value is that object's, of a type this package
-does not name. Asked on every read, so it is never stale.</p>
-
-    </div>
-
-</div>
-
 
 
 
@@ -24012,6 +24013,121 @@ type, which no dict annotation can spell per key.</p>
           </tr>
       </tbody>
     </table>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-attribute">
+
+
+
+<h2 id="django_service_specs.types.transport_key.TRANSPORT_KEY" class="doc doc-heading">
+            <span class="doc doc-object-name doc-attribute-name">TRANSPORT_KEY</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span>
+
+<a href="#django_service_specs.types.transport_key.TRANSPORT_KEY" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">TRANSPORT_KEY</span><span class="p">:</span> <span class="n">Final</span> <span class="o">=</span> <span class="s1">'transport'</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The <code>call_context</code> key that names the transport which built the call's context.</p>
+<p>The transport stamps it last, over anything already there, as the plain string,
+so <code>call_context["transport"] == "agent"</code> holds with nothing imported. The kernel
+neither writes nor reads it, and it is not a reserved name: a seed or an argument
+may be called <code>transport</code>. A missing key means an in-process caller, or a
+transport on a release that has not adopted the key yet. See
+<a href="../dispatching/#reading-which-transport-is-calling">reading which transport is calling</a>.</p>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+<h2 id="django_service_specs.types.transport.Transport" class="doc doc-heading">
+            <span class="doc doc-object-name doc-class-name">Transport</span>
+
+
+<a href="#django_service_specs.types.transport.Transport" class="headerlink" title="Permanent link">&para;</a></h2>
+
+
+    <div class="doc doc-contents first">
+            <p class="doc doc-class-bases">
+              Bases: <code><span title="str">str</span></code>, <code><span title="enum.Enum">Enum</span></code></p>
+
+
+
+        <p>The name each of the family's transports stamps under <code>TRANSPORT_KEY</code>.</p>
+<p>One value per package, and the package that builds the call's context stamps
+its own: an MCP call that django-spec-agents proxies in process reads <code>MCP</code>,
+because django-spec-mcp's handler builds that context. Each package stamps from
+the release that adopts the key.</p>
+<p>Not a closed set. A third-party transport stamps its own string, so read a
+stamp by comparing it to a member rather than converting it to one, which
+raises for a string that is not listed here.</p>
+<p>Inheriting from <code>str</code> makes a member equal to its plain string, the form a
+transport stamps with <code>.value</code>. <code>str()</code> of a member is its qualified name
+rather than its value, which is why a stamp is never the member itself.</p>
+
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.types.call_transport.call_transport" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">call_transport</span>
+
+
+<a href="#django_service_specs.types.call_transport.call_transport" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">call_transport</span><span class="p">(</span><span class="n">call_context</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>Return what the call's transport stamped under <code>TRANSPORT_KEY</code>, or <code>None</code>.</p>
+<p><code>None</code> means nothing stamped this context: an in-process caller, whose dict
+has no such key, a transport on a release that has not adopted the key yet, or
+a Validator's <code>parameters()</code> asked outside a call, which is handed no dict at
+all.</p>
+<p>The stamp comes back as it was written, a known value or a third-party
+transport's own string, so compare it to a
+<a class="autorefs autorefs-internal" title="Transport" href="#django_service_specs.types.transport.Transport"><code>Transport</code></a> member.</p>
 
 
     </div>
