@@ -9,7 +9,7 @@ from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.specs.utils import Foreign, ForeignWithContract, Nobody
+from tests.specs.utils import Foreign, Nobody
 
 
 def _noop() -> None:
@@ -499,16 +499,3 @@ class TestAForeignDeclaration:
 
         with pytest.raises(TypeError, match=r"'wrong': Wrong.as_kernel_spec\(\) must return"):
             SpecRegistry().register("wrong", Wrong())  # type: ignore[arg-type]
-
-    def test_register_takes_no_agent_contract(self) -> None:
-        with pytest.raises(TypeError, match="agent_contract"):
-            SpecRegistry().register("refund_order", _service(), agent_contract=object())  # type: ignore[call-arg]
-
-    def test_the_entry_answers_the_declaration_s_own_agent_contract(self) -> None:
-        contract = object()
-        registry = SpecRegistry()
-        registry.register("kernel", _service())
-        registry.register("bare", Foreign(_service()))
-        registry.register("carrying", ForeignWithContract(_service(), contract=contract))
-
-        assert [e.agent_contract for e in registry] == [None, None, contract]

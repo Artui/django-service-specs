@@ -70,13 +70,3 @@ class Foreign:
     def as_kernel_spec(self) -> ServiceSpec | SelectorSpec:
         self.compiles.append(1)
         return self.compiled
-
-
-@dataclass(frozen=True)
-class ForeignWithContract(Foreign):
-    """A ``Foreign`` that answers ``agent_contract()``, as the real one does while it carries one."""
-
-    contract: Any = None
-
-    def agent_contract(self) -> Any:
-        return self.contract

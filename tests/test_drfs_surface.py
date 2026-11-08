@@ -52,7 +52,6 @@ from django_service_specs import (
     Parameters,
     SelectorKind,
     SelectorSpec,
-    SpecRegistry,
     UnknownArguments,
     Unrestricted,
     adispatch,
@@ -356,11 +355,7 @@ SURFACE: dict[str, Pin] = {
     "provider_keys": _fn("pool.provider_keys", "provider"),
     "resolve_callable_kwargs": _fn("pool.resolve_callable_kwargs", "fn, pool"),
     # --- registry -----------------------------------------------------------------------------
-    "RegisteredSpec": Pin(
-        "registry.registered_spec",
-        signature="name, spec, tags=",
-        methods={"agent_contract": "property"},
-    ),
+    "RegisteredSpec": Pin("registry.registered_spec", signature="name, spec, tags="),
     "SpecRegistry": Pin(
         "registry.spec_registry",
         signature="entries=",
@@ -900,12 +895,7 @@ def test_the_rendering_tells_method_kinds_apart() -> None:
     ]
 
 
-# --- the registry entry's agent_contract --------------------------------------------------------
-#
-# The published MCP and agent transports read ``entry.agent_contract`` off a
-# registry entry. djangorestframework-services answers it from its own spec
-# while that release is current, so the entry must keep asking the object as
-# registered rather than storing a value of its own.
+# --- an open selector spec to dispatch --------------------------------------------------
 
 
 def _open_selector(selector: Any = None) -> SelectorSpec:
@@ -918,74 +908,6 @@ def _open_selector(selector: Any = None) -> SelectorSpec:
 
 def _no_rows() -> list[Any]:
     return []
-
-
-class _CompilesWithContract:
-    """Shaped as djangorestframework-services' spec where the entry reads it."""
-
-    def __init__(self, contract: object) -> None:
-        self.contract = contract
-
-    def as_kernel_spec(self) -> SelectorSpec:
-        return _open_selector()
-
-    def agent_contract(self) -> object:
-        return self.contract
-
-
-def test_the_entry_answers_the_registered_object_s_agent_contract() -> None:
-    contract = object()
-    registry = SpecRegistry()
-    registry.register("list_notes", _CompilesWithContract(contract))
-
-    assert registry.get("list_notes").agent_contract is contract
-
-
-class _CompilesWithoutContract:
-    """The same spec once it stops carrying a contract, as it will in a later release."""
-
-    def as_kernel_spec(self) -> SelectorSpec:
-        return _open_selector()
-
-
-class _HoldsAContractValue(_CompilesWithoutContract):
-    """An ``agent_contract`` that is a value rather than the method: not asked."""
-
-    agent_contract = "a value, not the method"
-
-
-@pytest.mark.parametrize(
-    "registered",
-    [_open_selector, _CompilesWithoutContract, _HoldsAContractValue],
-    ids=["kernel spec", "source without one", "source holding a value"],
-)
-def test_the_entry_answers_none_for_anything_without_the_method(registered: Any) -> None:
-    registry = SpecRegistry()
-    registry.register("list_notes", registered())
-
-    assert registry.get("list_notes").agent_contract is None
-
-
-def test_the_entry_s_agent_contract_is_a_property_without_a_setter() -> None:
-    # Assigning to the entry proves nothing here: the entry is a frozen
-    # dataclass, so any assignment raises, whatever agent_contract is. That
-    # it is no field, which a registration could fill, is the signature row
-    # for RegisteredSpec above.
-    attribute = inspect.getattr_static(django_service_specs.RegisteredSpec, "agent_contract")
-    assert isinstance(attribute, property)
-    assert attribute.fset is None
-
-
-def test_register_refuses_agent_contract_with_python_s_own_type_error() -> None:
-    with pytest.raises(TypeError, match="agent_contract") as refused:
-        SpecRegistry().register(
-            "list_notes",
-            _open_selector(),
-            agent_contract=object(),  # type: ignore[call-arg]
-        )
-    # Plain TypeError, the one an unexpected keyword raises, rather than a
-    # refusal of this package's own that a caller might catch by name.
-    assert type(refused.value) is TypeError
 
 
 # --- UnknownArguments.PASSTHROUGH ---------------------------------------------------------------

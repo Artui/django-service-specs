@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -49,19 +48,3 @@ class RegisteredSpec:
     name: str
     spec: ServiceSpec | SelectorSpec | SpecSource
     tags: frozenset[str] = frozenset()
-
-    @property
-    def agent_contract(self) -> Any:
-        """The registered object's own ``agent_contract()``, or ``None`` when it has none.
-
-        Read-only, and never a field: a declaration lives on the spec, never
-        on the registry entry, so nothing is passed here and the entry only
-        asks. A ``ServiceSpec`` or ``SelectorSpec`` has none and answers
-        ``None``; an object registered from djangorestframework-services
-        answers the contract its current release builds from what the spec
-        declares, for the transports published against that release. Typed
-        ``Any`` because the value is that object's, of a type this package
-        does not name. Asked on every read, so it is never stale.
-        """
-        answer = getattr(self.spec, "agent_contract", None)
-        return answer() if callable(answer) else None
