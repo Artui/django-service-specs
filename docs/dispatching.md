@@ -1276,7 +1276,7 @@ what the service left there.
   a seed, a provider's key, an overlay or an argument named `call_context` is
   refused. Seed resolvers do not see it, since a seed is resolved before
   anything the call adds.
-- **The kernel pre-fills nothing.** What goes in is the transport's
+- **Dispatch pre-fills nothing.** What goes in is the transport's
   convention: a transport over DRF is expected to put DRF's `request` there,
   and a key such as `request`, `view` or `format` means what the transport
   that wrote it says.
