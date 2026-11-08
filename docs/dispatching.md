@@ -1280,7 +1280,7 @@ what the service left there.
   convention: a transport over DRF is expected to put DRF's `request` there,
   and a key such as `request`, `view` or `format` means what the transport
   that wrote it says.
-  The kernel writes nothing and keeps nothing across calls. It reads two
+  Dispatch writes nothing to it and keeps nothing across calls. It reads two
   keys, `request` and `view`, for a callable naming one
   ([the call's `request` and `view`](#the-calls-request-and-view)).
   One more key is the family's: `transport`, which names the transport that built
