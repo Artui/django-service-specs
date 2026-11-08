@@ -563,6 +563,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # Whether a spec's checks need the call's arguments to answer, which a
         # transport's filtered listing reads; drfs serves no such listing.
         "checks_read_arguments",
+        # The checks asked as a call with no arguments asks them, which a
+        # transport's filtered listing or OPTIONS answer asks; drfs serves
+        # neither.
+        "authorize_without_arguments",
         # Permission checks combined as one: a check like any other, which a
         # project's spec declares under any transport, so drfs neither wraps
         # nor re-exports them.
@@ -642,12 +646,12 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         # wraps nor re-exports them.
         "is_supplied",
         "supplied_fields",
-        # The call context's transport key, its known values and its reader, for
-        # a transport to stamp and a stage to read: the transports use them from
+        # The call context's transport key, its reader and its builder, for a
+        # transport to stamp and a stage to read: the transports use them from
         # this package, and djangorestframework-services neither wraps nor
         # re-exports them.
         "TRANSPORT_KEY",
-        "Transport",
+        "build_call_context",
         "call_transport",
         # This package's version, which no importer reads as an API.
         "__version__",

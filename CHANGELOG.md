@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.29.0] — 2026-11-08
+
+### Added
+- **`build_call_context(transport, *, base=None, request=None, view=None, format=None,
+  action=None)`**, from the package root and `django_service_specs.types`, for a
+  transport to build a call's context in one call. It returns a new plain dict with
+  every entry of `base`, the four standard entries `request`, `view`, `format` and
+  `action`, each `None` where nothing gave one, and `transport` stamped last under
+  `TRANSPORT_KEY`, over any `transport` the `base` carried. An argument wins over the
+  entry of its name in `base`, and an argument left at `None` leaves that entry. `base`
+  is copied shallowly and never changed. A `None` entry binds as a missing one, so a
+  callable declaring `request` is handed `None` either way. Dispatch still neither
+  writes nor reads the transport key.
+- **`authorize_without_arguments(spec, principal, *, grant=None, call_context=None,
+  pool_seeds=None)`**, from the package root and `django_service_specs.dispatch`, asks
+  a spec's permission checks what a call with no arguments is asked, for a transport
+  answering before it has a call's arguments or without them: a filtered listing, an
+  OPTIONS answer, a call whose arguments failed their shape. It asks `authorize`, then,
+  for a service spec with no target selector, `authorize_scope` of `None`, each with
+  `arguments=None`, and returns the grant `authorize` returned. It catches nothing: a
+  refusal, a configuration error and a check that cannot answer without its arguments
+  each reach the caller as raised, for the transport to decide what each means. A
+  grant's `target_checked` does not answer the scope question here, since no target is
+  handed in. A deactivated principal raises `PrincipalUnavailable` when `pool_seeds` is
+  handed, as `authorize` does. `checks_read_arguments` now reads the same rule for
+  which questions are asked, so the two cannot disagree; its answers are unchanged.
+
+### Removed
+- **`Transport`, the enum of the family's transport names, is gone** from the package
+  root and from `django_service_specs.types`. It was published in 0.28.0 and no
+  transport had adopted it: the kernel is the base layer and should not list the
+  packages built on it, and a new transport should not need a kernel release to be
+  named. Each transport package owns the string it stamps and states it in its own
+  documentation once it stamps. `TRANSPORT_KEY` and `call_transport` are unchanged;
+  compare the stamp with a plain string, for example `call_transport(ctx) == "rest"`.
+  A migration is to replace `Transport.REST` with `"rest"`, and `Transport.REST.value`
+  with the same.
+
 ## [0.28.0] — 2026-11-08
 
 ### Added
@@ -2557,7 +2595,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.28.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.29.0...HEAD
+[0.29.0]: https://github.com/Artui/django-service-specs/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Artui/django-service-specs/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Artui/django-service-specs/compare/v0.26.1...v0.27.0
 [0.26.1]: https://github.com/Artui/django-service-specs/compare/v0.26.0...v0.26.1

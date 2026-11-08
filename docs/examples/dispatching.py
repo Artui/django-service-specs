@@ -21,19 +21,22 @@ from django_service_specs import (
     Grant,
     InvalidArguments,
     NoneOf,
+    NotPermitted,
     Parameter,
     Parameters,
     PermissionCheck,
     PoolSeeds,
+    PrincipalUnavailable,
     ProgressReporter,
     SelectorKind,
     SelectorSpec,
     ServerArguments,
     ServiceSpec,
-    Transport,
     apply_server_arguments,
     authorize,
+    authorize_without_arguments,
     bind_arguments,
+    build_call_context,
     call_transport,
     check_call,
     check_seeds,
@@ -255,6 +258,41 @@ def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
 
 
 # --8<-- [end:checks_read_arguments]
+
+
+# --8<-- [start:authorize_without_arguments]
+class UnderQuota(PermissionCheck):
+    def has_permission(self, principal: Any, spec: Any) -> bool:
+        return principal.is_authenticated
+
+    def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
+        # A create's scope is nothing (None): may one more note be made?
+        return Note.objects.filter(owner=principal).count() < 3
+
+
+def add_untitled_note(*, user: Any) -> Note:
+    return Note.objects.create(owner=user, title="Untitled")
+
+
+add_note_spec = ServiceSpec(service=add_untitled_note, permissions=[UnderQuota()])
+
+
+def offered_to(principal: Any, specs: list[Any]) -> list[Any]:
+    # Each spec is asked what a call with no arguments is asked. The kernel
+    # catches nothing: hiding a refused operation is this listing's policy,
+    # and a spec whose checks read the arguments is left to the call.
+    offered = []
+    for spec in specs:
+        if not checks_read_arguments(spec):
+            try:
+                authorize_without_arguments(spec, principal, pool_seeds=DEFAULT_POOL_SEEDS)
+            except (NotPermitted, PrincipalUnavailable):
+                continue
+        offered.append(spec)
+    return offered
+
+
+# --8<-- [end:authorize_without_arguments]
 
 
 # --8<-- [start:check_seeds]
@@ -660,7 +698,7 @@ def archive_from_back_office(user: Any, pk: int) -> dict[str, Any]:
 def note_heading(*, user: Any, pk: int, call_context: dict[str, Any]) -> str:
     note = Note.objects.get(owner=user, pk=pk)
     # A missing key reads as ``None``, so a caller in process gets the full heading.
-    if call_transport(call_context) == Transport.AGENT:
+    if call_transport(call_context) == "agent":
         return note.title
     return f"Note: {note.title}"
 
@@ -676,9 +714,23 @@ def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
     # What a transport does as it builds the call's context: its own name goes
     # in last, as the plain string, over anything already there.
     context: dict[str, Any] = {"client": "back-office"}
-    context[TRANSPORT_KEY] = Transport.AGENT.value
+    context[TRANSPORT_KEY] = "agent"
     result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
     return result.value, context
 
 
 # --8<-- [end:call_transport]
+
+
+# --8<-- [start:build_call_context]
+def heading_for_a_tool_call(
+    user: Any, pk: int, run_context: dict[str, Any]
+) -> tuple[str, dict[str, Any]]:
+    # One new dict per call: the run's entries, what the transport knows of this
+    # call, and its own name stamped last, over a ``transport`` the run carried.
+    context = build_call_context("agent", base=run_context, action="note_heading")
+    result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
+    return result.value, context
+
+
+# --8<-- [end:build_call_context]

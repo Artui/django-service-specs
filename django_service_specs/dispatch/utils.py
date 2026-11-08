@@ -1535,6 +1535,32 @@ def conclude_selector(
     return DispatchResult(kind="instance", value=value, context=context)
 
 
+def asks_scope_of_nothing(spec: ServiceSpec | SelectorSpec) -> bool:
+    """Whether a call asks ``spec``'s scope question of nothing, before its arguments name anything.
+
+    The predicate is: ``spec`` is a ``ServiceSpec`` and declares no target
+    selector. That is a create, which ``walk_target`` asks ``authorize_scope``
+    of ``None`` because it resolves no row. Any other spec's scope question is
+    of a row or a set that only the call's arguments name: a service spec's
+    target selector resolves it, and a selector spec's own selector reads the
+    list. ``spec`` is a compiled spec, so a caller holding a ``SpecSource``
+    reads it through ``kernel_spec`` first: a source is neither class, and
+    read as it is would never be asked.
+
+    One rule for the two readers that ask it without arguments,
+    ``checks_read_arguments`` (what a check declares) and
+    ``authorize_without_arguments`` (what a check answers), so the declaration
+    and the answer cannot disagree on which questions there are. One arc to
+    coverage, so each conjunct is held by its own test in each reader. The
+    first, without which a selector spec raises ``AttributeError``, is held by
+    test_a_read_is_not_asked_the_scope_of_nothing and every ``_listing`` case
+    of test_checks_read_arguments. The second is held by
+    test_a_write_with_a_target_is_not_asked_the_scope_of_nothing and
+    test_the_scope_question_is_not_asked_where_a_target_or_a_selector_stands.
+    """
+    return isinstance(spec, ServiceSpec) and spec.target_selector_spec() is None
+
+
 def target_entry(spec: ServiceSpec, target: Any) -> dict[str, Any]:
     """``target`` under the pool name a service spec hands it to its service as.
 

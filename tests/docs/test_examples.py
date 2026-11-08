@@ -394,6 +394,23 @@ class TestCallContext:
 
         assert result.value == "Note: Old"
 
+    def test_a_built_context_holds_every_standard_key_and_the_stamp_wins(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="Old")
+        run_context = {"client": "back-office", "transport": "rest"}
+
+        heading, context = dispatching.heading_for_a_tool_call(ada, note.pk, run_context)
+
+        assert heading == "Old"
+        assert context == {
+            "request": None,
+            "view": None,
+            "format": None,
+            "action": "note_heading",
+            "client": "back-office",
+            "transport": "agent",
+        }
+        assert run_context == {"client": "back-office", "transport": "rest"}
+
     def test_a_catch_all_is_never_handed_it(self, ada: Any) -> None:
         seen: dict[str, Any] = {}
         spec = ServiceSpec(
@@ -614,6 +631,18 @@ class TestDispatching:
         note = Note.objects.create(owner=ada, title="Draft")
         result = dispatch(dispatching.owned_note_spec, principal=ada, arguments={"pk": note.pk})
         assert result.kind != "not_found"
+
+    def test_a_listing_hides_what_a_call_with_no_arguments_is_refused(self, ada: Any) -> None:
+        specs = [dispatching.note_spec, dispatching.owned_note_spec, dispatching.add_note_spec]
+        assert dispatching.offered_to(ada, specs) == specs
+        # Refused the class question; the spec whose check reads the arguments
+        # is left to the call.
+        assert dispatching.offered_to(AnonymousUser(), specs) == [dispatching.owned_note_spec]
+        # The create's scope question of nothing refuses at the quota, as its call does.
+        Note.objects.bulk_create(Note(owner=ada, title=title) for title in "abc")
+        assert dispatching.offered_to(ada, specs) == specs[:2]
+        with pytest.raises(NotPermitted):
+            dispatch(dispatching.add_note_spec, principal=ada, arguments={})
 
     def test_a_call_is_refused_at_enqueue_as_dispatch_would_refuse_it(self, ada: Any) -> None:
         queue: list[Any] = []

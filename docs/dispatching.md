@@ -311,6 +311,26 @@ docs/examples/dispatching.py:checks_read_arguments
 --8<--
 ```
 
+To ask the checks rather than read their declarations,
+[`authorize_without_arguments`][django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments]
+asks a spec what a call with no arguments is asked: `authorize`, then, for a
+service spec with no target selector (a create), `authorize_scope` of `None`.
+That is the same rule `checks_read_arguments` reads, so the two agree on which
+questions there are. Each question is handed `arguments=None`, and `grant=`,
+`call_context=` and `pool_seeds=` as `authorize` takes them; a grant's
+`target_checked` does not answer a create's scope question here, since no target
+is handed in. It returns the grant `authorize` returned. **It catches
+nothing**: a refusal, `PrincipalUnavailable`, a configuration error and a check
+that cannot answer without the arguments it reads each reach the caller as they
+were raised, because what each means for a listing, an OPTIONS answer or a call
+whose arguments failed their shape is the transport's decision:
+
+```python
+--8<--
+docs/examples/dispatching.py:authorize_without_arguments
+--8<--
+```
+
 **A check can read the call's context and a registered seed the same way.** A
 keyword `call_context` is handed the one dict every stage of the call shares
 ([the call's context](#the-calls-context)), and a keyword named after a seed
@@ -1276,11 +1296,11 @@ what the service left there.
   a seed, a provider's key, an overlay or an argument named `call_context` is
   refused. Seed resolvers do not see it, since a seed is resolved before
   anything the call adds.
-- **The kernel pre-fills nothing.** What goes in is the transport's
+- **Dispatch pre-fills nothing.** What goes in is the transport's
   convention: a transport over DRF is expected to put DRF's `request` there,
   and a key such as `request`, `view` or `format` means what the transport
   that wrote it says.
-  The kernel writes nothing and keeps nothing across calls. It reads two
+  Dispatch writes nothing to it and keeps nothing across calls. It reads two
   keys, `request` and `view`, for a callable naming one
   ([the call's `request` and `view`](#the-calls-request-and-view)).
   One more key is the family's: `transport`, which names the transport that built
@@ -1332,16 +1352,8 @@ docs/examples/dispatching.py:call_transport
 --8<--
 ```
 
-[`Transport`][django_service_specs.types.transport.Transport] lists the family's
-values, one per package:
-
-| Value | Package |
-| --- | --- |
-| `Transport.REST`, `"rest"` | django-spec-rest |
-| `Transport.HTML`, `"html"` | django-spec-html |
-| `Transport.MCP`, `"mcp"` | django-spec-mcp |
-| `Transport.AGENT`, `"agent"` | django-spec-agents |
-| `Transport.CLI`, `"cli"` | django-spec-cli |
+Each transport package owns the string it stamps and states it in its own
+documentation, so a new transport needs no kernel release.
 
 The contract, for a transport writing it and a stage reading it:
 
@@ -1354,26 +1366,42 @@ The contract, for a transport writing it and a stage reading it:
 - **Nothing a client sends reaches it.** A transport builds the dict on the server and
   stamps it last, so an entry a caller smuggled in would be overwritten, and a stage may
   branch on what it reads.
-- **A stamp is the plain string**, `Transport.AGENT.value`, never the member. So
+- **A stamp is the plain string**, `"agent"` and not a wrapper of it. So
   `call_context["transport"] == "agent"` holds with nothing imported, and the value
-  serializes as itself. A member equals its string, so compare with `==`; `str()` of a
-  member is its qualified name, not its value, and how an f-string formats a member
-  varies by Python version, so use `.value` to get the string.
+  serializes as itself. Compare it with `==`.
 - **A missing key means an in-process caller**: a `dispatch` made directly, from a
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
   handed no dict.
-- **A transport stamps from the release that adopts the key.** django-spec-agents
-  already does. Until another transport adopts it, that transport's calls read as
-  missing too, and a stage cannot tell them from an in-process caller, so check the
-  release of each transport you run before branching on `None`.
-- **The known values are not a closed set.** A third-party transport stamps a string of
-  its own, and the reader hands back whatever was stamped. Compare a stamp to a member
-  rather than converting it: `Transport("worker")` raises.
-- **The kernel neither writes nor reads it.** Dispatch runs the same with the key or
+- **A transport stamps from the release that adopts the key.** Until a transport's
+  release does, its calls read as missing too, and a stage cannot tell them from an
+  in-process caller, so check the release of each transport you run before branching
+  on `None`.
+- **The values are not a closed set.** A third-party transport stamps a string of its
+  own, and the reader hands back whatever was stamped, so a stage compares a stamp to
+  the strings it cares about and treats any other as a transport it does not know.
+- **Dispatch neither writes nor reads it.** It runs the same with the key or
   without, and it is not a reserved name: a seed or an argument may be called `transport`,
   in a different namespace from this dict.
+
+A transport builds the dict with
+[`build_call_context`][django_service_specs.types.build_call_context.build_call_context],
+which keeps that contract in one place. It returns a new dict holding every entry of the
+`base` it is handed, such as an agent run's own dict, and the four standard entries,
+`request`, `view`, `format` and `action`, each `None` where nothing gave one, so
+`call_context["action"]` never raises on a transport that builds through it. An argument
+wins over the entry of its name in `base`, an argument left at `None` leaves that entry,
+and the transport's string goes in last, over any `transport` the `base` carried. `base`
+is never changed, and the result is a fresh plain dict for the transport to keep: one that
+hands every callable of a request the same dict builds it once. A `None` entry binds as a
+missing one, so a callable declaring `request` is handed `None` either way.
+
+```python
+--8<--
+docs/examples/dispatching.py:build_call_context
+--8<--
+```
 
 ## Answering every refusal
 

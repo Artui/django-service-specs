@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from django_service_specs.authorization.utils import CLASS_LEVEL, SCOPE_LEVEL, declared_keywords
+from django_service_specs.dispatch.utils import asks_scope_of_nothing
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -44,14 +45,16 @@ def checks_read_arguments(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool
     a create's scope question
     (test_a_check_declaring_arguments_only_on_the_scope_question_reads_them_in_a_create),
     and the scope question left out beside a target selector or on a selector
-    spec, one arc to coverage with two conjuncts
+    spec, the predicate ``asks_scope_of_nothing`` that
+    [`authorize_without_arguments`][django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments]
+    reads too, one arc to coverage with two conjuncts
     (test_the_scope_question_is_not_asked_where_a_target_or_a_selector_stands
     holds the target selector's; the selector spec's, which has no
     ``target_selector_spec``, is held by every ``_listing`` case).
     """
     spec = kernel_spec(spec)
     questions = [CLASS_LEVEL]
-    if isinstance(spec, ServiceSpec) and spec.target_selector_spec() is None:
+    if asks_scope_of_nothing(spec):
         questions.append(SCOPE_LEVEL)
     return any(
         "arguments" in declared_keywords(check, method, positional=positional)

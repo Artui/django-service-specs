@@ -63,7 +63,7 @@ class ValidationContext:
     was handed none. It trails every other field, so no existing
     construction changes. One key is the family's rather than any one
     transport's: ``"transport"``, where stamped, names the transport that built
-    the context, by convention only - the kernel neither writes nor reads it,
+    the context, by convention only - dispatch neither writes nor reads it,
     so read it with
     [`call_transport`][django_service_specs.types.call_transport.call_transport].
     """

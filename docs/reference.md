@@ -150,6 +150,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.dispatch.authorize.authorize
 ::: django_service_specs.dispatch.authorize_scope.authorize_scope
 ::: django_service_specs.dispatch.checks_read_arguments.checks_read_arguments
+::: django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments
 ::: django_service_specs.dispatch.authorize_target.authorize_target
 ::: django_service_specs.authorization.resolve_principal.resolve_principal
 ::: django_service_specs.authorization.is_deactivated.is_deactivated
@@ -246,8 +247,8 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.types.is_supplied.is_supplied
 ::: django_service_specs.types.supplied_fields.supplied_fields
 ::: django_service_specs.types.transport_key.TRANSPORT_KEY
-::: django_service_specs.types.transport.Transport
 ::: django_service_specs.types.call_transport.call_transport
+::: django_service_specs.types.build_call_context.build_call_context
 ::: django_service_specs.types.affordance.Affordance
 ::: django_service_specs.types.progress_reporter.ProgressReporter
 ::: django_service_specs.types.provider_keys.ProviderKeys

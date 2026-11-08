@@ -33,6 +33,7 @@ from django_service_specs.dispatch.audience_projection_for_spec import audience_
 from django_service_specs.dispatch.authorize import authorize
 from django_service_specs.dispatch.authorize_scope import authorize_scope
 from django_service_specs.dispatch.authorize_target import authorize_target
+from django_service_specs.dispatch.authorize_without_arguments import authorize_without_arguments
 from django_service_specs.dispatch.bind_arguments import bind_arguments
 from django_service_specs.dispatch.call_seeds import CallSeeds
 from django_service_specs.dispatch.check_call import check_call
@@ -150,6 +151,7 @@ from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.build_call_context import build_call_context
 from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.dispatch_error import DispatchError
 from django_service_specs.types.field_audience import FieldAudience
@@ -168,7 +170,6 @@ from django_service_specs.types.relation_phase import RelationPhase
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.supplied_fields import supplied_fields
-from django_service_specs.types.transport import Transport
 from django_service_specs.types.transport_key import TRANSPORT_KEY
 from django_service_specs.types.unguarded_reason import UnguardedReason
 from django_service_specs.types.unknown_arguments import UnknownArguments
@@ -258,7 +259,6 @@ __all__ = [
     "ServiceValidationError",
     "SpecRegistry",
     "SpecSource",
-    "Transport",
     "UnguardedReason",
     "UnguardedSpec",
     "UnknownArguments",
@@ -291,8 +291,10 @@ __all__ = [
     "authorize",
     "authorize_scope",
     "authorize_target",
+    "authorize_without_arguments",
     "base_pool",
     "bind_arguments",
+    "build_call_context",
     "call_transport",
     "can_present_nothing",
     "check_arguments",
