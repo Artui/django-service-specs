@@ -654,8 +654,10 @@ methods, and two more methods, an attribute and a property with defaults:
   `parameters(self, *, call_context=None)`: every ask inside a call then hands
   it [the call's context](dispatching.md#the-calls-context), the same dict its
   `ValidationContext` carries, and every ask outside one hands it `None` -
-  at registration, for a schema, and for every other reader describing the
-  spec before a call - so the declaration must hold without it. Opted in or
+  at registration, for a schema handed no context, and for every other reader
+  describing the spec before a call - so the declaration must hold without it. A
+  transport describing a spec may instead hand a stamped dict with no call under way,
+  where `request` and `view` are `None`, so it must hold without those too. Opted in or
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose `parameters` takes only `**kwargs`, or is a
   `functools.wraps` wrapper that does not name the keyword itself: the
@@ -668,16 +670,22 @@ methods, and two more methods, an attribute and a property with defaults:
   [`check_requested_input`][django_service_specs.dispatch.check_requested_input.check_requested_input]
   and
   [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys].
-  Those that check or describe a spec - `check_server_arguments`,
-  `check_seeds`, `seed_named_parameters`, `unreceived_fields`,
-  `provider_reached` and the two input schemas - are describe-time, and read
+  So do those a transport describes a spec with:
+  [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema],
+  [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema]
+  and
+  [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+  so a field declared to [one transport](schema.md#a-field-declared-to-one-transport)
+  is offered there; handed none, they read the declaration made to no call.
+  Those that only check a spec - `check_server_arguments`, `check_seeds`,
+  `seed_named_parameters`, `unreceived_fields` - are describe-time, and read
   the declaration it makes to no call wherever they are called, a
   transport's check of a binding against one call's seeds included.
   `ServiceSpec.parameters()` and
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept `call_context`, which
   dispatch now passes: an override written `parameters(self)` raises `TypeError`
-  under dispatch.
+  under dispatch and when a schema is read.
 - `validate(arguments, context)` returns the validated values keyed by name, or
   raises [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
   It receives only the arguments its own `parameters()` declare, already

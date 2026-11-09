@@ -17,6 +17,7 @@ def spec_input_schema(
     spec: ServiceSpec | SelectorSpec | SpecSource,
     *,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """[`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema] over ``spec.parameters()``.
 
@@ -49,13 +50,16 @@ def spec_input_schema(
 
     Read on every call, as ``parameters()`` is, so a Validator reading a
     model-backed declaration is asked only once the app registry is ready.
-    **Describe-time**: a schema describes the spec outside any call, so a
-    Validator that declares ``call_context`` is handed ``None``
-    (test_describe_time_readers_hand_none).
+    **Describe-time unless handed a context**: a schema describes the spec
+    outside any call, so with no ``call_context`` a Validator that declares it
+    is handed ``None`` (test_describe_time_readers_hand_none). A transport
+    describing the spec under a context of its own hands that dict, and the
+    Validator is asked with it, as ``spec.parameters(call_context=...)`` asks
+    (test_a_field_declared_only_to_a_call_is_listed_under_that_call_s_context_alone).
     """
     # Relaxed by the shape check's own reading of ``partial``, so the schema
     # requires exactly what dispatch refuses absent, less what a provider fills
     # or may fill.
     spec = kernel_spec(spec)
-    parameters = relax_partial(spec, spec.parameters())
+    parameters = relax_partial(spec, spec.parameters(call_context=call_context))
     return parameters_schema(parameters, unknown_arguments=unknown_arguments)

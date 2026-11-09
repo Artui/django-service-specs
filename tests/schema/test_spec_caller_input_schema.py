@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.check_call import check_call
+from django_service_specs.dispatch.check_seeds import check_seeds
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -22,11 +23,13 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.types.build_call_context import build_call_context
+from django_service_specs.types.call_transport import call_transport
 from django_service_specs.types.provider_keys import ProviderKeys
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unknown_arguments import UnknownArguments
-from django_service_specs.types.unset import UnsetType
+from django_service_specs.types.unset import UNSET, UnsetType
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
 from tests.dispatch.utils import OPEN, PK, TENANT_SEEDS, Record, make_user, note_by_pk, notes_of
@@ -572,10 +575,19 @@ def test_the_declaration_is_read_on_every_call() -> None:
 
 
 def _refused_absent(
-    spec: ServiceSpec | SelectorSpec, pool_seeds: PoolSeeds, arguments: Mapping[str, Any]
+    spec: ServiceSpec | SelectorSpec,
+    pool_seeds: PoolSeeds,
+    arguments: Mapping[str, Any],
+    call_context: dict[str, Any] | None = None,
 ) -> set[str]:
     try:
-        check_call(spec, principal=make_user("ada"), arguments=arguments, pool_seeds=pool_seeds)
+        check_call(
+            spec,
+            principal=make_user("ada"),
+            arguments=arguments,
+            pool_seeds=pool_seeds,
+            call_context=call_context,
+        )
     except InvalidArguments as refused:
         assert all(message == REQUIRED for message in refused.detail.values())
         return set(refused.detail)
@@ -883,3 +895,248 @@ def test_the_rest_reading_requires_what_a_provider_may_fill_and_a_partial_spec_s
 
     assert schema["properties"] == rest["properties"]
     assert set(rest["required"]) - set(schema.get("required", [])) == offered_and_required
+
+
+# --- the context a transport describes under -----------------------------------------------
+
+
+class _ToOneTransport(Validator):
+    """Declares a required ``title``, and ``extra`` only to a call a ``cli`` transport stamped.
+
+    Keyed on the stamp the way a Validator declaring a field for one transport
+    is, so a test reading ``extra`` proves that transport's own dict reached the ask.
+    """
+
+    def __init__(self, *extra: Parameter) -> None:
+        self.extra = extra
+
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        title = Parameter("title", "string", required=True)
+        if call_transport(call_context) == "cli":
+            return Parameters.of(title, *self.extra)
+        return Parameters.of(title)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+class _RowFills(TypedDict):
+    extra: str
+
+
+def _fills_a_row() -> _RowFills:
+    return {"extra": "server's"}
+
+
+class _RowMayFill(TypedDict):
+    extra: str | UnsetType
+
+
+def _may_fill_a_row() -> _RowMayFill:
+    return {"extra": UNSET}
+
+
+def _answers_extra() -> dict[str, Any]:
+    return {"extra": "server's"}
+
+
+_EXTRA = _required("extra")
+_TITLE_ONLY = {
+    "type": "object",
+    "properties": {"title": {"type": "string"}},
+    "required": ["title"],
+    "additionalProperties": False,
+}
+_TITLE_AND_EXTRA = {
+    "type": "object",
+    "properties": {"title": {"type": "string"}, "extra": {"type": "string"}},
+    "required": ["title", "extra"],
+    "additionalProperties": False,
+}
+
+
+def test_a_field_declared_to_one_transport_is_offered_and_required_under_its_context() -> None:
+    spec = _service(validator=_ToOneTransport(_EXTRA))
+
+    assert spec_caller_input_schema(spec, call_context=build_call_context("cli")) == (
+        _TITLE_AND_EXTRA
+    )
+
+
+@pytest.mark.parametrize(
+    "call_context",
+    [
+        pytest.param(lambda: build_call_context("agent"), id="another-transport"),
+        pytest.param(dict, id="an-unstamped-dict"),
+        pytest.param(lambda: None, id="none"),
+    ],
+)
+def test_a_field_declared_to_one_transport_is_not_offered_under_any_other_context(
+    call_context: Callable[[], dict[str, Any] | None],
+) -> None:
+    spec = _service(validator=_ToOneTransport(_EXTRA))
+
+    assert spec_caller_input_schema(spec, call_context=call_context()) == _TITLE_ONLY
+
+
+def test_with_no_call_context_the_schema_is_the_declaration_made_to_no_call() -> None:
+    # Literal, so the pin is the schema itself and not this function's own
+    # answer to an explicit None.
+    assert spec_caller_input_schema(_service(validator=_ToOneTransport(_EXTRA))) == _TITLE_ONLY
+    assert spec_caller_input_schema(_many(validator=_ToOneTransport(_EXTRA))) == {
+        "type": "object",
+        "properties": {
+            "items": {"type": "array", "items": _TITLE_ONLY, "maxItems": 1000},
+        },
+        "required": ["items"],
+        "additionalProperties": False,
+    }
+
+
+def test_a_seed_named_field_declared_only_to_a_transport_is_the_caller_s_under_its_context() -> (
+    None
+):
+    # The ``server_owned_keys`` ask: the mount's seed owns the name in the
+    # declaration made to no call, so without the context the field would be
+    # listed by the base and withheld here.
+    spec = _service(validator=_ToOneTransport(Parameter("tenant", "string")))
+
+    schema = spec_caller_input_schema(
+        spec, pool_seeds=TENANT_SEEDS, call_context=build_call_context("cli")
+    )
+
+    assert schema["properties"].keys() == {"title", "tenant"}
+
+
+def test_a_field_declared_only_to_a_transport_input_data_may_fill_is_not_required() -> None:
+    # The ``provider_reached`` ask: an untyped ``input_data`` reaches every field,
+    # the one declared to this transport among them.
+    spec = _service(validator=_ToOneTransport(_EXTRA), input_data=_answers_extra)
+
+    schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+    assert schema["properties"].keys() == {"title", "extra"}
+    assert "required" not in schema
+
+
+def test_a_row_field_declared_only_to_a_transport_input_data_fills_is_not_offered() -> None:
+    # The row's ask, read for what ``input_data`` is annotated to fill.
+    spec = _many(validator=_ToOneTransport(_EXTRA), input_data=_fills_a_row)
+
+    schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+    row = schema["properties"][spec.many_argument]["items"]
+    assert row["properties"].keys() == {"title"}
+    assert row["required"] == ["title"]
+
+
+def test_a_row_field_declared_only_to_a_transport_input_data_may_fill_is_not_required() -> None:
+    # The row's ask, read for what ``input_data`` may fill.
+    spec = _many(validator=_ToOneTransport(_EXTRA), input_data=_may_fill_a_row)
+
+    schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+    row = schema["properties"][spec.many_argument]["items"]
+    assert row["properties"].keys() == {"title", "extra"}
+    assert row["required"] == ["title"]
+
+
+def test_a_partial_spec_requires_no_field_declared_only_to_a_transport() -> None:
+    spec = _service(validator=_ToOneTransport(_EXTRA), partial=True)
+
+    schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+    assert schema["properties"].keys() == {"title", "extra"}
+    assert "required" not in schema
+
+
+@pytest.mark.parametrize("build", [_service, _many], ids=["single", "many"])
+def test_a_validator_declaring_no_call_context_is_asked_as_before_under_one(
+    build: Callable[..., ServiceSpec],
+) -> None:
+    # A keyword handed to one that never declared it raises TypeError, so each
+    # ask goes through the reader that reads the signature.
+    spec = build(validator=_title_and_owner(), input_data=_answers_extra)
+
+    assert spec_caller_input_schema(
+        spec, call_context=build_call_context("cli")
+    ) == spec_caller_input_schema(spec)
+
+
+@pytest.mark.parametrize(
+    ("field", "declared", "refusal"),
+    [
+        pytest.param(
+            Parameter("user", "string"),
+            {},
+            r"declares the parameter\(s\) \['user'\], which dispatch seeds itself",
+            id="a-name-dispatch-seeds",
+        ),
+        pytest.param(
+            Parameter("page", "integer"),
+            {"reads": Parameters.of(Parameter("page", "integer"))},
+            r"Parameters \['page'\] are declared by two sources",
+            id="a-name-two-sources-declare",
+        ),
+        pytest.param(
+            _EXTRA,
+            {"kwargs": _fills_a_row},
+            r"is annotated to fill \['extra'\], which ServiceSpec.validator declares, "
+            r"and its values never reach",
+            id="a-name-a-typed-kwargs-fills",
+        ),
+    ],
+)
+def test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks(
+    field: Parameter, declared: dict[str, Any], refusal: str
+) -> None:
+    # ``check_seeds`` asks with no context, so what only the ``cli`` stamp
+    # declares is never assembled there: the registration passes, the schema
+    # asked with no context passes, and the first ask under the stamp raises.
+    # A schema's ask and dispatch's are one assembly.
+    spec = _service(validator=_ToOneTransport(field), **declared)
+
+    assert check_seeds(spec) is None
+    assert "title" in spec_caller_input_schema(spec)["properties"]
+    with pytest.raises(ImproperlyConfigured, match=refusal):
+        spec_caller_input_schema(spec, call_context=build_call_context("cli"))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("extra", "provider"),
+    [
+        pytest.param(_EXTRA, None, id="required"),
+        pytest.param(_EXTRA, _answers_extra, id="beside-an-untyped-input-data"),
+        pytest.param(Parameter("extra", "string"), None, id="optional"),
+    ],
+)
+def test_under_a_context_it_requires_exactly_what_check_call_refuses_absent_under_it(
+    extra: Parameter, provider: Callable[..., Any] | None
+) -> None:
+    spec = _service(validator=_ToOneTransport(extra), input_data=provider)
+    call_context = build_call_context("cli")
+
+    required = spec_caller_input_schema(spec, call_context=call_context).get("required", [])
+
+    assert set(required) == _refused_absent(spec, DEFAULT_POOL_SEEDS, {}, call_context)
+
+
+@pytest.mark.django_db
+def test_a_field_offered_under_a_context_is_one_dispatch_takes_under_it() -> None:
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=_ToOneTransport(_EXTRA))
+    arguments = {"title": "Dune", "extra": "sent"}
+
+    dispatch(
+        spec,
+        principal=make_user("ada"),
+        arguments=arguments,
+        call_context=build_call_context("cli"),
+    )
+
+    assert service.calls[-1]["data"] == arguments
+    # The same arguments under no context name a field the declaration does not have.
+    with pytest.raises(InvalidArguments) as refused:
+        dispatch(spec, principal=make_user("bob"), arguments=arguments)
+    assert set(refused.value.detail) == {"extra"}

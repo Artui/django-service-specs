@@ -317,7 +317,8 @@ asks a spec what a call with no arguments is asked: `authorize`, then, for a
 service spec with no target selector (a create), `authorize_scope` of `None`.
 That is the same rule `checks_read_arguments` reads, so the two agree on which
 questions there are. Each question is handed `arguments=None`, and `grant=`,
-`call_context=` and `pool_seeds=` as `authorize` takes them; a grant's
+`call_context=` and `pool_seeds=` as `authorize` takes them, with one
+`call_context` dict between the two, a fresh one where none is handed; a grant's
 `target_checked` does not answer a create's scope question here, since no target
 is handed in. It returns the grant `authorize` returned. **It catches
 nothing**: a refusal, `PrincipalUnavailable`, a configuration error and a check
@@ -1315,7 +1316,7 @@ what the service left there.
   `parameters(self, *, call_context=None)` is handed the call's dict on every
   ask of its `parameters()` inside the call - the shape check, the seed
   check, validation and the service's keywords alike - and `None` on every
-  ask outside one, such as registration or a schema
+  ask outside one, such as registration or a schema handed no context
   ([the Validator](declaring.md#the-validator)). So a transport describing a
   serializer under its own request can tell its own call from a `dispatch`
   the service makes inside it, which is handed a dict of its own. A
@@ -1373,7 +1374,13 @@ The contract, for a transport writing it and a stage reading it:
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
-  handed no dict.
+  handed no dict, unless a transport describing a spec hands a stamped dict with no
+  call under way.
+- **The schema a transport offers is read under its stamp too**, when the transport
+  hands
+  [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+  its dict, so a stage's field for one transport is offered there
+  ([a field declared to one transport](schema.md#a-field-declared-to-one-transport)).
 - **A transport stamps from the release that adopts the key.** Until a transport's
   release does, its calls read as missing too, and a stage cannot tell them from an
   in-process caller, so check the release of each transport you run before branching

@@ -11,7 +11,11 @@ Here the readers in ``_READERS`` do the same: each row is a reader and a case
 where that reader reaches its ask, and records what the Validator was handed.
 ``apply_server_arguments``, ``check_requested_input`` and ``server_owned_keys``
 also run inside a call and take its ``call_context``; called here with none,
-as a describe-time reader calls them, they hand none on.
+as a describe-time reader calls them, they hand none on. So do
+``spec_caller_input_schema``, ``spec_input_schema`` and ``provider_reached``,
+which a transport hands the dict of the context it describes a spec under, a
+stamped one included; a third test holds that such a dict is the object every
+ask is handed. A reader handed none still invents none.
 The three readers in ``_SINGLE_ONLY`` reach no ask for a ``many`` spec, so a
 second test holds that they leave its Validator unasked.
 """
@@ -19,6 +23,7 @@ second test holds that they leave its Validator unasked.
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Any
 
 import pytest
 
@@ -29,6 +34,7 @@ from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.dispatch.seed_named_parameters import seed_named_parameters
 from django_service_specs.dispatch.unreceived_fields import unreceived_fields
 from django_service_specs.schema.spec_caller_input_schema import spec_caller_input_schema
+from django_service_specs.schema.spec_input_schema import spec_input_schema
 from django_service_specs.specs.server_owned_keys import server_owned_keys
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.server_arguments import ServerArguments
@@ -93,3 +99,31 @@ def test_top_level_field_readers_ask_a_many_spec_nothing(reader: str) -> None:
     spec, validator, _, _ = every_ask_case("many")
     _READERS[reader](spec)
     assert validator.asked == []
+
+
+_HANDED: dict[str, Callable[[ServiceSpec, dict[str, Any]], object]] = {
+    "spec_caller_input_schema": lambda spec, context: spec_caller_input_schema(
+        spec, pool_seeds=TENANT_SEEDS, call_context=context
+    ),
+    "spec_input_schema": lambda spec, context: spec_input_schema(spec, call_context=context),
+    "provider_reached": lambda spec, context: provider_reached(spec, call_context=context),
+}
+
+
+@pytest.mark.parametrize(
+    ("reader", "case"),
+    [
+        pytest.param(reader, case, id=f"{reader}-{case}")
+        for reader in _HANDED
+        for case in ("single", "many")
+        if not (case == "many" and reader in _SINGLE_ONLY)
+    ],
+)
+def test_a_reader_handed_a_context_hands_that_object_to_every_ask(reader: str, case: str) -> None:
+    spec, validator, _, _ = every_ask_case(case)
+    context: dict[str, Any] = {}
+
+    _HANDED[reader](spec, context)
+
+    assert validator.asked
+    assert all(asked is context for asked in validator.asked)

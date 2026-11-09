@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from django_service_specs.dispatch.utils import reach, server_filled
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 
-def provider_reached(spec: ServiceSpec | SelectorSpec | SpecSource) -> frozenset[str]:
+def provider_reached(
+    spec: ServiceSpec | SelectorSpec | SpecSource,
+    *,
+    call_context: dict[str, Any] | None = None,
+) -> frozenset[str]:
     """Every top-level parameter of ``spec`` a provider fills or may fill: what the shape check relaxes.
 
     Each provider's values reach one seat, and relax the parameters there: a
@@ -43,11 +50,15 @@ def provider_reached(spec: ServiceSpec | SelectorSpec | SpecSource) -> frozenset
     read's name
     (test_check_server_arguments_still_refuses_withholding_a_many_read_a_row_field_shares).
 
-    **Describe-time**: for a schema or a check made where a transport is
-    built, it reads the Validator's fields as it declares them to no call,
-    handing one that declares ``call_context`` ``None``
+    **Describe-time unless handed a context**: for a schema or a check made
+    where a transport is built, it reads the Validator's fields as it declares
+    them to no call, handing one that declares ``call_context`` ``None``
     (test_describe_time_readers_hand_none). The shape check relaxes each call
-    by the parameters that call declares.
+    by the parameters that call declares, so a transport describing the spec
+    under a context of its own hands that dict here, and reads the set the
+    shape check relaxes under it
+    (test_a_field_declared_only_to_a_call_is_reached_under_that_call_s_context_alone,
+    test_under_a_context_it_is_the_set_check_call_relaxes_under_it).
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.
@@ -55,5 +66,6 @@ def provider_reached(spec: ServiceSpec | SelectorSpec | SpecSource) -> frozenset
     spec = kernel_spec(spec)
     reached = server_filled(spec)[1]
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:
-        reached |= reach(spec.input_data, spec.validator.parameters())[1]
+        fields = validator_parameters(spec.validator, call_context=call_context)
+        reached |= reach(spec.input_data, fields)[1]
     return reached

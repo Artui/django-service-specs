@@ -255,6 +255,18 @@ def check_seeds(
     the spec as it declares itself to no call, handing a Validator that
     declares ``call_context`` ``None``
     (test_describe_time_readers_hand_none).
+    It takes no ``call_context``, unlike the input schemas, because none of
+    its five refusals reads a Validator's field: what it refuses is a read, a
+    shape, a ``many`` spec's list and a callable's keywords, a top-level
+    Validator field is in neither of ``seed_named_parameters``' sets, and a
+    service beside a Validator is left to dispatch
+    (test_a_validator_field_is_the_caller_s_and_fills_the_service_s_keyword).
+    Assembling ``spec.parameters()`` still refuses a seat dispatch seeds
+    itself, a name two sources declare and a field a typed ``kwargs`` fills.
+    So a field declared only to one transport with such a shape is not refused
+    here, and raises at the first ask under that stamp, a schema's as well as
+    dispatch's
+    (test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks).
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.

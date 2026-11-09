@@ -17,7 +17,16 @@ from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validation_context import ValidationContext
 from django_service_specs.validation.validator import Validator
-from tests.dispatch.utils import EVERY_ASK, OPEN, PK, every_ask_case, note_by_pk, notes_of
+from tests.dispatch.utils import (
+    A_CALL,
+    EVERY_ASK,
+    OPEN,
+    PK,
+    DeclaredToACall,
+    every_ask_case,
+    note_by_pk,
+    notes_of,
+)
 from tests.specs.utils import Foreign
 
 ROW = Parameters.of(Parameter("title", "string", required=True))
@@ -374,3 +383,22 @@ def test_describe_time_readers_hand_none(case: str) -> None:
     spec_input_schema(spec)
     assert validator.asked
     assert validator.asked == [None] * len(validator.asked)
+
+
+def test_a_field_declared_only_to_a_call_is_listed_under_that_call_s_context_alone() -> None:
+    spec = ServiceSpec(
+        service=print, permissions=OPEN, validator=DeclaredToACall(Parameter("extra", "string"))
+    )
+    assert spec_input_schema(spec, call_context=A_CALL)["properties"].keys() == {"title", "extra"}
+    assert spec_input_schema(spec, call_context={})["properties"].keys() == {"title"}
+    assert spec_input_schema(spec)["properties"].keys() == {"title"}
+
+
+def test_a_partial_spec_requires_no_field_declared_only_to_the_call() -> None:
+    spec = ServiceSpec(
+        service=print,
+        permissions=OPEN,
+        partial=True,
+        validator=DeclaredToACall(Parameter("extra", "string", required=True)),
+    )
+    assert "required" not in spec_input_schema(spec, call_context=A_CALL)

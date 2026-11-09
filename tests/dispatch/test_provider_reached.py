@@ -13,7 +13,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.unset import UnsetType
-from tests.dispatch.utils import OPEN, Titled, make_user
+from tests.dispatch.utils import A_CALL, OPEN, DeclaredToACall, Titled, make_user
 from tests.specs.utils import Foreign
 
 _READS = Parameters.of(
@@ -98,3 +98,28 @@ def test_it_is_the_set_check_call_relaxes() -> None:
     assert set(refused.value.detail) == _READS.names() - provider_reached(spec) == {"page"}
     # Every read reached, so the call starts with none sent.
     check_call(_listing(kwargs=_untyped), principal=ada, arguments={})
+
+
+def test_a_field_declared_only_to_a_call_is_reached_under_that_call_s_context_alone() -> None:
+    spec = ServiceSpec(
+        service=print,
+        permissions=OPEN,
+        validator=DeclaredToACall(Parameter("extra", "string", required=True)),
+        input_data=_untyped,
+    )
+    assert provider_reached(spec, call_context=A_CALL) == {"title", "extra"}
+    assert provider_reached(spec, call_context={}) == {"title"}
+    assert provider_reached(spec) == {"title"}
+
+
+@pytest.mark.django_db
+def test_under_a_context_it_is_the_set_check_call_relaxes_under_it() -> None:
+    spec = ServiceSpec(
+        service=print,
+        permissions=OPEN,
+        validator=DeclaredToACall(Parameter("extra", "string", required=True)),
+        input_data=_untyped,
+    )
+    assert "extra" in provider_reached(spec, call_context=A_CALL)
+    # Not refused as absent, though the Validator requires it of this call.
+    check_call(spec, principal=make_user("ada"), arguments={}, call_context=dict(A_CALL))

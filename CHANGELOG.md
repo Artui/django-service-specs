@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.30.0] — 2026-11-09
+
+### Added
+- **`spec_caller_input_schema` takes `call_context=`, so the schema a transport offers
+  can be read under its own stamp.** A Validator may declare a field to one transport
+  by reading the stamp in its context, and dispatch honours it, but the schema was
+  asked with no context, so such a field was never offered, and where it was required
+  every call was refused. Handed a dict, the schema hands that object to every ask of
+  the Validator: what it lists, what the server fills, what a provider may fill, and
+  a `many` spec's rows. `spec_input_schema` and `provider_reached` take the keyword
+  too. With no `call_context` each answers as before, but for a `ServiceSpec` subclass
+  overriding `parameters(self)` with no keyword: `spec_input_schema` now asks
+  `spec.parameters(call_context=None)`, so that override, which already raised
+  `TypeError` under dispatch, raises when a schema is read as well. `check_seeds`
+  does not take the keyword, since none of its five refusals reads a Validator's field; but
+  assembling `spec.parameters()` still refuses a seat dispatch seeds itself, a name
+  two sources declare and a field a typed `kwargs` fills, so a field declared only to
+  one transport with such a shape passes `check_seeds` and raises at the first ask
+  under that stamp, a schema's as well as dispatch's.
+
+### Fixed
+- **`authorize_without_arguments` hands both questions one `call_context` when given
+  none.** Its docstring said both questions get the one dict, but with
+  `call_context=None` each `authorize` function built its own empty one, so what a
+  class-level check wrote to it the scope check never read. `None` now becomes one new
+  dict before either question is asked. A dict the caller hands is still the dict both
+  are handed, an empty one included.
+
 ## [0.29.0] — 2026-11-08
 
 ### Added
@@ -2595,7 +2623,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.29.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.30.0...HEAD
+[0.30.0]: https://github.com/Artui/django-service-specs/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/Artui/django-service-specs/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Artui/django-service-specs/compare/v0.27.0...v0.28.0
 [0.27.0]: https://github.com/Artui/django-service-specs/compare/v0.26.1...v0.27.0
