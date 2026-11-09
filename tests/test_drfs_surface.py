@@ -350,7 +350,6 @@ SURFACE: dict[str, Pin] = {
         ),
     ),
     "base_pool": _fn("pool.base_pool", "*, user, progress=, seeds=, **extra"),
-    "seeded_pool": _fn("pool.seeded_pool", "*, user, seeds=, call_context, progress="),
     "combine_progress": _fn("pool.combine_progress", "*reporters"),
     "null_progress": _fn("pool.null_progress", "progress, *, total=, message=, meta="),
     "provider_keys": _fn("pool.provider_keys", "provider"),
@@ -656,6 +655,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "TRANSPORT_KEY",
         "build_call_context",
         "call_transport",
+        # A transport's pool under its call's context: the transports use it from
+        # this package, and djangorestframework-services neither wraps nor
+        # re-exports it.
+        "seeded_pool",
         # This package's version, which no importer reads as an API.
         "__version__",
     }

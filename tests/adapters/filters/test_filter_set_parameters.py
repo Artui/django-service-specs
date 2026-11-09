@@ -345,6 +345,15 @@ def test_a_labelled_filter_s_schema_states_its_labels() -> None:
     ]
 
 
+def test_an_ordering_filter_s_own_labels_reach_the_schema() -> None:
+    # django-filter labels these itself, so its schema moves with no author's label.
+    read = _offered(django_filters.OrderingFilter(fields=["username"]))
+    assert parameters_schema(Parameters.of(read))["properties"]["read"]["items"]["anyOf"] == [
+        {"const": "username", "title": "Username"},
+        {"const": "-username", "title": "Username (descending)"},
+    ]
+
+
 def test_labels_that_only_repeat_the_values_keep_the_enum() -> None:
     read = _offered(
         django_filters.ChoiceFilter(field_name="title", choices=[("draft", "draft"), (1, "1")])

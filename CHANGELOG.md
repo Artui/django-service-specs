@@ -20,12 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `filter_set_parameters`, and so a `SelectorSpec`'s `filter_set`, now hands each
   label on as the Parameter's `choice_labels`, keyed on the value as it is offered:
   an integer set's stay integers, and any other set's are its strings. A named group
-  flattens with its labels, in each spelling Django reads as a group, a mapping's
-  included, and a mapping's labels are read off its items. A lazy translation stays
+  flattens with its labels, and a mapping's labels are read off its items. A lazy translation stays
   lazy until a schema renders it, and a bare value is left unlabelled. So **a labelled
   filter's schema moves from `enum` to an `anyOf` of `const` and `title`**, an array's
-  `items` too; labels that only repeat their values stay an `enum`. What a filter
-  accepts does not change.
+  `items` too; labels that only repeat their values stay an `enum`. An `OrderingFilter`
+  moves with no label written, since django-filter labels its choices itself. What a
+  filter accepts does not change.
 - **A read redeclaring a filter's is compared without its labels.** `SelectorSpec`
   refuses a read that declares a filter's name differently, and a difference in
   labels alone no longer counts: the read stands as the author wrote it, with its own
@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused as before.
 
 ### Fixed
+- **A filter's named group held in a mapping offers its choices.** Choices spelled
+  `{"Open": {"draft": "Draft"}}`, `{"Open": [("draft", "Draft")]}` or
+  `[("Open", {"draft": "Draft"})]`, each of which Django 5 reads as a group, offered the
+  group's name as a value and refused `draft`, a value the filter itself accepts. They
+  now offer `draft`.
 - **A `<uuid:pk>` route capture is accepted by a `string` parameter.** Django's path
   converter hands the view a `uuid.UUID`, so a route declaring its capture as a
   string, with or without `format="uuid"`, answered `Expected a string.` on every
