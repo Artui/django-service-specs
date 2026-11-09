@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import sys
 from decimal import Decimal
 from typing import Any, ClassVar
@@ -10,6 +11,7 @@ import django_filters
 import pytest
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.functional import lazy
 
 from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters
 from django_service_specs.authorization.not_permitted import NotPermitted
@@ -17,6 +19,7 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameter, Parameters
+from django_service_specs.schema.parameters_schema import parameters_schema
 from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.selector_kind import SelectorKind
@@ -65,6 +68,7 @@ def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
             "kind",
             "string",
             choices=("draft", "final"),
+            choice_labels=(("draft", "Draft"), ("final", "Final")),
             help="Matches `title` with the `exact` lookup.",
         ),
         Parameter(
@@ -72,6 +76,7 @@ def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
             "array",
             items="string",
             choices=("draft", "final"),
+            choice_labels=(("draft", "Draft"), ("final", "Final")),
             help="Matches `title` with the `exact` lookup.",
         ),
         Parameter("owner", "string"),
@@ -126,6 +131,7 @@ def test_the_date_time_and_choice_shapes() -> None:
             "level",
             "integer",
             choices=(1, 2),
+            choice_labels=((1, "One"), (2, "Two")),
             help="Matches `pk` with the `exact` lookup.",
         ),
         # A ChoiceField compares the string of each choice, so a mixed set is
@@ -134,17 +140,26 @@ def test_the_date_time_and_choice_shapes() -> None:
             "mixed",
             "string",
             choices=("1", "b"),
+            choice_labels=(("1", "One"), ("b", "B")),
             help="Matches `username` with the `exact` lookup.",
         ),
         Parameter(
             "grouped",
             "string",
             choices=("ada", "bob", "eve"),
+            choice_labels=(("ada", "Ada"), ("bob", "Bob"), ("eve", "Eve")),
             help="Matches `username` with the `exact` lookup.",
         ),
         Parameter("deferred", "string", help="Matches `username` with the `exact` lookup."),
         Parameter("group", "string", help="Matches `groups` with the `exact` lookup."),
-        Parameter("ordering", "array", items="string", choices=("username", "-username")),
+        # The labels an ordering filter builds for itself.
+        Parameter(
+            "ordering",
+            "array",
+            items="string",
+            choices=("username", "-username"),
+            choice_labels=(("username", "Username"), ("-username", "Username (descending)")),
+        ),
         Parameter("spent", "string", help="Matches `pk` with the `exact` lookup."),
     )
 
@@ -154,12 +169,16 @@ def test_a_choice_set_of_booleans_is_offered_as_strings() -> None:
         flag = django_filters.ChoiceFilter(field_name="is_staff", choices=[(True, "Yes")])
 
     assert filter_set_parameters(Flags).get("flag") == Parameter(
-        "flag", "string", choices=("True",), help="Matches `is_staff` with the `exact` lookup."
+        "flag",
+        "string",
+        choices=("True",),
+        choice_labels=(("True", "Yes"),),
+        help="Matches `is_staff` with the `exact` lookup.",
     )
 
 
 def test_choices_given_as_a_mapping_offer_its_keys() -> None:
-    # Django 5 takes ``{value: label}`` for choices; iterating it yields the values.
+    # Django 5 takes ``{value: label}`` for choices.
     class Kinds(django_filters.FilterSet):
         kind = django_filters.ChoiceFilter(
             field_name="title", choices={"draft": "Draft", "final": "Final"}
@@ -169,6 +188,7 @@ def test_choices_given_as_a_mapping_offer_its_keys() -> None:
         "kind",
         "string",
         choices=("draft", "final"),
+        choice_labels=(("draft", "Draft"), ("final", "Final")),
         help="Matches `title` with the `exact` lookup.",
     )
 
@@ -182,8 +202,157 @@ def test_a_numeric_multiple_choice_is_an_array_of_integers() -> None:
         "array",
         items="integer",
         choices=(1, 2),
+        choice_labels=((1, "a"), (2, "b")),
         help="Matches `pk` with the `exact` lookup.",
     )
+
+
+def _offered(filter_obj: Any) -> Parameter:
+    """The one Parameter a FilterSet holding only ``filter_obj`` reads, under the name ``read``."""
+    filter_set = type("Offered", (django_filters.FilterSet,), {"read": filter_obj})
+    parameter = filter_set_parameters(filter_set).get("read")
+    assert parameter is not None
+    return parameter
+
+
+def test_a_choice_filter_s_values_carry_their_labels() -> None:
+    read = _offered(
+        django_filters.ChoiceFilter(
+            field_name="title", choices=[("draft", "Draft"), ("final", "Final")]
+        )
+    )
+    assert read.choices == ("draft", "final")
+    assert read.choice_labels == (("draft", "Draft"), ("final", "Final"))
+
+
+def test_an_integer_choice_set_keeps_its_labels_on_the_integers() -> None:
+    read = _offered(django_filters.ChoiceFilter(field_name="pk", choices=[(1, "One"), (2, "Two")]))
+    assert read.type == "integer"
+    assert read.choices == (1, 2)
+    assert read.choice_labels == ((1, "One"), (2, "Two"))
+    assert all(type(value) is int for value, _label in read.choice_labels)
+
+
+def test_a_mixed_choice_set_keys_its_labels_on_the_strings_it_offers() -> None:
+    # Not every value an ``int``, so each is the string ``ChoiceField`` compares;
+    # a label keyed on the ``1`` would name no choice, and ``Parameter`` would
+    # refuse it.
+    read = _offered(
+        django_filters.ChoiceFilter(field_name="title", choices=[(1, "One"), ("b", "Bee")])
+    )
+    assert read.choices == ("1", "b")
+    assert read.choice_labels == (("1", "One"), ("b", "Bee"))
+
+
+def test_a_multiple_choice_filter_s_labels_describe_each_element() -> None:
+    read = _offered(
+        django_filters.MultipleChoiceFilter(field_name="pk", choices=[(1, "One"), (2, "Two")])
+    )
+    assert (read.type, read.items, read.choices) == ("array", "integer", (1, 2))
+    assert read.choice_labels == ((1, "One"), (2, "Two"))
+
+
+def test_a_named_group_flattens_with_its_labels() -> None:
+    read = _offered(
+        django_filters.ChoiceFilter(
+            field_name="title",
+            choices=[
+                ("Open", [("draft", "Draft"), ("review", "In review")]),
+                ("Closed", (("final", "Final"),)),
+            ],
+        )
+    )
+    assert read.choices == ("draft", "review", "final")
+    assert read.choice_labels == (("draft", "Draft"), ("review", "In review"), ("final", "Final"))
+
+
+def test_a_mapping_s_labels_are_read_through_its_items() -> None:
+    read = _offered(
+        django_filters.ChoiceFilter(
+            field_name="title", choices={"draft": "Draft", "final": "Final"}
+        )
+    )
+    assert read.choices == ("draft", "final")
+    assert read.choice_labels == (("draft", "Draft"), ("final", "Final"))
+
+
+@pytest.mark.parametrize(
+    "choices",
+    [
+        pytest.param({"Open": {"draft": "Draft"}, "final": "Final"}, id="a mapping in a mapping"),
+        pytest.param({"Open": [("draft", "Draft")], "final": "Final"}, id="pairs in a mapping"),
+        pytest.param({"Open": (("draft", "Draft"),), "final": "Final"}, id="a tuple in a mapping"),
+        pytest.param([("Open", {"draft": "Draft"}), ("final", "Final")], id="a mapping in pairs"),
+    ],
+)
+def test_a_named_group_flattens_whichever_of_django_s_spellings_holds_it(choices: Any) -> None:
+    # Each spelling Django 5's ``normalize_choices`` reads as a group: read as a
+    # label, the group's name would be offered as a value no form field accepts.
+    read = _offered(django_filters.ChoiceFilter(field_name="title", choices=choices))
+    assert read.choices == ("draft", "final")
+    assert read.choice_labels == (("draft", "Draft"), ("final", "Final"))
+
+
+def test_bare_values_are_unlabelled() -> None:
+    read = _offered(django_filters.ChoiceFilter(field_name="title", choices=["draft", "final"]))
+    assert read.choices == ("draft", "final")
+    assert read.choice_labels is None
+
+
+def test_a_bare_value_beside_a_labelled_one_stays_unlabelled() -> None:
+    # ``Parameter`` lets a choice go unlabelled, so nothing is dropped or invented.
+    read = _offered(
+        django_filters.ChoiceFilter(field_name="title", choices=[("draft", "Draft"), "final"])
+    )
+    assert read.choices == ("draft", "final")
+    assert read.choice_labels == (("draft", "Draft"),)
+    assert parameters_schema(Parameters.of(read))["properties"]["read"]["anyOf"] == [
+        {"const": "draft", "title": "Draft"},
+        {"const": "final"},
+    ]
+
+
+def test_a_lazy_label_stays_lazy_until_the_schema_renders_it() -> None:
+    renders: list[str] = []
+
+    def rendered(text: str) -> str:
+        renders.append(text)
+        return text.upper()
+
+    label = lazy(rendered, str)("draft label")
+    read = _offered(django_filters.ChoiceFilter(field_name="title", choices=[("draft", label)]))
+    assert read.choice_labels is not None
+    assert read.choice_labels[0][1] is label
+    # Read off the declaration and joined to a spec's reads, a copy's too, at
+    # import where the translation machinery may not be ready: nothing renders it.
+    fresh = django_filters.ChoiceFilter(field_name="title", choices=[("draft", label)])
+    filter_set = type("Lazy", (django_filters.FilterSet,), {"read": fresh})
+    dataclasses.replace(_spec(filter_set), selector=dict)
+    assert renders == []
+    schema = parameters_schema(Parameters.of(read))["properties"]["read"]
+    assert schema["anyOf"] == [{"const": "draft", "title": "DRAFT LABEL"}]
+
+
+def test_a_labelled_filter_s_schema_states_its_labels() -> None:
+    read = _offered(
+        django_filters.ChoiceFilter(
+            field_name="title", choices=[("draft", "Draft"), ("final", "Final")]
+        )
+    )
+    assert parameters_schema(Parameters.of(read))["properties"]["read"]["anyOf"] == [
+        {"const": "draft", "title": "Draft"},
+        {"const": "final", "title": "Final"},
+    ]
+
+
+def test_labels_that_only_repeat_the_values_keep_the_enum() -> None:
+    read = _offered(
+        django_filters.ChoiceFilter(field_name="title", choices=[("draft", "draft"), (1, "1")])
+    )
+    assert read.choice_labels == (("draft", "draft"), ("1", "1"))
+    schema = parameters_schema(Parameters.of(read))["properties"]["read"]
+    assert schema["enum"] == ["draft", "1"]
+    assert "anyOf" not in schema
 
 
 def test_a_suffixed_filter_of_an_unknown_kind_reads_as_strings() -> None:

@@ -15,7 +15,7 @@ from django_service_specs.adapters.filters.filter_set_parameters import filter_s
 from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.output.output import Output
 from django_service_specs.output.presenter import Presenter
-from django_service_specs.parameters.parameters import Parameters
+from django_service_specs.parameters.parameters import Parameter, Parameters
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.specs.check_permissions import check_permissions
 from django_service_specs.specs.utils import (
@@ -102,8 +102,9 @@ class SelectorSpec:
             [`filter_set_parameters`][django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters]
             and added to ``reads`` after the author's own, so the schema, the
             closed argument set and the shape check all cover them, and a
-            filter named like a read declared differently is refused here. Its
-            ``data`` is the arguments the call was sent for those names. Needs
+            filter named like a read declared differently is refused here,
+            where a difference in labels alone is no difference and the read
+            as the author wrote it stands. Its ``data`` is the arguments the call was sent for those names. Needs
             the ``[filter]`` extra to read a real FilterSet.
         affordances: What can be done to each row right now. A mapping from a
             name the caller chooses to the
@@ -354,8 +355,21 @@ def _read_filters(spec: SelectorSpec) -> None:
     A filter equal to a read the author declared is not added, and so not
     recorded as added: it stays the author's when the filter set goes
     (TestFilterSet.test_a_read_the_author_declared_as_the_filter_does_survives_a_copy).
-    One declared differently reaches ``+`` and is refused as two sources of one
-    name (TestFilterSet.test_a_read_the_filter_declares_differently_is_refused).
+    **Labels are left out of that comparison, and the author's read wins** with
+    its own labels or none: a label constrains nothing, and a spec declaring a
+    filter's read should not be refused because the filter's choices are labelled
+    (TestFilterSet.test_a_labelled_filter_redeclared_with_no_labels_survives_with_none,
+    TestFilterSet.test_a_labelled_filter_redeclared_with_other_labels_survives_with_those).
+    One differing in anything else reaches ``+`` and is refused as two sources of
+    one name (TestFilterSet.test_a_read_the_filter_declares_differently_is_refused,
+    TestFilterSet.test_a_labelled_filter_redeclared_differing_in_more_than_labels_is_refused).
+
+    What a previous construction added is compared exactly, labels included: an
+    author's unlabelled read on a copy is not the filter's labelled one, and taken
+    for it would be replaced by it
+    (TestFilterSet.test_an_author_redeclaring_a_read_on_a_copy_takes_it_from_the_filter).
+    Neither comparison renders a lazy label, since a spec is built at import
+    (test_a_lazy_label_stays_lazy_until_the_schema_renders_it).
     """
     previous = spec._filter_reads.items
     # Nothing added before and nothing to add: ``reads`` stays the object the
@@ -368,9 +382,15 @@ def _read_filters(spec: SelectorSpec) -> None:
         return
     own = Parameters(tuple(p for p in spec.reads.items if p not in previous))
     filters = filter_set_parameters(spec.filter_set) if spec.filter_set is not None else ()
-    added = Parameters(tuple(p for p in filters if p not in own.items))
+    declared = tuple(_unlabelled(p) for p in own.items)
+    added = Parameters(tuple(p for p in filters if _unlabelled(p) not in declared))
     object.__setattr__(spec, "reads", own + added)
     object.__setattr__(spec, "_filter_reads", added)
+
+
+def _unlabelled(parameter: Parameter) -> Parameter:
+    """``parameter`` as a read is compared with a filter: everything but its labels."""
+    return replace(parameter, choice_labels=None)
 
 
 def _check_shapes(spec: SelectorSpec) -> None:

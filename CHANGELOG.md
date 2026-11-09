@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A choice filter's values carry their labels into the schema.**
+  `filter_set_parameters`, and so a `SelectorSpec`'s `filter_set`, now hands each
+  label on as the Parameter's `choice_labels`, keyed on the value as it is offered:
+  an integer set's stay integers, and any other set's are its strings. A named group
+  flattens with its labels, in each spelling Django reads as a group, a mapping's
+  included, and a mapping's labels are read off its items. A lazy translation stays
+  lazy until a schema renders it, and a bare value is left unlabelled. So **a labelled
+  filter's schema moves from `enum` to an `anyOf` of `const` and `title`**, an array's
+  `items` too; labels that only repeat their values stay an `enum`. What a filter
+  accepts does not change.
+- **A read redeclaring a filter's is compared without its labels.** `SelectorSpec`
+  refuses a read that declares a filter's name differently, and a difference in
+  labels alone no longer counts: the read stands as the author wrote it, with its own
+  labels or none, so a spec redeclaring a labelled filter's read with no labels is
+  not refused now that the filter carries them. A read differing in anything else is
+  refused as before.
+
 ## [0.30.0] — 2026-11-09
 
 ### Added
