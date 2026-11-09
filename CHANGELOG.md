@@ -25,6 +25,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not refused now that the filter carries them. A read differing in anything else is
   refused as before.
 
+### Fixed
+- **A `<uuid:pk>` route capture is accepted by a `string` parameter.** Django's path
+  converter hands the view a `uuid.UUID`, so a route declaring its capture as a
+  string, with or without `format="uuid"`, answered `Expected a string.` on every
+  call. `coerce_flat`, which every route capture passes through, now spells a
+  `uuid.UUID` back for a `string` parameter and for each element of a `string` array.
+  An `any`, and an array declaring no `items`, keep what the route decoded; any other
+  value for a `string`, an integer included, is still refused by the shape check, and
+  `check_arguments` alone still refuses a `uuid.UUID`.
+
 ## [0.30.0] — 2026-11-09
 
 ### Added
