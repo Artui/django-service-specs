@@ -72,6 +72,23 @@ class _Asked(PermissionCheck):
         return [question for question, *_ in self.asked]
 
 
+class _PassesANote(PermissionCheck):
+    """The class question writes to the call's context; the scope question reads it back."""
+
+    def __init__(self) -> None:
+        self.read: Any = None
+
+    def has_permission(self, principal: Any, spec: Any, *, call_context: Any) -> bool:
+        call_context["note"] = "from the class question"
+        return True
+
+    def has_scope_permission(
+        self, principal: Any, spec: Any, scope: Any, *, call_context: Any
+    ) -> bool:
+        self.read = call_context.get("note")
+        return True
+
+
 class _ReadsTheArguments(PermissionCheck):
     """Decides by what the call names, so it cannot answer when handed nothing."""
 
@@ -254,6 +271,11 @@ class TestPassedThrough:
         authorize_without_arguments(_create(check), object(), call_context=call_context)
         assert [asked[3] for asked in check.asked] == [call_context, call_context]
         assert all(asked[3] is call_context for asked in check.asked)
+
+    def test_handed_no_call_context_both_questions_share_one(self) -> None:
+        check = _PassesANote()
+        authorize_without_arguments(_create(check), object())
+        assert check.read == "from the class question"
 
     def test_a_covering_grant_answers_the_class_question_and_is_returned(self) -> None:
         check = _Asked(permission=False)

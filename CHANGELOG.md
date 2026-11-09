@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`authorize_without_arguments` hands both questions one `call_context` when given
+  none.** Its docstring said both questions get the one dict, but with
+  `call_context=None` each `authorize` function built its own empty one, so what a
+  class-level check wrote to it the scope check never read. `None` now becomes one new
+  dict before either question is asked. A dict the caller hands is still the dict both
+  are handed, an empty one included.
+
 ## [0.29.0] — 2026-11-08
 
 ### Added

@@ -53,8 +53,9 @@ def authorize_without_arguments(
     ``grant``, ``call_context`` and ``pool_seeds`` are handed to both questions
     as ``authorize`` takes them: a covering grant answers the class-level
     question and a grant for another spec or principal is refused; both
-    questions are handed the one ``call_context`` dict; and each question
-    resolves from ``pool_seeds`` the seeds its own checks name. A deactivated
+    questions are handed the one ``call_context`` dict, a fresh one where none
+    is handed, so what a check writes to it the next question reads; and each
+    question resolves from ``pool_seeds`` the seeds its own checks name. A deactivated
     principal handed with ``pool_seeds`` raises ``PrincipalUnavailable`` before
     any check is asked, as dispatch refuses one; without ``pool_seeds`` it is
     asked exactly as ``authorize`` asks it. A grant's ``target_checked`` does
@@ -74,6 +75,11 @@ def authorize_without_arguments(
     # Compiled first, since the predicate reads the spec's class and a source
     # is neither (test_a_source_compiling_to_a_create_is_asked_the_scope_of_nothing).
     spec = kernel_spec(spec)
+    # Here rather than left to each question, which would make a dict of its own
+    # (test_handed_no_call_context_both_questions_share_one). Never ``or``: an
+    # empty dict the caller handed is the one it reads afterwards
+    # (test_both_questions_are_handed_the_one_call_context).
+    call_context = {} if call_context is None else call_context
     granted = authorize(
         spec,
         principal,

@@ -317,7 +317,8 @@ asks a spec what a call with no arguments is asked: `authorize`, then, for a
 service spec with no target selector (a create), `authorize_scope` of `None`.
 That is the same rule `checks_read_arguments` reads, so the two agree on which
 questions there are. Each question is handed `arguments=None`, and `grant=`,
-`call_context=` and `pool_seeds=` as `authorize` takes them; a grant's
+`call_context=` and `pool_seeds=` as `authorize` takes them, with one
+`call_context` dict between the two, a fresh one where none is handed; a grant's
 `target_checked` does not answer a create's scope question here, since no target
 is handed in. It returns the grant `authorize` returned. **It catches
 nothing**: a refusal, `PrincipalUnavailable`, a configuration error and a check
