@@ -1452,7 +1452,15 @@ and narrows nothing. Its filters are reads: each is read as a Parameter by
 and joins <code>reads</code> after the author's own, named as django-filter reads it -
 <code>price_min</code> and <code>price_max</code> for a range - so the schema, the closed argument
 set and the shape check cover every filter, and a filter named like a read
-declared differently is refused. Every filter is optional. A number filter,
+declared differently is refused. Labels are no difference: a read redeclaring
+a filter with labels of its own, or none, stands as the author wrote it. Every
+filter is optional. A choice filter's values carry the labels they were declared
+with as <a href="#parameters"><code>choice_labels</code></a>, which a schema states as titles; a label
+that is text, a <code>str</code> or a lazy translation, is kept and any other leaves its value
+unlabelled, as a bare value is. A lazy translation among them stays lazy until a
+schema renders it, in the language active then, and hashing a spec renders none. An
+<code>OrderingFilter</code>'s descending label is the exception: django-filter builds it when
+the filter is declared, so it is fixed in the language active then. A number filter,
 and each bound of a numeric range, is a <code>decimal</code> string, which its
 <code>DecimalField</code> reads exactly: read as a float on the way, a key past <code>2**53</code>
 would match its neighbour's row. A JSON number is still taken. Each such

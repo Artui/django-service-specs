@@ -2939,6 +2939,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.pool.seeded_pool.seeded_pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        seeded_pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.pool.null_progress.null_progress" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -6620,6 +6631,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#django_service_specs.pool.seeded_pool.seeded_pool" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        seeded_pool
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#django_service_specs.pool.null_progress.null_progress" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -9013,8 +9035,9 @@ reads: read as Parameters by
 <a class="autorefs autorefs-internal" title="filter_set_parameters" href="#django_service_specs.adapters.filters.filter_set_parameters.filter_set_parameters"><code>filter_set_parameters</code></a>
 and added to <code>reads</code> after the author's own, so the schema, the
 closed argument set and the shape check all cover them, and a
-filter named like a read declared differently is refused here. Its
-<code>data</code> is the arguments the call was sent for those names. Needs
+filter named like a read declared differently is refused here,
+where a difference in labels alone is no difference and the read
+as the author wrote it stands. Its <code>data</code> is the arguments the call was sent for those names. Needs
 the <code>[filter]</code> extra to read a real FilterSet.</p>
               </div>
             </td>
@@ -10019,8 +10042,14 @@ query string's <code>"3"</code> reaches the shape check and the Validator as
 <li>A key the parameters do not declare passes through untouched, so the
   closed argument set in <code>check_arguments</code> stays the one place that
   refuses it, under the caller's policy.</li>
-<li>A value that is not a string passes through untouched: it has already
-  been decoded by someone, and this does not second-guess them.</li>
+<li><strong>A</strong> <code>uuid.UUID</code> <strong>for a</strong> <code>string</code> <strong>is spelled back</strong>, an element of a
+  <code>string</code> array's too: Django's <code>&lt;uuid:pk&gt;</code> path converter decodes one
+  before the kernel sees it, and a string is what the declaration says, so
+  the shape check reads it as it would read the same id off a JSON wire.</li>
+<li>Any other value that is not a string passes through untouched: it has
+  already been decoded by someone, and this does not second-guess them. An
+  <code>any</code>, and an array declaring no <code>items</code>, takes a <code>uuid.UUID</code> as it
+  came, since neither says it is a string.</li>
 </ul>
 
 
@@ -13538,9 +13567,10 @@ called <code>price</code> that no FilterSet reads. A CSV filter (<code>BaseInFil
 <code>BaseRangeFilter</code>) reads one key holding several values, and is an array;
 its widget takes a list as it takes <code>"1,2"</code>. A choice filter offers its
 values, flattened out of any group, as <code>integer</code> when every value is an
-<code>int</code> and otherwise as the strings Django's <code>ChoiceField</code> compares; a
-choice set built by a callable, and a related row's key, offer only
-<code>string</code>. Every other filter is its scalar: <code>boolean</code>, a <code>date</code> or
+<code>int</code> and otherwise as the strings Django's <code>ChoiceField</code> compares, each
+with the label it was declared with as its <code>choice_labels</code>, so the schema
+names it for a reader; a choice set built by a callable, and a related row's
+key, offer only <code>string</code>. Every other filter is its scalar: <code>boolean</code>, a <code>date</code> or
 <code>date-time</code> string, and <code>string</code> for the rest. <strong>A number filter, and
 each bound of a numeric range, is a</strong> <code>decimal</code> <strong>string</strong>, because its
 form field is a <code>DecimalField</code> and reads one exactly, where a float read
@@ -19866,6 +19896,41 @@ convenience: a registered name is also reserved, so dispatch refuses a spec
 that declares an argument by that name rather than letting the two meet in
 one pool. An <code>**extra</code> entry has no such protection. Spread an entry that
 is genuinely per-call; register one that is ambient.</p>
+
+
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h2 id="django_service_specs.pool.seeded_pool.seeded_pool" class="doc doc-heading">
+            <span class="doc doc-object-name doc-function-name">seeded_pool</span>
+
+
+<a href="#django_service_specs.pool.seeded_pool.seeded_pool" class="headerlink" title="Permanent link">&para;</a></h2>
+<div class="language-python doc-signature highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nf">seeded_pool</span><span class="p">(</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="o">*</span><span class="p">,</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">user</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">seeds</span><span class="p">:</span> <span class="n">PoolSeeds</span> <span class="o">=</span> <span class="n">DEFAULT_POOL_SEEDS</span><span class="p">,</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">call_context</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">progress</span><span class="p">:</span> <span class="n">ProgressReporter</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+</span></code></pre></div>
+
+    <div class="doc doc-contents first">
+
+        <p>The seeds of <a class="autorefs autorefs-internal" title="base_pool" href="#django_service_specs.pool.base_pool.base_pool"><code>base_pool</code></a>, resolved under a call's context.</p>
+<p><strong>A transport with a call context builds its pool here</strong>, rather than
+spreading its own <code>request</code> beside a registered seed: <code>base_pool</code> refuses
+that pair, and it should, since a seed cannot silently outrank what the caller
+spread in. Here nothing is spread. A resolver declaring <code>request</code> or <code>view</code>
+reads the context's, and a seed registered under either name is the value.</p>
+<p><code>call_context</code> is what the resolvers bind against and no entry of what comes
+back: it is no seed, and a Validator's <code>ambient</code> is a pool built here. A
+transport that binds a callable against the context adds it back by name.
+<code>user</code>, <code>seeds</code> and <code>progress</code> are as <code>base_pool</code> takes them.</p>
 
 
     </div>

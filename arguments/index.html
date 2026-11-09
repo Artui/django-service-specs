@@ -1441,6 +1441,14 @@ directed by the declaration.</p>
   and hands a UUID on in its canonical spelling. So does each element
   of an array of decimal strings, which the shape check then reads and
   bounds as a decimal, at its index.</li>
+<li><strong>A <code>uuid.UUID</code> for a <code>string</code> is spelled back</strong>, each element of a <code>string</code>
+  array's too. Django's <code>&lt;uuid:pk&gt;</code> path converter decodes one before the kernel
+  sees it, and a string is what the declaration says, so the shape check reads
+  it as it would the same id off a JSON wire, with or without <code>format="uuid"</code>.
+  Any other decoded value passes through for the shape check to judge, an
+  integer for a <code>string</code> still <code>"Expected a string."</code>, and so does a <code>uuid.UUID</code>
+  for an <code>any</code> or in an array declaring no <code>items</code>. The shape check alone still
+  refuses a <code>uuid.UUID</code>: only this reading of a route's captures spells it back.</li>
 <li><strong>An <code>any</code> stays the string it arrived as</strong>: it declares no type to read the
   string as, so <code>?pk=3</code> reaches the Validator as <code>"3"</code>, not 3.</li>
 <li>An array's elements are coerced by its <code>items</code> type, and a single value

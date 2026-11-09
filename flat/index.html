@@ -756,7 +756,9 @@ reads the source by the declaration, and nothing else.</p>
 <p>It takes Django's <code>QueryDict</code>, or any <code>MultiValueDict</code>, and returns strings and
 lists of strings. It coerces nothing: the transport merges its route's kwargs
 into what it read, then calls <code>coerce_flat</code> once over the whole, so a path
-segment with no converter is read by the same rules as the query beside it.</p>
+segment with no converter is read by the same rules as the query beside it, and
+a <code>&lt;uuid:pk&gt;</code> capture, which reaches it decoded, <a href="../arguments/#flat-transports">is spelled back</a>
+for a <code>string</code> parameter.</p>
 <ul>
 <li><strong>An <code>array</code> takes every value its key was sent with</strong>, and anything else
   takes the last, as <code>QueryDict</code> reads a repeated key.</li>
