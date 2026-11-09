@@ -1945,8 +1945,10 @@ methods, and two more methods, an attribute and a property with defaults:</p>
   <code>parameters(self, *, call_context=None)</code>: every ask inside a call then hands
   it <a href="../dispatching/#the-calls-context">the call's context</a>, the same dict its
   <code>ValidationContext</code> carries, and every ask outside one hands it <code>None</code> -
-  at registration, for a schema, and for every other reader describing the
-  spec before a call - so the declaration must hold without it. Opted in or
+  at registration, for a schema handed no context, and for every other reader
+  describing the spec before a call - so the declaration must hold without it. A
+  transport describing a spec may instead hand a stamped dict with no call under way,
+  where <code>request</code> and <code>view</code> are <code>None</code>, so it must hold without those too. Opted in or
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose <code>parameters</code> takes only <code>**kwargs</code>, or is a
   <code>functools.wraps</code> wrapper that does not name the keyword itself: the
@@ -1959,16 +1961,22 @@ methods, and two more methods, an attribute and a property with defaults:</p>
   <a class="autorefs autorefs-internal" title="check_requested_input" href="../reference/#django_service_specs.dispatch.check_requested_input.check_requested_input"><code>check_requested_input</code></a>
   and
   <a class="autorefs autorefs-internal" title="server_owned_keys" href="../reference/#django_service_specs.specs.server_owned_keys.server_owned_keys"><code>server_owned_keys</code></a>.
-  Those that check or describe a spec - <code>check_server_arguments</code>,
-  <code>check_seeds</code>, <code>seed_named_parameters</code>, <code>unreceived_fields</code>,
-  <code>provider_reached</code> and the two input schemas - are describe-time, and read
+  So do those a transport describes a spec with:
+  <a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>,
+  <a class="autorefs autorefs-internal" title="spec_input_schema" href="../reference/#django_service_specs.schema.spec_input_schema.spec_input_schema"><code>spec_input_schema</code></a>
+  and
+  <a class="autorefs autorefs-internal" title="provider_reached" href="../reference/#django_service_specs.dispatch.provider_reached.provider_reached"><code>provider_reached</code></a>,
+  so a field declared to <a href="../schema/#a-field-declared-to-one-transport">one transport</a>
+  is offered there; handed none, they read the declaration made to no call.
+  Those that only check a spec - <code>check_server_arguments</code>, <code>check_seeds</code>,
+  <code>seed_named_parameters</code>, <code>unreceived_fields</code> - are describe-time, and read
   the declaration it makes to no call wherever they are called, a
   transport's check of a binding against one call's seeds included.
   <code>ServiceSpec.parameters()</code> and
   <code>SelectorSpec.parameters()</code> take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept <code>call_context</code>, which
   dispatch now passes: an override written <code>parameters(self)</code> raises <code>TypeError</code>
-  under dispatch.</li>
+  under dispatch and when a schema is read.</li>
 <li><code>validate(arguments, context)</code> returns the validated values keyed by name, or
   raises <a class="autorefs autorefs-internal" title="InvalidArguments" href="../reference/#django_service_specs.parameters.invalid_arguments.InvalidArguments"><code>InvalidArguments</code></a>.
   It receives only the arguments its own <code>parameters()</code> declare, already

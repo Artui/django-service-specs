@@ -1716,7 +1716,8 @@ asks a spec what a call with no arguments is asked: <code>authorize</code>, then
 service spec with no target selector (a create), <code>authorize_scope</code> of <code>None</code>.
 That is the same rule <code>checks_read_arguments</code> reads, so the two agree on which
 questions there are. Each question is handed <code>arguments=None</code>, and <code>grant=</code>,
-<code>call_context=</code> and <code>pool_seeds=</code> as <code>authorize</code> takes them; a grant's
+<code>call_context=</code> and <code>pool_seeds=</code> as <code>authorize</code> takes them, with one
+<code>call_context</code> dict between the two, a fresh one where none is handed; a grant's
 <code>target_checked</code> does not answer a create's scope question here, since no target
 is handed in. It returns the grant <code>authorize</code> returned. <strong>It catches
 nothing</strong>: a refusal, <code>PrincipalUnavailable</code>, a configuration error and a check
@@ -3040,7 +3041,7 @@ what the service left there.</p>
   <code>parameters(self, *, call_context=None)</code> is handed the call's dict on every
   ask of its <code>parameters()</code> inside the call - the shape check, the seed
   check, validation and the service's keywords alike - and <code>None</code> on every
-  ask outside one, such as registration or a schema
+  ask outside one, such as registration or a schema handed no context
   (<a href="../declaring/#the-validator">the Validator</a>). So a transport describing a
   serializer under its own request can tell its own call from a <code>dispatch</code>
   the service makes inside it, which is handed a dict of its own. A
@@ -3116,7 +3117,13 @@ documentation, so a new transport needs no kernel release.</p>
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   <a class="autorefs autorefs-internal" title="call_transport" href="../reference/#django_service_specs.types.call_transport.call_transport"><code>call_transport</code></a> returns
   <code>None</code> there, and for a Validator's <code>parameters()</code> asked outside a call, which is
-  handed no dict.</li>
+  handed no dict, unless a transport describing a spec hands a stamped dict with no
+  call under way.</li>
+<li><strong>The schema a transport offers is read under its stamp too</strong>, when the transport
+  hands
+  <a class="autorefs autorefs-internal" title="spec_caller_input_schema" href="../reference/#django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema"><code>spec_caller_input_schema</code></a>
+  its dict, so a stage's field for one transport is offered there
+  (<a href="../schema/#a-field-declared-to-one-transport">a field declared to one transport</a>).</li>
 <li><strong>A transport stamps from the release that adopts the key.</strong> Until a transport's
   release does, its calls read as missing too, and a stage cannot tell them from an
   in-process caller, so check the release of each transport you run before branching
