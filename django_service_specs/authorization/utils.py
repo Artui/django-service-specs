@@ -28,8 +28,8 @@ from django_service_specs.authorization.permission_check import PermissionCheck
 from django_service_specs.authorization.principal_unavailable import PrincipalUnavailable
 from django_service_specs.authorization.sync_answer import sync_answer
 from django_service_specs.authorization.unrestricted import Unrestricted
-from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.pool_seeds import PoolSeeds
+from django_service_specs.pool.seeded_pool import seeded_pool
 from django_service_specs.pool.utils import call_entries, only_seeds
 from django_service_specs.types.utils import check_callable
 
@@ -370,7 +370,7 @@ def resolved_seeds(
     seeds leave it.
     """
     named = names & pool_seeds.names
-    resolved = base_pool(
+    resolved = seeded_pool(
         user=user,
         seeds=only_seeds(pool_seeds, named),
         call_context={} if call_context is None else call_context,

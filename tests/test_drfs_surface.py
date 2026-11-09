@@ -350,6 +350,7 @@ SURFACE: dict[str, Pin] = {
         ),
     ),
     "base_pool": _fn("pool.base_pool", "*, user, progress=, seeds=, **extra"),
+    "seeded_pool": _fn("pool.seeded_pool", "*, user, seeds=, call_context, progress="),
     "combine_progress": _fn("pool.combine_progress", "*reporters"),
     "null_progress": _fn("pool.null_progress", "progress, *, total=, message=, meta="),
     "provider_keys": _fn("pool.provider_keys", "provider"),

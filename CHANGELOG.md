@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`seeded_pool(*, user, seeds=DEFAULT_POOL_SEEDS, call_context, progress=None)`**, a
+  pool built under a call's context. A resolver declaring `request` or `view` reads the
+  context's, a seed registered under either name is the value, and `call_context` is
+  not in the pool that comes back. A transport with a call context builds its pool here
+  rather than spreading its own `request` beside a registered seed, which `base_pool`
+  still refuses. Dispatch builds its own pools on it.
+
 ### Changed
 - **A choice filter's values carry their labels into the schema.**
   `filter_set_parameters`, and so a `SelectorSpec`'s `filter_set`, now hands each

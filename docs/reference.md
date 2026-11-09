@@ -181,6 +181,7 @@ Installed with the `pydantic` extra and imported from
 ::: django_service_specs.pool.reserved_pool_seeds.RESERVED_POOL_SEEDS
 ::: django_service_specs.pool.call_seeds.CALL_SEEDS
 ::: django_service_specs.pool.base_pool.base_pool
+::: django_service_specs.pool.seeded_pool.seeded_pool
 ::: django_service_specs.pool.null_progress.null_progress
 ::: django_service_specs.pool.combine_progress.combine_progress
 ::: django_service_specs.pool.provider_keys.provider_keys

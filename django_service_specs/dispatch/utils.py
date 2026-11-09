@@ -46,11 +46,11 @@ from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
 from django_service_specs.parameters.parameters import Parameters
 from django_service_specs.parameters.utils import length_problem
-from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.null_progress import null_progress
 from django_service_specs.pool.pool_seeds import PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
+from django_service_specs.pool.seeded_pool import seeded_pool
 from django_service_specs.pool.utils import (
     deferred_progress,
     only_seeds,
@@ -273,14 +273,14 @@ def seeded_base(
     early: Mapping[str, Any],
     call_context: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """``base_pool``, taking the seeds already resolved for a check as they are.
+    """``seeded_pool``, taking the seeds already resolved for a check as they are.
 
     ``early`` holds the seeds a check of the call named, resolved before the
     class-level check (``open_call``). Every pool after takes those values
     rather than resolving them again, so each resolves once per call and the
     check, the selectors and the run see one object
     (test_the_check_and_every_stage_see_the_one_value). The rest resolve here
-    as ``base_pool`` resolves them, once per pool. An early value was resolved
+    as ``seeded_pool`` resolves them, once per pool. An early value was resolved
     before the run's reporter existed, so its resolver saw ``progress`` as the
     no-op reporter.
 
@@ -293,8 +293,7 @@ def seeded_base(
     (test_the_registered_seed_supplies_the_name).
     """
     seeds = pool_seeds if not early else only_seeds(pool_seeds, pool_seeds.names - early.keys())
-    pool = base_pool(user=principal, progress=progress, seeds=seeds, call_context=call_context)
-    del pool[CALL_CONTEXT]
+    pool = seeded_pool(user=principal, seeds=seeds, call_context=call_context, progress=progress)
     pool.update(early)
     return pool
 
