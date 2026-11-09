@@ -296,7 +296,11 @@ class Parameter:
     items_nullable: bool = False
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
-    choice_labels: tuple[tuple[Any, str], ...] | None = None
+    # Out of the hash, as ``default`` is: a label may be a lazy translation, which
+    # renders when hashed, and a spec is hashed at import, before the apps are
+    # ready. Equality still compares them, and equal Parameters still hash equal.
+    # Held by test_a_lazy_label_is_compared_and_never_hashed.
+    choice_labels: tuple[tuple[Any, str], ...] | None = field(default=None, hash=False)
     minimum: int | float | None = None
     maximum: int | float | None = None
     # A list's own count, under the names Django's and DRF's length validators

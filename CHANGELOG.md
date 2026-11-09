@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.31.0] — 2026-11-09
+
+### Added
+- **`seeded_pool(*, user, seeds=DEFAULT_POOL_SEEDS, call_context, progress=None)`**, a
+  pool built under a call's context. A resolver declaring `request` or `view` reads the
+  context's, a seed registered under either name is the value, and `call_context` is
+  not in the pool that comes back. A transport with a call context builds its pool here
+  rather than spreading its own `request` beside a registered seed, which `base_pool`
+  still refuses. Dispatch builds its own pools on it.
+
+### Changed
+- **A choice filter's values carry their labels into the schema.**
+  `filter_set_parameters`, and so a `SelectorSpec`'s `filter_set`, now hands each
+  label on as the Parameter's `choice_labels`, keyed on the value as it is offered:
+  an integer set's stay integers, and any other set's are its strings. A named group
+  flattens with its labels, and a mapping's labels are read off its items. A label is
+  kept only if it is text, a `str` or a lazy translation: any other leaves its value
+  unlabelled, rather than title it with an object's `repr`. A lazy translation stays
+  lazy until a schema renders it, and hashing a spec, or copying one with a read of
+  its own over a filter's, renders none (a Parameter's labels take no part in its
+  hash, as its `default` does not, and still in its equality). A bare value is left
+  unlabelled. So **a labelled
+  filter's schema moves from `enum` to an `anyOf` of `const` and `title`**, an array's
+  `items` too; labels that only repeat their values stay an `enum`. An `OrderingFilter`
+  moves with no label written, since django-filter labels its choices itself; the
+  descending label is fixed in the language active when the filter is declared,
+  because django-filter builds it there, so under another language a schema can
+  read `Montag` beside `Monday (descending)`. What a filter accepts does not change.
+- **`django-spec-rest` before 0.12.0 writes these labelled filters as `const`** into a
+  document that OpenAPI 3.0, drf-spectacular's default, refuses. 0.12.0 lowers them and
+  floors on this release, so a project serving a 3.0 document moves to both together.
+- **A read redeclaring a filter's is compared without its labels.** `SelectorSpec`
+  refuses a read that declares a filter's name differently, and a difference in
+  labels alone no longer counts: the read stands as the author wrote it, with its own
+  labels or none, so a spec redeclaring a labelled filter's read with no labels is
+  not refused now that the filter carries them. A read differing in anything else is
+  refused as before.
+
+### Fixed
+- **A filter's named group held in a mapping offers its choices.** Choices spelled
+  `{"Open": {"draft": "Draft"}}`, `{"Open": [("draft", "Draft")]}` or
+  `[("Open", {"draft": "Draft"})]`, each of which Django 5.0 and later reads as a group,
+  offered the group's name as a value and refused `draft`, which the filter accepts
+  from there. They now offer `draft` from Django 5.0. Django 4.2 reads only a list or
+  a tuple as a group, so there a group of pairs flattens as it did, the first two
+  spellings are ones its form refuses outright, and the third offers `Open`, the
+  value its form accepts, unlabelled.
+- **A `<uuid:pk>` route capture is accepted by a `string` parameter.** Django's path
+  converter hands the view a `uuid.UUID`, so a route declaring its capture as a
+  string, with or without `format="uuid"`, answered `Expected a string.` on every
+  call. `coerce_flat`, which every route capture passes through, now spells a
+  `uuid.UUID` back for a `string` parameter and for each element of a `string` array.
+  An `any`, and an array declaring no `items`, keep what the route decoded; any other
+  value for a `string`, an integer included, is still refused by the shape check, and
+  `check_arguments` alone still refuses a `uuid.UUID`.
+
 ## [0.30.0] — 2026-11-09
 
 ### Added
@@ -2623,7 +2679,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.30.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.31.0...HEAD
+[0.31.0]: https://github.com/Artui/django-service-specs/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/Artui/django-service-specs/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/Artui/django-service-specs/compare/v0.28.0...v0.29.0
 [0.28.0]: https://github.com/Artui/django-service-specs/compare/v0.27.0...v0.28.0

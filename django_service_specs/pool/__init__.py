@@ -8,6 +8,7 @@ from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.seeded_pool import seeded_pool
 
 __all__ = [
     "CALL_SEEDS",
@@ -19,4 +20,5 @@ __all__ = [
     "null_progress",
     "provider_keys",
     "resolve_callable_kwargs",
+    "seeded_pool",
 ]

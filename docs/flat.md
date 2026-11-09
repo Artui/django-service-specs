@@ -18,7 +18,9 @@ docs/examples/flat.py:read
 It takes Django's `QueryDict`, or any `MultiValueDict`, and returns strings and
 lists of strings. It coerces nothing: the transport merges its route's kwargs
 into what it read, then calls `coerce_flat` once over the whole, so a path
-segment with no converter is read by the same rules as the query beside it.
+segment with no converter is read by the same rules as the query beside it, and
+a `<uuid:pk>` capture, which reaches it decoded, [is spelled back](arguments.md#flat-transports)
+for a `string` parameter.
 
 - **An `array` takes every value its key was sent with**, and anything else
   takes the last, as `QueryDict` reads a repeated key.

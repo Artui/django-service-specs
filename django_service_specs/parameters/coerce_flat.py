@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
@@ -63,8 +64,14 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
     - A key the parameters do not declare passes through untouched, so the
       closed argument set in ``check_arguments`` stays the one place that
       refuses it, under the caller's policy.
-    - A value that is not a string passes through untouched: it has already
-      been decoded by someone, and this does not second-guess them.
+    - **A** ``uuid.UUID`` **for a** ``string`` **is spelled back**, an element of a
+      ``string`` array's too: Django's ``<uuid:pk>`` path converter decodes one
+      before the kernel sees it, and a string is what the declaration says, so
+      the shape check reads it as it would read the same id off a JSON wire.
+    - Any other value that is not a string passes through untouched: it has
+      already been decoded by someone, and this does not second-guess them. An
+      ``any``, and an array declaring no ``items``, takes a ``uuid.UUID`` as it
+      came, since neither says it is a string.
 
     Raises:
         InvalidArguments: every refusal at once, a parameter's at its name and
@@ -92,8 +99,10 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
                 errors[key] = [problem]
             continue
         # ``nested`` is None, so ``items`` is a type name or undeclared; an
-        # undeclared element is left as the string it arrived as.
-        item_type = param.items if isinstance(param.items, str) else "string"
+        # undeclared element is left as it arrived, as an ``any`` is, a
+        # ``uuid.UUID`` included:
+        # test_a_uuid_in_an_array_declaring_no_items_is_left_alone.
+        item_type = param.items if isinstance(param.items, str) else "any"
         elements = list(value) if isinstance(value, list | tuple) else [value]
         # Before any element is parsed, so a long list costs no per-element work:
         # test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read.
@@ -117,6 +126,12 @@ def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any
 
 def _coerce_one(json_type: str, value: Any) -> tuple[Any, CodedMessage | None]:
     """``(value, None)``, or ``(None, message)`` for a string that does not parse."""
+    # One arc to coverage, a condition each:
+    # test_a_uuid_for_a_parameter_that_is_no_string_is_left_alone fails without the
+    # first and test_an_integer_for_a_string_stays_refused_by_the_shape_check
+    # without the second.
+    if json_type == "string" and isinstance(value, uuid.UUID):
+        return str(value), None
     if not isinstance(value, str):
         return value, None
     if json_type in ("integer", "number"):

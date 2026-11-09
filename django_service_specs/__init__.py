@@ -106,6 +106,7 @@ from django_service_specs.pool.pool_seeds import DEFAULT_POOL_SEEDS, PoolSeeds
 from django_service_specs.pool.provider_keys import provider_keys
 from django_service_specs.pool.reserved_pool_seeds import RESERVED_POOL_SEEDS
 from django_service_specs.pool.resolve_callable_kwargs import resolve_callable_kwargs
+from django_service_specs.pool.seeded_pool import seeded_pool
 from django_service_specs.registry.registered_spec import RegisteredSpec
 from django_service_specs.registry.spec_registry import SpecRegistry
 from django_service_specs.registry.unguarded_spec import UnguardedSpec
@@ -347,6 +348,7 @@ __all__ = [
     "run_selector",
     "run_service",
     "seed_named_parameters",
+    "seeded_pool",
     "server_owned_keys",
     "shape_queryset",
     "spec_caller_input_schema",

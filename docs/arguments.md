@@ -364,6 +364,14 @@ docs/examples/arguments.py:flat
   and hands a UUID on in its canonical spelling. So does each element
   of an array of decimal strings, which the shape check then reads and
   bounds as a decimal, at its index.
+- **A `uuid.UUID` for a `string` is spelled back**, each element of a `string`
+  array's too. Django's `<uuid:pk>` path converter decodes one before the kernel
+  sees it, and a string is what the declaration says, so the shape check reads
+  it as it would the same id off a JSON wire, with or without `format="uuid"`.
+  Any other decoded value passes through for the shape check to judge, an
+  integer for a `string` still `"Expected a string."`, and so does a `uuid.UUID`
+  for an `any` or in an array declaring no `items`. The shape check alone still
+  refuses a `uuid.UUID`: only this reading of a route's captures spells it back.
 - **An `any` stays the string it arrived as**: it declares no type to read the
   string as, so `?pk=3` reaches the Validator as `"3"`, not 3.
 - An array's elements are coerced by its `items` type, and a single value

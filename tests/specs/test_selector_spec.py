@@ -12,6 +12,7 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.utils.functional import lazy
 from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
@@ -133,6 +134,39 @@ ARCHIVED = Affordance(code="archived", reason="Archived.", when=Q(archived=False
 RENAME = ServiceSpec(service=print, affordances=[ARCHIVED])
 
 
+class _LabelledKinds(django_filters.FilterSet):
+    kind = django_filters.ChoiceFilter(
+        field_name="title", choices=[("draft", "Draft"), ("final", "Final")]
+    )
+
+
+def _kind_read(**changed: Any) -> Parameter:
+    """The filter's own ``kind`` read, as an author would redeclare it, with ``changed``."""
+    return Parameter(
+        "kind",
+        "string",
+        choices=("draft", "final"),
+        help="Matches `title` with the `exact` lookup.",
+        **changed,
+    )
+
+
+def _lazily_labelled() -> tuple[list[str], Any, type[django_filters.FilterSet]]:
+    """The renderings a lazy label has had, a maker of lazy labels, and a FilterSet using one."""
+    renders: list[str] = []
+
+    def rendered(text: str) -> str:
+        renders.append(text)
+        return text.upper()
+
+    label = lazy(rendered, str)
+
+    class Lazily(django_filters.FilterSet):
+        kind = django_filters.ChoiceFilter(field_name="title", choices=[("a", label("A"))])
+
+    return renders, label, Lazily
+
+
 def listing(**kwargs: object) -> SelectorSpec:
     return SelectorSpec(kind=SelectorKind.LIST, selector=list, **kwargs)  # type: ignore[arg-type]
 
@@ -242,6 +276,75 @@ class TestFilterSet:
         with pytest.raises(ImproperlyConfigured, match=r"\['title'\] are declared by two sources"):
             listing(reads=Parameters.of(Parameter("title", "integer")), filter_set=TitleFilter)
 
+    def test_a_labelled_filter_redeclared_with_no_labels_survives_with_none(self) -> None:
+        declared = _kind_read(choice_labels=None)
+        spec = listing(reads=Parameters.of(declared), filter_set=_LabelledKinds)
+        assert spec.reads == Parameters.of(declared)
+        assert spec.reads.items[0].choice_labels is None
+        # The author's own, so it outlives the filter set.
+        assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(declared)
+
+    def test_a_labelled_filter_redeclared_with_other_labels_survives_with_those(self) -> None:
+        declared = _kind_read(choice_labels=(("draft", "Unfinished"),))
+        spec = listing(reads=Parameters.of(declared), filter_set=_LabelledKinds)
+        assert spec.reads == Parameters.of(declared)
+        assert spec.reads.items[0].choice_labels == (("draft", "Unfinished"),)
+        assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(declared)
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            pytest.param({"help": "Something else."}, id="help"),
+            pytest.param({"type": "integer", "choices": (1, 2), "choice_labels": None}, id="type"),
+            pytest.param({"choices": ("draft",), "choice_labels": None}, id="choices"),
+            pytest.param({"required": True}, id="required"),
+        ],
+    )
+    def test_a_labelled_filter_redeclared_differing_in_more_than_labels_is_refused(
+        self, changed: dict[str, Any]
+    ) -> None:
+        # With no labels of its own too, so a label's absence hides no difference.
+        declared = dataclasses.replace(_kind_read(choice_labels=None), **changed)
+        with pytest.raises(ImproperlyConfigured, match=r"\['kind'\] are declared by two sources"):
+            listing(reads=Parameters.of(declared), filter_set=_LabelledKinds)
+
+    def test_a_copy_keeps_a_labelled_filter_s_labels_and_adds_it_once(self) -> None:
+        spec = listing(filter_set=_LabelledKinds)
+        copy = dataclasses.replace(spec, selector=dict)
+        assert [p.name for p in copy.reads.items] == ["kind"]
+        assert copy.reads.items[0].choice_labels == (("draft", "Draft"), ("final", "Final"))
+
+    def test_an_author_redeclaring_a_read_on_a_copy_takes_it_from_the_filter(self) -> None:
+        # The read a previous construction added is the filter's, and this one
+        # is not it: compared exactly there, so the author's unlabelled read is
+        # kept rather than taken for the filter's own and replaced by it.
+        declared = _kind_read(choice_labels=None)
+        copy = dataclasses.replace(
+            listing(filter_set=_LabelledKinds), reads=Parameters.of(declared)
+        )
+        assert copy.reads == Parameters.of(declared)
+        assert copy.reads.items[0].choice_labels is None
+
+    def test_a_lazily_labelled_filter_is_hashed_without_rendering_a_label(self) -> None:
+        # A spec is hashed at import, where a translation raises AppRegistryNotReady.
+        renders, _label, lazily = _lazily_labelled()
+        spec = listing(filter_set=lazily)
+        hash(spec)
+        hash(spec.reads)
+        hash(spec.reads.items[0])
+        assert renders == []
+
+    def test_a_copy_redeclaring_a_lazily_labelled_read_renders_no_label(self) -> None:
+        # The comparison that tells the filter's read from the author's is by
+        # identity: ``==`` would render both labels.
+        renders, label, lazily = _lazily_labelled()
+        base = listing(filter_set=lazily)
+        mine = dataclasses.replace(base.reads.items[0], choice_labels=(("a", label("mine")),))
+        copy = dataclasses.replace(base, reads=Parameters.of(mine))
+        assert renders == []
+        assert copy.reads.items == (mine,)
+        assert copy.reads.items[0] is mine
+
     def test_a_filter_named_after_a_reserved_seed_is_refused(self) -> None:
         class ByUser(django_filters.FilterSet):
             user = django_filters.CharFilter(field_name="owner__username")
@@ -257,7 +360,10 @@ class TestFilterSet:
             "description": "The `min` bound of `pk`.",
         }
         assert properties["kinds"]["type"] == "array"
-        assert properties["kinds"]["items"]["enum"] == ["draft", "final"]
+        assert properties["kinds"]["items"]["anyOf"] == [
+            {"const": "draft", "title": "Draft"},
+            {"const": "final", "title": "Final"},
+        ]
 
     def test_it_must_be_callable(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="SelectorSpec.filter_set must be callable"):

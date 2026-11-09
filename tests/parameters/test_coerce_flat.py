@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import uuid
 from typing import Any
 
 import pytest
@@ -184,6 +185,82 @@ def test_a_value_that_is_not_a_string_passes_through() -> None:
         "ids": [1, 2],
         "meta": {"a": "1"},
     }
+
+
+ROUTE_UUID = uuid.UUID("12345678-1234-5678-1234-567812345678")
+ROUTE_UUID_TEXT = "12345678-1234-5678-1234-567812345678"
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        pytest.param(Parameter("pk", "string"), id="plain"),
+        pytest.param(Parameter("pk", "string", format="uuid"), id="format"),
+    ],
+)
+def test_a_uuid_a_path_converter_decoded_is_spelled_back_for_a_string(
+    parameter: Parameter,
+) -> None:
+    # ``<uuid:pk>`` hands the view a ``uuid.UUID``, and the declaration says a string.
+    parameters = Parameters.of(parameter)
+    coerced = coerce_flat(parameters, {"pk": ROUTE_UUID})
+    assert coerced == {"pk": ROUTE_UUID_TEXT}
+    assert check_arguments(parameters, coerced) == {"pk": ROUTE_UUID_TEXT}
+
+
+@pytest.mark.parametrize(
+    ("sent", "expected"),
+    [
+        pytest.param([ROUTE_UUID, "plain"], [ROUTE_UUID_TEXT, "plain"], id="elements"),
+        pytest.param(ROUTE_UUID, [ROUTE_UUID_TEXT], id="bare"),
+    ],
+)
+def test_each_uuid_element_of_a_string_array_is_spelled_back(
+    sent: Any, expected: list[str]
+) -> None:
+    parameters = Parameters.of(Parameter("pks", "array", items="string"))
+    coerced = coerce_flat(parameters, {"pks": sent})
+    assert coerced == {"pks": expected}
+    assert check_arguments(parameters, coerced) == {"pks": expected}
+
+
+def test_check_arguments_alone_still_refuses_a_uuid() -> None:
+    # The spelling back is ``coerce_flat``'s: a typed caller handing the shape
+    # check a ``UUID`` for a string is still refused.
+    with pytest.raises(InvalidArguments) as refused:
+        check_arguments(Parameters.of(Parameter("pk", "string")), {"pk": ROUTE_UUID})
+    assert coded(refused.value.detail) == {"pk": [("Expected a string.", "invalid")]}
+
+
+@pytest.mark.parametrize(
+    "parameter",
+    [
+        pytest.param(Parameter("pk", "any"), id="an any"),
+        pytest.param(Parameter("pk", "integer"), id="an integer"),
+    ],
+)
+def test_a_uuid_for_a_parameter_that_is_no_string_is_left_alone(parameter: Parameter) -> None:
+    # The first condition of the arm in ``_coerce_one``: an ``any`` declares no
+    # type to spell it as, so the Validator sees what the route decoded.
+    assert coerce_flat(Parameters.of(parameter), {"pk": ROUTE_UUID}) == {"pk": ROUTE_UUID}
+
+
+def test_a_uuid_in_an_array_declaring_no_items_is_left_alone() -> None:
+    # Such an array takes any element, so nothing says this one is a string.
+    parameters = Parameters.of(Parameter("tags", "array"))
+    assert coerce_flat(parameters, {"tags": [ROUTE_UUID, "x"]}) == {"tags": [ROUTE_UUID, "x"]}
+    assert coerce_flat(parameters, {"tags": ROUTE_UUID}) == {"tags": [ROUTE_UUID]}
+
+
+def test_an_integer_for_a_string_stays_refused_by_the_shape_check() -> None:
+    # The second condition of the arm in ``_coerce_one``: only a ``UUID`` is
+    # spelled back. Spelling every value would turn this refusal into a ``"3"``.
+    parameters = Parameters.of(Parameter("title", "string"))
+    coerced = coerce_flat(parameters, {"title": 3})
+    assert coerced == {"title": 3}
+    with pytest.raises(InvalidArguments) as refused:
+        check_arguments(parameters, coerced)
+    assert coded(refused.value.detail) == {"title": [("Expected a string.", "invalid")]}
 
 
 def test_an_undeclared_key_passes_through_for_the_closed_set_to_refuse() -> None:

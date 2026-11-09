@@ -1149,7 +1149,19 @@ ambient context need them to differ. An adapter that builds a pool of its own
 builds it with [`base_pool`][django_service_specs.pool.base_pool.base_pool]
 and binds a callable with
 [`resolve_callable_kwargs`][django_service_specs.pool.resolve_callable_kwargs.resolve_callable_kwargs],
-the declare-to-receive rule every callable here is called through.
+the declare-to-receive rule every callable here is called through. A transport
+with a call context builds it with
+[`seeded_pool`][django_service_specs.pool.seeded_pool.seeded_pool] instead, rather
+than spreading its own `request` beside a registered seed, which `base_pool`
+refuses: a resolver declaring `request` or `view` reads the context's, a seed
+registered under either name is the value, and the context itself is not in the
+pool that comes back.
+
+```python
+--8<--
+docs/examples/dispatching.py:seeded_pool
+--8<--
+```
 
 ### Progress
 

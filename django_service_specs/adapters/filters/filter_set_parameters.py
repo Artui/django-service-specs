@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from typing import Any
+
+import django
+from django.utils.functional import Promise
 
 from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -39,9 +42,10 @@ def filter_set_parameters(filter_set: Any) -> Parameters:
     ``BaseRangeFilter``) reads one key holding several values, and is an array;
     its widget takes a list as it takes ``"1,2"``. A choice filter offers its
     values, flattened out of any group, as ``integer`` when every value is an
-    ``int`` and otherwise as the strings Django's ``ChoiceField`` compares; a
-    choice set built by a callable, and a related row's key, offer only
-    ``string``. Every other filter is its scalar: ``boolean``, a ``date`` or
+    ``int`` and otherwise as the strings Django's ``ChoiceField`` compares, each
+    with the label it was declared with as its ``choice_labels``, so the schema
+    names it for a reader; a choice set built by a callable, and a related row's
+    key, offer only ``string``. Every other filter is its scalar: ``boolean``, a ``date`` or
     ``date-time`` string, and ``string`` for the rest. **A number filter, and
     each bound of a numeric range, is a** ``decimal`` **string**, because its
     form field is a ``DecimalField`` and reads one exactly, where a float read
@@ -113,7 +117,10 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
     # test_each_note_filter_reads_as_the_argument_django_filter_reads.
     if isinstance(filter_obj, (module.BaseCSVFilter, module.MultipleChoiceFilter)):
         if offered is not None:
-            yield Parameter(name, "array", items=offered[0], choices=offered[1], help=help_)
+            type_, values, labels = offered
+            yield Parameter(
+                name, "array", items=type_, choices=values, choice_labels=labels, help=help_
+            )
             return
         # Each element read as the filter's scalar would be: a number filter's
         # as a bounded decimal, the format and the bounds describing the
@@ -130,7 +137,8 @@ def _parameters_for(module: Any, name: str, filter_obj: Any) -> Iterator[Paramet
             maximum=maximum,
         )
     elif offered is not None:
-        yield Parameter(name, offered[0], choices=offered[1], help=help_)
+        type_, values, labels = offered
+        yield Parameter(name, type_, choices=values, choice_labels=labels, help=help_)
     else:
         # A related row's filter has a queryset where its ``choices`` would
         # be: its key's type is not known without the database, so it is a
@@ -222,34 +230,68 @@ def _bounds(format_: str | None) -> tuple[float | None, float | None]:
     return None, None
 
 
-def _choices(extra: dict[str, Any]) -> tuple[str, tuple[Any, ...]] | None:
-    """The type and values a choice filter offers, or ``None`` when it offers none here.
+def _choices(
+    extra: dict[str, Any],
+) -> tuple[str, tuple[Any, ...], tuple[tuple[Any, str], ...] | None] | None:
+    """The type, values and labels a choice filter offers, or ``None`` when it offers none here.
 
     ``None`` for a callable or absent ``choices``: they are resolved when the
     form field is built, which reading the declaration does not do. Integers
     stay integers, so ``?level=1`` and a JSON ``1`` both arrive; any other set
     is offered as the strings Django's ``ChoiceField`` compares the argument
-    against, ``True`` included. A value is never labelled here.
+    against, ``True`` included. A label is keyed on its value as offered, since
+    ``Parameter`` refuses a label for a choice it does not list, and handed on
+    unrendered, so a lazy translation renders when a schema is built, in the
+    language active then. A bare value has no label, and a set with none has no
+    labels at all (test_bare_values_are_unlabelled).
     """
     choices: Any = extra.get("choices")
     if not choices or callable(choices):
         return None
-    values = tuple(_values(choices))
-    if all(type(value) is int for value in values):
-        return "integer", values
-    return "string", tuple(str(value) for value in values)
+    pairs = tuple(_labelled(choices))
+    if all(type(value) is int for value, _label in pairs):
+        type_ = "integer"
+    else:
+        type_ = "string"
+        pairs = tuple((str(value), label) for value, label in pairs)
+    labels = tuple(pair for pair in pairs if pair[1] is not None)
+    return type_, tuple(value for value, _label in pairs), labels or None
 
 
-def _values(choices: Any) -> Iterator[Any]:
-    """Each value of a choices list: ``(value, label)``, a named group, or a mapping's key.
+# What holds a named group's choices as a choice's second element. A list or a tuple
+# on every Django; a mapping from 5.0, whose ``normalize_choices`` reads one as the
+# group's choices. Django 4.2 takes it for the choice's label and accepts the group's
+# name as a value, so counting it a group there would offer ``draft`` to a form that
+# refuses it. A ternary rather than an ``if``, so both jobs run the same lines
+# (test_a_group_spelling_offers_what_the_filter_s_own_field_accepts).
+_GROUPS: tuple[type, ...] = (tuple, list, Mapping) if django.VERSION >= (5, 0) else (tuple, list)
 
-    A bare value is what iterating a ``{value: label}`` mapping yields, which
-    Django takes as choices from 5.0.
+
+def _labelled(choices: Any) -> Iterator[tuple[Any, Any]]:
+    """Each value of a choices list with its label: ``None`` for a bare value, which has none.
+
+    A mapping is read through ``.items()``, its entries being the ``(value,
+    label)`` pairs a list spells out; Django takes one as choices from 5.0.
+    Whatever holds further choices is a named group and flattens, in the spellings
+    read here: pairs, as a tuple or a list, and a mapping from Django 5.0, as the
+    group's second element (``_GROUPS``). One arc to coverage, a type each, held
+    by test_a_named_group_flattens_whichever_of_django_s_spellings_holds_it:
+    ``pairs in a mapping``, ``a tuple in a mapping`` and ``a mapping in a mapping``.
+    Any other spelling (a ``TextChoices`` class, a callable, ``dict.items()``) is
+    not read: the choice is offered as the group's name, as it always was, and
+    unlabelled, its label being no text
+    (test_a_label_that_is_no_text_goes_unlabelled_rather_than_become_its_repr).
+
+    A label is kept only if it is text, a ``str`` or a lazy translation: the title
+    made of anything else would be its ``repr``, whose address changes a schema on
+    every process.
     """
-    for choice in choices:
+    for choice in choices.items() if isinstance(choices, Mapping) else choices:
         if not isinstance(choice, (tuple, list)):
-            yield choice
-        elif isinstance(choice[1], (tuple, list)):
-            yield from _values(choice[1])
+            yield choice, None
+        elif isinstance(choice[1], _GROUPS):
+            yield from _labelled(choice[1])
         else:
-            yield choice[0]
+            # The conditional is one expression, not an arc, so the test above holds
+            # it by mutation: ``isinstance`` taken out fails that test's four cases.
+            yield choice[0], choice[1] if isinstance(choice[1], (str, Promise)) else None

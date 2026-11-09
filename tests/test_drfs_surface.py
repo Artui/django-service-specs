@@ -655,6 +655,10 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "TRANSPORT_KEY",
         "build_call_context",
         "call_transport",
+        # A transport's pool under its call's context: the transports use it from
+        # this package, and djangorestframework-services neither wraps nor
+        # re-exports it.
+        "seeded_pool",
         # This package's version, which no importer reads as an API.
         "__version__",
     }
