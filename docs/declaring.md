@@ -655,8 +655,9 @@ methods, and two more methods, an attribute and a property with defaults:
   it [the call's context](dispatching.md#the-calls-context), the same dict its
   `ValidationContext` carries, and every ask outside one hands it `None` -
   at registration, for a schema handed no context, and for every other reader
-  describing the spec before a call - unless a transport describing a spec hands a
-  stamped dict with no call under way, so the declaration must hold without it. Opted in or
+  describing the spec before a call - so the declaration must hold without it. A
+  transport describing a spec may instead hand a stamped dict with no call under way,
+  where `request` and `view` are `None`, so it must hold without those too. Opted in or
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose `parameters` takes only `**kwargs`, or is a
   `functools.wraps` wrapper that does not name the keyword itself: the

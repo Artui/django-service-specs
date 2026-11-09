@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overriding `parameters(self)` with no keyword: `spec_input_schema` now asks
   `spec.parameters(call_context=None)`, so that override, which already raised
   `TypeError` under dispatch, raises when a schema is read as well. `check_seeds`
-  does not take it, since none of its five refusals reads a Validator's field; but
+  does not take the keyword, since none of its five refusals reads a Validator's field; but
   assembling `spec.parameters()` still refuses a seat dispatch seeds itself, a name
   two sources declare and a field a typed `kwargs` fills, so a field declared only to
   one transport with such a shape passes `check_seeds` and raises at the first ask

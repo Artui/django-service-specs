@@ -432,8 +432,9 @@ class ServiceSpec(AffordanceDeclarer):
 
         ``call_context`` is the call's dict when a call asks, and ``None``
         when a reader outside one does, unless a transport describing the spec
-        hands a stamped dict with no call under way; it is handed on to a Validator whose
-        ``parameters`` declares the keyword (see ``Validator.parameters``).
+        hands a stamped dict with no call under way; it is handed on to a
+        Validator whose ``parameters`` declares the keyword (see
+        ``Validator.parameters``).
         """
         own = (
             validator_parameters(self.validator, call_context=call_context)
