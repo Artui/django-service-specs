@@ -1157,6 +1157,12 @@ refuses: a resolver declaring `request` or `view` reads the context's, a seed
 registered under either name is the value, and the context itself is not in the
 pool that comes back.
 
+```python
+--8<--
+docs/examples/dispatching.py:seeded_pool
+--8<--
+```
+
 ### Progress
 
 `progress=` on `dispatch` and `adispatch` takes the transport's own

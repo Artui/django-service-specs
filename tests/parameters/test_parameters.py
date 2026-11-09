@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.functional import lazy
 from django.utils.translation import gettext_lazy
 
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -315,13 +316,34 @@ def test_choice_labels_are_none_unless_declared() -> None:
 )
 def test_choice_labels_are_normalized_to_pairs(labels: Any) -> None:
     # A mapping is how a reader writes it and a list of pairs is how Django
-    # spells ``choices``, so both are read, and stored as a tuple of pairs so
-    # the declaration stays hashable.
+    # spells ``choices``, so both are read, and stored as a tuple of pairs.
     status = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
     assert status.choice_labels == (("draft", "Draft"), ("live", "Published"))
     twin = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
     assert hash(status) == hash(twin)
     assert status != Parameter("status", "string", choices=("draft", "live"))
+
+
+def test_a_lazy_label_is_compared_and_never_hashed() -> None:
+    # Out of the hash, as ``default`` is: a lazy translation renders when it is
+    # hashed, and a hash taken at import, before the apps are ready, would raise.
+    # Equality still compares the labels, and equal Parameters still hash equal.
+    renders: list[str] = []
+
+    def rendered(text: str) -> str:
+        renders.append(text)
+        return text.upper()
+
+    label = lazy(rendered, str)
+    one = Parameter("status", "string", choices=("a",), choice_labels={"a": label("A")})
+    other = Parameter("status", "string", choices=("a",), choice_labels={"a": label("B")})
+    plain = Parameter("status", "string", choices=("a",))
+    assert hash(one) == hash(other) == hash(plain)
+    hash(Parameters.of(one))
+    assert renders == []
+    assert one != other
+    assert one != plain
+    assert one == Parameter("status", "string", choices=("a",), choice_labels={"a": label("A")})
 
 
 def test_a_choice_may_go_unlabelled() -> None:

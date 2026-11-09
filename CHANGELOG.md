@@ -20,12 +20,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `filter_set_parameters`, and so a `SelectorSpec`'s `filter_set`, now hands each
   label on as the Parameter's `choice_labels`, keyed on the value as it is offered:
   an integer set's stay integers, and any other set's are its strings. A named group
-  flattens with its labels, and a mapping's labels are read off its items. A lazy translation stays
-  lazy until a schema renders it, and a bare value is left unlabelled. So **a labelled
+  flattens with its labels, and a mapping's labels are read off its items. A label is
+  kept only if it is text, a `str` or a lazy translation: any other leaves its value
+  unlabelled, rather than title it with an object's `repr`. A lazy translation stays
+  lazy until a schema renders it, and hashing a spec, or copying one with a read of
+  its own over a filter's, renders none (a Parameter's labels take no part in its
+  hash, as its `default` does not, and still in its equality). A bare value is left
+  unlabelled. So **a labelled
   filter's schema moves from `enum` to an `anyOf` of `const` and `title`**, an array's
   `items` too; labels that only repeat their values stay an `enum`. An `OrderingFilter`
-  moves with no label written, since django-filter labels its choices itself. What a
-  filter accepts does not change.
+  moves with no label written, since django-filter labels its choices itself; the
+  descending label is fixed in the language active when the filter is declared,
+  because django-filter builds it there, so under another language a schema can
+  read `Montag` beside `Monday (descending)`. What a filter accepts does not change.
+- **Upgrade `django-spec-rest` to 0.11.1 or later with this release:** earlier versions
+  write these labelled filters as `const` into a document that OpenAPI 3.0,
+  drf-spectacular's default, refuses.
 - **A read redeclaring a filter's is compared without its labels.** `SelectorSpec`
   refuses a read that declares a filter's name differently, and a difference in
   labels alone no longer counts: the read stands as the author wrote it, with its own
@@ -36,9 +46,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **A filter's named group held in a mapping offers its choices.** Choices spelled
   `{"Open": {"draft": "Draft"}}`, `{"Open": [("draft", "Draft")]}` or
-  `[("Open", {"draft": "Draft"})]`, each of which Django 5 reads as a group, offered the
-  group's name as a value and refused `draft`, a value the filter itself accepts. They
-  now offer `draft`.
+  `[("Open", {"draft": "Draft"})]`, each of which Django 5.0 and later reads as a group,
+  offered the group's name as a value and refused `draft`, which the filter accepts
+  from there. They now offer `draft` from Django 5.0. Django 4.2 reads only a list or
+  a tuple as a group, so there a group of pairs flattens as it did, the first two
+  spellings are ones its form refuses outright, and the third offers `Open`, the
+  value its form accepts, unlabelled.
 - **A `<uuid:pk>` route capture is accepted by a `string` parameter.** Django's path
   converter hands the view a `uuid.UUID`, so a route declaring its capture as a
   string, with or without `format="uuid"`, answered `Expected a string.` on every

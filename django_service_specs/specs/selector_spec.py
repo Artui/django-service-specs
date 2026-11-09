@@ -368,8 +368,13 @@ def _read_filters(spec: SelectorSpec) -> None:
     author's unlabelled read on a copy is not the filter's labelled one, and taken
     for it would be replaced by it
     (TestFilterSet.test_an_author_redeclaring_a_read_on_a_copy_takes_it_from_the_filter).
-    Neither comparison renders a lazy label, since a spec is built at import
-    (test_a_lazy_label_stays_lazy_until_the_schema_renders_it).
+    No step of building a spec renders a lazy label, since a spec is built at
+    import: not the comparison above, by identity, nor the hash, which leaves a
+    Parameter's labels out (test_a_copy_redeclaring_a_lazily_labelled_read_renders_no_label,
+    test_a_lazily_labelled_filter_is_hashed_without_rendering_a_label).
+    ``==`` on two specs, or on a read and the filter's, does render them, as it
+    compares the labels (test_a_lazy_label_stays_lazy_until_the_schema_renders_it
+    holds the other steps).
     """
     previous = spec._filter_reads.items
     # Nothing added before and nothing to add: ``reads`` stays the object the
@@ -380,7 +385,11 @@ def _read_filters(spec: SelectorSpec) -> None:
     # without the second.
     if not previous and spec.filter_set is None:
         return
-    own = Parameters(tuple(p for p in spec.reads.items if p not in previous))
+    # By identity: ``in`` would compare by ``==``, which renders both lazy labels of
+    # an author's read and the filter's. A previous construction's reads are the
+    # very objects it put in ``reads``, so a copy that kept them holds the same ones
+    # (test_a_copy_redeclaring_a_lazily_labelled_read_renders_no_label).
+    own = Parameters(tuple(p for p in spec.reads.items if not any(p is q for q in previous)))
     filters = filter_set_parameters(spec.filter_set) if spec.filter_set is not None else ()
     declared = tuple(_unlabelled(p) for p in own.items)
     added = Parameters(tuple(p for p in filters if _unlabelled(p) not in declared))

@@ -12,6 +12,7 @@ from asgiref.sync import async_to_sync
 from django.contrib.auth.models import AnonymousUser
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.utils.functional import lazy
 from typing_extensions import TypedDict
 
 from django_service_specs.authorization.unrestricted import Unrestricted
@@ -148,6 +149,22 @@ def _kind_read(**changed: Any) -> Parameter:
         help="Matches `title` with the `exact` lookup.",
         **changed,
     )
+
+
+def _lazily_labelled() -> tuple[list[str], Any, type[django_filters.FilterSet]]:
+    """The renderings a lazy label has had, a maker of lazy labels, and a FilterSet using one."""
+    renders: list[str] = []
+
+    def rendered(text: str) -> str:
+        renders.append(text)
+        return text.upper()
+
+    label = lazy(rendered, str)
+
+    class Lazily(django_filters.FilterSet):
+        kind = django_filters.ChoiceFilter(field_name="title", choices=[("a", label("A"))])
+
+    return renders, label, Lazily
 
 
 def listing(**kwargs: object) -> SelectorSpec:
@@ -307,6 +324,26 @@ class TestFilterSet:
         )
         assert copy.reads == Parameters.of(declared)
         assert copy.reads.items[0].choice_labels is None
+
+    def test_a_lazily_labelled_filter_is_hashed_without_rendering_a_label(self) -> None:
+        # A spec is hashed at import, where a translation raises AppRegistryNotReady.
+        renders, _label, lazily = _lazily_labelled()
+        spec = listing(filter_set=lazily)
+        hash(spec)
+        hash(spec.reads)
+        hash(spec.reads.items[0])
+        assert renders == []
+
+    def test_a_copy_redeclaring_a_lazily_labelled_read_renders_no_label(self) -> None:
+        # The comparison that tells the filter's read from the author's is by
+        # identity: ``==`` would render both labels.
+        renders, label, lazily = _lazily_labelled()
+        base = listing(filter_set=lazily)
+        mine = dataclasses.replace(base.reads.items[0], choice_labels=(("a", label("mine")),))
+        copy = dataclasses.replace(base, reads=Parameters.of(mine))
+        assert renders == []
+        assert copy.reads.items == (mine,)
+        assert copy.reads.items[0] is mine
 
     def test_a_filter_named_after_a_reserved_seed_is_refused(self) -> None:
         class ByUser(django_filters.FilterSet):

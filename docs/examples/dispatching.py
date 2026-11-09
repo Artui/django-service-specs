@@ -47,6 +47,7 @@ from django_service_specs import (
     present,
     resolve_seeds,
     resolve_target,
+    seeded_pool,
     unreceived_fields,
 )
 from docs.examples.declaring import IsSignedIn, NoteRow, list_notes_spec
@@ -630,6 +631,22 @@ def create_countersigned_note(user: Any, title: str, signature: str) -> Dispatch
 
 
 # --8<-- [end:seed_named_field]
+
+
+# --8<-- [start:seeded_pool]
+# A seed registered under ``request``: what a service reads from the request, not
+# the request itself.
+request_seeds = DEFAULT_POOL_SEEDS.extend(request=lambda *, request: request.META["REMOTE_ADDR"])
+
+
+def pool_for(user: Any, request: Any) -> dict[str, Any]:
+    # ``base_pool(request=request, seeds=request_seeds)`` is refused: a seed cannot
+    # silently outrank what the caller spread in. The context carries the request
+    # instead, the seed's resolver reads it, and the context is not in the pool.
+    return seeded_pool(user=user, seeds=request_seeds, call_context={"request": request})
+
+
+# --8<-- [end:seeded_pool]
 
 
 # --8<-- [start:progress]

@@ -5,6 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from typing import Any
 
+import django
+from django.utils.functional import Promise
+
 from django_service_specs.adapters.filters.utils import import_django_filters, range_suffixes
 from django_service_specs.parameters.parameters import Parameter, Parameters
 
@@ -255,21 +258,40 @@ def _choices(
     return type_, tuple(value for value, _label in pairs), labels or None
 
 
+# What holds a named group's choices as a choice's second element. A list or a tuple
+# on every Django; a mapping from 5.0, whose ``normalize_choices`` reads one as the
+# group's choices. Django 4.2 takes it for the choice's label and accepts the group's
+# name as a value, so counting it a group there would offer ``draft`` to a form that
+# refuses it. A ternary rather than an ``if``, so both jobs run the same lines
+# (test_a_group_spelling_offers_what_the_filter_s_own_field_accepts).
+_GROUPS: tuple[type, ...] = (tuple, list, Mapping) if django.VERSION >= (5, 0) else (tuple, list)
+
+
 def _labelled(choices: Any) -> Iterator[tuple[Any, Any]]:
     """Each value of a choices list with its label: ``None`` for a bare value, which has none.
 
     A mapping is read through ``.items()``, its entries being the ``(value,
     label)`` pairs a list spells out; Django takes one as choices from 5.0.
-    Whatever holds further choices is a named group and flattens, in each
-    spelling Django's ``normalize_choices`` reads as one. One arc to coverage, a
-    type each, all three held by
-    test_a_named_group_flattens_whichever_of_django_s_spellings_holds_it:
+    Whatever holds further choices is a named group and flattens, in the spellings
+    read here: pairs, as a tuple or a list, and a mapping from Django 5.0, as the
+    group's second element (``_GROUPS``). One arc to coverage, a type each, held
+    by test_a_named_group_flattens_whichever_of_django_s_spellings_holds_it:
     ``pairs in a mapping``, ``a tuple in a mapping`` and ``a mapping in a mapping``.
+    Any other spelling (a ``TextChoices`` class, a callable, ``dict.items()``) is
+    not read: the choice is offered as the group's name, as it always was, and
+    unlabelled, its label being no text
+    (test_a_label_that_is_no_text_goes_unlabelled_rather_than_become_its_repr).
+
+    A label is kept only if it is text, a ``str`` or a lazy translation: the title
+    made of anything else would be its ``repr``, whose address changes a schema on
+    every process.
     """
     for choice in choices.items() if isinstance(choices, Mapping) else choices:
         if not isinstance(choice, (tuple, list)):
             yield choice, None
-        elif isinstance(choice[1], (tuple, list, Mapping)):
+        elif isinstance(choice[1], _GROUPS):
             yield from _labelled(choice[1])
         else:
-            yield choice[0], choice[1]
+            # The conditional is one expression, not an arc, so the test above holds
+            # it by mutation: ``isinstance`` taken out fails that test's four cases.
+            yield choice[0], choice[1] if isinstance(choice[1], (str, Promise)) else None

@@ -19,7 +19,7 @@ import pickle
 import re
 from collections.abc import Iterator
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -55,6 +55,7 @@ from django_service_specs import (
     Unrestricted,
     ValidationContext,
     authorize,
+    base_pool,
     check_arguments,
     check_server_arguments,
     coerce_flat,
@@ -782,6 +783,17 @@ class TestDispatching:
     def test_a_dispatchers_own_name_cannot_be_registered(self) -> None:
         with pytest.raises(ValueError, match="reserved pool seed"):
             dispatching.seeds.extend(user=lambda: None)
+
+    def test_a_transport_builds_its_pool_under_the_call_s_request_seed(self, ada: Any) -> None:
+        request = SimpleNamespace(META={"REMOTE_ADDR": "10.0.0.7"})
+        pool = dispatching.pool_for(ada, request)
+        assert pool["request"] == "10.0.0.7"
+        assert pool["user"] is ada
+        # The context the resolver read is no entry of the pool.
+        assert set(pool) == {"user", "progress", "request"}
+        # The refusal it stays clear of: the request spread beside a seed for it.
+        with pytest.raises(TypeError, match="'request'"):
+            base_pool(user=ada, seeds=dispatching.request_seeds, request=request)
 
     def test_a_service_reports_to_the_transports_reporter(self, ada: Any) -> None:
         Note.objects.create(owner=ada, title="One")
