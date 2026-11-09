@@ -35,9 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   descending label is fixed in the language active when the filter is declared,
   because django-filter builds it there, so under another language a schema can
   read `Montag` beside `Monday (descending)`. What a filter accepts does not change.
-- **Upgrade `django-spec-rest` to 0.12.0 or later with this release:** earlier versions
-  write these labelled filters as `const` into a document that OpenAPI 3.0,
-  drf-spectacular's default, refuses.
+- **`django-spec-rest` before 0.12.0 writes these labelled filters as `const`** into a
+  document that OpenAPI 3.0, drf-spectacular's default, refuses. 0.12.0 lowers them and
+  floors on this release, so a project serving a 3.0 document moves to both together.
 - **A read redeclaring a filter's is compared without its labels.** `SelectorSpec`
   refuses a read that declares a filter's name differently, and a difference in
   labels alone no longer counts: the read stands as the author wrote it, with its own
