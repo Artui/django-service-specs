@@ -124,15 +124,19 @@ class Validator(abc.ABC):
         ``ValidationContext`` carries, so a transport describing a serializer
         under its own request can tell its own call from a ``dispatch`` the
         service makes inside it. It is ``None`` outside a call - at
-        registration, for a schema, or for any other reader describing the
-        spec - and the declaration must hold there too. Opted in or not, it
-        never queries. A Validator declaring no keyword is asked as before,
-        as is one whose ``parameters`` takes only ``**kwargs`` or is a
-        ``functools.wraps`` wrapper that does not name the keyword itself:
+        registration, for a schema handed no context, or for any other reader
+        describing the spec - and the declaration must hold there too. Opted
+        in or not, it never queries. A Validator declaring no keyword is asked
+        as before, as is one whose ``parameters`` takes only ``**kwargs`` or is
+        a ``functools.wraps`` wrapper that does not name the keyword itself:
         the method's own signature decides. The helpers a transport calls
         during a call - ``apply_server_arguments``,
         ``check_requested_input``, ``server_owned_keys`` - take the call's
-        dict as ``call_context=`` and ask with it.
+        dict as ``call_context=`` and ask with it. So do those it describes a
+        spec with - ``spec_caller_input_schema``, ``spec_input_schema``,
+        ``provider_reached`` - which also take a transport's stamped dict with
+        no call under way, where ``request`` and ``view`` are ``None``, so a
+        declaration read under one must hold without them.
         """
 
     @abc.abstractmethod

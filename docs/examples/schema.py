@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any
 
 # --8<-- [start:schema]
@@ -13,8 +14,13 @@ from django_service_specs import (
     Parameters,
     ServiceSpec,
     UnknownArguments,
+    ValidationContext,
+    Validator,
+    build_call_context,
+    call_transport,
     output_schema,
     parameters_schema,
+    spec_caller_input_schema,
     spec_input_schema,
     spec_output_schema,
 )
@@ -70,3 +76,28 @@ isbn_input = parameters_schema(Parameters.of(isbn))
 tags = OutputField("tags", "array", items="string", json_schema_extra={"uniqueItems": True})
 tags_output = output_schema(Output((tags,)))
 # --8<-- [end:extra]
+
+
+# --8<-- [start:one_transport]
+class RenameArguments(Validator):
+    """A required ``title``, and ``dry_run`` only for a call the ``cli`` transport stamped."""
+
+    def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
+        title = Parameter("title", "string", required=True)
+        if call_transport(call_context) == "cli":
+            return Parameters.of(title, Parameter("dry_run", "boolean", required=True))
+        return Parameters.of(title)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
+def rename(*, data: Mapping[str, Any]) -> None: ...
+
+
+rename_spec = ServiceSpec(service=rename, permissions=[IsSignedIn()], validator=RenameArguments())
+
+# What the command line offers, then what a transport describing no context offers.
+on_the_command_line = spec_caller_input_schema(rename_spec, call_context=build_call_context("cli"))
+in_no_context = spec_caller_input_schema(rename_spec)
+# --8<-- [end:one_transport]

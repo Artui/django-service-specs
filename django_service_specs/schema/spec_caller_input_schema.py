@@ -17,6 +17,7 @@ from django_service_specs.specs.spec_source import SpecSource
 from django_service_specs.types.server_arguments import ServerArguments
 from django_service_specs.types.unknown_arguments import UnknownArguments
 from django_service_specs.validation.validator import Validator
+from django_service_specs.validation.validator_parameters import validator_parameters
 
 
 def spec_caller_input_schema(
@@ -25,6 +26,7 @@ def spec_caller_input_schema(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     server_arguments: ServerArguments | None = None,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
+    call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """What a caller is asked to send ``spec``: [`spec_input_schema`][django_service_specs.schema.spec_input_schema.spec_input_schema] less what the server answers.
 
@@ -102,24 +104,45 @@ def spec_caller_input_schema(
     described as the spec it compiles to
     (test_a_spec_source_is_described_as_the_spec_it_compiles_to). Read on
     every call, as ``parameters()`` is
-    (test_the_declaration_is_read_on_every_call). **Describe-time**, as
-    ``spec_input_schema`` is: a Validator that declares ``call_context`` is
-    handed ``None``, and ``server_owned_keys`` and ``provider_reached`` are
-    read with no call's context
-    (test_describe_time_readers_hand_none).
+    (test_the_declaration_is_read_on_every_call).
+
+    **Describe-time unless handed a context.** With no ``call_context`` a
+    Validator that declares it is handed ``None``, and ``server_owned_keys`` and
+    ``provider_reached`` are read with no call's context
+    (test_describe_time_readers_hand_none), so a field declared only to a
+    transport is not offered
+    (test_with_no_call_context_the_schema_is_the_declaration_made_to_no_call).
+    A transport describing the spec under a context of its own, a stamped one
+    above all, hands that dict, and it is the object every ask of the Validator
+    is handed (test_a_reader_handed_a_context_hands_that_object_to_every_ask).
+    The field is then offered there and nowhere else
+    (test_a_field_declared_to_one_transport_is_offered_and_required_under_its_context,
+    test_a_field_declared_to_one_transport_is_not_offered_under_any_other_context),
+    and read as dispatch reads it under that dict: withheld, relaxed and
+    required at each level by what its context declares
+    (test_a_seed_named_field_declared_only_to_a_transport_is_the_caller_s_under_its_context,
+    test_a_field_declared_only_to_a_transport_input_data_may_fill_is_not_required,
+    test_a_row_field_declared_only_to_a_transport_input_data_fills_is_not_offered,
+    test_a_row_field_declared_only_to_a_transport_input_data_may_fill_is_not_required,
+    test_under_a_context_it_requires_exactly_what_check_call_refuses_absent_under_it).
+    A Validator declaring no ``call_context`` is asked as before
+    (test_a_validator_declaring_no_call_context_is_asked_as_before_under_one).
+    No call need be under way: where a transport has none, the dict of
+    ``build_call_context`` names it, with ``request`` and ``view`` ``None``.
     """
     spec = kernel_spec(spec)
-    schema = spec_input_schema(spec, unknown_arguments=unknown_arguments)
+    schema = spec_input_schema(spec, unknown_arguments=unknown_arguments, call_context=call_context)
     # The rows first, on the list as declared. One arc to coverage, each
     # conjunct held by its own test: test_a_selector_spec_s_reads_beside_an_untyped_kwargs_are_offered_and_none_required
     # (the first: a selector spec has no ``many``) and
     # test_a_read_a_typed_kwargs_fills_is_not_offered (the second: a spec
     # that is not ``many`` has no list to read).
-    withheld = server_owned_keys(spec, pool_seeds=pool_seeds)
+    withheld = server_owned_keys(spec, pool_seeds=pool_seeds, call_context=call_context)
     if isinstance(spec, ServiceSpec) and spec.many:
         # ``ServiceSpec`` refuses a ``many`` spec with no Validator when it is built.
         validator = cast(Validator, spec.validator)
-        owned, reached = reach(spec.input_data, validator.parameters())
+        fields = validator_parameters(validator, call_context=call_context)
+        owned, reached = reach(spec.input_data, fields)
         the_list = schema["properties"][spec.many_argument]
         the_list["items"] = _asked(the_list["items"], withheld=owned, relaxed=reached)
         # The list is never the server's to fill: dispatch demands it of the
@@ -132,7 +155,8 @@ def spec_caller_input_schema(
         withheld -= {spec.many_argument}
     if server_arguments is not None:
         withheld |= server_arguments.names()
-    return _asked(schema, withheld=withheld, relaxed=provider_reached(spec))
+    relaxed = provider_reached(spec, call_context=call_context)
+    return _asked(schema, withheld=withheld, relaxed=relaxed)
 
 
 def _asked(

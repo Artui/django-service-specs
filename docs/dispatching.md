@@ -1316,7 +1316,7 @@ what the service left there.
   `parameters(self, *, call_context=None)` is handed the call's dict on every
   ask of its `parameters()` inside the call - the shape check, the seed
   check, validation and the service's keywords alike - and `None` on every
-  ask outside one, such as registration or a schema
+  ask outside one, such as registration or a schema handed no context
   ([the Validator](declaring.md#the-validator)). So a transport describing a
   serializer under its own request can tell its own call from a `dispatch`
   the service makes inside it, which is handed a dict of its own. A
@@ -1375,6 +1375,11 @@ The contract, for a transport writing it and a stage reading it:
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
   handed no dict.
+- **The schema a transport offers is read under its stamp too**, when the transport
+  hands
+  [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+  its dict, so a stage's field for one transport is offered there
+  ([a field declared to one transport](schema.md#a-field-declared-to-one-transport)).
 - **A transport stamps from the release that adopts the key.** Until a transport's
   release does, its calls read as missing too, and a stage cannot tell them from an
   in-process caller, so check the release of each transport you run before branching

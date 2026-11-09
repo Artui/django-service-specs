@@ -255,6 +255,13 @@ def check_seeds(
     the spec as it declares itself to no call, handing a Validator that
     declares ``call_context`` ``None``
     (test_describe_time_readers_hand_none).
+    It takes no ``call_context``, as the input schemas do, because no context
+    could change its answer: what it refuses is a read, a shape, a ``many``
+    spec's list and a callable's keywords, a top-level Validator field is in
+    neither of ``seed_named_parameters``' sets, and a service beside a Validator
+    is left to dispatch. So a field a Validator declares only to one transport
+    is neither refused here nor needed to pass
+    (test_a_field_declared_only_to_a_call_changes_nothing_it_answers).
 
     ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
     it compiles to.

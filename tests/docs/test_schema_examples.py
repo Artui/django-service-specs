@@ -226,3 +226,11 @@ class TestJsonSchemaExtra:
         param = Parameter("tags", "array", items="string", json_schema_extra=extra)
         extra["examples"][0].append("b")
         assert param.json_schema_extra == {"examples": [["a"]]}
+
+
+class TestAFieldDeclaredToOneTransport:
+    def test_the_command_line_is_offered_the_field_and_no_context_is_not(self) -> None:
+        assert schema.on_the_command_line["properties"].keys() == {"title", "dry_run"}
+        assert schema.on_the_command_line["required"] == ["title", "dry_run"]
+        assert schema.in_no_context["properties"].keys() == {"title"}
+        assert schema.in_no_context["required"] == ["title"]

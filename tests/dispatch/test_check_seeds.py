@@ -41,6 +41,7 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
+    DeclaredToACall,
     Titled,
     every_ask_case,
     make_user,
@@ -2409,3 +2410,20 @@ def test_describe_time_readers_hand_none(case: str) -> None:
     check_seeds(spec, pool_seeds=TENANT_SEEDS)
     assert validator.asked
     assert validator.asked == [None] * len(validator.asked)
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        pytest.param(Parameter("tenant", "string"), id="named-for-a-seed"),
+        pytest.param(Parameter("note", "string", required=True), id="the-service-s-keyword"),
+    ],
+)
+def test_a_field_declared_only_to_a_call_changes_nothing_it_answers(field: Parameter) -> None:
+    """Refused by nothing, though the declaration made to no call lacks it, so no context is owed."""
+
+    def service(*, note: str = "") -> None: ...
+
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=DeclaredToACall(field))
+
+    assert check_seeds(spec, pool_seeds=TENANT_SEEDS) is None

@@ -18,13 +18,13 @@ happened to install.
 
 ## The functions
 
-- [`spec_input_schema(spec, *, unknown_arguments=REJECT)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
+- [`spec_input_schema(spec, *, unknown_arguments=REJECT, call_context=None)`][django_service_specs.schema.spec_input_schema.spec_input_schema]
   describes everything `spec.parameters()` declares: the arguments dispatch
   checks. A `many` service spec's is its `reads`, its `shapes` and the one
   required list `many_argument` names, each row an object of the Validator's
   parameters. A spec's `shapes` are properties like any other, closed set
   included, though only the presenter reads what is sent for them.
-- [`spec_caller_input_schema(spec, *, pool_seeds=DEFAULT_POOL_SEEDS, server_arguments=None, unknown_arguments=REJECT)`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
+- [`spec_caller_input_schema(spec, *, pool_seeds=DEFAULT_POOL_SEEDS, server_arguments=None, unknown_arguments=REJECT, call_context=None)`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]
   is the one a transport advertises: `spec_input_schema` less what the
   server answers, so its `required` is exactly what dispatch refuses the
   caller for leaving out. A name the server fills -
@@ -339,6 +339,36 @@ among them (see [arguments the server supplies](dispatching.md#arguments-the-ser
 and requires nothing a provider may fill, in each row of a `many` spec too,
 but a read a provider requires itself, which the caller alone can hand it.
 The list itself is never relaxed, and withheld only when the transport binds it.
+
+### A field declared to one transport
+
+A Validator that [opts into the call](declaring.md#the-validator) may declare a
+field to the one transport that [stamps its context](dispatching.md#the-calls-context)
+a certain way. Dispatch reads it under the dict the call carries, so a schema
+read with no context would offer one set of fields while the call takes another: the
+field would go unoffered, and where it is required every call would be refused.
+
+A transport hands the schema the dict it describes the spec under:
+
+```python
+--8<--
+docs/examples/schema.py:one_transport
+--8<--
+```
+
+`on_the_command_line` offers and requires `title` and `dry_run`. `in_no_context` offers
+and requires `title` alone, as any other transport's stamp does, and handed no
+`call_context` the schema is the declaration made to no call, as it always was. Every
+ask of the Validator inside the schema is handed that object, so what the server fills
+and what a provider may fill are read under it as well, at the top level and in each row
+of a `many` spec, and `required` still means what dispatch refuses the caller for leaving
+out under that dict.
+
+No call need be under way. A transport with no call in hand, building a schema for a
+listing or a document, can hand what
+[`build_call_context`][django_service_specs.types.build_call_context.build_call_context]
+returns, stamped with its name and with `request` and `view` `None`. So a Validator that
+reads either from the dict has to hold there too, as it does for `None`.
 
 ### The decimal convention
 

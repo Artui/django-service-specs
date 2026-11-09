@@ -413,9 +413,11 @@ SURFACE: dict[str, Pin] = {
     "parameters_schema": _fn("schema.parameters_schema", "parameters, *, unknown_arguments="),
     "spec_caller_input_schema": _fn(
         "schema.spec_caller_input_schema",
-        "spec, *, pool_seeds=, server_arguments=, unknown_arguments=",
+        "spec, *, pool_seeds=, server_arguments=, unknown_arguments=, call_context=",
     ),
-    "spec_input_schema": _fn("schema.spec_input_schema", "spec, *, unknown_arguments="),
+    "spec_input_schema": _fn(
+        "schema.spec_input_schema", "spec, *, unknown_arguments=, call_context="
+    ),
     "spec_output_schema": _fn(
         "schema.spec_output_schema", "spec, *, paginate=, projection=, handle_description="
     ),
