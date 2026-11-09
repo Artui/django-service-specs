@@ -14,7 +14,8 @@ def call_transport(call_context: Mapping[str, Any] | None) -> str | None:
     ``None`` means nothing stamped this context: an in-process caller, whose dict
     has no such key, a transport on a release that has not adopted the key yet, or
     a Validator's ``parameters()`` asked outside a call, which is handed no dict at
-    all.
+    all, unless a transport describing a spec hands a stamped dict with no call
+    under way.
 
     The stamp comes back as it was written, whatever string the transport chose,
     so compare it to a plain string: ``call_transport(call_context) == "rest"``.

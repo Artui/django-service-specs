@@ -129,6 +129,11 @@ def spec_caller_input_schema(
     (test_a_validator_declaring_no_call_context_is_asked_as_before_under_one).
     No call need be under way: where a transport has none, the dict of
     ``build_call_context`` names it, with ``request`` and ``view`` ``None``.
+
+    Raises:
+        ImproperlyConfigured: a declaration that fails assembly, one a Validator
+            makes only under the handed ``call_context`` included
+            (test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks).
     """
     spec = kernel_spec(spec)
     schema = spec_input_schema(spec, unknown_arguments=unknown_arguments, call_context=call_context)

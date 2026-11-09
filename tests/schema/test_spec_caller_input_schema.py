@@ -8,6 +8,7 @@ from django.core.exceptions import ImproperlyConfigured
 from typing_extensions import TypedDict
 
 from django_service_specs.dispatch.check_call import check_call
+from django_service_specs.dispatch.check_seeds import check_seeds
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.provider_reached import provider_reached
 from django_service_specs.parameters.invalid_arguments import InvalidArguments
@@ -1060,6 +1061,45 @@ def test_a_validator_declaring_no_call_context_is_asked_as_before_under_one(
     assert spec_caller_input_schema(
         spec, call_context=build_call_context("cli")
     ) == spec_caller_input_schema(spec)
+
+
+@pytest.mark.parametrize(
+    ("field", "declared", "refusal"),
+    [
+        pytest.param(
+            Parameter("user", "string"),
+            {},
+            r"declares the parameter\(s\) \['user'\], which dispatch seeds itself",
+            id="a-name-dispatch-seeds",
+        ),
+        pytest.param(
+            Parameter("page", "integer"),
+            {"reads": Parameters.of(Parameter("page", "integer"))},
+            r"Parameters \['page'\] are declared by two sources",
+            id="a-name-two-sources-declare",
+        ),
+        pytest.param(
+            _EXTRA,
+            {"kwargs": _fills_a_row},
+            r"is annotated to fill \['extra'\], which ServiceSpec.validator declares, "
+            r"and its values never reach",
+            id="a-name-a-typed-kwargs-fills",
+        ),
+    ],
+)
+def test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks(
+    field: Parameter, declared: dict[str, Any], refusal: str
+) -> None:
+    # ``check_seeds`` asks with no context, so what only the ``cli`` stamp
+    # declares is never assembled there: the registration passes, the schema
+    # asked with no context passes, and the first ask under the stamp raises.
+    # A schema's ask and dispatch's are one assembly.
+    spec = _service(validator=_ToOneTransport(field), **declared)
+
+    assert check_seeds(spec) is None
+    assert "title" in spec_caller_input_schema(spec)["properties"]
+    with pytest.raises(ImproperlyConfigured, match=refusal):
+        spec_caller_input_schema(spec, call_context=build_call_context("cli"))
 
 
 @pytest.mark.django_db

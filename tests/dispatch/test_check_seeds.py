@@ -41,7 +41,6 @@ from tests.dispatch.utils import (
     OPEN,
     PK,
     TENANT_SEEDS,
-    DeclaredToACall,
     Titled,
     every_ask_case,
     make_user,
@@ -2412,18 +2411,42 @@ def test_describe_time_readers_hand_none(case: str) -> None:
     assert validator.asked == [None] * len(validator.asked)
 
 
+class _Declaring(Validator):
+    """Declares the fields it is given to every ask, and passes its arguments through."""
+
+    def __init__(self, *fields: Parameter) -> None:
+        self.fields = fields
+
+    def parameters(self) -> Parameters:
+        return Parameters.of(*self.fields)
+
+    def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
+        return dict(arguments)
+
+
 @pytest.mark.parametrize(
-    "field",
+    "fields",
     [
-        pytest.param(Parameter("tenant", "string"), id="named-for-a-seed"),
-        pytest.param(Parameter("note", "string", required=True), id="the-service-s-keyword"),
+        pytest.param(
+            (Parameter("tenant", "string"), Parameter("note", "string", required=True)),
+            id="a-field-named-for-a-seed",
+        ),
+        pytest.param((Parameter("note", "string", required=True),), id="the-service-s-keyword"),
     ],
 )
-def test_a_field_declared_only_to_a_call_changes_nothing_it_answers(field: Parameter) -> None:
-    """Refused by nothing, though the declaration made to no call lacks it, so no context is owed."""
+def test_a_validator_field_is_the_caller_s_and_fills_the_service_s_keyword(
+    fields: tuple[Parameter, ...],
+) -> None:
+    """A field a Validator always declares is left alone, a seed's name or the service's keyword.
 
-    def service(*, note: str = "") -> None: ...
+    The ``tenant`` case fails without ``seed_named_fields`` in
+    ``split_seed_named``, which would refuse the name as a seed's; both fail
+    without ``or seat.validated``, which would judge the service's required
+    ``note`` as nothing filling it.
+    """
 
-    spec = ServiceSpec(service=service, permissions=OPEN, validator=DeclaredToACall(field))
+    def service(*, note: str) -> None: ...
+
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=_Declaring(*fields))
 
     assert check_seeds(spec, pool_seeds=TENANT_SEEDS) is None

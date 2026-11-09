@@ -362,7 +362,9 @@ and requires `title` alone, as any other transport's stamp does, and handed no
 ask of the Validator inside the schema is handed that object, so what the server fills
 and what a provider may fill are read under it as well, at the top level and in each row
 of a `many` spec, and `required` still means what dispatch refuses the caller for leaving
-out under that dict.
+out under that dict. A declaration that fails assembly, a seat dispatch seeds itself or
+a name two sources declare, raises `ImproperlyConfigured` here too, one a Validator makes
+only under the handed dict included.
 
 No call need be under way. A transport with no call in hand, building a schema for a
 listing or a document, can hand what

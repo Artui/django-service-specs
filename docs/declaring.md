@@ -655,7 +655,8 @@ methods, and two more methods, an attribute and a property with defaults:
   it [the call's context](dispatching.md#the-calls-context), the same dict its
   `ValidationContext` carries, and every ask outside one hands it `None` -
   at registration, for a schema handed no context, and for every other reader
-  describing the spec before a call - so the declaration must hold without it. Opted in or
+  describing the spec before a call - unless a transport describing a spec hands a
+  stamped dict with no call under way, so the declaration must hold without it. Opted in or
   not, it never queries. A Validator declaring no keyword is asked as
   before, as is one whose `parameters` takes only `**kwargs`, or is a
   `functools.wraps` wrapper that does not name the keyword itself: the
@@ -683,7 +684,7 @@ methods, and two more methods, an attribute and a property with defaults:
   `SelectorSpec.parameters()` take the same keyword, which a selector spec
   ignores, so a subclass overriding either must accept `call_context`, which
   dispatch now passes: an override written `parameters(self)` raises `TypeError`
-  under dispatch.
+  under dispatch and when a schema is read.
 - `validate(arguments, context)` returns the validated values keyed by name, or
   raises [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
   It receives only the arguments its own `parameters()` declare, already

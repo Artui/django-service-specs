@@ -1374,7 +1374,8 @@ The contract, for a transport writing it and a stage reading it:
   script, a shell or a test, or by a service handing an inner call a dict of its own.
   [`call_transport`][django_service_specs.types.call_transport.call_transport] returns
   `None` there, and for a Validator's `parameters()` asked outside a call, which is
-  handed no dict.
+  handed no dict, unless a transport describing a spec hands a stamped dict with no
+  call under way.
 - **The schema a transport offers is read under its stamp too**, when the transport
   hands
   [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema]

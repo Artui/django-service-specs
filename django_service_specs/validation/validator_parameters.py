@@ -19,8 +19,9 @@ def validator_parameters(
 
     Every ask inside one call passes that call's dict, the same object, and
     every ask outside a call - registration, a schema, a describe-time
-    reader - passes ``None``, so a Validator keyed on the dict describes one
-    call one way. Handed ``None``, the Validator is asked as it always was,
+    reader - passes ``None``, unless a transport describing a spec hands a
+    stamped dict with no call under way, so a Validator keyed on the dict
+    describes one call one way. Handed ``None``, the Validator is asked as it always was,
     with no keyword at all
     (test_an_opted_in_validator_asked_outside_a_call_is_handed_no_keyword).
     Otherwise the keyword is passed only to a ``parameters`` naming
