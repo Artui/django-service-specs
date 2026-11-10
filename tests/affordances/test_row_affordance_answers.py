@@ -1,5 +1,3 @@
-"""``row_affordance_answers``: one row's affordances, read off the row itself."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -43,8 +41,7 @@ def listing(selector: Any = notes_of, **fields: Any) -> SelectorSpec:
 
 
 def rows_of(spec: SelectorSpec, user: Any) -> list[Any]:
-    # What dispatch hands a transport: the rows carrying the answers it wrote,
-    # so the alias read here is the one dispatch actually produced.
+    # What dispatch hands a transport: the rows carrying the answers it wrote.
     return list(dispatch(spec, principal=user, arguments={}).value)
 
 
@@ -110,8 +107,7 @@ class TestARowDispatchAnswered:
         output = listing(
             lambda *, result: Note.objects.filter(pk__in=result), affordances={"rename": RENAME}
         )
-        # Its own affordances are what it is checked against and are never
-        # presented: only the output selector's mapping answers a row.
+        # Its own affordances are what it is checked against and are never presented.
         spec = ServiceSpec(
             service=lambda: [live.pk, archived.pk],
             permissions=OPEN,
@@ -174,8 +170,7 @@ class TestARowThatIsNotThere:
             affordance__rename__note_archived=None, affordance__rename__books_closed=False
         )
 
-        # Not ``False``: no condition's sentence is true of a row that no
-        # longer exists, and the walk stops before the unmet second condition.
+        # Not ``False``: no condition's sentence is true of a row that no longer exists.
         assert row_affordance_answers(listing(affordances={"rename": RENAME}), row) == {
             "rename": {"available": False}
         }
@@ -206,8 +201,7 @@ class TestARowThatCarriesNoAnswer:
 
 class TestANameWithNoConditions:
     def test_it_reads_no_flag_so_any_row_is_available_for_it(self) -> None:
-        # Nothing is asked of the row, so a row carrying no answers is fine; the
-        # refusal above is for a name that does declare a condition.
+        # Nothing is asked of the row, so a row carrying no answers is fine.
         spec = listing(affordances={"edit": EDIT})
 
         assert row_affordance_answers(spec, object()) == {"edit": {"available": True}}
@@ -216,8 +210,7 @@ class TestANameWithNoConditions:
 class TestAProjectBuiltFlag:
     @pytest.mark.parametrize("flag", [0, ""], ids=["zero", "empty-string"])
     def test_a_falsy_flag_that_is_not_false_is_unmet(self, flag: Any) -> None:
-        # A mapping row built by the project may carry 0 where dispatch writes
-        # False; an unmet condition is anything falsy, as the call reads it.
+        # A mapping row built by the project may carry 0 where dispatch writes False.
         row = {"affordance__rename__note_archived": flag}
         spec = listing(affordances={"rename": RENAME})
 
@@ -241,8 +234,6 @@ class TestASpecThatPresentsNoAffordances:
         ids=["selector", "output-selector-declaring-none", "no-output-selector"],
     )
     def test_a_spec_presenting_none_answers_empty(self, spec: Any) -> None:
-        # No mapping at all (``None``), not an empty one: this is the arm that
-        # fails without ``or {}``, with an AttributeError rather than an answer.
         assert rendered_affordances(spec) is None
         assert row_affordance_answers(spec, object()) == {}
 

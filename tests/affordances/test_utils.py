@@ -1,5 +1,3 @@
-"""The helpers every reader of an affordance answers through."""
-
 from __future__ import annotations
 
 import inspect
@@ -53,9 +51,6 @@ def call_pool(user: Any, **entries: Any) -> dict[str, Any]:
 
 
 class TestAmbientPool:
-    # The filter is ``key in reserved and key not in PER_CALL_POOL_NAMES``. The
-    # first test holds the first half and the second test the second: delete
-    # either half and exactly that test fails.
     def test_the_call_context_is_ambient_whatever_reserved_names(self) -> None:
         """The affordance functions set the key themselves, so a narrower ``reserved`` keeps it."""
         context: dict[str, Any] = {}
@@ -81,9 +76,7 @@ class TestAmbientPool:
         assert ambient_pool(pool, reserved=RESERVED_POOL_SEEDS) == {"user": "ada", "progress": "p"}
 
     def test_a_drf_adapters_serializer_is_never_ambient(self) -> None:
-        # djangorestframework-services hands these functions a pool holding the
-        # bound input serializer, with ``serializer`` in its reserved set. It is
-        # the call's input, so a condition never sees it there either.
+        # djangorestframework-services hands these a pool holding the bound serializer.
         pool = {"user": "ada", "request": "r", "serializer": "bound"}
         reserved = RESERVED_POOL_SEEDS | {"request", "serializer"}
         assert ambient_pool(pool, reserved=reserved) == {"user": "ada", "request": "r"}
@@ -133,12 +126,7 @@ async def _books_closed_lazily() -> Any:
 
 
 class TestAnAnswerThatIsNotAnAnswer:
-    """A condition is sync-only, and an unawaited answer is truthy: refused, never read as met.
-
-    Each condition is a plain callable returning the object, a shape no
-    declaration can refuse - a lambda, a partial, a decorated ``async def``.
-    Each shape holds one condition of the guard.
-    """
+    """A condition is sync-only, and an unawaited answer is truthy: refused, never read as met."""
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:
         answer = books_closed()
@@ -176,8 +164,7 @@ class TestAffordanceExpression:
         assert answers == {live.pk: True, gone.pk: False}
 
     def test_a_multi_valued_relation_does_not_duplicate_the_rows(self) -> None:
-        # Inline, a condition across ``owner__notes`` would join every sibling
-        # note into the outer query; inside the subquery it joins nothing.
+        # Inline, a condition across ``owner__notes`` would join every sibling note outward.
         ada = make_user("ada")
         for title in ("a", "b", "c"):
             Note.objects.create(owner=ada, title=title)
@@ -303,8 +290,7 @@ class TestRowsOfAQuerySet:
         assert [row.siblings for row in rows] == [2, 2]
 
     def test_extend_queryset_sees_the_answers(self, ada: Any, two_notes: Any) -> None:
-        # In the one ``annotate`` call the declared annotations make, so a
-        # project's ``extend_queryset`` may filter on an answer.
+        # In the one ``annotate`` call the declared annotations make.
         spec = listing(
             extend_queryset=lambda *, queryset: queryset.filter(
                 affordance__rename__note_archived=True
@@ -350,8 +336,7 @@ class TestRowsOfAQuerySet:
             reads=Parameters.of(Parameter("search", "string")),
         )
 
-        # The selector reads an argument, so it sits in the selector's pool beside
-        # the seeds, and must not reach the condition.
+        # The selector reads an argument, so it sits in the selector's pool beside the seeds.
         rows = rows_of(spec, ada, arguments={"search": "x"})
 
         assert len(seen) == 1
@@ -428,8 +413,7 @@ class TestRowsASelectorReturnsDirectly:
         return rows, len(ctx.captured_queries)
 
     def test_declaring_nothing_leaves_a_returned_list_as_it_was(self, ada: Any) -> None:
-        # Not walked, copied or refused: rows that are neither instances nor
-        # mappings are refused only where there are answers to carry.
+        # Not walked, copied or refused.
         rows = [object(), object()]
 
         assert rows_of(listing(lambda: rows, affordances=None), ada) is rows
@@ -470,8 +454,7 @@ class TestRowsASelectorReturnsDirectly:
         assert {row.affordance__a__books_closed for row in rows} == {False}
 
     def test_one_query_per_model_class_each_answered_against_its_own_table(self, ada: Any) -> None:
-        # Pks collide across the two tables, so answering one class's rows
-        # against the other's table would read the wrong titles.
+        # Pks collide across the two tables.
         note = Note.objects.create(owner=ada, title="draft")
         other_note = Note.objects.create(owner=ada, title="not a draft")
         post = Post.objects.create(title="not a draft")
@@ -507,8 +490,7 @@ class TestRowsASelectorReturnsDirectly:
     def test_a_row_deleted_after_the_selector_ran_has_no_row_answer(
         self, ada: Any, two_notes: Any
     ) -> None:
-        # ``None``, not ``False``: a ``False`` names a condition the row fails,
-        # and a row that no longer exists fails none of them.
+        # ``None``, not ``False``: a ``False`` names a condition the row fails.
         def then_delete(*, user: Any) -> list[Note]:
             rows = list(notes_of(user=user))
             Note.objects.filter(pk=rows[0].pk).delete()
@@ -519,7 +501,6 @@ class TestRowsASelectorReturnsDirectly:
         assert gone.affordance__rename__note_archived is None
         # A callable condition is not about the row, and still answers.
         assert gone.affordance__rename__books_closed is True
-        # The row that still exists is answered as before.
         assert first_unmet(archived) == "note_archived"
 
     def test_a_default_manager_that_hides_the_rows_does_not_decide(self, ada: Any) -> None:

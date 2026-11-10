@@ -1,10 +1,3 @@
-"""``enforce_affordances``: refuse a call whose declared affordances are not met.
-
-Called directly, with a pool shaped as dispatch shapes a service's - the
-seeds, the validated values spread by name, ``data`` and the target - which
-is what a transport running a service itself hands it.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -122,8 +115,7 @@ class TestRowConditions:
         assert refused.code == "note_archived"
 
     def test_the_row_is_read_from_the_table_not_from_the_instance(self, ada: Any) -> None:
-        # The instance in hand still says "not archived"; the table says
-        # otherwise, and the table is what the condition reads.
+        # The instance in hand still says "not archived"; the table says otherwise.
         note = Note.objects.create(owner=ada, title="Draft")
         Note.objects.filter(pk=note.pk).update(archived=True)
         assert refusal(spec_with(NOT_ARCHIVED), pool_for(ada, note), note).code == "note_archived"
@@ -145,9 +137,7 @@ class TestRowConditions:
         assert refusal(spec, pool_for(ada, note), note).code == "owner_gone"
 
     def test_a_row_the_default_manager_hides_is_still_answered(self, ada: Any) -> None:
-        # Both reads go through ``_base_manager``: the narrowing to the one row,
-        # and the correlated condition. Through the default manager, this row
-        # would be not-found or unavailable, though the caller holds it.
+        # Both reads go through ``_base_manager``: the narrowing to the one row.
         hidden = LiveNote.objects.create(owner=ada, title="Draft", archived=True)
         assert not LiveNote.objects.filter(pk=hidden.pk).exists()
         spec = spec_with(TITLED)
@@ -233,9 +223,7 @@ class TestCallableConditions:
     async def test_adispatch_does_not_run_a_service_whose_condition_answered_with_a_coroutine(
         self, atomic: bool
     ) -> None:
-        # An ``async def`` service, so both of adispatch's paths are walked: run
-        # inside the hop when atomic, awaited after it when not. The condition
-        # is answered inside the hop either way, before the run.
+        # An ``async def`` service, so both of adispatch's paths are walked.
         ran: list[Any] = []
 
         async def service() -> None:
@@ -252,9 +240,7 @@ class TestCallableConditions:
         assert ran == []
 
     def test_an_async_def_condition_is_refused_before_any_call_can_be_made(self) -> None:
-        # The literal shape is refused when it is declared, so no spec carrying
-        # it exists to dispatch. What a declaration cannot see, a plain ``def``
-        # handing back the coroutine, is the test above.
+        # The literal shape is refused when it is declared.
         with pytest.raises(ImproperlyConfigured, match="`when` is an async callable"):
             Affordance(code="books_closed", reason="r", when=books_closed)
 

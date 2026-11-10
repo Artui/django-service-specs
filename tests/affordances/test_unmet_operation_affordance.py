@@ -1,5 +1,3 @@
-"""``unmet_operation_affordance``: whether an operation should be offered at all."""
-
 from __future__ import annotations
 
 import inspect
