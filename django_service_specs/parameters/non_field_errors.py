@@ -1,5 +1,3 @@
-"""``NON_FIELD_ERRORS`` - the key a node's own message sits under."""
-
 from __future__ import annotations
 
 from typing import Final

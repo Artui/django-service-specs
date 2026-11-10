@@ -1,5 +1,3 @@
-"""What can be done right now: answering a spec's affordances, at the call and before it."""
-
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,

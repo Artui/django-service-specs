@@ -1,5 +1,3 @@
-"""``NoneOf`` - checks of which none may pass, as one check."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -16,19 +14,8 @@ from django_service_specs.authorization.utils import (
 
 
 class NoneOf(_Combinator):
-    """Passes when none of its checks passes ``has_permission``: ``NoneOf(IsSuspended(), message=...)``.
-
-    It inverts the class-level question alone, asking each check in order
-    and refusing at the first that passes; its row and scope questions allow,
-    as a ``PermissionCheck``'s do by default. So a check judging rows or a
-    scope has no place inside it - the opposite of "may act on this row" is
-    no rule a call can be refused by - and one whose ``has_object_permission``
-    or ``has_scope_permission`` is its own, at any depth, is refused when
-    this is built (test_none_of_refuses_a_row_level_child).
-
-    ``message`` is what ``NotPermitted`` says when it refuses; ``None`` keeps
-    the generic wording.
-    """
+    """Passes when none of its checks passes ``has_permission``: ``NoneOf(IsSuspended(),
+    message=...)``."""
 
     _asks = {
         CLASS_LEVEL[0]: (CLASS_LEVEL,),
@@ -55,16 +42,7 @@ class NoneOf(_Combinator):
 
 
 def _judges_rows(check: PermissionCheck) -> str | None:
-    """The first row or scope method a leaf under ``check`` overrides, as ``Class.method``, else ``None``.
-
-    A combinator is walked rather than read: its own row and scope methods
-    are always its own, and what they ask is its children. Read off the bound
-    method, so a callable set on the instance counts as an override too. One
-    case per method in test_none_of_refuses_a_row_level_child, since either
-    alone is a rule NoneOf cannot invert, and a depth-two case, with
-    test_none_of_accepts_a_combinator_of_class_level_checks holding that the
-    walk does not read the combinator itself.
-    """
+    """The ``Class.method`` a leaf under ``check`` overrides first, or ``None``."""
     if isinstance(check, _Combinator):
         return next(
             (judged for child in check.checks if (judged := _judges_rows(child)) is not None),

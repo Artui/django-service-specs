@@ -1,5 +1,3 @@
-"""Running one operation, from any transport, the authorization checks it runs, and the refusals it raises."""
-
 from django_service_specs.dispatch.adispatch import adispatch
 from django_service_specs.dispatch.apply_server_arguments import apply_server_arguments
 from django_service_specs.dispatch.apresent import apresent

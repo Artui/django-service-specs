@@ -1,5 +1,3 @@
-"""``DispatchResult`` - what one dispatch produced."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -10,29 +8,7 @@ from django_service_specs.output.presentation_context import PresentationContext
 
 @dataclass(frozen=True)
 class DispatchResult:
-    """The value an operation produced, and how to read it.
-
-    Not-found is **reported, not raised**: a required row that does not exist
-    comes back as ``kind="not_found"`` and the transport decides what that
-    means on its wire - a 404, an exit code, a tool error. Nothing here is a
-    status code, because most transports have none.
-
-    Attributes:
-        kind: ``"instance"`` (one value, possibly ``None``), ``"list"`` (a
-            collection, a queryset when it can be one), or ``"not_found"``.
-        value: What to present: the selector's rows, or the service's return,
-            or what its output selector re-read.
-        service_result: The service's own return, before any output selector.
-        instance: The resolved target - the row, or the collection's queryset.
-        data: The Validator's ``data`` the service received: the validated
-            mapping, or the instance a dataclass Validator builds.
-        context: The call a presenter renders for: its principal, its target,
-            its resolved seeds, the call's context and the arguments sent for
-            the spec's ``shapes``, which ``present`` hands to
-            ``Presenter.presented()``. ``None`` on a result dispatch did not
-            build, and on a not-found, which is never presented. It takes no
-            part in equality: two results of one value are one result.
-    """
+    """The value an operation produced, and how to read it."""
 
     kind: Literal["instance", "list", "not_found"]
     value: Any = None

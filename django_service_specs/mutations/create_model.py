@@ -17,36 +17,7 @@ def create_model(
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None,
     relations: Mapping[str, RelationSpec] | None = None,
 ) -> Callable[..., ModelT]:
-    """A service that builds a row of ``model`` from its validated ``data``, and returns the row.
-
-    The service a create operation would otherwise write by hand:
-
-        def create_author(*, data: AuthorIn, **_: Any) -> Author:
-            return create_from_input(Author, data).instance
-
-    ``field_map``, ``exclude_fields`` and ``relations`` are handed to
-    [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]
-    as they are, so one ``relations`` map writes every nested kind, a reverse
-    foreign key's
-    [`ChildSpec`][django_service_specs.relations.child_spec.ChildSpec] among
-    them. ``m2m`` is a static mapping, or a callable handed the validated
-    ``data`` that returns one, which is the usual case when the rows to link
-    arrive in the arguments:
-
-        create_model(Post, m2m=lambda data: {"tags": data.tags})
-
-    The service returns the row, not the
-    [`ChangeResult`][django_service_specs.mutations.change_result.ChangeResult],
-    since the row is what a create's output presents. It opens no transaction:
-    dispatch runs a service inside one, which covers the row and every nested
-    write. It takes ``**kwargs``, so the rest of the pool - the ``user`` and
-    any registered seed - is absorbed rather than refused. It names
-    ``call_context``, which a catch-all is never handed, and the same pool
-    with the call's context beside it is handed on as the helper's
-    ``context``, so a row service a relation spec declares can see who is
-    calling and, by naming ``call_context``, the very dict the call's other
-    stages share.
-    """
+    """A service that builds a row of ``model`` from its validated ``data``, and returns the row."""
 
     def _service(*, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any) -> ModelT:
         return create_from_input(

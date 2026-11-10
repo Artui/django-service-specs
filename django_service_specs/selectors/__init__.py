@@ -1,5 +1,3 @@
-"""Running a ``SelectorSpec``'s selector, and shaping and collapsing what it returns."""
-
 from django_service_specs.selectors.amaterialize_retrieve import amaterialize_retrieve
 from django_service_specs.selectors.arun_selector import arun_selector
 from django_service_specs.selectors.async_selector import AsyncSelector
