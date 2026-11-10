@@ -14,9 +14,7 @@ def test_a_call_is_whole_unless_it_says_otherwise() -> None:
 
 
 def test_partial_follows_the_two_positional_fields() -> None:
-    # Dispatch builds the context positionally, so ``partial`` trails and is
-    # defaulted, and a caller written against principal and target alone
-    # keeps working.
+    # Dispatch builds the context positionally, so ``partial`` trails and is defaulted.
     context = ValidationContext("ada", "row", partial=True)
     assert (context.principal, context.target, context.partial) == ("ada", "row", True)
 
@@ -28,8 +26,7 @@ def test_the_context_is_frozen() -> None:
 
 
 def test_a_context_built_by_hand_carries_no_ambient_values() -> None:
-    """Empty unless dispatch fills it, so a context built from a principal and
-    a target is still a whole one."""
+    """Empty unless dispatch fills it."""
     assert dict(ValidationContext("ada", "row").ambient) == {}
 
 
@@ -41,8 +38,7 @@ def test_two_contexts_differing_in_ambient_alone_are_equal() -> None:
 
 
 def test_a_context_carrying_ambient_values_is_hashable() -> None:
-    """A mapping proxy cannot be hashed, so ``ambient`` stays out of the hash
-    a frozen dataclass derives from its compared fields."""
+    """A mapping proxy cannot be hashed."""
     context = ValidationContext("ada", "row", ambient=MappingProxyType({"tenant": "a"}))
     assert hash(context) == hash(ValidationContext("ada", "row"))
 
@@ -64,8 +60,7 @@ def test_a_context_carrying_a_resolved_target_is_hashable() -> None:
 
 
 def test_a_context_built_by_hand_carries_an_empty_call_context() -> None:
-    """A plain ``dict`` every context has, so a Validator declaring nothing
-    else still reads and writes one without guarding for ``None``."""
+    """A plain ``dict`` every context has."""
     context = ValidationContext("ada", "row")
     assert type(context.call_context) is dict
     assert context.call_context == {}
@@ -77,8 +72,7 @@ def test_each_context_built_by_hand_has_a_call_context_of_its_own() -> None:
 
 
 def test_the_call_context_is_the_object_handed_in() -> None:
-    """The same dict, not a copy: what a Validator writes is there for every
-    later stage of the call that holds it."""
+    """The same dict, not a copy."""
     shared: dict[str, object] = {}
     context = ValidationContext("ada", call_context=shared)
     context.call_context["tenant"] = "a"
@@ -86,8 +80,7 @@ def test_the_call_context_is_the_object_handed_in() -> None:
 
 
 def test_the_call_context_trails_every_other_field() -> None:
-    """Built positionally as dispatch builds the rest, so no existing
-    construction changes."""
+    """Built positionally as dispatch builds the rest, so no existing construction changes."""
     shared: dict[str, object] = {"request": None}
     context = ValidationContext(
         "ada", "row", True, MappingProxyType({}), MappingProxyType({}), shared
