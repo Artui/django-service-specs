@@ -1,13 +1,3 @@
-"""Reading a dataclass's annotations, and encoding a value back to JSON-like data.
-
-Shared by the validator and the presenter, which read one declaration from two
-sides: what an argument must be to decode into a field, and what a field's
-value becomes when it is rendered. Reading it once, here, is what keeps the two
-from disagreeing about a type. The scalar table and the unwrapping of
-``Annotated`` and ``| None`` are shared with the other adapters, in
-``adapters/utils.py``, for the same reason one level up.
-"""
-
 from __future__ import annotations
 
 import dataclasses
@@ -40,15 +30,7 @@ _SUPPORTED = (
 
 @dataclass(frozen=True)
 class Shape:
-    """What one annotation means, once ``Annotated``, ``None`` and ``UnsetType`` are off it.
-
-    ``python`` is what a value decodes into: the scalar class, the ``Enum``
-    class, the dataclass, or ``dict``. It is ``None`` for a ``Literal``, whose
-    values are already what the field holds, and for a list, which is ``items``.
-
-    ``values`` is a str-keyed dict's value, read as any annotation is. It is
-    not ``items``, which everything reading a shape takes to mean an array.
-    """
+    """What one annotation means, once ``Annotated``, ``None`` and ``UnsetType`` are off it."""
 
     type: str
     python: Any = None
@@ -90,23 +72,13 @@ class FieldShape:
 
 
 def check_dataclass(cls: Any, *, label: str) -> None:
-    """Refuse anything that is not a dataclass *type*, naming what was passed.
-
-    An instance passes ``dataclasses.is_dataclass`` as well, and would fail
-    later and further away, so the class is what is asked for.
-    """
+    """Refuse anything that is not a dataclass *type*, naming what was passed."""
     if not (isinstance(cls, type) and dataclasses.is_dataclass(cls)):
         raise ImproperlyConfigured(f"{label} takes a dataclass type; got {cls!r}.")
 
 
 def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[FieldShape, ...]:
-    """Every field of ``cls``, in declaration order, with its annotation read.
-
-    ``stack`` holds the dataclasses being read above this one. A dataclass
-    that contains itself describes a tree of unbounded depth, which Parameters
-    cannot declare, so it is refused by name rather than recursing until
-    Python gives up.
-    """
+    """Every field of ``cls``, in declaration order, with its annotation read."""
     if cls in stack:
         chain = " -> ".join(c.__qualname__ for c in (*stack, cls))
         raise ImproperlyConfigured(
@@ -114,12 +86,8 @@ def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[Fiel
             "depth, and a declaration is a finite one."
         )
     try:
-        # ``include_extras`` keeps ``Annotated``, which is where a field's
-        # FieldMarking is declared.
         hints = typing.get_type_hints(cls, include_extras=True)
     except NameError as exc:
-        # The annotations are strings under ``from __future__ import
-        # annotations``, resolved only now, against the module of ``cls``.
         raise ImproperlyConfigured(
             f"{cls.__qualname__}: an annotation names something not importable from its "
             f"module ({exc})."
@@ -142,21 +110,7 @@ def read_fields(cls: type[Any], stack: tuple[type[Any], ...] = ()) -> tuple[Fiel
 
 
 def encode(shape: Shape, value: Any) -> Any:
-    """``value`` as JSON-like data, read the way ``shape`` declares it.
-
-    An object is read **by attribute**, one declared field at a time, so the
-    value may be an instance of the dataclass or any object carrying the same
-    names: a model row is the case this exists for. A field whose value is
-    ``UNSET`` is left out rather than rendered, because it was never given one.
-
-    A list may be a related manager, which is what a model row's reverse or
-    many-to-many relation is, and is read through ``.all()`` so a prefetch is
-    used when there is one.
-
-    Scalars are encoded by what they are rather than by what the annotation
-    says: a model's choice column holds a plain ``str`` where the dataclass
-    declares an ``Enum``, and both encode to the value.
-    """
+    """``value`` as JSON-like data, read the way ``shape`` declares it."""
     if value is None or value is UNSET:
         return value
     if shape.fields is not None:
@@ -168,11 +122,8 @@ def encode(shape: Shape, value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if isinstance(value, Decimal):
-        # ``str`` and not ``float``: a float cannot hold every decimal, and a
-        # decimal parameter is declared as a string for the same reason.
         return str(value)
     if isinstance(value, dt.date):
-        # ``datetime`` subclasses ``date``, so this covers both.
         return value.isoformat()
     return value
 
@@ -190,17 +141,11 @@ def encode_fields(fields: tuple[FieldShape, ...], value: Any) -> dict[str, Any]:
 def _read(
     annotation: Any, *, where: str, stack: tuple[type[Any], ...]
 ) -> tuple[Shape, bool, tuple[Any, ...]]:
-    """(shape, omittable, extras) for one annotation, or ``ImproperlyConfigured``.
-
-    Never a silent ``string``: an annotation this cannot map is refused where it
-    is declared, naming the field, because a wrong type in a declaration is a
-    schema that lies to every transport reading it.
-    """
+    """(shape, omittable, extras) for one annotation, or ``ImproperlyConfigured``."""
     base, nullable, omittable, extras = strip(annotation)
     origin = typing.get_origin(base)
     args = typing.get_args(base)
     if origin is typing.Literal:
-        # ``Literal["a", None]`` is Python's own spelling of a nullable choice.
         values = tuple(v for v in args if v is not None)
         shape = Shape(
             choice_type(values, base, where=where, supported=_SUPPORTED),
@@ -208,20 +153,9 @@ def _read(
             choices=values,
         )
     elif origin is list and len(args) == 1:
-        # The element's shape keeps its own nullability, so decoding honours
-        # ``list[int | None]``. What it cannot keep is a marking or
-        # ``UnsetType``: a marking belongs to a field, and "may be omitted"
-        # means nothing for one element of a list.
         items, _, _ = _read(args[0], where=where, stack=stack)
         shape = Shape("array", nullable=nullable, items=items)
     elif origin is dict and args[:1] == (str,):
-        # JSON object keys are strings, so only a str-keyed dict crosses a
-        # wire as one; ``dict[int, int]`` is refused
-        # (test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation).
-        # Parameters has no way to declare "every value is an X", so the
-        # declaration is an object with no fields, as the pydantic adapter's
-        # is, and each value is decoded here as the shape read off it says.
-        # The value drops a marking and ``UnsetType`` as a list's element does.
         values, _, _ = _read(args[1], where=where, stack=stack)
         shape = Shape("object", python=dict, nullable=nullable, values=values)
     elif isinstance(base, type) and issubclass(base, Enum):

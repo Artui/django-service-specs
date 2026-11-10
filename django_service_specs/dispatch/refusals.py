@@ -1,5 +1,3 @@
-"""``REFUSALS`` - every refusal the kernel raises, for a transport's map to answer."""
-
 from __future__ import annotations
 
 from django_service_specs.authorization.not_permitted import NotPermitted

@@ -1,6 +1,3 @@
-"""Async equivalent of
-[`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input]."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -22,9 +19,7 @@ async def aupdate_from_input(
     relations: Mapping[str, RelationSpec] | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> ChangeResult[ModelT]:
-    """Async sibling of
-    [`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input]
-    using ``asave()``/``aset()``."""
+    """Async sibling of ``update_from_input``, using ``asave()`` and ``aset()``."""
     return await aupdate_instance(
         instance,
         data,

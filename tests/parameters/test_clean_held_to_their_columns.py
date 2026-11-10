@@ -1,4 +1,4 @@
-"""``clean_held_to_their_columns`` leaves the form as it found it, whether validation returned or raised.
+"""``clean_held_to_their_columns`` leaves the form as found, whether validation returned or raised.
 
 What it refuses is held where its readers are tested: here in
 ``tests/adapters/forms/test_form_validator.py``, and in django-spec-html's

@@ -1,5 +1,3 @@
-"""``CALL_SEEDS`` - the call's ``request`` and ``view``, for every callable dispatch binds."""
-
 from __future__ import annotations
 
 from typing import Final

@@ -75,7 +75,8 @@ class TestRegister:
         registry = SpecRegistry()
         with pytest.raises(
             TypeError,
-            match=r"'nonsense': expected a ServiceSpec or SelectorSpec, or an object with as_kernel_spec\(\); got str",
+            match=r"'nonsense': expected a ServiceSpec or SelectorSpec, "
+            r"or an object with as_kernel_spec\(\); got str",
         ):
             registry.register("nonsense", "not a spec")  # type: ignore[arg-type]
 

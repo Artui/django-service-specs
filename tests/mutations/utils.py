@@ -74,7 +74,7 @@ def savepoints_during(call: Callable[[], Any]) -> list[str]:
 
 
 def bound_call(service: Callable[..., Any], **pool: Any) -> Any:
-    """``service`` called as dispatch calls it: bound to ``pool`` through ``resolve_callable_kwargs``.
+    """``service`` called as dispatch does: bound to ``pool`` via ``resolve_callable_kwargs``.
 
     Calling a helper's service directly hands it every keyword, the call's
     context included, where dispatch hands a ``**kwargs`` only what it names.

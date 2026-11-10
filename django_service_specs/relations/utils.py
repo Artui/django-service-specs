@@ -1,9 +1,3 @@
-"""Internal helpers shared across the ``relations`` package.
-
-``pk_input_targets`` is the exception to the package name. The write path in
-``mutations`` shares it, so the three spellings of a primary key are written
-down once rather than agreed between two modules."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
@@ -19,11 +13,7 @@ VALID_RELATION_MODES = tuple(mode.value for mode in RelationMode)
 
 
 def validate_relation_mode(mode: str, *, label: str) -> None:
-    """Reject a ``mode`` that is neither ``"replace"`` nor ``"merge"``.
-
-    Shared by every relation kind that reconciles a collection so the two words
-    mean the same thing on all of them.
-    """
+    """Reject a ``mode`` that is neither ``"replace"`` nor ``"merge"``."""
     if mode not in VALID_RELATION_MODES:
         raise ValueError(f"{label}.mode must be one of {VALID_RELATION_MODES}; got {mode!r}.")
 
@@ -32,13 +22,7 @@ VALID_RELATION_ORPHANS = tuple(orphan.value for orphan in RelationOrphan)
 
 
 def validate_relation_orphan(orphan: str, *, delete_service: Any, label: str) -> None:
-    """Check ``orphan``, and refuse it beside the service that would silence it.
-
-    A ``delete_service`` replaces the unlink-or-delete rule outright, so an
-    explicit ``orphan`` beside one would decide nothing and be silently ignored.
-    ``AUTO`` is exempt because it states nothing — it is the default, carried by
-    every spec that does not mention ``orphan`` at all.
-    """
+    """Check ``orphan``, and refuse it beside the service that would silence it."""
     if orphan not in VALID_RELATION_ORPHANS:
         raise ValueError(f"{label}.orphan must be one of {VALID_RELATION_ORPHANS}; got {orphan!r}.")
     if delete_service is None or orphan == RelationOrphan.AUTO:
@@ -52,11 +36,7 @@ def validate_relation_orphan(orphan: str, *, delete_service: Any, label: str) ->
 
 
 class _RowWriteSpec(Protocol):
-    """The six fields of a relation spec that say who writes its rows, and how.
-
-    Read-only properties, so a frozen dataclass declaring them as fields
-    satisfies it.
-    """
+    """The six fields of a relation spec that say who writes its rows, and how."""
 
     @property
     def create_service(self) -> Callable[..., Any] | None: ...
@@ -73,17 +53,7 @@ class _RowWriteSpec(Protocol):
 
 
 def validate_relation_services(spec: _RowWriteSpec, *, label: str) -> None:
-    """Refuse a relation spec that declares a row service *and* row shaping.
-
-    A ``create_service`` / ``update_service`` stands in for the mutation-helper
-    call, so every knob configuring that call is bypassed for the row — silently,
-    unless caught here.
-
-    Reconciliation fields (``fk`` / ``match_key`` / ``mode`` / ``scope`` /
-    orphan handling) are read on neither side, and neither is
-    ``delete_service``: it replaces the unlink-or-delete rule rather than the
-    helper call, so it composes with row shaping.
-    """
+    """Refuse a relation spec that declares a row service *and* row shaping."""
     services: dict[str, Any] = {
         "create_service": spec.create_service,
         "update_service": spec.update_service,
@@ -111,12 +81,7 @@ def validate_relation_services(spec: _RowWriteSpec, *, label: str) -> None:
 
 
 def pk_input_targets(model: type[Model]) -> frozenset[str]:
-    """The names an incoming row can use to mean ``model``'s primary key.
-
-    Three spellings reach the same column and a payload may send any of them:
-    ``pk``, the field's ``name``, and its ``attname`` (``id``/``id`` for an
-    implicit key, ``author``/``author_id`` where a one-to-one *is* the key).
-    """
+    """The names an incoming row can use to mean ``model``'s primary key."""
     return frozenset({"pk", model._meta.pk.name, model._meta.pk.attname})
 
 
@@ -127,27 +92,7 @@ def validate_pk_field_map(
     match_key: str,
     field_map: Mapping[str, str] | None,
 ) -> None:
-    """Refuse a ``field_map`` that renames an input key onto the primary key,
-    on a spec that also matches *by* the primary key.
-
-    The two readers of a nested row disagree about ``field_map``, and where the
-    match key is the primary key that disagreement leaves no working payload.
-    Matching reads the row exactly as it arrived (``item[match_key]``), so a
-    payload spelling its key ``ident`` never matches; the primary-key guard
-    *does* fold ``field_map`` in, sees ``ident``, reads it as a key nothing
-    matched, and refuses the row. Every payload using the mapped name is
-    rejected, and none can ever match.
-
-    Scoped to a primary-key ``match_key`` because that is the whole of what is
-    unreachable. Mapped onto a *natural* match key the same declaration is
-    coherent -- the row matches on its natural key and the alias goes on
-    guarding creates, exactly as a plainly-spelled ``pk`` would.
-
-    Refused rather than resolved: ``match_key`` names an input key on one side
-    and a model field on the other, so "apply ``field_map`` to it too" has no
-    single correct answer, and a spec no payload can reach is better caught
-    where it is written than on the first request that tries.
-    """
+    """Refuse a ``field_map`` that renames an input key onto the primary key."""
     targets: frozenset[str] = pk_input_targets(model)
     if match_key not in targets:
         return

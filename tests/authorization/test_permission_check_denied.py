@@ -1,4 +1,4 @@
-"""``PermissionCheckDenied``: the mark on a declared check's denial, and on no other ``NotPermitted``."""
+"""``PermissionCheckDenied``: marks a declared check's denial, and no other ``NotPermitted``."""
 
 from __future__ import annotations
 
@@ -148,7 +148,7 @@ class TestACheckSDenialIsMarked:
 
 
 class TestEveryOtherRefusalIsNot:
-    """A ``NotPermitted`` the kernel raises for another reason, or that is raised at it, stays bare."""
+    """A ``NotPermitted`` the kernel raises for another reason, or raised at it, stays bare."""
 
     def test_the_grant_refusal(self) -> None:
         spec, principal = _spec([Unrestricted()]), object()

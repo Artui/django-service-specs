@@ -1,4 +1,4 @@
-"""The kernel's own settings, read at the call so ``override_settings`` and a late configure both reach them."""
+"""The kernel's settings, read per call so ``override_settings`` and a late configure reach them."""
 
 from __future__ import annotations
 
@@ -32,7 +32,8 @@ def test_a_setting_that_is_no_count_is_refused_by_name(value: Any) -> None:
         override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=value),
         pytest.raises(
             ImproperlyConfigured,
-            match=f"SERVICE_SPECS_MAX_ARRAY_LENGTH must be a non-negative int or None; got {value!r}",
+            match=f"SERVICE_SPECS_MAX_ARRAY_LENGTH must be a non-negative int or None; "
+            f"got {value!r}",
         ),
     ):
         max_array_length()

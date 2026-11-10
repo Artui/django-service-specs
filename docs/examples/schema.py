@@ -1,4 +1,4 @@
-"""JSON Schema from a spec's declarations: what it takes, what it returns, and keywords no field spells."""
+"""JSON Schema from a spec's declarations: what it takes, returns, and keywords no field spells."""
 
 from __future__ import annotations
 

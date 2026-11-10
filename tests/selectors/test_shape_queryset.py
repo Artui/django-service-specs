@@ -264,7 +264,7 @@ class _ByView(django_filters.FilterSet):
 @pytest.mark.django_db
 class TestFilterSet:
     def test_a_filter_named_view_builds_and_shapes(self) -> None:
-        """A selector spec is built here outside dispatch, so a filter of the call's names is a filter.
+        """A selector spec is built outside dispatch, so a filter of the call's names is a filter.
 
         As a transport shaping its own list builds one from a consumer's
         FilterSet: the build refuses a read of either name on a service

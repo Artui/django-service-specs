@@ -298,7 +298,7 @@ def offered_to(principal: Any, specs: list[Any]) -> list[Any]:
 
 # --8<-- [start:check_seeds]
 class ToolRegistry:
-    """A transport's registry: a declaration that cannot hold on its mount is refused as it is registered."""
+    """A transport's registry: a declaration its mount cannot hold is refused at registration."""
 
     def __init__(self, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS) -> None:
         self.pool_seeds = pool_seeds

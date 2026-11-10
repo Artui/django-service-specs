@@ -966,7 +966,7 @@ def test_passthrough_is_refused_where_the_policy_is_normalized(policy: Any) -> N
         check_arguments(AUTHOR, {"name": "Le Guin", "tenant": "acme"}, unknown_arguments=policy)
 
 
-# --- every problem at once --------------------------------------------------------------------------
+# --- every problem at once ------------------------------------------------------------------------
 
 
 def test_every_problem_is_reported_in_one_tree() -> None:
@@ -1052,7 +1052,7 @@ FORTY_DIGITS = "0.1234567890123456789012345678901234567891"
 
 
 def _decimals() -> Parameters:
-    """A django-filter CSV number filter's declaration, built in the test so a tree refusing it fails there."""
+    """A django-filter CSV number filter's declaration, built here: a refusing tree fails there."""
     return one(
         Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
     )
@@ -1126,7 +1126,7 @@ def test_a_bound_message_is_translated_through_djangos_own_catalog() -> None:
     assert detail == {"n": [expected % {"limit_value": 10}]}
 
 
-# --- array length ------------------------------------------------------------------------------------
+# --- array length ---------------------------------------------------------------------------------
 
 TOO_MANY = "Ensure this field has no more than %s elements."
 TOO_FEW = "Ensure this field has at least %s elements."
@@ -1219,7 +1219,7 @@ def test_a_length_message_is_spelled_as_drf_spells_it() -> None:
     }
 
 
-# --- messages ----------------------------------------------------------------------------------------
+# --- messages -------------------------------------------------------------------------------------
 
 
 def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> None:

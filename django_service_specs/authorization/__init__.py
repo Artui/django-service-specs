@@ -1,5 +1,3 @@
-"""Who is acting, what decides whether they may, and the refusals when they may not."""
-
 from django_service_specs.authorization.all_of import AllOf
 from django_service_specs.authorization.any_of import AnyOf
 from django_service_specs.authorization.is_deactivated import is_deactivated

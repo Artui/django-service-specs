@@ -1,5 +1,3 @@
-"""What an operation takes, the refusal of arguments that do not fit, and the policy for undeclared ones."""
-
 from django_service_specs.parameters.check_arguments import check_arguments
 from django_service_specs.parameters.clean_held_to_their_columns import (
     clean_held_to_their_columns,

@@ -1,5 +1,3 @@
-"""A service contract for Django, dispatched from any transport."""
-
 from django_service_specs.adapters.dataclass.dataclass_presenter import DataclassPresenter
 from django_service_specs.adapters.dataclass.dataclass_validator import DataclassValidator
 from django_service_specs.adapters.filters.filter_set_parameters import filter_set_parameters

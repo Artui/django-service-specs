@@ -130,7 +130,7 @@ async def _refuse_lazily() -> Any:
 
 
 class TestAPreconditionAnsweringWithAnAwaitable:
-    """A precondition's answer is ignored, unless it is one still to be awaited: refused, never a pass.
+    """A precondition's answer is ignored unless still to be awaited: refused, never a pass.
 
     Each precondition is a plain callable returning the object, a shape no
     declaration can refuse. Each shape holds one condition of ``sync_result``.
@@ -164,12 +164,12 @@ class TestAPreconditionAnsweringWithAnAwaitable:
 
 
 def test_every_pool_is_base_pool_s_keys_and_the_call_s_own() -> None:
-    """Held to ``base_pool``, so a seed it gains or loses moves what ``check_seeds`` counts as filled."""
+    """Held to ``base_pool``: a seed gained or lost moves what ``check_seeds`` counts as filled."""
     assert frozenset(base_pool(user=None)) | {CALL_CONTEXT, SHAPES} | CALL_SEEDS == EVERY_POOL
 
 
 def test_seat_seed_named_splits_the_whole_spec_and_narrows_only_what_is_checked() -> None:
-    """``resolve_target`` checks its target's parameters alone, and the seat answers for the spec."""
+    """``resolve_target`` checks its target's parameters alone; the seat answers for the spec."""
     seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "seeded")
     target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=lambda **_: None, reads=PK)
 

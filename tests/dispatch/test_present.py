@@ -82,7 +82,7 @@ def test_a_list_is_presented_item_by_item() -> None:
 
 
 class Awaiting(Presenter):
-    """A presenter whose plain ``def present`` hands back a coroutine, as a decorated async one does."""
+    """A presenter whose plain ``def present`` returns a coroutine, as a decorated async one."""
 
     def __init__(self) -> None:
         self.answers: list[Any] = []

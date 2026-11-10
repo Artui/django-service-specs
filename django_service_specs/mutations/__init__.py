@@ -1,11 +1,3 @@
-"""Mutation helpers: apply validated values to model rows, with change tracking.
-
-Services call them explicitly inside their own bodies; dispatch never calls
-them implicitly. Each returns a ``ChangeResult`` saying what the write did,
-field by field and relation by relation. The model write helpers
-(``create_model`` and its siblings) build a service from them.
-"""
-
 from django_service_specs.mutations.acreate_from_input import acreate_from_input
 from django_service_specs.mutations.acreate_model import acreate_model
 from django_service_specs.mutations.adelete_collection import adelete_collection

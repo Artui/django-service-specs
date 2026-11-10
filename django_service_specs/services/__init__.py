@@ -1,5 +1,3 @@
-"""A service's own refusals, the protocols it implements, and the sync/async bridge that runs one."""
-
 from django_service_specs.services.action_unavailable import ActionUnavailable
 from django_service_specs.services.additional_input_required import AdditionalInputRequired
 from django_service_specs.services.arun_service import arun_service

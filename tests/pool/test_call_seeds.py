@@ -581,7 +581,7 @@ class TestAnArgumentNamedEither:
     def test_an_output_selector_s_read_named_request_builds_and_runs(
         self, entry: Callable[..., Any], name: str, reflected: bool
     ) -> None:
-        """Its reads are never the call's parameters, and its selector is handed the call's own by name.
+        """Its reads are never the call's parameters; its selector is handed the call's own by name.
 
         So it is neither refused when the spec is built nor at dispatch,
         whether or not it is marked ``reflected``.
@@ -762,7 +762,7 @@ class TestAnArgumentNamedEither:
 
 
 class TestEverySeedPool:
-    """Each pool a seed resolves in carries the call's context, so a tenant read off the request binds."""
+    """Each seed's pool carries the call's context, so a tenant read off the request binds."""
 
     @_ENTRIES
     def test_a_selector_spec_s_seed_reads_the_request(self, entry: Callable[..., Any]) -> None:
@@ -852,7 +852,7 @@ class TestTheTransportFacingAnswers:
 
     @pytest.mark.parametrize("name", ["request", "view"])
     def test_server_owned_keys_owns_a_reflected_read_named_either(self, name: str) -> None:
-        """Dispatch fills it from the context and refuses a caller's, so no caller is asked for it."""
+        """Dispatch fills it from the context and refuses any caller's, so none is asked for it."""
         assert name in server_owned_keys(_reading(name, reflected=True))
         assert name not in server_owned_keys(_reading("title", reflected=True))
         assert name not in server_owned_keys(_reading(name, reflected=False))

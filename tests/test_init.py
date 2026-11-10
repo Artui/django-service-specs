@@ -244,6 +244,6 @@ def test_a_name_the_kernel_shares_is_the_root_s_own_object(name: str, reader: st
 
 
 def test_the_root_s_functions_are_listed_in_sorted_order() -> None:
-    """The lowercase block of ``__all__`` is the functions, kept sorted so a new one has one place."""
+    """The lowercase block of ``__all__`` is the functions, sorted so a new one has one place."""
     functions = [name for name in django_service_specs.__all__ if name[0].islower()]
     assert functions == sorted(functions)

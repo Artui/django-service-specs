@@ -1,5 +1,3 @@
-"""How a nested write persists each kind of relation: the five relation specs."""
-
 from django_service_specs.relations.child_spec import ChildSpec
 from django_service_specs.relations.forward_relation_spec import ForwardRelationSpec
 from django_service_specs.relations.generic_relation_spec import GenericRelationSpec

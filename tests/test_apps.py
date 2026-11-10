@@ -58,7 +58,11 @@ django.setup()
 from django.core.checks import run_checks
 from django.core.checks.registry import registry
 print(json.dumps([
-    sorted(c.__module__ for c in registry.get_checks() if c.__module__.startswith("django_service_specs")),
+    sorted(
+        c.__module__
+        for c in registry.get_checks()
+        if c.__module__.startswith("django_service_specs")
+    ),
     [m.id for m in run_checks()],
 ]))
 """

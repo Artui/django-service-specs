@@ -1,4 +1,4 @@
-"""``resolve_seeds``: the seeds a spec's checks name, resolved once, for an ``authorize``-first call."""
+"""``resolve_seeds``: the seeds checks name, resolved once, for an ``authorize``-first call."""
 
 from __future__ import annotations
 
