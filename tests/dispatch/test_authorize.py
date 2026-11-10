@@ -107,12 +107,7 @@ def test_every_check_runs_when_all_pass() -> None:
 
 
 class TestAnAnswerThatIsNotAnAnswer:
-    """A check is sync-only, and an unawaited answer is truthy: refused, never read as a pass.
-
-    Every check here is a plain ``def`` returning the object, the shape a spec
-    cannot refuse at construction, so the refusal comes from where the answer
-    is read. Each shape holds one condition of that guard.
-    """
+    """A check is sync-only, and an unawaited answer is truthy: refused, never read as a pass."""
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:
         answer = refuses()
@@ -122,7 +117,6 @@ class TestAnAnswerThatIsNotAnAnswer:
         assert "AnswersWith.has_permission" in str(caught.value)
         # Not the construction refusal: the spec was accepted, and this is the read.
         assert "an async callable" not in str(caught.value)
-        # Closed, so nothing is left to warn that it was never awaited.
         assert inspect.getcoroutinestate(answer) == inspect.CORO_CLOSED
 
     def test_an_awaitable_that_is_not_a_coroutine_is_refused(self) -> None:
@@ -163,9 +157,7 @@ def test_dispatch_does_not_run_a_service_its_check_answered_with_a_coroutine() -
 async def test_adispatch_does_not_run_a_service_its_check_answered_with_a_coroutine(
     atomic: bool,
 ) -> None:
-    # An ``async def`` service, so both of adispatch's paths are walked: run
-    # inside the hop when atomic, awaited after it when not. The check is
-    # answered inside the hop either way, and the refusal must land first.
+    # An ``async def`` service, so both of adispatch's paths are walked.
     ran: list[Any] = []
 
     async def service() -> None:
@@ -236,8 +228,7 @@ def test_a_check_asked_with_no_call_context_gets_a_dict_of_its_own() -> None:
 
 
 def test_a_seed_left_out_of_seeds_is_not_offered() -> None:
-    """A check naming a seed nobody resolved is asked without it, and its
-    own signature decides: here, a required keyword, so a ``TypeError``."""
+    """A check naming a seed nobody resolved is asked without it, and its own signature decides."""
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Offered()])
     with pytest.raises(TypeError, match="tenant"):
         authorize(spec, PRINCIPAL)
@@ -251,8 +242,7 @@ class TestPoolSeeds:
         pool_seeds, resolved = recorded_seeds()
         authorize(_spec([check]), "ada", pool_seeds=pool_seeds)
         assert check.handed == [("has_permission", "club of ada")]
-        # Not a seed only the object or scope question names, and not one no
-        # check names at all: either could read what a refused caller lacks.
+        # Not a seed only the object or scope question names, and not one no check names at all.
         assert resolved == ["club"]
 
     def test_a_spec_whose_checks_name_no_seed_resolves_none(self) -> None:
@@ -290,9 +280,7 @@ class TestPoolSeeds:
             authorize(_spec([SeedPerQuestion()]), "ada", pool_seeds=DEFAULT_POOL_SEEDS)
 
     def test_a_call_without_pool_seeds_asks_a_seed_naming_check_as_before(self) -> None:
-        """A transport calling ``authorize(spec, principal)`` - django-spec-html's page
-        does - is asked exactly as before ``pool_seeds`` existed: the check is handed
-        no seed, and its own signature refuses the call."""
+        """A transport calling ``authorize(spec, principal)`` - django-spec-html's page does."""
         check = SeedPerQuestion()
         with pytest.raises(TypeError) as raised:
             authorize(_spec([check]), "ada")
@@ -308,19 +296,13 @@ class TestPoolSeeds:
         pool_seeds, resolved = recorded_seeds()
         grant = authorize(spec, principal, pool_seeds=pool_seeds)
         dispatch(spec, principal=principal, arguments={}, grant=grant, pool_seeds=pool_seeds)
-        # Once for authorize, and once for dispatch's own call.
         assert resolved.count("club") == 2
-        # The grant stood in for dispatch's class-level check: it was asked once.
         assert [asked for asked in check.handed if asked[0] == "has_permission"] == [
             ("has_permission", "club of ada")
         ]
 
     def test_both_kinds_are_refused_before_a_covering_grant_answers(self) -> None:
-        """Unconditionally, as documented: not only when a check is asked.
-
-        Holds the refusal's place at the top of the function: below the grant's
-        short cut, this call would return the grant.
-        """
+        """Unconditionally, as documented: not only when a check is asked."""
         spec, principal = _spec([SeedPerQuestion()]), "ada"
         pool_seeds, resolved = recorded_seeds()
         with pytest.raises(TypeError) as raised:
@@ -356,9 +338,7 @@ class TestPoolSeeds:
         assert resolved == []
 
     def test_a_deactivated_principal_without_pool_seeds_is_asked_as_before(self) -> None:
-        """The guard is on ``pool_seeds``: django-spec-html calls ``authorize(spec, principal)``
-        and a call without the keyword is no different from 0.16.0, a deactivated
-        principal included (this test fails without the ``pool_seeds is not None`` conjunct)."""
+        """The guard is on ``pool_seeds``: django-spec-html calls ``authorize(spec."""
         principal = Deactivated()
         spec = _spec([Unrestricted()])
         assert authorize(spec, principal).covers(spec, principal)
@@ -434,8 +414,7 @@ class TestCombinators:
         assert offered.asked[0][1] is context
 
     def test_the_refusal_names_the_combinator_s_message(self) -> None:
-        # Not the message of the check inside that refused: the combinator is
-        # the rule the spec declares, and it is what refuses.
+        # Not the message of the check inside that refused.
         spec = _spec([AnyOf(RefuseWithMessage(), Refuse(), message="Owners or staff only.")])
         with pytest.raises(NotPermitted) as refused:
             authorize(spec, object())

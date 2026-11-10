@@ -1,5 +1,3 @@
-"""``operation_affordances``: the conditions answerable without a row."""
-
 from __future__ import annotations
 
 from django.db.models import Q
@@ -27,8 +25,7 @@ def test_a_spec_declaring_none_answers_empty() -> None:
 
 
 def test_a_selector_answers_empty_whatever_its_mapping_holds() -> None:
-    # Its mapping names other operations; reading their conditions as the
-    # selector's own would answer a question about something else.
+    # Its mapping names other operations.
     rename = ServiceSpec(service=print, affordances=[FROZEN])
     selector = SelectorSpec(kind=SelectorKind.LIST, selector=list, affordances={"rename": rename})
     assert operation_affordances(selector) == ()

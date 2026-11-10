@@ -1,8 +1,3 @@
-"""The batching presenter's example on the declaring page, run.
-
-Each test is a statement the page makes about ``docs/examples/presenting_rows.py``.
-"""
-
 from __future__ import annotations
 
 from dataclasses import replace
@@ -50,8 +45,7 @@ def test_a_page_s_rows_carry_their_counts(ada: Any, books: list[Book]) -> None:
 def test_the_count_is_one_query_however_many_rows_the_page_holds(
     ada: Any, books: list[Book], limit: int
 ) -> None:
-    """Three queries at any page size: the pager's count of the catalogue, the
-    page's rows, then every edition count at once, grouped by book."""
+    """Three queries at any page size: the pager's count of the catalogue, the page's rows."""
     with CaptureQueriesContext(connection) as queries:
         rows = presenting_rows.first_page(ada, limit=limit)
 

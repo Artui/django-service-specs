@@ -1,5 +1,3 @@
-"""The kernel's settings, read per call so ``override_settings`` and a late configure reach them."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -26,8 +24,7 @@ def test_the_setting_is_read_as_given(value: int | None) -> None:
     "value", [True, -1, 1.5, "1000"], ids=["bool", "negative", "float", "string"]
 )
 def test_a_setting_that_is_no_count_is_refused_by_name(value: Any) -> None:
-    # Refused where it is read rather than compared, so a string never reaches
-    # ``len(value) > "1000"`` as a TypeError naming nothing.
+    # Refused where it is read rather than compared.
     with (
         override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=value),
         pytest.raises(

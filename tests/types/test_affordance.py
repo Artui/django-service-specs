@@ -1,5 +1,3 @@
-"""``Affordance``: a condition under which an operation can be done right now."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -41,8 +39,7 @@ def test_a_callable_reading_only_seeds_is_a_condition_on_nothing_in_particular()
 
 
 def test_a_callable_taking_kwargs_is_accepted_and_withheld_the_per_call_names_later() -> None:
-    # A catch-all names nothing, so the declaration cannot refuse it; what it
-    # is handed is filtered instead (tests/affordances/test_utils.py).
+    # A catch-all names nothing, so the declaration cannot refuse it.
     def anything(**kwargs: Any) -> bool:
         return True
 
@@ -56,8 +53,7 @@ def test_it_is_frozen() -> None:
 
 
 class TestCodeAndReason:
-    # The guard is ``not isinstance(value, str) or not value``: each of its two
-    # halves is held by its own case here, for each of the two fields.
+    # The guard is ``not isinstance(value, str) or not value``.
     @pytest.mark.parametrize("field_name", ["code", "reason"])
     @pytest.mark.parametrize(
         "value", [pytest.param(7, id="non-string"), pytest.param("", id="empty-string")]
@@ -119,8 +115,7 @@ class TestWhen:
         )
 
     def test_every_per_call_name_a_callable_reads_is_named_in_order(self) -> None:
-        # Four, declared out of order, so an unsorted set cannot pass by luck of
-        # the hash seed, as two names would half the time.
+        # Four, declared out of order, so an unsorted set cannot pass by luck of the hash seed.
         def when(*, user: Any, result: Any, serializer: Any, data: Any, queryset: Any) -> bool:
             return True
 
@@ -155,12 +150,7 @@ class _BooksClosed:
 
 
 class TestAnAsyncCondition:
-    """A condition is sync-only and is never awaited: an async one is refused when declared.
-
-    Each reads only the seeds, so the per-call-name check has nothing to say
-    and the refusal that answers is the one this class names. One shape per
-    disjunct of the guard.
-    """
+    """A condition is sync-only and is never awaited: an async one is refused when declared."""
 
     def test_an_async_def_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
@@ -177,8 +167,7 @@ class TestAnAsyncCondition:
         )
 
     def test_an_async_generator_function_is_refused(self) -> None:
-        # Not a coroutine function, and what it returns is not awaitable
-        # either, but it is truthy and never runs.
+        # Not a coroutine function, and what it returns is not awaitable either.
         with pytest.raises(ImproperlyConfigured) as refused:
             Affordance(code="books_closed", reason="r", when=_books_closed_lazily)
         assert str(refused.value).startswith(
@@ -191,6 +180,5 @@ class TestAnAsyncCondition:
         ids=["q", "exists"],
     )
     def test_an_expression_is_still_a_condition_on_the_row(self, when: Any) -> None:
-        # The row check returns before the async check is asked, so an
-        # expression is never mistaken for a callable of either kind.
+        # The row check returns before the async check is asked.
         assert Affordance(code="c", reason="r", when=when).when is when

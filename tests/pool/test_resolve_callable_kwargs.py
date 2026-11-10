@@ -1,5 +1,3 @@
-"""Tests for ``resolve_callable_kwargs`` — the declare-to-receive binder."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -35,18 +33,13 @@ def test_forwards_what_the_callable_declares(
 
 
 def test_forwards_in_the_order_the_callable_declares() -> None:
-    # The pool's own order is not the one kept: a caller reading the result as
-    # a sequence sees the signature's.
+    # The pool's own order is not the one kept.
     resolved = resolve_callable_kwargs(lambda *, b, a, c: None, {"a": 1, "c": 3, "b": 2})
     assert list(resolved) == ["b", "a", "c"]
 
 
 class TestTheCallContextIsHandedByNameOnly:
-    """``call_context`` reaches a callable naming it, never one taking ``**kwargs`` for the rest.
-
-    A catch-all written before the name existed forwards what it gets, so one
-    more key would break it on an upgrade it never asked for.
-    """
+    """``call_context`` reaches a callable naming it, never one taking ``**kwargs`` for the rest."""
 
     def test_a_catch_all_is_never_handed_it(self) -> None:
         context: dict[str, Any] = {}

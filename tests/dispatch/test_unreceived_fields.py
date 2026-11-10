@@ -1,11 +1,3 @@
-"""``unreceived_fields``: the Validator fields a service is never handed, answered, not refused.
-
-Each answer is tested beside what ``dispatch`` does with the spec, so the
-claim that a field's value is validated and then reaches the service by no
-route is held, and so is the claim that a field the service does receive is
-never answered.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -180,11 +172,7 @@ def test_an_untyped_provider_may_fill_any_keyword_so_no_field_is_answered() -> N
 
 
 def test_a_field_validated_under_its_alias_reaches_its_own_name_and_is_not() -> None:
-    """``parameters()`` names the wire's key, and the value is returned under the field's.
-
-    A service taking a keyword nothing declares may be handed a field under
-    it, so no field is answered.
-    """
+    """``parameters()`` names the wire's key, and the value is returned under the field's."""
     spec = _service(lambda *, title, note: note, validator=PydanticValidator(_Aliased))
     assert spec.validator is not None
     assert spec.validator.parameters().names() == {"title", "noteText"}

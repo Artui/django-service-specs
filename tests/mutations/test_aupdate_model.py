@@ -1,5 +1,3 @@
-"""Tests for ``aupdate_model``."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -34,11 +32,7 @@ _SECTIONS = {"sections": ChildSpec(model=Section, fk="catalog")}
 
 
 def _update_sql(service: Any, **kwargs: Any) -> str:
-    """The one ``UPDATE`` the service runs.
-
-    Called from sync code through ``async_to_sync``, so the helper's ORM hops
-    come back to this thread and its connection, which the capture watches.
-    """
+    """The one ``UPDATE`` the service runs."""
     with CaptureQueriesContext(connection) as queries:
         async_to_sync(service)(**kwargs)
     [sql] = [q["sql"] for q in queries.captured_queries if q["sql"].startswith("UPDATE")]

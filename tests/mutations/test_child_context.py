@@ -1,10 +1,3 @@
-"""The opaque ``context=`` thread through the mutation helpers.
-
-``context`` exists so per-row work downstream can see the acting caller. The
-helpers themselves must never read it, so every assertion here is "passing a
-hostile mapping changes nothing".
-"""
-
 from __future__ import annotations
 
 from typing import Any

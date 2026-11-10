@@ -24,8 +24,7 @@ def test_it_is_its_message_to_everything_that_reads_a_string() -> None:
 
 
 def test_its_code_never_takes_part_in_equality() -> None:
-    # Two codes on one message are still one message: a tree compared with a
-    # plain one, or with a library's, compares what a caller reads.
+    # Two codes on one message are still one message: a tree compared with a plain one.
     assert CodedMessage(MESSAGE, "required") == CodedMessage(MESSAGE, "invalid")
 
 

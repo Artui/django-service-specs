@@ -1,10 +1,3 @@
-"""``adelete_relations`` - the async cascade, as a delete service awaits it.
-
-The same three things ``test_delete_relations`` holds for the sync entry: the
-report, the map refused as the write helpers refuse it, and ``context``
-reaching the row services, which must be ``async def`` here.
-"""
-
 from __future__ import annotations
 
 from typing import Any

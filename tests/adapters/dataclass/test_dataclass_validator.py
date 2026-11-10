@@ -124,8 +124,7 @@ def test_parameters_map_every_supported_annotation() -> None:
         Parameter("price", "string", required=True, format="decimal"),
         Parameter("at", "string", required=True, format="date-time"),
         Parameter("on", "string", required=True, format="date"),
-        # A Django ``Choices`` enum labels its values; a plain ``Enum`` and a
-        # ``Literal`` have no label of their own, as the presenter reads them.
+        # A Django ``Choices`` enum labels its values.
         Parameter(
             "status",
             "string",
@@ -146,10 +145,8 @@ def test_parameters_map_every_supported_annotation() -> None:
         Parameter("address", "object", required=True, fields=address),
         Parameter("lines", "array", required=True, items=line),
         Parameter("note", "string", nullable=True, default=None),
-        # UnsetType: optional, with no default a transport could print.
         Parameter("bio", "string", nullable=True),
         Parameter("level", "integer", default=3),
-        # A factory's value is not a declaration, so no default is reported.
         Parameter("extras", "array", items="integer"),
     )
 
@@ -188,10 +185,8 @@ def test_validate_decodes_into_the_declared_types() -> None:
         "mode": "fast",
         "tags": ["a", "b"],
         "address": Address("Oslo", "0150"),
-        # A dataclass equals only an instance of its own class, so this also
-        # holds each row, and the object inside it, to the dataclass declared.
+        # A dataclass equals only an instance of its own class, so this also holds each row.
         "lines": [Line(sku="A-1", quantity=1, ship_to=Address("Oslo"))],
-        # Omitted: the dataclass fills its defaults, and UnsetType stays UNSET.
         "note": None,
         "bio": UNSET,
         "level": 3,
@@ -221,8 +216,7 @@ def test_a_number_takes_an_integer_and_holds_a_float() -> None:
 def test_a_decimal_takes_a_string_or_a_json_number(argument: Any, expected: Decimal) -> None:
     values = DataclassValidator(_Price).validate({"price": argument}, CONTEXT)
     assert values["price"] == expected
-    # Equal is not enough: Decimal(0.1) == Decimal("0.1") is False, so this
-    # also holds the float to the digits the wire carried.
+    # Equal is not enough: Decimal(0.1) == Decimal("0.1") is False.
     assert str(values["price"]) == str(expected)
 
 
@@ -237,9 +231,7 @@ def test_a_decimal_takes_a_string_or_a_json_number(argument: Any, expected: Deci
 def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(
     argument: str, expected: Decimal
 ) -> None:
-    # Django's ``DecimalField``, DRF's and pydantic's ``Decimal`` all hand the
-    # string to ``Decimal``, which reads Arabic-Indic and fullwidth digits, so
-    # the adapter takes the digits each of them takes, the plain ones alike.
+    # Django's ``DecimalField``.
     values = DataclassValidator(_Price).validate({"price": argument}, CONTEXT)
     assert str(values["price"]) == str(expected)
 
@@ -301,7 +293,6 @@ def test_every_required_field_is_reported_not_the_first() -> None:
         ({"count": "3"}, {"count": ["Expected an integer."]}),
         # bool subclasses int in Python and is not an integer on the wire.
         ({"count": True}, {"count": ["Expected an integer."]}),
-        # A float is a number, not an integer, even when it is whole.
         ({"count": 2.0}, {"count": ["Expected an integer."]}),
         ({"ratio": "0.5"}, {"ratio": ["Expected a number."]}),
         ({"active": 1}, {"active": ["Expected a boolean."]}),
@@ -331,8 +322,7 @@ def test_a_wrong_json_type_is_refused_not_a_crash(overrides: dict, detail: dict)
             {"mode": "idle"},
             {"mode": ["Select a valid choice. idle is not one of the available choices."]},
         ),
-        # The JSON type is checked before membership: ``True == 1`` in Python,
-        # so ``true`` would otherwise pass as the integer choice 1.
+        # The JSON type is checked before membership: ``True == 1`` in Python.
         ({"priority": True}, {"priority": ["Expected an integer."]}),
         ({"mode": 1}, {"mode": ["Expected a string."]}),
     ],
@@ -344,17 +334,13 @@ def test_a_value_outside_the_choices_is_refused(overrides: dict, detail: dict) -
 @pytest.mark.parametrize(
     "argument",
     [
-        # A Decimal is the case only the JSON type check answers: its str
-        # parses, so without the check a value no wire carries would pass,
-        # where a date-time object is refused for not being a string.
+        # A Decimal is the case only the JSON type check answers: its str parses.
         Decimal("1.5"),
         True,
         [1],
     ],
 )
 def test_a_decimal_that_is_neither_a_string_nor_a_number_is_refused(argument: Any) -> None:
-    # The type check's own message, which the parse below never produces, so
-    # this names the check that answered.
     assert _refusal(_Price, {"price": argument}) == {
         "price": ["Expected a decimal string or a number."]
     }
@@ -367,16 +353,13 @@ def test_a_decimal_that_is_not_a_finite_number_is_refused(argument: Any) -> None
 
 @pytest.mark.parametrize("argument", [10**400, -(10**400)], ids=["above", "below"])
 def test_an_integer_past_a_float_s_range_is_no_number(argument: int) -> None:
-    # JSON's number has no range, so the shape check passes the integer on,
-    # and ``float`` raises OverflowError for it rather than refusing it.
+    # JSON's number has no range, so the shape check passes the integer on.
     detail = _refusal(Everything, everything_arguments(ratio=argument))
     assert coded(detail) == {"ratio": [("Enter a number.", "invalid")]}
 
 
 def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits() -> None:
-    # Past the 4300 digits ``str`` writes an int in from Python 3.10.7 on, a
-    # decimal read through its string raised ValueError. An int is a Decimal
-    # exactly as it is, so no digit is lost reading it whole.
+    # Past the 4300 digits ``str`` writes an int in from Python 3.10.7 on.
     argument = 10**5000
     assert DataclassValidator(_Price).validate({"price": argument}, CONTEXT) == {
         "price": Decimal(argument)
@@ -387,8 +370,8 @@ def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits() -> None:
     "argument",
     [
         1717243200,  # not a string
-        "next tuesday",  # a string Django's parser returns None for
-        "2024-02-30T10:00:00",  # well formed, and not a day: the parser raises
+        "next tuesday",
+        "2024-02-30T10:00:00",
     ],
 )
 def test_a_date_time_django_cannot_parse_is_refused(argument: Any) -> None:
@@ -422,7 +405,6 @@ def test_bad_rows_are_refused_by_index_and_only_the_rows_that_failed() -> None:
             # A message about a row itself sits inside the row.
             2: {"non_field_errors": ["Expected an object."]},
             3: {"non_field_errors": ["This field cannot be null."]},
-            # Two levels down: a row containing an object.
             4: {"ship_to": {"city": [REQUIRED], "postcode": ["Expected a string."]}},
         }
     }
@@ -504,9 +486,7 @@ class _Typed:
 def test_the_validator_and_the_shape_check_refuse_a_fault_in_the_same_words(
     arguments: dict[str, Any],
 ) -> None:
-    # Dispatch puts the shape check in front of the Validator, so a caller of
-    # dispatch only ever reads the first; a caller of ``validate()`` reads the
-    # second. One fault should read the same to both.
+    # Dispatch puts the shape check in front of the Validator.
     valid = {"count": 1, "price": "1.5", "status": Status.values[0], "prices": []}
     validator = DataclassValidator(_Typed)
     with pytest.raises(InvalidArguments) as shape:
@@ -522,9 +502,7 @@ class _Dated:
 
 
 def test_a_list_of_decimals_declares_each_element_a_decimal() -> None:
-    # A date or a date-time element takes no format on an array, so those
-    # lists stay arrays of strings: without the decimal condition in
-    # ``element_format`` this dataclass could not be declared at all.
+    # A date or a date-time element takes no format on an array.
     params = DataclassValidator(_Dated).parameters()
     assert [(p.name, p.items, p.format) for p in params] == [
         ("prices", "string", "decimal"),
@@ -534,8 +512,7 @@ def test_a_list_of_decimals_declares_each_element_a_decimal() -> None:
 
 
 def test_the_shape_check_takes_each_decimal_element_as_the_validator_does() -> None:
-    # A scalar decimal takes a JSON number as well as a string, and so does
-    # each element of a list of them, at the shape check as in ``validate()``.
+    # A scalar decimal takes a JSON number as well as a string.
     validator = DataclassValidator(_Dated)
     arguments = {"prices": [1.5, "2.25", 3], "at": [], "on": []}
     assert check_arguments(validator.parameters(), arguments) == arguments
@@ -567,9 +544,7 @@ class _Tagged:
 
 
 def test_a_list_of_choices_declares_them_for_each_element() -> None:
-    # ``items`` holds only the element's JSON type, and an array's choices
-    # constrain each element, so a list of choices keeps them there: where the
-    # shape check and the JSON Schema read them.
+    # ``items`` holds only the element's JSON type, and an array's choices constrain each element.
     params = DataclassValidator(_Tagged).parameters()
     assert [(p.name, p.items, p.choices) for p in params] == [
         ("modes", "string", ("fast", "slow")),
@@ -591,8 +566,7 @@ def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> N
     assert [(p.name, p.items_nullable, p.nullable) for p in params] == [
         ("scores", True, False),
         ("addresses", True, False),
-        # ``Literal["fast", None]`` spells a nullable choice: the null is the
-        # element's to take, and the choices keep only the values.
+        # ``Literal["fast", None]`` spells a nullable choice: the null is the element's to take.
         ("modes", True, False),
         ("tags", False, False),
     ]
@@ -601,8 +575,7 @@ def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> N
 
 
 def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
-    # Dispatch runs the shape check before the Validator, so a null element the
-    # declaration did not call nullable was refused before this adapter saw it.
+    # Dispatch runs the shape check before the Validator.
     params = DataclassValidator(_Gaps).parameters()
     arguments = {
         "scores": [1, None],
@@ -668,9 +641,7 @@ def test_the_values_leave_out_a_field_the_dataclass_computes() -> None:
 
 @pytest.mark.parametrize("method", ["validate", "validated"])
 def test_a_partial_call_is_refused_as_the_spec_s_error(method: str) -> None:
-    # A dataclass instance holds every field, so a call that may leave some out
-    # cannot build one; a refused caller could not fix it, so it is not
-    # InvalidArguments.
+    # A dataclass instance holds every field, so a call that may leave some out cannot build one.
     validator = DataclassValidator(_Price)
     with pytest.raises(
         ImproperlyConfigured,
@@ -683,8 +654,7 @@ def test_a_partial_call_is_refused_as_the_spec_s_error(method: str) -> None:
 
 
 def test_a_partial_spec_over_it_is_refused_when_declared() -> None:
-    # Not on the first call: a spec reaches transports that dispatch it
-    # without ever asking, and every call would raise.
+    # Not on the first call: a spec reaches transports that dispatch it without ever asking.
     with pytest.raises(ImproperlyConfigured) as refused:
         ServiceSpec(service=print, validator=DataclassValidator(_Price), partial=True)
     message = str(refused.value)
@@ -840,8 +810,7 @@ class _Scored:
 
 class TestStrKeyedMap:
     def test_it_is_declared_an_object_with_no_fields(self) -> None:
-        # Parameters cannot say "every value is an X", so the declaration says
-        # only what is true of the whole: an object, its keys strings.
+        # Parameters cannot say "every value is an X".
         assert DataclassValidator(_Scored).parameters() == Parameters(
             (
                 Parameter("scores", "object", required=True),
@@ -871,8 +840,7 @@ class TestStrKeyedMap:
         assert check_arguments(parameters, arguments) == arguments
 
     def test_a_value_is_refused_at_its_key_and_only_the_values_that_failed(self) -> None:
-        # The tree pydantic's own adapter gives a str-keyed dict
-        # (test_a_dict_value_is_addressed_by_its_key), in the kernel's words.
+        # The tree pydantic's own adapter gives a str-keyed dict.
         detail = _refusal(
             _Scored,
             {
@@ -886,7 +854,6 @@ class TestStrKeyedMap:
             "weights": {"rigour": [("Expected a decimal string or a number.", "invalid")]},
             "stops": {
                 "home": {"city": [(REQUIRED, "required")]},
-                # A message about an object value sits inside it, as a row's does.
                 "work": {NON_FIELD_ERRORS: [("Expected an object.", "invalid")]},
             },
         }
@@ -896,8 +863,7 @@ class TestStrKeyedMap:
         [
             [4],
             "clarity",
-            # Only a caller skipping the shape check can send one: JSON's keys
-            # are strings, so a map with any other key is not a JSON object.
+            # Only a caller skipping the shape check can send one: JSON's keys are strings.
             {1: 4},
         ],
     )

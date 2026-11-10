@@ -1,5 +1,3 @@
-"""Tests for the shared ``relations`` helpers."""
-
 from __future__ import annotations
 
 import pytest
@@ -28,9 +26,7 @@ class TestValidateRelationOrphan:
             validate_relation_orphan("archive", delete_service=None, label="ChildSpec")
 
     def test_the_default_composes_with_a_delete_service(self) -> None:
-        # ``AUTO`` is the default every spec that never mentions ``orphan``
-        # carries, so it is not a second answer to the question the service
-        # already answers.
+        # ``AUTO`` is the default every spec that never mentions ``orphan`` carries.
         validate_relation_orphan(RelationOrphan.AUTO, delete_service=_service, label="ChildSpec")
 
     def test_stating_it_beside_a_delete_service_is_refused(self) -> None:
@@ -49,8 +45,7 @@ class TestPkInputTargets:
         assert pk_input_targets(Author) == frozenset({"pk", "id"})
 
     def test_the_name_and_attname_collapse_for_an_implicit_key(self) -> None:
-        # ``name`` and ``attname`` are both ``id`` here; they diverge only where
-        # a relation *is* the key, which is why both are read rather than one.
+        # ``name`` and ``attname`` are both ``id`` here.
         assert pk_input_targets(Profile) == frozenset({"pk", "id"})
 
 
@@ -82,8 +77,7 @@ class TestValidatePkFieldMap:
             )
 
     def test_a_natural_match_key_makes_the_same_mapping_coherent(self) -> None:
-        # Nothing is unreachable here: the row matches on its natural key and
-        # the alias goes on guarding creates, exactly as a plain ``pk`` would.
+        # Nothing is unreachable here.
         validate_pk_field_map(
             label="ChildSpec", model=Author, match_key="name", field_map={"ident": "pk"}
         )

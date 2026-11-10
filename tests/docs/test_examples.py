@@ -1,16 +1,3 @@
-"""The documentation's examples, run.
-
-Every page includes its code from ``docs/examples/`` rather than carrying a
-copy, and these tests run that code, so a page cannot describe behaviour the
-package does not have. Where a page states an outcome - a refusal's tree, what
-an adapter declares, which rows a nested write changed - the assertion here is
-that statement.
-
-``docs/`` and ``docs/examples/`` are packages so the examples import by their
-path from the repository root, which pytest already puts on ``sys.path`` for
-the ``tests`` package; no path is patched here.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -132,8 +119,7 @@ class TestQuickstart:
         assert quickstart.rename(ada, {"pk": 404, "title": "Final"}) is None
 
     def test_a_refused_principal_learns_nothing_about_which_rows_exist(self) -> None:
-        # Class-level authorization runs before resolution, so the missing row
-        # and the present one are refused alike.
+        # Class-level authorization runs before resolution.
         with pytest.raises(NotPermitted):
             quickstart.rename(AnonymousUser(), {"pk": 404, "title": "Final"})
 
@@ -149,9 +135,7 @@ class TestQuickstart:
         block = re.search(r"```python\n(.*?)```", after, re.DOTALL)
         assert block is not None
         example = section(ROOT / "docs" / "examples" / "quickstart.py", "quickstart")
-        # One line differs, on purpose: the example imports its model from the
-        # suite's own app, and the README names an app a reader would have.
-        # Swapping exactly that line keeps every other byte checked.
+        # One line differs, on purpose: the example imports its model from the suite's own app.
         run_from = "from tests.dispatch_app.models import Note"
         shown_as = "from notes.models import Note"
         assert example.count(run_from) == 1
@@ -339,12 +323,10 @@ class TestDeclaringWrites:
 
     def test_a_read_the_providers_requires_is_asked_of_the_caller(self, ada: Any) -> None:
         spec = declaring_writes.file_in_project_spec
-        # The provider may fill `project`, yet it is handed only the caller's
-        # reads, so a call leaving it out is refused before the provider runs.
+        # The provider may fill `project`, yet it is handed only the caller's reads.
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments={})
         assert refused.value.detail == {"project": ["This field is required."]}
-        # Sent, it reaches the provider, whose answer outranks the caller's.
         sent = dispatch(spec, principal=ada, arguments={"project": "  Apollo "})
         assert sent.value == "apollo"
 
@@ -465,8 +447,7 @@ class TestDispatching:
             dispatch(spec, principal=ada, arguments={"pk": 7})
 
     def test_the_lock_check_refuses_a_call_it_is_handed_no_arguments_for(self, ada: Any) -> None:
-        """``None`` is a transport calling ``authorize()`` without them; the
-        example decides that is a refusal, never an allow."""
+        """``None`` is a transport calling ``authorize()`` without them."""
         with pytest.raises(NotPermitted, match="That note is locked."):
             authorize(dispatching.lockable_note_spec, ada)
 
@@ -521,7 +502,6 @@ class TestDispatching:
         assert not form.is_bound
         result = dispatching.club_note_page(ada, "chess", "Openings")
         assert result.kind == "instance" and result.value.title == "chess: Openings"
-        # Refused before the form, and by the club the route names.
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.club_note_page(bob, "chess")
         with pytest.raises(NotPermitted, match="Members of this club only."):
@@ -569,15 +549,14 @@ class TestDispatching:
         self, ada: Any, bob: Any
     ) -> None:
         ada.groups.add(Group.objects.create(name="chess"))
-        # The form is built with the club seed; without it, its __init__ is
-        # missing the keyword and the bind raises TypeError.
+        # The form is built with the club seed; without it.
         assert dispatching.check_club_note(ada, "chess", "Openings") == {"title": "Openings"}
         with pytest.raises(InvalidArguments) as refused:
             dispatching.check_club_note(ada, "chess", "")
         assert refused.value.detail == {"title": ["This field is required."]}
         with pytest.raises(NotPermitted, match="Members of this club only."):
             dispatching.check_club_note(bob, "chess", "Openings")
-        assert not Note.objects.exists()  # nothing ran
+        assert not Note.objects.exists()
 
     def test_the_club_a_check_admitted_is_the_club_the_call_runs_in(self, ada: Any) -> None:
         ada.groups.add(Group.objects.create(name="chess"))
@@ -586,7 +565,7 @@ class TestDispatching:
         result = dispatching.post_to_a_club_checked_first(ada, lambda: next(clubs), "Openings")
 
         assert result.value.title == "chess: Openings"
-        assert next(clubs) == "go"  # asked once, by the prelude
+        assert next(clubs) == "go"
 
     def test_resolve_target_refuses_and_reports_as_dispatch_would(self, ada: Any, bob: Any) -> None:
         note = Note.objects.create(owner=ada, title="Draft")
@@ -608,8 +587,7 @@ class TestDispatching:
         def charge() -> None:
             charged.append(1)
 
-        # Admitted and well-formed, then admitted with a refused row: both are
-        # charged. A call refused at its shape, or by a check, is not.
+        # Admitted and well-formed, then admitted with a refused row: both are charged.
         checked = dispatching.spend_a_call_on_the_admitted(ada, {"items": [{"title": "a"}]}, charge)
         assert checked == {"items": [{"title": "a"}]}
         refused = dispatching.spend_a_call_on_the_admitted(
@@ -636,10 +614,8 @@ class TestDispatching:
     def test_a_listing_hides_what_a_call_with_no_arguments_is_refused(self, ada: Any) -> None:
         specs = [dispatching.note_spec, dispatching.owned_note_spec, dispatching.add_note_spec]
         assert dispatching.offered_to(ada, specs) == specs
-        # Refused the class question; the spec whose check reads the arguments
-        # is left to the call.
+        # Refused the class question; the spec whose check reads the arguments is left to the call.
         assert dispatching.offered_to(AnonymousUser(), specs) == [dispatching.owned_note_spec]
-        # The create's scope question of nothing refuses at the quota, as its call does.
         Note.objects.bulk_create(Note(owner=ada, title=title) for title in "abc")
         assert dispatching.offered_to(ada, specs) == specs[:2]
         with pytest.raises(NotPermitted):
@@ -701,8 +677,7 @@ class TestDispatching:
         alpha = Note.objects.create(owner=ada, title="Alpha")
         Note.objects.create(owner=bob, title="Bob's")
         tool = dispatching.notes_tool(ada)
-        # Bob's pk and a descending order are both dropped; so is a value the
-        # caller could never have been shown, which would fail the choices.
+        # Bob's pk and a descending order are both dropped.
         assert list(tool({"author_pk": bob.pk, "ordering": "-title"}).value) == [alpha, beta]
         assert list(tool({"ordering": "null", "search": "be"}).value) == [beta]
         with pytest.raises(InvalidArguments) as refused:
@@ -791,7 +766,6 @@ class TestDispatching:
         assert pool["user"] is ada
         # The context the resolver read is no entry of the pool.
         assert set(pool) == {"user", "progress", "request"}
-        # The refusal it stays clear of: the request spread beside a seed for it.
         with pytest.raises(TypeError, match="'request'"):
             base_pool(user=ada, seeds=dispatching.request_seeds, request=request)
 
@@ -1010,11 +984,6 @@ class TestTransport:
     def test_the_ladder_answers_each_refusal_with_djangorestframework_services_status(
         self, ada: Any, refusal: Any, expected: Any
     ) -> None:
-        # The page says the statuses are djangorestframework-services', and the
-        # arguments page's reader copies this ladder into a transport: a status
-        # that drifted from those would teach a client two answers to one
-        # refusal. The table is spelled out rather than read from an HTTP
-        # transport, since none ships here.
         spec = ServiceSpec(
             service=_raising(refusal),
             permissions=[declaring.IsSignedIn()],
@@ -1101,8 +1070,7 @@ class TestRelations:
         assert Book.objects.filter(author=author).count() == 0
 
     def test_the_create_dataclass_would_empty_an_update(self, ada: Any) -> None:
-        # Why the page gives updates their own dataclass: AuthorIn's default
-        # for an unsent ``books`` is ``[]``, which a replace reads as "none".
+        # Why the page gives updates their own dataclass.
         author = self._create(ada).value
         data = declaring.author_validator.validate(
             {"name": "Ursula"}, ValidationContext(ada, author)
@@ -1289,8 +1257,7 @@ def _exporter(path: str) -> ModuleType:
 
 class TestReference:
     def test_every_public_name_has_a_reference_entry(self) -> None:
-        # The root's names and, since the root cannot re-export them, each
-        # optional-library adapter's own: public all the same.
+        # The root's names and, since the root cannot re-export them.
         public = set(django_service_specs.__all__) - {"__version__"}
         for adapter in OPTIONAL_LIBRARY_ADAPTERS:
             public |= set(importlib.import_module(adapter).__all__)

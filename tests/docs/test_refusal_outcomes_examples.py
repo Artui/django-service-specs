@@ -1,5 +1,3 @@
-"""The refusal-coverage section's example, run, and each finding the page quotes."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -27,8 +25,7 @@ def test_the_example_s_own_tests_pass() -> None:
 
 
 def test_the_gap_left_on_purpose_is_the_one_found() -> None:
-    # So the example's filter has something to remove: a row whose outcome is
-    # the unanswered value answers nothing, though a later row's base would.
+    # So the example's filter has something to remove.
     found = unanswered_refusals(refusal_outcomes.NO_QUESTIONS, unanswered="failed")
     assert [(finding.refusal, finding.kind) for finding in found] == [
         (AdditionalInputRequired, "unanswered")

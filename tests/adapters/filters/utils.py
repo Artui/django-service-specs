@@ -1,9 +1,3 @@
-"""FilterSets the filter tests share: real django-filter classes, never stand-ins.
-
-The reading is checked against what django-filter itself reads, so each one is a
-real ``FilterSet`` over a model the suite migrates.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -112,11 +106,7 @@ class TitleFilter(django_filters.FilterSet):
 
 
 class RequestScopedFilter(django_filters.FilterSet):
-    """Narrows by the request's own principal, as a view-side FilterSet does.
-
-    ``self.request`` is what ``DjangoFilterBackend`` fills; here it is whatever
-    the pool carries under ``request``, a seed an HTTP adapter registers.
-    """
+    """Narrows by the request's own principal, as a view-side FilterSet does."""
 
     mine = django_filters.BooleanFilter(method="filter_mine")
 

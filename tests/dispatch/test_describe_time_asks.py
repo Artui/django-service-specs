@@ -1,25 +1,3 @@
-"""The readers that describe a spec outside any call hand its Validator no call context.
-
-A Validator that opts into ``parameters(*, call_context=...)`` is handed the
-call's dict on every ask inside a call, and ``None`` on every ask outside one.
-A reader that registers, checks or describes a spec runs before any call
-exists, so a dict it invented would tell the Validator a call is under way
-and let it answer for a call that never comes.
-
-``check_seeds`` and ``spec_input_schema`` hold the half for their own asks.
-Here the readers in ``_READERS`` do the same: each row is a reader and a case
-where that reader reaches its ask, and records what the Validator was handed.
-``apply_server_arguments``, ``check_requested_input`` and ``server_owned_keys``
-also run inside a call and take its ``call_context``; called here with none,
-as a describe-time reader calls them, they hand none on. So do
-``spec_caller_input_schema``, ``spec_input_schema`` and ``provider_reached``,
-which a transport hands the dict of the context it describes a spec under, a
-stamped one included; a third test holds that such a dict is the object every
-ask is handed. A reader handed none still invents none.
-The three readers in ``_SINGLE_ONLY`` reach no ask for a ``many`` spec, so a
-second test holds that they leave its Validator unasked.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

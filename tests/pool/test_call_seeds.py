@@ -1,9 +1,3 @@
-"""The call's ``request`` and ``view``, read off its context for every callable naming one.
-
-The behavioural tests name the two keys as strings rather than importing the
-constant, so each runs against a tree that has none and fails on its assertion.
-"""
-
 from __future__ import annotations
 
 import importlib
@@ -216,10 +210,7 @@ class TestEveryStage:
     def test_with_every_standard_key_none_every_stage_is_handed_none(
         self, entry: Callable[..., Any]
     ) -> None:
-        # A ``None`` entry binds as a missing one, so a transport that fills the
-        # four standard keys with ``None`` (``build_call_context``) hands every
-        # stage what one that sets none of them does, and no stage that runs
-        # without the keys is refused with them.
+        # A ``None`` entry binds as a missing one.
         ada = make_user("ada")
         note = Note.objects.create(title="n", owner=ada)
         saw = _Saw()
@@ -300,12 +291,7 @@ class TestEveryStage:
 
     @_ENTRIES
     def test_a_catch_all_is_handed_neither(self, entry: Callable[..., Any]) -> None:
-        """By name only, as the call's context is: a ``**kwargs`` seat is handed what it was before.
-
-        A catch-all forwarding its ``**kwargs`` into a strict callable would
-        otherwise raise on two keys more, at the service and at a seed's
-        resolver alike.
-        """
+        """By name only, as the call's context is."""
         handed: dict[str, Any] = {}
 
         def service(**kwargs: Any) -> None:
@@ -414,11 +400,7 @@ class TestASeedResolver:
     def test_a_seed_resolver_naming_the_call_context_is_handed_it(
         self, entry: Callable[..., Any]
     ) -> None:
-        """Its pool carries the context, so the two can be read off it; and so it is handed it.
-
-        A resolver read neither before, and nothing else of the call's context
-        reaches a pool through a seed's resolution.
-        """
+        """Its pool carries the context, so the two can be read off it; and so it is handed it."""
         call_context = {"locale": "fr"}
         seeds = DEFAULT_POOL_SEEDS.extend(locale=lambda *, call_context: call_context["locale"])
         result = entry(
@@ -432,13 +414,7 @@ class TestASeedResolver:
 
 
 class TestAMountRegisteringEither:
-    """A mount that registers ``request`` or ``view`` keeps its own; the kernel skips the name.
-
-    The registries are built exactly as the two packages build theirs:
-    djangorestframework-services by the constructor, django-spec-agents through
-    ``extend``. Both pass on a tree without the change, and hold that it breaks
-    neither.
-    """
+    """A mount that registers ``request`` or ``view`` keeps its own; the kernel skips the name."""
 
     @pytest.mark.parametrize(
         "registry",
@@ -547,14 +523,7 @@ class TestAnArgumentNamedEither:
     def test_a_parameter_named_either_is_refused(
         self, entry: Callable[..., Any], name: str, where: str
     ) -> None:
-        """The parameters of either name a spec can still be built with, refused on every call.
-
-        A service spec's read, its target selector's or its shape of either
-        name is refused when the spec is built
-        (``tests/specs/test_utils.py``'s ``TestAParameterNamedForTheCallsOwnSeat``);
-        a selector spec's own is not, since it is also built where its
-        parameters are no call's.
-        """
+        """The parameters of either name a spec can still be built with, refused on every call."""
         declared = Parameters.of(Parameter(name, "string"))
         spec: ServiceSpec | SelectorSpec
         if where == "a-many-list":
@@ -581,11 +550,7 @@ class TestAnArgumentNamedEither:
     def test_an_output_selector_s_read_named_request_builds_and_runs(
         self, entry: Callable[..., Any], name: str, reflected: bool
     ) -> None:
-        """Its reads are never the call's parameters; its selector is handed the call's own by name.
-
-        So it is neither refused when the spec is built nor at dispatch,
-        whether or not it is marked ``reflected``.
-        """
+        """Its reads are never the call's parameters."""
         marker = _Marker(name)
         seen: list[Any] = []
 
@@ -612,11 +577,7 @@ class TestAnArgumentNamedEither:
     def test_a_reflected_read_named_either_is_the_call_s(
         self, entry: Callable[..., Any], name: str
     ) -> None:
-        """Read off a selector's signature, so the selector's own: the context fills it.
-
-        As a reflected read named like a registered seed is the seed's: no
-        caller argument carries it, and the selector is handed the call's.
-        """
+        """Read off a selector's signature, so the selector's own: the context fills it."""
         marker = _Marker(name)
         seen: list[Any] = []
 
@@ -638,12 +599,7 @@ class TestAnArgumentNamedEither:
     def test_a_validator_field_named_request_takes_the_seat(
         self, entry: Callable[..., Any], name: str
     ) -> None:
-        """Into ``data``, and never the pool: the service naming it reads the call's own.
-
-        As a field named like a registered seed does. Fails with the name
-        refused, and, without the call's names among the fields the pool keeps
-        out, on the second assertion.
-        """
+        """Into ``data``, and never the pool: the service naming it reads the call's own."""
         seen: dict[str, Any] = {}
 
         def service(*, data: Any, request: Any, view: Any) -> None:

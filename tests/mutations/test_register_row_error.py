@@ -1,23 +1,3 @@
-"""Tests for ``register_row_error``: a foreign refusal re-rooted under the row that raised it.
-
-The stand-in below is the shape of the error class an adapter registers - the
-one ``djangorestframework-services`` registers is DRF's ``ValidationError`` -
-written from that class's source rather than imported, since nothing in this
-suite may install DRF. What it reproduces, quirk for quirk:
-
-- ``detail=None`` becomes the default message, a tuple becomes a list, and
-  anything that is neither a list nor a dict is wrapped in a one-item list, so
-  ``detail`` is only ever a list or a dict at the top.
-- Below the top nothing is wrapped: a bare string inside a dict stays a bare
-  message, and a dict's keys, ``int`` row indexes among them, are kept as they
-  are.
-- Every message is a ``str`` subclass carrying a ``code``, and one that already
-  carries a code keeps it when the class is built again from a tree holding it.
-
-So rebuilding the class from the re-rooted tree is lossless, which is the
-contract ``register_row_error`` states.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -208,8 +188,7 @@ class TestARowServiceRefusal:
     def test_a_message_about_the_row_itself_lands_under_non_field_errors(
         self, registered: None
     ) -> None:
-        # The constructor wraps a bare string in a list, and a list at a row is
-        # the row's own complaint rather than a field of it.
+        # The constructor wraps a bare string in a list.
         with pytest.raises(_ForeignRefusal) as excinfo:
             create_from_input(Catalog, _ROWS, relations=_create_spec(_ForeignRefusal("Not today.")))
         assert _codes(excinfo.value.detail) == {
@@ -363,7 +342,6 @@ class TestRegistering:
             register_row_error(Exception, _read_detail)
 
     def test_a_class_beside_the_kernels_is_accepted(self) -> None:
-        # Overlapping none of the five, in either direction: what tells the
-        # guard's two directions apart from a guard refusing every builtin.
+        # Overlapping none of the five, in either direction.
         register_row_error(LookupError, _read_detail)
         assert ROW_ERROR_READERS[LookupError] is _read_detail

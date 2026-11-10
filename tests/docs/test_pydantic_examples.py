@@ -1,11 +1,3 @@
-"""The pydantic adapter page's examples, run.
-
-As in ``test_examples.py``: the page includes its code from
-``docs/examples/pydantic_adapter.py``, and where it states an outcome - what a
-model declares, a refusal's tree, how deep a tree is described - the assertion
-here is that statement.
-"""
-
 from __future__ import annotations
 
 import dataclasses
@@ -55,8 +47,7 @@ class TestDeclaringWithModels:
     def test_the_service_s_data_is_the_model_instance(
         self, ada: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # What ``create_author`` is annotated with, and what the page says it
-        # receives; ``create_from_input`` reads the instance through ``__dict__``.
+        # What ``create_author`` is annotated with, and what the page says it receives.
         seen: list[Any] = []
         write = pydantic_adapter.create_from_input
 

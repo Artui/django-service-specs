@@ -1,5 +1,3 @@
-"""The async twin of ``materialize_retrieve``: the same rule, without blocking the loop."""
-
 from __future__ import annotations
 
 import pytest

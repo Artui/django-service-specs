@@ -1,5 +1,3 @@
-"""``RetrieveSelector``: one row or ``None``, the lookup the spec reads through ``**extras``."""
-
 from __future__ import annotations
 
 from typing import Any

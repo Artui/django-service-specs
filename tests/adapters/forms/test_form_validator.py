@@ -250,8 +250,7 @@ class TestParameters:
             FormValidator(BookForm).parameters()
 
     def test_every_array_declares_its_items_as_a_type_name(self) -> None:
-        # What coerce_flat reads an array's elements by; nested Parameters
-        # would have no flat spelling.
+        # What coerce_flat reads an array's elements by.
         arrays = [p for p in FormValidator(Everything).parameters() if p.type == "array"]
         assert [(p.name, p.items) for p in arrays] == [
             ("tags", "string"),
@@ -290,19 +289,7 @@ class TestParameters:
 
 
 class _ArrayLikeField(forms.CharField):
-    """``django.contrib.postgres.forms.SimpleArrayField``'s shape, which needs psycopg to import.
-
-    It subclasses ``CharField`` (Django 5.2's ``contrib/postgres/forms/array.py``,
-    line 15) and, in its ``__init__`` (lines 26-31), sets ``min_length`` and
-    ``max_length`` and
-    appends ``ArrayMinLengthValidator`` and ``ArrayMaxLengthValidator`` built
-    from ``int()`` of each, which count the list's items: copied here line for
-    line, with the real validators, which import without psycopg.
-    ``ArrayField.formfield()`` passes its ``size`` as ``max_length``
-    (``contrib/postgres/fields/array.py``, lines 226-233), so a ModelForm over a sized
-    ``ArrayField`` builds one. It reads the string as its comma-separated items,
-    as the real one does before its validators run.
-    """
+    """``django.contrib.postgres.forms.SimpleArrayField``'s shape, which needs psycopg to import."""
 
     def __init__(
         self, *, max_length: int | None = None, min_length: int | None = None, **kwargs: Any
@@ -355,9 +342,7 @@ class TestLengths:
     def test_an_optional_field_s_min_length_is_not_advertised_since_the_form_takes_an_empty_string(
         self,
     ) -> None:
-        # Django runs no validator on an empty value, so ``""`` is taken
-        # whatever ``min_length`` says, and a ``minLength`` would tell a client
-        # to refuse what the form takes.
+        # Django runs no validator on an empty value.
         form_class = _form("Code", code=forms.CharField(min_length=3, max_length=8, required=False))
         assert _node(form_class, "code") == {"type": ["string", "null"], "maxLength": 8}
         assert _checked_then_validated(form_class, {"code": ""}) == ("validated", {"code": ""})
@@ -366,8 +351,7 @@ class TestLengths:
         ("field", "minimum"),
         [
             (forms.EmailField(max_length=40, min_length=6), 6),
-            # Its minimum is left out: see
-            # test_a_url_s_min_length_is_not_advertised_since_the_form_counts_the_scheme.
+            # Its minimum is left out.
             (forms.URLField(max_length=40, min_length=6), None),
             (forms.SlugField(max_length=40, min_length=6), 6),
             (forms.RegexField(r"^[a-z]+$", max_length=40, min_length=6), 6),
@@ -390,8 +374,7 @@ class TestLengths:
         )
 
     def test_an_item_count_is_not_a_string_s_length(self) -> None:
-        # The double holds the claim: 16 characters in three items are taken,
-        # and seven characters in four refused, by the count.
+        # The double holds the claim: 16 characters in three items are taken.
         form_class = _form("Tags", tags=_ArrayLikeField(min_length=2, max_length=3))
         assert _node(form_class, "tags") == {"type": "string"}
         assert _checked_then_validated(form_class, {"tags": "aaaaa,bbbbb,cccc"}) == (
@@ -446,11 +429,9 @@ class TestLengths:
             {"code": [("Ensure this value has at most 4 characters (it has 6).", "max_length")]},
         )
 
-    # Django 5.x warns that its default scheme changes in 6.0; 4.2 has no
-    # ``assume_scheme`` to silence it with.
+    # Django 5.x warns that its default scheme changes in 6.0.
     @pytest.mark.filterwarnings("ignore:The default scheme will be changed")
     def test_a_url_is_counted_with_the_scheme_the_field_adds(self) -> None:
-        # Which scheme, and so the count, depends on the Django version.
         form_class = _form("Site", site=forms.URLField(max_length=20))
         assert _node(form_class, "site") == {"type": "string", "maxLength": 20}
         verdict, detail = _checked_then_validated(form_class, {"site": "abcdefghijklmnop.com"})
@@ -486,8 +467,7 @@ class TestLengths:
         assert code == Parameter("code", "string", required=True)
 
     def test_a_length_is_carried_as_the_int_django_enforces(self) -> None:
-        # Django keeps ``max_length`` as given and validates against ``int()``
-        # of it, so a length written as a string is the number it spells.
+        # Django keeps ``max_length`` as given and validates against ``int()`` of it.
         form_class = _form("Code", code=forms.CharField(max_length="32", min_length="3"))
         assert _node(form_class, "code") == {"type": "string", "minLength": 3, "maxLength": 32}
 
@@ -515,8 +495,7 @@ class TestLengths:
     def test_an_over_long_value_is_refused_by_the_form_in_its_own_words(
         self, field: forms.Field, expected: list[tuple[str, str]]
     ) -> None:
-        # Advertised, not enforced by the shape check: the form answers, beside
-        # its other refusals.
+        # Advertised, not enforced by the shape check: the form answers, beside its other refusals.
         form_class = _form("Code", code=field, email=forms.EmailField())
         assert _checked_then_validated(form_class, {"code": "long", "email": "no"}) == (
             "form",
@@ -525,11 +504,7 @@ class TestLengths:
 
 
 class TestANumberSBoundsStayTheForms:
-    """An ``IntegerField``'s and a ``FloatField``'s bounds are not declared.
-
-    The shape check enforces a declared ``minimum`` or ``maximum`` before the
-    form runs, in its own words, so declaring them would change two refusals.
-    """
+    """An ``IntegerField``'s and a ``FloatField``'s bounds are not declared."""
 
     def test_no_bound_is_declared(self) -> None:
         form_class = _form(
@@ -575,8 +550,7 @@ class TestChoices:
     @pytest.mark.parametrize(
         ("field", "declared"),
         [
-            # Django 5.0 and later normalise every group to a list; 4.2 keeps the
-            # tuple it was given, which is the case this holds.
+            # Django 5.0 and later normalise every group to a list.
             pytest.param(
                 forms.ChoiceField(choices=(("Warm", (("red", "Red"), ("amber", "Amber"))),)),
                 ("string", None, None, ("red", "amber"), True, False),
@@ -681,9 +655,7 @@ class TestModelChoices:
         [
             (None, "integer", None),
             ("price", "string", "decimal"),
-            # A date takes no format on an array, so a list of them stays an
-            # array of strings: without the decimal condition in
-            # ``element_format`` this field could not be declared.
+            # A date takes no format on an array, so a list of them stays an array of strings.
             ("published_on", "string", None),
         ],
     )
@@ -698,11 +670,7 @@ class TestModelChoices:
 
     @pytest.mark.django_db
     def test_a_list_of_decimal_keys_is_matched_on_the_column_s_own_spelling(self) -> None:
-        # The shape check reads each element as a decimal, a JSON number
-        # included, and hands it on as sent. Django's field then matches each
-        # value against the ``str`` of the rows' column, so ``"12.50"`` names
-        # the row a two-place column holds and ``12.5`` names none: the form's
-        # refusal, in its words, where a list of strings was refused by type.
+        # The shape check reads each element as a decimal, a JSON number included.
         author = Author.objects.create(name="Ursula")
         book = Book.objects.create(author=author, title="Lathe", price=Decimal("12.50"))
         field = forms.ModelMultipleChoiceField(queryset=Book.objects.all(), to_field_name="price")
@@ -722,11 +690,7 @@ class TestModelChoices:
     @pytest.mark.django_db
     @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
     def test_a_list_naming_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
-        # Django's ``ModelMultipleChoiceField`` matches the list with an
-        # ``__in`` lookup, which hands a key past the integer column's range
-        # to the database driver and raises ``OverflowError`` on every Django
-        # version. No row can hold that key, so the list is no choice: refused
-        # in the field's own words, beside the form's other refusals.
+        # Django's ``ModelMultipleChoiceField`` matches the list with an ``__in`` lookup.
         validator = FormValidator(_form("Pick", rows=_many_books(), title=forms.CharField()))
         arguments = check_arguments(validator.parameters(), {"rows": [key], "title": "Lathe"})
         assert coded(_refusal(validator.form_class, {**arguments, "title": ""})) == {
@@ -741,19 +705,14 @@ class TestModelChoices:
 
     @pytest.mark.django_db
     def test_django_s_own_list_field_hands_such_a_key_to_the_driver(self) -> None:
-        # Why the adapter answers first: the field alone raises, on every
-        # Django version the package supports. Fails, and says the adapter's
-        # check can go, once Django answers it.
+        # Why the adapter answers first: the field alone raises.
         with pytest.raises(OverflowError):
             _many_books().clean([_BEYOND_THE_COLUMN])
 
     @pytest.mark.django_db
     @pytest.mark.parametrize("key", [_BEYOND_THE_COLUMN, -_BEYOND_THE_COLUMN - 1])
     def test_a_key_past_the_column_s_range_is_no_choice(self, key: int) -> None:
-        # Django 5.0 answers an exact lookup past the range with no rows, so
-        # ``ModelChoiceField`` refuses it there; Django 4.2 raises
-        # ``OverflowError`` from its ``get``. Refused before the query, the
-        # answer is the field's own on both.
+        # Django 5.0 answers an exact lookup past the range with no rows.
         field = forms.ModelChoiceField(queryset=Book.objects.all())
         validator = FormValidator(_form("Pick", row=field))
         arguments = check_arguments(validator.parameters(), {"row": key})
@@ -788,8 +747,7 @@ class TestModelChoices:
 
     @pytest.mark.django_db
     def test_a_key_past_an_integer_range_on_a_text_column_is_matched(self) -> None:
-        # Only an integer column has a range: a title is matched as the text
-        # the integer spells, as Django matches it.
+        # Only an integer column has a range: a title is matched as the text the integer spells.
         author = Author.objects.create(name="Ursula")
         book = Book.objects.create(
             author=author, title=str(_BEYOND_THE_COLUMN), price=Decimal("1.00")
@@ -802,9 +760,7 @@ class TestModelChoices:
     @pytest.mark.usefixtures("unstated_ranges")
     @pytest.mark.parametrize("many", [False, True], ids=["one", "a-list"])
     def test_a_key_spelled_as_digits_past_the_column_s_range_is_no_choice(self, many: bool) -> None:
-        # A caller handing ``validate`` the string, where dispatch's shape
-        # check hands on an ``int``: the field's lookup reads the digits as
-        # the integer they spell, and handed that to the driver.
+        # A caller handing ``validate`` the string.
         key = str(_BEYOND_THE_COLUMN)
         if many:
             form_class = _form("Pick", rows=_many_books())
@@ -819,8 +775,7 @@ class TestModelChoices:
     @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
     def test_a_key_that_spells_no_number_is_the_field_s(self) -> None:
-        # The column's lookup refuses ``"abc"`` with a ValueError, which the
-        # field catches and answers in its words.
+        # The column's lookup refuses ``"abc"`` with a ValueError.
         form_class = _form("Pick", rows=_many_books())
         assert coded(_refusal(form_class, {"rows": ["abc"]})) == {
             "rows": [("\u201cabc\u201d is not a valid value.", "invalid_pk_value")]
@@ -837,8 +792,7 @@ class TestModelChoices:
 
     @pytest.mark.django_db
     def test_a_key_sent_as_a_string_is_left_to_the_field(self) -> None:
-        # Dispatch's shape check hands an integer key on as an ``int``; a
-        # caller handing ``validate`` the string is answered by the field.
+        # Dispatch's shape check hands an integer key on as an ``int``.
         author = Author.objects.create(name="Ursula")
         book = Book.objects.create(author=author, title="Lathe", price=Decimal("1.00"))
         validator = FormValidator(_form("Pick", rows=_many_books()))
@@ -989,7 +943,6 @@ class TestValidate:
             "scores": [2],
             "author": author,
         }
-        # The multiple one cleans to a queryset, which is what the service receives.
         assert isinstance(cleaned["books"], QuerySet)
         assert list(cleaned["books"]) == [book]
 
@@ -1045,8 +998,7 @@ class TestValidate:
     def test_every_leaf_is_a_list_of_str(self) -> None:
         detail = _refusal(_form("Pair", a=forms.IntegerField(max_value=1)), {"a": 2})
         assert detail == {"a": ["Ensure this value is less than or equal to 1."]}
-        # A ``str`` each, never a lazy translation or Django's error object,
-        # carrying the field's own code beside its words.
+        # A ``str`` each, never a lazy translation or Django's error object.
         assert all(isinstance(m, str) for messages in detail.values() for m in messages)
         assert coded(detail) == {
             "a": [("Ensure this value is less than or equal to 1.", "max_value")]
@@ -1078,22 +1030,19 @@ class TestTheWireFormIsNotLocalized:
             yield
 
     def test_a_decimal_with_three_places_is_not_read_as_thousands(self, german: Any) -> None:
-        # Bound as the string, the field read "1.500" as fifteen hundred: a
-        # person typing 1,500 on a German form was sent on as 1500.
+        # Bound as the string, the field read "1.500" as fifteen hundred.
         form_class = _form("Priced", price=forms.DecimalField(localize=True, decimal_places=3))
         cleaned = FormValidator(form_class).validate({"price": "1.500"}, CONTEXT)
         assert cleaned == {"price": Decimal("1.500")}
 
     def test_a_field_that_is_not_a_number_is_bound_as_it_came(self, german: Any) -> None:
-        # A postcode spells a number and is not one: made a Decimal, it lost
-        # its leading zero.
+        # A postcode spells a number and is not one: made a Decimal, it lost its leading zero.
         form_class = _form("Addressed", postcode=forms.CharField(localize=True))
         cleaned = FormValidator(form_class).validate({"postcode": "01234"}, CONTEXT)
         assert cleaned == {"postcode": "01234"}
 
     def test_a_json_number_for_a_decimal_is_bound_as_it_came(self) -> None:
-        # The shape check accepts a JSON number for a decimal. Made a Decimal,
-        # 0.1 carries its binary expansion and fails the field's two places.
+        # The shape check accepts a JSON number for a decimal.
         form_class = _form("Priced", price=forms.DecimalField(decimal_places=2))
         cleaned = FormValidator(form_class).validate({"price": 0.1}, CONTEXT)
         assert cleaned == {"price": Decimal("0.1")}
@@ -1123,9 +1072,7 @@ class TestANumberPastItsRange:
     def test_an_integer_past_a_float_s_range_is_the_field_s_invalid_number(
         self, value: int
     ) -> None:
-        # JSON's number has no range, so the shape check hands the integer on,
-        # and the field's ``float`` raised OverflowError. A string of the same
-        # digits reads as infinity, which the field refuses as no number.
+        # JSON's number has no range, so the shape check hands the integer on.
         form_class = _form("Measured", ratio=forms.FloatField())
         assert coded(_refusal(form_class, {"ratio": value})) == {
             "ratio": [("Enter a number.", "invalid")]
@@ -1143,16 +1090,13 @@ class TestANumberPastItsRange:
         assert cleaned == {"ratio": float(2**53 + 1)}
 
     def test_a_decimal_sent_as_an_integer_is_read_whatever_its_digits(self) -> None:
-        # The field reads a value through ``str``, which refuses an int past
-        # 4300 digits from Python 3.10.7 on, with a ValueError the field does
-        # not catch. A Decimal's ``str`` has no such limit.
+        # The field reads a value through ``str``.
         form_class = _form("Priced", price=forms.DecimalField())
         cleaned = FormValidator(form_class).validate({"price": 10**5000}, CONTEXT)
         assert cleaned == {"price": Decimal(10**5000)}
 
     def test_true_is_still_no_decimal_to_the_field(self) -> None:
-        # Python makes a bool an int, and ``Decimal(True)`` is one; bound as it
-        # came, the field reads ``"True"`` and refuses it.
+        # Python makes a bool an int, and ``Decimal(True)`` is one; bound as it came.
         form_class = _form("Priced", price=forms.DecimalField())
         assert _refusal(form_class, {"price": True}) == {"price": ["Enter a number."]}
 
@@ -1170,18 +1114,14 @@ class TestANumberPastItsRange:
     def test_a_value_past_an_integer_column_s_range_is_refused_in_django_s_words(
         self, views: Any, refusal: tuple[str, int, str]
     ) -> None:
-        # The words Django's model validators use from 5.0, where the backend
-        # states the range; where it states none, Django took the value and
-        # the column could not hold it. Digits are the integer the field
-        # cleans them to, as Django's validators read it.
+        # The words Django's model validators use from 5.0, where the backend states the range.
         words, limit, code = refusal
         detail = _refusal(_Viewed, {"title": "Hi", "views": views})
         assert coded(detail) == {"views": [(f"Ensure this value is {words} {limit}.", code)]}
 
     @pytest.mark.django_db
     def test_a_field_s_own_limit_answers_before_the_column_s(self) -> None:
-        # As where Django validates the model: the field refuses first, and
-        # the model is never asked about it.
+        # As where Django validates the model: the field refuses first.
         form_class = _form_over_views(forms.IntegerField(max_value=100))
         assert coded(_refusal(form_class, {"title": "Hi", "views": 2**63})) == {
             "views": [("Ensure this value is less than or equal to 100.", "max_value")]
@@ -1212,8 +1152,7 @@ class TestANumberPastItsRange:
     def test_a_value_past_a_unique_column_s_range_never_reaches_the_uniqueness_query(
         self,
     ) -> None:
-        # The constraint's check queries with the value, and SQLite's driver
-        # raised OverflowError for it.
+        # The constraint's check queries with the value.
         book = _book()
         detail = _refusal(_EditionForm, {"book": book.pk, "number": 2**63})
         assert coded(detail) == {"number": _PAST_THE_COLUMN}
@@ -1278,8 +1217,7 @@ class TestANumberPastItsRange:
     def test_a_field_declared_over_a_column_meta_leaves_out_is_never_judged(
         self, meta: dict[str, Any]
     ) -> None:
-        # Declared on the form but left out by ``Meta``, the value is never
-        # written onto the instance, and Django validates no column for it.
+        # Declared on the form but left out by ``Meta``.
         form_class = type(
             "Undeclared",
             (forms.ModelForm,),
@@ -1329,8 +1267,7 @@ class TestANumberPastItsRange:
     @pytest.mark.django_db
     @pytest.mark.usefixtures("unstated_ranges")
     def test_digits_a_text_field_cleans_to_are_held_to_the_column(self) -> None:
-        # The model reads the digits as the integer they spell, and the
-        # constraint's check queried with it.
+        # The model reads the digits as the integer they spell.
         form_class = type("Spelled", (_EditionForm,), {"number": forms.CharField()})
         book = _book()
         detail = _refusal(form_class, {"book": book.pk, "number": str(2**63)})
@@ -1378,8 +1315,7 @@ class TestModelForm:
         assert ada.username == "ada"
 
     def test_an_update_helper_saves_what_the_form_cleaned(self) -> None:
-        # The case the copy exists for: a helper that saves only what changed
-        # would see no change on a target the form had already written to.
+        # The case the copy exists for.
         ada = User.objects.create_user(username="ada")
         cleaned = FormValidator(Username).validate(
             {"username": "lovelace"}, ValidationContext(ada, ada)
@@ -1437,7 +1373,6 @@ class TestChoiceLabels:
         # An array's labels are its element's, beside its choices.
         assert labels["tags"] == (("a", "A"), ("b", "B"))
         assert labels["scores"] == ((1, "One"), (2, "Two"))
-        # No choices, no labels: rows, and fields with no choices at all.
         assert labels["author"] is None
         assert labels["name"] is None
 
@@ -1503,8 +1438,7 @@ class TestFiles:
         assert _refusal(_Upload, {"title": "Notes"}) == {"attachment": [REQUIRED]}
 
     def test_a_file_with_no_name_is_the_form_s_to_refuse(self) -> None:
-        # A ContentFile a Python caller builds without a name: the shape check
-        # takes any Django File, and the form needs a name to read one.
+        # A ContentFile a Python caller builds without a name.
         detail = _refusal(_Upload, {"title": "Notes", "attachment": ContentFile(b"hello")})
         assert detail == {"attachment": [forms.FileField.default_error_messages["invalid"]]}
 
@@ -1527,11 +1461,7 @@ class _BareUpload(forms.Form):
 
 
 def _clashing(*, disabled: bool) -> type[forms.BaseForm]:
-    """A form whose field is named as another field's clear checkbox.
-
-    Only reachable through ``base_fields`` set by hand, since a class
-    attribute cannot carry a hyphen.
-    """
+    """A form whose field is named as another field's clear checkbox."""
     return type(
         "_Clashing",
         (forms.BaseForm,),
@@ -1601,8 +1531,7 @@ class TestClearingAFile:
         cleaned = FormValidator(_DocumentForm).validate(
             {"title": "Notes", "attachment-clear": True}, _row(row)
         )
-        # The form's own value for a cleared file: False, under the field's
-        # name, and nothing under the checkbox's.
+        # The form's own value for a cleared file: False, under the field's name.
         assert cleaned["attachment"] is False
         assert "attachment-clear" not in cleaned
         assert cleaned["scan"] == row.scan
@@ -1632,8 +1561,7 @@ class TestClearingAFile:
         ("checked", "expected"),
         [
             pytest.param(True, {"attachment": False}, id="checked-clears-the-file"),
-            # Unchecked is what absent is on a whole call, so it is on a partial
-            # one too: nothing about the file was sent.
+            # Unchecked is what absent is on a whole call, so it is on a partial one too.
             pytest.param(False, {}, id="unchecked-leaves-the-file-out"),
         ],
     )
@@ -1648,8 +1576,7 @@ class TestClearingAFile:
     @pytest.mark.django_db
     def test_dispatch_takes_the_checkbox_and_the_service_clears_the_row(self, media: str) -> None:
         def clear(instance: Document, attachment: Any) -> Document:
-            # A ModelForm's own write: ``save_form_data`` stores a cleared
-            # file as the empty name.
+            # A ModelForm's own write: ``save_form_data`` stores a cleared file as the empty name.
             Document._meta.get_field("attachment").save_form_data(instance, attachment)
             instance.save()
             return instance
@@ -1687,8 +1614,7 @@ class _Profile(forms.Form):
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
         assert cleaned is not None
-        # ``get``, as Django advises: a field that failed, or was not sent on a
-        # partial call, has no cleaned value.
+        # ``get``, as Django advises: a field that failed, or was not sent on a partial call.
         if cleaned.get("title") == "admin":
             raise ValidationError("Reserved.")
         return cleaned
@@ -1713,12 +1639,7 @@ class _EditionForm(forms.ModelForm):
 
 
 def _a_pair_and_its_collision(pair: str) -> tuple[Any, Any, dict[str, Any]]:
-    """A row holding a value, another row beside it, and the whole call that collides.
-
-    ``(taken, target, whole)``: the value of the pair's second field the first
-    row holds, the row an update targets, which shares the first field, and
-    the whole call that would give the target the first row's pair.
-    """
+    """A row holding a value, another row beside it, and the whole call that collides."""
     if pair == "permission":
         kind = ContentType.objects.get_for_model(Book)
         Permission.objects.create(name="Taken", content_type=kind, codename="taken")
@@ -1740,8 +1661,7 @@ class TestPartial:
     def test_a_partial_call_returns_only_the_fields_the_caller_sent(self) -> None:
         validator = FormValidator(_Profile)
         assert validator.validate({"age": 3}, _partial()) == {"age": 3}
-        # The same call made whole is refused, and an absent checkbox cleans
-        # to False there, which is exactly what a partial update must not write.
+        # The same call made whole is refused, and an absent checkbox cleans to False there.
         assert _refusal(_Profile, {"age": 3}) == {"title": [REQUIRED]}
         assert validator.validate({"title": "Ada"}, CONTEXT) == {
             "title": "Ada",
@@ -1756,8 +1676,7 @@ class TestPartial:
         assert validator.validate({"subscribed": False}, _partial()) == {"subscribed": False}
 
     def test_a_value_sent_is_checked_as_on_a_whole_call(self) -> None:
-        # Under partial a required field may be left out, never sent empty: a
-        # null for it is refused as before, rather than cleaned to a blank.
+        # Under partial a required field may be left out, never sent empty.
         assert _refusal_partial(_Profile, {"title": None}) == {"title": [REQUIRED]}
         assert _refusal_partial(_Profile, {"nickname": "Ada"}) == {"nickname": ["Lower case only."]}
         assert _refusal_partial(_Profile, {"title": "admin"}) == {"non_field_errors": ["Reserved."]}
@@ -1815,16 +1734,12 @@ class TestPartial:
         [
             # ``unique_together``, which a ModelForm checks with validate_unique.
             pytest.param(_PermissionForm, "permission", id="unique-together"),
-            # A ``UniqueConstraint``, which it checks with validate_constraints.
             pytest.param(_EditionForm, "edition", id="unique-constraint"),
         ],
     )
     def test_a_partial_update_colliding_with_a_unique_pair_is_refused_as_a_whole_one_is(
         self, form_class: type[forms.ModelForm], pair: str
     ) -> None:
-        # The update sends one field of the pair. Bound with only that field,
-        # the form excluded the other from its uniqueness check, and so skipped
-        # the pair: the collision surfaced as an IntegrityError on save.
         taken, target, whole = _a_pair_and_its_collision(pair)
         sent = {"codename": taken} if pair == "permission" else {"number": taken}
         refused = _refusal(form_class, whole, target)
@@ -1843,18 +1758,14 @@ class TestPartial:
 
     @pytest.mark.django_db
     def test_a_partial_call_with_no_target_row_checks_nothing_it_was_not_sent(self) -> None:
-        # Bound as a create, the form's instance holds the model's defaults for
-        # every field not sent, which nothing will write: checked, an empty
-        # username that a row already holds refused a call that never sent one.
+        # Bound as a create.
         User.objects.create(username="")
         context = _partial()
         assert FormValidator(Username).validate({}, context) == {}
 
     @pytest.mark.django_db
     def test_a_partial_update_checks_no_pair_the_form_does_not_declare(self) -> None:
-        # The whole call of a form without ``content_type`` excludes the pair,
-        # as Django excludes any model field a form does not have, and a
-        # partial one is no stricter.
+        # The whole call of a form without ``content_type`` excludes the pair.
         taken, target, _ = _a_pair_and_its_collision("permission")
         context = _partial(target)
         assert FormValidator(_PermissionName).validate({"codename": taken}, context) == {
@@ -1890,8 +1801,7 @@ class _CodedForm(forms.Form):
 
     def clean(self) -> dict[str, Any]:
         cleaned = super().clean()
-        # One message with a code of its own and one with none, which DRF
-        # reports as ``invalid``.
+        # One message with a code of its own and one with none, which DRF reports as ``invalid``.
         if cleaned.get("count") == 13:
             raise ValidationError(["Unlucky.", ValidationError("Taken.", code="taken")])
         return cleaned
@@ -2040,8 +1950,7 @@ class TestFormKwargs:
         spec = _tenant_spec()
         result = dispatch(spec, principal=ada, arguments={"book": own.pk}, pool_seeds=_TENANT_SEEDS)
         assert result.value == own
-        # The other tenant's row exists and the shape check takes its key: the
-        # scoped queryset is what refuses it.
+        # The other tenant's row exists and the shape check takes its key.
         with pytest.raises(InvalidArguments) as caught:
             dispatch(spec, principal=ada, arguments={"book": other.pk}, pool_seeds=_TENANT_SEEDS)
         assert [code for _, code in coded(caught.value.detail)["book"]] == ["invalid_choice"]
@@ -2050,8 +1959,7 @@ class TestFormKwargs:
     async def test_adispatch_calls_it_where_it_may_query(self) -> None:
         ada, own, other = await sync_to_async(_tenants)()
 
-        # Queries: from the event loop itself Django would refuse it with
-        # SynchronousOnlyOperation.
+        # Queries: from the event loop itself Django would refuse it with SynchronousOnlyOperation.
         def from_the_database(user: Any) -> dict[str, Any]:
             return {"tenant": Author.objects.get(name=user.username)}
 
@@ -2079,7 +1987,6 @@ class TestFormKwargs:
         # The row the service received itself, not the form's copy.
         assert len(seen) == 2
         assert seen[1] is result.value["instance"]
-        # The form edited a copy, as it does without form_kwargs.
         assert result.value["instance"].title == "Notes"
 
     @pytest.mark.django_db
@@ -2290,9 +2197,7 @@ _NOT_HANDED = object()
 @pytest.mark.django_db
 @pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
 def test_form_kwargs_naming_the_shapes_is_handed_no_seed(entry: Callable[..., Any]) -> None:
-    """The shapes seed is the pool's, and a Validator is never handed what
-    the caller sent for the spec's shapes: the form is built from the
-    arguments alone, so ``form_kwargs`` gets its own default here."""
+    """The shapes seed is the pool's."""
     handed: list[Any] = []
 
     def form_kwargs(*, shapes: Any = _NOT_HANDED) -> dict[str, Any]:

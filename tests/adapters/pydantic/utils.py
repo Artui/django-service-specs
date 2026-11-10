@@ -1,11 +1,3 @@
-"""Models the pydantic validator and presenter tests share.
-
-Module-level on purpose: the annotations are strings under ``from __future__
-import annotations``, and pydantic resolves them against this module's
-globals. ``Everything`` mirrors the dataclass tests' model of the same name,
-field for field, so the two adapters can be compared on one declaration.
-"""
-
 from __future__ import annotations
 
 import datetime as dt

@@ -1,10 +1,3 @@
-"""Dataclasses the validator and presenter tests share.
-
-Module-level on purpose: the annotations are strings under ``from __future__
-import annotations``, and ``typing.get_type_hints`` resolves them against this
-module's globals, which a class defined inside a test function cannot use.
-"""
-
 from __future__ import annotations
 
 import datetime as dt

@@ -63,15 +63,13 @@ class TestDeclaration:
             ValueFormatter(str, produces=produces)
 
     def test_the_produced_type_is_checked_first(self) -> None:
-        """djangorestframework-services' order: a formatter wrong on both counts
-        is told about ``produces``, and never about the fragment."""
+        """djangorestframework-services' order."""
         with pytest.raises(ImproperlyConfigured, match="is not a JSON type") as raised:
             ValueFormatter(str, produces="object", schema={"type": "integer"})  # type: ignore[arg-type]
         assert "may not set" not in str(raised.value)
 
     def test_the_fragment_may_not_name_the_type(self) -> None:
-        """``produces`` declares it, so a formatter cannot contradict its own
-        advertisement, and the refusal names the spelling that would."""
+        """``produces`` declares it, so a formatter cannot contradict its own advertisement."""
         with pytest.raises(ImproperlyConfigured, match=r"Set produces='integer' instead\.$"):
             ValueFormatter(str, produces="string", schema={"type": "integer"})
 
@@ -85,8 +83,7 @@ class TestApply:
         assert MONEY.apply("9.99") == "EUR 9.99"
 
     def test_a_null_is_never_rendered(self) -> None:
-        """A null is the absence of the value formatted, so it passes through
-        rather than every transform guarding it."""
+        """A null is the absence of the value formatted."""
         assert ValueFormatter(refuse, produces="string").apply(None) is None
 
 
@@ -102,8 +99,7 @@ class TestTimestamp:
             assert ValueFormatter.timestamp().apply(moment) == "31 Jan 2026 22:05"
 
     def test_a_naive_date_time_is_formatted_as_it_is(self) -> None:
-        """A project with ``USE_TZ = False`` has naive date-times that are
-        already local, and there is no zone to convert one from."""
+        """A project with ``USE_TZ = False`` has naive date-times that are already local."""
         with timezone.override("Asia/Tokyo"):
             assert ValueFormatter.timestamp().apply("2026-01-31T14:05:09") == "31 Jan 2026 14:05"
 
@@ -125,16 +121,12 @@ class TestTimestamp:
     def test_a_date_time_string_naming_no_real_moment_is_reported_as_stored(
         self, value: str
     ) -> None:
-        """Django's parser accepts the shape and then refuses the day with a
-        ``ValueError``; one row's bad data must not fail the call, so the row
-        is reported as it is stored, as any other string that is not a
-        date-time is."""
+        """Django's parser accepts the shape and then refuses the day with a ``ValueError``."""
         assert ValueFormatter.timestamp().apply(value) == value
 
     @pytest.mark.django_db
     def test_one_bad_row_does_not_fail_its_page(self) -> None:
-        """Paging is what turned one row's bad data into a failed page: the
-        row is served as stored and its neighbours are formatted."""
+        """Paging is what turned one row's bad data into a failed page."""
         ada = make_user("ada")
         stored = ["2026-01-31T14:05:09", "2026-02-30T10:00:00", "2026-03-01T08:00:00"]
         Note.objects.bulk_create([Note(owner=ada, title=title) for title in stored])
@@ -153,8 +145,7 @@ class TestTimestamp:
         ]
 
     def test_the_example_is_rendered_from_the_format_in_use(self) -> None:
-        """A day past the twelfth and an hour past noon, so the example tells
-        day-first from month-first and 24-hour from 12-hour."""
+        """A day past the twelfth and an hour past noon."""
         assert ValueFormatter.timestamp().schema == {"examples": ["31 Jan 2026 14:05"]}
         assert ValueFormatter.timestamp("%m/%d %I%p").schema == {"examples": ["01/31 02PM"]}
 

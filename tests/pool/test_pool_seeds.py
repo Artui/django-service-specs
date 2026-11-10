@@ -1,5 +1,3 @@
-"""Tests for ``PoolSeeds``."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -75,8 +73,6 @@ def test_a_reserved_name_is_refused_before_an_async_resolver() -> None:
         DEFAULT_POOL_SEEDS.extend(shapes=_books_open)
     with pytest.raises(ValueError, match="reserved pool seed"):
         PoolSeeds(seeds=(("shapes", _books_open),))
-    # Two entries, the async resolver first: a loop that checked each entry's name
-    # and then that entry's resolver would meet the async one before the reserved name.
     with pytest.raises(ValueError, match="reserved pool seed"):
         DEFAULT_POOL_SEEDS.extend(tenant=_books_open, user=_tenant)
     with pytest.raises(ValueError, match="reserved pool seed"):
@@ -113,12 +109,7 @@ class _BooksOpen:
 
 
 class TestAnAsyncResolverIsRefused:
-    """A resolver is called from sync code and never awaited: an async one is refused.
-
-    Its value would be a coroutine, which is truthy, so a condition or a
-    precondition reading the seed would see an answer nobody computed. One
-    shape per disjunct of the guard.
-    """
+    """A resolver is called from sync code and never awaited: an async one is refused."""
 
     def test_an_async_def_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured) as refused:
@@ -142,11 +133,7 @@ class TestAnAsyncResolverIsRefused:
 
 
 def test_reserved_keeps_its_published_answer_without_the_call_s_names() -> None:
-    """The transports drop or refuse a caller's argument by ``reserved``; dispatch refuses the rest.
-
-    djangorestframework-services drops a caller's argument named in ``reserved``,
-    so widening it would drop a caller's ``view`` where that transport refuses it.
-    """
+    """The transports drop or refuse a caller's argument by ``reserved``."""
     assert PoolSeeds().reserved == RESERVED_POOL_SEEDS
     assert not CALL_SEEDS & PoolSeeds().reserved
 

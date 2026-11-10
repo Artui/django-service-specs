@@ -1,5 +1,3 @@
-"""``asked_with``, which the three ``authorize`` functions share: what a check is handed."""
-
 from __future__ import annotations
 
 import functools
@@ -61,8 +59,7 @@ def test_a_parameter_named_arguments_that_no_keyword_reaches_is_handed_nothing(
 
 
 def test_a_check_is_not_kept_once_asked() -> None:
-    """The signature is cached under the function a bound method wraps, never
-    under the bound method, which would hold its check for the process's life."""
+    """The signature is cached under the function a bound method wraps."""
     check = _Shapes()
     held = weakref.ref(check)
     assert asked_with(check, "keyword_only", {"pk": 1}) == {"arguments": {"pk": 1}}
@@ -72,8 +69,7 @@ def test_a_check_is_not_kept_once_asked() -> None:
 
 
 def test_a_callable_set_on_the_instance_is_not_kept_once_asked() -> None:
-    """Only a function a class defines is cached; one set on an instance, or
-    a mock, is read uncached, so a cache does not hold every one ever asked."""
+    """Only a function a class defines is cached; one set on an instance, or a mock."""
     check = _Shapes()
 
     def shadow(principal: Any, spec: Any, *, arguments: Any = None) -> bool:
@@ -107,9 +103,7 @@ def test_a_forwarding_wrapper_answers_for_the_method_it_wraps() -> None:
 def test_a_class_defined_function_s_signature_is_inspected_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A call asks each check up to three times, and many checks share a
-    class, so the signature is read once per function rather than once per
-    question."""
+    """A call asks each check up to three times, and many checks share a class."""
     read: list[Any] = []
 
     def counted(asked: Any) -> frozenset[str]:
@@ -127,8 +121,7 @@ def test_a_class_defined_function_s_signature_is_inspected_once(
 
 
 def test_a_class_built_at_runtime_is_not_kept_once_asked() -> None:
-    """A check class a factory builds per call is freed with its last
-    instance, so the cache does not grow with every class ever asked."""
+    """A check class a factory builds per call is freed with its last instance."""
 
     def build() -> Any:
         class Built(_Shapes):
@@ -156,8 +149,7 @@ def test_a_wrapped_chain_that_loops_is_handed_nothing() -> None:
 
 
 def test_a_decorator_without_wraps_answers_for_its_own_spread_alone() -> None:
-    """With no ``__wrapped__`` there is nothing to walk to: ``**kwargs`` over
-    nothing named is not handed the keyword."""
+    """With no ``__wrapped__`` there is nothing to walk to."""
 
     def unwrapped(*args: Any, **kwargs: Any) -> bool:
         return _Shapes.keyword_only(*args, **kwargs)
@@ -174,16 +166,14 @@ def test_a_forwarding_wrapper_over_a_positional_only_arguments_is_handed_nothing
 
 
 def test_a_callable_with_no_signature_is_handed_nothing() -> None:
-    """``inspect.signature`` raises ``ValueError`` for a builtin method; it
-    never opted in, so it is read as not having done so."""
+    """``inspect.signature`` raises ``ValueError`` for a builtin method; it never opted in."""
     check = _Shapes()
     cast(Any, check).undeclared = "abc".startswith
     assert asked_with(check, "undeclared", {"pk": 1}) == {}
 
 
 def test_a_wrapped_layer_that_is_not_callable_is_handed_nothing() -> None:
-    """``inspect.signature`` raises ``TypeError`` for a ``__wrapped__`` that
-    cannot be called; the walk stops there, not opted in."""
+    """``inspect.signature`` raises ``TypeError`` for a ``__wrapped__`` that cannot be called."""
 
     def forwarded(*args: Any, **kwargs: Any) -> bool:
         return True
@@ -203,8 +193,7 @@ class _UnhashableRule:
 
 
 def test_a_method_binding_a_callable_object_is_read_uncached() -> None:
-    """``MethodType`` binds any callable, and its ``__func__`` here has no
-    hash: only a plain function is a cache key, so it is read uncached."""
+    """``MethodType`` binds any callable, and its ``__func__`` here has no hash."""
     check = _Shapes()
     cast(Any, check).undeclared = types.MethodType(_UnhashableRule(), check)
     assert asked_with(check, "undeclared", {"pk": 1}) == {}
@@ -244,9 +233,7 @@ def test_the_offered_value_is_the_object_itself() -> None:
 
 
 def test_a_positional_parameter_named_after_an_offered_name_is_handed_nothing() -> None:
-    """The call fills ``positional`` parameters by position, whatever their
-    names, so naming one after a seed is no opt-in: handing it again by
-    keyword would be a ``TypeError``."""
+    """The call fills ``positional`` parameters by position, whatever their names."""
     assert asked_with(_Offered(), "tenant_first", None, offered=OFFERED) == {
         "call_context": {"k": 1}
     }
@@ -255,8 +242,7 @@ def test_a_positional_parameter_named_after_an_offered_name_is_handed_nothing() 
 
 
 def test_a_forwarding_wrapper_s_positional_parameters_are_the_method_s() -> None:
-    """A wrapper spreading ``*args`` passes its positionals to the method it
-    wraps, so the method's names are the ones filled by position."""
+    """A wrapper spreading ``*args`` passes its positionals to the method it wraps."""
 
     class Wrapped(_Offered):
         tenant_first = _forwarding(_Offered.tenant_first)

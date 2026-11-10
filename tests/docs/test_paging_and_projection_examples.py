@@ -1,11 +1,3 @@
-"""The paging and projection page's example, run.
-
-Each test is a statement the page makes about
-``docs/examples/paging_and_projection.py``. The page's JSON blocks are read
-back and compared with what the example returns, so neither can drift from the
-other.
-"""
-
 from __future__ import annotations
 
 import json
@@ -141,8 +133,7 @@ class TestServingAPage:
     def test_each_formatted_example_is_the_shape_its_rows_are_served_in(
         self, ada: Any, books: list[Book]
     ) -> None:
-        """The page says each example shows what the field looks like, and the
-        timestamp's is rendered from the format its rows are served in."""
+        """The page says each example shows what the field looks like."""
         properties = SCHEMA["properties"]["items"]["items"]["properties"]
 
         served = paging_and_projection.list_books_tool(ada)["items"][0]
@@ -221,8 +212,7 @@ class TestShapes:
         assert whole[0] == {"id": books[0].pk, "title": "The Dispossessed", "price": "9.99"}
 
     def test_a_shaped_list_requires_no_field_of_a_row(self) -> None:
-        # ``id`` is in every row this presenter renders, and still not
-        # promised: the kernel cannot see which keys a shape leaves out.
+        # ``id`` is in every row this presenter renders, and still not promised.
         schema = spec_output_schema(paging_and_projection.pick_books_spec)
         assert schema is not None
         assert "required" not in schema["items"]

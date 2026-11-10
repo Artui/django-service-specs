@@ -1,39 +1,3 @@
-"""The names djangorestframework-services takes from this package, pinned.
-
-djangorestframework-services depends on this package with an unbounded floor,
-and re-exports or wraps the names below. A release here that renames one,
-moves it to another module, or changes how it is called would not fail here:
-it would fail every install of that package that resolves onto the release.
-So each name is pinned in a table, and changing a row is a decision a pull
-request here has to make in the open.
-
-A row pins the shape a caller depends on, never the annotations, which a
-release may widen without breaking anyone:
-
-- **where it is importable**: the package root, its subpackage, and its leaf
-  module, all the same object;
-- **how it is called**: parameter names, their kinds (positional-only,
-  positional, keyword-only, ``*args``, ``**kwargs``) and whether each has a
-  default, written as a signature with the annotations and default values
-  left out, so ``"spec, *, grant="`` is ``(spec, *, grant=None)``. A new
-  optional keyword changes the row on purpose: it is the same one-line
-  decision, and a reorder of positional parameters must fail;
-- **what it is**: the methods and properties a caller or a subclass reads,
-  the abstract methods a subclass must provide, its public base classes, an
-  enum's members and a constant's value.
-
-A row marked ``leaf_only`` pins a name importable from its leaf module and
-from nowhere else, because exporting it would put it in the root's namespace
-for no reader: a type variable a downstream generic subclass parameterizes
-with, read as ``from <leaf> import ModelT``. Its row says what it is bound to
-and whose type parameter it is.
-
-A few rows are read directly by transports that reach this package without
-going through djangorestframework-services, and are pinned for the same
-reason. The test is pure Python and Django: it imports neither DRF nor
-djangorestframework-services, as nothing in this suite may.
-"""
-
 from __future__ import annotations
 
 import enum
@@ -95,8 +59,7 @@ def _enum(leaf: str, members: Mapping[str, object], mixin: type) -> Pin:
 
 
 def _protocol(leaf: str, call: str) -> Pin:
-    # A Protocol class's own signature is typing's placeholder and differs
-    # between Python versions; what an implementer must match is ``__call__``.
+    # A Protocol class's own signature is typing's placeholder and differs between Python versions.
     return Pin(leaf, methods={"__call__": call})
 
 
@@ -666,13 +629,7 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
 
 
 def _render(signature: inspect.Signature, *, bound: bool) -> str:
-    """``signature`` as names, kinds and default-or-not, in Python's own notation.
-
-    ``bound`` drops the first parameter, the ``self`` of a method read off the
-    class. A parameter named with a leading underscore is the declaring
-    class's own (a dataclass's private field) and no caller passes it, so it
-    is left out.
-    """
+    """``signature`` as names, kinds and default-or-not, in Python's own notation."""
     parameters = list(signature.parameters.values())[1 if bound else 0 :]
     parts: list[str] = []
     star = False
@@ -732,8 +689,7 @@ def _leaf_value(name: str) -> Any:
 def test_importable_from_the_root_its_subpackage_and_its_leaf(name: str) -> None:
     leaf = SURFACE[name].leaf
     subpackage = importlib.import_module(f"{_PACKAGE}.{leaf.rpartition('.')[0]}")
-    # import_module rather than attribute access: a subpackage re-exporting a
-    # function named after its module shadows that module as an attribute.
+    # import_module rather than attribute access.
     module = importlib.import_module(f"{_PACKAGE}.{leaf}")
 
     exported = getattr(django_service_specs, name)
@@ -777,15 +733,13 @@ def test_methods_called_as_pinned(name: str) -> None:
 
 @pytest.mark.parametrize("name", _rows("abstract"))
 def test_a_subclass_owes_only_the_pinned_abstract_methods(name: str) -> None:
-    # A new abstract method breaks every subclass downstream at instantiation,
-    # which no signature pin would see.
+    # A new abstract method breaks every subclass downstream at instantiation.
     assert getattr(django_service_specs, name).__abstractmethods__ == SURFACE[name].abstract
 
 
 @pytest.mark.parametrize("name", _rows("bases"))
 def test_keeps_its_pinned_bases(name: str) -> None:
-    # An exception ladder catching the base, and a class subclassing this one
-    # beside another library's, both rest on the hierarchy.
+    # An exception ladder catching the base.
     exported = getattr(django_service_specs, name)
     for base in SURFACE[name].bases:
         assert issubclass(exported, _resolve(base)), base
@@ -829,8 +783,7 @@ def test_value_of_the_pinned_type(name: str) -> None:
 def test_exceptions_carry_what_a_translator_reads(
     name: str, args: tuple[Any, ...], kwargs: dict[str, Any], attributes: set[str]
 ) -> None:
-    # A translator re-raising these as DRF's exceptions, and a transport's
-    # exception ladder, read these attributes off the instance.
+    # A translator re-raising these as DRF's exceptions, and a transport's exception ladder.
     raised = getattr(django_service_specs, name)(*args, **kwargs)
     assert {attribute for attribute in attributes if hasattr(raised, attribute)} == attributes
 
@@ -877,9 +830,7 @@ def _private_tail(a: int, *, _hidden: int = 0) -> None: ...
     ],
 )
 def test_the_rendering_tells_every_kind_apart(function: Any, rendered: str) -> None:
-    # The pins are only as strict as this rendering: a parameter made
-    # keyword-only, given or stripped of a default, or renamed must read
-    # differently, or the table would pass a change it exists to catch.
+    # The pins are only as strict as this rendering: a parameter made keyword-only.
     assert _render(inspect.signature(function), bound=False) == rendered
 
 
@@ -934,8 +885,7 @@ def test_passthrough_is_a_member_of_its_own() -> None:
     passthrough = UnknownArguments.PASSTHROUGH
     assert passthrough.value == "passthrough"
     assert UnknownArguments("passthrough") is passthrough
-    # An alias of IGNORE would make the transport's test true and change
-    # which branch it takes; iteration skips aliases.
+    # An alias of IGNORE would make the transport's test true and change which branch it takes.
     assert passthrough in list(UnknownArguments)
     configured = UnknownArguments.IGNORE
     assert (configured is UnknownArguments.PASSTHROUGH) is False
@@ -949,9 +899,7 @@ def test_dispatch_refuses_passthrough_rather_than_running_it_as_ignore() -> None
         return []
 
     spec = _open_selector(notes)
-    # Sized so the policy answers: an anonymous principal no deactivation
-    # check refuses, an open spec, and a key no parameter declares, which
-    # IGNORE drops and runs.
+    # Sized so the policy answers: an anonymous principal no deactivation check refuses.
     dispatch(
         spec,
         principal=AnonymousUser(),

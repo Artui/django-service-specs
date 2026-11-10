@@ -1,5 +1,3 @@
-"""Tests for non-exported helpers in selectors/utils.py."""
-
 from __future__ import annotations
 
 import inspect
@@ -39,9 +37,7 @@ def _spec(extend: Any) -> SelectorSpec:
     return SelectorSpec(
         kind=SelectorKind.LIST,
         selector=lambda: Note.objects.all(),
-        # A plain ``def``, which the spec accepts as sync, handing back what
-        # is still to be awaited: an ``async def`` itself is refused when the
-        # spec is built.
+        # A plain ``def``, which the spec accepts as sync, handing back what is still to be awaited.
         extend_queryset=extend,
         permissions=[Unrestricted()],
     )
@@ -49,11 +45,7 @@ def _spec(extend: Any) -> SelectorSpec:
 
 @pytest.mark.django_db
 class TestAnExtendQuerysetAnsweringWithAnAwaitable:
-    """``extend_queryset`` is called from sync code and never awaited.
-
-    What it hands back would stand in for the queryset, so dispatch would
-    return an unawaited coroutine as a list's value.
-    """
+    """``extend_queryset`` is called from sync code and never awaited."""
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:
         handed: list[Any] = []

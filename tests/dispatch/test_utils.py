@@ -1,5 +1,3 @@
-"""The shared phases, where a property is sharper stated on the phase than through dispatch."""
-
 from __future__ import annotations
 
 import inspect
@@ -130,11 +128,7 @@ async def _refuse_lazily() -> Any:
 
 
 class TestAPreconditionAnsweringWithAnAwaitable:
-    """A precondition's answer is ignored unless still to be awaited: refused, never a pass.
-
-    Each precondition is a plain callable returning the object, a shape no
-    declaration can refuse. Each shape holds one condition of ``sync_result``.
-    """
+    """A precondition's answer is ignored unless still to be awaited: refused, never a pass."""
 
     @staticmethod
     def _spec(answer: Any) -> ServiceSpec:
@@ -182,13 +176,9 @@ def test_seat_seed_named_splits_the_whole_spec_and_narrows_only_what_is_checked(
             reads=Parameters.of(tenant, region),
         )
 
-    # A reflected read outside the target's parameters: seated, and the
-    # narrowed set comes back as it went in, never widened to the whole spec.
     seated = spec(Parameter("tenant", "string", required=True, reflected=True))
     narrowed = seat_seed_named(seated, seated.parameters(), PK, seeds)
     assert narrowed.names() == {"pk"}
-    # An unmarked one outside them is still refused: the split reads the
-    # whole declaration, not what this call checks.
     unmarked = spec(Parameter("tenant", "string"))
     with pytest.raises(ImproperlyConfigured, match="registered pool seed occupies"):
         seat_seed_named(unmarked, unmarked.parameters(), PK, seeds)

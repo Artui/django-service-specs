@@ -1,5 +1,3 @@
-"""Helpers shared by the adapters' tests."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -9,11 +7,7 @@ from django_service_specs.parameters.parameters import Parameters
 
 
 def agree(parameters: Parameters, output: Output) -> None:
-    """Each declared parameter has an output field of the same name and type.
-
-    What one declaration read by an adapter's Validator and by its Presenter
-    owes: the same types going in and coming out, nested rows included.
-    """
+    """Each declared parameter has an output field of the same name and type."""
     for parameter in parameters:
         field = output.get(parameter.name)
         assert field is not None, parameter.name

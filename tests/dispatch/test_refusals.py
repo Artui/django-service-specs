@@ -21,14 +21,7 @@ from django_service_specs.dispatch.refusals import REFUSALS
 
 
 def _import_every_module() -> None:
-    # The class tree holds only what has been imported, and importing the root
-    # loads every module an ``__init__`` lists and nothing else: a refusal in a
-    # module none lists, or under the pydantic adapter the root never imports,
-    # would be missing from the tree and so from the comparison. Walking every
-    # module makes the answer the package's rather than the collection order's.
-    # Every module imports in each environment the suite runs in: the dev group
-    # installs both extras' libraries, and no module needs a setting the test
-    # settings lack.
+    # The class tree holds only what has been imported.
     for info in pkgutil.walk_packages(
         django_service_specs.__path__, prefix=f"{django_service_specs.__name__}."
     ):
@@ -43,10 +36,7 @@ def _family(base: type[Exception]) -> set[type[Exception]]:
 
 
 def test_it_is_every_refusal_the_core_defines() -> None:
-    # Read from the class tree, so a refusal a later release adds fails here
-    # until it is listed. The tree is filtered by module so a test's subclass,
-    # or a refusal a transport defines in a distribution of its own, is not
-    # read as the package's.
+    # Read from the class tree, so a refusal a later release adds fails here until it is listed.
     _import_every_module()
     package = django_service_specs.__name__ + "."
     defined = {

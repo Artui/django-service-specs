@@ -14,6 +14,5 @@ def test_unset_is_a_falsy_singleton_that_survives_copying() -> None:
 
 
 def test_unset_is_not_none() -> None:
-    # The trap every consumer of the sentinel has to know: a check written as
-    # ``default is not None`` treats an undeclared default as a declared one.
+    # The trap every consumer of the sentinel has to know.
     assert UNSET is not None

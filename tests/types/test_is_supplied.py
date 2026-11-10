@@ -1,5 +1,3 @@
-"""``is_supplied``, run, and checked by the type checker whose narrowing it exists for."""
-
 from __future__ import annotations
 
 import re
@@ -65,8 +63,6 @@ def _reported_lines(tmp_path: Path, source: str) -> set[int]:
     """The lines ty reports an error on, checking ``source`` against this environment."""
     module = tmp_path / "narrowing.py"
     module.write_text(source)
-    # Outside the project, so no ``[tool.ty]`` scope applies, and against this
-    # interpreter's environment, so the package resolves as a consumer sees it.
     completed = subprocess.run(
         [
             sys.executable,
@@ -84,7 +80,6 @@ def _reported_lines(tmp_path: Path, source: str) -> set[int]:
         cwd=tmp_path,
         check=False,
     )
-    # ty ran and checked the module, or no diagnostics would read as narrowing.
     assert re.search(r"All checks passed|Found \d+ diagnostic", completed.stdout), (
         completed.stdout + completed.stderr
     )

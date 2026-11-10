@@ -1,10 +1,3 @@
-"""``form_keywords``: what a FormValidator's ``form_kwargs`` returns, for a page building the form.
-
-Called through the package root rather than imported from its leaf, so each
-test here fails on its own against a kernel without the function, rather than
-the whole file failing to collect.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -177,8 +170,7 @@ class TestThePool:
         assert keywords["progress"] is null_progress
 
     def test_form_kwargs_naming_the_call_context_is_handed_the_very_dict(self) -> None:
-        # Empty, as a page's is when it builds the form: a mutant reading
-        # ``call_context or {}`` would hand a fresh one in its place.
+        # Empty, as a page's is when it builds the form.
         context: dict[str, Any] = {}
         spec = _create(lambda *, call_context: {"context": call_context})
         assert form_keywords(spec, make_user("ada"), call_context=context)["context"] is context

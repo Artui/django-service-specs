@@ -1,5 +1,3 @@
-"""``aunmet_operation_affordance``: the async twin, asked in one executor hop or none."""
-
 from __future__ import annotations
 
 import importlib

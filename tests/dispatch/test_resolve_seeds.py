@@ -1,5 +1,3 @@
-"""``resolve_seeds``: the seeds checks name, resolved once, for an ``authorize``-first call."""
-
 from __future__ import annotations
 
 from typing import Any

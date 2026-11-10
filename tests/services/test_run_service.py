@@ -1,5 +1,3 @@
-"""Tests for ``run_service`` — sync dispatch with optional atomic wrapping."""
-
 from __future__ import annotations
 
 from typing import Any

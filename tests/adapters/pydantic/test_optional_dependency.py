@@ -1,5 +1,3 @@
-"""pydantic is an extra: the package imports without it, and only this adapter needs it."""
-
 from __future__ import annotations
 
 import subprocess
@@ -28,5 +26,4 @@ def test_the_package_imports_without_pydantic_and_only_the_adapter_needs_it() ->
     exported, refused = result.stdout.split("\n")[:2]
     # The root, and every subpackage it re-exports, imported.
     assert int(exported) > 0
-    # The blocker works: the one subpackage that imports pydantic could not.
     assert refused == "the adapter needs pydantic"

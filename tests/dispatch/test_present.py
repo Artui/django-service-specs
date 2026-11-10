@@ -150,8 +150,7 @@ def test_an_instance_with_no_presenter_is_returned_as_it_is() -> None:
 
 @pytest.mark.django_db
 def test_a_list_with_no_presenter_is_evaluated_into_a_list() -> None:
-    # A queryset handed back lazily would run its query wherever the caller
-    # first iterates it, which for ``apresent``'s caller is the event loop.
+    # A queryset handed back lazily would run its query wherever the caller first iterates it.
     note = Note.objects.create(owner=make_user("ada"), title="a")
 
     rendered = present(selector_spec(LIST), DispatchResult("list", Note.objects.all()))
@@ -315,8 +314,7 @@ class TestAnswers:
     def test_a_service_spec_presents_its_output_selector_s_answers_not_its_own(
         self, ada: Any, two_notes: Any
     ) -> None:
-        # A service spec's own ``affordances`` are what it is checked against;
-        # only its output selector's are about the row it hands back.
+        # A service spec's own ``affordances`` are what it is checked against.
         def output(**fields: Any) -> SelectorSpec:
             return SelectorSpec(
                 kind=RETRIEVE,
@@ -409,8 +407,7 @@ class TestAnswers:
         ids=["list", "instance", "none"],
     )
     def test_no_presenter_is_refused_rather_than_dropping_the_answers(self, result: Any) -> None:
-        # Refused whatever the value, ``None`` included: a spec declaring answers
-        # with nothing to present them through is wrong for every call.
+        # Refused whatever the value, ``None`` included.
         spec = listing(presenter=None)
 
         with pytest.raises(ImproperlyConfigured) as caught:
@@ -455,16 +452,14 @@ class TestARowThatVanished:
     """A row deleted between the selector returning it and its answers being asked."""
 
     def test_it_is_unavailable_with_no_code_and_no_reason(self, ada: Any, two_notes: Any) -> None:
-        # No condition's sentence is true of a row that no longer exists. The
-        # row that still exists is answered exactly as before.
+        # No condition's sentence is true of a row that no longer exists.
         payload = served(vanishing(NOT_ARCHIVED, BOOKS_OPEN), ada)
 
         assert payload[0]["affordances"] == {"rename": {"available": False}}
         assert payload[1]["affordances"] == {"rename": REFUSED_ARCHIVED}
 
     def test_it_stops_at_its_first_row_condition(self, ada: Any, two_notes: Any) -> None:
-        # An unmet callable declared after the row condition: the walk stops at
-        # the missing row, so the later callable's sentence is not reported.
+        # An unmet callable declared after the row condition: the walk stops at the missing row.
         payload = served(vanishing(NOT_ARCHIVED, BOOKS_CLOSED), ada)
 
         assert payload[0]["affordances"] == {"rename": {"available": False}}
@@ -472,8 +467,7 @@ class TestARowThatVanished:
     def test_it_still_reports_an_unmet_callable_declared_first(
         self, ada: Any, two_notes: Any
     ) -> None:
-        # A callable condition is not about the row: declared first and unmet,
-        # it is the genuine first refusal, true whether or not the row exists.
+        # A callable condition is not about the row: declared first and unmet.
         payload = served(vanishing(BOOKS_CLOSED, NOT_ARCHIVED), ada)
 
         assert [row["affordances"] for row in payload] == [{"rename": REFUSED_CLOSED}] * 2
@@ -481,8 +475,7 @@ class TestARowThatVanished:
 
 @pytest.mark.django_db
 def test_a_list_selector_returning_a_manager_presents_every_row() -> None:
-    # ``Note.objects`` is a selector's shortest spelling of "every row", and a
-    # Manager is neither iterable nor sliceable: dispatch takes ``.all()`` of it.
+    # ``Note.objects`` is a selector's shortest spelling of "every row".
     ada = make_user("ada")
     Note.objects.create(owner=ada, title="One")
     Note.objects.create(owner=ada, title="Two")
@@ -497,9 +490,7 @@ def test_a_list_selector_returning_a_manager_presents_every_row() -> None:
 
 @pytest.mark.django_db
 def test_a_list_selector_returning_a_manager_built_on_base_manager_presents_every_row() -> None:
-    # ``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
-    # and ``is_queryset`` counts it like one, so dispatch takes its ``.all()``
-    # as well.
+    # ``BaseManager.from_queryset`` builds a manager that is not a ``Manager``.
     ada = make_user("ada")
     Note.objects.create(owner=ada, title="One")
     Note.objects.create(owner=ada, title="Two")
@@ -532,8 +523,7 @@ def test_a_list_selector_returning_a_manager_answers_its_rows_affordances() -> N
 
 @pytest.mark.django_db
 def test_a_target_lookup_s_answers_are_never_presented() -> None:
-    # Answered, as djangorestframework-services' dispatch answers them, and read
-    # by nothing: a service spec presents only its output selector's answers.
+    # Answered, as djangorestframework-services' dispatch answers them, and read by nothing.
     ada = make_user("ada")
     note = Note.objects.create(owner=ada, title="Draft")
     spec = ServiceSpec(
@@ -595,9 +585,7 @@ class TestTheCallsContext:
     def test_a_retrieve_s_context_holds_the_seeds_and_never_its_reads_provider_or_overlay(
         self,
     ) -> None:
-        """A retrieve's pool holds a read, a ``kwargs`` provider's key and an
-        ``extra_kwargs`` key beside the seeds; the context is handed the seeds
-        alone, since the rest are the call's arguments, not its surroundings."""
+        """A retrieve's pool holds a read."""
         ada = make_user("ada")
         note = Note.objects.create(owner=ada, title="a")
         presenter = Contextual()
@@ -706,8 +694,7 @@ class _ReadsTheCall(Presenter):
 
 
 def test_every_row_of_one_result_shares_its_call_context_and_its_shapes() -> None:
-    """One context per result, never a copy per row, so what one row's
-    presenting writes to the call's context the next one reads."""
+    """One context per result, never a copy per row."""
     call_context: dict[str, Any] = {}
     context = PresentationContext(
         "ada", call_context=call_context, shapes=MappingProxyType({"fields": ["title"]})
@@ -725,12 +712,7 @@ def test_every_row_of_one_result_shares_its_call_context_and_its_shapes() -> Non
 
 
 class Batching(NoteRows):
-    """Presents a list in one call: one lookup over its rows, then each row with its share.
-
-    The lookup is each title's rank among the titles it was handed, which no
-    single row can answer, so a presenter asked row by row could not give it.
-    ``answer`` replaces what is handed back, for the refusals.
-    """
+    """Presents a list in one call: one lookup over its rows, then each row with its share."""
 
     def __init__(self, answer: Callable[[list[Any]], Any] | None = None) -> None:
         self.calls: list[tuple[Any, PresentationContext | None]] = []
@@ -765,9 +747,7 @@ class TestPresentedRows:
         [(rows, context)] = presenter.calls
         assert list(rows) == [live, archived]
         assert context is result.context
-        # The ranks are the batch's answer and the affordances each row's own:
-        # "archived" ranks first among the page's titles and is the row that
-        # may not be renamed, so a payload walked against the wrong rows fails.
+        # The ranks are the batch's answer and the affordances each row's own.
         assert json.loads(json.dumps(payload)) == [
             {
                 "id": live.pk,
@@ -833,8 +813,7 @@ class TestPresentedRows:
         with pytest.raises(ImproperlyConfigured) as caught:
             present(spec, result)
 
-        # The refusal is this one, not with_affordances' strict zip, which
-        # would answer a mismatch too, as a ValueError.
+        # The refusal is this one, not with_affordances' strict zip.
         assert str(caught.value).startswith(
             "Batching.presented_rows answered with a list of 1 for 2 rows."
         )

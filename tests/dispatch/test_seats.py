@@ -1,20 +1,3 @@
-"""Where a provider's parameter and a registered seed's name are answered.
-
-- **A parameter a provider may fill** - a typed provider's declinable key, or
-  any parameter an untyped provider's values reach - is not demanded by the
-  shape check. Its requiredness is checked once the provider has answered,
-  where the answer is merged: for a read against the assembled pool, for a
-  Validator field against the input the Validator is handed.
-- **A reflected read**: a read marked ``reflected`` that a registered seed is named
-  like leaves the call's argument set, and the seed fills it.
-- **A seed-named Validator field**: a top-level Validator field named like a registered seed stays
-  the caller's argument, is validated into ``data``, and is never spread into
-  the service's pool, where the seed keeps its own value.
-
-Every ``Parameter(..., reflected=True)`` is built inside a test, never at
-import, so this module collects against a ``Parameter`` with no such field.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -156,9 +139,7 @@ def _filled(value: Any, calls: list[None]) -> Callable[[], _MaybeProject]:
 def test_a_read_an_untyped_provider_may_fill_left_out_reaches_the_class_level_check(
     ada: Any,
 ) -> None:
-    # Relaxed at step one, so the refusing check answers first and no
-    # provider has run: it stays after class-level authorization. The
-    # declinable key's twin is test_a_declinable_key_left_out_reaches_the_class_level_check.
+    # Relaxed at step one, so the refusing check answers first and no provider has run.
     calls: list[None] = []
     spec = ServiceSpec(
         service=Record(), permissions=[Refuse()], reads=_project(), kwargs=_untyped({}, calls)
@@ -198,8 +179,7 @@ def test_a_may_fill_read_the_provider_answers_reaches_the_service(
 def test_a_may_fill_read_nobody_fills_is_refused_at_the_service_seat(
     ada: Any, entry: Any, provider: Callable[[list[None]], Any]
 ) -> None:
-    # The service takes ``**pool``, so ``call_keywords`` would never ask for
-    # it: the refusal is the seat's, keyed by the read, after the provider ran.
+    # The service takes ``**pool``, so ``call_keywords`` would never ask for it.
     calls: list[None] = []
     service = Record()
     spec = ServiceSpec(service=service, permissions=OPEN, reads=_project(), kwargs=provider(calls))
@@ -295,8 +275,7 @@ def test_a_target_read_an_untyped_lookup_provider_may_fill(ada: Any, answers: bo
 
 
 def test_a_target_read_is_relaxed_only_by_the_lookup_s_own_provider(ada: Any) -> None:
-    # The spec's untyped ``kwargs`` reaches the spec's reads, never the
-    # target's, so the target's ``pk`` stays required of the caller.
+    # The spec's untyped ``kwargs`` reaches the spec's reads, never the target's.
     target = SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK)
     spec = ServiceSpec(
         service=Record(),
@@ -318,8 +297,7 @@ class _TitleForm(forms.Form):
 def test_a_validator_field_an_untyped_input_data_may_fill(
     ada: Any, entry: Any, answers: bool
 ) -> None:
-    # Relaxed at step one, and refused by dispatch before the Validator runs
-    # if nobody filled it, in the shape check's words.
+    # Relaxed at step one, and refused by dispatch before the Validator runs if nobody filled it.
     service = Record()
     spec = ServiceSpec(
         service=service,
@@ -402,9 +380,7 @@ def _declining_title() -> _DecliningTitle:
 def test_a_required_field_nobody_filled_is_refused_before_the_validator_runs(
     ada: Any, entry: Any, validator: Callable[[], Validator], input_data: Callable[[], Any]
 ) -> None:
-    # Relaxed at step one, so the presence check is the merged input's: a
-    # Validator that returns what it is handed would otherwise run without the
-    # field, and each adapter would refuse it in its own words.
+    # Relaxed at step one, so the presence check is the merged input's.
     service = Record()
     the_validator = validator()
     spec = ServiceSpec(
@@ -420,8 +396,7 @@ def test_a_required_field_nobody_filled_is_refused_before_the_validator_runs(
 def test_a_required_field_the_caller_sent_is_present_though_the_provider_left_it_out(
     ada: Any,
 ) -> None:
-    # The presence check reads the caller's arguments and the provider's answer
-    # merged, not the provider's alone.
+    # The presence check reads the caller's arguments and the provider's answer merged.
     service = Record()
     spec = ServiceSpec(
         service=service,
@@ -434,8 +409,7 @@ def test_a_required_field_the_caller_sent_is_present_though_the_provider_left_it
 
 
 def test_a_many_row_field_nobody_filled_is_refused_in_its_row(ada: Any) -> None:
-    # Reported under the row's index, as a row the shape check refused is,
-    # and only the rows that pass reach the Validator.
+    # Reported under the row's index, as a row the shape check refused is.
     service = Record()
     validator = Fields(Parameter("title", "string", required=True))
     spec = ServiceSpec(
@@ -471,9 +445,7 @@ def _no_title() -> _MaybeTitle:
 def test_a_field_nobody_filled_answers_without_the_validator_s_refusals_of_other_fields(
     ada: Any,
 ) -> None:
-    # Holds the changelog's claim that the presence check's refusal is its own
-    # answer: the Validator never runs, so its refusal of ``body`` waits until
-    # ``title`` is supplied, where it once came back in the same tree.
+    # Holds the changelog's claim that the presence check's refusal is its own answer.
     spec = ServiceSpec(
         service=Record(),
         permissions=OPEN,
@@ -486,9 +458,7 @@ def test_a_field_nobody_filled_answers_without_the_validator_s_refusals_of_other
 
 
 def test_a_caller_s_shape_error_answers_before_a_field_nobody_filled(ada: Any) -> None:
-    # Holds the changelog's claim that the caller's other shape errors answer
-    # first: the shape check refuses ``count`` alone, before any provider runs,
-    # and the missing ``title`` is not reported beside it.
+    # Holds the changelog's claim that the caller's other shape errors answer first.
     calls: list[None] = []
     spec = ServiceSpec(
         service=Record(),
@@ -524,10 +494,7 @@ def test_a_partial_spec_s_field_nobody_filled_is_still_not_required(ada: Any) ->
 def test_a_may_fill_read_nobody_fills_answers_before_an_affordance_and_a_precondition(
     ada: Any, archived: bool
 ) -> None:
-    # A refusal of the call itself answers before one describing the row's
-    # state, as test_a_missing_argument_answers_before_an_affordance holds for
-    # an argument the caller left out. An unarchived note passes the
-    # affordance, so the precondition is the next check on its own.
+    # A refusal of the call itself answers before one describing the row's state.
     note = Note.objects.create(owner=ada, title="old", archived=archived)
     ran: list[None] = []
 
@@ -558,8 +525,7 @@ def test_a_may_fill_read_nobody_fills_answers_before_an_affordance_and_a_precond
 def test_a_required_read_the_provider_declines_is_refused_though_its_callable_has_a_default(
     ada: Any, seat: str, declined: Any
 ) -> None:
-    # A filled key the provider declines meets the seat's rule too: the
-    # callable's own default never stands in for a read declared required.
+    # A filled key the provider declines meets the seat's rule too.
     calls: list[None] = []
     ran: list[Any] = []
 
@@ -598,8 +564,7 @@ def test_an_optional_read_nobody_fills_is_not_refused_at_the_seat(ada: Any) -> N
 
 
 def test_a_required_read_declaring_a_default_is_not_refused_at_the_seat(ada: Any) -> None:
-    # Holds the seat's ``default`` conjunct, as ``check_arguments`` reads one:
-    # the shape check lets it through absent, and so does the seat.
+    # Holds the seat's ``default`` conjunct, as ``check_arguments`` reads one.
     service = Record()
     spec = ServiceSpec(service=service, permissions=OPEN, reads=_project(default=3))
     dispatch(spec, principal=ada, arguments={})
@@ -626,8 +591,7 @@ def test_bind_arguments_relaxes_a_may_fill_read(ada: Any) -> None:
 
 
 def test_check_server_arguments_lets_a_read_an_untyped_provider_reaches_be_withheld() -> None:
-    # The selector declares the read with no default, which alone would
-    # refuse withholding it: the provider may fill it, so a call can do without.
+    # The selector declares the read with no default, which alone would refuse withholding it.
     def selector(*, project_pk: int) -> list[Any]:
         return []
 
@@ -737,11 +701,7 @@ REQUIRING_SEATS = pytest.mark.parametrize(
 def test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller(
     ada: Any, entry: Any, seat: str
 ) -> None:
-    # The provider may fill ``tenant``, but it is handed the caller's reads
-    # and never its own answer: relaxed, every call leaving the read out
-    # reached the provider's ``TypeError``. Refused by the shape check, so
-    # before the class-level check that refuses everyone here, and before any
-    # provider runs.
+    # The provider may fill ``tenant``.
     calls: list[str] = []
     with pytest.raises(InvalidArguments) as caught:
         entry(_requiring_spec(seat, calls), principal=ada, arguments={})
@@ -753,8 +713,7 @@ def test_a_read_its_own_untyped_provider_requires_is_demanded_of_the_caller(
 def test_a_read_input_data_requires_is_demanded_beside_an_untyped_kwargs(
     ada: Any, entry: Any
 ) -> None:
-    # ``kwargs`` may fill ``tenant``, but ``input_data`` is called from the
-    # same pool, before ``kwargs`` answers: only the caller can hand it.
+    # ``kwargs`` may fill ``tenant``, but ``input_data`` is called from the same pool.
     calls: list[str] = []
     spec = ServiceSpec(
         service=Record(),
@@ -792,9 +751,7 @@ def test_a_provider_requiring_its_read_runs_when_the_caller_sends_it(ada: Any, e
 def test_a_read_a_typed_provider_fills_stays_relaxed_though_a_provider_requires_it(
     ada: Any, provider: str
 ) -> None:
-    # The caller's value for a read ``kwargs`` is typed to fill is dropped, so
-    # no provider is ever handed it; demanding it would ask the caller for a
-    # value nothing reads. ``check_seeds`` refuses such a spec instead.
+    # The caller's value for a read ``kwargs`` is typed to fill is dropped.
     def fills(*, tenant: str) -> _Tenant:
         return {"tenant": tenant}
 
@@ -820,8 +777,7 @@ def test_a_read_a_typed_provider_fills_stays_relaxed_though_a_provider_requires_
 def test_a_reflected_read_a_seed_fills_reaches_a_provider_requiring_it(
     ada: Any, entry: Any
 ) -> None:
-    # Out of the call's parameters before anything is relaxed or demanded, so
-    # the caller is asked for nothing and the provider is handed the seed.
+    # Out of the call's parameters before anything is relaxed or demanded.
     calls: list[str] = []
     spec = SelectorSpec(
         kind=LIST,
@@ -846,8 +802,7 @@ setattr(_bad_signature, "__signature__", 3)  # noqa: B010
 def test_a_provider_whose_signature_cannot_be_read_relaxes_as_before(
     ada: Any, provider: Callable[..., Any]
 ) -> None:
-    # Refused by ``check_seeds``, and failing where dispatch binds it; the
-    # shape check reads no demand off it.
+    # Refused by ``check_seeds``, and failing where dispatch binds it.
     spec = ServiceSpec(service=Record(), permissions=OPEN, reads=_project(), kwargs=provider)
     checked, _ = check_call(spec, principal=ada, arguments={})
     assert checked == {}
@@ -855,8 +810,7 @@ def test_a_provider_whose_signature_cannot_be_read_relaxes_as_before(
 
 @pytest.mark.parametrize("seat", ["selector-spec", "target-selector", "service-spec"])
 def test_check_server_arguments_refuses_withholding_a_read_a_provider_requires(seat: str) -> None:
-    # A typed provider's key, declinable or not, is refused binding or
-    # withholding outright, before this is read.
+    # A typed provider's key, declinable or not, is refused binding or withholding outright.
     with pytest.raises(ImproperlyConfigured, match="which no call could then do without"):
         check_server_arguments(
             _requiring_spec(seat, []), ServerArguments(withheld=frozenset({"tenant"}))
@@ -884,8 +838,7 @@ def test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s(
 
 
 def test_bind_arguments_still_demands_a_required_reflected_read(ada: Any) -> None:
-    # It is handed no seeds, so the read is checked as declared; dispatch,
-    # which knows the seed, fills it and refuses the caller's value for it.
+    # It is handed no seeds, so the read is checked as declared; dispatch, which knows the seed.
     spec = SelectorSpec(
         kind=LIST,
         selector=lambda *, tenant: [tenant],
@@ -906,8 +859,7 @@ def test_bind_arguments_still_demands_a_required_reflected_read(ada: Any) -> Non
 def test_a_caller_s_value_for_a_reflected_read_never_reaches_its_callable(
     ada: Any, entry: Any, seat: str
 ) -> None:
-    # The read is no argument of the call: unknown under REJECT, dropped under
-    # IGNORE, and never merged over the seed.
+    # The read is no argument of the call: unknown under REJECT, dropped under IGNORE.
     seen: list[Any] = []
 
     def selector(*, tenant: str) -> list[Any]:
@@ -1084,8 +1036,7 @@ def test_a_field_named_like_a_registered_seed_validates_into_data_and_the_pool_k
         unknown_arguments=policy,
     )
     assert validator.calls == [{"tenant": "caller's"}]
-    # The base ``validated()`` hands one dict as ``values`` and ``data``, so
-    # ``data`` keeping the field is what shows the spread took a copy.
+    # The base ``validated()`` hands one dict as ``values`` and ``data``.
     assert service.calls[0]["data"] == {"tenant": "caller's"}
     assert service.calls[0]["tenant"] == SEEDED
 
@@ -1157,10 +1108,7 @@ def test_a_many_row_field_named_like_a_registered_seed_stays_in_its_row(ada: Any
 
 
 def test_an_overlay_key_named_like_the_seed_is_still_refused_beside_such_a_field(ada: Any) -> None:
-    # An ``UNSET`` entry, which ``refuse_overlaid_parameters`` lets through for
-    # a declared parameter: the field's value is not spread, so the entry
-    # reaches the overlay's own refusal of a seed's name, as on a spec
-    # declaring no such field, rather than being dropped beneath it.
+    # An ``UNSET`` entry.
     spec = _field_spec()
     with pytest.raises(ImproperlyConfigured) as caught:
         dispatch(
@@ -1174,8 +1122,7 @@ def test_an_overlay_key_named_like_the_seed_is_still_refused_beside_such_a_field
 
 
 def test_check_call_passes_a_spec_with_such_a_field(ada: Any) -> None:
-    # resolve_target's twin is
-    # test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it.
+    # The twin is test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it.
     note = Note.objects.create(owner=ada, title="Row")
     spec = _field_spec(
         instance_selector_spec=SelectorSpec(kind=RETRIEVE, selector=note_by_pk, reads=PK)
@@ -1222,8 +1169,6 @@ def test_server_owned_keys_still_lists_a_seed_no_top_level_field_takes(
 
 
 def test_server_owned_keys_still_lists_a_dispatcher_name_a_field_takes() -> None:
-    # Only a registered seed's name leaves the set: ``parameters()`` refuses a
-    # field named like one of the dispatcher's own when the call assembles it,
-    # and this reads the Validator without assembling.
+    # Only a registered seed's name leaves the set.
     spec = ServiceSpec(service=Record(), validator=Fields(Parameter("user", "string")))
     assert "user" in server_owned_keys(spec, pool_seeds=TENANT_SEEDS)

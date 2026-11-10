@@ -1,5 +1,3 @@
-"""``PermissionCheckDenied``: marks a declared check's denial, and no other ``NotPermitted``."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -129,9 +127,7 @@ class TestACheckSDenialIsMarked:
 
     @pytest.mark.parametrize("question", ["class", "row", "scope"])
     def test_a_source_s_denial_carries_the_spec_it_compiles_to(self, question: str) -> None:
-        # The check is asked about the compiled spec, so that is the one it
-        # names; a transport holding the source compares through kernel_spec.
-        # Each question takes the source directly, as a transport may hand it.
+        # The check is asked about the compiled spec, so that is the one it names.
         check = _Denies() if question == "class" else _AdmitsTheClass()
         source, principal = Foreign(_spec([check], SelectorKind.RETRIEVE)), object()
         grant = Grant(kernel_spec(source), principal)
@@ -210,7 +206,6 @@ class TestThroughDispatch:
 
     def test_an_inner_dispatch_s_denial_names_the_inner_spec(self) -> None:
         # The outer call's check passed; a dispatch its service made was denied.
-        # The class alone cannot tell the two apart, so the spec does.
         check = _Denies()
         inner = ServiceSpec(service=lambda: None, permissions=[check], atomic=False)
 

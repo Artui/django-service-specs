@@ -1,5 +1,3 @@
-"""Tests for ``AdditionalInputRequired``."""
-
 from __future__ import annotations
 
 import pytest
@@ -28,8 +26,7 @@ def test_schema_is_keyword_only() -> None:
 
 
 def test_is_a_plain_service_error() -> None:
-    # Not a validation error: what was sent is not wrong. Not a conflict
-    # either: nothing about the resource's state needs re-reading.
+    # Not a validation error: what was sent is not wrong.
     err = AdditionalInputRequired("Confirm.")
     assert isinstance(err, ServiceError)
     assert not isinstance(err, ServiceValidationError | ServiceConflict)

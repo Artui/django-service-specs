@@ -57,8 +57,7 @@ class TestEachShape:
 
     @pytest.mark.parametrize("empty", [[], ()], ids=["list", "tuple"])
     def test_empty_permissions_never_reach_a_registry(self, empty: Any) -> None:
-        # The fourth shape has no member: the spec refuses it when it is built,
-        # so no registry can hold it to be reported.
+        # The fourth shape has no member: the spec refuses it when it is built.
         with pytest.raises(ImproperlyConfigured, match=r"permissions is empty"):
             service(*empty)
 

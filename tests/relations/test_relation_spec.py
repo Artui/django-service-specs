@@ -1,5 +1,3 @@
-"""The shape every relation spec shares: required fields positional, options by keyword."""
-
 from __future__ import annotations
 
 from dataclasses import MISSING, fields
@@ -27,8 +25,7 @@ _REQUIRED: tuple[tuple[type[RelationSpec], tuple[Any, ...]], ...] = (
 
 
 def test_every_kind_is_listed() -> None:
-    # A kind added without a row here would escape every check below. Only the
-    # package's own: the suite declares stand-in kinds of its own elsewhere.
+    # A kind added without a row here would escape every check below.
     own = {
         kind
         for kind in RelationSpec.__subclasses__()
@@ -72,8 +69,7 @@ def _service(**_: Any) -> None: ...
 def test_every_kind_refuses_a_row_service_beside_row_shaping(
     kind: type[RelationSpec], required: tuple[Any, ...]
 ) -> None:
-    # The refusal is one helper each kind calls with its own label, so a kind
-    # that stopped calling it would take the service and drop the shaping.
+    # The refusal is one helper each kind calls with its own label.
     with pytest.raises(ImproperlyConfigured) as excinfo:
         kind(*required, create_service=_service, exclude_fields=["notes"])
     assert f"{kind.__name__}: create_service declared alongside exclude_fields" in str(

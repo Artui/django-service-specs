@@ -325,10 +325,7 @@ class TestJsonSchemaExtra:
         assert node["items"]["properties"]["code"] == {"type": "string", "pattern": "^[A-Z]"}
 
     def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
-        """As on input: every top-level key a node can carry from its fields is
-        refused, and nothing else is, but ``const``, which is the choices' to
-        state. Imported here, so a tree without the table fails this test
-        alone."""
+        """As on input: every top-level key a node can carry from its fields is refused."""
         from django_service_specs.types.utils import OUTPUT_FIELD_SCHEMA_KEYWORDS
 
         catalogue = Output(

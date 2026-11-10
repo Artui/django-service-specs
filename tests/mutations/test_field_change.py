@@ -1,5 +1,3 @@
-"""Tests for the FieldChange dataclass."""
-
 from __future__ import annotations
 
 from dataclasses import FrozenInstanceError

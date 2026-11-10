@@ -1,5 +1,3 @@
-"""Tests for ``create_model``."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -138,8 +136,7 @@ class TestCreateModel:
         assert seen == [(request, None)]
 
     def test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context(self) -> None:
-        # The by-name rule holds one level down: the helper hands the call's
-        # context on, and a nested catch-all is still never given it.
+        # The by-name rule holds one level down: the helper hands the call's context on.
         seen: list[dict[str, Any]] = []
 
         def create_section(*, data: dict[str, Any], **kwargs: Any) -> Section:
@@ -169,8 +166,7 @@ class TestCreateModel:
             create_model(Catalog, relations={"sections": {"model": Section}})(data={"name": "c"})
 
     def test_opens_no_savepoint_of_its_own(self) -> None:
-        # The run's transaction covers the row and every nested write; a block
-        # here would cost a savepoint inside it and guarantee nothing more.
+        # The run's transaction covers the row and every nested write.
         with CaptureQueriesContext(connection) as queries:
             create_model(Catalog, relations=_SECTIONS)(
                 data={"name": "c", "sections": [{"title": "a"}]}

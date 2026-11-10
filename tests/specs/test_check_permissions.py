@@ -1,5 +1,3 @@
-"""``check_permissions``: the one rule a ``permissions=`` declaration is held to."""
-
 from __future__ import annotations
 
 import re
@@ -51,11 +49,7 @@ class _AsyncGeneratorClassLevel(PermissionCheck):
 
 
 class TestAnAsyncPermissionCheckIsRefused:
-    """A check method is read for truth from sync code; an ``async def`` one never refuses.
-
-    One case per method, because the methods are named in one tuple and
-    coverage cannot see a name dropped from it.
-    """
+    """A check method is read for truth from sync code; an ``async def`` one never refuses."""
 
     @pytest.mark.parametrize(
         ("check", "method"),
@@ -94,9 +88,7 @@ class TestAnAsyncPermissionCheckIsRefused:
     ids=["service-spec", "selector-spec"],
 )
 def test_an_empty_permissions_sequence_is_refused(make: Any, label: str, empty: Any) -> None:
-    # Every check passing is vacuously true of no checks, so an empty list
-    # would let anyone run the operation; it is a list computed by accident
-    # as often as a decision, and the decision has its own name.
+    # Every check passing is vacuously true of no checks.
     with pytest.raises(ImproperlyConfigured) as caught:
         make(empty)
     assert str(caught.value) == (

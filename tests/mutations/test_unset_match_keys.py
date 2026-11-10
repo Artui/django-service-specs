@@ -1,16 +1,3 @@
-"""A relation row whose match key was left ``UNSET`` is a create, not a match.
-
-``UNSET`` means "field omitted from input" everywhere else in the library, and
-:func:`filter_input` drops it before anything is assigned. The match-key reads
-happen *before* that, so a partial-input dataclass -- a documented input shape,
-and the whole reason the sentinel exists -- must not have its sentinel read as if
-it were a key. Every kind that matches by key is covered here, because reading it
-as one is fatal for most combinations and accidentally harmless for one: a
-non-pk ``match_key`` on an owned collection misses the ``existing_by_key`` lookup
-and falls through to the create branch, arriving at the right answer for the
-wrong reason.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,11 +46,7 @@ class AttachmentIn:
 @pytest.mark.django_db
 class TestAnOwnedCollectionCreatesTheRow:
     def test_a_child_with_an_unset_pk_is_created(self) -> None:
-        """The primary-key guard reads the sentinel as absent and lets the row through.
-
-        Its own message says "omit the identifier to create a new one", which
-        is exactly what the caller has done.
-        """
+        """The primary-key guard reads the sentinel as absent and lets the row through."""
         catalog = Catalog.objects.create(name="c")
 
         result = update_from_input(
@@ -150,13 +133,7 @@ class TestAScopedTargetCreatesTheRow:
         assert Author.objects.get().name == "a"
 
     def test_an_unscoped_forward_target_is_created(self) -> None:
-        """A payload carrying no key must not read as one that does.
-
-        The unscoped guard exists for a row that *names* a target. A sentinel
-        naming nothing that tripped it would make an omitted optional key raise
-        ``ImproperlyConfigured`` -- an unhandled error telling the author to declare a
-        ``scope=`` their create-only spec does not need.
-        """
+        """A payload carrying no key must not read as one that does."""
         result = create_from_input(
             Post,
             {"title": "t", "author": AuthorIn(name="a")},
@@ -217,8 +194,6 @@ class TestThePrimaryKeyGuardStillRefusesARealKey:
                 relations={"sections": ChildSpec(model=Section, fk="catalog")},
             )
 
-        # ``[0]`` is the row's index, and a message about the row itself sits
-        # under ``non_field_errors`` inside it.
         [message] = excinfo.value.detail["sections"][0]["non_field_errors"]
         assert "which this write did not match" in message
 

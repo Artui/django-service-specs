@@ -150,9 +150,7 @@ def test_a_list_returns_the_principals_rows_as_a_list(ada: Any, bob: Any) -> Non
 def test_a_nullish_identifier_is_refused_before_the_selector_runs(
     ada: Any, value: str, django_assert_num_queries: Any
 ) -> None:
-    # A UUID lookup handed one of these raises Django's ValidationError from
-    # inside the ORM, which no transport maps; the format answers first, as
-    # the ordinary refusal of the arguments.
+    # A UUID lookup handed one of these raises Django's ValidationError from inside the ORM.
     ran: list[str] = []
 
     def notes_in(*, user: Any, project_pk: str) -> Any:
@@ -235,8 +233,7 @@ def _notes_of_owner(how: str) -> Callable[..., Any]:
 
 @pytest.mark.parametrize("allow_none", [False, True])
 def test_a_list_whose_parent_lookup_raises_http404_is_not_found(ada: Any, allow_none: bool) -> None:
-    # ``allow_none`` lets a LIST's own ``None`` through as the empty list; it
-    # never turns a missing parent into one.
+    # ``allow_none`` lets a LIST's own ``None`` through as the empty list.
     spec = SelectorSpec(
         kind=LIST,
         selector=_notes_of_owner("get_object_or_404"),
@@ -254,8 +251,7 @@ def test_a_list_whose_parent_lookup_raises_http404_is_not_found(ada: Any, allow_
 def test_an_http404_from_extend_queryset_is_not_the_selector_s_not_found(
     ada: Any, kind: SelectorKind
 ) -> None:
-    # Only the selector's own raise is its "not found": shaping runs after it,
-    # and an ``Http404`` there passes through, as it does on ``adispatch``.
+    # Only the selector's own raise is its "not found": shaping runs after it.
     def refuse(*, queryset: Any) -> Any:
         raise Http404("shaping")
 
@@ -323,9 +319,7 @@ def test_a_write_whose_collection_selector_raises_http404_is_not_found(ada: Any)
 
 
 def test_a_collection_selector_s_extend_queryset_http404_passes_through(ada: Any) -> None:
-    # Only the collection selector's own raise is its "not found": an
-    # ``Http404`` from shaping, which runs after it, is not, and reaches the
-    # caller instead of skipping the scope check as a missing parent would.
+    # Only the collection selector's own raise is its "not found": an ``Http404`` from shaping.
     def refuse(*, queryset: Any) -> Any:
         raise Http404("shaping")
 
@@ -416,9 +410,7 @@ def test_a_grant_for_another_principal_is_refused(ada: Any, bob: Any) -> None:
 def test_a_grant_that_checked_a_target_does_not_cover_the_row_a_selector_spec_finds(
     ada: Any, bob: Any
 ) -> None:
-    # A selector spec takes no ``target=``, so a grant has no row to be bound
-    # to: whatever its transport checked, the row the arguments make the
-    # selector find is checked here, as a service spec's lookup is.
+    # A selector spec takes no ``target=``, so a grant has no row to be bound to.
     theirs = Note.objects.create(owner=bob, title="theirs")
     check = OwnerOnly()
     spec = retrieve(permissions=[check])
@@ -445,8 +437,7 @@ def test_a_grant_that_checked_a_target_does_not_cover_the_set_a_selector_spec_re
 
 
 def test_a_selector_spec_s_object_level_check_sees_the_row_the_call_returns(ada: Any) -> None:
-    # The row after shaping and the collapse to one row: the very object the
-    # result carries, annotations included, never the queryset it came from.
+    # The row after shaping and the collapse to one row: the very object the result carries.
     mine = Note.objects.create(owner=ada, title="mine")
     check = OwnerOnly()
     spec = retrieve(permissions=[check], annotations={"shaped": Value(1)})
@@ -779,9 +770,7 @@ def test_an_output_selector_that_finds_nothing_is_none_not_not_found(ada: Any, h
 
 
 def test_a_list_output_selector_raising_http404_is_a_fault_after_the_run(ada: Any) -> None:
-    # The write has run, so a not-found would tell the caller it had not; and
-    # a bare ``Http404`` would be answered 404 by any transport that maps it,
-    # so it is re-raised as a fault that is not one.
+    # The write has run, so a not-found would tell the caller it had not.
     service = Record(returns="done")
 
     def gone(*, result: Any) -> Any:
@@ -803,8 +792,7 @@ def test_a_list_output_selector_raising_http404_is_a_fault_after_the_run(ada: An
 def test_an_output_selector_reads_the_service_s_return_as_instance_not_the_target(
     ada: Any,
 ) -> None:
-    # The service acts on one note and returns another, so a re-read handed
-    # the resolved target under ``instance`` would answer the wrong row.
+    # The service acts on one note and returns another.
     target = Note.objects.create(owner=ada, title="target")
     written = Note.objects.create(owner=ada, title="written")
 
@@ -825,8 +813,7 @@ def test_an_output_selector_reads_the_service_s_return_as_instance_not_the_targe
 
 @pytest.mark.parametrize("returns", [None, ["a", "b"], "done"], ids=["none", "list", "str"])
 def test_an_output_selector_s_instance_and_result_are_one_value(ada: Any, returns: Any) -> None:
-    # One pool entry under two names, whatever the service returned: a re-read
-    # declares whichever its author wrote, as under djangorestframework-services.
+    # One pool entry under two names, whatever the service returned.
     reread = Record(returns=Note.objects.none())
     spec = ServiceSpec(
         service=Record(returns=returns),
@@ -926,9 +913,6 @@ def test_a_spec_declaring_a_registered_seed_s_name_is_refused(
     ada: Any, spec: Any, label: str
 ) -> None:
     # Optional, well-formed and open: without the registration nothing refuses it.
-    # A read nobody marked ``reflected`` is refused, and on a ``many`` spec a
-    # row field of the read's name spares it nothing, since no row field is
-    # top level (the ``many`` conjunct of ``seed_named_fields``).
     dispatch(spec, principal=ada, arguments={"items": []} if spec_is_many(spec) else {})
     with pytest.raises(ImproperlyConfigured) as caught:
         dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS)
@@ -1027,9 +1011,7 @@ def _user_by_pk(*, pk: int) -> Any:
 
 @pytest.mark.django_db
 def test_a_service_s_target_is_presented_with_the_relations_it_wrote() -> None:
-    # The instance selector prefetches the notes; the service adds one and
-    # returns its target. Without clearing the target's prefetch cache, the
-    # value would still list the notes as they were before the write.
+    # The instance selector prefetches the notes; the service adds one and returns its target.
     owner = make_user("prolific")
     Note.objects.create(owner=owner, title="first")
 
@@ -1102,15 +1084,13 @@ def test_a_grant_does_not_admit_a_deactivated_principal() -> None:
 
 
 def test_a_deactivated_principal_is_refused_before_its_arguments_are_checked() -> None:
-    # ``pk`` is missing, which the shape check would refuse; the principal answers
-    # first, as ``adispatch`` refuses a deactivated ``principal_id``.
+    # ``pk`` is missing, which the shape check would refuse; the principal answers first.
     with pytest.raises(PrincipalUnavailable):
         dispatch(retrieve(), principal=_deactivated("ada"), arguments={})
 
 
 def test_anonymous_goes_on_to_the_permission_check() -> None:
-    # ``AnonymousUser.is_active`` is false, so only the ``is_authenticated`` half
-    # of the rule keeps this from being refused as deactivated.
+    # ``AnonymousUser.is_active`` is false.
     spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[Refuse()])
 
     with pytest.raises(NotPermitted) as caught:
@@ -1163,8 +1143,7 @@ def test_an_unmet_affordance_refuses_the_call_and_the_service_never_runs(
     note = Note.objects.create(owner=ada, title="old", archived=True)
     service = Record()
     spec = _renaming(service, NOT_ARCHIVED)
-    # A grant that claims both checks ran, on the row handed over with it,
-    # still leaves the row's state to ask.
+    # A grant that claims both checks ran, on the row handed over with it.
     extra: dict[str, Any] = (
         {"grant": Grant(spec, ada, target_checked=True), "target": note} if granted else {}
     )
@@ -1187,8 +1166,7 @@ def test_a_met_affordance_lets_the_service_run(ada: Any) -> None:
 
 
 def test_the_object_level_check_answers_before_an_affordance(ada: Any, bob: Any) -> None:
-    # Both would refuse: the row is archived and is not ada's. A principal who may
-    # not see the row is never told what state it is in.
+    # Both would refuse: the row is archived and is not ada's.
     theirs = Note.objects.create(owner=bob, title="theirs", archived=True)
     condition = _Condition(returns=False)
     spec = _renaming(
@@ -1268,9 +1246,7 @@ def test_a_condition_reads_a_registered_seed_through_dispatch(ada: Any) -> None:
 
 
 def test_affordances_are_answered_before_the_transaction_opens(ada: Any) -> None:
-    # Where djangorestframework-services answers them: outside the atomic block
-    # ``run_service`` opens, so a refusal never opens a transaction. Depth is
-    # counted, because the test's own transaction is already open around both.
+    # Where djangorestframework-services answers them.
     depths: dict[str, int] = {}
 
     def condition(*, user: Any) -> bool:
@@ -1293,8 +1269,7 @@ def test_affordances_are_answered_before_the_transaction_opens(ada: Any) -> None
 
 
 def test_a_selector_spec_s_affordances_are_answers_not_refusals(ada: Any) -> None:
-    # A selector spec's ``affordances`` name the operations each row answers for,
-    # and what a list reports is per row. Nothing about reading is refused.
+    # A selector spec's ``affordances`` name the operations each row answers for.
     archived = Note.objects.create(owner=ada, title="old", archived=True)
     spec = SelectorSpec(
         kind=RETRIEVE,
@@ -1365,8 +1340,7 @@ def test_a_selector_spec_may_report_too(ada: Any) -> None:
 
 
 def test_a_lookup_never_reports_to_the_caller_s_reporter(ada: Any) -> None:
-    # A target or output selector has no progress of its own to report, and one
-    # reporting after the service finished would read as the work restarting.
+    # A target or output selector has no progress of its own to report.
     note = Note.objects.create(owner=ada, title="old")
     reporter = _Reporter()
 
@@ -1396,8 +1370,7 @@ def test_a_lookup_never_reports_to_the_caller_s_reporter(ada: Any) -> None:
 
 
 def test_the_run_and_a_condition_are_handed_the_caller_s_reporter_as_it_is(ada: Any) -> None:
-    # Not wrapped: a transport's reporter must not raise, because nothing
-    # between it and the service would catch it.
+    # Not wrapped: a transport's reporter must not raise.
     reporter = _Reporter()
     handed: dict[str, Any] = {}
 
@@ -1500,8 +1473,7 @@ def test_an_optional_read_a_selector_requires_is_refused_when_not_sent(ada: Any)
         dispatch(spec, principal=ada, arguments={})
 
     assert caught.value.detail == {"tenant": REQUIRED}
-    # The shape check's own code for the same absence, so a caller reads one
-    # code whichever of the two refused the read.
+    # The shape check's own code for the same absence.
     assert coded(caught.value.detail) == {"tenant": [("This field is required.", "required")]}
 
 
@@ -1538,9 +1510,7 @@ def test_a_service_parameter_its_validator_left_unfilled_is_refused(ada: Any) ->
 
 
 def test_a_registered_seed_fills_a_parameter_no_argument_did(ada: Any) -> None:
-    """``tenant`` is not a read, so only the declaration can fill it: a
-    registered seed does, and without one the call raises as the author's
-    error, since no argument a caller sends could fill it."""
+    """``tenant`` is not a read, so only the declaration can fill it: a registered seed does."""
     spec = SelectorSpec(kind=LIST, selector=_by_tenant, permissions=OPEN)
 
     assert dispatch(spec, principal=ada, arguments={}, pool_seeds=TENANT_SEEDS).value == [
@@ -1551,10 +1521,7 @@ def test_a_registered_seed_fills_a_parameter_no_argument_did(ada: Any) -> None:
 
 
 def test_a_selector_parameter_no_read_declares_is_the_author_s_error(ada: Any) -> None:
-    """The argument set is closed: ``tenant`` is not a read, so REJECT refuses
-    it as unknown and IGNORE drops it, and no caller can ever fill it. Refused
-    as a missing argument, the call would ask for a value nobody can send, and
-    a client reading ``InvalidArguments`` as its own mistake would retry it."""
+    """The argument set is closed: ``tenant`` is not a read."""
     spec = SelectorSpec(kind=LIST, selector=_by_tenant, permissions=OPEN)
 
     with pytest.raises(InvalidArguments) as unknown:
@@ -1577,8 +1544,7 @@ def test_a_selector_parameter_no_read_declares_is_the_author_s_error(ada: Any) -
 def test_a_service_parameter_no_validator_declares_is_the_author_s_error(
     ada: Any, validator: Validator | None
 ) -> None:
-    """Only a Validator's parameters reach the service, so a service parameter
-    it does not declare - or any, with no Validator - is one no caller can fill."""
+    """Only a Validator's parameters reach the service."""
     calls: list[str] = []
 
     def publish(*, title: str = "", body: str) -> str:
@@ -1641,12 +1607,7 @@ def _rename(*, title: str) -> str:
 def test_a_validator_parameter_the_caller_sent_is_the_author_s_error(
     ada: Any, validator: Validator, service: Any, arguments: dict[str, Any], name: str
 ) -> None:
-    """The caller sent every argument, and the Validator did not hand ``name``
-    back under that name: a form read it and popped it, pydantic returned it
-    under the field's own name, or the Validator dropped it. Refused as missing,
-    the call would tell the caller a field they just sent is required, and a
-    client reading ``InvalidArguments`` as its own mistake would send it again,
-    forever. It is the declaration's error, and raises as the callable's own."""
+    """The caller sent every argument."""
     spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
 
     with pytest.raises(TypeError, match=name):
@@ -1654,9 +1615,7 @@ def test_a_validator_parameter_the_caller_sent_is_the_author_s_error(
 
 
 def test_a_service_parameter_named_after_a_target_read_is_the_author_s_error(ada: Any) -> None:
-    """``pk`` is the instance selector's read, consumed there and never in the
-    service's pool, and the caller sent it: only a Validator's parameters are
-    the service's to ask a caller for, never the spec's whole argument set."""
+    """``pk`` is the instance selector's read, consumed there and never in the service's pool."""
     note = Note.objects.create(owner=ada, title="mine")
     spec = ServiceSpec(
         service=lambda *, instance, pk: pk,
@@ -1678,8 +1637,7 @@ def test_a_defaulted_parameter_is_never_missing(ada: Any) -> None:
 
 
 def test_a_callable_taking_the_whole_pool_is_never_missing_anything(ada: Any) -> None:
-    """``**tenant`` is named after a read the caller left out, so only its kind
-    keeps it from being refused: it takes whatever arrives, and needs nothing."""
+    """``**tenant`` is named after a read the caller left out."""
     spec = SelectorSpec(
         kind=LIST, selector=lambda **tenant: sorted(tenant), reads=TENANT_READ, permissions=OPEN
     )
@@ -1688,8 +1646,7 @@ def test_a_callable_taking_the_whole_pool_is_never_missing_anything(ada: Any) ->
 
 
 def test_a_positional_only_parameter_is_not_reported(ada: Any) -> None:
-    """Dispatch passes keywords only, so no caller value could ever fill it,
-    even one sent under a read's name, and refusing it would ask for one."""
+    """Dispatch passes keywords only, so no caller value could ever fill it."""
 
     def by_tenant(tenant: str, /) -> list[str]:
         return [tenant]
@@ -1701,8 +1658,7 @@ def test_a_positional_only_parameter_is_not_reported(ada: Any) -> None:
 
 
 def test_a_var_positional_parameter_is_never_missing(ada: Any) -> None:
-    """``*tenant`` is named after a read the caller left out, and is filled by
-    nothing whatever is sent: it needs no value, so there is nothing to refuse."""
+    """``*tenant`` is named after a read the caller left out."""
 
     def by_tenant(*tenant: str) -> list[str]:
         return list(tenant)
@@ -1713,9 +1669,7 @@ def test_a_var_positional_parameter_is_never_missing(ada: Any) -> None:
 
 
 def test_a_missing_reserved_seed_is_the_author_s_error_and_not_refused(ada: Any) -> None:
-    """``instance`` is never in a selector spec's pool, and no caller could
-    send it: refusing it as a missing argument would blame the caller for a
-    declaration only its author can fix."""
+    """``instance`` is never in a selector spec's pool, and no caller could send it."""
     spec = SelectorSpec(kind=LIST, selector=lambda *, instance: [instance], permissions=OPEN)
 
     with pytest.raises(TypeError, match="instance"):
@@ -1723,14 +1677,11 @@ def test_a_missing_reserved_seed_is_the_author_s_error_and_not_refused(ada: Any)
 
 
 def test_an_output_selector_is_never_refused_after_the_run(ada: Any) -> None:
-    """Its pool carries no argument, so nothing a caller left out can be
-    missing from it, and the service has already run: a refusal that reads as
-    "before the run" would tell the caller the operation did not happen."""
+    """Its pool carries no argument, so nothing a caller left out can be missing from it."""
     service = Record(returns=1)
     spec = ServiceSpec(
         service=service,
         permissions=OPEN,
-        # A read declared, so that only its being after the run keeps it unrefused.
         output_selector_spec=nested(LIST, selector=_by_tenant, reads=TENANT_READ),
     )
 
@@ -1761,8 +1712,7 @@ def test_an_output_selector_s_extend_queryset_is_never_refused_after_the_run(ada
 def test_a_read_left_out_is_refused_alike_by_whichever_callable_takes_it(
     ada: Any, taker: str
 ) -> None:
-    """``extend_queryset`` is bound from the same pool as the selector, so a
-    declared read the caller left out is the same refusal whichever one takes it."""
+    """``extend_queryset`` is bound from the same pool as the selector."""
     Note.objects.create(owner=ada, title="kept")
     spec = _taking_title(taker)
 
@@ -1802,8 +1752,7 @@ def test_a_target_selector_s_extend_queryset_refuses_a_read_left_out(ada: Any) -
 
 
 def test_a_missing_argument_answers_before_an_affordance(ada: Any) -> None:
-    """As the Validator does: a refusal of the call itself comes before one
-    describing the row's state."""
+    """As the Validator does."""
     note = Note.objects.create(owner=ada, title="old", archived=True)
     spec = _renaming(lambda *, instance, title: title, NOT_ARCHIVED, validator=_OptionalTitle())
 
@@ -1856,9 +1805,7 @@ def test_a_partial_call_tells_the_validator_it_is_partial(ada: Any) -> None:
 
 
 def test_a_partial_call_never_refuses_a_service_parameter_the_caller_left_out(ada: Any) -> None:
-    # The service declaring ``body`` with no default is the author's error under
-    # ``partial``, where any field may be left out: it raises as the callable's
-    # own, never as a missing argument a client would be asked to resend.
+    # The service declaring ``body`` with no default is the author's error under ``partial``.
     def edit(*, title: str, body: str) -> None: ...
 
     with pytest.raises(TypeError, match="body"):
@@ -1906,8 +1853,7 @@ def test_a_value_the_validator_binds_reaches_the_service_by_name(ada: Any) -> No
     [
         pytest.param({"user": "someone"}, "['user']", id="a-seed"),
         pytest.param({"title": "other"}, "['title']", id="a-validated-value"),
-        # A value the Validator returns without declaring it: no parameter
-        # names it, so only the validated values' own names refuse it.
+        # A value the Validator returns without declaring it: no parameter names it.
         pytest.param({"slug": "other"}, "['slug']", id="an-undeclared-validated-value"),
     ],
 )
@@ -2158,8 +2104,7 @@ def test_a_list_selector_spec_s_preconditions_see_the_collection(ada: Any) -> No
 def test_a_retrieve_selector_spec_s_preconditions_never_run_on_a_row_the_principal_is_refused(
     ada: Any, bob: Any
 ) -> None:
-    # The object check answers first, so a principal refused the row is never
-    # told what a rule over it says.
+    # The object check answers first.
     theirs = Note.objects.create(owner=bob, title="theirs")
     precondition = _Precondition(Boom())
     spec = retrieve(permissions=[OwnerOnly()], preconditions=[precondition])
@@ -2261,8 +2206,7 @@ async def _areporting(*, progress: Any) -> None:
 def test_a_call_refused_before_its_run_never_calls_the_progress_provider(
     ada: Any, run: Callable[..., Any]
 ) -> None:
-    # The provider of an ``async def`` run is resolved before the run, so it
-    # must be resolved after everything that can refuse the call.
+    # The provider of an ``async def`` run is resolved before the run.
     sink = _Sink()
     spec = ServiceSpec(
         service=run,
@@ -2286,8 +2230,7 @@ def test_a_run_that_never_reports_never_calls_the_progress_provider(ada: Any) ->
 
 
 def test_an_async_service_s_progress_provider_is_resolved_before_the_run(ada: Any) -> None:
-    # A provider that queries cannot run on the loop an ``async def`` service
-    # reports from, so it is resolved from sync code first.
+    # A provider that queries cannot run on the loop an ``async def`` service reports from.
     count: list[int] = []
     sink = _Sink()
 
@@ -2318,8 +2261,7 @@ def test_a_selector_spec_s_progress_provider_hears_its_selector(ada: Any) -> Non
 def test_a_selector_spec_s_precondition_reports_to_the_transport_and_not_the_spec_s_sink(
     ada: Any,
 ) -> None:
-    # The spec's sink is the run's, and a selector spec's run is its selector:
-    # a precondition answering after it reports where a service spec's does.
+    # The spec's sink is the run's, and a selector spec's run is its selector.
     sink = _Sink()
     transport: list[float] = []
 
@@ -2344,9 +2286,7 @@ def test_a_selector_spec_s_precondition_reports_to_the_transport_and_not_the_spe
 def test_a_selector_spec_s_queryset_step_and_row_conditions_read_the_transport_s_reporter(
     ada: Any,
 ) -> None:
-    # Only the selector, the run, reports to the spec's sink: what shapes its
-    # rows and what answers each row's affordances are handed the reporter
-    # the transport passed, as a service spec's conditions are.
+    # Only the selector, the run, reports to the spec's sink.
     Note.objects.create(owner=ada, title="Row")
     sink = _Sink()
     reporter = _Reporter()
@@ -2383,8 +2323,7 @@ def test_a_selector_spec_s_queryset_step_and_row_conditions_read_the_transport_s
 def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
     ada: Any,
 ) -> None:
-    # Bound and handed a reporter, a selector that never reports never calls
-    # the provider: a sync run resolves it on the first report.
+    # Bound and handed a reporter, a selector that never reports never calls the provider.
     sink = _Sink()
 
     def quiet(*, user: Any, progress: Any) -> Any:
@@ -2399,8 +2338,7 @@ def test_a_sync_selector_calls_the_progress_provider_on_its_first_report_alone(
 def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
     ada: Any, asynchronous: bool
 ) -> None:
-    # As a service spec's is: the seeds, never the reads the caller sent, so a
-    # provider taking the whole pool sees what ``base_pool`` holds and no more.
+    # As a service spec's is: the seeds, never the reads the caller sent.
     seen: list[list[str]] = []
 
     def provider(**pool: Any) -> Any:
@@ -2429,9 +2367,7 @@ def test_a_selector_spec_s_progress_provider_is_called_from_the_base_pool(
 def test_an_async_selector_refused_its_missing_read_never_calls_the_progress_provider(
     ada: Any,
 ) -> None:
-    # An ``async def`` selector's provider is resolved before the run, so it
-    # must be resolved after the binding that refuses a read left out, as a
-    # service's is: a call refused before its run never calls it.
+    # An ``async def`` selector's provider is resolved before the run.
     sink = _Sink()
 
     async def by_title(*, user: Any, title: str, progress: Any) -> Any:
@@ -2464,8 +2400,7 @@ def test_an_async_selector_that_takes_no_progress_never_calls_the_progress_provi
 
 
 def test_a_read_outranks_a_validated_value_of_its_name(ada: Any) -> None:
-    # A Validator may return a key it does not declare; a read the caller sent
-    # under that name is the argument, as a route's own capture outranks the body.
+    # A Validator may return a key it does not declare.
     service = Record()
     spec = ServiceSpec(
         service=service,
@@ -2511,13 +2446,7 @@ def test_a_bound_value_naming_a_parameter_is_refused(
 
 
 def _refused_at_the_shape_check(spec: ServiceSpec, principal: Any, arguments: Any) -> Any:
-    """The shape check's refusal, where a class-level refusal would answer next.
-
-    Each spec here refuses every principal at class level, so a call the shape
-    check lets through is refused as ``NotPermitted`` instead. Without that, an
-    argument the shape check leaves out is refused one step later in the same
-    words, by the selector or the service that asks for it.
-    """
+    """The shape check's refusal, where a class-level refusal would answer next."""
     with pytest.raises(DispatchError) as caught:
         dispatch(spec, principal=principal, arguments=arguments)
     assert isinstance(caught.value, InvalidArguments), caught.value
@@ -2560,8 +2489,7 @@ class _Echo(Validator):
 
 
 def test_a_partial_call_may_leave_out_a_validator_field_at_every_depth(ada: Any) -> None:
-    # ``tone`` is required with a default, which a relaxed copy must keep
-    # constructing: the declaration is rebuilt for the shape check.
+    # ``tone`` is required with a default, which a relaxed copy must keep constructing.
     row = Parameters.of(
         Parameter("title", "string", required=True),
         Parameter("tone", "string", required=True, default="plain"),
@@ -2576,8 +2504,6 @@ def test_a_partial_call_may_leave_out_a_validator_field_at_every_depth(ada: Any)
     arguments = {"rows": [{}], "meta": {}, "tags": ["a"]}
     dispatch(spec, principal=ada, arguments=arguments)
     assert service.calls[0]["data"] == arguments
-    # A present value is still checked, and an unknown key still refused, below
-    # the top as at it.
     with pytest.raises(InvalidArguments) as caught:
         dispatch(spec, principal=ada, arguments={"rows": [{"title": 1, "x": 2}]})
     assert caught.value.detail == {
@@ -2590,11 +2516,7 @@ class _ServerTitle(TypedDict):
 
 
 def _title_provider(title: Any = "server's") -> tuple[Callable[[], _ServerTitle], list[None]]:
-    """An ``input_data`` provider annotated to fill ``title``, and the list its calls append to.
-
-    A function rather than a recording object: ``provider_keys`` reads a
-    function's return annotation.
-    """
+    """An ``input_data`` provider annotated to fill ``title``, and the list its calls append to."""
     calls: list[None] = []
 
     def server() -> _ServerTitle:
@@ -2627,8 +2549,7 @@ def test_a_filled_field_the_provider_declines_is_refused_before_the_validator(ad
     with pytest.raises(InvalidArguments) as caught:
         dispatch(spec, principal=ada, arguments={})
     assert caught.value.detail == {"title": REQUIRED}
-    # The presence check answered, once the provider had run: the shape check
-    # let the field through, and the provider runs after it.
+    # The presence check answered, once the provider had run: the shape check let the field through.
     assert calls == [None]
 
 
@@ -2644,8 +2565,7 @@ def test_a_field_the_provider_does_not_name_stays_required(ada: Any) -> None:
 
 
 def test_an_untyped_input_data_provider_relaxes_the_fields_its_values_reach(ada: Any) -> None:
-    # It may fill any field, so none is demanded of the caller; the Validator
-    # refuses one it left out (test_a_validator_field_an_untyped_input_data_may_fill).
+    # It may fill any field, so none is demanded of the caller.
     validator = Titled()
     spec = ServiceSpec(
         service=Record(),
@@ -2729,8 +2649,7 @@ def test_a_relaxed_read_the_caller_sends_is_still_checked_and_the_provider_outra
 def test_a_filled_read_the_provider_declines_is_refused_where_the_service_asks_for_it(
     ada: Any, declined: Any
 ) -> None:
-    # Required of what the service is called with, not of the caller: the
-    # refusal is the usual one, from ``call_keywords``, after the provider ran.
+    # Required of what the service is called with, not of the caller: the refusal is the usual one.
     provider, calls = _project_provider(project_pk=declined)
     ran: list[int] = []
 
@@ -2750,9 +2669,7 @@ def _names_another_key() -> _ServerTenant:
 
 
 def test_a_read_no_provider_may_fill_stays_required(ada: Any) -> None:
-    # A typed provider naming another key reaches this read with nothing, so
-    # the shape check demands it. One whose return names no keys may fill
-    # it, and is test_seats.py's.
+    # A typed provider naming another key reaches this read with nothing.
     spec = ServiceSpec(
         service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=_names_another_key
     )
@@ -2828,15 +2745,12 @@ TENANT = Parameters.of(Parameter("tenant", "string", required=True))
 
 
 def _tenant_of(*, user: Any) -> _MaybeTenant:
-    # A provider that fills the tenant for the users who have one, and this
-    # user has none: ``total=False`` still reads as filled.
+    # A provider that fills the tenant for the users who have one, and this user has none.
     return {}
 
 
 def test_a_server_owned_key_the_provider_leaves_out_is_never_the_caller_s(ada: Any) -> None:
-    # Declared required, so the seat refuses the call once the provider has
-    # left it out, though the service takes ``**pool`` and would run without
-    # it; the caller's value never stands in.
+    # Declared required, so the seat refuses the call once the provider has left it out.
     service = Record()
     spec = ServiceSpec(service=service, permissions=OPEN, reads=TENANT, kwargs=_tenant_of)
     with pytest.raises(InvalidArguments) as caught:
@@ -2978,8 +2892,7 @@ def _declining_project(calls: list[None]) -> Callable[[], _DecliningProject]:
 
 
 def test_a_declinable_key_stays_the_caller_s(ada: Any) -> None:
-    # Not filled, so neither relaxed nor dropped: the caller's value is the
-    # one the service receives when the provider declines.
+    # Not filled, so neither relaxed nor dropped.
     calls: list[None] = []
     service = Record()
     spec = ServiceSpec(
@@ -2991,9 +2904,7 @@ def test_a_declinable_key_stays_the_caller_s(ada: Any) -> None:
 
 
 def test_a_declinable_key_left_out_reaches_the_class_level_check(ada: Any) -> None:
-    # Not demanded by the shape check, since the provider may fill it, so the
-    # class-level check refuses this principal first, and no provider has run:
-    # it stays after class-level authorization.
+    # Not demanded by the shape check, since the provider may fill it.
     calls: list[None] = []
     spec = ServiceSpec(
         service=Record(), permissions=[Refuse()], reads=PROJECT, kwargs=_declining_project(calls)
@@ -3085,7 +2996,6 @@ def test_a_grant_that_checked_the_target_skips_the_scope_check_only_for_a_target
     dispatch(spec, principal=ada, arguments={}, grant=grant, target=None)
     assert check.scopes == []
     assert len(service.calls) == 1
-    # Without it, the grant says nothing about what dispatch resolves itself.
     with pytest.raises(NotPermitted):
         dispatch(spec, principal=ada, arguments={}, grant=grant)
     assert check.scopes == [None]
@@ -3179,8 +3089,7 @@ def test_a_list_selector_s_none_under_allow_none_is_refused_as_an_empty_set(ada:
 
 
 def test_a_list_selector_s_none_under_allow_none_skips_the_shaping(ada: Any) -> None:
-    # Nothing to shape: the shaping check's "returned None" refusal does not
-    # answer for a None the spec says it may return.
+    # Nothing to shape.
     spec = SelectorSpec(
         kind=LIST, selector=_nothing, permissions=OPEN, allow_none=True, select_related=["owner"]
     )
@@ -3209,8 +3118,7 @@ def test_a_retrieve_selector_s_own_none_under_allow_none_stays_none(ada: Any) ->
 
 
 def test_a_list_selector_s_none_without_allow_none_is_left_as_it_was(ada: Any) -> None:
-    # Unchanged: the scope check is asked of ``None``, the result carries it,
-    # and presenting it as a list fails as the author's error.
+    # Unchanged: the scope check is asked of ``None``, the result carries it.
     check = Scoped()
     spec = SelectorSpec(kind=LIST, selector=_nothing, permissions=[check])
 
@@ -3277,8 +3185,7 @@ def test_a_pre_resolved_target_runs_no_lookup_and_is_object_checked_once(
     assert selector.calls == 0
     assert check.rows == [note]
     assert service.calls[0]["instance"] == note
-    # Not a lookup skipped and a check with it: a row the principal may not
-    # touch is still refused.
+    # Not a lookup skipped and a check with it: a row the principal may not touch is still refused.
     with pytest.raises(NotPermitted, match="Not within your scope."):
         dispatch(spec, principal=ada, arguments={"pk": theirs.pk}, target=theirs)
 
@@ -3396,11 +3303,7 @@ def writes_then_returns(owner: Any, returned: Any) -> Callable[..., Any]:
 
 
 class TestMany:
-    """A ``many`` spec: a list of rows, each checked and validated, then one run.
-
-    Every spec is built inside its test, so a tree without ``many`` fails each
-    test on its own.
-    """
+    """A ``many`` spec: a list of rows, each checked and validated, then one run."""
 
     def test_the_service_runs_once_with_every_validated_row(self, ada: Any) -> None:
         service = Record(returns=["a", "b"])
@@ -3427,8 +3330,7 @@ class TestMany:
         assert service.calls[0]["data"] == []
 
     def test_a_shape_refusal_and_a_validator_refusal_are_one_tree_by_index(self, ada: Any) -> None:
-        # Row 0 is well-shaped and refused by the Validator alone, row 2 by the
-        # shape check alone, so each address is answered by the check it names.
+        # Row 0 is well-shaped and refused by the Validator alone, row 2 by the shape check alone.
         service = Record()
         validator = Rows()
         spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
@@ -3442,7 +3344,6 @@ class TestMany:
             }
         }
         assert refused.value.detail["items"][0]["title"] != [expected_type_refusal("string")]
-        # Every row the shape check let through was validated, and none ran.
         assert [args for args, _ in validator.calls] == [{"title": "bad"}, {"title": "fine"}]
         assert service.calls == []
 
@@ -3546,8 +3447,7 @@ class TestMany:
     def test_the_scope_check_is_asked_of_nothing_before_any_row_is_validated(
         self, ada: Any
     ) -> None:
-        # A list of rows resolves no target, so the scope check is asked about
-        # ``None``, as for a create, and never about the caller's rows.
+        # A list of rows resolves no target, so the scope check is asked about ``None``.
         validator = Titled()
         check = Scoped(refuse_scope=True)
         spec = ServiceSpec(service=Record(), permissions=[check], many=True, validator=validator)
@@ -3557,9 +3457,7 @@ class TestMany:
         assert validator.calls == []
 
     def test_a_malformed_row_from_a_refused_principal_is_not_permitted(self, ada: Any) -> None:
-        # A row is checked with its Validator, after authorization, so a
-        # principal refused learns nothing about the rows it sent; the list's
-        # own shape is checked before, as any argument's is.
+        # A row is checked with its Validator, after authorization.
         spec = ServiceSpec(service=Record(), permissions=[Refuse()], many=True, validator=Titled())
         with pytest.raises(NotPermitted, match="Only editors may run this."):
             dispatch(spec, principal=ada, arguments={"items": [{"title": 3}]})
@@ -3620,9 +3518,7 @@ class TestMany:
         ]
 
     def test_each_row_s_validator_sees_only_the_keys_it_declares(self, ada: Any) -> None:
-        # The shape check refuses an unknown key inside a row, so only a
-        # provider can put one there; a serializer ignores a key it has no
-        # field for, and so is the Validator never handed one.
+        # The shape check refuses an unknown key inside a row, so only a provider can put one there.
         validator = Titled()
         spec = ServiceSpec(
             service=Record(),
@@ -3637,9 +3533,7 @@ class TestMany:
     def test_a_validator_validating_the_list_as_one_is_asked_once_and_binds_once(
         self, ada: Any
     ) -> None:
-        """``validated_many`` is what dispatch asks of a many spec: once, with
-        each row under its index, ``input_data`` merged over it and only the
-        keys the Validator declares, and what it binds reaches the service."""
+        """``validated_many`` is what dispatch asks of a many spec: once."""
         service = Record()
         validator = Listed()
         spec = ServiceSpec(
@@ -3653,16 +3547,13 @@ class TestMany:
         [(rows, context, many_argument)] = validator.lists
         assert rows == {0: {"title": "a"}, 1: {"title": "b"}}
         assert (context.principal, context.target, many_argument) == (ada, None, "items")
-        # The per-row path is never taken.
         assert validator.calls == []
         [call] = service.calls
         assert call["items"] == call["data"] == [{"title": "A"}, {"title": "B"}]
         assert call["listed"] is validator
 
     def test_a_list_level_refusal_sits_beside_the_rows_shape_refusals(self, ada: Any) -> None:
-        """The Validator sees only the rows the shape check let through, each
-        under its own index, so its refusals land on the rows they name; the
-        list's own message sits under ``non_field_errors``, after the rows."""
+        """The Validator sees only the rows the shape check let through."""
         validator = Listed(most=1)
         spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
         rows = [{"title": 3}, {"title": "fine"}, {"title": "bad"}]
@@ -3680,10 +3571,7 @@ class TestMany:
     def test_the_refusals_are_in_index_order_whatever_order_the_validator_raised_them_in(
         self, ada: Any
     ) -> None:
-        """The shape check's refusal of a later row and a Validator that puts
-        the list's message first still read row by row, then the list's own:
-        merged as raised they would read 2, ``non_field_errors``, 0. The ints
-        and the string do not compare, so ``sort_keys`` cannot order them."""
+        """The shape check still reads a later row by row, before the list's own message."""
 
         class ListFirst(Listed):
             def validated_many(
@@ -3717,8 +3605,7 @@ class TestMany:
         assert service.calls == []
 
     def test_values_spread_beside_the_list_are_refused(self, ada: Any) -> None:
-        """A many spec's rows are never spread by field, so ``validated_many``
-        hands back its values under ``many_argument`` alone."""
+        """A many spec's rows are never spread by field."""
 
         class Spreading(Titled):
             def validated_many(
@@ -3755,8 +3642,7 @@ class TestMany:
     def test_a_service_parameter_named_after_a_row_field_is_the_author_s_error(
         self, ada: Any
     ) -> None:
-        # A row's fields are never spread, so nothing a caller sends fills
-        # ``title``: the service's own error, never a missing argument.
+        # A row's fields are never spread, so nothing a caller sends fills ``title``.
         def bulk(*, title: str) -> None: ...
 
         spec = ServiceSpec(service=bulk, permissions=OPEN, many=True, validator=Titled())
@@ -3810,9 +3696,7 @@ class TestMany:
     def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
         self, ada: Any, returned: Any, name: str, atomic: bool
     ) -> None:
-        # The operands of the check in ``finish_service``, for a ``many`` spec:
-        # fails without any of them. The fix it names is not ``returns_many``'s,
-        # which a ``many`` spec does not set, and the write is still there.
+        # The operands of the check in ``finish_service``, for a ``many`` spec.
         spec = ServiceSpec(
             service=writes_then_returns(ada, returned),
             permissions=OPEN,
@@ -3835,9 +3719,7 @@ class TestMany:
     def test_a_single_value_is_presented_when_an_output_selector_re_reads_it(
         self, ada: Any
     ) -> None:
-        # Holds the ``output_spec is None`` operand of the check in
-        # ``finish_service``: with a selector the service's return is only what
-        # it re-reads, so a summary mapping is not refused.
+        # Holds the ``output_spec is None`` operand of the check in ``finish_service``.
         spec = ServiceSpec(
             service=Record(returns={"written": 1}),
             permissions=OPEN,
@@ -3877,16 +3759,14 @@ class TestMany:
         assert seen == [[{"title": "a"}, {"title": "b"}]]
 
     def test_a_many_service_returning_none_presents_none(self, ada: Any) -> None:
-        # The write has committed by the time the result is presented, so a
-        # bulk service with nothing to return must not be refused there.
+        # The write has committed by the time the result is presented.
         spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())
         result = dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
         assert result.kind == "instance"
         assert present(spec, result) is None
 
     def test_a_list_of_rows_past_the_default_maximum_is_refused_at_the_list(self, ada: Any) -> None:
-        # Refused before any row is checked or validated: one transaction over
-        # every row and one Validator run each is the cost being bounded.
+        # Refused before any row is checked or validated.
         service = Record()
         validator = Titled()
         spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
@@ -3935,8 +3815,7 @@ class TestMany:
             "items": [("Ensure this field has at least 1 elements.", "min_length")]
         }
         assert service.calls == []
-        # A list that meets it is checked as any other: the empty stand-in the
-        # top level is checked with is never held to the minimum.
+        # A list that meets it is checked as any other.
         dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
         assert service.calls[0]["data"] == [{"title": "a"}]
 
@@ -4022,7 +3901,6 @@ class TestRefusalCodes:
         with pytest.raises(InvalidArguments) as refused:
             dispatch(spec, principal=ada, arguments={"items": [{"title": "bad"}]})
         assert type(refused.value.detail["items"][0]["title"][0]) is str
-        # And on one call, where the Validator's tree is the refusal itself.
         validator = Blank()
         one = ServiceSpec(service=Record(), permissions=OPEN, validator=validator)
         with pytest.raises(InvalidArguments) as refused:
@@ -4032,10 +3910,7 @@ class TestRefusalCodes:
     def test_a_row_the_shape_check_refuses_is_never_validated_as_on_one_call(
         self, ada: Any
     ) -> None:
-        # Row 0's title is blank and it carries an unknown key: the shape check
-        # answers it and the Validator never sees it, as a single call with the
-        # same arguments is refused before its Validator runs. Row 1 is
-        # well-shaped, so its blank title is the Validator's to refuse.
+        # Row 0's title is blank and it carries an unknown key.
         validator = Blank()
         spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=validator)
         rows = [{"title": " ", "colour": "red"}, {"title": " "}]
@@ -4055,8 +3930,7 @@ class TestRefusalCodes:
 
 
 def test_passthrough_is_refused_rather_than_run_as_ignore(ada: Any) -> None:
-    # Sized so the policy is what answers: an active principal, an open spec
-    # and an undeclared key the IGNORE branch would drop and run.
+    # Sized so the policy is what answers: an active principal.
     spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=OPEN)
     with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
         dispatch(
@@ -4091,8 +3965,7 @@ def test_a_foreign_service_declaration_runs_as_its_compiled_spec(ada: Any) -> No
 
 
 def test_a_foreign_declaration_s_grant_is_its_compiled_spec_s(ada: Any) -> None:
-    # A grant bound to the compiled spec covers the object it was compiled
-    # from, so the class-level check is not asked twice.
+    # A grant bound to the compiled spec covers the object it was compiled from.
     asked: list[Any] = []
 
     class Counted(PermissionCheck):
@@ -4125,9 +3998,7 @@ class _Counted(PermissionCheck):
 
 
 def test_a_grant_built_from_a_source_covers_the_source_and_its_compiled_spec(ada: Any) -> None:
-    # The shape of an HTTP transport over another library's declarations: its
-    # view authorizes the object it holds, mints the grant from that object,
-    # and dispatches either the object or what it compiles to.
+    # The shape of an HTTP transport over another library's declarations.
     check = _Counted()
     source = Foreign(SelectorSpec(kind=LIST, selector=notes_of, permissions=[check]))
     grant = Grant(source, ada)
@@ -4193,9 +4064,7 @@ class TestAmbient:
             context.ambient["tenant"] = "another"  # ty: ignore[invalid-assignment]
 
     def test_the_validator_reads_the_resolved_row_and_cannot_replace_it(self, ada: Any) -> None:
-        # Behind a read-only proxy, as ``ambient`` is: handed the mapping
-        # itself, a Validator assigning into it would change the row the
-        # service receives.
+        # Behind a read-only proxy, as ``ambient`` is: handed the mapping itself.
         note = Note.objects.create(owner=ada, title="kept")
         validator = Titled()
         spec = ServiceSpec(
@@ -4248,9 +4117,7 @@ class TestOverlays:
         assert (call["tag"], call["extra"]) == ("spec", 1)
 
     def test_an_extra_kwargs_key_naming_a_declared_parameter_is_refused(self, ada: Any) -> None:
-        """The caller's value for a declared parameter is what the checks and
-        the target selector read, so an overlay standing in for it would run
-        the call on a value they never saw. Refused before anything runs."""
+        """The caller's value for a declared parameter is what the checks read."""
         service = Record()
         spec = ServiceSpec(service=service, permissions=OPEN, reads=_READ_Q)
         with pytest.raises(ImproperlyConfigured) as refused:
@@ -4283,8 +4150,7 @@ class TestOverlays:
                 )
 
     def test_a_many_spec_s_list_is_a_declared_parameter_too(self, ada: Any) -> None:
-        """The rows are the call's argument under ``many_argument``, so an
-        overlay may not stand in for the list either."""
+        """The rows are the call's argument under ``many_argument``."""
         service = Record()
         spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=Titled())
         with pytest.raises(ImproperlyConfigured, match=r"\['items'\]"):
@@ -4312,8 +4178,7 @@ class TestOverlays:
         assert "other" not in service.calls[0]
 
     def test_a_parameter_the_spec_s_typed_provider_fills_is_not_refused(self, ada: Any) -> None:
-        """The caller's value for it is dropped before any check, and the
-        overlay's is dropped beneath the provider, so the two cannot diverge."""
+        """The caller's value for it is dropped before any check."""
         provider, _ = _project_provider()
         service = Record()
         spec = ServiceSpec(service=service, permissions=OPEN, reads=PROJECT, kwargs=provider)
@@ -4323,7 +4188,6 @@ class TestOverlays:
     @pytest.mark.parametrize(
         ("overlay", "key", "computed"),
         [
-            # Returned by the Validator and declared by no parameter.
             pytest.param({"slug": "view"}, "slug", "t", id="a-validated-value"),
             pytest.param({"form": "view"}, "form", "bound", id="a-bound-value"),
         ],
@@ -4331,9 +4195,7 @@ class TestOverlays:
     def test_a_value_the_validator_computed_outranks_the_overlay(
         self, ada: Any, overlay: Mapping[str, Any], key: str, computed: str
     ) -> None:
-        """The overlay is the lowest tier: the Validator's values and the pool
-        it binds stand over it, and its entry is dropped for the call rather
-        than refused, since whether a key is computed can turn on the request."""
+        """The overlay is the lowest tier."""
         service = Record()
         validator = _Binds({"form": "bound"}, returns={"title": "T", "slug": "t"})
         spec = ServiceSpec(service=service, permissions=OPEN, validator=validator)
@@ -4343,9 +4205,7 @@ class TestOverlays:
     def test_the_overlay_fills_what_the_validator_left_uncomputed_on_this_call(
         self, ada: Any
     ) -> None:
-        """A Validator computing ``slug`` only from a ``title`` sent: the same
-        overlay fills the gap on a call without one and yields on a call with
-        one, and neither call is an error."""
+        """A Validator computing ``slug`` only from a ``title`` sent."""
 
         class _SlugWhenTitled(Validator):
             def parameters(self) -> Parameters:
@@ -4368,8 +4228,7 @@ class TestOverlays:
         assert [call["slug"] for call in service.calls] == ["view", "t"]
 
     def test_a_many_call_s_bound_value_outranks_the_overlay(self, ada: Any) -> None:
-        """``validated_many`` binds its pool once for the call, and stands over
-        the overlay as on a single call."""
+        """``validated_many`` binds its pool once for the call."""
         service, validator = Record(), Listed()
         spec = ServiceSpec(service=service, permissions=OPEN, many=True, validator=validator)
         dispatch(
@@ -4397,8 +4256,7 @@ class TestOverlays:
     def test_a_computed_value_the_spec_s_typed_provider_owns_is_never_the_overlay_s(
         self, ada: Any
     ) -> None:
-        """The overlay's value for a key the provider owns is dropped beneath
-        it, so it reaches nothing and the Validator's value stands."""
+        """The overlay's value for a key the provider owns is dropped beneath it."""
 
         def owns() -> _OwnsScope:
             return {}
@@ -4412,8 +4270,7 @@ class TestOverlays:
     def test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing(
         self, ada: Any
     ) -> None:
-        """The caller's dict is changed while the call runs, here by a check;
-        the run still sees the overlay as it was on entry."""
+        """The caller's dict is changed while the call runs, here by a check."""
         extra = {"tag": "view"}
 
         class Changing(PermissionCheck):
@@ -4431,8 +4288,7 @@ class TestOverlays:
             dispatch(retrieve(), principal=ada, arguments={"pk": 1}, extra_kwargs={"pk": 2})
 
     def test_a_key_the_spec_s_typed_provider_owns_is_never_the_overlay_s(self, ada: Any) -> None:
-        """The provider is the key's only source: one that leaves it out
-        leaves it absent, whatever the overlay says."""
+        """The provider is the key's only source: one that leaves it out leaves it absent."""
 
         def owns() -> _OwnsScope:
             return {}
@@ -4474,8 +4330,7 @@ class TestOverlays:
 
     @pytest.mark.parametrize("spec", [EDIT, retrieve()], ids=["service", "selector"])
     def test_there_is_no_input_data_overlay(self, spec: Any, ada: Any) -> None:
-        """A transport merges what it would overlay into the arguments it
-        hands dispatch, so the checks and the Validator see one value."""
+        """A transport merges what it would overlay into the arguments it hands dispatch."""
         with pytest.raises(TypeError, match="unexpected keyword argument 'extra_input_data'"):
             dispatch(spec, principal=ada, arguments={}, extra_input_data={"x": 1})
 
@@ -4548,9 +4403,7 @@ class TestArgumentsChannel:
     def test_the_mapping_is_read_only_at_its_top_level_and_its_values_are_the_call_s(
         self, ada: Any
     ) -> None:
-        """No key can be set or removed, and that is all the proxy promises:
-        a value is the call's own object, the one the run receives, so a
-        check must not mutate it. No copy is made to make it otherwise."""
+        """No key can be set or removed, and that is all the proxy promises."""
         arguing, service = Arguing(), Record()
         spec = ServiceSpec(
             service=service,
@@ -4565,8 +4418,7 @@ class TestArgumentsChannel:
         assert handed["tags"] is service.calls[0]["tags"]
 
     def test_a_many_call_s_checks_are_handed_its_reads_and_never_its_rows(self, ada: Any) -> None:
-        """The rows are refused or validated in step five, after every
-        check, so they are not the checks' to read."""
+        """The rows are refused or validated in step five, after every check."""
         arguing = Arguing()
         spec = ServiceSpec(
             service=Record(),
@@ -4582,9 +4434,7 @@ class TestArgumentsChannel:
         ]
 
     def test_a_method_taking_only_keywords_is_handed_nothing(self, ada: Any) -> None:
-        """Opt-in is by name: a method spreading ``**kwargs`` - a wrapper
-        forwarding to one that never declared ``arguments`` - is not handed
-        a keyword it might pass on to a call that refuses it."""
+        """Opt-in is by name: a method spreading ``**kwargs``."""
         seen: list[dict[str, Any]] = []
 
         class Spreading(PermissionCheck):
@@ -4607,9 +4457,7 @@ class TestArgumentsChannel:
     def test_a_method_replaced_on_its_class_is_read_as_it_now_is(
         self, ada: Any, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Read from the method dispatch is about to call, not from a
-        snapshot taken when the class was defined, so patching the method
-        in or out of the keyword is followed."""
+        """Read from the method dispatch is about to call."""
         seen: list[str] = []
 
         class Plain(PermissionCheck):
@@ -4630,9 +4478,7 @@ class TestArgumentsChannel:
         assert seen == ["plain", "declaring {'pk': 1}"]
 
     def test_a_method_shadowed_on_the_instance_is_read_as_the_shadow(self, ada: Any) -> None:
-        """Dispatch calls ``getattr(check, method)``, so that is what is read:
-        a callable set on the instance answers for its own signature, not
-        for the class method it shadows."""
+        """Dispatch calls ``getattr(check, method)``, so that is what is read."""
         seen: list[tuple[Any, ...]] = []
         check = Arguing()
 
@@ -4646,8 +4492,7 @@ class TestArgumentsChannel:
         assert seen == [(ada, spec)]
 
     def test_a_mock_patched_over_a_method_is_asked_as_before(self, ada: Any) -> None:
-        """A mock's signature spreads ``**kwargs``, so it is asked exactly as a
-        check that never opted in, whatever the method it replaces declared."""
+        """A mock's signature spreads ``**kwargs``."""
         check = Arguing()
         spec = ServiceSpec(service=Record(), permissions=(check,))
         with mock.patch.object(
@@ -4659,8 +4504,7 @@ class TestArgumentsChannel:
     def test_a_callable_the_class_holds_unhashed_is_read_by_its_own_signature(
         self, ada: Any
     ) -> None:
-        """An ``eq=True`` dataclass has no hash, so nothing can be cached
-        under it; its signature is read on every call instead."""
+        """An ``eq=True`` dataclass has no hash, so nothing can be cached under it."""
 
         @dataclass
         class Rule:
@@ -4684,8 +4528,7 @@ class TestArgumentsChannel:
     def test_a_wrapper_narrower_than_the_method_it_wraps_is_read_as_the_wrapper(
         self, ada: Any
     ) -> None:
-        """``functools.wraps`` points ``__wrapped__`` at a method declaring
-        ``arguments``; the wrapper is what is called, and it does not."""
+        """``functools.wraps`` points ``__wrapped__`` at a method declaring ``arguments``."""
 
         def narrowing(method: Callable[..., bool]) -> Callable[..., bool]:
             @functools.wraps(method)
@@ -4704,9 +4547,7 @@ class TestArgumentsChannel:
     def test_a_forwarding_wrapper_is_handed_them_where_the_method_it_wraps_declares_them(
         self, ada: Any
     ) -> None:
-        """An ordinary ``functools.wraps`` decorator spreading ``*args,
-        **kwargs`` forwards the keyword to the method it wraps, so a check
-        that opted in stays opted in behind one."""
+        """An ordinary ``functools.wraps`` decorator spreading ``*args."""
 
         def spreading(method: Callable[..., bool]) -> Callable[..., bool]:
             @functools.wraps(method)
@@ -4723,8 +4564,7 @@ class TestArgumentsChannel:
         assert check.questions()[0] == ("has_permission", {})
 
     def test_a_decorated_check_refusing_by_an_argument_still_refuses(self, ada: Any) -> None:
-        """Handed nothing, the check below would read the absent mapping and
-        decide without the ``x`` it guards; it must be handed the call's."""
+        """Handed nothing, the check below would decide without the ``x`` it guards."""
 
         def forwarding(method: Callable[..., bool]) -> Callable[..., bool]:
             @functools.wraps(method)
@@ -4750,9 +4590,7 @@ class TestArgumentsChannel:
             dispatch(spec, principal=ada, arguments={"x": 7})
 
     def test_a_forwarding_wrapper_over_a_narrower_one_is_handed_nothing(self, ada: Any) -> None:
-        """Each layer answers for itself: the forwarding one passes the keyword
-        to the narrow one beneath it, which would refuse it, so neither is
-        handed it, whatever the method at the bottom declares."""
+        """Each layer answers for itself."""
         seen: list[Any] = []
 
         def guarded(
@@ -4777,8 +4615,7 @@ class TestArgumentsChannel:
         assert seen == [None]
 
     def test_forwarding_layers_over_an_opted_in_method_are_handed_them(self, ada: Any) -> None:
-        """Every layer between spreads ``**kwargs``, so the keyword reaches the
-        method that asked, however many there are."""
+        """Every layer between spreads ``**kwargs``."""
 
         class Layered(Arguing):
             has_permission = _forwarding(_forwarding(Arguing.has_permission))
@@ -4788,8 +4625,7 @@ class TestArgumentsChannel:
         assert check.questions()[0] == ("has_permission", {})
 
     def test_a_callable_with_no_signature_is_asked_as_before(self, ada: Any) -> None:
-        """A builtin behind a partial has no signature to read; it never
-        opted in, so it is asked as a check that did not."""
+        """A builtin behind a partial has no signature to read; it never opted in."""
 
         class Builtin(PermissionCheck):
             has_permission = staticmethod(functools.partial(max, key=id))
@@ -4804,8 +4640,7 @@ class TestArgumentsChannel:
     def test_a_forwarding_wrapper_over_a_method_naming_none_is_handed_nothing(
         self, ada: Any
     ) -> None:
-        """``**kwargs`` alone opts nothing in: the method it forwards to never
-        asked, and would refuse the keyword."""
+        """``**kwargs`` alone opts nothing in: the method it forwards to never asked."""
         seen: list[tuple[Any, ...]] = []
 
         def plain(self: Any, principal: Any, spec: Any) -> bool:
@@ -4824,9 +4659,7 @@ class TestArgumentsChannel:
         assert seen == [(ada, spec)]
 
     def test_a_caller_s_value_for_a_key_the_server_fills_is_never_a_check_s(self, ada: Any) -> None:
-        """The caller's value for a read the ``kwargs`` provider is annotated
-        to fill, or a field the ``input_data`` provider is, is checked and then
-        dropped, so it is not the call's argument for a check to decide on."""
+        """The caller's value for a read the ``kwargs`` provider is annotated to fill."""
         provider, _ = _project_provider()
 
         class _ServerTitle(TypedDict):
@@ -5017,18 +4850,13 @@ class TestTheCallContext:
         }
         assert saw.all_are(call_context)
         assert result.context.call_context is call_context
-        # The kernel writes nothing to it.
         assert call_context == {}
 
     @_ENTRIES
     def test_the_transport_key_is_the_transport_s_and_the_kernel_leaves_it_alone(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """``transport`` is a family convention: never set, read, refused or replaced here.
-
-        The other half, that the kernel sets none on a dict handed none, is
-        ``call_context == {}`` in the test above.
-        """
+        """``transport`` is a family convention: never set, read, refused or replaced here."""
         note = Note.objects.create(title="n", owner=ada)
         saw = _Saw()
         presenter = Contextual()
@@ -5049,12 +4877,7 @@ class TestTheCallContext:
     def test_no_stage_of_the_kernel_touches_the_transport_key(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """Dispatch and presenting run the same with the key absent, and never look it up.
-
-        The two tests above see only what the dict holds afterwards; a read
-        leaves no mark there, and a kernel that branched on a transport would
-        pass both.
-        """
+        """Dispatch and presenting run the same with the key absent, and never look it up."""
         note = Note.objects.create(title="n", owner=ada)
         saw = _Saw()
         presenter = Contextual()
@@ -5200,8 +5023,7 @@ class TestTheCallContext:
     def test_a_call_handed_none_gets_a_fresh_dict_its_stages_share(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """One per call, never one shared between calls, and empty: a stage
-        that writes to it needs no guard for a transport that has none."""
+        """One per call, never one shared between calls, and empty."""
         note = Note.objects.create(title="n", owner=ada)
         saw = _Saw()
         presenter = Contextual()
@@ -5319,11 +5141,7 @@ def _reporting_first(result: Callable[[dict[str, Any]], Any]) -> Callable[[dict[
 
 
 def _catch_all_stages(handed: dict[str, list[str]]) -> ServiceSpec:
-    """``_every_stage`` with every stage taking ``**kwargs`` and naming nothing.
-
-    Each records the names it was handed, by the stage's name, so a test reads
-    what a catch-all written before ``call_context`` existed would forward.
-    """
+    """``_every_stage`` with every stage taking ``**kwargs`` and naming nothing."""
 
     def seat(stage: str, result: Any) -> Callable[..., Any]:
         def stage_callable(**kwargs: Any) -> Any:
@@ -5364,13 +5182,7 @@ def _catch_all_stages(handed: dict[str, list[str]]) -> ServiceSpec:
 
 
 class TestACatchAllIsNeverHandedTheCallContext:
-    """``call_context`` reaches a stage by its name alone, never through ``**kwargs``.
-
-    The kernel's floors are unbounded, so every published transport resolves
-    onto this release: a catch-all condition or provider forwarding its
-    ``**kwargs`` into a strict callable must go on receiving what it did.
-    ``TestTheCallContext`` holds the other half, a stage naming it.
-    """
+    """``call_context`` reaches a stage by its name alone, never through ``**kwargs``."""
 
     _SEATS = (
         "instance_selector",
@@ -5749,17 +5561,10 @@ class TestShapesReachThePool:
         }
         assert saw.all_are({"query": "name"})
         assert dict(presenter.contexts[0].shapes) == {"query": "name"}
-        # The seed is the presenter's own mapping, not an equal copy of it, at
-        # every seat that is handed it: the providers' pool and the output
-        # selector's are each built from it, and a copy that merely equals it
-        # passes the equality above and fails this.
+        # The seed is the presenter's own mapping, not an equal copy of it.
         assert all(
             each is presenter.contexts[0].shapes for seen in saw.shapes.values() for each in seen
         )
-        # The write's target selector is the one callable that is not: it is
-        # handed nothing on any route, as ``resolve_target`` does, so one that
-        # filters by the shapes finds the same row under either
-        # (test_a_target_selector_is_handed_no_shapes_on_any_route).
         assert [dict(shapes) for shapes in looked_up] == [{}]
 
     def test_an_awaited_selector_receives_the_shapes_the_presenter_is_handed(
@@ -5815,8 +5620,7 @@ class TestShapesReachThePool:
     def test_a_catch_all_is_never_handed_the_shapes(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """By name only, as ``call_context`` is: a selector forwarding its ``**kwargs``
-        into ``filter()`` runs as it did before the name was reserved."""
+        """By name only, as ``call_context`` is."""
         Note.objects.create(title="name", owner=ada)
         saw: list[Mapping[str, Any]] = []
 
@@ -5838,8 +5642,7 @@ class TestShapesReachThePool:
     def test_a_seed_resolver_naming_the_shapes_is_handed_none(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """A seed is resolved before anything the call adds, so its resolver
-        gets its own default for ``shapes``, as for ``call_context``."""
+        """A seed is resolved before anything the call adds."""
         handed: list[Any] = []
         not_handed = object()
 
@@ -5881,8 +5684,7 @@ class TestShapesReachThePool:
 def test_with_none_passed_the_validator_and_the_presenter_share_one_fresh_dict(
     entry: Callable[..., Any], ada: Any
 ) -> None:
-    """Neither declares more than its context, so each would otherwise get
-    the empty dict a context built by hand gets, and the two would differ."""
+    """Neither declares more than its context."""
     note = Note.objects.create(title="n", owner=ada)
     validator = Titled()
     spec = ServiceSpec(service=lambda: note, permissions=OPEN, validator=validator)
@@ -6014,8 +5816,7 @@ class TestSeedsAtThePermissionCheck:
     def test_a_spec_whose_checks_name_no_seed_resolves_them_exactly_as_before(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """Once per pool, every one after the class-level check: opting into
-        the arguments or the call's context resolves nothing early."""
+        """Once per pool, every one after the class-level check."""
         note = Note.objects.create(title="n", owner=ada)
         events = _Events()
         entry(
@@ -6030,8 +5831,7 @@ class TestSeedsAtThePermissionCheck:
     def test_an_anonymous_caller_is_refused_before_a_seed_reads_its_principal(
         self, entry: Callable[..., Any]
     ) -> None:
-        """``PoolSeeds``' own example raises for an anonymous user; a spec whose
-        checks name no seed refuses the caller before it runs."""
+        """``PoolSeeds``' own example raises for an anonymous user."""
         seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: user.tenant)
 
         class _Authenticated(PermissionCheck):
@@ -6046,10 +5846,7 @@ class TestSeedsAtThePermissionCheck:
     def test_a_positional_parameter_named_after_a_seed_is_not_an_opt_in(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """A check written DRF-style, ``has_permission(self, request, spec)``,
-        under a transport registering ``request``: the principal fills the
-        parameter by position, so it is never handed the seed as well, and the
-        spec resolves its seeds as before."""
+        """A check written DRF-style, ``has_permission(self, request, spec)``."""
         events = _Events()
         asked: list[Any] = []
 
@@ -6263,9 +6060,7 @@ class TestEarlySeeds:
         assert all(handed is context for _, handed, _ in check.asked)
         assert [tenant for _, _, tenant in check.asked] == ["tenant-of-ada", "tenant-of-ada"]
 
-    # --- seeds handed on from the prelude -------------------------------------------------------
-    # Every carrier here is minted and dispatched with one shared ``call_context``:
-    # a carrier binds the dict its prelude ran with, and ``None`` binds a private one.
+    # Seeds handed on from the prelude; a carrier binds the dict the prelude ran with.
 
     @_ENTRIES
     def test_check_call_then_dispatch_resolves_a_check_named_seed_once(
@@ -6499,8 +6294,6 @@ class TestEarlySeeds:
             pool_seeds=tenancy.pool_seeds,
             call_context={},
         )
-        # The dict it ran with is public on the carrier, and a call handed
-        # that very dict is covered and runs on the carried values.
         entry(
             spec,
             principal=ada,
@@ -6666,15 +6459,7 @@ class TestEarlySeeds:
 
 
 class TestReturnsMany:
-    """``returns_many``: a service's own return dispatched and presented as a list, row by row.
-
-    The field is the output half of ``many``, so these cases dispatch a spec
-    taking one set of arguments and read back what ``present`` and its
-    audience sibling hand a transport; the async path is in
-    test_adispatch.py. Each asserts the result's kind before it presents, so
-    a tree that ignores the field fails at that assertion rather than inside
-    the presenter, handed a list where it expects a row.
-    """
+    """``returns_many``: a service's own return dispatched and presented as a list, row by row."""
 
     def test_a_list_of_rows_is_presented_row_by_row(self) -> None:
         rows = two_notes()
@@ -6687,7 +6472,6 @@ class TestReturnsMany:
         assert present(spec, result) == [{"title": "First"}, {"title": "Second"}]
         # Each row reached the item presenter on its own, never the list.
         assert presenter.seen == rows
-        # The input is left alone: one call, with the one argument as declared.
         assert [call["owner"] for call in service.calls] == ["ada"]
 
     def test_a_list_of_mappings_is_presented_row_by_row(self) -> None:
@@ -6710,8 +6494,7 @@ class TestReturnsMany:
         assert present(spec, result) == []
 
     def test_a_none_return_presents_none(self) -> None:
-        # One value, as a ``many`` service's ``None`` is: as a list it would be
-        # refused by ``present`` after the service had run.
+        # One value, as a ``many`` service's ``None`` is.
         ada = make_user("ada")
         spec, _ = returning_many(None, Titles())
 
@@ -6725,11 +6508,7 @@ class TestReturnsMany:
     def test_a_return_that_is_not_a_set_of_rows_is_the_authors_error(
         self, returned: Any, name: str, atomic: bool
     ) -> None:
-        # ``mapping``, ``str``, ``bytes`` and ``non-iterable`` are each an operand
-        # of the one check in ``finish_service``, which fails without it: the
-        # return would reach ``present`` as a list and die there on an unrelated
-        # error. Raised as ``ImproperlyConfigured``, not a refusal, because the
-        # service has run; the note it wrote is still there.
+        # ``mapping``, ``str``.
         ada = make_user("ada")
         spec = ServiceSpec(
             service=writes_then_returns(ada, returned),
@@ -6760,8 +6539,7 @@ class TestReturnsMany:
             dispatch(spec, principal=ada, arguments={"owner": "ada"})
 
     def test_without_the_field_a_returned_list_is_one_value(self) -> None:
-        # The other half of the cases above: the field is what makes the list, so
-        # the same return from a spec without it reaches the presenter whole.
+        # The other half of the cases above: the field is what makes the list.
         ada = make_user("ada")
         spec = ServiceSpec(service=Record(returns=[ROW]), permissions=OPEN, reads=OWNER_NAME)
 
@@ -6785,8 +6563,7 @@ class TestReturnsMany:
 
 @pytest.mark.parametrize("case", EVERY_ASK)
 def test_every_ask_in_one_dispatch_is_handed_its_own_dict(ada: Any, case: str) -> None:
-    """Every ask, not some: a Validator keyed on the dict would otherwise
-    describe one call two ways."""
+    """Every ask, not some."""
     spec, validator, arguments, service = every_ask_case(case)
     context: dict[str, Any] = {}
     dispatch(
@@ -6839,8 +6616,7 @@ def test_an_inner_dispatch_is_handed_a_different_dict(ada: Any) -> None:
 
 
 def test_an_inner_dispatch_handed_the_outer_dict_reads_it(ada: Any) -> None:
-    """The documented gap: a service forwarding its own dict to an inner
-    dispatch has that call described as the outer one. Hand it a fresh dict."""
+    """The documented gap."""
     inner_validator = AskedWith()
     inner = ServiceSpec(service=Record(), permissions=OPEN, validator=inner_validator)
     outer, _ = _nesting(inner, forwarding=True)

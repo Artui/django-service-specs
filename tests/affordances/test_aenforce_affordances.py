@@ -1,5 +1,3 @@
-"""``aenforce_affordances``: the async twin, answering every condition in one executor hop."""
-
 from __future__ import annotations
 
 import importlib
@@ -148,8 +146,7 @@ async def test_a_source_declaring_nothing_costs_no_executor_hop(hops: list[str])
 
 @pytest.mark.parametrize("wrapped", [False, True], ids=["spec", "source"])
 async def test_a_selector_spec_is_refused_as_the_sync_function_refuses_it(wrapped: bool) -> None:
-    # Declaring no affordances, so a check that answered "nothing declared"
-    # before asking what kind of spec it holds would let it through.
+    # Declaring no affordances.
     selector = SelectorSpec(kind=SelectorKind.LIST, selector=list)
     spec: Any = Foreign(selector) if wrapped else selector
     with pytest.raises(TypeError) as sync:

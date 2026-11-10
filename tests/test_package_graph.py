@@ -1,18 +1,3 @@
-"""The subpackages import one another in a line, never in a ring, and no import is guarded.
-
-A ring of packages is the shape rule 8 describes: the first leaf loaded from
-any of them runs a package ``__init__`` that imports the rest, and one of those
-imports the leaf back, half-initialized. It also leaves no order the packages
-can be read in. So the graph of every import in the package, annotation-only
-ones included, is held acyclic here.
-
-An ``if TYPE_CHECKING:`` guard is how a ring is hidden from the interpreter
-while the type checker still sees it, so none may exist in the package at all.
-A function-local import hides one the same way, so imports are read at every
-depth, and no module ring is allowed either: functions that recurse through one
-another live in one module, where the recursion is a call rather than an import.
-"""
-
 from __future__ import annotations
 
 import ast
@@ -45,18 +30,13 @@ def _modules() -> list[tuple[str, ast.Module]]:
 
 
 def _imported(tree: ast.AST) -> list[str]:
-    """Every module the tree imports, at any depth: a function body is an import too.
-
-    A function-local import is how a ring is hidden from the interpreter
-    without a guard, so it counts exactly as a top-level one does.
-    """
+    """Every module the tree imports, at any depth: a function body is an import too."""
     found: list[str] = []
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             found.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
             found.append(node.module)
-            # ``from pkg import module`` imports ``pkg.module`` when that is one.
             found.extend(f"{node.module}.{alias.name}" for alias in node.names)
     return found
 
@@ -151,8 +131,7 @@ def test_the_modules_form_no_ring() -> None:
 
 
 def test_the_ring_finder_finds_a_ring() -> None:
-    # The negative control: a finder that returned nothing for every graph
-    # would pass the test above for a package that was all rings.
+    # The negative control.
     assert _rings({"a": {"b"}, "b": {"c"}, "c": {"a"}, "d": {"a"}}) == [["a", "b", "c"]]
     assert _rings({"a": {"b"}, "b": {"c"}}) == []
 
@@ -173,7 +152,6 @@ def test_the_guard_finder_finds_each_spelling() -> None:
         # Only the name arm sees these two; ruff's ban misses both.
         "TYPE_CHECKING = False\nif TYPE_CHECKING:\n    pass\n",
         "from typing import *\nif TYPE_CHECKING:\n    pass\n",
-        # Only the alias arm sees a guard that is imported and never used here.
         "from typing import TYPE_CHECKING as TC\n",
     ):
         assert _guards(ast.parse(source)) != []

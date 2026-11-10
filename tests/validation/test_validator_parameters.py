@@ -1,5 +1,3 @@
-"""``validator_parameters``: how a Validator is asked what it takes, in a call or outside one."""
-
 from __future__ import annotations
 
 import functools
@@ -125,8 +123,7 @@ def _forwarding(method: Callable[..., Parameters]) -> Callable[..., Parameters]:
 
 
 def test_a_wrapper_not_naming_the_keyword_is_handed_nothing() -> None:
-    """The method's own signature decides, never the ``__wrapped__`` chain:
-    the function beneath names the keyword, the wrapper called does not."""
+    """The method's own signature decides, never the ``__wrapped__`` chain."""
 
     class Wrapped(_KeywordOnly):
         parameters = _forwarding(_KeywordOnly.parameters)
@@ -154,8 +151,7 @@ def test_a_wrapper_naming_the_keyword_itself_is_handed_it() -> None:
 
 
 def test_a_parameters_with_no_signature_is_asked_as_before() -> None:
-    """``inspect.signature`` raises for a ``__signature__`` that is not one;
-    such a callable never declared the keyword."""
+    """``inspect.signature`` raises for a ``__signature__`` that is not one."""
 
     def unreadable() -> Parameters:
         return TITLE
@@ -169,9 +165,7 @@ def test_a_parameters_with_no_signature_is_asked_as_before() -> None:
 def test_a_parameters_whose_signature_read_raises_value_error_is_asked_as_before(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``inspect.signature`` raises ``ValueError`` for a builtin with no signature
-    to read; which builtins vary by Python version, so the read is made to raise it.
-    A class built here, so no earlier ask has cached its answer."""
+    """``inspect.signature`` raises ``ValueError`` for a builtin with no signature to read."""
 
     def unreadable(*args: Any, **kwargs: Any) -> Any:
         raise ValueError("no signature found")
@@ -187,8 +181,7 @@ def test_a_parameters_whose_signature_read_raises_value_error_is_asked_as_before
 
 
 def test_a_method_binding_an_unhashable_callable_is_handed_the_call_s_dict() -> None:
-    """``MethodType`` binds any callable, so ``__func__`` is not always a function
-    and not always hashable: it is read uncached, never used as a cache key."""
+    """``MethodType`` binds any callable."""
 
     class Unhashable:
         # Defining ``__eq__`` without ``__hash__`` leaves it unhashable.
@@ -212,9 +205,7 @@ def test_a_method_binding_an_unhashable_callable_is_handed_the_call_s_dict() -> 
 
 
 def test_the_signature_is_read_once_per_function(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Read once for the function the class defines, across asks and instances:
-    a cache under the bound method, made afresh on each lookup, reads it on
-    every ask."""
+    """Read once for the function the class defines, across asks and instances."""
     read: list[Any] = []
     names = _module._names_call_context
 

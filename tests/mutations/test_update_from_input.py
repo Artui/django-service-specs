@@ -1,5 +1,3 @@
-"""Tests for update_from_input."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -197,10 +195,7 @@ class TestUpdateFromInput:
         assert obj.updated_at > old_ts
 
     def test_the_new_auto_now_value_needs_no_reload_to_be_read(self) -> None:
-        # Django's pre_save puts the new timestamp on the instance, so the
-        # returned one already carries it. The docs draw the line between
-        # values like this and the ones only a reload or a re-fetch produces
-        # (an F() expression, a fetch-time annotation), so pin this end of it.
+        # Django's pre_save puts the new timestamp on the instance.
         obj = Timestamped.objects.create(title="orig")
         Timestamped.objects.filter(pk=obj.pk).update(updated_at=timezone.now() - timedelta(hours=1))
         obj.refresh_from_db()
@@ -221,8 +216,7 @@ class TestFileFields:
         change = result.get_field_change("attachment")
         assert change is not None
         assert change.old == STORED
-        # What was written, as other fields report theirs: no file, not the
-        # form's marker for one.
+        # What was written, as other fields report theirs: no file, not the form's marker for one.
         assert change.new == ""
         assert change.new is not False
 
@@ -251,8 +245,7 @@ class TestFileFields:
     def test_an_upload_named_as_the_held_file_replaces_it_as_a_model_form_does(
         self, media: str
     ) -> None:
-        # The name says nothing about the content: an upload is a file to
-        # write, whatever it is called, and a ModelForm writes it.
+        # The name says nothing about the content: an upload is a file to write.
         with attachment_at_the_root():
             row = stored_document()
             twin = stored_document()
@@ -268,13 +261,10 @@ class TestFileFields:
             with Document.objects.get(pk=written.pk).attachment.open("rb") as stored:
                 assert stored.read() == b"new"
         assert result.changed_fields == ("attachment",)
-        # The name the row held, as a clear reports it.
         assert result.get_field_change("attachment").old == "notes.txt"
 
     def test_the_held_file_handed_back_is_no_change(self, media: str) -> None:
-        # A file the row already holds is no upload, so it compares by name and
-        # is not written again; a ModelForm's field cleans to it when nothing
-        # is uploaded.
+        # A file the row already holds is no upload.
         row = stored_document()
         with patch.object(Document, "save") as save:
             result = update_from_input(row, {"attachment": row.attachment, "scan": row.scan})

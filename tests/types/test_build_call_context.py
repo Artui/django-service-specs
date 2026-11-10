@@ -1,5 +1,3 @@
-"""``build_call_context``, the one way a transport builds a call's context and stamps it."""
-
 from __future__ import annotations
 
 import copy
@@ -34,8 +32,7 @@ class _Marker:
 
 
 def test_every_standard_entry_is_there_and_none_where_nothing_gave_one() -> None:
-    # The four keys are always written, so ``call_context["action"]`` is ``None``
-    # rather than a ``KeyError`` on a transport that has no action.
+    # The four keys are always written.
     assert build_call_context("cli") == {
         "request": None,
         "view": None,
@@ -74,8 +71,7 @@ def test_base_s_entries_are_kept_over_the_none_defaults() -> None:
 
 @pytest.mark.parametrize("name", _STANDARD)
 def test_an_argument_wins_over_base_s_entry(name: str) -> None:
-    # Parametrized over all four: one comprehension is one coverage arc, so a
-    # key dropped from the arguments would otherwise go unseen.
+    # Parametrized over all four: one comprehension is one coverage arc.
     given = _Marker(f"given {name}")
     context = build_call_context("agent", base={name: _Marker(f"base {name}")}, **{name: given})
     assert context[name] is given
@@ -90,8 +86,7 @@ def test_a_none_argument_leaves_base_s_entry(name: str) -> None:
 
 
 def test_the_stamp_wins_over_a_transport_base_carried() -> None:
-    # A run's dict handed in as ``base`` may name a transport of its own; the
-    # transport building this context is the one that serves the call.
+    # A run's dict handed in as ``base`` may name a transport of its own.
     context = build_call_context("agent", base={TRANSPORT_KEY: "rest"})
     assert context[TRANSPORT_KEY] == "agent"
 
@@ -130,8 +125,7 @@ def test_a_read_only_base_is_accepted() -> None:
 
 
 def test_each_call_returns_a_fresh_plain_dict_the_caller_may_change() -> None:
-    # A transport that keeps one dict per request builds it once and passes the
-    # same object to every callable; the builder's part is a dict it owns.
+    # A per-request transport builds one dict and passes the same object to every callable.
     base = {"client": "back-office"}
     first = build_call_context("rest", base=base)
     second = build_call_context("rest", base=base)

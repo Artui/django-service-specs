@@ -35,18 +35,14 @@ def test_by_default_the_validated_mapping_is_the_call_s_data_and_nothing_is_boun
     validated = validator.validated({"title": " Dune "}, context)
 
     assert validated.values == {"title": "Dune"}
-    # The same object, so a service taking ``data`` and one taking ``title``
-    # read one validation rather than two.
+    # The same object.
     assert validated.data is validated.values
     assert dict(validated.pool) == {}
-    # ``validate()`` runs once, handed the arguments and the context as they came.
     assert validator.calls == [({"title": " Dune "}, context)]
 
 
 def test_supports_partial_is_an_ordinary_attribute_an_instance_may_set() -> None:
-    """Declared as a plain ``bool``, never a ``ClassVar``: an adapter whose
-    answer depends on what it was built over sets it in ``__init__``, which a
-    type checker refuses for a ``ClassVar``."""
+    """Declared as a plain ``bool``, never a ``ClassVar``."""
     assert get_origin(get_type_hints(Validator)["supports_partial"]) is not ClassVar
     assert Validator.supports_partial is True
 
@@ -154,8 +150,7 @@ def test_a_class_attribute_override_is_what_a_reader_sees() -> None:
 
 @pytest.mark.parametrize("validator_class", [_Bare, _RequiresUser], ids=["inherited", "property"])
 def test_an_instance_cannot_assign_unsendable(validator_class: type[Validator]) -> None:
-    """A property with no setter, unlike ``supports_partial``: a subclass
-    answers for its instances, inherited or in a property override."""
+    """A property with no setter, unlike ``supports_partial``."""
     validator: Any = validator_class()
 
     with pytest.raises(AttributeError):
@@ -163,8 +158,7 @@ def test_an_instance_cannot_assign_unsendable(validator_class: type[Validator]) 
 
 
 def test_an_instance_can_assign_a_class_attribute_override() -> None:
-    """The caveat the docs give a plain class attribute: it is no descriptor,
-    so an instance assigning it shadows it."""
+    """The caveat the docs give a plain class attribute: it is no descriptor."""
     validator: Any = _RequiresUserByClass()
 
     validator.unsendable = frozenset({"other"})

@@ -1,5 +1,3 @@
-"""What ``check_call`` returns: the checked arguments and the grant, carrying the call's seeds."""
-
 from __future__ import annotations
 
 import copy

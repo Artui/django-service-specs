@@ -65,8 +65,7 @@ def test_the_shapes_seed_is_owned_and_never_asked_of_the_caller() -> None:
 
 
 def test_the_keys_a_provider_fills_are_the_server_s_and_those_it_may_decline_are_not() -> None:
-    # ``region`` admits ``UNSET``: the provider may step aside, so the
-    # caller's value is the one the callable receives, and the key stays theirs.
+    # ``region`` admits ``UNSET``: the provider may step aside.
     assert server_owned_keys(listing(kwargs=scope)) == RESERVED_POOL_SEEDS | {"tenant"}
 
 
@@ -80,9 +79,7 @@ def test_a_registered_seed_is_owned_with_the_dispatcher_s_own() -> None:
 
 
 def test_a_service_spec_owns_its_providers_and_its_target_lookup_s() -> None:
-    # Each provider is one part of the union. A key one of them fills is the
-    # server's for the whole call, because a parameter declaring it where
-    # that provider's values never reach is refused when the spec is built.
+    # Each provider is one part of the union.
     target = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=list, reads=PK, kwargs=owner)
     spec = ServiceSpec(
         service=print,
@@ -108,8 +105,7 @@ def test_a_source_owns_what_the_spec_it_compiles_to_owns() -> None:
 
 
 def test_a_seed_named_field_declared_only_to_a_call_is_the_caller_s_in_that_call() -> None:
-    # Owned by the seed in the declaration made to no call, which has no such
-    # field, and the caller's in the call whose context the Validator declares it to.
+    # Owned by the seed in the declaration made to no call, which has no such field.
     spec = ServiceSpec(
         service=print,
         validator=DeclaredToACall(Parameter("tenant", "string")),

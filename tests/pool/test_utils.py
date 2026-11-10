@@ -71,8 +71,7 @@ def test_no_provider_leaves_the_transport_s_reporter_as_it_is(resolve: Any) -> N
 
 class TestDeferredProgress:
     def test_the_provider_is_not_called_until_the_first_report(self) -> None:
-        # A call refused before its run never reports, so it never resolves
-        # the provider - a task record is not created for a call that was not made.
+        # A call refused before its run never reports, so it never resolves the provider.
         calls: list[Any] = []
 
         def provider(user: Any) -> Recorder:

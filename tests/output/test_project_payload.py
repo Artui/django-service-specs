@@ -46,8 +46,7 @@ def test_projects_each_row_of_a_list() -> None:
 
 
 def test_a_handle_keeps_its_constant() -> None:
-    """The second condition of the substitution: a handle is another tool's
-    input, so its choices are never spoken."""
+    """The second condition of the substitution: a handle is another tool's input."""
     projection = AudienceProjection(
         fields={"kind": FieldMarking.handle()}, choice_labels={"kind": LABELS}
     )
@@ -56,8 +55,7 @@ def test_a_handle_keeps_its_constant() -> None:
 
 
 def test_a_field_with_no_labels_is_passed_through() -> None:
-    """The first condition of the substitution: only a field with labels has
-    a display to substitute."""
+    """The first condition of the substitution."""
     projection = AudienceProjection(choice_labels={"status": LABELS})
 
     assert project_payload({"status": "PENDING_REVIEW", "other": "PENDING_REVIEW"}, projection) == {
@@ -79,8 +77,7 @@ def test_an_unknown_constant_passes_through() -> None:
     ids=["list", "tuple", "set", "frozenset"],
 )
 def test_each_member_of_a_collection_is_spoken(value: Any) -> None:
-    """A collection of constants is substituted member by member: looked up
-    whole, a list would be hashed and raise."""
+    """A collection of constants is substituted member by member: looked up whole."""
     projection = AudienceProjection(choice_labels={"tags": LABELS})
 
     assert project_payload({"tags": value}, projection) == {"tags": ["Awaiting review"]}
@@ -114,8 +111,7 @@ class TestFormatters:
         assert project_payload({"name": None}, projection) == {"name": None}
 
     def test_a_formatter_wins_over_the_choice_displays(self) -> None:
-        """Declared beats derived: the transform written by hand is the one
-        asked for, so the display is never substituted first."""
+        """Declared beats derived: the transform written by hand is the one asked for."""
         projection = AudienceProjection(
             fields={"status": FieldMarking.formatted(SHOUTED)}, choice_labels={"status": LABELS}
         )
@@ -133,8 +129,7 @@ class TestFormatters:
         assert project_payload({"line": {"cost": 1}}, projection) == {"line": "{'COST': 1}"}
 
     def test_a_handle_is_never_formatted(self) -> None:
-        """Declaring both is honoured as the handle, and its choices keep their
-        constants as well."""
+        """Declaring both is honoured as the handle."""
         projection = AudienceProjection(
             fields={"kind": FieldMarking(FieldAudience.HANDLE, formatter=SHOUTED)},
             choice_labels={"kind": LABELS},
@@ -165,9 +160,7 @@ class ProjectPresenter(Presenter):
 
 
 def test_a_uuid_choice_is_spoken_for_the_spelling_a_model_presents() -> None:
-    # The choice is held canonical, the spelling ``str()`` gives a model's UUID,
-    # so a row presenting that spelling finds its display. Output values are not
-    # canonicalised, so a row presenting another spelling passes through.
+    # The choice is held canonical, the spelling ``str()`` gives a model's UUID.
     spec = SelectorSpec(
         kind=SelectorKind.LIST, selector=notes_of, permissions=OPEN, presenter=ProjectPresenter()
     )

@@ -1,11 +1,3 @@
-"""Generic relations: the child collection whose link is a content type.
-
-Same reconciliation as a reverse foreign key -- matched inside the parent's own
-accessor, orphans unlinked when the link is nullable and deleted when it is not
--- with the one column replaced by two, and the content type resolved on first
-use rather than imported with the package.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -136,8 +128,7 @@ class TestOrphansFollowTheSameUnlinkOrDeleteRule:
 
         assert result.get_child_change("annotations").unlinked == (dropped.pk,)
         dropped.refresh_from_db()
-        # A link is severed or it is not -- half of one is a row pointing at a
-        # content type with no row id.
+        # A link is severed or it is not; half of one points at a content type with no row id.
         assert (dropped.kind_id, dropped.row_id) == (None, None)
 
     def test_merge_removes_nothing(self) -> None:
@@ -160,13 +151,7 @@ class TestOrphansFollowTheSameUnlinkOrDeleteRule:
 
 @pytest.mark.django_db
 class TestAGenericRowCannotBeCreatedUnderAForeignPrimaryKey:
-    """A generic row is created like any other, so ``Attachment(pk=7,
-    content_type=..., object_id=...).save()`` reassigns attachment 7 to this
-    parent and overwrites it.
-
-    The match is scoped to the parent's own accessor, so a pk belonging to a
-    different parent walks straight past it into the create.
-    """
+    """A generic row is created like any other, so ``Attachment(pk=7, content_type=...."""
 
     def test_another_parents_row_is_refused(self) -> None:
         catalog = Catalog.objects.create(name="c")

@@ -1,15 +1,3 @@
-"""``flat_arguments``: a query string or a form's fields read by the declaration, uncoerced.
-
-Every source here is Django's own ``QueryDict``, parsed from the query string a
-browser sends, so what is read back is what a real client's request carries;
-one test hands in a bare ``MultiValueDict``, the type the signature names.
-What comes back is strings and lists of strings: where a docstring claims a
-refusal, the test runs the value through ``coerce_flat`` as a transport does,
-and asserts the refusal it answers with.
-
-Called through the package root, which is where a transport reads it.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -83,8 +71,7 @@ def refusal(query: str, parameters: Parameters) -> dict[Any, Any]:
 
 class TestRepeatedKeys:
     def test_a_scalar_takes_the_last_of_repeated_values(self) -> None:
-        # QueryDict's own reading of a repeated key, so a query string built by
-        # appending reads as the client's last word rather than its first.
+        # QueryDict's own reading of a repeated key.
         assert read("count=1&count=2&title=a&title=b") == {"count": "2", "title": "b"}
 
     def test_an_array_takes_every_value(self) -> None:
@@ -94,8 +81,7 @@ class TestRepeatedKeys:
         assert read("ids=7") == {"ids": ["7"]}
 
     def test_a_value_is_handed_on_as_the_string_it_arrived_as(self) -> None:
-        # Coercing is ``coerce_flat``'s, after the transport has merged its
-        # route: nothing is parsed, so nothing is refused here.
+        # Coercing is ``coerce_flat``'s, after the transport has merged its route.
         assert read("count=many&active=maybe&ids=x") == {
             "count": "many",
             "active": "maybe",
@@ -103,13 +89,11 @@ class TestRepeatedKeys:
         }
 
     def test_an_undeclared_key_passes_through_for_the_closed_set_to_refuse(self) -> None:
-        # Left to check_arguments, under the caller's policy; the blank one is
-        # kept too, since a blank only means "absent" for a declared type.
+        # Left to check_arguments, under the caller's policy; the blank one is kept too.
         assert read("colour=red&shade=") == {"colour": "red", "shade": ""}
 
     def test_a_multi_value_dict_is_read_as_a_query_dict_is(self) -> None:
-        # The type the signature names, which a form's fields and a parsed
-        # body's are as well as a query string's.
+        # The type the signature names.
         source = MultiValueDict({"count": ["1", "2"], "ids": ["1,2", "3"], "title": [""]})
         assert django_service_specs.flat_arguments(FLAT, source) == {
             "count": "2",
@@ -122,14 +106,7 @@ class TestRepeatedKeys:
 
 
 class TestCommaSeparatedArrays:
-    """``?pks=1,2``: the spelling django-filter's CSV filters advertise.
-
-    Splitting is the element type's to allow. A number, an integer and a
-    boolean can never hold a comma, so the split is unambiguous; a string
-    can, so a string array (declared or not) takes its value whole, unless
-    its choices hold no comma, when a value holding one can only be several
-    choices. ``_splits`` names the test holding each condition.
-    """
+    """``?pks=1,2``: the spelling django-filter's CSV filters advertise."""
 
     @pytest.mark.parametrize(
         ("query", "expected"),
@@ -141,9 +118,6 @@ class TestCommaSeparatedArrays:
             ("flags=true, false ,1", {"flags": ["true", "false", "1"]}),
             ("ids=1&ids=2", {"ids": ["1", "2"]}),
             ("ids=1,2&ids=3&ids=4,5", {"ids": ["1", "2", "3", "4", "5"]}),
-            # ``?o=title,-pk``: the spelling django-filter's OrderingFilter
-            # takes. No choice holds a comma, so a value holding one is several
-            # choices.
             ("o=title,-pk&o=pk", {"o": ["title", "-pk", "pk"]}),
         ],
         ids=[
@@ -162,8 +136,7 @@ class TestCommaSeparatedArrays:
         assert read(query, CSV) == expected
 
     def test_a_decimal_array_reads_a_comma_separated_value_as_its_elements_exactly(self) -> None:
-        # A decimal never holds a comma, so ``?pks=1,2`` splits as a number's
-        # does, and each part stays the string it spells, digits and all.
+        # A decimal never holds a comma, so ``?pks=1,2`` splits as a number's does.
         fraction = "0.1234567890123456789012345678901234567891"
         query = f"pks=1,{fraction}, 3 &pks=4"
         assert read(query, DECIMAL_PKS) == {"pks": ["1", fraction, "3", "4"]}
@@ -178,7 +151,6 @@ class TestCommaSeparatedArrays:
         [
             # A comma is part of a string; the whole value is the element.
             ("words=a,b&words=c", {"words": ["a,b", "c"]}),
-            # One choice holds a comma, so the whole value may be that choice.
             ("places=Paris, France&places=Paris", {"places": ["Paris, France", "Paris"]}),
             ("marks=a,b", {"marks": ["a,b"]}),
             ("tags=a,b", {"tags": ["a,b"]}),
@@ -197,8 +169,7 @@ class TestCommaSeparatedArrays:
 
     @pytest.mark.parametrize("query", ["o=title,-pk", "o=title&o=-pk"])
     def test_an_ordering_filter_s_two_fields_read_as_two_elements(self, query: str) -> None:
-        # The declaration django-filter's own OrderingFilter produces, rather
-        # than one written to look like it.
+        # The declaration django-filter's own OrderingFilter produces.
         assert read(query, filter_set_parameters(_Ordered)) == {"o": ["title", "-pk"]}
 
     def test_an_array_of_rows_is_not_split_and_stays_refused_by_name(self) -> None:
@@ -217,8 +188,7 @@ class TestCommaSeparatedArrays:
     def test_an_empty_part_is_kept_for_coerce_flat_to_refuse_at_its_index(
         self, query: str, parts: list[str], index: int
     ) -> None:
-        # Not dropped as a blank element is: a stray comma is a mistake in the
-        # value, and the reader's wording for one is the element's own.
+        # Not dropped as a blank element is: a stray comma is a mistake in the value.
         assert read(query, CSV) == {"ids": parts}
         assert refusal(query, CSV) == {"ids": {index: [WHOLE]}}
 
@@ -233,48 +203,40 @@ class TestCommaSeparatedArrays:
 
 class TestBlanks:
     def test_a_blank_value_for_a_type_that_is_not_a_string_is_absent(self) -> None:
-        # Kept, ``""`` reaches coerce_flat as an integer and is refused as
-        # "Enter a whole number.", which is not what a left-blank field means.
+        # Kept, ``""`` reaches coerce_flat as an integer and is refused as "Enter a whole number.".
         assert read("count=&active=&pk=4") == {"pk": "4"}
 
     def test_a_blank_string_is_kept(self) -> None:
-        # A string's blank is a value, the empty string, and dropping it would
-        # make it unsendable.
+        # A string's blank is a value, the empty string, and dropping it would make it unsendable.
         assert read("title=") == {"title": ""}
 
     def test_a_blank_untyped_read_is_kept(self) -> None:
-        # An untyped read is handed what was sent, so ``?pk=`` reaches it as
-        # the empty string, as a string's does, rather than being dropped.
+        # An untyped read is handed what was sent, so ``?pk=`` reaches it as the empty string.
         assert read("pk=", Parameters.of(Parameter("pk", "any"))) == {"pk": ""}
 
     def test_blank_elements_of_a_non_string_array_are_dropped(self) -> None:
         assert read("ids=1&ids=&ids=3") == {"ids": ["1", "3"]}
 
     def test_an_array_whose_every_element_is_blank_is_absent(self) -> None:
-        # A multi-value input left blank: nothing was chosen, so nothing is
-        # sent, and a required array reads as missing rather than as ``[]``.
+        # A multi-value input left blank: nothing was chosen, so nothing is sent.
         assert read("ids=&ids=") == {}
 
     def test_blank_elements_of_a_string_array_are_kept(self) -> None:
         assert read("words=a&words=") == {"words": ["a", ""]}
 
     def test_a_blank_date_is_absent(self) -> None:
-        # A filter form's empty date input. Kept, it reached the shape check as
-        # a malformed date, refusing a form that was only left blank.
+        # A filter form's empty date input.
         assert read("since=&price=", BLANKS) == {}
 
     def test_a_blank_the_choices_leave_out_is_absent(self) -> None:
-        # An "any status" option whose value is blank: the shape check would
-        # refuse it as no valid choice, and an array's choices constrain each
-        # of its elements the same way.
+        # An "any status" option whose value is blank.
         assert read("status=&labels=&labels=a", BLANKS) == {"labels": ["a"]}
 
     def test_a_blank_the_choices_name_is_kept(self) -> None:
         assert read("shelf=", BLANKS) == {"shelf": ""}
 
     def test_blank_elements_of_an_undeclared_element_type_are_kept(self) -> None:
-        # coerce_flat reads an undeclared element as the string it arrived as,
-        # so its blank is a string's blank.
+        # coerce_flat reads an undeclared element as the string it arrived as.
         assert read("tags=&tags=x") == {"tags": ["", "x"]}
 
 
@@ -282,8 +244,7 @@ class TestArrayLength:
     """A flat array's commas never build past its bound, and the list stays over it."""
 
     def test_a_comma_list_past_the_default_maximum_is_refused_at_its_name(self) -> None:
-        # The spelling that reaches round Django's DATA_UPLOAD_MAX_NUMBER_FIELDS:
-        # one key, any number of values.
+        # The spelling that reaches round Django's DATA_UPLOAD_MAX_NUMBER_FIELDS: one key.
         query = "ids=" + ",".join(map(str, range(1001)))
         assert len(read(query, CSV)["ids"]) == 1001
         assert refusal(query, CSV) == {"ids": [TOO_MANY % 1000]}
@@ -306,11 +267,7 @@ class TestArrayLength:
     def test_a_flat_array_is_split_no_further_than_one_past_its_maximum(
         self, query: str, handed_on: list[str]
     ) -> None:
-        # Invisible to every message, which is the length's either way: what is
-        # held is the list built on the way, one element past the bound and no
-        # more, so a value of a million commas is never split a million times.
-        # One past rather than at it, or a list over the bound would be cut to
-        # one that is accepted.
+        # Invisible to every message, which is the length's either way.
         assert read(query, CSV) == {"ids": handed_on}
 
     @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=None)

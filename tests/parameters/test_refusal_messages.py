@@ -1,5 +1,3 @@
-"""``refusal_messages``: a refusal tree read as paths to messages."""
-
 from __future__ import annotations
 
 from django.utils.translation import gettext_lazy
@@ -24,7 +22,6 @@ def test_a_refusal_tree_is_read_as_paths_to_messages() -> None:
 
 def test_a_message_that_is_no_list_is_one_message_not_its_characters() -> None:
     ((path, text),) = refusal_messages(gettext_lazy("Whole."))
-    # A lazy proxy equals its string, so only the type shows it was rendered:
-    # a join over the messages raises on a proxy.
+    # A lazy proxy equals its string, so only the type shows it was rendered.
     assert (path, type(text)) == ((), str)
     assert text == "Whole."

@@ -1,11 +1,3 @@
-"""The delete cascade, one rule across every relation kind.
-
-The cascade removes the rows the parent **owns** and leaves alone the rows it
-merely points at. Ownership is the whole question, and each kind answers it the
-same way here as on the write path -- which is why this is settled once, for
-all of them, rather than a rule per kind.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -88,9 +80,7 @@ class TestWhatTheParentOwnsGoes:
         assert singular[0].outcome == "untouched"
 
     def test_the_rows_own_relations_go_first(self) -> None:
-        # A grandchild declared in the child spec's relations= goes before the
-        # child it points at: the cascade follows the same tree the write path
-        # does.
+        # A grandchild declared in the child spec's relations= goes before the child it points at.
         author = Author.objects.create(name="a")
         profile = Profile.objects.create(author=author, bio="b")
         catalog = Catalog.objects.create(name="c")
@@ -107,8 +97,6 @@ class TestWhatTheParentOwnsGoes:
                 )
             },
         )
-        # The singular kind follows its own tree the same way, and a spec that
-        # declares none is the ordinary case rather than a separate branch.
         cascade_owned(author, {"profile": ReverseOneToOneSpec(model=Profile, fk="author")})
 
         assert not Item.objects.filter(pk=item.pk).exists()
@@ -142,8 +130,7 @@ class TestWhatTheParentOnlyPointsAtStays:
 
         assert (singular[0].relation, singular[0].outcome) == ("author", "untouched")
         assert not singular[0]
-        # Nothing for the cascade to do: the column holding the link goes when
-        # the parent row does, and the target may be shared.
+        # Nothing for the cascade to do: the column holding the link goes when the parent row does.
         assert Author.objects.filter(pk=author.pk).exists()
 
     def test_an_unknown_kind_is_still_refused(self) -> None:

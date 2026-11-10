@@ -1,5 +1,3 @@
-"""Tests for ``delete_model``."""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -80,8 +78,7 @@ class TestDeleteModel:
         delete_model(Catalog, relations=_CASCADE)(instance=catalog)
         assert not Section.objects.exists()
         assert not Item.objects.exists()
-        # The cascade's rows are each deleted before the parent, a grandchild
-        # before its own parent.
+        # The cascade's rows are each deleted before the parent, a grandchild before its own parent.
         assert deleted == ["Item", "Section", "Catalog"]
 
     def test_a_many_to_many_loses_only_its_membership(self) -> None:

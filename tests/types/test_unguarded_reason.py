@@ -6,8 +6,7 @@ from django_service_specs.types.unguarded_reason import UnguardedReason
 
 
 def test_the_one_reason_a_registered_spec_can_be_open() -> None:
-    # An empty ``permissions`` is refused when a spec is built and ``None`` when
-    # it is registered, so neither has a member to be reported under.
+    # An empty ``permissions`` is refused when a spec is built and ``None`` when it is registered.
     assert [reason.value for reason in UnguardedReason] == ["unrestricted"]
 
 

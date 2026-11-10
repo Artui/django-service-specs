@@ -47,8 +47,7 @@ def test_a_marking_formats_nothing_by_default() -> None:
 
 
 def test_the_formatter_is_the_third_field() -> None:
-    """In djangorestframework-services' order, so a positional declaration
-    means the same thing in both packages."""
+    """In djangorestframework-services' order."""
     money = ValueFormatter(str, produces="string")
 
     marking = FieldMarking(FieldAudience.LABEL, "The amount.", money)

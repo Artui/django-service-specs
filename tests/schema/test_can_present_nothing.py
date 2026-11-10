@@ -1,5 +1,3 @@
-"""``can_present_nothing``: whether a spec's dispatch may present ``None``, asked in one place."""
-
 from __future__ import annotations
 
 import enum
@@ -121,13 +119,7 @@ def test_every_true_row_really_presents_none(spec: Any) -> None:
 @pytest.mark.django_db
 @pytest.mark.parametrize("allow_none", [False, True], ids=["strict", "allow-none"])
 def test_returns_many_answers_its_own_allow_none(allow_none: bool) -> None:
-    """``returns_many`` is not read, as ``many`` is not: it shapes the result as a list.
-
-    Built inside the test rather than in ``_TABLE``, so a tree without the
-    field fails this case alone rather than the module's collection. Both
-    halves are observed: the answer, the schema that asks it, and what
-    dispatch presents for the service's ``None``.
-    """
+    """``returns_many`` is not read, as ``many`` is not: it shapes the result as a list."""
     spec = ServiceSpec(
         service=write,
         permissions=OPEN,
@@ -157,20 +149,14 @@ class _ForeignReRead:
 
 @dataclass(frozen=True)
 class _ForeignService(Foreign):
-    """A foreign service spec carrying the attributes this function reads, under its own kinds.
-
-    Shaped as djangorestframework-services' spec is: an ``output_selector_spec``
-    whose ``kind`` is that library's enum and an ``allow_none`` of its own, so
-    reading it uncompiled answers without raising, and answers wrong.
-    """
+    """A foreign service spec carrying the attributes this function reads, under its own kinds."""
 
     output_selector_spec: _ForeignReRead | None = None
     allow_none: bool = False
 
 
 def test_a_source_answers_as_the_spec_it_compiles_to() -> None:
-    # Uncompiled, the foreign RETRIEVE is not the kernel's RETRIEVE, so the
-    # re-read reads as a LIST and the answer is a silent False.
+    # Uncompiled, the foreign RETRIEVE is not the kernel's RETRIEVE.
     source = _ForeignService(
         _service(_re_read(RETRIEVE)), output_selector_spec=_ForeignReRead(_ForeignKind.RETRIEVE)
     )

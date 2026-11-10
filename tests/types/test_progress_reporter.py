@@ -1,5 +1,3 @@
-"""``ProgressReporter``: the shape every reporter a dispatch hands over has."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -24,8 +22,7 @@ class _Keeper:
 
 
 def test_any_callable_of_the_shape_is_a_reporter() -> None:
-    # Structural: a transport's own sink satisfies the Protocol without
-    # subclassing it, which is what lets a transport pass its reporter as it is.
+    # Structural: a transport's own sink satisfies the Protocol without subclassing it.
     keeper = _Keeper()
     reporter: ProgressReporter = keeper
 

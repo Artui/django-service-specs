@@ -1,9 +1,3 @@
-"""Tests for ``paginate_output``.
-
-Each case pins a rule a page has to hold: the clamps at both ends, the count
-before the slice, and the ``.count`` that is not a count.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Iterator
@@ -74,8 +68,7 @@ def test_the_page_served(asked: dict[str, int], expected: tuple[Any, ...]) -> No
 
 
 def test_an_empty_result_is_one_empty_page() -> None:
-    """Not zero pages: the page served is 1, so saying it does not exist
-    contradicts the payload it arrives with."""
+    """Not zero pages: the page served is 1."""
     page = paginate_output([], page=7, limit=10)
 
     assert (page.page, page.total, page.total_pages, page.has_next) == (1, 0, 1, False)
@@ -90,8 +83,7 @@ def test_a_queryset_is_counted_and_sliced_rather_than_evaluated() -> None:
     page = paginate_output(Note.objects.order_by("pk"), page=2, limit=2)
 
     assert (page.total, page.page, page.total_pages, page.has_next) == (5, 2, 3, True)
-    # Still a queryset: the slice is an ``OFFSET``/``LIMIT`` the caller's
-    # rendering evaluates, not rows read here.
+    # Still a queryset: the slice is an ``OFFSET``/``LIMIT`` the caller's rendering evaluates.
     assert page.items.query.low_mark == 2
     assert [note.title for note in page.items] == ["n2", "n3"]
 
@@ -104,9 +96,7 @@ def test_a_tuple_is_paginated_in_memory() -> None:
 
 
 def test_a_list_is_not_mistaken_for_a_queryset_by_its_count_attribute() -> None:
-    """``list.count`` exists and takes an argument, so discriminating on
-    ``hasattr(rows, "count")`` would answer an opaque ``count() takes exactly
-    one argument`` for a list."""
+    """``list.count`` exists and takes an argument, so discriminating on ``hasattr(rows."""
     assert hasattr(ROWS, "count")
 
     assert paginate_output(ROWS, limit=10).total == 250
@@ -127,8 +117,7 @@ class _Indexable:
     "rows",
     [
         pytest.param(_generator(), id="neither-sized-nor-sliceable"),
-        # Each of the next two holds one condition of the sequence check: a set
-        # is sized and cannot be sliced, ``_Indexable`` slices and has no size.
+        # Each of the next two holds one condition of the sequence check.
         pytest.param({1, 2, 3}, id="sized-and-not-sliceable"),
         pytest.param(_Indexable(), id="sliceable-and-not-sized"),
     ],
@@ -152,9 +141,7 @@ def test_a_manager_is_paged_as_its_queryset() -> None:
 
 @pytest.mark.django_db
 def test_a_manager_built_on_base_manager_is_paged_too() -> None:
-    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``,
-    and ``is_queryset`` counts it like one, so it is paged as its ``.all()`` as
-    well."""
+    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``."""
     ada = make_user("ada")
     for title in ("a", "b", "c"):
         Note.objects.create(owner=ada, title=title)
@@ -175,10 +162,7 @@ def _five_notes() -> None:
 @pytest.mark.django_db
 @pytest.mark.parametrize("limit", [2**63, 2**70])
 def test_a_limit_past_any_integer_column_serves_every_row(limit: int) -> None:
-    # With no ceiling, a slice ending at the limit itself would be a ``LIMIT``
-    # past 64 bits, which the database refuses as ``datatype mismatch``. The
-    # page served ends at the rows counted, and the limit reported is the one
-    # asked for.
+    # With no ceiling, a slice ending at the limit itself would be a ``LIMIT`` past 64 bits.
     _five_notes()
 
     page = paginate_output(Note.objects.order_by("pk"), limit=limit)
@@ -189,8 +173,7 @@ def test_a_limit_past_any_integer_column_serves_every_row(limit: int) -> None:
 
 @pytest.mark.django_db
 def test_a_page_past_any_integer_column_never_reaches_the_offset() -> None:
-    # The page clamps to the last one that exists before the offset is
-    # computed, so the offset stays inside the rows counted.
+    # The page clamps to the last one that exists before the offset is computed.
     _five_notes()
 
     page = paginate_output(Note.objects.order_by("pk"), page=2**70, limit=2)

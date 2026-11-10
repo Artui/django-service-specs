@@ -1,5 +1,3 @@
-"""Tests for acreate_from_input."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

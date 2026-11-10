@@ -26,9 +26,7 @@ def test_names_are_the_bound_and_the_withheld_together() -> None:
 
 
 def test_the_values_are_copied_so_a_later_change_to_the_mapping_reaches_nothing() -> None:
-    # A transport checks the binding once, at construction, and applies it on
-    # every call after: a value added to the caller's dict afterwards would
-    # bypass that check, so the binding holds its own copy.
+    # A transport checks the binding once, at construction, and applies it on every call after.
     given = {"project_pk": 7}
     server = ServerArguments(values=given)
     given["draw_request_pk"] = 9
@@ -37,17 +35,15 @@ def test_the_values_are_copied_so_a_later_change_to_the_mapping_reaches_nothing(
 
 
 def test_the_values_cannot_be_changed_after_the_check() -> None:
-    # The same hole from the other side: a key set on the binding itself
-    # after the check ran would reach every call unchecked.
+    # The same hole from the other side.
     server = ServerArguments(values={"project_pk": 7})
     with pytest.raises(TypeError):
-        server.values["tenant_pk"] = 1  # the mapping refuses assignment
+        server.values["tenant_pk"] = 1
     assert server.values == {"project_pk": 7}
 
 
 def test_it_copies_and_pickles_like_any_value_a_transport_holds() -> None:
-    # A toolset deep-copies its per-tool map, and a queue pickles what it
-    # carries; a copy is read-only too.
+    # A toolset deep-copies its per-tool map, and a queue pickles what it carries.
     server = ServerArguments(values={"project_pk": 7}, withheld=frozenset({"draw_request_pk"}))
     for copied in (copy.deepcopy(server), copy.copy(server), pickle.loads(pickle.dumps(server))):
         assert copied == server
@@ -62,8 +58,7 @@ def test_a_set_of_withheld_names_is_held_as_a_frozenset() -> None:
 
 
 def test_a_bare_string_is_refused_as_the_withheld_names() -> None:
-    # ``frozenset("pk")`` is ``{"p", "k"}``: a set of characters no parameter is
-    # named, which the static check would refuse letter by letter.
+    # ``frozenset("pk")`` is ``{"p", "k"}``: a set of characters no parameter is named.
     with pytest.raises(TypeError, match="a collection of names, not one string"):
         ServerArguments(withheld="draw_request_pk")
 

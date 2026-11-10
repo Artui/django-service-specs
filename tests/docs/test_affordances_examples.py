@@ -1,11 +1,3 @@
-"""The affordances page's example, run.
-
-Each test is a statement the page makes about ``docs/examples/affordances.py``.
-The page's JSON blocks are read back and compared with the message, code and
-schema the refusals the example raises carry, so neither can drift from the
-other.
-"""
-
 from __future__ import annotations
 
 import json

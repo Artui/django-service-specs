@@ -89,8 +89,7 @@ class TestObjects:
         }
 
     def test_a_required_parameter_with_a_default_is_not_required(self) -> None:
-        # The shape check does not refuse its absence, since the Validator
-        # supplies the default, so a schema listing it would refuse a call that runs.
+        # The shape check does not refuse its absence, since the Validator supplies the default.
         parameters = Parameters.of(
             Parameter("title", "string", required=True),
             Parameter("status", "string", required=True, default="draft"),
@@ -138,9 +137,7 @@ class TestTheClosedArgumentSet:
         assert schema["properties"]["books"]["items"]["required"] == ["title"]
 
     def test_the_schema_closes_exactly_where_the_shape_check_refuses_an_unknown_key(self) -> None:
-        # One unknown key at every level, including inside both free-form
-        # objects. The levels the shape check refuses it at are the levels the
-        # schema closes, and none other.
+        # One unknown key at every level, including inside both free-form objects.
         arguments = {
             "name": "Ursula",
             "x": 1,
@@ -179,8 +176,7 @@ class TestTheClosedArgumentSet:
         )
 
     def test_the_policys_plain_value_is_accepted(self) -> None:
-        # "reject" rather than "ignore": compared by identity without being
-        # normalized, a plain "reject" would quietly describe the open set.
+        # "reject" rather than "ignore": compared by identity without being normalized.
         assert parameters_schema(AUTHOR, unknown_arguments="reject") == parameters_schema(AUTHOR)
         assert parameters_schema(AUTHOR, unknown_arguments="ignore") == parameters_schema(
             AUTHOR, unknown_arguments=UnknownArguments.IGNORE
@@ -201,8 +197,7 @@ class TestTypes:
         assert one(Parameter("value", "string", format=fmt)) == {"type": "string", "format": fmt}
 
     def test_a_decimal_is_a_string_though_the_shape_check_also_accepts_a_number(self) -> None:
-        # The documented convention, held here so it stays a decision rather
-        # than drifting into one: the schema advertises the lossless form only.
+        # The documented convention, held here so it stays a decision rather than drifting into one.
         price = Parameter("price", "string", format="decimal")
 
         assert check_arguments(Parameters.of(price), {"price": 12.5}) == {"price": 12.5}
@@ -212,9 +207,7 @@ class TestTypes:
         assert one(Parameter("meta", "object")) == {"type": "object"}
 
     def test_an_array_of_a_type_name_states_the_type_of_its_items(self) -> None:
-        # The maximum in force is stated though none is declared: the shape
-        # check refuses past it, so a client that does not learn it sends a
-        # call that cannot run.
+        # The maximum in force is stated though none is declared: the shape check refuses past it.
         assert one(Parameter("ids", "array", items="integer")) == {
             "type": "array",
             "maxItems": 1000,
@@ -327,8 +320,7 @@ class TestChoices:
     def test_a_nullable_element_admits_null_in_its_items_and_its_enum(self) -> None:
         ids = Parameter("ids", "array", items="integer", items_nullable=True, choices=[1, 2])
 
-        # The shape check keeps a null element without reading the choices, so an
-        # enum that did not list it would refuse a call that runs.
+        # The shape check keeps a null element without reading the choices.
         assert check_arguments(Parameters.of(ids), {"ids": [1, None]}) == {"ids": [1, None]}
         assert one(ids) == {
             "type": "array",
@@ -363,8 +355,7 @@ class TestChoices:
         }
 
     def test_choices_json_cannot_carry_are_left_out_whole(self) -> None:
-        # Listing only the values JSON can carry would claim the others are
-        # refused, so the enum goes and the type stays.
+        # Listing only the values JSON can carry would claim the others are refused.
         rate = Parameter("rate", "string", format="decimal", choices=["1.5", Decimal("2.5")])
 
         assert one(rate) == {"type": "string", "format": "decimal"}
@@ -377,9 +368,7 @@ class TestChoices:
 
 class TestChoiceLabels:
     def test_labelled_choices_are_any_of_pairs_of_const_and_title(self) -> None:
-        # ``anyOf`` rather than ``oneOf``: the entries are disjoint, so the two
-        # admit the same values, and ``oneOf`` is the one keyword an OpenAI
-        # strict schema and Gemini's both refuse.
+        # ``anyOf`` rather than ``oneOf``: the entries are disjoint.
         status = Parameter(
             "status",
             "string",
@@ -396,8 +385,7 @@ class TestChoiceLabels:
         }
 
     def test_labels_that_only_repeat_their_values_stay_an_enum(self) -> None:
-        # A title restating its constant tells a reader nothing the enum does
-        # not, so the schema a declaration had before it was labelled is kept.
+        # A title restating its constant tells a reader nothing the enum does not.
         rank = Parameter("rank", "integer", choices=[1, 2], choice_labels={1: "1", 2: "2"})
 
         assert one(rank) == {"type": "integer", "enum": [1, 2]}
@@ -410,9 +398,7 @@ class TestChoiceLabels:
         assert one(status)["anyOf"] == [{"const": "draft"}, {"const": "live", "title": "Published"}]
 
     def test_a_nullable_parameter_adds_an_untitled_null(self) -> None:
-        # ``{"type": "null"}`` rather than ``{"const": null}``: Google's schema
-        # transform drops a null ``const`` and leaves ``{}``, which matches
-        # every value.
+        # ``{"type": "null"}`` rather than ``{"const": null}``.
         status = Parameter(
             "status", "string", choices=["live"], choice_labels={"live": "On"}, nullable=True
         )
@@ -435,10 +421,7 @@ class TestChoiceLabels:
         assert one(status)["anyOf"] == [{"const": "live"}, {"type": "null", "title": "Unset"}]
 
     def test_a_choice_declared_twice_is_one_entry(self) -> None:
-        # Listed once, so the entries stay disjoint and a reader meets each
-        # value under one title. ``True``
-        # is not ``1`` to JSON, although Python finds them equal, so pairs keep
-        # the two labels apart where a mapping's keys would merge them.
+        # Listed once, so the entries stay disjoint and a reader meets each value under one title.
         rank = Parameter(
             "rank", "integer", choices=[1, 1, True], choice_labels=[(1, "One"), (True, "Yes")]
         )
@@ -488,8 +471,7 @@ class TestChoiceLabels:
 
 class TestFiles:
     def test_a_file_states_no_type(self) -> None:
-        # No JSON value is a file, so any JSON type stated here would be false;
-        # what a multipart body carries, a JSON Schema has no keyword for.
+        # No JSON value is a file, so any JSON type stated here would be false.
         assert one(Parameter("notes", "file")) == {}
 
     def test_a_nullable_file_is_still_untyped(self) -> None:
@@ -584,8 +566,7 @@ class TestNothingElse:
 
 
 def test_a_bound_is_stated_beside_the_type_of_a_number() -> None:
-    # Both arcs of ``_reading``'s bounds, and the format condition: a guard
-    # that skipped every bound, not only a decimal's, fails here.
+    # Both arcs of ``_reading``'s bounds, and the format condition.
     count = Parameter("n", "integer", minimum=0, nullable=True)
     ratio = Parameter("ratio", "number", minimum=-0.5, maximum=1.5)
     schema = parameters_schema(Parameters.of(count, ratio))
@@ -596,10 +577,7 @@ def test_a_bound_is_stated_beside_the_type_of_a_number() -> None:
 
 
 def test_a_decimal_string_states_no_bound() -> None:
-    # JSON Schema applies ``minimum`` and ``maximum`` to a number instance
-    # only, so on a string a validating client ignores both and a strict
-    # validator may flag them. The shape check still enforces them: see
-    # test_a_decimal_is_compared_as_the_decimal_it_spells.
+    # JSON Schema applies ``minimum`` and ``maximum`` to a number instance only.
     price = Parameter("price", "string", format="decimal", minimum=-1e50, maximum=1e50)
     one_sided = Parameter("floor", "string", format="decimal", minimum=0)
     assert parameters_schema(Parameters.of(price, one_sided))["properties"] == {
@@ -609,9 +587,7 @@ def test_a_decimal_string_states_no_bound() -> None:
 
 
 def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_itself() -> None:
-    # The shape check reads them on each element, so the array node carries
-    # neither: stated there, a reader would take ``minimum`` for a count. A
-    # decimal element states its format and no bound, as a scalar does.
+    # The shape check reads them on each element, so the array node carries neither: stated there.
     pks = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
     ids = Parameter("ids", "array", items="integer", minimum=1, max_length=5, items_nullable=True)
     ratios = Parameter("ratios", "array", items="number", minimum=0, maximum=1)
@@ -633,9 +609,7 @@ def test_an_array_states_its_element_s_format_and_bounds_on_items_and_not_on_its
 
 
 def test_a_bounded_decimal_filter_is_advertised_with_its_format_and_no_bound() -> None:
-    # End to end through a real django-filter FilterSet: the adapter keeps
-    # django-filter's 1e50 cost guard on the Parameter, the shape check
-    # enforces it, and the schema states none of it.
+    # End to end through a real django-filter FilterSet.
     parameters = filter_set_parameters(NoteFilters)
     declared = {param.name: param for param in parameters}
     assert (declared["min_pk"].minimum, declared["min_pk"].maximum) == (-1e50, 1e50)
@@ -734,10 +708,7 @@ print(json.dumps(answers))
 
 
 def test_an_undeclared_array_bound_needs_django_configured_to_describe_or_check() -> None:
-    # The setting is the bound in force, so it is read rather than guessed: a
-    # default stated before ``settings.configure()`` could describe a bound
-    # the calls after it never meet, and the shape check and ``coerce_flat``
-    # read it the same way. A declared maximum needs no setting.
+    # The setting is the bound in force, so it is read rather than guessed.
     env = {key: value for key, value in os.environ.items() if key != "DJANGO_SETTINGS_MODULE"}
     completed = subprocess.run(
         [sys.executable, "-c", _UNCONFIGURED_PROBE],
@@ -799,9 +770,7 @@ class TestJsonSchemaExtra:
     def test_max_items_is_refused_whether_or_not_the_setting_states_it(
         self, cap: int | None
     ) -> None:
-        """With the cap off, an array declaring no ``max_length`` states no
-        ``maxItems``, so a check made against one build would let the extra
-        through and then refuse it the day the cap came on."""
+        """With the cap off, an array declaring no ``max_length`` states no ``maxItems``."""
         with (
             override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=cap),
             pytest.raises(ImproperlyConfigured) as refused,
@@ -817,9 +786,7 @@ class TestJsonSchemaExtra:
     def test_additional_properties_is_refused_under_either_policy(
         self, policy: UnknownArguments
     ) -> None:
-        """Only ``REJECT`` states ``additionalProperties``; the extra is
-        refused under both, since the policy is the spec's to choose and the
-        parameter's fields are what the keyword describes."""
+        """Only ``REJECT`` states ``additionalProperties``; the extra is refused under both."""
         with pytest.raises(ImproperlyConfigured) as refused:
             parameters_schema(
                 Parameters.of(
@@ -837,9 +804,7 @@ class TestJsonSchemaExtra:
         )
 
     def test_a_default_beside_one_the_schema_leaves_out_is_refused(self) -> None:
-        """A ``Decimal`` default is left out of the schema, so the extra's
-        ``default`` would have filled the gap with a value the declaration
-        never chose. Its own value is JSON, so the ownership is what refuses."""
+        """A ``Decimal`` default is left out of the schema."""
         with pytest.raises(ImproperlyConfigured) as refused:
             parameters_schema(
                 Parameters.of(
@@ -857,11 +822,7 @@ class TestJsonSchemaExtra:
         assert "is no JSON value" not in message
 
     def test_the_keywords_refused_are_the_ones_the_builder_states(self) -> None:
-        """Every top-level key a node can carry from its fields is refused, and
-        nothing else is, but ``const``: a single accepted value, which is the
-        choices' to state, though the builder spells choices as ``enum`` or
-        ``anyOf``. Imported here, so a tree without the table fails this test
-        alone."""
+        """Every top-level key a node can carry from its fields is refused, and nothing else is."""
         from django_service_specs.types.utils import PARAMETER_SCHEMA_KEYWORDS
 
         catalogue = Parameters.of(
@@ -882,8 +843,7 @@ class TestJsonSchemaExtra:
         assert stated == PARAMETER_SCHEMA_KEYWORDS.keys() - {"const"}
 
     def test_it_is_advertised_and_not_enforced_by_the_shape_check(self) -> None:
-        """The shape check never reads it: it holds only where the spec's
-        Validator enforces it."""
+        """The shape check never reads it: it holds only where the spec's Validator enforces it."""
         param = Parameter("code", "string", json_schema_extra={"pattern": "^[A-Z]{3}$"})
         assert check_arguments(Parameters.of(param), {"code": "nope"}) == {"code": "nope"}
 

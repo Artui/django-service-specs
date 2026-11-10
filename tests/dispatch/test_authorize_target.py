@@ -54,10 +54,7 @@ def test_skips_the_checks_when_the_grant_already_checked_the_target() -> None:
 
 
 def test_no_permissions_declared_has_nothing_to_check() -> None:
-    # Called directly: dispatch hands authorize_target the spec it dispatched,
-    # never a nested selector, and authorize() refuses one whose permissions
-    # are None before any target is resolved. Nothing to check reads as pass,
-    # not refuse.
+    # Called directly: dispatch hands authorize_target the spec it dispatched.
     spec, principal, target = _spec(None), object(), object()
     grant = Grant(spec, principal)
     authorize_target(spec, principal, target, grant=grant)
@@ -302,9 +299,7 @@ class TestAnyOf:
     """At the row question a check of ``AnyOf`` counts only if it passes the class-level one too."""
 
     def test_any_of_row_question_skips_a_child_refused_at_class_level(self) -> None:
-        # ``owner`` refuses this principal at class level and, like most
-        # checks, allows any row by default; ``staff`` admits them at class
-        # level and refuses this row. Neither passes both, so the row is refused.
+        # ``owner`` refuses this principal at class level and, like most checks.
         log: list[str] = []
         owner = Answers("owner", log, permission=False)
         staff = Answers("staff", log, row=False)
@@ -318,9 +313,7 @@ class TestAnyOf:
         ]
 
     def test_any_of_under_a_covering_grant_still_judges_the_row(self) -> None:
-        # A grant covering the class-level question answers it without asking
-        # any check, so nothing could have been remembered from it: the row
-        # question asks it again.
+        # A grant covering the class-level question answers it without asking any check.
         log: list[str] = []
         spec, principal = (
             _spec(
@@ -335,9 +328,7 @@ class TestAnyOf:
         assert "owner.has_object_permission" not in log
 
     def test_any_of_writes_nothing_to_the_call_s_context(self) -> None:
-        # Handed the context, since a check inside it declares it, and still
-        # answering the row from the questions alone: nothing a later stage,
-        # or another transport's grant, could lack.
+        # Handed the context, since a check inside it declares it.
         log: list[str] = []
         context: dict[str, Any] = {}
         spec = _spec([AnyOf(_ReadsTheContext(log), Answers("staff", log, row=False))])
@@ -358,8 +349,7 @@ class TestAnyOf:
         assert log[-1] == "staff.has_object_permission"
 
     def test_authorize_target_resolves_a_child_s_class_level_seed(self) -> None:
-        # The child is asked its class-level question at the row question, so
-        # the seed that question names resolves there too.
+        # The child is asked its class-level question at the row question.
         check, principal = SeedPerQuestion(), "ada"
         spec = _spec([AnyOf(check)])
         pool_seeds, resolved = recorded_seeds()
@@ -388,7 +378,6 @@ class TestCarriedSeeds:
         if other == "principal":
             principal = "bob"
         elif other == "spec":
-            # A frozen dataclass compares by field: only identity tells the twin apart.
             asked_spec = dataclasses.replace(kernel_spec(spec))
             assert asked_spec == kernel_spec(spec)
         elif other == "call_context":

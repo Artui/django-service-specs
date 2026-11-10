@@ -54,8 +54,7 @@ def _create(*checks: PermissionCheck) -> ServiceSpec:
 
 
 def _on_a_row(*checks: PermissionCheck) -> ServiceSpec:
-    # A target selector: its scope question is asked of the row or the set it
-    # resolves, which only the call's arguments name.
+    # A target selector: its scope question is asked of the row or the set it resolves.
     return ServiceSpec(
         service=Record(),
         permissions=list(checks),
@@ -77,9 +76,7 @@ def test_a_check_declaring_arguments_only_on_the_scope_question_reads_them_in_a_
 
 
 def test_the_scope_question_is_not_asked_where_a_target_or_a_selector_stands() -> None:
-    # Held by name: the same check is read in a create and not beside a target
-    # selector (dispatch asks a row's or a set's scope with the call's
-    # arguments, not with none), and a selector spec has no scope question at all.
+    # Dispatch asks a row's or a set's scope with the call's arguments, not with none.
     assert checks_read_arguments(_on_a_row(_OnTheScopeQuestion())) is False
     assert checks_read_arguments(_listing(_OnTheScopeQuestion())) is False
 
@@ -100,8 +97,7 @@ def test_one_check_among_several_is_enough() -> None:
 
 
 def test_a_spec_declaring_no_permissions_has_no_checks_to_read() -> None:
-    # Dispatch refuses it at the call; the reader answers about the checks it
-    # has, which are none.
+    # Dispatch refuses it at the call; the reader answers about the checks it has, which are none.
     assert checks_read_arguments(ServiceSpec(service=Record())) is False
 
 
@@ -146,8 +142,7 @@ class _ArgumentsInTheSecondSlot(PermissionCheck):
 
 
 def test_a_forwarding_wrapper_over_a_method_naming_arguments_reads_them() -> None:
-    # The wrapper's own signature is (*args, **kwargs); authorize hands
-    # `arguments` through it to the method it wraps.
+    # The wrapper's own signature is (*args, **kwargs).
     assert checks_read_arguments(_create(_Wrapped())) is True
 
 
@@ -160,8 +155,7 @@ def test_a_parameter_filled_by_position_is_no_opt_in_whatever_its_name() -> None
 
 
 def test_a_target_selector_of_either_kind_leaves_the_scope_question_out() -> None:
-    # Held by name: `target_selector_spec()` is the instance selector or the
-    # collection one; reading only the collection's would call a retrieve a create.
+    # Held by name: `target_selector_spec()` is the instance selector or the collection one.
     instance = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=notes_of)
     spec = ServiceSpec(
         service=Record(), permissions=[_OnTheScopeQuestion()], instance_selector_spec=instance
@@ -170,8 +164,7 @@ def test_a_target_selector_of_either_kind_leaves_the_scope_question_out() -> Non
 
 
 def test_a_check_declaring_arguments_with_a_default_still_declares_them() -> None:
-    # It answers "declares", not "cannot answer without": this check answers
-    # when handed None, and is still handed the call's arguments where it can.
+    # It answers "declares", not "cannot answer without": this check answers when handed None.
     assert checks_read_arguments(_create(_TakesNone())) is True
 
 
@@ -181,8 +174,7 @@ class _TakesNone(PermissionCheck):
 
 
 def test_checks_read_arguments_sees_a_child_s_declaration() -> None:
-    # Read through the combinator, at any depth: its own methods take
-    # ``**offered`` and, read by signature, declare nothing.
+    # Read through the combinator, at any depth: its own methods take ``**offered`` and.
     spec = SelectorSpec(
         kind=SelectorKind.LIST,
         selector=notes_of,

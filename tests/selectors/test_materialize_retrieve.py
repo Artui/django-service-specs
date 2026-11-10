@@ -1,5 +1,3 @@
-"""The exported rule for what a RETRIEVE selector's return resolves to."""
-
 from __future__ import annotations
 
 import pytest

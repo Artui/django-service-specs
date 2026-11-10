@@ -232,7 +232,6 @@ class TestNames:
             ("split", "in_wire", "out_wire", False),
             # Excluded: an input, never output.
             ("hidden", "hidden", None, False),
-            # Computed: output, never an input.
             ("double", "double", "twice", True),
         ]
         assert [fs.name for fs in inputs(read_fields(_Aliased))] == [

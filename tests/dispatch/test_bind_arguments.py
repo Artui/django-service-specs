@@ -35,11 +35,7 @@ PK = Parameters.of(Parameter("pk", "integer", required=True))
 
 
 class Recording(Validator):
-    """Declares a title and a nested author, and records what it was given.
-
-    Its verdict refuses one title by name, with a message no shape check
-    produces, so a test can tell which of the two steps answered.
-    """
+    """Declares a title and a nested author, and records what it was given."""
 
     def __init__(self) -> None:
         self.calls: list[tuple[dict[str, Any], ValidationContext]] = []
@@ -113,8 +109,7 @@ def test_passthrough_is_refused_rather_than_run_as_ignore() -> None:
 
 
 def test_a_service_spec_with_no_validator_checks_its_target_reads_and_returns_nothing() -> None:
-    # Every argument it takes is its target selector's, and none reaches the
-    # service, so the bind's value is empty even when the check passes.
+    # Every argument it takes is its target selector's, and none reaches the service.
     spec = ServiceSpec(service=service, instance_selector_spec=retrieve())
     assert bind_arguments(spec, {"pk": 1}, principal=PRINCIPAL, target=ROW) == {}
     with pytest.raises(InvalidArguments) as caught:
@@ -161,9 +156,7 @@ def test_the_validator_sees_the_cleaned_copy_under_ignore() -> None:
 
 
 def test_the_shape_check_answers_before_the_validator_runs() -> None:
-    # "Taken" is the one title the validator refuses, so a malformed author
-    # beside it proves which step answered: the shape check's message comes
-    # back and the validator is never called.
+    # "Taken" is the one title the validator refuses.
     validator = Recording()
     spec = ServiceSpec(service=service, validator=validator)
     with pytest.raises(InvalidArguments) as caught:
@@ -187,8 +180,7 @@ class _Scores:
 
 
 def test_a_null_element_the_validator_takes_reaches_it() -> None:
-    # The shape check answers first, so an element it could not see as nullable
-    # was refused before the Validator that accepts it was ever asked.
+    # The shape check answers first.
     spec = ServiceSpec(service=service, validator=DataclassValidator(_Scores))
     bound = bind_arguments(spec, {"scores": [1, None]}, principal=PRINCIPAL)
     assert bound == {"scores": [1, None]}
@@ -225,8 +217,7 @@ def test_the_same_call_on_a_spec_that_is_not_partial_is_refused() -> None:
 
 
 def test_a_partial_spec_still_requires_its_target_s_pk() -> None:
-    # ``partial`` relaxes the Validator's fields alone: a partial update still
-    # says which row it updates.
+    # ``partial`` relaxes the Validator's fields alone.
     spec = ServiceSpec(
         service=service, validator=Recording(), instance_selector_spec=retrieve(), partial=True
     )
@@ -260,9 +251,7 @@ class _Merged(Validator):
 
 
 def test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider() -> None:
-    # The shape check relaxes the field as dispatch's does, and this function
-    # calls no provider, so the Validator is handed the caller's arguments
-    # alone and is the one that refuses.
+    # The shape check relaxes the field as dispatch's does, and this function calls no provider.
     validator = _Merged()
     spec = ServiceSpec(service=service, validator=validator, input_data=_server_title)
     with pytest.raises(InvalidArguments) as caught:
@@ -283,8 +272,7 @@ def _server_pk() -> _ServerPk:
 
 
 def test_a_selector_spec_s_read_its_kwargs_provider_fills_is_not_demanded() -> None:
-    # The selector is called with the provider's value, which this function
-    # does not call, so the checked arguments carry only what was sent.
+    # The selector is called with the provider's value, which this function does not call.
     spec = SelectorSpec(kind=SelectorKind.RETRIEVE, selector=selector, reads=PK, kwargs=_server_pk)
     assert bind_arguments(spec, {}, principal=PRINCIPAL) == {}
 
@@ -306,9 +294,7 @@ def test_a_read_the_spec_s_kwargs_provider_fills_is_not_demanded() -> None:
 
 
 def test_a_read_an_untyped_kwargs_provider_may_fill_is_not_demanded() -> None:
-    # A provider whose return names no keys may fill any read its values
-    # reach, so the shape check relaxes them as dispatch does; dispatch
-    # refuses the read at its seat if the provider leaves it out.
+    # A provider whose return names no keys may fill any read its values reach.
     spec = ServiceSpec(service=service, reads=PK, kwargs=lambda: {"pk": 1})
     assert bind_arguments(spec, {}, principal=PRINCIPAL) == {}
 
@@ -431,7 +417,6 @@ def test_a_form_kwargs_naming_a_registered_seed_is_handed_it(seeds: PoolSeeds | 
         return
     bound = bind_arguments(spec, {"title": "Lathe"}, principal=PRINCIPAL, pool_seeds=seeds)
     assert bound["seen"] == SEEDED
-    # The value dispatch hands the form for the same call.
     ran = dispatch(spec, principal=PRINCIPAL, arguments={"title": "Lathe"}, pool_seeds=seeds)
     assert ran.value == SEEDED
 
@@ -478,8 +463,7 @@ def test_the_caller_s_value_for_it_is_refused_under_reject_as_dispatch_refuses_i
 
 
 def test_the_caller_s_value_for_it_is_dropped_under_ignore() -> None:
-    # A selector spec's, since it returns what it checked; without the seeds
-    # the value is kept, as the REJECT test's no-seeds case shows.
+    # A selector spec's, since it returns what it checked; without the seeds the value is kept.
     spec = _reflected("selector-spec")
     bound = bind_arguments(
         spec,
@@ -675,20 +659,17 @@ def test_given_seeds_a_deactivated_principal_is_refused_first_as_dispatch_refuse
     spec = _kind(kind)
     malformed = {"title": 3}
     if seeds is None:
-        # As before: no deactivation check, so the shape check answers, and a
-        # well-shaped call binds.
+        # As before: no deactivation check, so the shape check answers.
         with pytest.raises(InvalidArguments):
             bind_arguments(spec, malformed, principal=DORMANT)
         bind_arguments(spec, {"title": "t"}, principal=DORMANT)
         return
-    # Before the shape check, which would refuse the malformed title.
     with pytest.raises(PrincipalUnavailable):
         bind_arguments(spec, malformed, principal=DORMANT, pool_seeds=seeds)
 
 
 def test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal() -> None:
-    # An unmarked read a registered seed shares: the declaration is wrong, and
-    # still a deactivated principal learns that first, as on dispatch.
+    # An unmarked read a registered seed shares: the declaration is wrong.
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=selector, reads=_tenant())
     with pytest.raises(PrincipalUnavailable):
         bind_arguments(spec, {}, principal=DORMANT, pool_seeds=TENANT_SEEDS)
@@ -697,8 +678,7 @@ def test_given_seeds_a_deactivated_principal_is_refused_before_the_seat_refusal(
 
 
 def test_a_service_spec_with_no_validator_resolves_no_seed() -> None:
-    # It validates nothing, so nothing reads a seed, and a resolver that queries
-    # or raises is never run for it.
+    # It validates nothing, so nothing reads a seed.
     resolved: list[Any] = []
     seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda *, user: resolved.append(user))
     spec = ServiceSpec(service=service, reads=PK)
@@ -709,8 +689,7 @@ def test_a_service_spec_with_no_validator_resolves_no_seed() -> None:
 @pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
 @pytest.mark.parametrize("case", EVERY_ASK)
 def test_bind_arguments_hands_every_ask_one_dict(case: str, passed: bool) -> None:
-    """The one dict the Validator is handed, on every ask of its ``parameters``,
-    the first included: handed none, the bind makes it before it asks."""
+    """The one dict the Validator is handed, on every ask of its ``parameters``."""
     spec, validator, arguments, _ = every_ask_case(case)
     passed_context: dict[str, Any] = {}
     bind_arguments(

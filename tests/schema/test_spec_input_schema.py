@@ -125,8 +125,7 @@ class TestSpecInputSchema:
 
 
 def test_a_many_spec_takes_its_reads_and_the_list_of_rows() -> None:
-    # Built here rather than at module level, so a tree without ``many``
-    # fails this test alone.
+    # Built here rather than at module level, so a tree without ``many`` fails this test alone.
     row = Declares(Parameter("title", "string", required=True))
     reads = Parameters.of(Parameter("confirmed", "boolean"))
     spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=row, reads=reads)
@@ -193,8 +192,7 @@ class TestPartial:
     ) -> None:
         schema = spec_input_schema(article_spec(partial=True))
 
-        # The reads still name the row and its scope; the Validator's fields,
-        # an object's and each row's included, may each be left out.
+        # The reads still name the row and its scope; the Validator's fields.
         assert schema["required"] == ["pk", "project"]
         assert "required" not in schema["properties"]["meta"]
         assert "required" not in schema["properties"]["tags"]["items"]
@@ -218,8 +216,7 @@ class TestPartial:
         assert spec_input_schema(spec)["required"] == ["project"]
 
     def test_an_update_naming_its_row_by_pk_requires_the_pk_alone(self) -> None:
-        # The case docs/schema.md states: a target read ``pk``, and a Validator
-        # requiring ``title`` and ``body``.
+        # The case docs/schema.md states: a target read ``pk``.
         title_and_body = Declares(
             Parameter("title", "string", required=True),
             Parameter("body", "string", required=True),
@@ -239,9 +236,7 @@ class TestPartial:
     def test_a_read_a_provider_fills_is_listed_as_declared_and_owned_by_the_server(
         self,
     ) -> None:
-        # The schema relaxes only what ``partial`` relaxes. A read a typed
-        # provider fills stays required here, and ``server_owned_keys`` is how
-        # a transport learns to take it out.
+        # The schema relaxes only what ``partial`` relaxes.
         spec = ServiceSpec(
             service=edit,
             permissions=OPEN,
@@ -308,10 +303,7 @@ def _filled_spec(*, partial: bool, filled: str) -> ServiceSpec:
 def test_the_schema_less_server_owned_keys_requires_what_the_shape_check_demands(
     partial: bool, filled: str
 ) -> None:
-    # The two read ``partial`` through one function, and a key a typed
-    # provider fills is the one place they part: the schema lists it as
-    # declared and ``server_owned_keys`` names it for a transport to take out,
-    # where the shape check never demands it. Less that set, they agree.
+    # The two read ``partial`` through one function.
     spec = _filled_spec(partial=partial, filled=filled)
     whole = {
         "pk": 1,

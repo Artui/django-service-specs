@@ -1,5 +1,3 @@
-"""``sync_answer``: the one reading of a permission check's answer, for whoever asks a check."""
-
 from __future__ import annotations
 
 import inspect
@@ -32,8 +30,7 @@ def test_a_coroutine_is_refused_naming_the_method_and_closed() -> None:
 
 
 def test_an_awaitable_that_is_not_a_coroutine_is_refused() -> None:
-    # Without the ``isawaitable`` disjunct this is truthy and passes; the
-    # ``iscoroutine`` guard is what keeps ``close()`` off it.
+    # Without the ``isawaitable`` disjunct this is truthy and passes.
     with pytest.raises(ImproperlyConfigured, match="answered with an awaitable"):
         sync_answer(NotACoroutine(), asked="Check.has_permission")
 

@@ -1,5 +1,3 @@
-"""Test models exercising the full surface area of the mutation helpers."""
-
 from __future__ import annotations
 
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation

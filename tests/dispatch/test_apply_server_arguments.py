@@ -86,8 +86,7 @@ def run(spec: SelectorSpec, ada: Any, arguments: dict[str, Any], server: ServerA
 
 
 def test_a_bound_value_outranks_the_caller_s() -> None:
-    # Fails if the overlay runs before the drop: the bound value is dropped with
-    # the caller's, and the call goes out with no project at all.
+    # Fails if the overlay runs before the drop: the bound value is dropped with the caller's.
     applied = apply_server_arguments(
         scoped(Seen()),
         {"project_pk": 99, "status": "closed"},
@@ -131,8 +130,7 @@ def test_the_caller_s_arguments_are_not_changed() -> None:
 
 
 def test_a_bound_value_is_handed_on_as_the_shape_check_reads_it() -> None:
-    # Checked against its own declaration, as dispatch would check it: an
-    # integral float declared an integer is the int.
+    # Checked against its own declaration, as dispatch would check it.
     applied = apply_server_arguments(
         scoped(Seen()), {}, ServerArguments(values={"project_pk": 7.0})
     )
@@ -144,8 +142,7 @@ def test_a_bound_value_is_handed_on_as_the_shape_check_reads_it() -> None:
 
 
 def test_a_bound_value_that_fails_its_declaration_is_the_server_s_mistake() -> None:
-    # Not InvalidArguments: a client refusal would ask the caller to fix a
-    # value it never sent and cannot see.
+    # Not InvalidArguments.
     server = ServerArguments(values={"project_pk": "seven", "status": "closed"})
     with pytest.raises(ImproperlyConfigured) as raised:
         apply_server_arguments(scoped(Seen()), {"project_pk": 7}, server)
@@ -154,13 +151,11 @@ def test_a_bound_value_that_fails_its_declaration_is_the_server_s_mistake() -> N
     assert raised.value.__cause__.detail == {"project_pk": ["Expected an integer."]}
     assert "'project_pk'" in str(raised.value)
     assert "status" not in str(raised.value)
-    # Named, so a transport over many tools can say which one is wrong.
     assert "SelectorSpec for scoped.<locals>.notes_in" in str(raised.value)
 
 
 def test_an_undeclared_bound_name_is_the_server_s_mistake_at_the_call_too() -> None:
-    # ``check_server_arguments`` refuses it at construction; a transport that
-    # skipped that check is still not handed a key no parameter declares.
+    # ``check_server_arguments`` refuses it at construction.
     with pytest.raises(ImproperlyConfigured) as raised:
         apply_server_arguments(scoped(Seen()), {}, ServerArguments(values={"rogue": 1}))
     assert "'rogue'" in str(raised.value)
@@ -170,16 +165,14 @@ def test_an_undeclared_bound_name_is_the_server_s_mistake_at_the_call_too() -> N
 
 
 def test_a_malformed_value_for_a_withheld_name_never_reaches_the_shape_check(ada: Any) -> None:
-    # The drop runs first, so a value the model sends for a name it was never
-    # shown cannot refuse the call: under REJECT, ``"null"`` for an integer.
+    # The drop runs first.
     seen = Seen()
     run(scoped(seen), ada, {"project_pk": "null", "draw_request_pk": "null"}, SCOPE)
     assert seen.selector == [{"project_pk": 7, "draw_request_pk": ABSENT, "status": "open"}]
 
 
 def test_reject_still_refuses_a_key_nobody_declared(ada: Any) -> None:
-    # A bound or withheld name stays declared, so REJECT never reaches it; it
-    # still closes the set for everything else.
+    # A bound or withheld name stays declared, so REJECT never reaches it.
     seen = Seen()
     with pytest.raises(InvalidArguments) as refused:
         run(scoped(seen), ada, {"draw_request_pk": 5, "rogue": 1}, SCOPE)
@@ -201,9 +194,7 @@ def test_a_bound_value_replaces_a_read_s_default(ada: Any) -> None:
 
 
 def test_a_withheld_name_falls_back_to_its_default(ada: Any) -> None:
-    # Dispatch reports a declared default and does not apply it, so the read is
-    # absent and the selector's own default answers, as for any omitted read:
-    # ``"open"``, never the declared ``"any"``.
+    # Dispatch reports a declared default and does not apply it.
     seen = Seen()
     server = ServerArguments(values={"project_pk": 7}, withheld=frozenset({"status"}))
     run(scoped(seen), ada, {"status": "closed"}, server)
@@ -211,8 +202,7 @@ def test_a_withheld_name_falls_back_to_its_default(ada: Any) -> None:
 
 
 def test_the_permission_check_sees_the_bound_value(ada: Any) -> None:
-    # The values are in ``arguments`` before dispatch's first step, so the
-    # class-level check reads the same project the selector does.
+    # The values are in ``arguments`` before dispatch's first step.
     seen = Seen()
     run(scoped(seen), ada, {"project_pk": 99, "draw_request_pk": 5}, SCOPE)
     assert seen.permission == [{"project_pk": 7}]
@@ -220,8 +210,7 @@ def test_the_permission_check_sees_the_bound_value(ada: Any) -> None:
 
 
 def test_a_kwargs_provider_sees_the_bound_value(ada: Any) -> None:
-    # A provider declaring a read receives it from the same arguments the
-    # selector does, so it reads the server's value and not the caller's.
+    # A provider declaring a read receives it from the same arguments the selector does.
     provided: list[Any] = []
 
     def scope(*, project_pk: int) -> dict[str, Any]:
@@ -273,8 +262,7 @@ class TestAKeyDeclaredOnlyToACall:
         assert applied == {"title": "t", "project_pk": 7}
 
     def test_handed_none_the_key_is_refused_as_undeclared(self) -> None:
-        # The declaration the Validator makes to no call has no such key, so a
-        # describe-time reader, and a transport that hands no context, refuse it.
+        # The declaration the Validator makes to no call has no such key, so a describe-time reader.
         with pytest.raises(ImproperlyConfigured, match="project_pk"):
             apply_server_arguments(self.spec(), {"title": "t"}, ServerArguments({"project_pk": 7}))
 
@@ -291,9 +279,7 @@ class TypedByTheCall(Validator):
 
 
 def test_a_bound_value_is_checked_against_the_call_s_own_declaration() -> None:
-    # The case a transport can reach: ``check_server_arguments`` reads the
-    # declaration made to no call, which names the key and takes the value, and
-    # the call's own declares it otherwise, so the call refuses what the build passed.
+    # The case a transport can reach.
     spec = ServiceSpec(service=Record(), permissions=OPEN, validator=TypedByTheCall())
     server = ServerArguments({"project_pk": "x"})
     assert apply_server_arguments(spec, {}, server) == {"project_pk": "x"}

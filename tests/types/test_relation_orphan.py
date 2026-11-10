@@ -1,5 +1,3 @@
-"""``RelationOrphan`` — the enum, and which specs carry it."""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -33,8 +31,7 @@ class TestTheEnum:
         assert [orphan.value for orphan in RelationOrphan] == ["auto", "unlink", "delete"]
 
     def test_a_member_compares_equal_to_the_plain_string(self) -> None:
-        # As ``RelationMode`` and ``RelationOutcome`` do, so a caller may spell
-        # it either way and a serialized value stays readable.
+        # As ``RelationMode`` and ``RelationOutcome`` do.
         assert RelationOrphan.DELETE == "delete"
 
 
@@ -53,7 +50,6 @@ class TestOnlyTheKindsThatOwnTheirRowsCarryIt:
                 build(orphan="delete", delete_service=_service)
 
     def test_the_kinds_that_own_nothing_have_no_flag(self) -> None:
-        # A many-to-many target is shared and never deleted, and a forward
-        # relation removes nothing at all — neither has an orphan to dispose of.
+        # A many-to-many target is shared and never deleted.
         assert not hasattr(ManyToManySpec(model=Tag), "orphan")
         assert not hasattr(ForwardRelationSpec(model=Author), "orphan")

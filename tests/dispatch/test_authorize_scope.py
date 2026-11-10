@@ -268,8 +268,7 @@ def test_a_check_is_handed_the_context_s_request_and_view() -> None:
 
 @pytest.mark.parametrize("scope", [None, [object()]], ids=["a-create-s-none", "a-set"])
 def test_any_of_scope_question_skips_a_child_refused_at_class_level(scope: Any) -> None:
-    # As at the row question: ``owner`` refuses at class level and allows any
-    # scope by default, ``staff`` admits at class level and refuses the scope.
+    # As at the row question: ``owner`` refuses at class level and allows any scope by default.
     log: list[str] = []
     owner = Answers("owner", log, permission=False)
     staff = Answers("staff", log, scope=False)
@@ -294,7 +293,6 @@ class TestCarriedSeeds:
         if other == "principal":
             principal = "bob"
         elif other == "spec":
-            # A frozen dataclass compares by field: only identity tells the twin apart.
             asked_spec = dataclasses.replace(kernel_spec(spec))
             assert asked_spec == kernel_spec(spec)
         elif other == "call_context":

@@ -1,5 +1,3 @@
-"""Tests for ``base_pool``."""
-
 from __future__ import annotations
 
 import inspect
@@ -30,12 +28,7 @@ def test_extra_entries_join_the_seeds() -> None:
 
 
 def test_an_entry_named_user_collides_loudly() -> None:
-    """The reason to route adapter entries through here rather than a dict literal.
-
-    A literal would let the entry outrank the transport's authenticated value in
-    silence; spreading it into this call cannot, because ``user`` is already a
-    named parameter and Python itself refuses the duplicate.
-    """
+    """The reason to route adapter entries through here rather than a dict literal."""
     own_entries: dict[str, Any] = {"user": "spoofed"}
     with pytest.raises(TypeError):
         base_pool(user="real", **own_entries)
@@ -70,12 +63,7 @@ def test_a_resolver_declaring_var_keyword_receives_the_whole_pool() -> None:
 
 
 def test_a_seed_cannot_read_another_seed() -> None:
-    """Resolvers bind against the pool *before* any seed is written.
-
-    Deliberate: it makes the result independent of registration order, so
-    re-ordering two ``extend`` calls cannot silently change what a callable sees.
-    A seed that needs another composes the two inside its own resolver.
-    """
+    """Resolvers bind against the pool *before* any seed is written."""
 
     def wants_a_sibling(**pool: Any) -> Any:
         return "tenant" in pool
@@ -85,8 +73,7 @@ def test_a_seed_cannot_read_another_seed() -> None:
 
 
 def test_a_seed_colliding_with_a_spread_entry_is_refused() -> None:
-    """``**extra`` is per-call and a seed is ambient; one silently outranking the
-    other is the ambiguity the registry exists to remove."""
+    """``**extra`` is per-call and a seed is ambient."""
     seeds = DEFAULT_POOL_SEEDS.extend(tenant=lambda: "registered")
     with pytest.raises(TypeError, match="tenant"):
         base_pool(user="u", seeds=seeds, tenant="spread")
@@ -133,11 +120,7 @@ class _NotACoroutine:
 
 
 class TestAResolverAnsweringWithAnAwaitable:
-    """A plain ``def`` handing back a coroutine looks sync until it answers.
-
-    The registry cannot refuse it, so the value is refused where it is
-    resolved, before it enters a pool. One shape per disjunct of the guard.
-    """
+    """A plain ``def`` handing back a coroutine looks sync until it answers."""
 
     def test_a_coroutine_is_refused_and_closed(self) -> None:
         answer = _books_open()
@@ -165,11 +148,7 @@ class TestAResolverAnsweringWithAnAwaitable:
 
 @pytest.mark.django_db
 class TestDispatchDoesNotRunOnAnAwaitableSeed:
-    """End to end: the seed's coroutine would have read as met, and the service run.
-
-    Each reader answers with a real ``bool`` or raises, so the refusal that
-    lands can only be the seed's, never the guard on a condition's answer.
-    """
+    """End to end: the seed's coroutine would have read as met, and the service run."""
 
     def test_through_an_affordance(self) -> None:
         ran: list[Any] = []
@@ -222,7 +201,6 @@ def test_a_resolver_reads_the_request_off_the_pool_s_call_context() -> None:
     )
     pool = base_pool(user="u", seeds=seeds, call_context={"request": request})
     assert pool["tenant"] == (request, None)
-    # A catch-all is handed neither, and the pool holds neither.
     assert pool["seen"] == ["progress", "user"]
     assert "request" not in pool
     assert "view" not in pool

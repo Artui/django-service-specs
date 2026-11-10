@@ -1,5 +1,3 @@
-"""Tests for create_from_input."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -120,7 +118,6 @@ class TestCreateFromInput:
             m2m={"tags": None},
         )
         assert list(result.instance.tags.all()) == []
-        # The change is still recorded for creates.
         assert "tags" in result.changed_fields
 
     def test_foreign_key_assignment(self) -> None:

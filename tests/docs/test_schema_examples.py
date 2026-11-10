@@ -1,11 +1,3 @@
-"""The JSON Schema page's example, run.
-
-The page shows what each call in ``docs/examples/schema.py`` returns. The
-assertions here are those statements, and the page's JSON blocks are read
-back and compared with them, so neither the page nor the emitter can drift
-from the other.
-"""
-
 from __future__ import annotations
 
 import json
