@@ -1,5 +1,3 @@
-"""Tests for ``arun_service`` — async dispatch with optional atomic wrapping."""
-
 from __future__ import annotations
 
 from typing import Any

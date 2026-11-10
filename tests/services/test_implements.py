@@ -1,12 +1,3 @@
-"""``implements``: unchanged at run time, and a type checker reports drift at the decorator.
-
-The static half is the claim the decorator exists for, so it is run rather than
-assumed: ty, which the dev group installs, checks a module of conforming and
-drifting callables written out for the test, and must report exactly the
-decorator lines marked as drift. ty's own scope is the package, so nothing else
-would ever check these.
-"""
-
 from __future__ import annotations
 
 import re
@@ -134,8 +125,6 @@ def _reported_lines(tmp_path: Path, source: str) -> set[int]:
     """The lines ty reports an error on, checking ``source`` against this environment."""
     module = tmp_path / "conformance.py"
     module.write_text(source)
-    # Outside the project, so no ``[tool.ty]`` scope applies, and against this
-    # interpreter's environment, so the package resolves as a consumer sees it.
     completed = subprocess.run(
         [
             sys.executable,
@@ -153,7 +142,6 @@ def _reported_lines(tmp_path: Path, source: str) -> set[int]:
         cwd=tmp_path,
         check=False,
     )
-    # ty ran and checked the module, or no diagnostics would read as conforming.
     assert re.search(r"All checks passed|Found \d+ diagnostic", completed.stdout), (
         completed.stdout + completed.stderr
     )

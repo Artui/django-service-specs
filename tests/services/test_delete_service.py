@@ -1,5 +1,3 @@
-"""``DeleteService``: the keywords it names are the ones dispatch hands a service."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping

@@ -1,5 +1,3 @@
-"""Tests for ``ServiceValidationError``."""
-
 from __future__ import annotations
 
 import copy
@@ -20,8 +18,7 @@ def test_string_detail() -> None:
 
 
 def test_lazy_detail() -> None:
-    # A lazy string is not a ``str``, and read as one of the structured shapes
-    # its text was replaced by the default message.
+    # A lazy string is not a ``str``.
     detail = gettext_lazy("Pick another day.")
     err = ServiceValidationError(detail)
     assert err.message is detail
