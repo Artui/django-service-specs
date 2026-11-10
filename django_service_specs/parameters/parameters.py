@@ -1,11 +1,3 @@
-"""``Parameters`` and ``Parameter`` - everything an operation takes, and each thing in it.
-
-The two share a file because each holds the other: a ``Parameter`` of type
-``object`` carries the ``Parameters`` of its fields, and ``Parameters`` is made of
-``Parameter``. Split across two modules, one of them could import the other only
-for its annotations.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -52,26 +44,7 @@ held in it too, so a listed id matches in any spelling it is sent in."""
 def canonical_choices(
     fmt: str | None, pairs: Iterable[tuple[Any, Any]]
 ) -> tuple[tuple[Any, Any], ...]:
-    """``pairs`` of a choice and what goes with it, each choice in the spelling the shape check hands a value of ``fmt`` on in.
-
-    A ``uuid`` string's is ``str(uuid.UUID(choice))``, as the shape check's for
-    the value, so a choice listed upper case or braced matches its own value
-    sent in any spelling, and a schema advertises the one spelling a call
-    receives. ``Parameter`` holds its choices and the keys of its labels
-    through this, and ``OutputField`` its (value, display) pairs, when they
-    are built.
-
-    Two spellings of one id would then be one choice listed twice, so the
-    first keeps its place and what goes with it - its label, its display -
-    and a later one is dropped: test_two_spellings_of_one_id_leave_one_choice_where_the_first_stood
-    and test_two_spellings_of_one_id_keep_the_first_label. Only a choice this
-    canonicalises is collapsed; any other repeat is kept as listed
-    (test_repeats_nothing_canonicalised_are_kept).
-
-    Nothing is refused: a choice that is no string, or a string spelling no
-    UUID, is kept as listed and matches nothing, since the format refuses
-    every value it could match first.
-    """
+    """The ``pairs`` of each choice, in the spelling a value of ``fmt`` is handed on in."""
     kept: list[tuple[Any, Any]] = []
     seen: set[str] = set()
     for choice, paired in pairs:
@@ -87,27 +60,7 @@ def canonical_choices(
 def checked_json_schema_extra(
     where: str, extra: Any, owned: Mapping[str, tuple[str, ...]]
 ) -> dict[str, Any] | None:
-    """``extra`` as a declaration's own ``dict``, or ``None``; refused when no schema could carry it.
-
-    ``Parameter`` and ``OutputField`` hold their ``json_schema_extra`` through
-    this, each passing the keywords its fields state in its schema node
-    (``PARAMETER_SCHEMA_KEYWORDS`` and ``OUTPUT_FIELD_SCHEMA_KEYWORDS``). Its
-    keys are a JSON object's, so each must be a string. A keyword a field
-    states is refused whether or not this declaration sets that field, naming
-    the field to declare it on, so whether a declaration is valid never turns
-    on which keys one build happened to emit. A value JSON cannot carry is
-    refused naming its key, at any depth, since every transport encodes the
-    schema as JSON and such a value would stop the operation being listed.
-    Last, a deep copy, so a mapping its caller changes afterwards, at any
-    depth, leaves the declaration as written; after the JSON check, its
-    values are plain containers to copy.
-
-    Each check holds its own test, by the order they run in:
-    test_a_value_no_schema_could_carry_is_refused (the mapping and its keys),
-    test_a_keyword_a_field_states_is_refused_whatever_the_parameter_declares,
-    test_a_value_json_cannot_carry_is_refused_naming_its_key and
-    test_it_is_kept_as_a_copy_of_its_own.
-    """
+    """``extra`` as a declaration's own ``dict``, or ``None``; refused if no schema carries it."""
     if extra is None:
         return None
     if not isinstance(extra, Mapping):
@@ -144,148 +97,18 @@ def checked_json_schema_extra(
 
 
 def _uuid_spelling(fmt: str | None, choice: Any) -> str | None:
-    """The canonical spelling of a ``uuid`` choice, or ``None`` for one this leaves as listed.
-
-    One branch arc of two conditions:
-    test_choices_under_no_uuid_format_are_kept_as_listed fails without the
-    first and test_a_choice_that_is_no_string_is_kept_as_listed without the
-    second.
-    """
+    """The canonical spelling of a ``uuid`` choice, or ``None`` for one this leaves as listed."""
     if fmt != "uuid" or not isinstance(choice, str):
         return None
     try:
         return str(uuid.UUID(choice))
     except ValueError:
-        # Held by test_a_choice_no_uuid_spells_is_kept_as_listed.
         return None
 
 
 @dataclass(frozen=True)
 class Parameter:
-    """One thing an operation takes, as a declaration every transport reads.
-
-    JSON Schema, argv, the closed argument set and the shape check are all
-    derived from it, so a transport describes itself from the declaration
-    rather than from whichever validation library the spec happens to use.
-
-    ``name`` and ``type`` are positional because every declaration has both;
-    everything else is keyword-only.
-
-    ``items`` is an array's element: a JSON type name for a flat list, or the
-    ``Parameters`` of the object each element is. ``fields`` is the same for a
-    parameter whose own type is ``object``. Nesting is what lets a relation
-    write declare its rows: an author with its books says what a book is, where
-    a flat ``items="object"`` would say nothing and let a malformed row through.
-
-    ``nullable`` is the parameter's own: whether the argument may be ``null``.
-    ``items_nullable`` is its element's: whether a ``null`` may stand in the
-    array where an element would, as in ``list[int | None]``. The two are
-    independent, because a list that may be absent and a list that may hold
-    gaps are different declarations, and an array with no declared ``items``
-    admits a ``null`` element already.
-
-    ``type`` is a JSON type or ``file``, which an array's ``items`` may name
-    too. A file is a Django ``File``, an upload included, and has no
-    ``choices``: it is matched by nothing a declaration could list.
-
-    ``type`` may also be ``any``, for a parameter that declares no type, as an
-    unannotated argument does: ``3`` and ``"abc"`` are both one. Its value is
-    handed on exactly as it arrived, never read as a number or a boolean, so
-    a query string's ``"3"`` stays the string ``"3"``; ``null`` is accepted
-    only where ``nullable`` says so, as for every other type. Having no type,
-    it describes nothing a type would - no ``choices``, ``format``, ``fields``,
-    ``items`` or bound - and an array's ``items`` never name it, since an
-    array that declares no ``items`` takes any element already.
-
-    ``choice_labels`` names the choices for a reader: a mapping of a choice to
-    its label, or Django's ``choices`` spelling, pairs of the two, which keeps
-    apart the ``1`` and ``True`` a mapping's keys would merge. A choice may go
-    unlabelled. The labels constrain nothing, so the shape check reads only
-    ``choices``; the schema carries them as titles. They are stored as a tuple
-    of pairs, and a label may be a lazy translation, rendered when the schema
-    is built.
-
-    ``default`` is [`UNSET`][django_service_specs.types.unset.UNSET] when none is
-    declared, so a default of ``None`` stays a real default. It is reported, not
-    applied: whether an omitted argument arrives as the default, as ``None`` or
-    not at all is the validating library's behaviour, and each adapter reports
-    what its library does. It takes no part in the hash, so a declaration with
-    a list or dict default is as hashable as any other, while equality still
-    tells two defaults apart.
-
-    ``minimum`` and ``maximum`` bound a number, inclusively: an ``integer``, a
-    ``number``, or a ``decimal`` string, which is compared as the decimal it
-    spells, so ``"1E+999999999"`` is past a bound of ``1e50`` without ever
-    being built as the integer it names. Each is an ``int`` or a finite
-    ``float``, a JSON number. The schema states them on an ``integer`` and a
-    ``number`` and not on a decimal string, where JSON Schema gives them no
-    meaning; the shape check enforces all three. They exist for the bound a
-    reader needs before any Validator runs: a filter whose form field has none
-    hands the value to the database's integer conversion, which builds every
-    digit. Any other bound - a string's length, a Validator's ``max_value`` -
-    is still the Validator's alone.
-
-    **On an array,** ``format``, ``minimum`` **and** ``maximum`` **describe
-    each element**, as ``choices`` do: an array of ``integer`` or ``number``
-    takes a bound, and an array of ``string`` takes ``format="decimal"`` and
-    then a bound too, which is what a django-filter CSV number filter
-    declares. A decimal is the one format an element takes: a number element
-    is read as a float on the way, which rounds a fraction past a float's
-    precision, where a decimal string is compared and handed on as it was
-    sent. Any other format on an array, and a format or a bound on an
-    element that cannot carry it, is refused. The list's own count is
-    ``min_length`` and ``max_length``'s, so an array may carry both pairs.
-
-    ``min_length`` and ``max_length`` bound how many elements an ``array``
-    takes, inclusively, and are refused on anything else: each a
-    non-negative ``int``. They are checked on the list whole, before any
-    element is read, so a list past its maximum costs no per-element work.
-    **An array that declares no** ``max_length`` **is still bounded**, by the
-    ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the project sets
-    another count or ``None``: a list a caller controls the length of is a
-    cost the caller controls, and the setting is read at the call, so it
-    applies to a declaration built before settings were configured. A
-    declared ``max_length`` outranks it either way, wider or narrower.
-    ``min_length`` has no default: an empty list is taken unless one says
-    otherwise.
-
-    ``json_schema_extra`` carries the JSON Schema keywords no field of a
-    Parameter spells - a ``pattern``, a string's ``maxLength``,
-    ``uniqueItems`` - as a mapping of keyword to value, held as a deep copy of
-    its own. It is how an adapter whose library declares more than a
-    Parameter carries keeps it on every route rather than on its own.
-    [`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema]
-    adds its keys to this parameter's node. A keyword a field states there is
-    refused here, naming the field, whether or not this parameter sets it:
-    ``type``, ``format`` (so a custom format is refused too: ``format`` is a
-    field), ``default``, the choices' ``enum``, ``anyOf`` and ``const``, the
-    bounds, ``minItems`` and ``maxItems``, ``items``, ``description`` from
-    ``help``, and ``properties``, ``required`` and ``additionalProperties``
-    from ``fields``. Either side winning would advertise what the declaration
-    does not say or drop what was written, and refusing the keyword only when
-    one build stated it would make the same declaration valid until the array
-    cap came on or a spec moved to ``REJECT``. A value JSON cannot carry - a
-    ``Decimal``, a lazy translation, at any depth - is refused too, naming its
-    key. It is advertised, not enforced: the shape check never reads it, so
-    what it states holds only where the spec's Validator enforces it
-    (test_it_is_advertised_and_not_enforced_by_the_shape_check).
-    It takes no part in the hash, as ``default`` does not, and still in equality.
-
-    ``reflected`` says the parameter was read off a callable's signature
-    rather than written by an author, as djangorestframework-services reads a
-    selector's, a target lookup's or a spread service's parameters into
-    ``reads``. It counts on a ``reads`` parameter alone - a selector spec's,
-    a target selector's or a service spec's - and only at dispatch: a
-    reflected read named like a seed the call's ``pool_seeds`` registers
-    leaves that call's argument set, and the seed fills it, where an unmarked
-    one is refused as a configuration error
-    (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s).
-    On a Validator field or a shape it changes nothing. No schema carries it,
-    since it describes where a declaration came from rather than what a caller
-    sends; it takes part in equality and the hash, because two declarations
-    that differ in it dispatch differently
-    (test_reflected_is_compared_and_hashed_and_never_in_the_schema).
-    """
+    """One thing an operation takes, as a declaration every transport reads."""
 
     name: str
     type: str
@@ -296,38 +119,19 @@ class Parameter:
     items_nullable: bool = False
     fields: Parameters | None = None
     choices: tuple[Any, ...] | None = None
-    # Out of the hash, as ``default`` is: a label may be a lazy translation, which
-    # renders when hashed, and a spec is hashed at import, before the apps are
-    # ready. Equality still compares them, and equal Parameters still hash equal.
-    # Held by test_a_lazy_label_is_compared_and_never_hashed.
     choice_labels: tuple[tuple[Any, str], ...] | None = field(default=None, hash=False)
     minimum: int | float | None = None
     maximum: int | float | None = None
-    # A list's own count, under the names Django's and DRF's length validators
-    # use, rather than JSON Schema's ``minItems``: the declaration is read by
-    # Python authors, and the schema states the JSON spelling.
     min_length: int | None = None
     max_length: int | None = None
-    # Out of the hash and still in equality, so a list or dict default - which
-    # the pydantic adapter reports as given - leaves the declaration hashable.
-    # Equal Parameters still hash equal, which is all a hash promises; two that
-    # differ only by default share one and stay unequal. This is the case the
-    # ``dataclasses`` documentation names for ``hash=``: a field equality needs
-    # while the others carry the hash. Freezing the value instead would change
-    # the type the adapter reported and leave a dict default unhashable.
     default: Any = field(default=UNSET, hash=False)
     nullable: bool = False
     help: str | None = None
-    # Out of the hash, as ``default`` is and for its reason: a dict cannot be
-    # hashed, and equality still tells two schemas apart. Held by
-    # test_a_parameter_carrying_one_is_hashable_and_compared_by_it.
     json_schema_extra: dict[str, Any] | None = field(default=None, hash=False)
     reflected: bool = False
 
     def __post_init__(self) -> None:
-        # A declaration that no reader can act on is refused where it is written,
-        # so the error names the parameter rather than surfacing later as a
-        # schema or a shape check that quietly ignores half of it.
+        # Refused where written, so the error names the parameter it is about.
         where = f"Parameter {self.name!r}"
         object.__setattr__(
             self,
@@ -353,9 +157,6 @@ class Parameter:
         if self.items is not None:
             if self.type != "array":
                 raise ImproperlyConfigured(f"{where}: items describes an array's element.")
-            # Before the type list, which names ``any``: one spelling for an
-            # element of any type, and the array with no items is it. Held by
-            # test_an_array_does_not_declare_any_as_its_element.
             if self.items == "any":
                 raise ImproperlyConfigured(
                     f"{where}: an array with no items takes any element already; declare no items."
@@ -372,21 +173,13 @@ class Parameter:
         if self.fields is not None and self.type != "object":
             raise ImproperlyConfigured(f"{where}: fields describes an object's own parameters.")
         if self.choices is not None:
-            # Normalized rather than refused, so a list reads as naturally as a
-            # tuple and the frozen declaration stays hashable.
-            # Held in the spelling the shape check compares a value in, so a
-            # listed id matches however it is sent: test_the_declared_choices_are_held_canonical.
             pairs = canonical_choices(self.format, ((choice, None) for choice in self.choices))
             choices = tuple(choice for choice, _ in pairs)
             object.__setattr__(self, "choices", choices)
-            # The element's type for an array, since its choices constrain each
-            # element. One branch to coverage, so each operand is held by its
-            # own test: test_a_file_has_no_choices[file] and [array-of-files].
             if "file" in (self.type, self.items):
                 raise ImproperlyConfigured(
                     f"{where}: a file is never one of a list of values; declare no choices."
                 )
-            # A list of values says what type they are; held by test_any_has_no_choices.
             if self.type == "any":
                 raise ImproperlyConfigured(
                     f"{where}: an untyped value is matched by no list; declare its type to list "
@@ -394,26 +187,14 @@ class Parameter:
                 )
         if self.choice_labels is not None:
             self._normalize_choice_labels(where, self.choice_labels)
-        # One branch to coverage, each side held by its own half of
-        # test_a_bound_must_be_a_finite_number: [minimum-...] and [maximum-...].
         if self.minimum is not None or self.maximum is not None:
             self._check_bounds(where)
-        # One branch to coverage, each side held by its own half of
-        # test_a_length_describes_an_array: [min_length] and [max_length].
         if self.min_length is not None or self.max_length is not None:
             self._check_lengths(where)
 
     def _check_bounds(self, where: str) -> None:
-        """Refuse a bound no reader can act on: a non-number, or one on a value that is no number."""
+        """Refuse a bound no reader can act on: a non-number, or one on a non-number value."""
         for label, bound in (("minimum", self.minimum), ("maximum", self.maximum)):
-            # A JSON number the schema can state: ``bool`` is an ``int`` to Python
-            # and no number to JSON, which ``type() is`` keeps out, and NaN and the
-            # infinities have no JSON spelling. Read by type rather than through
-            # ``math.isfinite`` alone, which overflows on a large ``int`` and takes
-            # a ``Decimal``. One branch to coverage, so each condition is held by
-            # its own test: test_a_bound_may_stand_alone (``None``),
-            # test_a_bound_on_an_integer_is_inclusive (``int``) and
-            # test_a_bound_must_be_a_finite_number[decimal] and [infinity].
             if bound is not None and not (
                 type(bound) is int or (type(bound) is float and math.isfinite(bound))
             ):
@@ -421,47 +202,24 @@ class Parameter:
                     f"{where}: {label} {bound!r} is not a finite int or float."
                 )
         if self.type == "array":
-            # Each element's, as an array's choices are, and so the element's
-            # type is asked. One branch to coverage, so each condition is held
-            # by its own test: test_a_bound_on_an_array_of_numbers_bounds_each_element
-            # (the type) and test_a_decimal_array_reads_each_element_as_a_bounded_decimal
-            # (the format, which ``_check_element_format`` allows on a string
-            # element alone).
             if self.items not in ("integer", "number") and self.format != "decimal":
                 raise ImproperlyConfigured(
                     f"{where}: a bound on an array describes each element, which must be a "
                     "number or a decimal string; declare items 'integer' or 'number', or "
                     "items 'string' with format 'decimal'."
                 )
-        # One branch to coverage, so each condition is held by its own test:
-        # test_a_bound_on_an_integer_is_inclusive (the type: without it, an
-        # integer's bound is refused) and test_a_decimal_string_takes_a_bound
-        # (the format).
         elif self.type not in ("integer", "number") and self.format != "decimal":
             raise ImproperlyConfigured(
                 f"{where}: a bound describes a number or a decimal string; "
                 f"this parameter is {self.type!r}."
             )
-        # One branch to coverage: test_one_bound_may_equal_the_other holds the
-        # comparison, and test_a_bound_may_stand_alone each ``is not None``,
-        # without which an absent bound is compared and raises.
         if self.minimum is not None and self.maximum is not None and self.minimum > self.maximum:
             raise ImproperlyConfigured(
                 f"{where}: minimum {self.minimum!r} is past maximum {self.maximum!r}."
             )
 
     def _check_element_format(self, where: str) -> None:
-        """Refuse a format on an array that its element cannot carry: anything but a decimal string.
-
-        On an array a format describes each element, as its choices do. Only
-        ``decimal`` is read there, because it is the one an element needs: a
-        number element is read as a float on the way, and a fraction past a
-        float's precision loses digits, where a decimal string is compared and
-        handed on as it was sent. A date or a date-time element stays the
-        string its Validator decodes; refused rather than read, since
-        Django's date-time parser takes a comma before the fraction of a
-        second, and a decimal is what a flat reader may split on commas.
-        """
+        """Refuse a format on an array whose element cannot carry it."""
         if self.items != "string":
             raise ImproperlyConfigured(
                 f"{where}: a format on an array describes each element, which must be a "
@@ -476,12 +234,6 @@ class Parameter:
     def _check_lengths(self, where: str) -> None:
         """Refuse a length no reader can act on: no count, or one on a value that is no array."""
         for label, length in (("min_length", self.min_length), ("max_length", self.max_length)):
-            # A count: ``bool`` is an ``int`` to Python and no count, which
-            # ``type() is`` keeps out. One branch to coverage, each condition
-            # held by its own test: test_a_length_may_stand_alone_and_be_zero
-            # (``None``: without it, the side left open is refused), and
-            # test_a_length_must_be_a_non_negative_int's [bool] and [string]
-            # (the type) and [negative] (the sign).
             if length is not None and not (type(length) is int and length >= 0):
                 raise ImproperlyConfigured(
                     f"{where}: {label} {length!r} is not a non-negative int."
@@ -490,9 +242,6 @@ class Parameter:
             raise ImproperlyConfigured(
                 f"{where}: a length describes an array; this parameter is {self.type!r}."
             )
-        # One branch to coverage: test_one_length_may_equal_the_other_and_not_pass_it
-        # holds the comparison, and test_a_length_may_stand_alone_and_be_zero
-        # each ``is not None``, without which an absent length is compared and raises.
         if (
             self.min_length is not None
             and self.max_length is not None
@@ -506,9 +255,6 @@ class Parameter:
         self, where: str, labels: Mapping[Any, str] | Iterable[tuple[Any, str]]
     ) -> None:
         """Store ``choice_labels`` as pairs, refusing a label for no declared choice."""
-        # Keyed as the choices are held, so a label written against the
-        # spelling a choice was listed in still names it:
-        # test_a_label_follows_its_choice_into_the_canonical_spelling.
         pairs = canonical_choices(
             self.format, labels.items() if isinstance(labels, Mapping) else labels
         )
@@ -535,18 +281,7 @@ class Parameter:
 
 @dataclass(frozen=True)
 class Parameters:
-    """An ordered set of [`Parameter`][django_service_specs.parameters.parameters.Parameter].
-
-    A spec's Parameters are assembled from several sources - its target
-    selector's ``reads``, its Validator's ``parameters()`` - and ``+`` is how.
-    **A name declared twice is refused**, at construction and at ``+`` alike:
-    two sources claiming one argument is a spec bug, and a last-wins merge
-    would hide which of the two declarations a transport describes and which
-    one the argument reaches.
-
-    Any iterable of parameters is accepted and stored as a tuple, so the
-    declaration stays hashable and ordered.
-    """
+    """An ordered set of [`Parameter`][django_service_specs.parameters.parameters.Parameter]."""
 
     items: tuple[Parameter, ...] = ()
 

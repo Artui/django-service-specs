@@ -1,5 +1,3 @@
-"""``NON_FIELD_KEYS`` - the keys a message about the whole input sits under."""
-
 from __future__ import annotations
 
 from typing import Final
