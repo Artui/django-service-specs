@@ -1,5 +1,3 @@
-"""``unmet_operation_affordance`` - whether an operation should be offered at all."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -19,61 +17,7 @@ def unmet_operation_affordance(
     reserved: frozenset[str],
     call_context: dict[str, Any] | None = None,
 ) -> Affordance | None:
-    """The first of the spec's operation-scope affordances not met now, or ``None``.
-
-    For a transport deciding whether to offer an operation at all, before anyone
-    attempts it: an MCP server building its tool list, an agent assembling the
-    toolset for its next step. An operation whose answer is an
-    [`Affordance`][django_service_specs.types.affordance.Affordance] cannot be
-    called right now whatever it is called with, so offering it only invites a
-    refusal.
-
-    Only the callable conditions are asked - the ones answered without a row. A
-    condition on the row is skipped without being evaluated, because at list
-    time there is no row: it runs no query and needs no instance, and it goes on
-    being answered per object where it always is, at the call. The callables are
-    asked in declaration order and the first unmet one is returned, which is the
-    one a call would be refused with when no row condition before it answers
-    first. A callable's result is read for truth, so one that returns nothing is
-    unmet here as it is refused at the call. An exception it raises propagates:
-    this answers the question, and a condition that cannot be answered is not a
-    ``no``.
-
-    **Build ``pool`` the way the call's would be.** A condition sees the seeds of
-    it, never a client argument, through the same definition the call is
-    refused by, so the two see the same names only if they are handed the same
-    seeds:
-    [`base_pool`][django_service_specs.pool.base_pool.base_pool] with the same
-    ``seeds=``, and ``reserved=seeds.reserved`` here. ``reserved`` is the names a
-    condition may be handed from the pool: the mount's ``pool_seeds.reserved``,
-    the kernel's reserved names plus the seeds it registers. It is required, with
-    no default, because a default would ask a condition with none of the
-    registered seeds, and one reading a registered seed would fail at describe
-    time though dispatch serves it.
-
-    **The answer is advisory.** Enforcement at the call
-    ([`enforce_affordances`][django_service_specs.affordances.enforce_affordances.enforce_affordances])
-    remains the authority, so a list built a moment before a condition flips is
-    answered, when the stale entry is called, by an
-    [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable]
-    carrying the ``code`` this would return if asked again then (or a row
-    condition's, where one declared earlier refuses first). A condition driven by
-    a clock has no event: it is answered when asked, and nothing announces the
-    moment it flips. A transport that can push list changes to its client needs
-    something else to tell it when to ask again.
-
-    A ``SelectorSpec`` is accepted and answers ``None``: its ``affordances`` maps
-    names to *other* operations, to be answered for its rows, and is never a
-    condition on the selector itself - so a transport passes whatever spec it
-    holds rather than branching on its type and risking reading that mapping as
-    the selector's own.
-
-    ``call_context`` is the call's context, handed to a callable condition
-    that names it and never to one taking ``**kwargs`` for the rest: the dict
-    passed, else the one ``pool`` carries, else a fresh one the conditions of
-    this call share. A ``call_context`` passed beside a different one in
-    ``pool`` raises ``ImproperlyConfigured`` (``with_call_context``).
-    """
+    """The first of the spec's operation-scope affordances not met now, or ``None``."""
     pool = with_call_context(pool, call_context)
     for affordance in operation_affordances(spec):
         if not answer_operation_condition(affordance.when, pool, reserved=reserved):
