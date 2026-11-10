@@ -1,20 +1,3 @@
-"""Reading a pydantic model's fields, shared by the validator and the presenter.
-
-The two read one declaration from two sides - what an argument must be for the
-model to validate it, and what a field becomes when the model dumps it - and
-reading it once, here, keeps them from disagreeing about a type. The
-annotations are read with the same table and the same unwrapping as the
-dataclass adapter's (``adapters/utils.py``), so a model and a dataclass
-declaring the same field declare the same parameter.
-
-What differs from the dataclass adapter is who builds the values. That adapter
-decodes rows itself, so a dataclass containing itself would decode forever,
-and it refuses one. Here pydantic builds every instance from its own schema,
-which handles recursion; the declaration is only a description, and a
-self-referential model is described to a bound (``MAX_APPEARANCES``) instead
-of refused.
-"""
-
 from __future__ import annotations
 
 import typing
@@ -72,17 +55,7 @@ _SUPPORTED = (
 
 @dataclass(frozen=True)
 class Shape:
-    """What one annotation means, once ``Annotated`` and ``None`` are off it.
-
-    ``python`` is the class a value validates into: the scalar class, the
-    ``Enum``, the model, or ``dict``. It is ``None`` for a ``Literal``, whose
-    values are already what the field holds, and for a list, which is
-    ``items``.
-
-    ``fields`` is a model's own fields. It is ``None`` for a model the
-    appearance bound truncated, as it is for a ``dict``: in both the
-    declaration says only that the value is an object.
-    """
+    """What one annotation means, once ``Annotated`` and ``None`` are off it."""
 
     type: str
     python: Any = None
@@ -106,20 +79,7 @@ class Shape:
 
 @dataclass(frozen=True)
 class FieldShape:
-    """One model field, or one computed field, with everything the adapters read off it.
-
-    ``name`` is the attribute: what ``validate()`` returns a value under,
-    because it is the keyword the service receives, and what ``present()``
-    reads off a value. The two wire names are pydantic's own, one per
-    direction:
-
-    - ``input_name``: the key pydantic validates by, and so the parameter's
-      name. A computed field is never an input (``computed``), and carries
-      its own name here.
-    - ``output_name``: the key ``model_dump(by_alias=True)`` emits, and so the
-      output field's name. ``None`` for a field declared ``exclude=True``,
-      which is never output.
-    """
+    """One model field, or one computed field, with everything the adapters read off it."""
 
     name: str
     shape: Shape
@@ -140,12 +100,7 @@ class FieldShape:
 
 
 def check_model(model: Any, *, label: str) -> None:
-    """Refuse anything that is not a pydantic model class, naming what was passed.
-
-    An instance is refused as well as an unrelated class: it would fail later
-    and further away. So is a ``RootModel``, which validates one value rather
-    than named arguments, so it has no fields to be parameters.
-    """
+    """Refuse anything that is not a pydantic model class, naming what was passed."""
     if not _is_model(model):
         raise ImproperlyConfigured(
             f"{label} takes a pydantic model class (not a RootModel, which validates one "
@@ -156,24 +111,14 @@ def check_model(model: Any, *, label: str) -> None:
 def read_fields(
     model: type[BaseModel], stack: tuple[type[BaseModel], ...] = ()
 ) -> tuple[FieldShape, ...]:
-    """Every field of ``model`` in declaration order, then every computed field.
-
-    ``stack`` holds the models being read above this one, which is what the
-    appearance bound counts. A caller leaves it empty.
-    """
+    """Every field of ``model`` in declaration order, then every computed field."""
     _complete(model)
     below = (*stack, model)
-    # Only pydantic's own config can say a model validates by field name
-    # rather than by alias; unset, it validates by alias.
     by_alias = model.model_config.get("validate_by_alias", True)
     out: list[FieldShape] = []
     for name, info in model.model_fields.items():
         where = f"{model.__qualname__}.{name}"
         shape, extras = _read(info.annotation, where=where, stack=below)
-        # pydantic lifts the metadata of an outer ``Annotated`` onto the
-        # FieldInfo and leaves an inner one in the annotation, so a marking
-        # and a length are each looked for in both. The annotation's go
-        # first, as pydantic applies them first.
         metadata = (*extras, *info.metadata)
         min_length, max_length = _lengths(shape, metadata)
         out.append(
@@ -215,12 +160,7 @@ def read_fields(
 
 
 def fields_of(shape: Shape) -> tuple[FieldShape, ...]:
-    """A model node's fields: as read, or read afresh where the appearance bound cut them.
-
-    Describing stops at the bound; walking a value or an error's location does
-    not, because a value can be deeper than its description. Reading afresh
-    starts a new count, so each re-read goes as deep again.
-    """
+    """A model node's fields: as read, or read afresh where the appearance bound cut them."""
     return shape.fields if shape.fields is not None else read_fields(shape.python)
 
 
@@ -230,10 +170,7 @@ def inputs(fields: tuple[FieldShape, ...]) -> tuple[FieldShape, ...]:
 
 
 def is_json_native(value: Any) -> bool:
-    """Whether ``value`` survives a JSON round trip as itself, containers included.
-
-    drfs' test for a publishable default, so both describe the same defaults.
-    """
+    """Whether ``value`` survives a JSON round trip as itself, containers included."""
     if isinstance(value, (str, int, float, bool)) or value is None:
         return True
     if isinstance(value, (list, tuple)):
@@ -244,11 +181,7 @@ def is_json_native(value: Any) -> bool:
 
 
 def _is_model(value: Any) -> bool:
-    # One branch to coverage, so each condition is held by its own test:
-    # test_refuses_anything_but_a_model_class holds the first two, and
-    # test_a_root_model_is_refused the third. On Python 3.10 ``list[int]``
-    # passes as a type; pydantic's metaclass answers ``issubclass`` for it
-    # with False rather than raising, so no guard is needed before it.
+    # One branch to coverage, so its condition has its own test.
     return (
         isinstance(value, type)
         and issubclass(value, BaseModel)
@@ -257,12 +190,7 @@ def _is_model(value: Any) -> bool:
 
 
 def _complete(model: type[BaseModel]) -> None:
-    """Resolve a model whose annotations named a class not defined when it was.
-
-    pydantic defers such a model rather than failing, and completes it on first
-    use; reading its fields is a first use, so it is completed here, against
-    the model's own module, or refused naming the model.
-    """
+    """Resolve a model whose annotations named a class not yet defined."""
     if model.__pydantic_complete__:
         return
     try:
@@ -283,9 +211,6 @@ def _input_name(name: str, info: FieldInfo, *, by_alias: bool, where: str) -> st
         return info.alias or name
     if isinstance(alias, str):
         return alias
-    # AliasPath reads a key inside another, and AliasChoices several keys;
-    # neither is one name a transport can declare, a caller send, or the
-    # closed argument set admit.
     raise ImproperlyConfigured(
         f"{where}: validation_alias {alias!r} is not one name, and a parameter has one. "
         "Use a string alias."
@@ -298,11 +223,7 @@ def _output_name(name: str, info: FieldInfo) -> str:
 
 
 def _default(info: FieldInfo) -> Any:
-    # A default_factory's value is computed per instance, so it is not a
-    # declaration a transport could print; and a default JSON cannot carry
-    # as itself (a Decimal, a date, a model) is left out rather than
-    # misstated. Either way the field stays optional: ``required`` is read
-    # separately, from pydantic.
+    # A ``default_factory``'s value is per instance, so it is not a printable default.
     default = info.default
     if default is PydanticUndefined or not is_json_native(default):
         return UNSET
@@ -310,31 +231,12 @@ def _default(info: FieldInfo) -> Any:
 
 
 def _always_present(info: FieldInfo | ComputedFieldInfo) -> bool:
-    # ``model_dump`` emits every key, except one whose ``exclude_if`` holds
-    # for the value at hand. Read with getattr because the option is newer
-    # than the floor: a field has it from pydantic 2.12 and a computed field
-    # from 2.13, and a model on an older release has no such key to drop.
+    # ``model_dump`` emits every key, except one whose ``exclude_if`` holds for the value at hand.
     return getattr(info, "exclude_if", None) is None
 
 
 def _lengths(shape: Shape, metadata: tuple[Any, ...]) -> tuple[int | None, int | None]:
-    """(min_length, max_length) a list field declares, each ``None`` where it declares none.
-
-    Read from ``annotated_types``' ``MinLen`` and ``MaxLen``, which is what
-    every spelling comes to: ``Field(min_length=, max_length=)``, ``conlist``
-    and ``Len``, whose ``Len`` groups the two, and the markers written
-    directly. pydantic applies a field's metadata in order, the annotation's
-    from the innermost ``Annotated`` out and then the field's own, and a
-    later length replaces an earlier one, so the last of each is the one it
-    enforces: test_each_declared_length_is_the_one_pydantic_enforces holds
-    that against the model, and test_every_spelling_of_a_list_s_length_is_declared
-    each spelling, the order included.
-
-    Only a list's: a length on a string or a dict is the model's alone, as
-    ``Parameter`` takes a length on an array and nothing else.
-    test_pydantic_answers_for_what_the_declaration_does_not_carry holds the
-    type, and without it a string's ``max_length`` is refused when declared.
-    """
+    """(min_length, max_length) a list field declares, each ``None`` where it declares none."""
     if shape.type != "array":
         return None, None
     min_length = max_length = None
@@ -347,14 +249,7 @@ def _lengths(shape: Shape, metadata: tuple[Any, ...]) -> tuple[int | None, int |
 
 
 def _flatten(metadata: Iterable[Any]) -> Iterator[Any]:
-    """Each piece of metadata, with every group opened where it stands.
-
-    A ``Field()`` inside an ``Annotated`` the FieldInfo did not lift carries
-    its constraints as its own ``metadata``, and a ``GroupedMetadata`` such as
-    ``Len`` yields its parts when iterated: each read in its place, so the
-    order pydantic applies them in is kept. Held by the ``inner_field`` and
-    ``grouped`` rows of test_every_spelling_of_a_list_s_length_is_declared.
-    """
+    """Each piece of metadata, with every group opened where it stands."""
     for item in metadata:
         if isinstance(item, FieldInfo):
             yield from _flatten(item.metadata)
@@ -367,22 +262,13 @@ def _flatten(metadata: Iterable[Any]) -> Iterator[Any]:
 def _read(
     annotation: Any, *, where: str, stack: tuple[type[BaseModel], ...]
 ) -> tuple[Shape, tuple[Any, ...]]:
-    """(shape, ``Annotated`` extras) for one annotation, or ``ImproperlyConfigured``.
-
-    Never a silent ``string``: an annotation this cannot map is refused where
-    it is declared, naming the field, because a wrong type in a declaration is
-    a schema that lies to every transport reading it.
-    """
+    """(shape, ``Annotated`` extras) for one annotation, or ``ImproperlyConfigured``."""
     base, nullable, omittable, extras = strip(annotation)
     if omittable:
-        # ``UnsetType`` is the dataclass adapter's way to leave an argument
-        # out. pydantic has its own (a default) and cannot dump the marker, so
-        # here it is one more type with no JSON type.
         raise unmappable(annotation, where=where, supported=_SUPPORTED)
     origin = typing.get_origin(base)
     args = typing.get_args(base)
     if origin is typing.Literal:
-        # ``Literal["a", None]`` is Python's own spelling of a nullable choice.
         values = tuple(v for v in args if v is not None)
         shape = Shape(
             choice_type(values, base, where=where, supported=_SUPPORTED),
@@ -390,15 +276,9 @@ def _read(
             choices=values,
         )
     elif origin is list and len(args) == 1:
-        # The element keeps its own nullability; a marking belongs to a field,
-        # not to one element of a list, so the element's extras are dropped.
         items, _ = _read(args[0], where=where, stack=stack)
         shape = Shape("array", nullable=nullable, items=items)
     elif origin is dict and args[:1] == (str,):
-        # JSON object keys are strings, so only a str-keyed dict crosses a
-        # wire as one. Its values are pydantic's to validate; Parameters has
-        # no way to declare "every value is an X", so the declaration is an
-        # object and says nothing false about what is inside it.
         shape = Shape("object", python=dict, nullable=nullable)
     elif isinstance(base, type) and issubclass(base, Enum):
         values = tuple(member.value for member in base)
