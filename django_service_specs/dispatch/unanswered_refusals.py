@@ -1,5 +1,3 @@
-"""``unanswered_refusals`` - what a transport's refusal-to-outcome map leaves unanswered."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence, Set
@@ -29,11 +27,7 @@ class _Denies(PermissionCheck):
 
 
 def _check_denied() -> PermissionCheckDenied:
-    """A check's denial as ``authorize`` raises it, naming the check and the spec declaring it.
-
-    ``authorize`` handed the same spec denies with the same check
-    (test_a_check_s_denial_is_built_as_authorize_raises_it).
-    """
+    """A check's denial as ``authorize`` raises it, naming the check and the spec declaring it."""
     check = _Denies()
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[check])
     return PermissionCheckDenied(check=check, spec=spec)
@@ -64,77 +58,12 @@ def unanswered_refusals(
     *,
     unanswered: object = None,
 ) -> tuple[RefusalFinding, ...]:
-    """What a transport's map from the kernel's refusals to its outcomes leaves unanswered.
-
-    A [`RefusalFinding`][django_service_specs.types.refusal_finding.RefusalFinding]
-    per finding, and none for a map that answers every one of
-    [`REFUSALS`][django_service_specs.dispatch.refusals.REFUSALS], so a transport
-    holds its map from its own test suite with
-    ``assert unanswered_refusals(...) == ()``; pytest's failure shows the
-    first finding, and ``-v`` lists them all. A transport that leaves a gap on purpose
-    filters the findings by ``refusal`` or ``kind``, never by their words,
-    which ``str()`` gives and which are free to change. Each transport keeps
-    its own vocabulary - an exit code, a status, a run state - and this checks
-    only that the vocabulary is total.
-
-    ``answers`` is the map in one of two shapes:
-
-    - **An ordered table of ``(refusal class, outcome)`` rows**, read top to
-      bottom by ``isinstance`` with the first match winning, which is how the
-      kernel's own maps are written. A refusal is answered with the outcome
-      of the first row whose class it is an instance of, so a row for a base
-      answers every refusal under it, and a catch-all row of ``Exception``
-      answers them all. A row whose outcome is ``unanswered`` is no answer:
-      a refusal it catches first stays unanswered whatever a later row says,
-      as for the callable below. Pass the table itself.
-    - **A callable**, given one instance of each refusal and answering with its
-      outcome, for a map written as branches. A refusal is unanswered when the
-      callable returns ``unanswered`` (compared with ``==``, so a falsy
-      outcome such as ``0`` is still an answer). Whatever it raises
-      propagates: a map that cannot answer a refusal without raising is
-      broken in a way this should not hide. A mapping looked up by the
-      error's exact class passes ``lambda error: table.get(type(error))``,
-      since reading it as ordered rows would let a base's key answer for a
-      subclass the lookup never reaches.
-
-    Three kinds of finding, each a
-    [`RefusalFindingKind`][django_service_specs.types.refusal_finding_kind.RefusalFindingKind],
-    shown here as ``str()`` words them:
-
-    - ``UNANSWERED``, ``nothing in the map answers NotPermitted``: a refusal
-      no row, or no call, answers.
-    - ``BARE_BASE``, ``nothing in the map answers DispatchError itself, though
-      it answers every refusal under it, and DispatchError may be raised
-      bare``: the map looks complete and is not. Either family base may be raised bare: the
-      kernel raises neither itself, but a project's own code may, and
-      ``ServiceConflict`` is a base too.
-    - ``SHADOWED_ROW``, ``the row for ServiceConflict never answers: the row
-      for ServiceError above it answers every ServiceConflict first``: the
-      precedence trap of an ordered table, a subclass's row below its base's.
-      Its ``refusal`` is the dead row's class and its ``shadowed_by`` the
-      earlier row's. Reported for every row, a transport's own refusal's
-      included, since a row nothing reaches is dead whoever's refusal it
-      names.
-
-    The precedence trap is reported for a table only. A callable written as
-    branches orders them in code, and a branch for a subclass below its
-    base's is a body that never runs, which the transport's own branch
-    coverage reports; a table's order is data, which coverage reads as one
-    expression.
-    """
+    """What a transport's map from the kernel's refusals to its outcomes leaves unanswered."""
     if callable(answers):
         answered = {kind for kind in REFUSALS if answers(_BUILDERS.get(kind, kind)()) != unanswered}
         shadowed: list[RefusalFinding] = []
     else:
-        # Read once into a tuple: every refusal walks the rows, and a generator
-        # would be spent by the first.
         rows = tuple(answers)
-        # The first matching row's outcome, read as the ladder reads it. Held
-        # in tests/dispatch/test_unanswered_refusals.py:
-        # ``test_the_first_matching_row_answers_even_when_it_answers_unanswered``
-        # fails if any matching row may answer instead of the first, and
-        # ``test_a_table_and_the_callable_reading_it_find_the_same`` fails both
-        # for that and if the outcome is not read at all.
         answered = {
             kind
             for kind in REFUSALS
@@ -148,12 +77,6 @@ def unanswered_refusals(
 def _unanswered(kind: type[BaseException], answered: Set[type[BaseException]]) -> RefusalFinding:
     """The finding for ``kind``, which nothing answers."""
     under = [other for other in REFUSALS if other is not kind and issubclass(other, kind)]
-    # Two conjuncts, each held in tests/dispatch/test_unanswered_refusals.py:
-    # ``test_a_refusal_with_nothing_under_it_is_never_called_a_base`` fails
-    # without the first (with nothing under it, "every refusal under it" is
-    # vacuously answered), and
-    # ``test_a_family_with_no_row_is_each_refusal_in_it_unanswered`` without
-    # the second (a map missing a whole family does not look complete).
     if under and all(other in answered for other in under):
         return RefusalFinding(kind, RefusalFindingKind.BARE_BASE)
     return RefusalFinding(kind, RefusalFindingKind.UNANSWERED)
