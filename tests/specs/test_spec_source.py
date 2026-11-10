@@ -1,5 +1,3 @@
-"""``SpecSource``: each entry point the registry page names is declared to take a source too."""
-
 from __future__ import annotations
 
 import inspect
@@ -40,9 +38,7 @@ ENTRY_POINTS = [
 
 @pytest.mark.parametrize("name", ENTRY_POINTS)
 def test_each_named_entry_point_is_annotated_to_take_a_source(name: str) -> None:
-    # What a type checker reads: a function that compiles a source but is
-    # annotated for a spec alone makes every caller holding a declaration
-    # write a cast, or call kernel_spec itself and lose nothing it could see.
+    # What a type checker reads.
     annotation = (
         inspect.signature(getattr(django_service_specs, name)).parameters["spec"].annotation
     )

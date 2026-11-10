@@ -1,5 +1,3 @@
-"""Minimal concept implementations the spec tests declare against."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -55,13 +53,7 @@ PK = Parameters.of(Parameter("pk", "integer", required=True))
 
 @dataclass(frozen=True)
 class Foreign:
-    """A stand-in for djangorestframework-services' spec: a declaration compiling to a kernel one.
-
-    Shaped as the real one is where the compile seam reads it: a frozen
-    dataclass, so it compares by its fields, holding a list, so it has no hash.
-    It counts its compiles, so a test can tell a cached spec from a recompiled
-    one.
-    """
+    """A stand-in for djangorestframework-services' spec."""
 
     compiled: ServiceSpec | SelectorSpec
     labels: list[str] = field(default_factory=list)

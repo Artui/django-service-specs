@@ -18,8 +18,7 @@ OPEN = (Unrestricted(),)
 
 
 async def _guard() -> None:
-    # Awaited, this would refuse. Called sync, as dispatch calls a precondition,
-    # it returns a coroutine nobody awaits, which raises nothing: the call passes.
+    # Awaited, this would refuse.
     raise PermissionError("never reached")
 
 
@@ -83,8 +82,7 @@ async def _aselector() -> list[Any]:
 
 
 def test_the_run_may_still_be_async() -> None:
-    # The service and a selector spec's own selector are the one seat that may
-    # be ``async def``: dispatch bridges it and ``adispatch`` awaits it.
+    # The service and a selector spec's own selector are the one seat that may be ``async def``.
     assert ServiceSpec(service=_aservice, permissions=OPEN).service is _aservice
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=_aselector, permissions=OPEN)
     assert spec.selector is _aselector
@@ -111,8 +109,7 @@ def test_a_value_that_is_not_callable_is_refused_before_it_is_asked_whether_it_i
 
 
 async def _guard_lazily() -> Any:
-    # An async generator function: ``iscoroutinefunction`` says no, and calling
-    # it returns a generator object that never runs and is truthy.
+    # An async generator function: ``iscoroutinefunction`` says no.
     yield
 
 
@@ -198,11 +195,7 @@ _LABELS = {
 
 
 class TestAParameterNamedForTheCallsOwnSeat:
-    """``request`` and ``view`` are the call's on every mount; a service's unmarked one is refused.
-
-    Each refused case is one ``dispatch`` refused on every call before the
-    build did, with or without a seed registered under the name.
-    """
+    """``request`` and ``view`` are the call's on every mount."""
 
     @pytest.mark.parametrize("name", ["request", "view"])
     @pytest.mark.parametrize("where", list(_LABELS))
@@ -215,25 +208,17 @@ class TestAParameterNamedForTheCallsOwnSeat:
         assert message.startswith(f"{_LABELS[where]} declares the parameter(s) ['{name}'], which")
         # Dispatch's own wording, so a consumer matching either refusal matches both.
         assert message.endswith("'request' and 'view' are the call's own, read off its context.")
-        # The build's own refusal, not dispatch's on the first call, nor the reserved names'.
         assert "registered pool seed" not in message
         assert "dispatch seeds itself" not in message
 
     @pytest.mark.parametrize("name", ["request", "view"])
     @pytest.mark.parametrize("where", ["selector-read", "selector-shape"])
     def test_a_selector_spec_s_own_builds(self, where: str, name: str) -> None:
-        """Built as an output selector or for ``shape_queryset``, its parameters being no call's.
-
-        Dispatched on its own it is refused by dispatch, as before
-        (``tests/pool/test_call_seeds.py``'s test_a_parameter_named_either_is_refused).
-        """
+        """Built as an output selector or for ``shape_queryset``, its parameters being no call's."""
         assert name in _seat(where, name).parameters().names()
 
     def test_a_reflected_shape_is_still_refused(self) -> None:
-        """No call's seat fills a shape, so ``reflected`` frees a read and never a shape.
-
-        As dispatch refuses a reflected shape named like a registered seed.
-        """
+        """No call's seat fills a shape, so ``reflected`` frees a read and never a shape."""
         with pytest.raises(ImproperlyConfigured, match=r"\['request'\]") as refused:
             _seat("service-shape", "request", reflected=True)
         assert "reflected=True" not in str(refused.value)

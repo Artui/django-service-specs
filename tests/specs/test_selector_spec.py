@@ -49,8 +49,7 @@ def test_defaults_and_normalization() -> None:
 
 @pytest.mark.parametrize("kind", [SelectorKind.LIST, SelectorKind.RETRIEVE])
 def test_allow_none_is_accepted_on_either_kind(kind: SelectorKind) -> None:
-    # On a RETRIEVE a missing row is None; on a LIST a selector's None is the
-    # empty list. Neither is refused.
+    # On a RETRIEVE a missing row is None; on a LIST a selector's None is the empty list.
     assert SelectorSpec(kind=kind, selector=list, allow_none=True).allow_none is True
 
 
@@ -242,18 +241,14 @@ class TestFilterSet:
         assert spec.filter_set is TitleFilter
 
     def test_a_copy_reads_the_filters_once(self) -> None:
-        # ``replace`` hands the merged reads back to the constructor, where the
-        # same filters arrive again: they are already there, not a second
-        # declaration of the same name.
+        # ``replace`` hands the merged reads back to the constructor.
         spec = listing(filter_set=TitleFilter)
         copy = dataclasses.replace(spec, allow_none=False)
         assert copy == spec
         assert copy.reads == Parameters.of(Parameter("title", "string"))
 
     def test_a_copy_with_another_filter_set_reads_only_its_filters(self) -> None:
-        # ``replace`` hands the merged reads back with the new filter set, so
-        # the old one's filters would otherwise survive as if the author had
-        # declared them.
+        # ``replace`` hands the merged reads back with the new filter set.
         own = Parameter("limit", "integer")
         spec = listing(reads=Parameters.of(own), filter_set=TitleFilter)
         copy = dataclasses.replace(spec, filter_set=UserFilters)
@@ -266,8 +261,7 @@ class TestFilterSet:
         assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(own)
 
     def test_a_read_the_author_declared_as_the_filter_does_survives_a_copy(self) -> None:
-        # Declared by the author and equal to the filter's, so never added as
-        # the filter's: dropping the filter set leaves it declared.
+        # Declared by the author and equal to the filter's, so never added as the filter's.
         title = Parameter("title", "string")
         spec = listing(reads=Parameters.of(title), filter_set=TitleFilter)
         assert dataclasses.replace(spec, filter_set=None).reads == Parameters.of(title)
@@ -315,9 +309,7 @@ class TestFilterSet:
         assert copy.reads.items[0].choice_labels == (("draft", "Draft"), ("final", "Final"))
 
     def test_an_author_redeclaring_a_read_on_a_copy_takes_it_from_the_filter(self) -> None:
-        # The read a previous construction added is the filter's, and this one
-        # is not it: compared exactly there, so the author's unlabelled read is
-        # kept rather than taken for the filter's own and replaced by it.
+        # The read a previous construction added is the filter's, and this one is not it.
         declared = _kind_read(choice_labels=None)
         copy = dataclasses.replace(
             listing(filter_set=_LabelledKinds), reads=Parameters.of(declared)
@@ -335,8 +327,7 @@ class TestFilterSet:
         assert renders == []
 
     def test_a_copy_redeclaring_a_lazily_labelled_read_renders_no_label(self) -> None:
-        # The comparison that tells the filter's read from the author's is by
-        # identity: ``==`` would render both labels.
+        # The comparison that tells the filter's read from the author's is by identity.
         renders, label, lazily = _lazily_labelled()
         base = listing(filter_set=lazily)
         mine = dataclasses.replace(base.reads.items[0], choice_labels=(("a", label("mine")),))
@@ -373,12 +364,7 @@ class TestFilterSet:
     def test_one_declaring_no_filters_is_refused_unless_it_is_a_filterset(
         self, declared: object
     ) -> None:
-        # A duck-typed object takes ``(data, queryset)`` and declares no
-        # filters, whether ``base_filters`` is missing or declares nothing, so
-        # it would be handed no data and never filter: the caller's argument
-        # was dropped under IGNORE and refused as unknown under REJECT. Refused
-        # where it is declared instead. A real FilterSet declaring nothing is
-        # still accepted, below.
+        # A duck-typed object takes ``(data, queryset)`` and declares no filters.
         class Duck:
             def __init__(self, data: object = None, queryset: object = None) -> None:
                 self.qs = queryset
@@ -421,10 +407,7 @@ class TestFilterSet:
     def test_without_django_filter_loaded_a_duck_declaring_nothing_is_refused(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        # A FilterSet cannot exist unless django-filter is loaded, so the
-        # check reads the loaded module rather than importing it: an
-        # environment without the extra refuses the duck in the same words,
-        # rather than raising for the missing package.
+        # A FilterSet cannot exist unless django-filter is loaded.
         monkeypatch.delitem(sys.modules, "django_filters")
 
         class Duck:
@@ -434,11 +417,7 @@ class TestFilterSet:
             listing(filter_set=Duck)
 
     def test_a_filterset_declaring_no_filters_is_accepted(self) -> None:
-        # Holds the guard's FilterSet condition: a real FilterSet with no
-        # filters narrows nothing and declares nothing, which is a spec
-        # worth nothing but not a broken one, where any other object
-        # declaring no filters is refused. A guard reading the emptiness of
-        # ``base_filters`` alone refuses this.
+        # Holds the guard's FilterSet condition.
         class Empty(django_filters.FilterSet):
             pass
 
@@ -466,8 +445,7 @@ class _AsyncFilterSet:
     ],
 )
 def test_an_async_shaping_callable_is_refused(field: str, value: object, named: str) -> None:
-    # Called from sync code while the rows are shaped, never awaited: the
-    # coroutine would stand where the queryset should.
+    # Called from sync code while the rows are shaped, never awaited.
     with pytest.raises(ImproperlyConfigured, match=named + ", an async callable"):
         listing(**{field: value})
 
@@ -478,8 +456,7 @@ def test_a_filterset_class_is_not_mistaken_for_an_async_callable() -> None:
 
 
 def test_a_selector_spec_compiles_to_itself() -> None:
-    # What makes it a SpecSource, and how kernel_spec tells a spec from a
-    # declaration that compiles to one without importing either class.
+    # What makes it a SpecSource.
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list)
 
     assert spec.as_kernel_spec() is spec
@@ -499,8 +476,7 @@ class TestDerive:
     def test_derived_reads_replace_the_author_s_own_and_the_filters_rejoin_after_them(
         self,
     ) -> None:
-        # ``reads`` replaces rather than extends, and what the filter set adds
-        # is still the filter set's: it follows the new reads, once.
+        # ``reads`` replaces rather than extends.
         base = listing(reads=Parameters.of(Parameter("limit", "integer")), filter_set=TitleFilter)
         offset = Parameter("offset", "integer")
         derived = base.derive(reads=Parameters.of(offset))
@@ -509,8 +485,7 @@ class TestDerive:
         assert derived == listing(reads=Parameters.of(offset), filter_set=TitleFilter)
 
     def test_every_field_it_does_not_name_is_the_base_s_own(self) -> None:
-        # With no filter set the constructor rebuilds nothing, so each field
-        # the variant does not name is the base's very object, not a copy.
+        # With no filter set the constructor rebuilds nothing.
         base = listing(
             permissions=[Unrestricted()],
             reads=PK,
@@ -533,8 +508,7 @@ class TestDerive:
                 )
 
     def test_a_field_it_does_not_name_is_equal_to_the_base_s_even_when_rebuilt(self) -> None:
-        # With a filter set, the constructor assembles ``reads`` afresh, so the
-        # variant's is equal to the base's and not the same object.
+        # With a filter set, the constructor assembles ``reads`` afresh.
         base = listing(reads=PK, filter_set=TitleFilter)
         derived = base.derive(allow_none=True)
 
@@ -562,9 +536,7 @@ class TestDerive:
     @pytest.mark.parametrize(
         ("changes", "named"),
         [
-            # An init field ``dataclasses.replace`` would accept and carry
-            # silently: the constructor's own record of what the filter set
-            # added, which no author writes.
+            # An init field ``dataclasses.replace`` would accept and carry silently.
             ({"_filter_reads": PK}, "'_filter_reads'"),
             ({"parameters": PK}, "'parameters'"),
             ({"read": PK}, "'read'"),
@@ -588,11 +560,7 @@ def _fields() -> _FillsFields:
 
 
 class TestShapes:
-    """``shapes``: the arguments that shape what the presenter renders.
-
-    Every spec here is built inside its test rather than at module level, so a
-    tree without the field fails each test on its own rather than the module.
-    """
+    """``shapes``: the arguments that shape what the presenter renders."""
 
     def test_none_by_default(self) -> None:
         assert SelectorSpec(kind=SelectorKind.LIST, selector=list).shapes == Parameters()
@@ -607,8 +575,7 @@ class TestShapes:
 
     @pytest.mark.parametrize("entry", [dispatch, async_to_sync(adispatch)], ids=["sync", "async"])
     def test_a_shape_is_kept_out_of_the_selector_s_pool(self, entry: Callable[..., Any]) -> None:
-        """Part of the closed set, so the call is not refused for sending one,
-        and never handed to the selector, whose ``fields`` keeps its default."""
+        """Part of the closed set, so the call is not refused for sending one."""
 
         def rows(fields: Any = "absent") -> list[Any]:
             return [fields]
@@ -640,9 +607,7 @@ class TestShapes:
             listing(filter_set=TitleFilter, shapes=shapes)
 
     def test_a_kwargs_provider_annotated_to_fill_a_shape_is_refused(self) -> None:
-        """Its values reach the selector's pool and never the shapes, so the
-        key would be reported as the server's while dispatch still asked the
-        caller for it."""
+        """Its values reach the selector's pool and never the shapes."""
         with pytest.raises(
             ImproperlyConfigured,
             match=r"SelectorSpec\.kwargs is annotated to fill \['fields'\].*No provider fills "
@@ -670,8 +635,7 @@ def _pk() -> _FillsPk:
 
 
 def test_selector_spec_parameters_takes_and_ignores_call_context() -> None:
-    """So a reader asks a ``ServiceSpec`` or a ``SelectorSpec`` alike; a
-    selector spec has no Validator to hand it to."""
+    """So a reader asks a ``ServiceSpec`` or a ``SelectorSpec`` alike."""
     shapes = Parameters.of(Parameter("q", "string"))
     spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=PK, shapes=shapes)
     assert spec.parameters(call_context={}) == spec.parameters() == PK + shapes

@@ -1,5 +1,3 @@
-"""``kernel_spec``: a spec as itself, a source compiled once per object and cached by identity."""
-
 from __future__ import annotations
 
 import gc
@@ -40,8 +38,7 @@ def test_a_source_is_compiled_once_and_answers_the_same_spec_every_time(spec: An
 
 
 def test_the_stand_in_has_no_hash_and_compares_by_its_fields() -> None:
-    # The shape the cache must survive: a WeakKeyDictionary would raise on the
-    # first, and would share one compile between the two below.
+    # The shape the cache must survive: a WeakKeyDictionary would raise on the first.
     with pytest.raises(TypeError, match="unhashable"):
         hash(Foreign(LISTING))
     assert Foreign(LISTING) == Foreign(LISTING)
@@ -91,8 +88,7 @@ class _ReadsItself:
 def test_a_compile_that_reads_itself_answers_the_spec_published_first() -> None:
     source = _ReadsItself()
     first, second = list(source.answers)
-    # The inner call compiles to the second answer and publishes it; the
-    # outer call, finishing later, answers what was published rather than its own.
+    # The inner call compiles to the second answer and publishes it; the outer call.
     assert kernel_spec(source) is second
     assert source.inner is second
     assert kernel_spec(source) is second
@@ -131,9 +127,7 @@ def test_an_object_with_no_compile_is_refused(value: Any) -> None:
 @pytest.mark.parametrize(
     ("answer", "named"),
     [
-        # Each held by name, as the two halves of the fixed-point check: an
-        # answer with no compile of its own, and one whose compile answers
-        # something other than itself.
+        # Each held by name, as the two halves of the fixed-point check.
         pytest.param("a spec", "str", id="no-compile"),
         pytest.param(Foreign(LISTING), "Foreign", id="not-a-fixed-point"),
     ],
