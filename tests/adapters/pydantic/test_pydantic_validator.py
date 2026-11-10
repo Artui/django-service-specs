@@ -178,17 +178,14 @@ class TestConstruction:
 
 class TestParameters:
     def test_a_model_declares_what_the_same_dataclass_declares(self) -> None:
-        # Everything mirrors the dataclass tests' model field for field, less the
-        # one annotation only the dataclass adapter reads (UnsetType), and the
-        # dataclass adapter's own tests pin every one of those parameters.
+        # Everything mirrors the dataclass tests' model field for field.
         by_dataclass = DataclassValidator(dataclass_models.Everything).parameters()
         assert PydanticValidator(Everything).parameters() == Parameters(
             p for p in by_dataclass if p.name != "bio"
         )
 
     def test_a_str_keyed_map_declares_what_the_same_dataclass_declares(self) -> None:
-        # Both adapters read annotations from one table: a map is an object
-        # with no declared fields, whichever declared it.
+        # Both adapters read annotations from one table: a map is an object with no declared fields.
         by_dataclass = DataclassValidator(_ScoreMapRow).parameters()
         assert PydanticValidator(_ScoreMap).parameters() == by_dataclass
         arguments = {"scores": {"clarity": 4}, "weights": {"clarity": "0.5"}}
@@ -208,8 +205,7 @@ class TestParameters:
         assert [p.name for p in parameters] == ["firstName", "memo"]
 
     def test_a_model_validating_by_field_name_takes_the_names_it_declares(self) -> None:
-        # The declaration and the model must agree on the key: a parameter
-        # pydantic would not accept is one no caller can send.
+        # The declaration and the model must agree on the key.
         validator = PydanticValidator(_ByName)
         assert [p.name for p in validator.parameters()] == ["first_name"]
         assert validator.validate({"first_name": "Ada"}, CONTEXT) == {"first_name": "Ada"}
@@ -244,8 +240,7 @@ class TestValidate:
             "mode": "fast",
             "tags": ["a", "b"],
             "address": Address(city="Oslo", postcode="0150"),
-            # A model equals only an instance of its own class, so this also
-            # holds each row, and the model inside it, to the model declared.
+            # A model equals only an instance of its own class, so this also holds each row.
             "lines": [Line(sku="A-1", quantity=1, ship_to=Address(city="Oslo"))],
             "note": None,
             "level": 3,
@@ -336,8 +331,7 @@ class TestRefusals:
         assert detail == {"colour": ["Extra inputs are not permitted"]}
 
     def test_a_message_about_a_node_with_messages_inside_it_goes_beside_them(self) -> None:
-        # Only reachable by a caller skipping the shape check: a dict key that is
-        # not a string, refused both as a key and, separately, for its value.
+        # Only reachable by a caller skipping the shape check: a dict key that is not a string.
         detail = _refusal(_Labels, {"labels": {1: 2}})
         assert detail == {
             "labels": {
@@ -364,7 +358,6 @@ class TestAgainstTheShapeCheck:
         validator = PydanticValidator(_Bounded)
         # Parameters carry no bounds, so the shape check passes the argument...
         assert check_arguments(validator.parameters(), {"name": "Adam"}) == {"name": "Adam"}
-        # ...and the model refuses it.
         with pytest.raises(InvalidArguments) as caught:
             validator.validate({"name": "Adam"}, CONTEXT)
         assert caught.value.detail == {"name": ["String should have at most 3 characters"]}
@@ -381,8 +374,7 @@ class TestAgainstTheShapeCheck:
         assert detail == {"name": ["Input should be a valid string"]}
 
     def test_a_model_refusing_itself_past_the_bound_is_addressed_inside_it(self) -> None:
-        # Past the bound the declaration says "object" and no more, so the
-        # address is found by reading the model again, not from the description.
+        # Past the bound the declaration says "object" and no more.
         arguments: dict[str, Any] = {"start": 2, "end": 1}
         for _ in range(6):
             arguments = {"start": 0, "end": 9, "inner": arguments}
@@ -428,9 +420,7 @@ class _Tagged(BaseModel):
 
 
 def test_a_list_of_choices_declares_them_for_each_element() -> None:
-    # ``items`` holds only the element's JSON type, and an array's choices
-    # constrain each element, so a list of choices keeps them there: where the
-    # shape check and the JSON Schema read them.
+    # ``items`` holds only the element's JSON type, and an array's choices constrain each element.
     params = PydanticValidator(_Tagged).parameters()
     assert [(p.name, p.items, p.choices) for p in params] == [
         ("modes", "string", ("fast", "slow")),
@@ -466,8 +456,7 @@ def test_a_nullable_element_is_declared_on_the_array_and_not_as_the_array() -> N
 
 
 def test_a_truncated_row_keeps_its_nullability() -> None:
-    # Past the bound a row is declared as an object with no fields, and a gap
-    # in the list is still pydantic's to accept, so it stays declared.
+    # Past the bound a row is declared as an object with no fields.
     children = PydanticValidator(_Sparse).parameters().get("children")
     for _ in range(3):
         assert children is not None and isinstance(children.items, Parameters)
@@ -478,8 +467,7 @@ def test_a_truncated_row_keeps_its_nullability() -> None:
 
 
 def test_the_shape_check_passes_the_null_elements_the_validator_takes() -> None:
-    # Dispatch runs the shape check before the Validator, so a null element the
-    # declaration did not call nullable was refused before this adapter saw it.
+    # Dispatch runs the shape check before the Validator.
     params = PydanticValidator(_Gaps).parameters()
     arguments = {
         "scores": [1, None],
@@ -516,10 +504,7 @@ class _RatioForm(forms.Form):
 def test_which_validators_take_the_non_finite_float_the_shape_check_refuses(
     value: float,
 ) -> None:
-    # The arguments page names them: JSON has no spelling for the value, so the
-    # shape check refuses it as outside the number type, where two of the
-    # validators behind it would have taken it from a Python caller and
-    # Django's number field refuses it in the same words.
+    # The arguments page names them: JSON has no spelling for the value.
     for validator in (PydanticValidator(_Ratio), DataclassValidator(_RatioRow)):
         assert not math.isfinite(validator.validate({"ratio": value}, CONTEXT)["ratio"])
         with pytest.raises(InvalidArguments) as caught:
@@ -544,7 +529,6 @@ class TestChoiceLabels:
             "status": (("draft", "Draft"), ("published", "Published")),
             # A list's labels are its element's, beside its choices.
             "priorities": ((1, "Low"), (2, "High")),
-            # A plain Enum and a Literal have no label of their own.
             "colour": None,
             "mode": None,
         }
@@ -553,8 +537,7 @@ class TestChoiceLabels:
 class TestPartial:
     @pytest.mark.parametrize("method", ["validate", "validated"])
     def test_a_partial_call_is_refused_as_the_spec_s_error(self, method: str) -> None:
-        # A model validates whole: a field it requires and was not sent is
-        # missing, and its model validators assume every field is there.
+        # A model validates whole: a field it requires and was not sent is missing.
         with pytest.raises(
             ImproperlyConfigured,
             match=re.escape(
@@ -567,8 +550,7 @@ class TestPartial:
             )
 
     def test_a_partial_spec_over_it_is_refused_when_declared(self) -> None:
-        # Not on the first call: a spec reaches transports that dispatch it
-        # without ever asking, and every call would raise.
+        # Not on the first call: a spec reaches transports that dispatch it without ever asking.
         with pytest.raises(ImproperlyConfigured) as refused:
             ServiceSpec(service=print, validator=PydanticValidator(Address), partial=True)
         message = str(refused.value)
@@ -576,15 +558,11 @@ class TestPartial:
         assert "which cannot validate a partial call" in message
 
     def test_a_whole_call_hands_the_model_instance_as_its_data(self) -> None:
-        # As the dataclass adapter hands its instance
-        # (test_the_call_s_data_is_the_instance_and_its_fields_are_the_values),
-        # so a service written for ``data.city`` keeps working when its
-        # Validator changes from one to the other.
+        # As the dataclass adapter does, so a service reading ``data.city`` keeps working.
         validated = PydanticValidator(Address).validated({"city": "Oslo"}, CONTEXT)
         assert isinstance(validated.data, Address)
         assert validated.data == Address(city="Oslo")
         assert validated.values == {"city": "Oslo", "postcode": None}
-        # The values are the instance's own, not a second validation of it.
         assert all(
             validated.values[name] is getattr(validated.data, name) for name in validated.values
         )
@@ -702,8 +680,7 @@ class TestRefusalCodes:
     def test_each_error_type_carries_its_code(
         self, arguments: dict[str, Any], field: str, code: str
     ) -> None:
-        # On ``validate()`` itself: through dispatch, the shape check answers
-        # an absent, a null and a wrongly typed argument first.
+        # On ``validate()`` itself: through dispatch, the shape check answers an absent.
         refused = coded(_refusal(_Coded, arguments))
         assert [found for _, found in refused[field]] == [code]
 
@@ -720,9 +697,7 @@ class _Dated(BaseModel):
 
 class TestDecimalElements:
     def test_a_list_of_decimals_declares_each_element_a_decimal(self) -> None:
-        # A date or a date-time element takes no format on an array, so those
-        # lists stay arrays of strings: without the decimal condition in
-        # ``element_format`` this model could not be declared at all.
+        # A date or a date-time element takes no format on an array.
         params = PydanticValidator(_Dated).parameters()
         assert [(p.name, p.items, p.format) for p in params] == [
             ("prices", "string", "decimal"),
@@ -760,21 +735,16 @@ class _Lengths(BaseModel):
     grouped: Annotated[list[int], Len(1, 3)] = [1]
     inner_field: Annotated[list[int], Field(max_length=4)] | None = None
     inner_raw: Annotated[list[int], MaxLen(3), MinLen(1)] | None = None
-    # pydantic applies a field's metadata in order, the annotation's first,
-    # and a later length replaces an earlier one, so each of these takes the
-    # last it declares: 8 over 6, 3 over 1, then 6 over the 8 of the
-    # annotation.
+    # pydantic applies a field's metadata in order, the annotation's first.
     later: Annotated[list[int], MaxLen(6), MaxLen(8)] = []
     fewest: Annotated[list[int], MinLen(1), MinLen(3)] = [1, 2, 3]
     outer: Annotated[list[int], MaxLen(8)] | None = Field(default=None, max_length=6)
-    # Two layers inside the annotation, which pydantic leaves there: the
-    # inner 6 first, then the outer 8 over it.
+    # Two layers inside the annotation, which pydantic leaves there: the inner 6 first.
     deep: Annotated[Annotated[list[int], MaxLen(6)] | None, MaxLen(8)] | None = None
     # Metadata that is no length is passed over.
     noted: Annotated[list[int], "unrelated", MaxLen(2)] = []
     open: list[int] = []
     rows: list[_Row] = []
-    # A length on anything but an array is the model's alone.
     name: str = Field(default="", max_length=3)
     scores: dict[str, int] = Field(default={}, max_length=2)
 
@@ -809,9 +779,7 @@ class TestDeclaredLengths:
         assert (tags.name, tags.max_length) == ("tags", 2)
 
     def test_each_declared_length_is_the_one_pydantic_enforces(self) -> None:
-        # Sized one past each declared maximum and one short of each minimum,
-        # so the model refuses exactly the arguments the declaration says it
-        # will: the order rule above is pydantic's, not a guess.
+        # Sized one past each declared maximum and one short of each minimum.
         validator = PydanticValidator(_Lengths)
         for param in validator.parameters():
             if param.max_length is not None and param.nested is None:
@@ -824,8 +792,7 @@ class TestDeclaredLengths:
                 validator.validate({param.name: [1] * param.min_length}, CONTEXT)
 
     def test_a_list_the_model_allows_past_the_default_passes_the_shape_check(self) -> None:
-        # 1500 is past the 1000 every undeclared array is held to, so only the
-        # model's own maximum lets this through.
+        # 1500 is past the 1000 every undeclared array is held to.
         parameters = PydanticValidator(_Lengths).parameters()
         arguments = {"keyword": list(range(1500))}
         assert check_arguments(parameters, arguments) == arguments
@@ -835,8 +802,7 @@ class TestDeclaredLengths:
     def test_a_list_past_its_length_is_refused_by_the_shape_check_with_the_model_s_code(
         self,
     ) -> None:
-        # Through dispatch the shape check answers first, in the kernel's words;
-        # ``validate()`` alone answers in pydantic's. The code is the same.
+        # Through dispatch the shape check answers first, in the kernel's words.
         parameters = PydanticValidator(_Lengths).parameters()
         with pytest.raises(InvalidArguments) as caught:
             check_arguments(parameters, {"keyword": [1] * 1501, "annotated": [1]})
@@ -850,9 +816,7 @@ class TestDeclaredLengths:
         ]
 
     def test_a_number_s_bounds_stay_the_model_s_in_its_words(self) -> None:
-        # ``ge`` and ``le`` could be stated as a parameter's inclusive bounds,
-        # ``gt`` and ``lt`` could not, so neither pair is, and one model's
-        # bounds are answered in one dialect.
+        # ``ge`` and ``le`` could be stated as a parameter's inclusive bounds.
         parameters = PydanticValidator(_Coded).parameters()
         bounds = {p.name: (p.minimum, p.maximum) for p in parameters}
         assert (bounds["count"], bounds["ratio"]) == ((None, None), (None, None))

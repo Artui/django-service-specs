@@ -216,7 +216,6 @@ class TestOutput:
         # A Django Choices enum brings its label.
         assert output.get("status").choices == (("draft", "Draft"), ("published", "Published"))
         assert output.get("priority").choices == ((1, "Low"), (2, "High"))
-        # A plain Enum and a Literal have no display, so the value stands in.
         assert output.get("colour").choices == (("red", "red"), ("blue", "blue"))
         assert output.get("mode").choices == (("fast", "fast"), ("slow", "slow"))
 
@@ -331,8 +330,7 @@ class TestModelRows:
         }
 
     def test_a_manager_built_on_base_manager_is_read_through_all_too(self) -> None:
-        """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``;
-        a model whose default manager is one has related managers built on it too."""
+        """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``."""
         author = Author.objects.create(name="Ann")
         Book.objects.create(author=author, title="One", price=Decimal("9.99"))
         books: Any = BaseManager.from_queryset(QuerySet)()
@@ -370,9 +368,7 @@ class _Tagged(BaseModel):
 
 
 def test_a_list_of_choices_declares_their_pairs_for_each_element() -> None:
-    # ``items`` holds only the element's JSON type, and an array's choices
-    # constrain each element, so a list of choices keeps them there: where the
-    # shape check and the JSON Schema read them.
+    # ``items`` holds only the element's JSON type, and an array's choices constrain each element.
     output = PydanticPresenter(_Tagged).output()
     assert output.get("modes").choices == (("fast", "fast"), ("slow", "slow"))
     assert output.get("colours").choices == (("red", "red"), ("blue", "blue"))

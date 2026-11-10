@@ -132,8 +132,7 @@ def test_shape_enum_is_the_enum_class_and_nothing_else() -> None:
 
 
 def test_a_str_keyed_dict_is_an_object_whose_values_keep_their_own_shape() -> None:
-    # Only a str key: a JSON object's keys are strings, and ``dict[int, int]``
-    # is refused (test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation).
+    # Only a str key: a JSON object's keys are strings, and ``dict[int.
     shape = _read(dict[str, int | None] | None).shape
     assert (shape.type, shape.python, shape.nullable, shape.fields) == ("object", dict, True, None)
     assert shape.values is not None
@@ -165,27 +164,19 @@ def test_a_nested_dataclass_is_read_with_its_own_fields() -> None:
         (typing.Any, "Any"),
         (object, "object"),
         (bytes, "bytes"),
-        # A parametrized generic as it was written, which Python 3.10 would
-        # otherwise print as its bare class.
+        # A parametrized generic as it was written.
         (dict[int, int], "dict[int, int]"),
-        # Unparameterised, or with values of no JSON type: nothing to decode into.
         (dict, "dict"),
         (dict[str, typing.Any], "Any"),
         (set[int], "set[int]"),
-        # A first argument of ``str`` is not enough: only a ``dict`` is one
-        # object. A tuple or a Mapping starting ``str`` reads like a str-keyed
-        # dict through its arguments alone.
         (tuple[str, int], "tuple[str, int]"),
         (Mapping[str, int], "Mapping[str, int]"),
-        # Unparameterised: there is no element to declare.
         (list, "list"),
         (typing.List, "typing.List"),  # noqa: UP006
         (tuple[int, ...], "tuple[int, ...]"),
-        # A union of two types has no single JSON type; nor does None alone.
         (int | str, "int | str"),
         (None, "None"),
         (UnsetType | None, "None"),
-        # Choices whose values share no JSON type, or have none.
         (Literal["a", 1], "Literal"),
         (Literal[True, 1], "Literal"),
         (_Pairs, "_Pairs"),
@@ -201,8 +192,6 @@ def test_an_annotation_with_no_json_type_is_refused_naming_field_and_annotation(
     assert message.startswith("Probe.x: ")
     assert named in message
     assert "has no JSON type this adapter can declare" in message
-    # Every row's refusal names what the adapter does read, whichever of the
-    # three refusals in ``_read`` raised it.
     assert message.endswith(
         "Use str, int, float, bool, Decimal, datetime, date, a Literal, an Enum, "
         "a dataclass, dict[str, ...], or a list of any of these, each optionally '| None'."

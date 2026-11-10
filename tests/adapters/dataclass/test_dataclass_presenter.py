@@ -135,7 +135,6 @@ def test_choices_are_value_and_display_pairs() -> None:
     # A Django Choices enum brings its label.
     assert output.get("status").choices == (("draft", "Draft"), ("published", "Published"))
     assert output.get("priority").choices == ((1, "Low"), (2, "High"))
-    # A plain Enum and a Literal have no display, so the value stands in.
     assert output.get("colour").choices == (("red", "red"), ("blue", "blue"))
     assert output.get("mode").choices == (("fast", "fast"), ("slow", "slow"))
 
@@ -253,7 +252,6 @@ def test_a_model_row_is_presented_through_its_relations() -> None:
         "author": {"name": "Ann"},
     }
     assert presenter.present(second)["published_on"] == "2024-06-01"
-    # A reverse relation is a manager, read through .all().
     assert DataclassPresenter(_AuthorOut).present(Author.objects.get()) == {
         "name": "Ann",
         "books": [{"title": "One"}, {"title": "Two"}],
@@ -262,8 +260,7 @@ def test_a_model_row_is_presented_through_its_relations() -> None:
 
 @pytest.mark.django_db
 def test_a_manager_built_on_base_manager_is_read_through_all_too() -> None:
-    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``;
-    a model whose default manager is one has related managers built on it too."""
+    """``BaseManager.from_queryset`` builds a manager that is not a ``Manager``."""
     author = Author.objects.create(name="Ann")
     Book.objects.create(author=author, title="One", price=Decimal("9.99"))
     books: Any = BaseManager.from_queryset(QuerySet)()
@@ -296,8 +293,7 @@ def test_a_str_keyed_map_is_an_object_whose_values_are_encoded() -> None:
     assert presenter.output().get("prices") == OutputField("prices", "object")
     assert presenter.output().get("colours") == OutputField("colours", "object", nullable=True)
     agree(DataclassValidator(_Priced).parameters(), presenter.output())
-    # Each value as JSON writes it, a Decimal as its string and an Enum as its
-    # value, read off a plain object as any other field is.
+    # Each value as JSON writes it, a Decimal as its string and an Enum as its value.
     value = SimpleNamespace(prices={"tea": Decimal("2.50")}, colours={"a": Colour.RED, "b": None})
     assert presenter.present(value) == {
         "prices": {"tea": "2.50"},
@@ -334,8 +330,7 @@ def test_what_the_validator_builds_the_presenter_renders_as_it_came_in() -> None
     values = DataclassValidator(Everything).validate(arguments, ValidationContext(principal=None))
     assert values["bio"] is UNSET
     presented = DataclassPresenter(Everything).present(Everything(**values))
-    # What was sent comes back unchanged; what was omitted comes back as the
-    # dataclass's defaults, and the UNSET field stays absent.
+    # What was sent comes back unchanged; what was omitted comes back as the dataclass's defaults.
     assert presented == {**arguments, "note": None, "level": 3, "extras": []}
 
 
@@ -347,9 +342,7 @@ class _Tagged:
 
 
 def test_a_list_of_choices_declares_their_pairs_for_each_element() -> None:
-    # ``items`` holds only the element's JSON type, and an array's choices
-    # constrain each element, so a list of choices keeps them there: where the
-    # shape check and the JSON Schema read them.
+    # ``items`` holds only the element's JSON type, and an array's choices constrain each element.
     output = DataclassPresenter(_Tagged).output()
     assert output.get("modes").choices == (("fast", "fast"), ("slow", "slow"))
     assert output.get("colours").choices == (("red", "red"), ("blue", "blue"))

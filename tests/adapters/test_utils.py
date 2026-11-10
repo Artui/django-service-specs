@@ -71,8 +71,7 @@ class TestStrip:
         assert strip(annotation) == (str, True, False, ("m",))
 
     def test_extras_are_collected_from_every_level_innermost_first(self) -> None:
-        # The order a library building the type applies them in: each layer
-        # as written, the innermost first.
+        # The order a library building the type applies them in: each layer as written.
         annotation = Annotated[Annotated[int, "a", "b"] | None, "c", "d"]
         assert strip(annotation) == (int, True, False, ("a", "b", "c", "d"))
 
@@ -112,8 +111,7 @@ def test_a_django_choices_enum_labels_each_value_and_keeps_a_lazy_label_lazy() -
 
 
 def test_the_pairs_an_output_field_presents_render_a_lazy_label() -> None:
-    # The pairs are the display a payload carries, so a lazy label is rendered
-    # here, in the language active for this call, and a plain ``str`` leaves.
+    # The pairs are the display a payload carries, so a lazy label is rendered here.
     pairs = choice_pairs(("l", "d"), _Shade)
     assert pairs == (("l", "Light"), ("d", "Dark"))
     assert pairs is not None

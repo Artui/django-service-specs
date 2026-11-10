@@ -1,5 +1,3 @@
-"""Tests for ``filter_set_parameters``: a FilterSet's filters, read as Parameters."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -52,15 +50,11 @@ def test_each_note_filter_reads_as_the_argument_django_filter_reads() -> None:
             help="Matches `pk` with the `gte` lookup.",
             **BOUNDED,
         ),
-        # django-filter gives every CSV filter this ``help_text`` of its own, and
-        # it holds for the query string, where ``?pks=1,2`` is the spelling.
-        # Each element is a number filter's decimal, bounded as one is.
+        # django-filter gives every CSV filter this ``help_text`` of its own.
         Parameter("pks", "array", items="string", format="decimal", help=CSV_HELP, **BOUNDED),
         Parameter(
             "pk_between", "array", items="string", format="decimal", help=CSV_HELP, **BOUNDED
         ),
-        # Two arguments, because django-filter reads ``pk_range_min`` and
-        # ``pk_range_max`` off the data and never a ``pk_range`` of its own.
         Parameter(
             "pk_range_min", "string", format="decimal", help="The `min` bound of `pk`.", **BOUNDED
         ),
@@ -137,8 +131,7 @@ def test_the_date_time_and_choice_shapes() -> None:
             choice_labels=((1, "One"), (2, "Two")),
             help="Matches `pk` with the `exact` lookup.",
         ),
-        # A ChoiceField compares the string of each choice, so a mixed set is
-        # offered as the strings it will match.
+        # A ChoiceField compares the string of each choice.
         Parameter(
             "mixed",
             "string",
@@ -155,7 +148,6 @@ def test_the_date_time_and_choice_shapes() -> None:
         ),
         Parameter("deferred", "string", help="Matches `username` with the `exact` lookup."),
         Parameter("group", "string", help="Matches `groups` with the `exact` lookup."),
-        # The labels an ordering filter builds for itself.
         Parameter(
             "ordering",
             "array",
@@ -237,9 +229,7 @@ def test_an_integer_choice_set_keeps_its_labels_on_the_integers() -> None:
 
 
 def test_a_mixed_choice_set_keys_its_labels_on_the_strings_it_offers() -> None:
-    # Not every value an ``int``, so each is the string ``ChoiceField`` compares;
-    # a label keyed on the ``1`` would name no choice, and ``Parameter`` would
-    # refuse it.
+    # Not every value an ``int``, so each is the string ``ChoiceField`` compares.
     read = _offered(
         django_filters.ChoiceFilter(field_name="title", choices=[(1, "One"), ("b", "Bee")])
     )
@@ -310,20 +300,17 @@ _A_MAPPING_IN_PAIRS = [("Open", {"draft": "Draft"}), ("final", "Final")]
 
 @pytest.mark.parametrize("choices", [*_IN_A_MAPPING, *_IN_PAIRS])
 def test_a_named_group_flattens_whichever_of_django_s_spellings_holds_it(choices: Any) -> None:
-    # Read as a label, the group's name would be offered as a value the filter's own
-    # field refuses, and ``draft``, which it accepts, would not be offered.
+    # Read as a label, the group's name would be offered as a value the filter's own field refuses.
     read = _offered(django_filters.ChoiceFilter(field_name="title", choices=choices))
     assert read.choices == ("draft", "final")
     assert read.choice_labels == (("draft", "Draft"), ("final", "Final"))
 
 
 def test_a_mapping_in_pairs_is_a_group_only_where_django_reads_it_as_one() -> None:
-    # Django 5.0 reads the mapping as the group's choices; 4.2 takes it for the
-    # label of a plain choice named ``Open``, which the form accepts and ``draft`` it refuses.
+    # Django 5.0 reads the mapping as the group's choices.
     read = _offered(django_filters.ChoiceFilter(field_name="title", choices=_A_MAPPING_IN_PAIRS))
     five = django.VERSION >= (5, 0)
     assert read.choices == (("draft", "final") if five else ("Open", "final"))
-    # The mapping is no text to title ``Open`` with, so it goes unlabelled there.
     assert read.choice_labels == (
         (("draft", "Draft"), ("final", "Final")) if five else (("final", "Final"),)
     )
@@ -342,9 +329,7 @@ def test_a_mapping_in_pairs_is_a_group_only_where_django_reads_it_as_one() -> No
 def test_a_group_spelling_offers_what_the_filter_s_own_field_accepts(
     choices: Any, flattened: bool
 ) -> None:
-    # The same value set from both ends, on every Django the suite runs: what the
-    # parameter offers is what the form field cleans, and what it refuses is not
-    # offered. Where the group flattens, its name is one of those refused.
+    # The same value set from both ends, on every Django the suite runs.
     filter_obj = django_filters.ChoiceFilter(field_name="title", choices=choices)
     read = _offered(filter_obj)
     assert read.choices is not None
@@ -383,9 +368,7 @@ def _stages() -> list[tuple[str, str]]:
     ],
 )
 def test_a_label_that_is_no_text_goes_unlabelled_rather_than_become_its_repr(label: Any) -> None:
-    # A spelling ``_labelled`` does not read as a group offers the group's name, as
-    # it always has; the group's name is not given a title made of the object's
-    # ``repr``, which carries an address and so changes a schema on every process.
+    # A spelling ``_labelled`` does not read as a group offers the group's name, as it always has.
     read = _offered(
         django_filters.ChoiceFilter(
             field_name="title", choices=[("Open", label), ("final", "Final")]
@@ -427,8 +410,7 @@ def test_a_lazy_label_stays_lazy_until_the_schema_renders_it() -> None:
     read = _offered(django_filters.ChoiceFilter(field_name="title", choices=[("draft", label)]))
     assert read.choice_labels is not None
     assert read.choice_labels[0][1] is label
-    # Read off the declaration and joined to a spec's reads, a copy's too, at
-    # import where the translation machinery may not be ready: nothing renders it.
+    # Read off the declaration and joined to a spec's reads, a copy's too.
     fresh = django_filters.ChoiceFilter(field_name="title", choices=[("draft", label)])
     filter_set = type("Lazy", (django_filters.FilterSet,), {"read": fresh})
     dataclasses.replace(_spec(filter_set), selector=dict)
@@ -461,11 +443,7 @@ def test_an_ordering_filter_s_own_labels_reach_the_schema() -> None:
 def test_an_ordering_filter_s_descending_label_is_fixed_when_it_is_declared(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # django-filter renders ``descending_fmt % label`` in the filter's constructor,
-    # so the descending title is in the language active then; the ascending one is
-    # a lazy label, and follows the language that renders the schema. A format that
-    # reads the active language stands in for the translated one, which needs
-    # django-filter's own catalog installed.
+    # django-filter renders ``descending_fmt % label`` in the filter's constructor.
     def spelled() -> str:
         return "%s (down)" if translation.get_language() == "de" else "%s (descending)"
 
@@ -578,10 +556,7 @@ def test_an_object_with_no_filters_reads_as_nothing_and_needs_no_django_filter(
 def test_an_argument_shaped_by_its_parameter_narrows_the_rows(
     arguments: dict[str, Any], titles: list[str]
 ) -> None:
-    # The reading is right only if the argument it describes is the one the
-    # FilterSet reads: shaped by the Parameter, passed by the shape check,
-    # accepted by the FilterSet as ``shape_queryset`` binds it, and narrowing
-    # the rows.
+    # The reading is right only if the argument it describes is the one the FilterSet reads.
     ada = make_user("ada")
     for title, archived in (("draft", False), ("final", True), ("other", False)):
         Note.objects.create(owner=ada, title=title, archived=archived)
@@ -636,7 +611,6 @@ def _matched(arguments: dict[str, Any]) -> list[int]:
     [
         # What a query string or a JSON string hands on: the digits as sent.
         pytest.param(lambda pk: {"pk": str(pk)}, id="string"),
-        # A JSON number was already exact: the decoder makes it an int.
         pytest.param(lambda pk: {"pk": pk}, id="number"),
         pytest.param(
             lambda pk: {"pk_range_min": str(pk), "pk_range_max": str(pk)}, id="range-bounds"
@@ -647,10 +621,6 @@ def _matched(arguments: dict[str, Any]) -> list[int]:
 def test_a_number_filter_matches_a_key_past_a_float_s_precision_exactly(
     big_ids: list[int], arguments_for: Any, index: int
 ) -> None:
-    # A number filter's form field is a ``DecimalField``, which reads a string
-    # exactly. Declared a JSON number, its string was read as a float on the
-    # way, and 2**53 + 1 came back as 2**53: the filter answered with the
-    # neighbouring row.
     assert _matched(arguments_for(big_ids[index])) == [big_ids[index]]
 
 
@@ -710,9 +680,7 @@ def _sent(name: str, value: str) -> dict[str, Any]:
 
 
 def _dispatch_refused(arguments: dict[str, Any]) -> None:
-    # The permission check refuses every call, so the shape check answering is
-    # what proves it ran first, and nothing past it - the FilterSet's own
-    # validators, the query - is reached by a value it let through.
+    # The permission check refuses every call.
     spec = SelectorSpec(
         kind=SelectorKind.LIST, selector=notes, filter_set=_Bounded, permissions=[Refuse()]
     )
@@ -728,17 +696,11 @@ def _dispatch_refused(arguments: dict[str, Any]) -> None:
 @pytest.mark.parametrize(
     ("value", "message"),
     [
-        # Cheap to convert if the guard ever regresses: a value whose integer
-        # has a million digits would hang the suite rather than fail it.
+        # Cheap to convert if the guard ever regresses.
         ("1e400", _ABOVE),
         ("-1e400", _BELOW),
-        # The spelling that held a worker for minutes. Safe here whatever
-        # regresses: the permission check refuses every call, so a value the
-        # shape check let through ends at NotPermitted, never at ``int()``.
         ("1E+999999999", _ABOVE),
         ("-1E+999999999", _BELOW),
-        # Just past the float django-filter's validator compares against,
-        # which is 1.00000000000000007...e50 rather than 10**50.
         ("1.0000000000000001e50", _ABOVE),
         ("-1.0000000000000001e50", _BELOW),
     ],
@@ -746,10 +708,6 @@ def _dispatch_refused(arguments: dict[str, Any]) -> None:
 def test_a_number_past_django_filter_s_bound_is_refused_by_the_shape_check(
     name: str, value: str, message: str
 ) -> None:
-    # A range's bounds have no validator in django-filter, and a number
-    # filter's has none below, so either value reached the integer field's
-    # ``int()``: twenty bytes of query string spelling ``1E+999999999`` built a
-    # billion-digit integer and held a worker for minutes.
     with pytest.raises(InvalidArguments) as caught:
         _dispatch_refused(_sent(name, value))
     assert caught.value.detail == _at(name, [message])
@@ -761,8 +719,7 @@ def test_a_number_past_django_filter_s_bound_is_refused_by_the_shape_check(
     "value", ["1e50", "-1e50", "100000000000000000000000000000000000000000000000001"]
 )
 def test_a_number_at_django_filter_s_bound_passes_the_shape_check(name: str, value: str) -> None:
-    # Inclusive, and the same float django-filter compares against, so 10**50
-    # and 10**50 + 1 both sit inside it, as they do in django-filter.
+    # Inclusive, and the same float django-filter compares against.
     with pytest.raises(NotPermitted):
         _dispatch_refused(_sent(name, value))
 
@@ -785,8 +742,7 @@ def test_a_json_number_past_the_bound_is_refused_too() -> None:
 def test_a_csv_number_filter_s_element_past_the_bound_is_refused_at_its_index(
     arguments: dict[str, Any],
 ) -> None:
-    # Each element is bounded as a number filter's value is, in the words and
-    # with the codes a DRF field gives, before anything converts it.
+    # Each element is bounded as a number filter's value is.
     with pytest.raises(InvalidArguments) as caught:
         _dispatch_refused(arguments)
     assert coded(caught.value.detail) == {
@@ -841,8 +797,7 @@ class _Recorded(django_filters.FilterSet):
 def test_a_csv_number_filter_s_fraction_reaches_the_filter_exactly(
     arguments: dict[str, Any],
 ) -> None:
-    # Read as a float on the way, the fraction reached the filter rounded to
-    # seventeen digits; a decimal element stays the string it spells.
+    # Read as a float on the way, the fraction reached the filter rounded to seventeen digits.
     _Recorded.seen.clear()
     params = filter_set_parameters(_Recorded)
     checked = check_arguments(params, arguments)
