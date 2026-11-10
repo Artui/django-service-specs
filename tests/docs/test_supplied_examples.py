@@ -1,5 +1,3 @@
-"""The supplied-fields example, run, and checked by the type checker whose narrowing it shows."""
-
 from __future__ import annotations
 
 import subprocess

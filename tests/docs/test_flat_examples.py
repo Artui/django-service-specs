@@ -1,5 +1,3 @@
-"""The flat-source page's example, run, and each outcome the page states."""
-
 from __future__ import annotations
 
 from django_service_specs import flat_arguments

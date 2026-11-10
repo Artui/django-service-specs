@@ -1,12 +1,3 @@
-"""The forms adapter page's examples, run.
-
-``docs/forms.md`` includes its code from ``docs/examples/forms_adapter.py``,
-and these tests run that code, so the page cannot describe behaviour the
-adapter does not have. Where the page states an outcome - what a form
-declares, a refusal's tree, what an update saves - the assertion here is that
-statement.
-"""
-
 from __future__ import annotations
 
 from datetime import date

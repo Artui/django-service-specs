@@ -1,5 +1,3 @@
-"""The typing section's example, run, and checked by the type checker it names."""
-
 from __future__ import annotations
 
 import subprocess

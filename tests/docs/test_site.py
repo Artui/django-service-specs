@@ -1,15 +1,3 @@
-"""What the docs site publishes, read from MkDocs' own file collection.
-
-``docs/`` doubles as a Python package, so the suite imports and runs every
-example as ``docs.examples.<name>``, and MkDocs copies every file under its
-source directory that is not a page into the site verbatim. Without
-``exclude_docs`` that published the example sources beside the pages, and the
-bytecode a test run had compiled from them moments before the deploy.
-
-The exclusion has to stay narrow: the release job writes ``coverage.json`` into
-``docs/`` for the README badge, and relies on that same copying to ship it.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path
