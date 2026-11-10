@@ -1,12 +1,3 @@
-"""``adispatch``: dispatch's steps, counted in executor hops.
-
-Every test here reads rows on the executor thread, whose connection is not the
-test's, so each runs with ``transaction=True``: rows written inside the
-ordinary test transaction would be invisible to it. Any query that strays onto
-the event loop raises ``SynchronousOnlyOperation``, so a test passing is also
-evidence that nothing did.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -210,8 +201,7 @@ async def test_an_atomic_async_service_joins_the_hop_and_rolls_back(
     ada: Any, hops: list[str]
 ) -> None:
     async def write_then_fail(*, user: Any) -> None:
-        # Its own thread-sensitive ORM call comes back to the executor thread,
-        # whose connection holds the transaction the bridge opened.
+        # Its own thread-sensitive ORM call comes back to the executor thread.
         await Note.objects.acreate(owner=user, title="half-done")
         raise Boom
 
@@ -420,8 +410,7 @@ async def test_an_async_list_raising_does_not_exist_passes_through(ada: Any) -> 
         await adispatch(spec, principal=ada, arguments={})
 
 
-# An ``async def`` selector, so the await on the loop is what raises: a sync one
-# under ``adispatch`` runs on ``dispatch``'s path.
+# An ``async def`` selector, so the await on the loop is what raises.
 async def _note_or_404(*, pk: int) -> Note:
     return await sync_to_async(get_object_or_404)(Note, pk=pk)
 
@@ -470,8 +459,7 @@ async def test_an_async_http404_from_extend_queryset_is_not_the_selector_s_not_f
 async def test_an_async_list_output_selector_raising_http404_is_a_fault_after_the_run(
     ada: Any,
 ) -> None:
-    # The output selector is called through ``lookup`` on a sync hop, so the
-    # re-raise as a fault holds here as on ``dispatch``.
+    # The output selector is called through ``lookup`` on a sync hop.
     service = Record(returns="done")
 
     async def gone(*, result: Any) -> Any:
@@ -622,8 +610,7 @@ async def test_a_deactivated_principal_is_refused_before_the_class_level_check(
 
 
 async def test_a_deactivated_principal_id_is_refused_by_resolve_principal(ada: Any) -> None:
-    # The one rule, answered by its first reader: the identifier's message, not
-    # dispatch's, so the two copies cannot disagree about who is refused.
+    # The one rule, answered by its first reader: the identifier's message, not dispatch's.
     ada.is_active = False
     await ada.asave(update_fields=["is_active"])
     spec = SelectorSpec(kind=LIST, selector=notes_of, permissions=[Refuse()])
@@ -748,8 +735,7 @@ async def test_a_run_declaring_progress_runs_with_no_reporter_supplied(ada: Any)
 
 
 async def test_a_list_s_rows_are_answered_inside_its_one_hop(ada: Any, hops: list[str]) -> None:
-    # A condition on the row is an annotation and a callable one is answered
-    # against the call's pool, registered seeds included, both in the hop.
+    # A callable condition is answered against the call's pool, registered seeds included.
     await _create(owner=ada, title="live")
     await _create(owner=ada, title="archived", archived=True)
     mine = ServiceSpec(
@@ -789,8 +775,7 @@ async def test_an_async_selector_s_rows_are_answered_off_the_loop(ada: Any) -> N
 
 
 async def test_an_async_selector_s_rows_are_answered_with_the_registered_seeds(ada: Any) -> None:
-    # The async selector path answers its rows in a hop of its own, so it is
-    # handed the call's seed set separately from the sync path.
+    # The async selector path answers its rows in a hop of its own.
     await _create(owner=ada, title="live")
 
     async def notes(*, user: Any) -> list[Note]:
@@ -884,9 +869,7 @@ _UNFILLABLE: dict[str, Callable[[], Any]] = {
 
 @pytest.mark.parametrize("path", sorted(_UNFILLABLE))
 async def test_a_parameter_no_caller_can_fill_is_the_author_s_error(ada: Any, path: str) -> None:
-    """Nothing declares ``tenant`` as an argument, so the closed argument set
-    keeps every caller from sending it: refusing it as missing would ask for a
-    value nobody can send, so it raises as the declaration's error."""
+    """Nothing declares ``tenant`` as an argument."""
     spec = _UNFILLABLE[path]()
 
     with pytest.raises(TypeError, match="tenant"):
@@ -1330,8 +1313,7 @@ _OVERLAID_IN_THE_HOP: dict[str, Callable[[PermissionCheck], Any]] = {
 async def test_extra_kwargs_are_copied_on_entry_so_a_change_during_the_call_reaches_nothing(
     path: str, ada: Any
 ) -> None:
-    """The caller's dict is changed while the call sits in its hop, here by a
-    check run there; the run still sees the overlay as it was on entry."""
+    """The caller's dict is changed while the call sits in its hop, here by a check run there."""
     extra = {"tag": "view", "extra": 1}
 
     class Changing(PermissionCheck):
@@ -1379,9 +1361,7 @@ _OFF_THE_LOOP: dict[str, Callable[[PermissionCheck], Any]] = {
 async def test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop(
     path: str, ada: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Both read the spec's declaration and the check's method, which may be
-    a lazily built property or a descriptor that queries, so neither runs on
-    the event loop's thread."""
+    """Both read the spec's declaration and the check's method."""
     loop = threading.get_ident()
     on_the_loop: list[tuple[str, bool]] = []
 
@@ -1427,8 +1407,7 @@ class _Computes(Titled):
 async def test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops(
     path: str, ada: Any
 ) -> None:
-    """A sync service's ``dispatch`` and a non-atomic async one's prelude both
-    leave the key to the Validator's value."""
+    """A sync dispatch and an async prelude both leave the key to the Validator."""
     ran: list[Mapping[str, Any]] = []
 
     def sync_service(**pool: Any) -> None:
@@ -1545,10 +1524,7 @@ async def test_a_returns_many_service_is_presented_row_by_row() -> None:
 async def test_a_returns_many_service_returning_one_row_is_the_authors_error(
     atomic: bool, is_async_service: bool
 ) -> None:
-    # The same refusal as the sync path, raised after the service has run and its
-    # write has committed on every route the service can take (the one-hop sync
-    # path, an atomic async service joining it, and a non-atomic async service
-    # awaited on the loop): the note is still there.
+    # The same refusal as the sync path.
     ada = await sync_to_async(make_user)("ada")
 
     def write_the_note(**pool: Any) -> Any:
@@ -1671,7 +1647,6 @@ async def test_adispatch_runs_on_the_carried_values(
     result = await adispatch(spec, grant=found[1], seeds=found.seeds, **asked, **handed)
 
     assert result.value == note
-    # The run was handed the value too, not only the checks before it.
     assert {stage for stage, _ in tenancy.seen} & {"selector", "service"}
     assert tenancy.one_value()
     assert hops[0] == hopped
@@ -1714,16 +1689,12 @@ async def test_one_resolution_from_resolve_seeds_to_adispatch(
         "service",
     ]
     assert len(tenancy.resolved) == 1
-    # The service was handed the very object the prelude resolved, not a second one.
     assert tenancy.seen[-1][1] is carrier.values["tenant"]
     assert tenancy.one_value()
 
 
 async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> None:
-    """Refused on the loop, so the sync route's ``dispatch`` never gets to refuse it instead.
-
-    The type check comes first: a mistyped carrier is named so even with no grant.
-    """
+    """Refused on the loop, so the sync route's ``dispatch`` never gets to refuse it instead."""
     tenancy = Tenancy()
     spec, context = tenancy.spec(), {}
     checked = await sync_to_async(check_call)(
@@ -1754,11 +1725,7 @@ async def test_seeds_are_refused_before_any_hop(ada: Any, hops: list[str]) -> No
 async def test_a_carrier_never_covers_a_principal_resolved_from_its_id(
     ada: Any, hops: list[str]
 ) -> None:
-    """A wiring mistake, refused on the loop at entry.
-
-    Where it is made beside another, the type check wins, then no grant, then this;
-    a principal_id of 0 is still a principal_id.
-    """
+    """A wiring mistake, refused on the loop at entry."""
     tenancy = Tenancy()
     spec, context = tenancy.spec(), {}
     checked = await sync_to_async(check_call)(

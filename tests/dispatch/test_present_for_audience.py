@@ -68,8 +68,7 @@ def test_projects_each_row_of_a_list() -> None:
 
 
 def test_uses_a_projection_built_once_and_passed_in() -> None:
-    """A transport builds the projection where it registers the spec, with a
-    mount's overrides, and the render applies exactly that one."""
+    """A transport builds the projection where it registers the spec, with a mount's overrides."""
     spec = spec_of(InvoicePresenter(), SelectorKind.RETRIEVE)
     projection = audience_projection_for_spec(spec, overrides={"etag": FieldMarking()})
 
@@ -126,9 +125,7 @@ class TestFromDispatch:
         }
 
     def test_an_agent_reads_the_same_answers_present_does_reason_included(self) -> None:
-        # The answers pass the projection whole: ``available``, the ``code`` a
-        # client branches on, and the ``reason`` a model relays. The field
-        # markings still apply beside them.
+        # The answers pass the projection whole: ``available``, the ``code`` a client branches on.
         ada = make_user("ada")
         note = Note.objects.create(owner=ada, title="Draft", archived=True)
         spec = replace(spec_of(NoteRow()), affordances={"rename": RENAME, "edit": EDIT})
@@ -144,8 +141,7 @@ class TestFromDispatch:
         ]
 
     def test_a_page_s_rows_carry_their_answers(self) -> None:
-        # Answered on the queryset before it is sliced, so the page's rows are
-        # read once and carry what the whole list would have.
+        # Answered on the queryset before it is sliced.
         ada = make_user("ada")
         Note.objects.bulk_create(
             [Note(owner=ada, title=f"n{index}", archived=index % 2 == 1) for index in range(5)]
@@ -184,8 +180,7 @@ class TestFromDispatch:
 
 @pytest.mark.django_db(transaction=True)
 async def test_from_async_code_the_presented_value_is_projected_on_the_loop() -> None:
-    """Presenting a lazy queryset on the loop would raise; projecting what
-    ``apresent`` brought back reads no row, so it needs no hop of its own."""
+    """Presenting a lazy queryset on the loop would raise."""
     ada = await sync_to_async(make_user)("ada")
     note = await Note.objects.acreate(owner=ada, title="Draft")
     spec = spec_of(NoteRow())

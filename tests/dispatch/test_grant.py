@@ -40,8 +40,7 @@ def test_a_grant_for_a_source_covers_the_source_and_the_spec_it_compiles_to() ->
 
     assert grant.covers(source, principal)
     assert grant.covers(kernel_spec(source), principal)
-    # Each held by name: another declaration compiles to another spec, and
-    # the principal is still read by identity.
+    # Each held by name: another declaration compiles to another spec.
     assert not grant.covers(Foreign(_spec()), principal)
     assert not grant.covers(source, object())
 
@@ -53,16 +52,14 @@ def test_a_grant_for_a_compiled_spec_covers_the_source_it_was_compiled_from() ->
 
 
 def test_a_grant_keeps_the_object_it_was_given() -> None:
-    # Compiled where it is read rather than when it is built, so the grant a
-    # transport holds is the one it constructed, field for field.
+    # Compiled where it is read rather than when it is built.
     source = Foreign(_spec())
 
     assert Grant(source, object()).spec is source
 
 
 def test_a_grant_does_not_cover_an_equal_declaration_compiled_on_its_own() -> None:
-    # Two declarations comparing equal, each compiling to a spec of its own,
-    # as a library compiling afresh per declaration does.
+    # Two declarations comparing equal, each compiling to a spec of its own.
     first = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=list))
     second = Foreign(SelectorSpec(kind=SelectorKind.LIST, selector=list))
     principal = object()

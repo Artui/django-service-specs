@@ -1,10 +1,3 @@
-"""``check_seeds``: a declaration that cannot hold on a mount as written, refused before any call.
-
-Each refusal is tested twice: what ``dispatch`` does with the spec today, so
-the claim about which calls fail is held, and the reader's refusal, by which
-message came back.
-"""
-
 from __future__ import annotations
 
 import functools
@@ -59,8 +52,7 @@ _POSITIONAL = "positional-only"
 
 
 def _service(service: Callable[..., Any], **declared: Any) -> ServiceSpec:
-    # A selector spec nested in a ServiceSpec declares no permissions: the
-    # service's checks authorize, so the nested one is the derivation without them.
+    # A selector spec nested in a ServiceSpec declares no permissions.
     for role in ("instance", "collection", "output"):
         nested = declared.get(f"{role}_selector_spec")
         if nested is not None:
@@ -149,8 +141,7 @@ def _list(selector: Callable[..., Any], **declared: Any) -> SelectorSpec:
 
 
 def _none(**_: Any) -> list[Any]:
-    # A LIST's rows, never ``None``: settle answers no condition on a
-    # ``None`` under ``allow_none``, so a condition test returns a list.
+    # A LIST's rows, never ``None``: settle answers no condition on a ``None`` under ``allow_none``.
     return []
 
 
@@ -178,13 +169,7 @@ def _mapping(condition: Any) -> dict[str, ServiceSpec]:
 
 
 def _taking(*names: str, seen: dict[str, Any], answer: Any = True) -> Callable[..., Any]:
-    """A callable requiring each of ``names`` by keyword, recording what it is handed.
-
-    Its signature is all dispatch and ``check_seeds`` read, and the body
-    records every keyword, so a test asserts the keyword arrived rather than
-    that the call did not fail. ``answer`` is returned, or called with what
-    was handed if it is callable.
-    """
+    """A callable requiring each of ``names`` by keyword, recording what it is handed."""
 
     def fn(**handed: Any) -> Any:
         seen.update(handed)
@@ -218,8 +203,7 @@ def _scope(*, tenant: Any) -> _Scope:
 
 
 def _fills_its_own_limit(*, limit: int) -> _Fills:
-    # Typed to fill ``limit``, so the caller's value for it is dropped
-    # (``_without``) and never reaches this provider.
+    # Typed to fill ``limit``.
     return {"limit": limit}
 
 
@@ -719,11 +703,7 @@ def _async_selector_extend(name: str, seen: dict[str, Any]) -> SelectorSpec:
 
 
 def _providing(name: str, seen: dict[str, Any], read: Parameters) -> dict[str, Any]:
-    """A seat's ``kwargs`` requiring ``name``: its read's, or ``limit``, a read it may decline.
-
-    The declinable read is declared required, so the fourth refusal, which
-    reads a read as declared, has nothing to say of it.
-    """
+    """A seat's ``kwargs`` requiring ``name``: its read's, or ``limit``, a read it may decline."""
     if name == "limit":
         return {"reads": _LIMIT_REQUIRED, "kwargs": _declines_its_limit(seen)}
     return {"kwargs": _provider(name, seen), **({"reads": read} if name in read.names() else {})}
@@ -739,8 +719,7 @@ def _service_kwargs(name: str, seen: dict[str, Any]) -> ServiceSpec:
 
 
 def _service_input_data(name: str, seen: dict[str, Any]) -> ServiceSpec:
-    # A read ``limit`` the spec's ``kwargs`` may decline, so the caller's
-    # value stays in the call and reaches ``input_data``.
+    # A read ``limit`` the spec's ``kwargs`` may decline.
     declared: dict[str, Any] = (
         {"reads": _LIMIT_REQUIRED, "kwargs": _may_fill_limit}
         if name == "limit"
@@ -946,11 +925,7 @@ class TestARequiredKeywordNothingFills:
         check_seeds(build(), pool_seeds=_SEEDED)
 
     def test_a_service_beside_a_validator_is_left_to_dispatch(self) -> None:
-        """A Validator may return a value it does not declare, so its service is not judged.
-
-        Dispatched to prove the value arrives: a keyword nothing declares that
-        such a Validator fills runs today.
-        """
+        """A Validator may return a value it does not declare, so its service is not judged."""
 
         spec = _service(lambda *, title, slug: slug, validator=_Computing())
         check_seeds(spec)
@@ -1154,14 +1129,7 @@ class TestTheSeatsTheFifthRefusalSkips:
 
 
 class TestWhatEachSeatTheFifthSkipsIsHanded:
-    """Each keyword counted as filled on a seat the fifth refusal skips: dispatched, seen arriving.
-
-    The guard against refusing a spec that runs: the check passes each of
-    these (test_a_keyword_something_fills_is_not), so each must reach its
-    callable on a real call. Each fixture is sized so the seat runs: a row
-    for a RETRIEVE's precondition, a QuerySet for ``extend_queryset``, and a
-    list, never ``None``, for a selector whose conditions are answered.
-    """
+    """Each keyword counted as filled on a seat the fifth refusal skips: dispatched."""
 
     @pytest.mark.parametrize(("build", "name"), _HANDED)
     def test_dispatch_hands_it(self, build: Callable[..., Any], name: str) -> None:
@@ -1254,11 +1222,7 @@ class TestAProviderSeat:
     def test_a_progress_reporter_beside_a_run_taking_no_progress_is_not_read(
         self, run: Callable[..., Any]
     ) -> None:
-        """Dispatch calls it only where the run takes ``progress``, so it requires nothing else.
-
-        Dispatched to hold the claim: the reporter requiring ``tenant``,
-        unregistered, is never called.
-        """
+        """Dispatch calls it only where the run takes ``progress``, so it requires nothing else."""
         spec = _service(run, progress_reporter=_needs_tenant)
         check_seeds(spec)
         dispatch(spec, principal=make_user("ada"), arguments={})
@@ -1415,8 +1379,7 @@ def _extends_with_pks(*, queryset: Any, pks: list[int]) -> Any:
 
 
 def _provides_with_pks(*, pks: list[int]) -> _Fills:
-    # Typed, so its seat is checked at all, and requiring ``pks`` as an
-    # annotated element, which is what the fifth refusal would read.
+    # Typed, so its seat is checked at all, and requiring ``pks`` as an annotated element.
     return {"limit": len(pks)}
 
 
@@ -1771,11 +1734,7 @@ _TWO_OPTIONAL = Parameters.of(Parameter("limit", "integer"), Parameter("after", 
 
 
 class TestAnOptionalReadOnTheOtherSeats:
-    """The fourth refusal on a precondition and an ``extend_queryset``, the seats handed reads.
-
-    A condition and the output selector are handed none, so there is nothing
-    for it to find on them.
-    """
+    """The fourth refusal on a precondition and an ``extend_queryset``, the seats handed reads."""
 
     @pytest.mark.parametrize(("build", "label", "error"), _OPTIONAL_SEATS)
     def test_dispatch_refuses_a_call_leaving_it_out(
@@ -1804,12 +1763,7 @@ class TestAnOptionalReadOnTheOtherSeats:
     async def test_adispatch_refuses_a_call_leaving_it_out_on_an_async_selector(
         self, build: Callable[[], Any], ada: Any
     ) -> None:
-        """The same refusal through ``_settle_and_conclude``, the route only async selectors take.
-
-        An ``extend_queryset`` binds there with the reads ``adispatch`` was
-        given; a RETRIEVE's precondition takes its ``fillable`` from
-        ``conclude_selector``, not from ``adispatch``.
-        """
+        """The same refusal through ``_settle_and_conclude``."""
         spec = build()
         with pytest.raises(InvalidArguments) as refused:
             await adispatch(spec, principal=ada, arguments={})
@@ -1842,11 +1796,7 @@ class TestAnOptionalReadOnTheOtherSeats:
     def test_it_is_left_to_dispatch_beside_an_untyped_provider_or_a_validator(
         self, build: Callable[[dict[str, Any]], Any], arguments: dict[str, Any]
     ) -> None:
-        """The fourth is bailed from where the third is, though ``checks_items`` is false.
-
-        A mutant running it on these seats whatever the provider or Validator
-        may return refuses a spec whose call sends no ``limit`` and runs.
-        """
+        """The fourth is bailed from where the third is, though ``checks_items`` is false."""
         seen: dict[str, Any] = {}
         spec = build(seen)
         check_seeds(spec)
@@ -1880,11 +1830,7 @@ class TestAnOptionalReadOnTheOtherSeats:
 
 
 class TestTheFifthRefusalIsNotRunOnThem:
-    """An array read with no ``items`` is refused on the callable it fills, not on any other seat.
-
-    A ``progress_reporter`` has no case: its seat reads nothing, so the
-    refusal would find nothing on it either way.
-    """
+    """An array read with no ``items`` is refused on the callable it fills."""
 
     @pytest.mark.parametrize(
         "build",
@@ -2259,19 +2205,10 @@ _UNREADABLE_PROVIDERS = [
 
 
 class TestACallableWhoseSignatureCannotBeRead:
-    """A builtin type has no signature to read, and dispatch fails every call that reaches it.
-
-    The refusal is ``ImproperlyConfigured``, as every other refusal is, not
-    the ``ValueError`` ``inspect.signature`` raises. The guard in
-    ``_unfilled`` catches ``(ValueError, TypeError)``: the first is held by
-    every ``dict`` case here and the second by
-    ``test_a_signature_that_is_not_one_is_refused_alike``, which fails
-    without ``TypeError`` in the tuple.
-    """
+    """A builtin type has no signature to read, and dispatch fails every call that reaches it."""
 
     def test_python_reads_no_signature_for_the_callable_used_here(self) -> None:
-        # Guards the tests below against passing vacuously on a Python where
-        # ``dict`` gained a signature.
+        # Guards the tests below against passing vacuously where ``dict`` gained a signature.
         with pytest.raises(ValueError, match="no signature found"):
             inspect.signature(dict)
         with pytest.raises(TypeError):
@@ -2325,8 +2262,7 @@ class TestACallableWhoseSignatureCannotBeRead:
         assert seat in refused
         assert repr(dict) in refused
         assert "signature cannot be read" in refused
-        # The unreadable seat is answered by this refusal alone, not by the
-        # checks that need its signature.
+        # The unreadable seat is answered by this refusal alone.
         assert _POSITIONAL not in refused
         assert _NOTHING_FILLS not in refused
 
@@ -2371,8 +2307,7 @@ class TestACallableWhoseSignatureCannotBeRead:
     def test_dispatch_fails_every_call_that_reaches_it(
         self, spec: Any, error: type[Exception]
     ) -> None:
-        # Holds the claim that the declaration cannot run, for each seat:
-        # every declared argument sent, so the call reaches it.
+        # Holds the claim that the declaration cannot run, for each seat.
         arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
         with pytest.raises(error, match="signature"):
             dispatch(spec, principal=make_user("ada"), arguments=arguments)
@@ -2437,13 +2372,7 @@ class _Declaring(Validator):
 def test_a_validator_field_is_the_caller_s_and_fills_the_service_s_keyword(
     fields: tuple[Parameter, ...],
 ) -> None:
-    """A field a Validator always declares is left alone, a seed's name or the service's keyword.
-
-    The ``tenant`` case fails without ``seed_named_fields`` in
-    ``split_seed_named``, which would refuse the name as a seed's; both fail
-    without ``or seat.validated``, which would judge the service's required
-    ``note`` as nothing filling it.
-    """
+    """A field a Validator always declares is left alone, a seed's name or the service's keyword."""
 
     def service(*, note: str) -> None: ...
 

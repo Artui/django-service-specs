@@ -145,8 +145,7 @@ def test_a_foreign_declaration_is_checked_as_its_compiled_spec(ada: Any) -> None
 
 
 def test_it_validates_nothing_where_bind_arguments_validates(ada: Any) -> None:
-    # The complement: check_call authorizes and never runs the Validator;
-    # bind_arguments runs the Validator and never authorizes.
+    # The complement: check_call authorizes and never runs the Validator.
     validator = Titled()
     spec = ServiceSpec(service=Record(), permissions=[Refuse()], validator=validator)
 
@@ -237,9 +236,7 @@ def test_a_many_spec_s_refused_rows_are_raised_as_dispatch_raises_them(ada: Any)
 
 
 def test_a_refused_row_is_marked_as_raised_after_the_class_level_check(ada: Any) -> None:
-    # The grant ``check_call`` earned still holds when it raises a row: step
-    # four has passed. Dispatch's own refusal of the same row is unmarked, so
-    # the mark is ``check_call``'s alone.
+    # The grant ``check_call`` earned still holds when it raises a row: step four has passed.
     arguments = {"items": [{"title": "a"}, {"title": 3}]}
     spec = _rows(_Asked())
 
@@ -253,9 +250,7 @@ def test_a_refused_row_is_marked_as_raised_after_the_class_level_check(ada: Any)
 
 
 def test_a_failed_shape_is_not_marked_as_raised_after_the_class_level_check(ada: Any) -> None:
-    # Held by name: a ``many`` spec whose list is no list, an argument the
-    # call does not take, and a spec that is not ``many``. Each is raised
-    # before step four, so no grant exists yet.
+    # Held by name: a ``many`` spec whose list is no list, an argument the call does not take.
     asked = _Asked()
     for spec, arguments in (
         (_rows(asked), {"items": 3}),
@@ -294,8 +289,7 @@ def test_a_pk_read_is_checked_as_declared(ada: Any) -> None:
 
 
 def test_a_scope_check_is_left_to_dispatch(ada: Any) -> None:
-    # Nothing after the prelude runs: a create whose scope check refuses
-    # passes here, and is refused when dispatch runs it.
+    # Nothing after the prelude runs: a create whose scope check refuses passes here.
     check = Scoped(refuse_scope=True)
     spec = ServiceSpec(service=Record(), permissions=[check])
 
@@ -333,8 +327,7 @@ def test_its_checks_are_offered_the_call_context_passed_and_the_seeds_they_name(
 
 @pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
 def test_check_call_hands_every_ask_its_dict(ada: Any, passed: bool) -> None:
-    """``open_call`` asks the Validator's ``parameters`` with the dict
-    ``check_call`` was handed or made, the one its checks are offered."""
+    """``open_call`` asks the Validator's ``parameters`` with the dict its checks read."""
     spec, validator, arguments, _ = every_ask_case("single")
     offered: list[Any] = []
 

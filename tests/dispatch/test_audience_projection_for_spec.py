@@ -48,8 +48,7 @@ def of(*fields: OutputField, name: str | None = None) -> AudienceProjection:
 
 
 def test_reads_every_marking_choice_and_child_off_the_output() -> None:
-    """The same projection the DRF-based walk reads off a serializer declaring
-    these fields with these markings."""
+    """The projection the DRF-based walk reads off a serializer declaring these fields."""
     projection = audience_projection_for_spec(listing(InvoicePresenter()))
 
     assert {name: m.audience for name, m in projection.fields.items()} == {
@@ -96,8 +95,7 @@ def test_a_child_with_nothing_to_project_is_left_out() -> None:
     )
 
     assert projection.is_empty()
-    # ``is_empty`` recurses, so an empty child kept under ``nested`` would
-    # still leave the projection empty: this is what holds the guard.
+    # ``is_empty`` recurses.
     assert projection.nested == {}
 
 
@@ -135,8 +133,7 @@ class TestLabels:
             of(OutputField("author", "object", fields=grandchild))
 
     def test_two_labels_are_refused_in_the_mounts_name_when_given(self) -> None:
-        # ``name=`` identifies the mount in every refusal, not only the
-        # overrides' one, and with no overrides at all.
+        # ``name=`` identifies the mount in every refusal, not only the overrides' one.
         with pytest.raises(ImproperlyConfigured) as refused:
             of(
                 OutputField("a", "string", marking=FieldMarking.label()),
@@ -149,8 +146,7 @@ class TestLabels:
     def test_two_labels_in_the_declaration_are_refused_in_the_mounts_name_beside_overrides(
         self,
     ) -> None:
-        # The declaration's refusal comes first, so overrides on other fields do
-        # not change whose name it is worded in.
+        # The declaration's refusal comes first.
         with pytest.raises(ImproperlyConfigured) as refused:
             audience_projection_for_spec(
                 listing(

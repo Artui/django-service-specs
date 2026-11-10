@@ -1,9 +1,3 @@
-"""``resolve_target``: the target dispatch would find, found the way dispatch finds it.
-
-Each case is asked of both functions, so "as dispatch would" is measured
-rather than restated: the same result, or the same error at the same step.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -292,9 +286,7 @@ def test_the_scope_check_refuses_with_its_own_message(
 def test_a_grant_that_checked_a_target_does_not_skip_the_checks_on_what_it_finds(
     ada: Any, make: Callable[[Any], ServiceSpec], arguments: dict[str, Any], scope: Any
 ) -> None:
-    # resolve_target looks its target up itself, so a grant claiming the
-    # checks ran says nothing about what this lookup finds: as dispatch with
-    # no target=, it asks them.
+    # resolve_target looks its target up itself.
     check = Scoped(refuse_scope=True)
     spec = make(check)
     grant = Grant(spec, ada, target_checked=True)
@@ -327,8 +319,7 @@ class _ServerPk(TypedDict, total=False):
 
 
 def test_a_filled_target_read_the_caller_sends_never_reaches_the_lookup(ada: Any, bob: Any) -> None:
-    # The provider leaves the key out, as one that fills it for some users only
-    # would: the caller's pk is dropped rather than looked up, as in dispatch.
+    # The provider leaves the key out, as one that fills it for some users only would.
     theirs = Note.objects.create(owner=bob, title="theirs")
 
     def scoped() -> _ServerPk:
@@ -373,8 +364,7 @@ def test_a_grant_for_another_principal_is_refused(ada: Any, bob: Any) -> None:
 
 
 def test_a_required_validator_field_left_out_is_not_refused(ada: Any) -> None:
-    # The GET in front of a form carries the route's arguments alone; the POST
-    # carries the form as well, and neither is refused for what the other has.
+    # The GET in front of a form carries the route's arguments alone.
     note = Note.objects.create(owner=ada, title="mine")
     spec = _update()
     for arguments in ({"pk": note.pk}, {"pk": note.pk, "title": "T", "other": 1}):
@@ -399,9 +389,7 @@ def test_a_parameter_a_registered_seed_occupies_is_refused(ada: Any) -> None:
 def test_a_validator_field_a_registered_seed_names_resolves_as_dispatch_runs_it(
     ada: Any,
 ) -> None:
-    # The field is not among the target selector's parameters, which are all
-    # resolve_target checks; it is the caller's argument, and dispatch runs the
-    # call with the field in ``data`` and the seed's value under its name.
+    # The field is not among the target selector's parameters, which are all resolve_target checks.
     note = Note.objects.create(owner=ada, title="mine")
     seeds = DEFAULT_POOL_SEEDS.extend(title=lambda *, user: "seeded")
     spec = _update()
@@ -430,8 +418,7 @@ def test_a_selector_spec_is_refused(ada: Any) -> None:
 def test_a_many_spec_is_refused_before_anything_runs(
     ada: Any, django_assert_num_queries: Any
 ) -> None:
-    # Before the class-level check, which would refuse this principal: the
-    # spec is the wrong kind for the question, whoever asks it.
+    # Before the class-level check, which would refuse this principal.
     spec = ServiceSpec(service=Record(), permissions=[Refuse()], many=True, validator=Titled())
     with django_assert_num_queries(0), pytest.raises(ImproperlyConfigured) as refused:
         resolve_target(spec, principal=ada, arguments={"items": []})
@@ -467,8 +454,7 @@ def test_dispatch_handed_its_result_looks_up_nothing_and_checks_the_row_once(ada
 
 
 def test_its_grant_handed_on_without_the_target_covers_no_other_row(ada: Any, bob: Any) -> None:
-    # The grant says the checks ran on the row resolve_target found; dispatch
-    # finding a different row itself, from the arguments, asks them again.
+    # The grant says the checks ran on the row resolve_target found.
     mine = Note.objects.create(owner=ada, title="mine")
     theirs = Note.objects.create(owner=bob, title="theirs")
     check = Scoped()
@@ -485,9 +471,7 @@ def test_its_grant_handed_on_without_the_target_covers_no_other_row(ada: Any, bo
 
 
 def test_a_foreign_declaration_resolves_and_its_grant_carries_to_dispatch(ada: Any) -> None:
-    # One compiled spec per object is what lets the grant, bound to the spec
-    # by identity, cover the dispatch handed the same object: the row's check
-    # is asked once across the two calls.
+    # One compiled spec per object is what lets the grant, bound to the spec by identity.
     note = Note.objects.create(owner=ada, title="mine")
     check = OwnerOnly()
     source = Foreign(_update(check))
@@ -620,18 +604,7 @@ def _resolved(spec: ServiceSpec, principal: Any, arguments: dict[str, Any]) -> A
 def test_a_target_selector_is_handed_no_shapes_on_any_route(
     kind: str, route: Callable[..., Any], ada: Any
 ) -> None:
-    """The lookup is the same call on every route, so it reads the same shapes: none.
-
-    ``resolve_target`` checks only the target's own parameters, so a shape the
-    caller sent is no argument of the lookup there. A target selector reading
-    the shapes would then find one row under ``dispatch`` and another here,
-    and a write would act on a row the page never showed. So ``walk_target``
-    hands an empty mapping on every route; each of its two ``selector_pool``
-    sites (instance, collection) is held by its own case, and a route that
-    built the pool for itself would show in its own. The service is still
-    handed the shapes, which the last assertion holds, so the exclusion is the
-    lookup's alone.
-    """
+    """The lookup is the same call on every route, so it reads the same shapes: none."""
     note = Note.objects.create(owner=ada, title="mine")
     looked_up: list[Any] = []
 
@@ -672,8 +645,7 @@ def test_a_target_selector_is_handed_no_shapes_on_any_route(
 
 @pytest.mark.parametrize("passed", [True, False], ids=["passed", "none"])
 def test_resolve_target_hands_every_ask_its_dict(ada: Any, passed: bool) -> None:
-    """``open_call`` asks the Validator's ``parameters`` with the dict
-    ``resolve_target`` was handed or made, the one its lookup is handed."""
+    """``open_call`` asks the Validator's ``parameters`` with the lookup's dict."""
     note = Note.objects.create(owner=ada, title="Row")
     looked_up: list[Any] = []
 
@@ -786,8 +758,7 @@ class TestCarriedSeeds:
     def test_a_plain_mapping_as_seeds_is_a_type_error(self, ada: Any) -> None:
         note = Note.objects.create(title="n", owner=ada)
         tenancy = Tenancy()
-        # Either type, so that without the refusal at entry this fails on its message
-        # rather than on the mapping meeting the carrier's own methods.
+        # Without the refusal at entry this fails on the mapping, not on its message.
         with pytest.raises((TypeError, AttributeError)) as refused:
             resolve_target(
                 tenancy.spec(),

@@ -134,8 +134,7 @@ class TestUndeclared:
         assert "reads" in message
 
     def test_a_selector_spec_is_given_no_many_hint(self, check: Check) -> None:
-        # Holds the ``isinstance`` half of the hint's guard: a selector spec
-        # has no ``many`` to read.
+        # Holds the ``isinstance`` half of the hint's guard.
         message = refusal(
             check,
             SelectorSpec(selector=service, kind=SelectorKind.LIST),
@@ -164,8 +163,7 @@ def fill_confirmed() -> _Confirmed:
 
 class TestServerOwned:
     def test_a_declared_key_a_provider_fills_is_refused(self, check: Check) -> None:
-        # Declared at the top level, so the undeclared check passes it, and the
-        # provider's value replaces whatever the caller answers.
+        # Declared at the top level, so the undeclared check passes it.
         spec = ServiceSpec(
             service=service,
             reads=Parameters.of(Parameter("confirmed", "boolean")),
@@ -187,10 +185,7 @@ class TestServerOwned:
         assert NOT_A_SCHEMA not in message
 
     def test_the_pool_seeds_given_are_the_ones_read(self, django_assert_num_queries: Any) -> None:
-        # A read a registered seed occupies is refused at the call, and the
-        # parameters are assembled against the default seeds, so a seed
-        # registered for the call is read from the keyword or not at all. A
-        # read, since a Validator field of a seed's name is the caller's.
+        # A read a registered seed occupies is refused at the call.
         spec = ServiceSpec(service=service, reads=Parameters.of(Parameter("confirmed", "boolean")))
         schema = {"confirmed": {"type": "boolean"}}
         seeds = PoolSeeds().extend(confirmed=lambda: None)
@@ -215,10 +210,7 @@ class TestAKeyDeclaredOnlyToACall:
         assert UNDECLARED in message
 
     def test_the_server_owned_keys_are_read_with_the_call_s_context_too(self) -> None:
-        # A field named like a registered seed is the caller's when the
-        # Validator declares it, and to no call it does not: read without the
-        # call's context, the seed would own the key, and an asked field the
-        # parameters declare would be refused as the server's.
+        # A field named like a registered seed is the caller's when the Validator declares it.
         spec = declaring_to_a_call(Parameter("tenant", "string"))
         schema = {"tenant": {"type": "string"}}
         check_requested_input(spec, schema, pool_seeds=TENANT_SEEDS, call_context=A_CALL)
@@ -252,13 +244,11 @@ class TestUnrenderable:
         "fragment",
         [
             pytest.param({"type": "object"}, id="bare"),
-            # Holds the ``array`` half of the multi-select rule: enum items do
-            # not make an object a list of values.
+            # Holds the ``array`` half of the multi-select rule.
             pytest.param({"type": "object", "items": {"enum": ["a"]}}, id="with-enum-items"),
         ],
     )
     def test_an_object_is_refused(self, check: Check, fragment: dict[str, Any]) -> None:
-        # Declared an object, so only renderability can refuse it.
         spec = declaring(Parameter("address", "object"))
         message = refusal(check, spec, {"address": fragment})
         assert "'address'" in message
@@ -339,15 +329,13 @@ class TestDisagrees:
         assert DISAGREES in refusal(check, spec, {"ids": fragment})
 
     def test_an_integer_for_an_array_of_decimal_strings_is_refused(self, check: Check) -> None:
-        # Holds the ``string`` half of the decimal rule: an array's format
-        # describes its elements, and a number is no array.
+        # Holds the ``string`` half of the decimal rule: an array's format describes its elements.
         spec = declaring(Parameter("amounts", "array", items="string", format="decimal"))
         message = refusal(check, spec, {"amounts": {"type": "integer"}})
         assert DISAGREES in message
 
     def test_the_rows_of_a_many_spec_are_no_list_of_values(self, check: Check) -> None:
-        # The list a many spec travels under is declared at the top level, and
-        # its rows are objects, which no value of an enum is.
+        # The list a many spec travels under is declared at the top level, and its rows are objects.
         spec = ServiceSpec(
             service=service, many=True, validator=Declaring(Parameter("title", "string"))
         )

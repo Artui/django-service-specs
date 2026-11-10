@@ -96,7 +96,6 @@ def test_it_is_the_set_check_call_relaxes() -> None:
     with pytest.raises(InvalidArguments) as refused:
         check_call(spec, principal=ada, arguments={})
     assert set(refused.value.detail) == _READS.names() - provider_reached(spec) == {"page"}
-    # Every read reached, so the call starts with none sent.
     check_call(_listing(kwargs=_untyped), principal=ada, arguments={})
 
 

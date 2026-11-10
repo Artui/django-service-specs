@@ -140,8 +140,7 @@ class TestUndeclared:
         assert "project_pk" not in message
 
     def test_a_field_inside_a_many_row_is_not_a_top_level_parameter(self, check: Check) -> None:
-        # A ``many`` spec's rows travel inside one list, so a row's field has
-        # no single value to bind; the read beside the list does.
+        # A ``many`` spec's rows travel inside one list.
         spec = ServiceSpec(
             service=service,
             validator=Declaring(Parameter("title", "string")),
@@ -170,8 +169,7 @@ class TestBoth:
 
 class TestSeed:
     def test_a_parameter_a_registered_seed_occupies_is_refused(self, check: Check) -> None:
-        # Declared, so the undeclared check passes it; a dispatcher seed such
-        # as ``user`` can never be declared, so only a registered one reaches here.
+        # Declared, so the undeclared check passes it.
         spec = scoped(reads=READS + Parameters.of(Parameter("tenant", "string")))
         message = refusal(
             check, spec, ServerArguments(values={"tenant": "acme"}), pool_seeds=TENANT_SEEDS
@@ -192,8 +190,7 @@ class TestSeed:
 
 class TestProvider:
     def test_a_name_a_typed_provider_fills_is_refused(self, check: Check) -> None:
-        # Declared and no seed: the provider's answer would replace the bound
-        # value inside dispatch, so the binding would do nothing.
+        # Declared and no seed: the provider's answer would replace the bound value inside dispatch.
         spec = scoped(
             reads=READS + Parameters.of(Parameter("tenant_pk", "integer")), kwargs=fill_tenant
         )
@@ -202,9 +199,7 @@ class TestProvider:
         assert "tenant_pk" in message
 
     def test_a_name_a_provider_may_decline_is_refused_too(self, check: Check) -> None:
-        # Left to the caller by ``server_owned_keys``, since the provider may
-        # return ``UNSET``; on every call where it does not, its answer would
-        # replace the bound value, so the binding cannot be relied on either.
+        # Left to the caller by ``server_owned_keys``, since the provider may return ``UNSET``.
         spec = scoped(
             reads=READS + Parameters.of(Parameter("tenant_pk", "integer")), kwargs=maybe_tenant
         )
@@ -234,8 +229,7 @@ class TestProvider:
         only(refusal(check, spec, ServerArguments(values={"tenant_pk": 2})), PROVIDER)
 
     def test_a_provider_whose_return_names_no_keys_refuses_no_name(self, check: Check) -> None:
-        # Such a provider may fill any name and so, as for
-        # ``server_owned_keys``, names none: nothing here is known statically.
+        # Such a provider may fill any name and so, as for ``server_owned_keys``, names none.
         def untyped(**_: object) -> dict[str, object]:
             return {}
 
@@ -290,9 +284,7 @@ class TestWithheld:
     def test_a_demanded_read_is_refused_though_its_selector_has_a_default(
         self, check: Check
     ) -> None:
-        # The shape check refuses it absent before the selector is asked, so
-        # the selector's own default never answers: fails without the
-        # "demanded" half of the read's disjunction.
+        # The shape check refuses it absent before the selector is asked.
         message = refusal(check, picky_spec(), ServerArguments(withheld=frozenset({"region"})))
         only(message, UNFILLABLE)
         assert "region" in message
@@ -300,9 +292,7 @@ class TestWithheld:
     def test_a_read_its_selector_declares_with_no_default_cannot_be_withheld(
         self, check: Check
     ) -> None:
-        # Optional to the shape check, so only the selector's signature can
-        # say every call would be refused as missing: fails without the
-        # callable's-default conjunct.
+        # Optional to the shape check.
         message = refusal(
             check, picky_spec(), ServerArguments(withheld=frozenset({"draw_request_pk"}))
         )
@@ -310,9 +300,7 @@ class TestWithheld:
         assert "draw_request_pk" in message
 
     def test_a_declared_default_does_not_stand_in_for_the_selector_s(self, check: Check) -> None:
-        # Required with a declared default, which the shape check accepts
-        # absent and dispatch never applies, so the selector is called without
-        # it and refuses.
+        # Required with a declared default.
         message = refusal(check, picky_spec(), ServerArguments(withheld=frozenset({"tier"})))
         only(message, UNFILLABLE)
         assert "tier" in message
@@ -322,8 +310,7 @@ class TestWithheld:
         check(picky_spec(), ServerArguments(withheld=frozenset({"search"})))
 
     def test_a_provider_that_also_declares_a_read_is_not_judged(self, check: Check) -> None:
-        # A stated limit: only the callable a read is handed to is read for a
-        # default, so a provider declaring ``search`` with none is not.
+        # A stated limit: only the callable a read is handed to is read for a default.
         def scope(*, search: str) -> dict[str, object]:
             return {}
 
@@ -341,13 +328,11 @@ class TestWithheld:
         check(picky_spec(), ServerArguments(withheld=frozenset({"account_pk"})))
 
     def test_a_read_its_selector_does_not_declare_may_be_withheld(self, check: Check) -> None:
-        # Nothing asks for it, so nothing misses it: fails if the signature is
-        # read for a name it does not have.
+        # Nothing asks for it, so nothing misses it.
         check(picky_spec(), ServerArguments(withheld=frozenset({"note"})))
 
     def test_an_optional_name_with_no_default_may_be_withheld(self, check: Check) -> None:
-        # The selector takes ``**kwargs``, so only the shape check could
-        # demand it, and it does not.
+        # The selector takes ``**kwargs``, so only the shape check could demand it, and it does not.
         check(scoped(), ServerArguments(withheld=frozenset({"draw_request_pk"})))
 
     def test_a_required_name_with_no_default_may_be_bound(self, check: Check) -> None:
@@ -392,9 +377,7 @@ class TestWithheld:
     def test_a_required_validator_field_may_be_withheld_from_a_partial_spec(
         self, check: Check
     ) -> None:
-        # A partial call may leave out any Validator parameter, so dispatch
-        # demands none of them: fails if the check reads the declaration
-        # unrelaxed.
+        # A partial call may leave out any Validator parameter, so dispatch demands none of them.
         spec = ServiceSpec(
             service=write,
             validator=Partial(Parameter("title", "string", required=True)),
@@ -427,8 +410,7 @@ class TestBoundValues:
     def test_a_bound_value_takes_the_wire_spelling(
         self, check: Check, fmt: str, natural: Any, wire: str
     ) -> None:
-        # The Python value a server holds is not the string the declaration
-        # takes; refused where the transport is built, not on every call.
+        # The Python value a server holds is not the string the declaration takes.
         spec = scoped(reads=Parameters.of(Parameter("pinned", "string", format=fmt)))
         message = refusal(check, spec, ServerArguments(values={"pinned": natural}))
         only(message, BAD_VALUE)
@@ -447,8 +429,7 @@ def test_each_refusal_names_the_callable_whose_spec_it_is(check: Check) -> None:
 
 
 def test_a_name_a_validator_declares_only_to_a_call_is_undeclared() -> None:
-    # Read as the spec declares itself to no call, wherever it is called, so
-    # rule 1 refuses a binding of a field the Validator declares only to one.
+    # Read as the spec declares itself to no call, wherever it is called.
     spec = ServiceSpec(
         service=Record(),
         permissions=OPEN,

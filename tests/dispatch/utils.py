@@ -1,5 +1,3 @@
-"""Concept doubles, callables and expected messages the dispatch tests share."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -43,8 +41,7 @@ def notes_of(*, user: Any) -> QuerySet[Note]:
 
 
 def note_by_pk(*, pk: int) -> QuerySet[Note]:
-    # Unscoped on purpose: the object-level check is what refuses another
-    # owner's row, so the selector must be able to find one.
+    # Unscoped on purpose: the object-level check is what refuses another owner's row.
     return Note.objects.filter(pk=pk)
 
 
@@ -74,12 +71,7 @@ class OwnerOnly(PermissionCheck):
 
 
 class Scoped(PermissionCheck):
-    """Admits every principal; records each row and each scope it is asked about.
-
-    ``refuse_scope`` refuses every scope, a set or nothing, in words no other
-    check uses; a row is refused unless the principal owns it, as ``OwnerOnly``
-    refuses one.
-    """
+    """Admits every principal; records each row and each scope it is asked about."""
 
     message = "Not within your scope."
 
@@ -96,19 +88,13 @@ class Scoped(PermissionCheck):
         return bool(target.owner_id == principal.pk)
 
     def has_scope_permission(self, principal: Any, spec: Any, scope: Any) -> bool:
-        # A set is recorded as its rows, so a test reads what was asked
-        # rather than a queryset that would re-query when compared.
+        # A set is recorded as its rows.
         self.scopes.append(None if scope is None else list(scope))
         return not self.refuse_scope
 
 
 class Arguing(PermissionCheck):
-    """Admits everything; records each question with the arguments it was handed.
-
-    Each method declares the keyword, so dispatch hands it the call's
-    arguments; the mapping itself is kept too, so a test can see it is
-    read-only.
-    """
+    """Admits everything; records each question with the arguments it was handed."""
 
     def __init__(self) -> None:
         self.asked: list[tuple[str, Mapping[str, Any] | None]] = []
@@ -161,12 +147,7 @@ class Offered(PermissionCheck):
 
 
 class SeedPerQuestion(PermissionCheck):
-    """Admits everything; each question names a seed of its own, and records what it was handed.
-
-    ``club`` at the class-level question, ``row_club`` at the object-level one
-    and ``scope_club`` at the scope one, so a test can tell which question's
-    seeds a call resolved.
-    """
+    """Admits everything; each question names a seed of its own, and records what it was handed."""
 
     def __init__(self) -> None:
         self.handed: list[tuple[str, Any]] = []
@@ -199,13 +180,7 @@ class Deactivated:
 
 
 class PositionalOnly(PermissionCheck):
-    """Names a registered seed in each question's last positional slot, and records what it got.
-
-    ``club`` is where ``has_permission`` is handed the spec, ``row_club`` where
-    ``has_object_permission`` is handed the target, and ``scope_club`` where
-    ``has_scope_permission`` is handed the scope: a parameter the call fills by
-    position, so no seed's, whatever its name.
-    """
+    """Names a registered seed in each question's last positional slot, and records what it got."""
 
     def __init__(self) -> None:
         self.handed: list[tuple[str, Any]] = []
@@ -224,11 +199,7 @@ class PositionalOnly(PermissionCheck):
 
 
 def recorded_seeds(raising: BaseException | None = None) -> tuple[PoolSeeds, list[str]]:
-    """``SeedPerQuestion``'s three seeds and one no check names, each recording when it resolves.
-
-    Each value names the seed and the principal it was resolved for. With
-    ``raising``, every resolver raises it instead.
-    """
+    """``SeedPerQuestion``'s three seeds and one no check names, each recording when it resolves."""
     resolved: list[str] = []
 
     def resolver(name: str) -> Any:
@@ -245,11 +216,7 @@ def recorded_seeds(raising: BaseException | None = None) -> tuple[PoolSeeds, lis
 
 
 class Titled(Validator):
-    """Declares a required title and strips it; records every call.
-
-    ``returns`` replaces the verdict, for a test about what a Validator hands
-    back rather than about what it checks.
-    """
+    """Declares a required title and strips it; records every call."""
 
     def __init__(self, returns: Mapping[str, Any] | None = None) -> None:
         self.returns = returns
@@ -266,12 +233,7 @@ class Titled(Validator):
 
 
 class Listed(Titled):
-    """Validates a many call's rows as one list, as a list serializer does, and binds itself once.
-
-    Refuses the list as a whole when it holds more than ``most`` rows, under
-    ``non_field_errors``, which a list-level ``validate()`` would raise, and a
-    row titled ``bad`` by its index. Records every ``validated_many`` call.
-    """
+    """Validates a many call's rows as one list, as a list serializer does."""
 
     def __init__(self, *, most: int = 10) -> None:
         super().__init__()
@@ -331,11 +293,7 @@ class Titles(Presenter):
 
 
 class Record:
-    """A spec callable that records the keywords it received and returns ``returns``.
-
-    Declares ``**pool``, so it receives the whole pool it was resolved from:
-    what a test reads back is exactly what dispatch put there.
-    """
+    """A spec callable that records the keywords it received and returns ``returns``."""
 
     def __init__(self, returns: Any = None) -> None:
         self.returns = returns
@@ -411,11 +369,7 @@ def two_notes() -> list[Note]:
 
 
 class AskedWith(Validator):
-    """Declares ``fields``, opts into ``call_context``, recording what every ``parameters`` ask got.
-
-    A required ``title`` unless given ``fields``. Validates nothing: each
-    argument comes back as it went in, and the context it came with is kept.
-    """
+    """Declares ``fields``, opts into ``call_context``."""
 
     def __init__(self, *fields: Parameter) -> None:
         self.fields = fields or (Parameter("title", "string", required=True),)
@@ -436,12 +390,7 @@ A_CALL: dict[str, Any] = {"marked": True}
 
 
 class DeclaredToACall(Validator):
-    """Declares ``title``, and ``extra`` only to a call whose ``call_context`` is marked.
-
-    Keyed on what the dict carries, not on its being there, so a test reading
-    the extra field proves the call's own dict reached the ask, and that a
-    reader handing none, or a dict of its own, describes the spec without it.
-    """
+    """Declares ``title``, and ``extra`` only to a call whose ``call_context`` is marked."""
 
     def __init__(self, extra: Parameter) -> None:
         self.extra = extra
@@ -466,11 +415,7 @@ service spec's call is prepared, so both run ``prepare_service``'s asks.
 
 
 def every_ask_case(case: str) -> tuple[ServiceSpec, AskedWith, dict[str, Any], Record]:
-    """A spec for ``case``, its ``AskedWith``, the arguments it is called with, and its service.
-
-    Called with ``pool_seeds=TENANT_SEEDS``. The Validator's record is empty
-    when it comes back, so what it holds was asked by the call.
-    """
+    """A spec for ``case``, its ``AskedWith``, the arguments it is called with, and its service."""
     service = Record()
     if case == "single":
         validator = AskedWith(
@@ -492,12 +437,7 @@ def every_ask_case(case: str) -> tuple[ServiceSpec, AskedWith, dict[str, Any], R
 
 
 class Tenancy:
-    """A ``tenant`` seed counting its resolutions, and a spec whose check names it.
-
-    Every stage of ``spec()`` that names ``tenant`` records what it was handed,
-    so a test can tell one resolved value from two. ``pool_seeds`` is this
-    object's own registry: two ``Tenancy`` objects are two registries.
-    """
+    """A ``tenant`` seed counting its resolutions, and a spec whose check names it."""
 
     def __init__(self) -> None:
         self.resolved: list[object] = []

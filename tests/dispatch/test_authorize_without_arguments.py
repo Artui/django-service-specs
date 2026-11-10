@@ -33,12 +33,7 @@ SCOPE = "has_scope_permission"
 
 
 class _Asked(PermissionCheck):
-    """Answers the class and scope questions as built, recording what each was handed.
-
-    An answer is a bool, or an exception the question raises instead. Each
-    entry is ``(question, scope, arguments, call_context)``; the class question
-    has no scope, and records ``None`` there.
-    """
+    """Answers the class and scope questions as built, recording what each was handed."""
 
     def __init__(self, *, permission: Any = True, scope: Any = True) -> None:
         self.answers = {CLASS: permission, SCOPE: scope}

@@ -31,8 +31,7 @@ def _partial_with_a_required_shape() -> ServiceSpec:
 
 
 def test_a_partial_spec_keeps_a_required_shape_required() -> None:
-    """A shape selects what is presented, not what is written, so a partial
-    call relaxes the Validator's fields and keeps it as declared."""
+    """A shape selects what is presented, not what is written."""
     spec = _partial_with_a_required_shape()
     relaxed = {param.name: param.required for param in relax_partial(spec, spec.parameters())}
     assert relaxed == {"fields": True, "title": False}

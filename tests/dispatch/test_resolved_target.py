@@ -1,5 +1,3 @@
-"""What ``resolve_target`` returns: the target and its grant, carrying the call's seeds."""
-
 from __future__ import annotations
 
 import copy

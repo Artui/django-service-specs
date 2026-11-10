@@ -1,15 +1,3 @@
-"""Each finding names the input that produced it, and only that one.
-
-Three findings can answer one map, so every test here is sized to raise
-exactly one kind, asserts the whole tuple that came back, and asserts the
-other kinds are absent: a bare base and a whole family missing both leave the
-base unanswered, and only one of them is the bare-base trap.
-
-No name this module's subject returns is imported, so each test runs against a
-tree that returned sentences and fails at the field it reads rather than at
-import.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -61,8 +49,7 @@ def _shadowed(row: type[BaseException], above: type[BaseException]) -> Fact:
 
 
 def _facts(found: tuple[Any, ...]) -> tuple[Fact, ...]:
-    # Read through the finding's fields, so the comparison is with what a
-    # transport filters by and never with the words.
+    # Read through the finding's fields.
     return tuple((finding.refusal, finding.kind, finding.shadowed_by) for finding in found)
 
 
@@ -88,9 +75,7 @@ class TestAnOrderedMap:
         assert unanswered_refusals(_rows(Exception)) == ()
 
     def test_a_family_with_no_row_is_each_refusal_in_it_unanswered(self) -> None:
-        # Not the bare-base message for ServiceError or ServiceConflict: the
-        # refusals under each are missing too, so the map does not look
-        # complete. Holds the second conjunct of the bare-base guard.
+        # Not the bare-base message for ServiceError or ServiceConflict.
         found = unanswered_refusals(_rows(DispatchError))
         assert _facts(found) == (
             _unanswered(ServiceError),
@@ -103,10 +88,7 @@ class TestAnOrderedMap:
         assert _without(found, BARE, SHADOWED)
 
     def test_a_table_and_the_callable_reading_it_find_the_same(self) -> None:
-        # The table carries a row whose outcome is the unanswered value and no
-        # row below its own base, so the only thing that can tell the two
-        # shapes apart is whether the table reads that outcome. Holds the
-        # ``!= unanswered`` comparison of the table form.
+        # The table reads the unanswered outcome; only that tells the two shapes apart.
         rows: tuple[tuple[type[BaseException], object], ...] = (
             (NotPermitted, None),
             (DispatchError, "invalid"),
@@ -123,10 +105,7 @@ class TestAnOrderedMap:
         assert unanswered_refusals(rows) == unanswered_refusals(answer)
 
     def test_the_first_matching_row_answers_even_when_it_answers_unanswered(self) -> None:
-        # The base's row reads as no answer, and a subclass row below it with
-        # a real outcome is never reached: first match wins, and the refusal
-        # takes the base's outcome. Holds first-match against a reading that
-        # takes any matching row's outcome.
+        # The base's row reads as no answer.
         rows = (
             (DispatchError, "invalid"),
             (ServiceError, "unanswered"),
@@ -165,8 +144,7 @@ class TestTheBareBaseTrap:
         assert _without(found, SHADOWED)
 
     def test_it_holds_at_a_base_below_the_top_of_its_family(self) -> None:
-        # ServiceConflict is a base too: ActionUnavailable is under it. Its
-        # own base is left plain, since ServiceConflict is missing beneath it.
+        # ServiceConflict is a base too: ActionUnavailable is under it.
         rows = _rows(
             DispatchError,
             ServiceNotFound,
@@ -179,8 +157,7 @@ class TestTheBareBaseTrap:
         assert _without(found, SHADOWED)
 
     def test_a_refusal_with_nothing_under_it_is_never_called_a_base(self) -> None:
-        # Holds the first conjunct of the bare-base guard: with nothing under
-        # PrincipalUnavailable, "every refusal under it" is vacuously answered.
+        # Holds the first conjunct of the bare-base guard: with nothing under PrincipalUnavailable.
         found = unanswered_refusals(
             lambda error: None if type(error) is PrincipalUnavailable else "answered"
         )
@@ -216,8 +193,7 @@ class TestThePrecedenceTrap:
         )
 
     def test_a_transport_s_own_row_below_its_base_is_reported(self) -> None:
-        # The check covers the kernel's refusals, but a row that can never be
-        # reached is dead whoever's refusal it names.
+        # The check covers the kernel's refusals.
         found = unanswered_refusals(_rows(DispatchError, _TransportRefusal, ServiceError))
         assert _facts(found) == (_shadowed(_TransportRefusal, DispatchError),)
 
@@ -250,8 +226,7 @@ class TestACallable:
         assert _facts(found) == (_bare(ServiceError),)
 
     def test_a_table_looked_up_by_exact_class_is_passed_as_a_callable(self) -> None:
-        # Its keys read as ordered rows would let ServiceConflict answer for
-        # ActionUnavailable, which ``table.get(type(error))`` never does.
+        # Its keys read as ordered rows would let ServiceConflict answer for ActionUnavailable.
         table = {kind: kind.__name__ for kind in REFUSALS if kind is not ActionUnavailable}
         assert _unanswered(ActionUnavailable) not in _facts(
             unanswered_refusals(tuple(table.items()))
@@ -274,12 +249,7 @@ class TestACallable:
             unanswered_refusals(answer)
 
     def test_each_refusal_carries_what_a_real_map_reads(self) -> None:
-        # An HTTP map reads every refusal's message, InvalidArguments' and
-        # ServiceValidationError's detail, ActionUnavailable's code,
-        # AdditionalInputRequired's schema and PermissionCheckDenied's check
-        # and spec; reading one an instance lacks
-        # raises here. It has no unanswered value, so this proves the
-        # instances, not the map's coverage.
+        # An HTTP map reads every refusal's message.
         def answer(error: DispatchError | ServiceError) -> Any:
             if isinstance(error, (InvalidArguments, ServiceValidationError)):
                 return error.detail
@@ -294,8 +264,7 @@ class TestACallable:
         assert unanswered_refusals(answer) == ()
 
     def test_invalid_arguments_carries_the_tree_the_shape_check_raises(self) -> None:
-        # Compared message by message rather than by tree: a CodedMessage
-        # equals its plain words, so tree equality passes with no code at all.
+        # Compared message by message rather than by tree: a CodedMessage equals its plain words.
         seen: list[InvalidArguments] = []
 
         def answer(error: DispatchError | ServiceError) -> str:
@@ -316,8 +285,7 @@ class TestACallable:
         assert built.detail["title"][0].code == "required"
 
     def test_a_check_s_denial_is_built_as_authorize_raises_it(self) -> None:
-        # Its spec declares its check, and authorize handed that spec denies
-        # with that check: the built denial is one authorize raises.
+        # Its spec declares its check, and authorize handed that spec denies with that check.
         seen: list[PermissionCheckDenied] = []
 
         def answer(error: DispatchError | ServiceError) -> str:

@@ -1,5 +1,3 @@
-"""``apresent``: ``present`` in one executor hop, safe to use from the event loop."""
-
 from __future__ import annotations
 
 import importlib
@@ -71,8 +69,7 @@ async def test_a_list_is_presented_in_one_hop_and_comes_back_evaluated(
 
     rendered = await apresent(spec, DispatchResult("list", Note.objects.all()))
 
-    # Compared here, on the loop, which iterates it: an unevaluated queryset
-    # would run its query now and raise.
+    # Compared here, on the loop, which iterates it.
     assert type(rendered) is list
     assert rendered == ([{"owner": "ada"}] if presenter is not None else [note])
     assert hops == ["present"]
