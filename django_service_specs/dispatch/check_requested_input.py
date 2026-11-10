@@ -64,8 +64,8 @@ def check_requested_input(
         if not isinstance(fragment, dict):
             raise ImproperlyConfigured(
                 f"AdditionalInputRequired asked for {name!r} with {type(fragment).__name__} "
-                'instead of a schema object; each value is a JSON Schema fragment, such as {"type": '
-                '"boolean"}.'
+                "instead of a schema object; each value is a JSON Schema fragment, "
+                'such as {"type": "boolean"}.'
             )
         asked = fragment.get("type")
         if not _renderable(asked, fragment.get("items")):
@@ -77,7 +77,8 @@ def check_requested_input(
         if not _agrees(declared, fragment):
             raise ImproperlyConfigured(
                 f"AdditionalInputRequired asked for {name!r} as {asked!r}, and the parameter is "
-                f"declared {_described(declared)}, so the answering call would fail the shape check."
+                f"declared {_described(declared)}, so the answering call would fail "
+                "the shape check."
             )
 
 

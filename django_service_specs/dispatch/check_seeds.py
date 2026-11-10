@@ -215,7 +215,7 @@ def _provided(
 
 
 def _selector_provider(spec: SelectorSpec, source: str, fills: frozenset[str]) -> list[_Seat]:
-    """A selector's ``kwargs`` seat: called from its pool before the answer joins it (``selector_pool``)."""
+    """A selector's ``kwargs`` seat: called from ``selector_pool`` before the answer joins it."""
     label = f"{_SPEC_LABELS[source]}.kwargs"
     return _provided(label, spec.kwargs, _handed(spec.reads, spec.kwargs), fills)
 
@@ -280,7 +280,7 @@ def _selector_seats(
 def _conditions(
     label: str, affordances: Sequence[Affordance] | None, fills: frozenset[str]
 ) -> list[_Seat]:
-    """A seat for each callable condition among ``affordances``, named by index and code as the spec names one."""
+    """A seat per callable condition in ``affordances``, named by index and code as spec does."""
     return [
         _Seat(
             f"{label}[{index}] ({affordance.code!r}).when",
@@ -364,13 +364,13 @@ def _every_check(seat: _Seat, signature: inspect.Signature, keys: ProviderKeys |
 
 
 def _required(seat: _Seat, keys: ProviderKeys) -> list[str]:
-    """The keywords ``seat``'s callable requires that neither its pool's own names nor its provider fill."""
+    """Keywords ``seat``'s callable requires that neither its pool's names nor its provider fill."""
     filled = seat.fills | keys.filled | keys.declinable
     return [name for name in required_keywords(seat.fn) if name not in filled]
 
 
 def _unfilled(seat: _Seat, required: list[str]) -> list[str]:
-    """Those of ``required`` no read of the seat declares either, sorted: the third refusal's offenders."""
+    """Those of ``required`` no read of the seat declares, sorted: the third refusal's offenders."""
     declared = seat.reads.names()
     return sorted(name for name in required if name not in declared)
 

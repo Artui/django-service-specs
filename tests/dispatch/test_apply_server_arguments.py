@@ -260,7 +260,7 @@ async def test_adispatch_answers_as_dispatch_does(ada: Any) -> None:
 
 
 class TestAKeyDeclaredOnlyToACall:
-    """A Validator declaring a bound key only to a call is checked against what it declares to that call."""
+    """A Validator declaring a bound key only to a call is checked on what it declares there."""
 
     def spec(self) -> ServiceSpec:
         extra = Parameter("project_pk", "integer", required=True)

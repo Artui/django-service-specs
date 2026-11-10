@@ -38,8 +38,8 @@ The refusal when a spec is built always ends with it
 Dispatch's refusal on every call and a transport's server arguments end
 with it only where no seed of the name is registered, since a registered
 seed is then what the parameter meets; so a consumer matching it matches
-each refusal on a mount registering neither name. It sits beside ``SHAPES_RENAME``, the other suffix a
-parameter's refusal adds.
+each refusal on a mount registering neither name. It sits beside ``SHAPES_RENAME``, the other
+suffix a parameter's refusal adds.
 """
 
 # The pool names dispatch seeds per call rather than per process: the validated

@@ -90,7 +90,7 @@ class _AsyncScopeLevel(PermissionCheck):
 
 
 class TestAChildIsRefused:
-    """A child is held to the rule a spec's ``permissions=`` holds a check to, worded for the combinator."""
+    """A child is held to the rule ``permissions=`` holds a check to, worded for the combinator."""
 
     def test_a_class(self) -> None:
         with pytest.raises(

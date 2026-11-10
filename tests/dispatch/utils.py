@@ -138,7 +138,7 @@ class Arguing(PermissionCheck):
 
 
 class Offered(PermissionCheck):
-    """Admits everything; each question names the call's context and a ``tenant`` seed, and records both."""
+    """Admits all; each question names the call's context and a ``tenant`` seed, recording both."""
 
     def __init__(self) -> None:
         self.asked: list[tuple[str, Any, Any]] = []
@@ -189,7 +189,7 @@ class SeedPerQuestion(PermissionCheck):
 
 
 class Deactivated:
-    """An authenticated principal whose ``is_active`` is false: ``is_deactivated`` reads it as one."""
+    """An authenticated principal with ``is_active`` false: ``is_deactivated`` reads it as one."""
 
     is_authenticated = True
     is_active = False
@@ -397,7 +397,7 @@ OWNER_NAME = Parameters.of(Parameter("owner", "string", required=True))
 
 
 def returning_many(rows: Any, presenter: Any) -> tuple[ServiceSpec, Record]:
-    """A ``returns_many`` spec whose service takes one argument and returns ``rows``, with the service."""
+    """A ``returns_many`` spec whose one-argument service returns ``rows``, with the service."""
     service = Record(returns=rows)
     spec = ServiceSpec(
         service=service, permissions=OPEN, reads=OWNER_NAME, presenter=presenter, returns_many=True
@@ -411,7 +411,7 @@ def two_notes() -> list[Note]:
 
 
 class AskedWith(Validator):
-    """Declares ``fields`` and opts into ``call_context``, recording what every ask of ``parameters`` was handed.
+    """Declares ``fields``, opts into ``call_context``, recording what every ``parameters`` ask got.
 
     A required ``title`` unless given ``fields``. Validates nothing: each
     argument comes back as it went in, and the context it came with is kept.

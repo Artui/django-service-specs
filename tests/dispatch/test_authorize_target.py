@@ -299,7 +299,7 @@ class _ReadsTheContext(PermissionCheck):
 
 
 class TestAnyOf:
-    """At the row question a check of ``AnyOf`` counts only where it passes the class-level one too."""
+    """At the row question a check of ``AnyOf`` counts only if it passes the class-level one too."""
 
     def test_any_of_row_question_skips_a_child_refused_at_class_level(self) -> None:
         # ``owner`` refuses this principal at class level and, like most
@@ -374,11 +374,11 @@ class TestAnyOf:
 
 
 class TestCarriedSeeds:
-    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for any other."""
+    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for others."""
 
     @pytest.mark.parametrize("other", ["principal", "spec", "call_context", "registry"])
     def test_a_carrier_for_another_call_is_refused_before_any_check(self, other: str) -> None:
-        """Each of the four ``values_for`` is handed is held: the carrier's own would admit the call."""
+        """Each of the four ``values_for`` handed is held: the carrier's own would admit it."""
         check = SeedPerQuestion()
         spec, context = _spec([check]), {}
         pool_seeds, resolved = recorded_seeds()
@@ -432,7 +432,7 @@ class TestCarriedSeeds:
         assert check.handed == [("has_object_permission", "chosen")]
 
     def test_a_carrier_under_its_registry_resolves_nothing(self) -> None:
-        """``pool_seeds=`` beside a carrier is the registry it is matched against, not a resolver."""
+        """``pool_seeds=`` beside a carrier is the registry matched against, not a resolver."""
         check = SeedPerQuestion()
         spec, context = _spec([check]), {}
         pool_seeds, resolved = recorded_seeds()

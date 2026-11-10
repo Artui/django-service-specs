@@ -1,4 +1,4 @@
-"""Declaring writes: many rows in one call, a service returning rows, and a provider filling a server-owned field."""
+"""Writes: many rows at once, a service returning rows, a provider filling a server-owned field."""
 
 from __future__ import annotations
 

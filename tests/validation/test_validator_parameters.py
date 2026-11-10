@@ -1,4 +1,4 @@
-"""``validator_parameters``: how the kernel asks a Validator what it takes, inside a call or outside one."""
+"""``validator_parameters``: how a Validator is asked what it takes, in a call or outside one."""
 
 from __future__ import annotations
 

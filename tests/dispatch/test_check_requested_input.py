@@ -202,7 +202,7 @@ class TestServerOwned:
 
 
 class TestAKeyDeclaredOnlyToACall:
-    """A Validator declaring an asked key only to a call is read as it declares itself to that call."""
+    """A Validator declaring an asked key only to a call is read as it declares itself there."""
 
     def test_handed_the_call_s_context_the_key_is_answerable(self) -> None:
         spec = declaring_to_a_call(Parameter("confirm", "boolean"))

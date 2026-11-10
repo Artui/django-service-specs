@@ -135,7 +135,7 @@ def _scan() -> SimpleUploadedFile:
 
 @pytest.mark.django_db
 class TestFileFields:
-    """A file field is written as a ``ModelForm`` writes it: ``None`` leaves it, ``False`` clears."""
+    """A file field is written as ``ModelForm`` writes it: ``None`` leaves it, ``False`` clears."""
 
     def test_false_stores_no_file(self, media: str) -> None:
         result = create_from_input(Document, {"title": "T", "attachment": False, "scan": _scan()})

@@ -660,7 +660,7 @@ def test_a_bounded_decimal_filter_is_advertised_with_its_format_and_no_bound() -
         }
 
 
-# --- array length ------------------------------------------------------------------------------------
+# --- array length ---------------------------------------------------------------------------------
 
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)

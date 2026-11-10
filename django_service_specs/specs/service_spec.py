@@ -157,7 +157,7 @@ class ServiceSpec(AffordanceDeclarer):
         return check_reserved(assembled, label="ServiceSpec.validator")
 
     def presenter_for_output(self) -> Presenter | None:
-        """The presenter the dispatch value is rendered with: this spec's or its output selector's."""
+        """The presenter the dispatch value renders with: this spec's or its output selector's."""
         if self.presenter is not None:
             return self.presenter
         out = self.output_selector_spec
