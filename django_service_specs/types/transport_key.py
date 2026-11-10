@@ -1,5 +1,3 @@
-"""``TRANSPORT_KEY`` - the key a call's context names its transport under."""
-
 from __future__ import annotations
 
 from typing import Final

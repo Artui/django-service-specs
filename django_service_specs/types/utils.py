@@ -1,21 +1,3 @@
-"""Helpers shared across ``types/``, with every reader of an affordance, and between a declaration and its schema.
-
-They live here rather than in ``affordances/`` for the reason ``types/`` exists.
-``Affordance`` and ``ServiceSpec`` both need them at construction, and
-``affordances/`` imports ``specs/``, so a home there would make the first spec
-to load pull in the phase that imports it back, half-initialized. The schema
-keywords and ``is_json_native`` are here for the same reason: ``Parameter`` and
-``OutputField`` read them at construction, and ``schema/`` imports both
-declarations, so a home there would be an import ring. ``gettext_noop`` is
-here because every refusal marks its default message with it, and the base of
-the dispatch refusals lives in ``types/``. ``check_callable`` and
-``callable_name`` are here because a spec refuses its callables with them and so
-does ``authorization/``, which holds a combinator's checks to the rule a spec's
-``permissions=`` gets: ``specs/`` imports ``authorization/``, so a home in
-``specs/`` would be an import ring. Nothing here imports anything in the package
-outside ``types/``.
-"""
-
 from __future__ import annotations
 
 import inspect
@@ -29,18 +11,7 @@ from django_service_specs.types.is_async import is_async
 
 
 def gettext_noop(message: str) -> str:
-    """Mark ``message`` as a msgid and return it unchanged.
-
-    Not ``django.utils.translation.gettext_noop``: that one reads ``USE_I18N``
-    each time it is called, and a refusal's ``default_message`` is marked when
-    its class is defined, so with it the package could not be imported before a
-    project's settings are configured. Django's own ``global_settings`` defines
-    an identity of this name for the same reason. ``makemessages`` passes
-    ``--keyword=gettext_noop`` to xgettext, which matches the call by its name
-    and never by where it was imported from, so this one marks a msgid for the
-    catalog just as Django's does. The lookup is ``gettext``, made when a
-    refusal is built (test_marking_a_msgid_reads_no_setting).
-    """
+    """Mark ``message`` as a msgid and return it unchanged."""
     return message
 
 
@@ -119,43 +90,17 @@ BY_NAME_ONLY_POOL_NAMES: Final = frozenset({CALL_CONTEXT, SHAPES})
 
 
 def is_row_condition(when: Any) -> bool:
-    """True when an affordance's ``when`` is an ORM expression - a condition on the row.
-
-    ``resolve_expression`` is the protocol every ORM expression and ``Q``
-    implements and no plain callable does, so it separates the two shapes
-    without importing each expression class. Shared because the declaration,
-    the enforcement and the list projection must all draw the line in the same
-    place: a condition one of them treats as a callable and another as SQL is
-    two definitions of one rule.
-    """
+    """True when an affordance's ``when`` is an ORM expression - a condition on the row."""
     return hasattr(when, "resolve_expression")
 
 
 def affordance_alias(name: str, code: str) -> str:
-    """The annotation a row carries one affordance's answer under.
-
-    ``name`` is the key a ``SelectorSpec.affordances`` entry is declared under and
-    ``code`` the affordance's own. Prefixed and double-underscored on purpose: a
-    Django field name may not contain ``__``, so the alias can never shadow a
-    model field, and the prefix keeps it clear of a model *method* of the same
-    name, which ``annotate`` would silently overwrite on every instance.
-    """
+    """The annotation a row carries one affordance's answer under."""
     return f"affordance__{name}__{code}"
 
 
 def is_json_native(value: Any) -> bool:
-    """Whether ``value`` survives the JSON encoding every transport performs on a schema.
-
-    A schema carries a value in three places, a ``default``, a choice and a
-    ``json_schema_extra``, and each reaches the wire as it is. A ``Decimal``, a
-    date, a lazy translation or a model row there does not describe the input
-    less well - it breaks the encoding, so the transport fails to list the
-    operation at all. The emitters leave such a default or choice out rather
-    than restate it in a form the declaration did not choose, and a
-    declaration refuses such an extra where it is written.
-
-    ``bool`` needs no case of its own: it is an ``int``, and both are native.
-    """
+    """Whether ``value`` survives the JSON encoding every transport performs on a schema."""
     if value is None or isinstance(value, (str, int, float)):
         return True
     if isinstance(value, (list, tuple)):
@@ -216,28 +161,9 @@ OUTPUT_FIELD_SCHEMA_KEYWORDS: Final[Mapping[str, tuple[str, ...]]] = MappingProx
 
 
 def check_callable(value: Any, *, label: str, sync: bool = False) -> None:
-    """Refuse a value that is not callable, and under ``sync`` one that is ``async def``.
-
-    ``sync`` is for every seat dispatch calls from sync code and never awaits:
-    the providers, the preconditions, a selector spec's ``extend_queryset`` and
-    ``filter_set``, each method of a permission check, a Validator's
-    ``validate`` and ``validated``, and a Presenter's ``present``. Called there, an
-    ``async def`` callable returns a coroutine nobody awaits, so a precondition
-    that would have refused the call raises nothing and the call goes ahead, a
-    permission check's answer is truthy and allows it, and a provider or a
-    shaping callable hands dispatch a coroutine where its mapping, its sink or
-    its queryset should be. An async generator function is refused with them:
-    what it returns is never awaitable, never runs, and is truthy too. Refused
-    when the spec is built, naming the seat and the callable, rather than
-    found at the first call or never. The run itself - the service, or a
-    selector spec's own selector - may be ``async def``, since dispatch
-    bridges it and ``adispatch`` awaits it, so it is checked without ``sync``.
-    """
+    """Refuse a value that is not callable, and under ``sync`` one that is ``async def``."""
     if not callable(value):
         raise ImproperlyConfigured(f"{label} must be callable; got {type(value).__name__}.")
-    # One arc to coverage: test_the_run_may_still_be_async holds ``sync``,
-    # test_a_sync_provider_and_precondition_are_accepted the second, and
-    # test_an_async_generator_precondition_is_refused the third.
     if sync and (is_async(value) or inspect.isasyncgenfunction(value)):
         raise ImproperlyConfigured(
             f"{label} is {callable_name(value)}, an async callable. It is called from sync code "

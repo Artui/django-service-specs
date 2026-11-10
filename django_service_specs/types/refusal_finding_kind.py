@@ -1,21 +1,10 @@
-"""``RefusalFindingKind`` - which of three ways a refusal map falls short."""
-
 from __future__ import annotations
 
 from enum import Enum
 
 
 class RefusalFindingKind(str, Enum):
-    """What a [`RefusalFinding`][django_service_specs.types.refusal_finding.RefusalFinding] found.
-
-    The thing a transport filters by when it allows a gap on purpose, beside
-    the refusal's class, rather than by a finding's words, which stay free to
-    change.
-
-    Inheriting from ``str`` keeps the value JSON-serializable and lets a caller
-    compare against the plain string, matching
-    [`SelectorKind`][django_service_specs.types.selector_kind.SelectorKind].
-    """
+    """What a ``RefusalFinding`` found."""
 
     UNANSWERED = "unanswered"
     """Nothing in the map answers the refusal: no row, or no call."""
