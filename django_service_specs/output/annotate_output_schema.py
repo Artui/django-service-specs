@@ -1,5 +1,3 @@
-"""``annotate_output_schema`` - mirror an audience projection onto a JSON Schema."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -51,62 +49,7 @@ def annotate_output_schema(
     *,
     handle_description: str | None = None,
 ) -> dict[str, Any] | None:
-    """Apply to a schema the projection [`project_payload`][django_service_specs.output.project_payload.project_payload] applies to the payload.
-
-    Four changes, each the mirror of one the payload undergoes:
-
-    - hidden properties are removed, and dropped from ``required``, which is
-      left out when nothing in it remains;
-    - a marking's ``description`` becomes the property's ``"description"``, so
-      a handle says what it is for in the schema a model reads without that
-      wording reaching any other reader;
-    - a field with labelled choices is restated in its **displays**, because
-      that is what the projected payload carries: an ``enum``'s values are
-      replaced, and a ``oneOf``'s ``const``s are, each losing the ``title``
-      that annotated the value it now equals. A ``"type"`` stated beside them
-      is restated as the types of the values now listed, so a display string
-      is never described as the integer it replaced, with ``"null"`` named
-      last where the stated type admitted it and a null is still served -
-      not where the choices give ``None`` a display, which is served in its
-      place - and left as written beside a ``oneOf`` entry that admits more
-      than its constants. A display two
-      values share is listed once, so a row served it matches one ``oneOf``
-      entry rather than two, and an array of such choices no longer claims
-      ``uniqueItems``. Not on a ``HANDLE``, which keeps its values on both
-      sides: a field another tool takes as input should be marked one.
-    - a formatted field is restated as the type its
-      [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
-      says it produces, plus whatever that declaration adds about the shape of
-      the produced value, in place of everything the property said about the
-      value before, choices included. Its ``title`` and ``description`` are
-      kept, and so is a ``null`` the property admitted - however it stated one,
-      as a type, an ``anyOf`` member, ``None`` in an ``enum`` or a ``oneOf``
-      entry for a labelled choice - since a null is never formatted. The type is written from ``produces`` rather than
-      taken from the fragment, so a renderer cannot contradict its own
-      advertisement, and a fragment's ``enum`` lists the null too, and its
-      ``const`` becomes an ``enum`` of that value and a null, where the
-      property admitted one. Not on a ``HANDLE`` either.
-
-    Generating both sides from one declaration is the point: a schema that
-    advertises a field the payload no longer carries is worse than either
-    behaviour on its own.
-
-    ``handle_description`` is the wording for a ``HANDLE`` whose marking
-    declares none, and defaults to **nothing**. Telling a reader what to do
-    with an identifier is advice for one kind of reader, and the kernel does
-    not know which kind is reading. The transport that knows its audience
-    supplies the sentence.
-
-    Takes the **item** schema; an array's ``items`` are annotated and the
-    array kept. A caller wrapping items in an envelope of its own annotates the
-    item and wraps it afterwards, as
-    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
-    does. ``None``, or a projection with nothing in it, returns ``schema``
-    itself; anything else returns a new schema and never modifies ``schema``.
-    """
-    # One branch to coverage, so each condition is held by its own test:
-    # test_no_schema_is_still_no_schema (the first) and
-    # test_an_empty_projection_returns_the_schema_itself (the second).
+    """Apply to a schema the ``project_payload`` projection applies to the payload."""
     if schema is None or projection.is_empty():
         return schema
     return _annotate(schema, projection, handle_description)
@@ -127,11 +70,6 @@ def _annotate(
         audience = projection.audience(name)
         if audience is FieldAudience.HIDDEN:
             continue
-        # The mirror of the chain in ``project_payload``, in the same order and
-        # for the same reason: a declared formatter is the transform its author
-        # asked for, so it wins over the substitution derived from a field's
-        # choices. Reorder one of these two and the schema starts describing a
-        # payload nobody renders.
         formatter = projection.formatter(name)
         child = projection.nested.get(name)
         if formatter is not None:
@@ -140,9 +78,6 @@ def _annotate(
             resolved = (
                 _annotate(subschema, child, handle_description) if child is not None else subschema
             )
-            # One branch to coverage, so each condition is held by its own test:
-            # test_a_handle_keeps_its_constants (the first) and
-            # test_a_field_with_no_labels_is_left_alone (the second).
             if audience is not FieldAudience.HANDLE and name in projection.choice_labels:
                 resolved = _spoken_schema(resolved, projection.choice_labels[name])
         description = _description(projection, name, audience, handle_description)
@@ -157,59 +92,11 @@ def _annotate(
 
 
 def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict[str, Any]:
-    """Restate a property as what its formatter produces.
-
-    Every assertion the property made - ``type``, ``format``, ``enum``,
-    ``oneOf``, an array's ``items`` - described the value the presenter
-    returned, and that value is no longer what the payload carries. A
-    date-time states ``format: date-time``, which a formatted local date-time
-    is not; keeping it would be a schema that fails its own claim while
-    looking correct. So the choices' displays are never spoken here either,
-    and their ``"type"`` is not restated from them: there are no choices left
-    to restate it from.
-
-    ``_CARRIED`` is what survives, because it annotates the *field* rather
-    than asserting anything about its value: its ``title`` and its
-    ``description``. The formatter's own fragment merges over both, so a
-    formatter that wants to say something else about the field still can.
-
-    A property that admits ``"null"`` still admits it, after the type the
-    formatter produces: ``apply`` passes a null through unformatted, so a
-    nullable field still serves one, and a schema refusing it would be false.
-    ``_admits_null`` reads every spelling a schema states one in - a type, an
-    ``anyOf`` member, ``None`` in an ``enum`` and, for a labelled nullable
-    choice, a ``oneOf`` entry - so the formatter's type is always written as
-    ``[produces, "null"]`` and nothing of the spelling is carried over: the
-    ``anyOf`` and ``enum`` it came in are discarded with everything else the
-    property said. A formatter's own ``enum`` gains the ``None`` as well, so
-    the type and the values it lists never disagree about the null, and a
-    ``const`` is restated as the ``enum`` of that value and a null.
-    """
+    """Restate a property as what its formatter produces."""
     carried = {key: schema[key] for key in _CARRIED if key in schema}
     formatted = {**carried, **formatter.json_schema()}
-    # One boolean, read by ``_admits_null``, which names the test that holds
-    # each spelling it reads.
     if _admits_null(schema):
         formatted["type"] = [formatted["type"], "null"]
-        # The formatter's own fragment merges over the type, and one listing
-        # an ``enum`` would refuse the null the type now admits, so the null
-        # is listed there too, in a new list: the declaration is shared and
-        # frozen. Two conditions in one branch, each held by its own test,
-        # the cases named being those of
-        # test_a_formatters_own_values_admit_the_null_its_field_does unless
-        # another test is named: the first by
-        # test_a_null_the_property_admits_stays_admitted[type-list] (without
-        # it a fragment with no enum gains a key) and the second by
-        # ``enum-already-listing-none`` (without it None is listed twice). The
-        # list itself is held by ``enum``, and the outer guard by
-        # ``enum-on-a-field-admitting-no-null``.
-        #
-        # A ``const`` refuses it the same way, and is restated as the ``enum``
-        # of that value, which then gains the null as above. Where both are
-        # declared both must hold, so the constant alone is what is left of
-        # the ``enum``. A ``const`` of ``None`` already is the null, and is
-        # left as declared: ``const-none``. No const at all is
-        # test_a_null_the_property_admits_stays_admitted[type-list].
         if formatted.get("const") is not None:
             formatted["enum"] = [formatted.pop("const")]
         if "enum" in formatted and None not in formatted["enum"]:
@@ -218,34 +105,7 @@ def _formatted_schema(schema: dict[str, Any], formatter: ValueFormatter) -> dict
 
 
 def _admits_null(schema: dict[str, Any]) -> bool:
-    """Whether ``schema`` states that it admits a ``null``, in any spelling.
-
-    - a type naming it: ``["string", "null"]``, or ``"null"`` alone;
-    - ``None`` among an ``enum``'s values, or as a ``const``. It is read
-      whatever ``type`` is stated beside it, because it lists a value the
-      server serves. ``_retyped`` weighs a listed ``None`` against the stated
-      type instead, because there the displays replace the values and the
-      type is what says whether a null was ever admitted;
-    - a member of ``anyOf`` or an entry of ``oneOf`` that admits one by any of
-      these rules: ``{"type": "null"}``, which is how a dataclass field typed
-      ``X | None`` is described, ``{"const": None}``, which is how a labelled
-      nullable choice is, a member that is itself nullable, or one that admits
-      anything (``true`` or ``{}``).
-
-    - a schema stating nothing about its value: ``{}``, or one whose every
-      keyword is an annotation in ``_ANNOTATIONS``, such as a lone ``title``.
-      An ``any`` field is described so, and it admits every value, the null
-      with it. A ``$ref``, a composition or a shape is not nothing.
-
-    One boolean, so one branch to coverage; each spelling has a test that
-    fails without it:
-    test_a_schema_stating_nothing_about_its_value_still_admits_null (nothing
-    stated), and the cases of test_a_null_the_property_admits_stays_admitted:
-    ``type-list``, ``null-alone``, ``enum``, ``const``, ``any-of-member``,
-    ``one-of-const`` and ``one-of-type`` (both entries), and
-    ``inside-an-any-of-member-type`` (the recursion). The negative of each is
-    a case of test_a_property_admitting_no_null_admits_none_after_formatting.
-    """
+    """Whether ``schema`` states that it admits a ``null``, in any spelling."""
     stated = schema.get("type")
     return (
         schema.keys() <= _ANNOTATIONS
@@ -266,54 +126,19 @@ def _states_null(stated: Any) -> bool:
 
 
 def _member_admits_null(member: Any) -> bool:
-    """Whether one entry of an ``anyOf`` or ``oneOf`` admits a ``null``.
-
-    A schema may be a boolean, and ``true`` or ``{}`` admits anything, the
-    null included, where ``false`` admits nothing; ``{}`` needs no case of its
-    own, as ``_admits_null`` reads it as a schema stating nothing. Anything
-    else that is not an object is no schema to read. Each of the three is a case of
-    test_a_null_the_property_admits_stays_admitted (``any-of-true``,
-    ``any-of-empty``) or of
-    test_a_property_admitting_no_null_admits_none_after_formatting
-    (``any-of-false``).
-    """
+    """Whether one entry of an ``anyOf`` or ``oneOf`` admits a ``null``."""
     if isinstance(member, dict):
         return _admits_null(member)
     return member is True
 
 
 def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[str, Any]:
-    """Restate a choice schema in the displays the payload now carries.
-
-    Both spellings an output schema uses are handled: a bare ``enum`` where the
-    displays added nothing to some values, and ``oneOf`` of ``const`` and
-    ``title`` where they did. A union arrives as ``anyOf`` from a schema
-    written elsewhere, and each member is rewritten, the null one passing
-    through untouched.
-
-    Django allows two values one display, and a display is listed once, where
-    first seen: ``oneOf`` admits a value valid under exactly one entry, so a
-    display listed twice would refuse every row served it. A ``oneOf`` entry
-    with no ``const`` is kept wherever it stands. The type stated beside the
-    values is restated by ``_retyped``.
-
-    An array of choices arrives as an array wrapping its element's schema, so
-    the rewrite descends one level. Its ``uniqueItems`` held for the stored
-    values and not for their displays: where the element's values collapse
-    onto fewer displays, two values selected together are served as one
-    display twice, and the payload keeps both because both are selected, so
-    the array stops claiming its items are unique. A schema written elsewhere
-    states it, such as a serializer's multiple choice.
-    """
+    """Restate a choice schema in the displays the payload now carries."""
     items = schema.get("items")
     if isinstance(items, dict):
         spoken_items = _spoken_schema(items, labels)
         spoken = {**schema, "items": spoken_items}
         if _listed_count(spoken_items) < _listed_count(items):
-            # Held by test_an_array_of_shared_displays_stops_claiming_unique_items
-            # (the drop) and test_an_array_of_distinct_displays_keeps_unique_items
-            # (the condition), end to end by
-            # test_two_selected_values_sharing_a_display_meet_their_schema.
             spoken.pop("uniqueItems", None)
         return spoken
     if "anyOf" in schema:
@@ -337,82 +162,28 @@ def _spoken_schema(schema: dict[str, Any], labels: Mapping[Any, str]) -> dict[st
                 consts.append(display)
                 one_of.append({"const": display})
         spoken = {**schema, "oneOf": one_of}
-        # An entry with no ``const`` admits values the displays say nothing
-        # about, so a type narrowed to the displays' would refuse them; one
-        # whose type is ``"null"`` admits only a null, which is passed on as a
-        # value it serves.
-        # One branch to coverage, so each condition is held by its own test:
-        # test_an_integer_spoken_whole_is_a_string (the first: without it every
-        # entry keeps the type) and
-        # test_null_is_kept_where_the_stated_type_admitted_it (the second). The
-        # guard itself is held by
-        # test_an_entry_admitting_more_than_its_constants_keeps_the_type.
         if any("const" not in entry and entry.get("type") != "null" for entry in one_of):
             return spoken
-        # A null that entry admits is served as itself, never as a display, so
-        # it is one of the values the type is restated from, as a listed
-        # ``None`` with no label is:
-        # test_null_is_kept_where_the_stated_type_admitted_it.
         admits_null = any(entry.get("type") == "null" for entry in one_of)
         return _retyped(spoken, [*consts, None] if admits_null else consts)
     return schema
 
 
 def _listed_count(schema: dict[str, Any]) -> int:
-    """How many values a choice schema lists, across a union's members.
-
-    Read across ``anyOf`` because a nullable element written elsewhere states
-    its values in a member: test_an_array_of_a_nullable_union_counts_across_its_members.
-    """
+    """How many values a choice schema lists, across a union's members."""
     members: list[Any] = schema.get("anyOf", [schema])
     return sum(len(member.get("enum", ())) + len(member.get("oneOf", ())) for member in members)
 
 
 def _is_listed(value: Any, listed: list[Any]) -> bool:
-    """Whether ``value`` is already in ``listed``, as JSON Schema compares values.
-
-    ``True == 1`` in Python and not in JSON Schema, where a boolean is never a
-    number, so dropping one as a repeat of the other would refuse every row
-    served it.
-    """
-    # One branch to coverage, so each condition is held by its own test:
-    # test_a_choice_schema_is_restated_in_its_displays[enum] (the first: two
-    # displays that differ) and
-    # test_a_boolean_is_not_the_number_python_says_it_equals (the second).
+    """Whether ``value`` is already in ``listed``, as JSON Schema compares values."""
     return any(
         value == seen and isinstance(value, bool) is isinstance(seen, bool) for seen in listed
     )
 
 
 def _retyped(schema: dict[str, Any], values: list[Any]) -> dict[str, Any]:
-    """``schema`` with any stated ``"type"`` restated as the types of ``values``.
-
-    An output schema states a choice's type beside its values, and a display
-    is a string whatever the value it replaced was, so an integer choice
-    spoken as ``"Low"`` would otherwise be described as an integer and the
-    projected payload would fail the projected schema.
-
-    ``"null"`` is named, last, where the stated type admitted it - as a list
-    naming it or as ``"null"`` alone - **and** a null is among ``values``: the
-    restated type admits what the stated one did, in display terms, and
-    nothing more. Both, because each answers a different half. The type says
-    whether a null was ever admitted, so a ``None`` listed beside a type that
-    refused it is not newly admitted. The values say whether one is still
-    served: Django's ``(None, "Unknown")`` serves ``"Unknown"`` in its place,
-    and naming ``"null"`` there would describe a value the payload never
-    carries. A ``oneOf`` entry whose type is ``"null"`` is passed in as a
-    ``None``, because the null it admits is served as itself. A ``oneOf``
-    entry admitting anything else is never passed here, because narrowing the
-    type would refuse what that entry admits.
-
-    A schema that states no type claims nothing to contradict, one listing no
-    value has nothing to restate it from, and a value JSON has no scalar name
-    for - or nothing but a null the type refused - leaves the type as written
-    rather than guessed at.
-    """
-    # One branch to coverage, so each condition is held by its own test:
-    # test_an_untyped_choice_states_no_type (the first) and
-    # test_a_choice_listing_nothing_keeps_its_type (the second).
+    """``schema`` with any stated ``"type"`` restated as the types of ``values``."""
     if "type" not in schema or not values:
         return schema
     names: list[str] = []
@@ -427,15 +198,8 @@ def _retyped(schema: dict[str, Any], values: list[Any]) -> dict[str, Any]:
         if name not in names:
             names.append(name)
     stated = schema["type"]
-    # One branch to coverage, so each condition is held by its own test:
-    # test_a_null_spoken_as_a_label_is_not_named (the first: the type admitted
-    # a null and none is served) and test_a_type_that_refused_null_still_refuses_it
-    # (the second: a null is listed and the type refused it). Both spellings of
-    # a stated null: test_a_nullable_integer_keeps_its_null (a list naming it)
-    # and test_a_type_stated_as_null_alone_still_admits_it (``"null"`` alone).
     if None in values and _states_null(stated):
         names.append("null")
-    # test_only_a_null_left_to_type_leaves_the_type_as_stated.
     if not names:
         return schema
     return {**schema, "type": names[0] if len(names) == 1 else names}
@@ -447,10 +211,8 @@ def _description(
     audience: FieldAudience,
     handle_description: str | None,
 ) -> str | None:
+    # Handle wording applies to handles only, never to an unmarked field.
     marking = projection.fields.get(name)
-    # One branch to coverage, so each condition is held by its own test:
-    # test_the_handle_wording_is_for_handles_only (the first: an unmarked field)
-    # and test_an_unlabelled_handle_takes_the_wording_supplied (the second).
     if marking is not None and marking.description:
         return marking.description
     return handle_description if audience is FieldAudience.HANDLE else None

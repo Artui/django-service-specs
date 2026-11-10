@@ -1,5 +1,3 @@
-"""What an operation returns, as a declaration, how a value is rendered, and for whom."""
-
 from django_service_specs.output.annotate_output_schema import annotate_output_schema
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking

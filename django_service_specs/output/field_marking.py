@@ -1,5 +1,3 @@
-"""``FieldMarking`` - how one output field is presented to an agent audience."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,30 +8,7 @@ from django_service_specs.types.value_formatter import ValueFormatter
 
 @dataclass(frozen=True, slots=True)
 class FieldMarking:
-    """How one output field is presented to an agent audience.
-
-    Carried on the [`OutputField`][django_service_specs.output.output.OutputField]
-    it marks, so it belongs to the declaration of what an operation returns
-    rather than to whichever library rendered it. That is what lets a
-    transport's projection for an audience work over a dataclass, a pydantic
-    model and a DRF serializer alike: each adapter reads its own library's
-    declaration into ``Output``, marking included, and the projection reads
-    only ``Output``.
-
-    Applied only for a caller that names an audience:
-    [`audience_projection_for_spec`][django_service_specs.dispatch.audience_projection_for_spec.audience_projection_for_spec]
-    reads the markings into an
-    [`AudienceProjection`][django_service_specs.output.audience_projection.AudienceProjection],
-    which [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
-    applies to the presented value and
-    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
-    to the schema. A caller that names none, which is every HTTP response, is
-    presented every field whatever its marking.
-
-    The marking lives on the **field**, not in a list beside the output. That is
-    what lets it travel into a nested output with no hoisting rule, and what
-    stops a rename from silently desyncing it from a name the parent maintains.
-    """
+    """How one output field is presented to an agent audience."""
 
     audience: FieldAudience = FieldAudience.CONTENT
     description: str | None = None
@@ -85,27 +60,10 @@ class FieldMarking:
 
     @classmethod
     def formatted(cls, formatter: ValueFormatter, description: str | None = None) -> FieldMarking:
-        """Ordinary content, rendered through ``formatter``.
-
-        The generic constructor: any transform that declares what it produces.
-        [`timestamp`][django_service_specs.output.field_marking.FieldMarking.timestamp]
-        is one of these with the formatter filled in, and a field that is both
-        formatted and something else - a formatted label, say - is written as
-        ``FieldMarking(FieldAudience.LABEL, formatter=...)``.
-        """
+        """Ordinary content, rendered through ``formatter``."""
         return cls(FieldAudience.CONTENT, description, formatter)
 
     @classmethod
     def timestamp(cls, fmt: str | None = None, description: str | None = None) -> FieldMarking:
-        """A date-time read as a formatted local string rather than raw ISO-8601.
-
-        ```python
-        due_at: Annotated[datetime, FieldMarking.timestamp()]
-        ```
-
-        The zone is Django's active one and cannot be passed here; ``fmt`` is a
-        ``strftime`` string and defaults to a day-first, 24-hour rendering.
-        [`ValueFormatter.timestamp`][django_service_specs.types.value_formatter.ValueFormatter.timestamp]
-        holds the transform and the reasoning behind both of those.
-        """
+        """A date-time read as a formatted local string rather than raw ISO-8601."""
         return cls(FieldAudience.CONTENT, description, ValueFormatter.timestamp(fmt))
