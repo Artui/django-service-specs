@@ -1,8 +1,3 @@
-"""Internal helpers shared by the mutation functions.
-
-Nothing in this module is exported from the package's public API.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -27,15 +22,7 @@ from django_service_specs.types.utils import CALL_CONTEXT
 
 
 def coerce_to_dict(data: Any) -> dict[str, Any]:
-    """Normalize input ``data`` to a dict mapping field name to value.
-
-    A dataclass gives its ``__init__`` fields only. A field declared
-    ``init=False`` is the dataclass's to compute, never the caller's to send,
-    so it is no input and writing it would put a value nobody sent in a
-    column. Every row is read here, the top-level one, each row of a
-    collection and each nested one alike, so the rule holds at every depth:
-    test_a_field_declared_init_false_is_left_out fails without the filter.
-    """
+    """Normalize input ``data`` to a dict mapping field name to value."""
     if data is None:
         return {}
     if isinstance(data, dict):
@@ -56,10 +43,7 @@ def filter_input(
     field_map: dict[str, str] | None,
     exclude_fields: list[str] | None,
 ) -> dict[str, Any]:
-    """Apply ``field_map`` and ``exclude_fields``, dropping ``UNSET`` values.
-
-    ``exclude_fields`` matches input field names, before mapping.
-    """
+    """Apply ``field_map`` and ``exclude_fields``, dropping ``UNSET`` values."""
     excluded: set[str] = set(exclude_fields or ())
     result: dict[str, Any] = {}
     mapping: dict[str, str] = field_map or {}
@@ -84,24 +68,7 @@ def diff_attrs(
     instance: Model,
     new_values: dict[str, Any],
 ) -> tuple[FieldChange, ...]:
-    """Return the subset of ``new_values`` whose value differs from current.
-
-    A file field's value has been through ``form_values`` by now, so it is a
-    file or ``""``. A file that is not one a row holds - an upload, a
-    ``ContentFile`` - is content to write, and so always a change, as a
-    ``ModelForm`` always writes one: compared by name, a re-upload of the
-    file a row holds under its own name, at the storage root, would be taken
-    for no change and never written. A file a row holds, ``""`` and a stored
-    name compare by name, so the held file handed back as itself is no
-    change. One branch to coverage, so each condition is held by its own
-    test: test_no_changes_returns_empty_result (a ``File``: without it every
-    value that is not a held file is a change) and
-    test_the_held_file_handed_back_is_no_change (not a ``FieldFile``: a
-    ModelForm's file field cleans to the held file when nothing is uploaded,
-    which test_anything_else_keeps_it reaches through dispatch).
-    test_an_upload_named_as_the_held_file_replaces_it_as_a_model_form_does
-    fails without the whole first operand.
-    """
+    """Return the subset of ``new_values`` whose value differs from current."""
     changes: list[FieldChange] = []
     for attr, new_value in new_values.items():
         old_value: Any = safe_getattr(instance, attr)
@@ -120,21 +87,7 @@ def file_fields(model: type[Model]) -> dict[str, FileField]:
 
 
 def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
-    """``values`` with each file field's read as a ``ModelForm`` writes it.
-
-    A form cleans an optional file field to ``None`` for "keep the file the
-    row holds" and to ``False`` for "clear it", and the model field's
-    ``save_form_data`` writes them so: nothing for ``None``, and ``""``, no
-    file, for any other false value. Read as they came, ``None`` against a
-    held file would differ by name and be written over it, and ``False``
-    would reach the column, where ``pre_save`` raises on it. ``save_form_data``
-    returns nothing to diff or report, so its reading is restated here,
-    ahead of the diff, and ``write_values`` still writes through it. Any
-    other field's value passes as it came. Each step is held by its own
-    test: test_none_and_false_on_any_other_field_are_written_as_they_came
-    (the file field), test_none_keeps_the_file (``None``) and
-    test_false_clears_the_file_and_reports_the_name_it_held (``""``).
-    """
+    """``values`` with each file field's read as a ``ModelForm`` writes it."""
     files = file_fields(model)
     read: dict[str, Any] = {}
     for attr, value in values.items():
@@ -147,11 +100,7 @@ def form_values(model: type[Model], values: dict[str, Any]) -> dict[str, Any]:
 
 
 def assign_changed_values(instance: Model, values: dict[str, Any]) -> tuple[FieldChange, ...]:
-    """Set on ``instance`` each of ``values`` that differs from what it holds, and return those.
-
-    ``values`` is read as a ``ModelForm`` writes it, through ``form_values``,
-    before the diff. Nothing is saved.
-    """
+    """Set on ``instance`` each of ``values`` that differs from what it holds, and return those."""
     changes = diff_attrs(instance, form_values(type(instance), values))
     write_values(instance, {change.field: change.new for change in changes})
     return changes
@@ -167,12 +116,7 @@ def split_file_values(
 
 
 def write_values(instance: Model, values: dict[str, Any]) -> None:
-    """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``.
-
-    As a ``ModelForm`` writes a file, so a field overriding how it stores
-    one is honoured; ``form_values`` has already read its value. Held by
-    test_a_file_is_set_through_its_field_s_save_form_data.
-    """
+    """Set each of ``values`` on ``instance``, a file field's through ``save_form_data``."""
     files = file_fields(type(instance))
     for attr, value in values.items():
         field = files.get(attr)
@@ -271,8 +215,7 @@ async def aapply_m2m(instance: Model, to_apply: dict[str, Any]) -> None:
 
 
 def changes_for_create(new_values: dict[str, Any]) -> tuple[FieldChange, ...]:
-    """Build [`FieldChange`][django_service_specs.mutations.field_change.FieldChange]
-    entries for every assigned create field."""
+    """Build ``FieldChange`` entries for every assigned create field."""
     return tuple(
         FieldChange(field=attr, old=UNSET, new=value) for attr, value in new_values.items()
     )
@@ -286,26 +229,12 @@ def auto_now_field_names(instance: Model) -> tuple[str, ...]:
 
 
 def dimension_field_names(instance: Model, changed: tuple[str, ...]) -> tuple[str, ...]:
-    """The ``width_field`` and ``height_field`` of each image field in ``changed``.
-
-    Setting an ``ImageField`` writes its dimension columns on the instance
-    too, ``None`` for no file, so a save narrowed to the changed columns has
-    to carry them, or the row keeps the old image's dimensions while the
-    instance holds the new one's. A ``ModelForm`` saves the whole row, and
-    so stores them. Each condition is held by its own test:
-    test_an_image_left_alone_saves_none_of_its_dimensions (only an image in
-    ``changed``) and test_an_image_with_no_dimension_columns_saves_only_itself
-    (only a dimension field the image declares); a file field that is not an
-    image has no dimension fields, and test_false_clears_the_file_and_reports_the_name_it_held
-    raises without the ``ImageField`` check.
-    """
+    """The ``width_field`` and ``height_field`` of each image field in ``changed``."""
     files = file_fields(type(instance))
     names: list[str] = []
     for attr in changed:
         field = files.get(attr)
         if isinstance(field, ImageField):
-            # The type stubs leave out the two attributes ``ImageField`` sets
-            # in its ``__init__``.
             image: Any = field
             names.extend(name for name in (image.width_field, image.height_field) if name)
     return tuple(names)
@@ -316,13 +245,7 @@ def resolve_update_fields(
     changed: tuple[str, ...],
     derived_fields: tuple[str, ...] = (),
 ) -> list[str] | None:
-    """Map the public ``update_fields`` argument to a ``save()``-compatible list.
-
-    ``True`` narrows the save to the changed columns, so the columns Django
-    derives from them have to be added back by hand: the ``auto_now`` ones,
-    which Django only refreshes when they are in ``update_fields``, and an
-    image's dimension columns, which setting the image wrote on the instance.
-    """
+    """Map the public ``update_fields`` argument to a ``save()``-compatible list."""
     if update_fields is True:
         fields = list(changed)
         if fields:
@@ -348,14 +271,7 @@ POST_SAVE_PHASES: tuple[RelationPhase, ...] = (
 
 
 def relation_map(relations: Mapping[str, RelationSpec] | None) -> dict[str, RelationSpec]:
-    """A ``relations=`` map as a plain ``dict``, refusing any value that is not a spec.
-
-    The driver orders the map by ``write_phase``, which only a ``RelationSpec``
-    carries, so a mapping or a model class declared in its place would otherwise
-    fail as an ``AttributeError`` naming no relation. Every map the helpers read
-    passes through here — the caller's own and each spec's nested ``relations`` —
-    so the delete cascade refuses exactly what the write path refuses.
-    """
+    """A ``relations=`` map as a plain ``dict``, refusing any value that is not a spec."""
     specs: dict[str, RelationSpec] = dict(relations or {})
     for name, spec in specs.items():
         if not isinstance(spec, RelationSpec):
@@ -386,12 +302,7 @@ def extract_relation_data(
     raw: dict[str, Any],
     relations: Mapping[str, RelationSpec],
 ) -> dict[str, Any]:
-    """Pop each relation key out of ``raw`` and return ``{relation: value}``.
-
-    Popping keeps nested payloads out of the scalar field set the parent's
-    write would otherwise assign. An omitted relation maps to ``UNSET`` and is
-    left untouched; an explicit ``[]`` or ``None`` maps to itself.
-    """
+    """Pop each relation key out of ``raw`` and return ``{relation: value}``."""
     return {name: raw.pop(name, UNSET) for name in relations}
 
 
@@ -458,13 +369,7 @@ CALLER_RAISED = "_django_service_specs_caller_raised"
 
 
 def mark_caller_raised(exc: BaseException) -> None:
-    """Record that ``exc`` came out of caller code rather than out of Django.
-
-    A row service two levels down raises into the ``try`` of every helper-path
-    row above it, and each of those translates Django's write failures. Without
-    the mark, the outer row would read the inner service's ``TypeError`` as its
-    own data failing to write.
-    """
+    """Record that ``exc`` came out of caller code rather than out of Django."""
     setattr(exc, CALLER_RAISED, True)
 
 
@@ -472,17 +377,7 @@ def resolve_m2m(
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None,
     data: Any,
 ) -> dict[str, Any] | None:
-    """A row's ``m2m=`` as a plain ``dict``, or ``None`` when none is declared.
-
-    A spec states it as a static mapping (``{"tags": [tag1, tag2]}``) or as a
-    callable deriving one from the row, and so does a model write helper
-    (``create_model`` and its siblings) for the row it writes. The callable is caller code, so an
-    error it raises is marked on its way out: it runs inside the parent row's
-    write, whose translation would otherwise read it as that row's own data
-    failing. ``cast`` records which branch is which, because a class can in
-    principle be both callable and a mapping and ``isinstance`` alone does not
-    narrow the union.
-    """
+    """A row's ``m2m=`` as a plain ``dict``, or ``None`` when none is declared."""
     if m2m is None:
         return None
     if isinstance(m2m, Mapping):
@@ -496,34 +391,7 @@ def resolve_m2m(
 
 
 def sync_relation_cache(parent: Model, relation: str, row: Any) -> None:
-    """Make ``parent``'s cached related object agree with what the write left.
-
-    The two singular kinds are matched by **re-querying** — a forward target
-    inside ``scope=``, a reverse one-to-one found through its foreign key — so
-    the row that gets saved is a different Python object from the one the parent
-    has cached, and nothing else invalidates that cache. A caller who read the
-    relation before the write then reads pre-write values back off the instance
-    the helper returns, which is what a presenter renders. Reading it
-    first is the ordinary shape: a validator reaching through the relation, a
-    before/after comparison, a ``scope=`` callable.
-
-    The diff does not catch the forward case either. Two rows sharing a primary
-    key are equal, so the column is correctly left alone — and the stale object
-    is left with it.
-
-    ``row`` is ``None`` where the write cleared or removed the relation, and that
-    case *drops* the cached entry rather than assigning ``None`` through the
-    descriptor: assigning would also blank the removed row's own link in memory,
-    which a ``delete_service`` that deliberately kept the row linked never asked
-    for. Dropping it lets the next read say what the database says. The entry is
-    keyed by the relation name for both kinds — a forward field caches under its
-    own name, a reverse one-to-one under its accessor — which is the name the
-    spec is declared with either way.
-
-    Assigning is the descriptor's own work, so this costs no query, and it stays
-    narrower than the blanket ``refresh_from_db()`` it removes the need for: only
-    a relation this write resolved is touched, and only in memory.
-    """
+    """Make ``parent``'s cached related object agree with what the write left."""
     if row is None:
         parent._state.fields_cache.pop(relation, None)
         return
@@ -531,33 +399,7 @@ def sync_relation_cache(parent: Model, relation: str, row: Any) -> None:
 
 
 def sync_collection_cache(parent: Model, change: ChildCollectionChange, spec: RelationSpec) -> None:
-    """Drop a prefetched collection this write left inaccurate.
-
-    Rows the write **added or removed** are the plain case: a cache built before
-    the write cannot know about them, and nothing done in memory can reproduce
-    what the database would now return — the cached queryset carries its own
-    ordering, its own filtering and any nested prefetches, and only running it
-    again applies them. So the entry goes and the next read re-queries.
-
-    An *updated* row turns on the same question this module asks everywhere:
-    did the library write the object the parent already had, or a re-queried one?
-    A reverse-FK or generic collection is reconciled **inside the parent's own
-    accessor**, so an update writes the very object the cache is holding and the
-    cache stays accurate — that collection keeps its prefetch, and its query. A
-    many-to-many is matched in ``scope=`` instead, so it writes a different
-    object and leaves the cached one stale, exactly as a forward target would. A
-    per-row ``update_service`` reads the same way: the library did not do the
-    writing and cannot vouch for which object the service touched.
-
-    The many-to-many arm is belt-and-braces: writing one goes through
-    ``manager.set()`` / ``.add()``, and Django drops the prefetch cache itself on
-    the way through. Deleting this arm therefore breaks no test today. It is
-    stated anyway so the rule stands on where the row came from rather than on
-    another library's internals.
-
-    Dropping costs a query, and only for a caller who prefetched this relation
-    and then wrote it.
-    """
+    """Drop a prefetched collection this write left inaccurate."""
     if not change:
         return
     updates_wrote_the_cached_rows = (
@@ -572,14 +414,5 @@ def sync_collection_cache(parent: Model, change: ChildCollectionChange, spec: Re
 
 
 def handed_on(pool: Mapping[str, Any], call_context: dict[str, Any] | None) -> dict[str, Any]:
-    """A mutation helper's pool, as the context it hands its nested row services and scopes.
-
-    ``call_context`` is the call's context, which a ``**kwargs`` service is
-    never handed (``resolve_callable_kwargs``), so the helper's service names
-    it to carry it on: a nested callable naming it is handed the very dict,
-    and one taking ``**kwargs`` is not, by the same rule
-    (test_the_call_context_reaches_a_row_service_that_names_it,
-    test_a_row_service_taking_only_kwargs_is_not_handed_the_call_context). Called with
-    none, off dispatch, the nested callables share a fresh dict.
-    """
+    """A mutation helper's pool, as the context it hands its nested row services and scopes."""
     return {**pool, CALL_CONTEXT: {} if call_context is None else call_context}

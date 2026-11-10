@@ -1,6 +1,3 @@
-"""Async equivalent of
-[`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -21,9 +18,7 @@ async def acreate_from_input(
     relations: Mapping[str, RelationSpec] | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> ChangeResult[ModelT]:
-    """Async sibling of
-    [`create_from_input`][django_service_specs.mutations.create_from_input.create_from_input]
-    using ``asave()``/``aset()``."""
+    """Async sibling of ``create_from_input``, using ``asave()`` and ``aset()``."""
     return await acreate_instance(
         model,
         data,

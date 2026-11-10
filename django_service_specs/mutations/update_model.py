@@ -18,27 +18,7 @@ def update_model(
     update_fields: bool | list[str] = True,
     relations: Mapping[str, RelationSpec] | None = None,
 ) -> Callable[..., ModelT]:
-    """A service that writes the validated ``data`` onto the resolved row, and returns the row.
-
-    The service an update operation would otherwise write by hand:
-
-        def update_author(*, instance: Author, data: AuthorIn, **_: Any) -> Author:
-            return update_from_input(instance, data).instance
-
-    ``model`` is not read: it is taken for symmetry with
-    [`create_model`][django_service_specs.mutations.create_model.create_model] and
-    to bind the row's type for a type checker, since the row is the
-    ``instance`` the spec's instance selector resolved. ``field_map``,
-    ``exclude_fields``, ``update_fields`` and ``relations`` are handed to
-    [`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input]
-    as they are, and ``m2m`` is read as ``create_model`` reads it.
-
-    The service returns the row rather than the
-    [`ChangeResult`][django_service_specs.mutations.change_result.ChangeResult],
-    opens no transaction of its own, absorbs the rest of the pool and hands it
-    on as ``context`` with the call's context beside it, as ``create_model``'s
-    does.
-    """
+    """A service that writes the validated ``data`` onto the resolved row, and returns the row."""
 
     def _service(
         *, instance: ModelT, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any
