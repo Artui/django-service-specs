@@ -1,5 +1,3 @@
-"""Unit tests for ``ChildSpec`` construction + validation."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -100,8 +98,7 @@ class TestServiceReplacesTheHelper:
         assert spec.mode == "merge"
 
     def test_delete_service_composes_with_row_shaping(self) -> None:
-        # It replaces the unlink-or-delete rule, not the helper call: the
-        # cascade still removes grandchildren before handing over the row.
+        # It replaces the unlink-or-delete rule, not the helper call.
         spec = ChildSpec(
             model=Section,
             fk="catalog",
