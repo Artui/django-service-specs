@@ -1,5 +1,3 @@
-"""The package root re-exports every subpackage's public surface, and only that."""
-
 from __future__ import annotations
 
 import importlib
@@ -49,10 +47,7 @@ def _subpackages() -> list[ModuleType]:
 
 
 def test_every_subpackage_name_is_re_exported_at_the_root() -> None:
-    # A subpackage's ``__all__`` is its public surface, and the root is where a
-    # consumer reads the whole of it. A name added to a subpackage and not to
-    # the root is public in one place and missing from the other, and nothing
-    # else in the suite notices, because every test imports from leaf paths.
+    # A subpackage's ``__all__`` is its public surface.
     missing = {
         f"{package.__name__}.{name}"
         for package in _subpackages()
@@ -63,9 +58,7 @@ def test_every_subpackage_name_is_re_exported_at_the_root() -> None:
 
 
 def test_each_root_name_is_the_subpackage_s_own_object() -> None:
-    # Identity rather than equality: a second definition of one name would
-    # pass ``==`` for a class compared with itself nowhere, and an
-    # ``isinstance`` against the other copy would fail in a consumer.
+    # Identity rather than equality.
     for package in _subpackages():
         for name in package.__all__:
             assert getattr(django_service_specs, name) is getattr(package, name), name
@@ -78,10 +71,7 @@ def test_the_root_names_nothing_it_does_not_define() -> None:
 
 
 def test_the_root_imports_no_optional_library_and_each_exempt_adapter_does() -> None:
-    # A fresh interpreter, because this one imported every adapter while
-    # walking the package. The second half is what makes the first mean
-    # something: an exemption naming no adapter, or a probe that cannot see
-    # the library, would otherwise pass as a root that stayed clean.
+    # A fresh interpreter, because this one imported every adapter while walking the package.
     probe = f"""
 import importlib, json, sys
 import django
@@ -107,8 +97,6 @@ print(json.dumps([before, after, before_lazy, loaded_lazy()]))
     before, after, lazy_before, lazy_after = json.loads(completed.stdout)
     assert before == []
     assert after == sorted(OPTIONAL_LIBRARY_ADAPTERS.values())
-    # The lazy adapter's library stays unloaded, on the root and on its module:
-    # a top-level import of it would make the root need an optional extra.
     assert lazy_before == []
     assert lazy_after == []
 
@@ -133,9 +121,7 @@ HTTP_NAMES = (
 
 
 def test_the_http_transport_is_not_served_from_this_package() -> None:
-    # The package, so every module that was under it goes with it: the form
-    # page's old path included, which a check of that module alone could not
-    # make once its parent stopped existing.
+    # The package, so every module that was under it goes with it.
     assert importlib.util.find_spec("django_service_specs.http") is None
 
 
@@ -183,8 +169,7 @@ def test_no_command_line_name_is_exported_at_the_root(name: str) -> None:
 
 
 def test_the_command_line_leaves_no_type_and_no_setting_behind() -> None:
-    # ``ExitCode`` was the one value type the command owned, and the output
-    # format the one setting only it read.
+    # ``ExitCode`` was the one value type the command owned.
     assert "ExitCode" not in django_service_specs.types.__all__
     assert not hasattr(django_service_specs.settings, "command_output")
 

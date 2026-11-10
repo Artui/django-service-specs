@@ -16,9 +16,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_apps_py_declares_exactly_one_app_config() -> None:
-    # Django picks the config itself only when the module holds exactly one
-    # subclass; a second would leave the plain ``AppConfig`` in charge, so a
-    # project listing the label would get a config other than the one it names.
+    # Django picks the config itself only when the module holds exactly one subclass.
     declared = [
         value
         for value in vars(django_service_specs.apps).values()
@@ -41,11 +39,7 @@ def test_the_app_is_named_for_the_package_and_owns_no_models() -> None:
     ids=["label", "config"],
 )
 def test_a_project_listing_the_app_starts_and_its_check_reports_nothing(listed: str) -> None:
-    # The app registers no system check: the unguarded-spec report belongs to
-    # the management command, which django-spec-cli serves, and listing this
-    # app, either way, is kept working so a project upgrading has nothing to
-    # unlist. A fresh interpreter, because this one's check registry holds
-    # whatever the test settings' apps registered.
+    # The app registers no system check.
     probe = f"""
 import json
 import django
@@ -77,9 +71,7 @@ print(json.dumps([
 
 
 def test_importing_the_app_before_setup_loads_no_model() -> None:
-    # ``apps.py`` is imported while the app registry is still being populated,
-    # so nothing it imports, the package root included, may reach a model or
-    # ``get_user_model``. A fresh interpreter, because this one is set up.
+    # ``apps.py`` is imported while the app registry is still being populated.
     probe = """
 import json, sys
 from django.conf import settings

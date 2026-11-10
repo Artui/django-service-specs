@@ -1,14 +1,3 @@
-"""Tests for the package's translation catalog, ``django_service_specs/locale/``.
-
-Every refusal's default message is a msgid in the shipped source catalog, and is
-looked up in the active language when the refusal is constructed. These tests
-translate through a real compiled catalog rather than a patched ``gettext``: a
-patch would agree with any lookup, including one made once at import. The
-catalog is written for a language Django ships none for (``xx``), so nothing but
-the test's own catalog can answer, and it is compiled by ``_write_mo`` below
-rather than ``msgfmt``, which not every machine running the suite has.
-"""
-
 from __future__ import annotations
 
 import array
@@ -72,9 +61,7 @@ DEFAULT_IDS = [cls.__name__ for cls, _, _ in DEFAULTS]
 
 
 def _refusal_classes() -> list[type[Exception]]:
-    # Read off the class tree rather than listed, so a refusal added later is
-    # held to the catalog without anyone remembering to add it here. Subclasses
-    # a test declares are not the package's and carry no msgid.
+    # Read off the class tree rather than listed.
     found: list[type[Exception]] = []
     pending: list[type[Exception]] = [ServiceError, DispatchError]
     while pending:
@@ -92,13 +79,7 @@ def _default_messages() -> set[str]:
 
 
 def _write_mo(path: Path, messages: dict[str, str]) -> None:
-    """Compile ``messages`` into a GNU ``.mo`` file, as ``msgfmt`` would.
-
-    The format is a header, a table of (length, offset) pairs for the sorted
-    msgids, one for their translations, then the NUL-terminated strings. The
-    empty msgid is the catalog's header, and its charset is what makes the
-    stdlib reader decode the strings as UTF-8 rather than ASCII.
-    """
+    """Compile ``messages`` into a GNU ``.mo`` file, as ``msgfmt`` would."""
     catalog = {"": "Content-Type: text/plain; charset=UTF-8\n", **messages}
     keys = sorted(catalog)
     ids = strs = b""
@@ -132,8 +113,7 @@ def _write_test_catalog(locale_dir: Path) -> None:
 
 
 def _msgids(po: Path) -> set[str]:
-    # A msgid may run over several quoted lines, which the reader joins; the
-    # header's empty msgid and obsolete (``#~``) entries are not messages.
+    # A msgid may run over several quoted lines, which the reader joins.
     msgids: set[str] = set()
     current: list[str] | None = None
     for line in [*po.read_text(encoding="utf-8").splitlines(), ""]:
@@ -150,9 +130,7 @@ def _msgids(po: Path) -> set[str]:
 
 @pytest.fixture
 def locale_paths(tmp_path: Path) -> Iterator[None]:
-    # Changing LOCALE_PATHS fires Django's own setting_changed receiver, which
-    # empties the translation cache on the way in and on the way out, so the
-    # test catalog is read fresh and leaves nothing behind.
+    # Changing LOCALE_PATHS fires Django's own setting_changed receiver.
     _write_test_catalog(tmp_path)
     with override_settings(LOCALE_PATHS=[str(tmp_path)]):
         yield
@@ -162,8 +140,7 @@ def locale_paths(tmp_path: Path) -> Iterator[None]:
 def test_each_refusal_declares_its_msgid(
     cls: type[Exception], build: Callable[[], Exception], msgid: str
 ) -> None:
-    # Ties the literals above to the classes, and lists every refusal that
-    # declares one, so a new member is added here rather than missed.
+    # Ties the literals above to the classes, and lists every refusal that declares one.
     assert vars(cls)["default_message"] == msgid
     assert sorted(c.__name__ for c in _refusal_classes() if "default_message" in vars(c)) == sorted(
         DEFAULT_IDS
@@ -185,8 +162,7 @@ def test_a_default_message_is_read_in_the_active_language(
 def test_nothing_is_frozen_at_import_or_at_the_last_call(
     cls: type[Exception], build: Callable[[], Exception], msgid: str
 ) -> None:
-    # The class keeps the msgid, and each construction looks it up again: a
-    # refusal built in another language before this one does not decide its words.
+    # The class keeps the msgid, and each construction looks it up again.
     with translation.override(LANGUAGE):
         build()
         assert vars(cls)["default_message"] == msgid
@@ -218,8 +194,7 @@ def test_nothing_is_frozen_at_import_or_at_the_last_call(
     ],
 )
 def test_a_message_the_caller_passes_is_used_as_given(build: Callable[[str], Exception]) -> None:
-    # Passed a string the test catalog does translate, so a lookup on the
-    # caller's message would show.
+    # Passed a string the test catalog does translate.
     with translation.override(LANGUAGE):
         error = build("Not found.")
     assert error.message == "Not found."
@@ -228,10 +203,7 @@ def test_a_message_the_caller_passes_is_used_as_given(build: Callable[[str], Exc
 def test_listing_the_app_loads_a_catalog_beside_the_package(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # The route the docs give: Django reads ``<app path>/locale`` for every
-    # installed app, which is where the shipped catalog sits. The app's path is
-    # pointed at a copy holding a compiled test language, so the package's own
-    # tree is never written to.
+    # The route the docs give: Django reads ``<app path>/locale`` for every installed app.
     config = apps.get_app_config("django_service_specs")
     assert SOURCE_CATALOG.is_relative_to(Path(config.path) / "locale")
     _write_test_catalog(tmp_path / "locale")
@@ -249,9 +221,7 @@ def test_the_source_catalog_lists_every_refusal_s_default_message() -> None:
 
 
 def test_the_source_catalog_keeps_django_rest_framework_s_msgids() -> None:
-    # Spelled as DRF spells them, so a project with DRF installed keeps DRF's
-    # translation of the four: ``NotFound``'s and ``PermissionDenied``'s
-    # default details and ``ListField``'s two length messages.
+    # Spelled as DRF spells them.
     assert {
         "Not found.",
         "You do not have permission to perform this action.",
@@ -271,11 +241,7 @@ def test_the_catalog_reader_joins_a_wrapped_msgid_and_skips_the_header(tmp_path:
 
 
 def test_marking_a_msgid_reads_no_setting() -> None:
-    # Each default is marked when its class is defined, at import, and the
-    # package imports before a project's settings are configured. Only the
-    # lookup, made when a refusal is built with no message, reads them; one the
-    # caller words needs none. A fresh interpreter with no settings module,
-    # because this one is configured.
+    # Each default is marked when its class is defined, at import.
     probe = """
 import django_service_specs
 print(django_service_specs.NotPermitted("Ask the owner.").message)
@@ -289,6 +255,5 @@ print(django_service_specs.NotPermitted("Ask the owner.").message)
 
 
 def test_the_package_ships_the_source_language_and_no_translation() -> None:
-    # A translated language is a contribution someone can review; until one is
-    # reviewed and added, ``locale/`` holds the source catalog alone.
+    # A translated language is a contribution someone can review; until one is reviewed and added.
     assert sorted(path.name for path in (PACKAGE_ROOT / "locale").iterdir()) == ["en"]
