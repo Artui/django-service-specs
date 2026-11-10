@@ -98,17 +98,14 @@ class TestRegister:
         assert "fake" not in registry
 
     def test_a_spec_with_no_declared_permissions_is_rejected(self) -> None:
-        # Off HTTP there is no view whose policy an undeclared spec could
-        # inherit, so registering one is refused rather than left to fail on
-        # every dispatch call.
+        # Off HTTP there is no view whose policy an undeclared spec could inherit.
         registry = SpecRegistry()
         with pytest.raises(ImproperlyConfigured, match="Unrestricted"):
             registry.register("orphan", ServiceSpec(service=_noop))
         assert "orphan" not in registry
 
     def test_names_are_a_per_registry_namespace(self) -> None:
-        # Independent registries are separate surfaces; reusing a name across
-        # them is legal and keeps them isolated.
+        # Independent registries are separate surfaces.
         internal, public = SpecRegistry(), SpecRegistry()
         internal_spec, public_spec = _service(), _service()
         internal.register("purge", internal_spec)
@@ -161,8 +158,7 @@ class TestOrderingAndKinds:
         assert [e.name for e in registry.queries()] == ["list_orders"]
 
     def test_mutations_and_queries_partition_every_entry(self) -> None:
-        # The spec-type check at registration is what guarantees this: no
-        # entry can fall outside both accessors.
+        # The spec-type check at registration is what guarantees this.
         registry = SpecRegistry()
         registry.register("refund_order", _service())
         registry.register("list_orders", _selector())
@@ -351,15 +347,12 @@ class TestReplace:
         assert [type(check) for check in swapped.spec.permissions or ()] == [Nobody]
 
     def test_a_name_not_registered_raises(self) -> None:
-        # A replacement for an operation nobody registered is a typo, as a
-        # ``subset`` naming one is, not a quiet registration.
+        # A replacement for an operation nobody registered is a typo, as a ``subset`` naming one is.
         with pytest.raises(KeyError, match="'refund' is not registered"):
             self._registry().replace("refund", _service())
 
     def test_the_replacement_is_checked_as_a_registration_is(self) -> None:
-        # A derived spec with its permissions taken away builds, since a spec
-        # may be registered with them declared elsewhere; the registry refuses
-        # it as ``register`` would.
+        # A derived spec with its permissions taken away builds.
         entry = self._registry().get("refund_order")
         assert entry is not None
         assert isinstance(entry.spec, ServiceSpec)
@@ -421,13 +414,7 @@ class TestContainerProtocol:
 
 
 class TestSpecMetadataRoundTrip:
-    """``spec.metadata`` survives every filtered view the registry hands back.
-
-    The views snapshot ``RegisteredSpec`` objects and share the spec
-    instances themselves, so this holds by construction - pinned here because
-    a future rebuild-the-spec optimization would silently drop consumer
-    declarations.
-    """
+    """``spec.metadata`` survives every filtered view the registry hands back."""
 
     def test_survives_register_all_by_tag_subset_and_merge(self) -> None:
         spec = _service(metadata={"scope": "tenant"})

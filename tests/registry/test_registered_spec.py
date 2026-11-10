@@ -45,8 +45,7 @@ class TestRegisteredSpec:
             entry.name = "other"  # type: ignore[misc]
 
     def test_kind_is_not_stored(self) -> None:
-        # Derived by isinstance wherever it is needed, so it can never drift
-        # from the spec it describes.
+        # Derived by isinstance wherever it is needed.
         entry = RegisteredSpec(
             name="list_orders",
             spec=SelectorSpec(kind=SelectorKind.LIST, selector=list, permissions=[Unrestricted()]),
