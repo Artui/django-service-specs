@@ -1,5 +1,3 @@
-"""The keyword pool every dispatched callable is bound from."""
-
 from django_service_specs.pool.base_pool import base_pool
 from django_service_specs.pool.call_seeds import CALL_SEEDS
 from django_service_specs.pool.combine_progress import combine_progress

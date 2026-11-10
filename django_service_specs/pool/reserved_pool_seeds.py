@@ -1,5 +1,3 @@
-"""``RESERVED_POOL_SEEDS`` - the keyword names dispatch owns."""
-
 from __future__ import annotations
 
 from typing import Final
