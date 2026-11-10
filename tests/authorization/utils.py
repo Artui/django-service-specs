@@ -1,5 +1,3 @@
-"""Permission-check test doubles shared by the authorization function tests."""
-
 from __future__ import annotations
 
 import inspect
@@ -48,12 +46,7 @@ class RefuseWithMessage(PermissionCheck):
 
 
 class AnswersWith(PermissionCheck):
-    """Answers every level with the object it was built with, from a plain ``def``.
-
-    The shape construction cannot see: each method is sync, so a spec accepts
-    the check, and what comes back is whatever the test handed in - a
-    coroutine, as a decorated or partial-wrapped ``async def`` returns one.
-    """
+    """Answers every level with the object it was built with, from a plain ``def``."""
 
     def __init__(self, answer: Any) -> None:
         self.answer = answer
@@ -110,11 +103,7 @@ class SeesTheCall(PermissionCheck):
 
 
 class Answers(PermissionCheck):
-    """Answers each question as it was built to, writing ``name.method`` to ``log`` when asked.
-
-    The log is the caller's, so checks sharing one show the order a
-    combinator asked them in, and which it never asked.
-    """
+    """Answers each question as it was built to, writing ``name.method`` to ``log`` when asked."""
 
     def __init__(
         self,
@@ -142,10 +131,7 @@ class Answers(PermissionCheck):
 
 
 class ClassLevel(PermissionCheck):
-    """Answers the class-level question alone, as built, writing ``name.has_permission`` to ``log``.
-
-    Its row and scope questions are the base's, so ``NoneOf`` accepts it.
-    """
+    """Answers the class-level question alone, as built."""
 
     def __init__(self, name: str, log: list[str], *, permission: Any = True) -> None:
         self.name, self.log, self.permission = name, log, permission
@@ -156,14 +142,7 @@ class ClassLevel(PermissionCheck):
 
 
 def opting_into(name: str, method: str) -> PermissionCheck:
-    """A check passing every question, whose ``method`` declares ``*, <name>``.
-
-    ``name`` is any identifier, including ``principal`` or ``scope``, which a
-    ``def`` could not spell beside the parameter of that name, so the
-    declaration is the signature ``inspect`` reports - the one every reader of
-    a check's keywords goes by - over a method taking anything. Its
-    positionals are named ``_a``, ``_b`` and ``_c``, which no seed uses.
-    """
+    """A check passing every question, whose ``method`` declares ``*, <name>``."""
     positional = dict(QUESTIONS)[method]
 
     def declaring(self: PermissionCheck, *args: Any, **kwargs: Any) -> bool:
@@ -178,6 +157,5 @@ def opting_into(name: str, method: str) -> PermissionCheck:
         inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY),
     ]
     declaring.__signature__ = inspect.Signature(parameters)
-    # has_permission is abstract, so a check declaring another still answers it.
     namespace = {"has_permission": lambda self, principal, spec: True, method: declaring}
     return type(f"Opts{method}", (PermissionCheck,), namespace)()

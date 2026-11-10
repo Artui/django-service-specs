@@ -54,8 +54,7 @@ def test_the_row_and_scope_questions_stop_at_the_first_check_passing_both(
 
 
 def test_a_child_answering_a_coroutine_does_not_pass_any_of() -> None:
-    # A plain ``def`` handing back a coroutine looks sync when the combinator
-    # is built; the coroutine is truthy, so read as it stands it would pass.
+    # A plain ``def`` handing back a coroutine looks sync when the combinator is built.
     check = AnyOf(AnswersWith(refuses()))
     with pytest.raises(ImproperlyConfigured, match=r"AnswersWith\.has_permission answered"):
         check.has_permission(_PRINCIPAL, _SPEC)
@@ -67,8 +66,7 @@ class _Raises(PermissionCheck):
 
 
 def test_a_child_raising_is_not_read_as_a_refusal() -> None:
-    # Read as a refusal, the next check would be asked and pass: an error in
-    # one rule would let the call through on another.
+    # Read as a refusal, the next check would be asked and pass.
     check = AnyOf(_Raises(), Allow())
     with pytest.raises(LookupError, match="the membership service is down"):
         check.has_permission(_PRINCIPAL, _SPEC)
@@ -144,8 +142,7 @@ class TestUnrestrictedInsideACombinatorIsRefused:
             AnyOf(Allow(), unrestricted)
 
     def test_at_depth_two(self, unrestricted: Unrestricted) -> None:
-        # Refused as the inner combinator is built, before the outer one could
-        # be: AnyOf(staff, AllOf(Unrestricted())) would let anyone in.
+        # Refused as the inner combinator is built, before the outer one could be: AnyOf(staff.
         named = f"AllOf.checks[0] is {type(unrestricted).__name__}, the explicit allow"
         with pytest.raises(ImproperlyConfigured, match=re.escape(named)):
             AnyOf(Allow(), AllOf(unrestricted))
@@ -159,8 +156,7 @@ _HP, _HOP, _HSP = "has_permission", "has_object_permission", "has_scope_permissi
     [
         (_HP, "principal", _HP),
         (_HP, "spec", _HP),
-        # Asked again at the row and scope questions, so its class-level
-        # opt-in meets the parameter those methods take.
+        # Asked again at the row and scope questions.
         (_HP, "target", _HOP),
         (_HP, "scope", _HSP),
         (_HOP, "principal", _HOP),
@@ -184,14 +180,12 @@ def test_a_child_naming_a_parameter_of_any_of_is_refused(
 
 
 def test_a_child_naming_a_parameter_of_any_of_is_refused_at_depth_two() -> None:
-    # AllOf takes no scope at the class-level question, so it accepts this
-    # child; AnyOf above it re-asks that question at the scope question.
+    # AllOf takes no scope at the class-level question, so it accepts this child.
     inner = AllOf(opting_into("scope", _HP))
     with pytest.raises(ImproperlyConfigured, match=re.escape("AnyOf.checks[0] opts into")):
         AnyOf(inner)
 
 
 def test_a_seed_a_parameter_of_another_question_is_named_for_is_accepted() -> None:
-    # `scope` at the row question: AnyOf's row method takes no scope, and the
-    # scope question never asks has_object_permission.
+    # `scope` at the row question: AnyOf's row method takes no scope.
     AnyOf(opting_into("scope", _HOP), opting_into("target", _HSP))

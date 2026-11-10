@@ -53,8 +53,7 @@ class _ClassAnswer(PermissionCheck):
 
 
 def test_none_of_none_of_a_coroutine_answer_is_refused() -> None:
-    # Read as it stands, the truthy coroutine makes the inner NoneOf refuse,
-    # which the outer one turns into an allow.
+    # Read as it stands, the truthy coroutine makes the inner NoneOf refuse.
     check = NoneOf(NoneOf(_ClassAnswer(refuses())))
     with pytest.raises(ImproperlyConfigured, match=r"_ClassAnswer\.has_permission answered"):
         check.has_permission(_PRINCIPAL, _SPEC)
@@ -109,8 +108,7 @@ class TestNoneOfRefusesARowLevelChild:
             NoneOf(AllOf(ClassLevel("a", []), AnyOf(ClassLevel("b", []), _ScopeLevel())))
 
     def test_none_of_accepts_a_combinator_of_class_level_checks(self) -> None:
-        # A combinator's own row and scope methods are always its own; the
-        # walk reads its children instead.
+        # A combinator's own row and scope methods are always its own.
         log: list[str] = []
         check = NoneOf(AllOf(ClassLevel("a", log), ClassLevel("b", log, permission=False)))
         assert check.has_permission(_PRINCIPAL, _SPEC) is True
@@ -122,8 +120,7 @@ class TestNoneOfRefusesARowLevelChild:
 
 
 def test_an_empty_combinator_is_refused() -> None:
-    # No check passing is vacuously true of none, so an empty NoneOf would let
-    # anyone run the operation it guards.
+    # No check passing is vacuously true of none.
     with pytest.raises(ImproperlyConfigured, match=r"NoneOf\.checks is empty"):
         NoneOf()
 
@@ -149,8 +146,7 @@ def test_a_child_naming_a_parameter_of_none_of_is_refused_at_depth_two() -> None
 
 @pytest.mark.parametrize("name", ["target", "scope"])
 def test_a_seed_named_for_a_row_or_scope_parameter_is_accepted(name: str) -> None:
-    # NoneOf asks the class-level question alone and its row and scope
-    # methods take no seed of the child's, so only principal and spec collide.
+    # NoneOf's row and scope methods take no child seed, so only principal and spec collide.
     NoneOf(opting_into(name, _HP))
 
 
@@ -162,10 +158,7 @@ class _TenantAtClassLevel(PermissionCheck):
 def test_a_seed_a_child_names_at_the_class_level_is_not_handed_to_the_row_or_scope_question() -> (
     None
 ):
-    # The empty row and scope entries of NoneOf._asks: replacing either with
-    # the class-level question hands the tenant to the inherited
-    # has_object_permission or has_scope_permission, which takes no keyword,
-    # and this raises TypeError (one mutation per entry, both shown red).
+    # The empty row and scope entries of NoneOf._asks.
     spec = SelectorSpec(
         kind=SelectorKind.LIST, selector=list, permissions=[NoneOf(_TenantAtClassLevel())]
     )

@@ -62,8 +62,7 @@ def test_its_checks_are_kept_in_order() -> None:
 
 
 def test_an_empty_combinator_is_refused() -> None:
-    # Every check passing is vacuously true of none, so an empty AllOf would
-    # let anyone run the operation it guards.
+    # Every check passing is vacuously true of none.
     with pytest.raises(ImproperlyConfigured, match=r"AllOf\.checks is empty"):
         AllOf()
 
@@ -106,8 +105,7 @@ class TestAChildIsRefused:
         ):
             AllOf(Allow(), "IsStaff")  # ty: ignore[invalid-argument-type]
 
-    # One case per method, since coverage cannot see a name dropped from the
-    # questions the rule reads.
+    # One case per method.
     @pytest.mark.parametrize(
         ("check", "method"),
         [
@@ -159,9 +157,7 @@ class _ScopeSeedAtClassLevel(PermissionCheck):
 
 
 def test_a_seed_named_for_another_question_s_parameter_is_accepted_and_reaches_the_child() -> None:
-    # AllOf asks has_permission at the class-level question alone, which
-    # takes no scope, so the seed is handed through (and AnyOf, re-asking it
-    # at the scope question, would refuse the same child).
+    # AllOf asks has_permission at the class-level question alone, which takes no scope.
     seeds = DEFAULT_POOL_SEEDS.extend(scope=lambda *, user: "seeded")
     spec = SelectorSpec(
         kind=SelectorKind.LIST,

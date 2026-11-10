@@ -18,13 +18,8 @@ User = get_user_model()
     "identifier",
     [
         pytest.param(999999, id="missing"),
-        # A non-integer string against an integer primary key raises ValueError
-        # from the field's own coercion, not DoesNotExist; both become the same
-        # refusal, because the caller cannot act on either outcome differently.
+        # A non-integer string raises ValueError from the field's own coercion, not DoesNotExist.
         pytest.param("abc", id="malformed"),
-        # A list reaches the integer field's own coercion as ``int([])``, which is a
-        # TypeError rather than a ValueError - a queue payload that decoded a
-        # structure where it expected a key.
         pytest.param([1], id="wrong-kind"),
         pytest.param(None, id="none"),
     ],
@@ -38,19 +33,14 @@ def test_an_identifier_naming_no_row_raises(identifier: object) -> None:
 @pytest.mark.usefixtures("unstated_ranges")
 @pytest.mark.parametrize("identifier", [2**63, -(2**63) - 1, str(2**63)])
 def test_an_identifier_past_the_key_s_column_raises(identifier: object) -> None:
-    # It names no row. Where the backend states no range for the column, as
-    # Django 4.2's SQLite backend does, the lookup handed it to the driver,
-    # which raised OverflowError.
+    # It names no row.
     with pytest.raises(PrincipalUnavailable, match="No principal"):
         resolve_principal(identifier)
 
 
 @pytest.mark.django_db
 def test_a_malformed_key_the_field_refuses_as_a_validation_error_raises() -> None:
-    # A UUID primary key refuses a malformed string with Django's own
-    # ValidationError, not ValueError. The suite's user model has an integer
-    # key, so the lookup is made to raise what a UUID key would, for a key
-    # that integer key reads: one it cannot read is refused before the lookup.
+    # A UUID primary key refuses a malformed string with Django's own ValidationError.
     refusal = ValidationError("not a valid UUID")
     with (
         mock.patch.object(User._default_manager, "get", side_effect=refusal),
@@ -60,9 +50,7 @@ def test_a_malformed_key_the_field_refuses_as_a_validation_error_raises() -> Non
 
 
 def test_an_unrelated_failure_is_not_read_as_a_missing_principal() -> None:
-    # Only the refusals that mean "no such principal" are translated; a
-    # database outage says nothing about the identifier and must surface as
-    # itself rather than as a principal the caller should stop asking for.
+    # Only the refusals that mean "no such principal" are translated.
     with (
         mock.patch.object(User._default_manager, "get", side_effect=RuntimeError("down")),
         pytest.raises(RuntimeError, match="down"),
@@ -72,8 +60,7 @@ def test_an_unrelated_failure_is_not_read_as_a_missing_principal() -> None:
 
 @pytest.mark.parametrize("identifier", [math.inf, -math.inf], ids=["above", "below"])
 def test_an_infinite_identifier_is_no_principal(identifier: float) -> None:
-    # The integer key's lookup reads it through ``int``, which raised
-    # OverflowError for an infinity: past every column, so no row.
+    # The integer key's lookup reads it through ``int``, which raised OverflowError for an infinity.
     with pytest.raises(PrincipalUnavailable, match="No principal with identifier"):
         resolve_principal(identifier)
 

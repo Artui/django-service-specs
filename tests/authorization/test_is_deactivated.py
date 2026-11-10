@@ -1,5 +1,3 @@
-"""``is_deactivated``: the one rule every refusal of a deactivated principal reads."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -27,8 +25,7 @@ def test_an_active_user_is_not_deactivated() -> None:
 
 
 def test_anonymous_is_not_deactivated() -> None:
-    # ``AnonymousUser.is_active`` is false: without the ``is_authenticated`` half,
-    # anonymous would be refused before its permission check could admit it.
+    # ``AnonymousUser.is_active`` is false: without the ``is_authenticated`` half.
     assert AnonymousUser().is_active is False
     assert is_deactivated(AnonymousUser()) is False
 
