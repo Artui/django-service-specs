@@ -1,12 +1,3 @@
-"""A collection's row error has the tree ``InvalidArguments`` documents.
-
-A caller validating rows and writing them through ``relations=`` receives both
-refusals from one dispatch, so the two have to agree on how a failing row is
-addressed: keyed by its ``int`` index, only the rows that failed, and a message
-about the row itself under ``non_field_errors`` inside it. There is one form,
-whatever transport reads it; offering another is an adapter's business.
-"""
-
 from __future__ import annotations
 
 import json
@@ -52,8 +43,7 @@ class TestTheTreeIsTheKernelsOwn:
         detail = self._refused()
 
         assert detail == {"sections": {1: _RUDE}}
-        # An ``int``, not the string ``"1"``: the tree is addressed by the
-        # position in the arguments, and only serializing it writes a string.
+        # An ``int``, not the string ``"1"``.
         [key] = detail["sections"]
         assert type(key) is int
 
@@ -119,8 +109,7 @@ class TestANullRowIsRefusedBeforeAnythingIsWritten:
         with pytest.raises(InvalidArguments) as excinfo:
             create_from_input(Catalog, {"name": "c", "sections": rows}, relations=_SECTIONS)
 
-        # Every null row, and none of the others: the refusal comes before the
-        # first write, so the row at index 0 was not written either.
+        # Every null row, and none of the others: the refusal comes before the first write.
         assert excinfo.value.detail == {"sections": {1: _NULL, 3: _NULL}}
         assert not Section.objects.exists()
 

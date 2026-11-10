@@ -1,11 +1,3 @@
-"""Payload-driven many-to-many: write the targets, then the membership.
-
-The distinction this kind exists for: the mutation helpers' ``m2m=`` argument
-*assigns* rows that already exist, and a ``ManyToManySpec`` *writes* the rows
-from the payload and then links them. Both ship, neither replaces the other,
-and a relation named by both is refused.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -131,9 +123,7 @@ class TestModeDecidesWhatHappensToTheMembersLeftOut:
 @pytest.mark.django_db
 class TestTheReverseSideIsTheSameCodePath:
     def test_a_reverse_accessor_writes_its_targets_too(self) -> None:
-        # ``Post.tags`` declares the field; ``Tag.posts`` is the reverse
-        # accessor. Django hands back the same related manager, so the loop
-        # never needs to know which side it is on.
+        # ``Post.tags`` declares the field; ``Tag.posts`` is the reverse accessor.
         result = create_from_input(
             Tag,
             {"name": "django", "posts": [{"title": "first"}, {"title": "second"}]},
@@ -178,8 +168,7 @@ class TestScopeIsWhatMakesMatchingSafe:
                 },
             )
 
-        # ``[0]`` is the row's index, and a message about the row itself sits
-        # under ``non_field_errors`` inside it.
+        # ``[0]`` is the row's index.
         [message] = excinfo.value.detail["tags"][0]["non_field_errors"]
         assert "outside the scope" in message
         theirs.refresh_from_db()
@@ -223,13 +212,7 @@ class TestScopeIsWhatMakesMatchingSafe:
 
 @pytest.mark.django_db
 class TestAM2MTargetCannotBeCreatedUnderAForeignPrimaryKey:
-    """A target built from a nested payload is a create like any other, and
-    ``Tag(pk=7, name="x").save()`` overwrites tag 7 rather than creating one.
-
-    The way in is a spec matching on a natural key: the match only runs when
-    the payload carries *that* key, so a payload carrying only a primary key
-    walks past it into the create with the key still on board.
-    """
+    """A target built from a nested payload is a create like any other, and ``Tag(pk=7."""
 
     def test_a_primary_key_the_match_never_looked_at_is_refused(self) -> None:
         theirs = Tag.objects.create(name="theirs")
@@ -277,8 +260,7 @@ class TestAssignmentAndPayloadWritingCoexist:
         assert list(result.instance.tags.all()) == [tag]
 
     def test_a_different_relation_may_be_written_from_the_payload(self) -> None:
-        # One relation assigned, another written -- the two arguments are not
-        # in competition, only a shared *name* is.
+        # One relation assigned, another written -- the two arguments are not in competition.
         assigned = Tag.objects.create(name="assigned")
 
         result = create_from_input(
@@ -387,8 +369,7 @@ class TestTheAsyncPathWritesTheSameWay:
                 },
             )
 
-        # ``[0]`` is the row's index, and a message about the row itself sits
-        # under ``non_field_errors`` inside it.
+        # ``[0]`` is the row's index.
         [message] = excinfo.value.detail["tags"][0]["non_field_errors"]
         assert "outside the scope" in message
 

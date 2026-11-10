@@ -1,12 +1,3 @@
-"""``orphan=`` — saying what happens to a row the relation lets go.
-
-The default derives it from the link, as it always has. These assert that the
-derived rule is unchanged, that stating it overrides the derivation in both
-directions, that asking for an impossible one raises where the rule is read,
-and that the delete cascade disposes of a row by the same rule as an
-update — a flag meaning two things would be worse than no flag.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -144,8 +135,8 @@ class TestUnlinkNeedsALinkItCanBlank:
 
         message = str(excinfo.value)
         assert "relations['sections']" in message  # the relation
-        assert "Section.catalog cannot hold NULL" in message  # the field
-        assert "null=True" in message  # and both remedies
+        assert "Section.catalog cannot hold NULL" in message
+        assert "null=True" in message
         assert "orphan='delete'" in message
         assert Section.objects.filter(pk=section.pk).exists()
 
@@ -176,9 +167,7 @@ class TestUnlinkNeedsALinkItCanBlank:
             )
 
     def test_a_merge_relation_disposes_of_nothing_so_the_rule_is_never_read(self) -> None:
-        # ``mode`` says whether a row is let go at all; ``orphan`` only says
-        # what happens to one that is. Nothing is let go here, so there is
-        # nothing for the impossible rule to be wrong about.
+        # ``mode`` says whether a row is let go at all.
         catalog = Catalog.objects.create(name="c")
         section = Section.objects.create(catalog=catalog, title="kept")
 

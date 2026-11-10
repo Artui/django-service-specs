@@ -1,5 +1,3 @@
-"""Unit tests for the singular-relation change carrier."""
-
 from __future__ import annotations
 
 from django_service_specs.mutations.related_object_change import RelatedObjectChange

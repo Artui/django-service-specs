@@ -1,5 +1,3 @@
-"""Tests for non-exported helpers in mutations/utils.py."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -136,8 +134,7 @@ def test_m2m_target_pks(value: Any, expected: list[Any]) -> None:
 @pytest.mark.parametrize(
     ("instance", "expected"),
     [
-        # ``Timestamped`` declares ``created_at`` with ``auto_now_add``, which is
-        # left out: only ``auto_now`` is refreshed on an update.
+        # ``Timestamped`` declares ``created_at`` with ``auto_now_add``, which is left out.
         pytest.param(Timestamped(), ("updated_at",), id="auto-now-not-auto-now-add"),
         pytest.param(Author(), (), id="model-without-auto-now"),
     ],

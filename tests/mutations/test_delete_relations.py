@@ -1,11 +1,3 @@
-"""``delete_relations`` - the cascade, as a delete service calls it.
-
-The rule itself (what is owned, what is only pointed at, the order) is held by
-``test_delete_cascade``, against the shared core. These hold what the public
-entry adds on top: the write helpers' signature and report, the map refused as
-the write helpers refuse it, and ``context`` reaching the row services.
-"""
-
 from __future__ import annotations
 
 from typing import Any

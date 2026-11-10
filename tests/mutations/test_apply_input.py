@@ -1,5 +1,3 @@
-"""Tests for apply_input — in-memory, no DB writes."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,5 +1,3 @@
-"""Tests for aupdate_from_input."""
-
 from __future__ import annotations
 
 from datetime import timedelta

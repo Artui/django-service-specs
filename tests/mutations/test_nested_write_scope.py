@@ -1,19 +1,3 @@
-"""A nested write must not reach a row the parent does not own.
-
-The child loop matches incoming rows against ``getattr(parent, relation).all()``,
-which is correctly scoped to the parent -- but only the *match* is scoped. A row
-that failed to match fell through to the create branch, which builds
-``Model(**item, fk=parent)`` and saves it. Django turns a ``save()`` carrying an
-explicit primary key into an **UPDATE**, so a payload naming somebody else's pk
-reassigned that row to the caller's parent and overwrote its fields.
-
-The parent scoping made the read safe and did nothing about the write that
-followed it.
-
-Every relation kind reaches the same create, and every one of them can be handed
-a primary key the match did not resolve, so each kind gets its own case here.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -58,9 +42,7 @@ class TestAPayloadCannotNameAnotherParentsRow:
         assert "posts" in str(exc.value.detail)
 
     def test_a_primary_key_that_exists_nowhere_is_refused_as_well(self) -> None:
-        # Not an authorization question -- the caller named a row and there is
-        # none. Creating a different one silently would do the opposite of what
-        # was asked, and would hand back a pk the caller never chose.
+        # Not an authorization question -- the caller named a row and there is none.
         author = Author.objects.create(name="a")
 
         with pytest.raises(ServiceValidationError):
@@ -74,17 +56,13 @@ class TestAPayloadCannotNameAnotherParentsRow:
     @pytest.mark.parametrize(
         ("spec", "key", "title"),
         [
-            # field_map runs before the model sees the payload, so an input key
-            # routed onto the pk is the same hazard wearing a different name.
+            # field_map runs before the model sees the payload.
             pytest.param(
                 ChildSpec(model=Post, fk="author", match_key="ref", field_map={"ref": "id"}),
                 "ref",
                 "pwned",
                 id="field-map-routes-a-key-onto-it",
             ),
-            # The hazard is the primary key reaching the create, not the match
-            # key. A spec matching on a natural key still must not accept a pk
-            # beside it.
             pytest.param(
                 ChildSpec(model=Post, fk="author", match_key="title"),
                 "id",
@@ -130,9 +108,7 @@ class TestTheLegitimateCasesStillWork:
         ("relations", "title"),
         [
             pytest.param(POSTS, "fresh", id="a-row-with-no-identifier"),
-            # The reason this refuses a primary key rather than any unmatched
-            # match key: a natural key that does not match is a genuine create,
-            # and declaring one is how a caller gets upsert semantics.
+            # The reason this refuses a primary key rather than any unmatched match key.
             pytest.param(
                 {"posts": ChildSpec(model=Post, fk="author", match_key="title")},
                 "brand new",
@@ -192,13 +168,7 @@ class TestTheAsyncPathBehavesIdentically:
 
 @pytest.mark.django_db
 class TestAServiceOwnedRowIsGuardedToo:
-    """A declared ``create_service`` receives the payload, so the check has to
-    run before the dispatch rather than inside the default helper.
-
-    Otherwise the row writer is bypassed and the primary key reaches user code,
-    which is free to persist it -- moving the same defect one layer out and
-    into a place the library cannot see.
-    """
+    """A declared ``create_service`` receives the payload."""
 
     def test_the_service_is_never_handed_another_parents_primary_key(self) -> None:
         victim = Author.objects.create(name="victim")
@@ -234,13 +204,7 @@ class TestAServiceOwnedRowIsGuardedToo:
 
 @pytest.mark.django_db
 class TestTheForwardKindIsGuardedToo:
-    """A forward target is matched inside ``scope=``, and the match only runs
-    when the payload carries the spec's ``match_key``.
-
-    So a spec matching on a natural key reaches the create branch for a payload
-    holding nothing but a primary key -- and ``Author(pk=7).save()`` blanks
-    author 7 rather than creating anybody.
-    """
+    """A forward target is matched inside ``scope=``."""
 
     def test_a_payload_carrying_only_a_primary_key_is_refused(self) -> None:
         victim = Author.objects.create(name="victim")
@@ -296,11 +260,7 @@ class TestTheForwardKindIsGuardedToo:
 
 @pytest.mark.django_db
 class TestTheReverseOneToOneKindIsGuardedToo:
-    """A reverse one-to-one has no ``match_key`` at all -- the parent's own
-    foreign key is the match -- so *every* payload primary key lands straight
-    in the create, where ``Profile(pk=7, author=parent).save()`` reassigns
-    profile 7 to this parent and overwrites it.
-    """
+    """A reverse one-to-one has no ``match_key``: the parent's foreign key matches."""
 
     def test_another_parents_row_cannot_be_claimed(self) -> None:
         victim = Author.objects.create(name="victim")

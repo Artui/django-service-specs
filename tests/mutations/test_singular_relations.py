@@ -1,11 +1,3 @@
-"""Forward FK / one-to-one, and reverse one-to-one.
-
-The three relations that hold exactly one row. The forward pair is written
-before the parent is saved, which is what lets the assignment ride the ordinary
-diff and ``update_fields`` machinery; the reverse one is the children loop with
-the collection taken out.
-"""
-
 from __future__ import annotations
 
 import json
@@ -64,8 +56,7 @@ class TestForwardRelation:
         assert result.get_field_change("author").new == author
 
     def test_the_target_exists_before_a_non_nullable_parent_is_saved(self) -> None:
-        # Cover.catalog cannot be null, so this only works if the forward phase
-        # really does run before the parent's save.
+        # Cover.catalog cannot be null.
         result = create_from_input(
             Cover,
             {"image": "cover.png", "catalog": {"name": "c"}},
@@ -90,8 +81,7 @@ class TestForwardRelation:
                 {"author": {"name": "Ursula"}},
                 relations={"author": ForwardRelationSpec(model=Author)},
             )
-        # One save of the parent, and the FK column travelled in update_fields
-        # like any other changed column -- no second save, no extra plumbing.
+        # One save of the parent.
         assert len(saves.calls) == 1
         assert saves.calls[0] == frozenset({"author"})
         assert result.get_field_change("author").new == Author.objects.get()
@@ -160,8 +150,7 @@ class TestForwardScope:
         assert theirs.name == "theirs"
 
     def test_a_key_outside_the_scope_is_refused_not_created(self) -> None:
-        # Creating here would write the payload -- pk included -- and Django's
-        # save() would land it on that very row, reaching past the scope.
+        # Creating here would write the payload, pk included, onto a row past the scope.
         theirs = Author.objects.create(name="theirs")
         with pytest.raises(ServiceValidationError) as excinfo:
             create_from_input(
@@ -173,7 +162,6 @@ class TestForwardScope:
                     )
                 },
             )
-        # A single row has no index: its own message sits under the relation.
         [message] = excinfo.value.detail["author"]["non_field_errors"]
         assert "outside the scope" in message
         theirs.refresh_from_db()
@@ -211,8 +199,8 @@ class TestForwardScope:
             )
         message = str(excinfo.value)
         assert "relations['author']" in message  # names the relation
-        assert "Declare scope=" in message  # names the remedy
-        assert "guessing a key" in message  # says why
+        assert "Declare scope=" in message
+        assert "guessing a key" in message
         author.refresh_from_db()
         assert author.name == "Ursula"
 
@@ -419,9 +407,7 @@ class TestReverseOneToOne:
         assert result.instance.sections.get().tags.get() == tag
 
     def test_the_delete_cascade_removes_the_singular_row(self) -> None:
-        # The parent owns this row, so the cascade removes it by the same rule
-        # the write path applies to an explicit null -- and reports it as the
-        # one-row change it is, rather than as a collection of one.
+        # The parent owns this row.
         catalog = Catalog.objects.create(name="c")
         cover = Cover.objects.create(catalog=catalog, image="i")
 
@@ -472,20 +458,12 @@ class TestEveryKindTogether:
 
 @pytest.mark.django_db
 class TestTheInstanceReadsWhatWasWritten:
-    """The returned instance must not still hold the pre-write related row.
-
-    Both singular kinds find their row by re-querying, so what gets saved is a
-    different Python object from whatever the parent had cached. Nothing about
-    the write invalidates that cache, and for a forward relation the diff cannot:
-    two rows sharing a primary key are equal, so the column is correctly left
-    alone and the stale object would be left with it.
-    """
+    """The returned instance must not still hold the pre-write related row."""
 
     def test_a_forward_target_updated_in_place_replaces_the_cached_row(self) -> None:
         author = Author.objects.create(name="Ursula")
         post = Post.objects.get(pk=Post.objects.create(title="t", author=author).pk)
-        # Something reads the relation before the write -- a validator, or the
-        # service comparing a before/after value. This caches the old row.
+        # Something reads the relation before the write -- a validator.
         previous_name = post.author.name
 
         result = update_from_input(
@@ -496,7 +474,6 @@ class TestTheInstanceReadsWhatWasWritten:
 
         assert previous_name == "Ursula"
         assert result.instance.author.name == "Ursula K."
-        # The column never changed, so the save must not have carried it.
         assert result.get_field_change("author") is None
         assert result.get_relation_change("author").outcome == "updated"
 
@@ -586,9 +563,7 @@ class TestTheInstanceReadsWhatWasWritten:
             _ = result.instance.profile
 
     def test_a_delete_service_that_kept_the_row_linked_keeps_the_row_intact(self) -> None:
-        # The cleared case drops the cache rather than assigning None through the
-        # descriptor, which would have blanked this row's own link in memory
-        # while the database still holds it.
+        # The cleared case drops the cache rather than assigning None through the descriptor.
         author = Author.objects.create(name="Ursula")
         profile = Profile.objects.create(author=author, bio="b")
 
@@ -603,7 +578,7 @@ class TestTheInstanceReadsWhatWasWritten:
         )
 
         assert profile.author_id == author.pk
-        assert result.instance.profile == profile  # re-read, and still there
+        assert result.instance.profile == profile
 
 
 @pytest.mark.django_db(transaction=True)
@@ -777,11 +752,10 @@ class TestAsyncSingularRelations:
         assert updated.get_relation_change("profile").pk == replacement.pk
 
     async def test_the_instance_reads_what_was_written(self) -> None:
-        # The sync twin of this is TestTheInstanceReadsWhatWasWritten; the async
-        # path resolves its rows the same way, so it can go stale the same way.
+        # The sync twin of this is TestTheInstanceReadsWhatWasWritten.
         author = await Author.objects.acreate(name="Ursula")
         post = await Post.objects.aget(pk=(await Post.objects.acreate(title="t", author=author)).pk)
-        _ = await sync_to_async(lambda: post.author.name)()  # caches the old row
+        _ = await sync_to_async(lambda: post.author.name)()
 
         forward = await aupdate_from_input(
             post,
@@ -789,7 +763,7 @@ class TestAsyncSingularRelations:
             relations={"author": ForwardRelationSpec(model=Author, scope=Author.objects.all())},
         )
         assert forward.instance.author.name == "Ursula K."
-        assert forward.get_field_change("author") is None  # the column never moved
+        assert forward.get_field_change("author") is None
 
         profile = await Profile.objects.acreate(author=author, bio="first")
         spec = {"profile": ReverseOneToOneSpec(model=Profile, fk="author")}
@@ -806,13 +780,7 @@ class TestAsyncSingularRelations:
 
 @pytest.mark.django_db
 class TestTheOutcomeIsAnEnumThatStillReadsAsAString:
-    """Both enums subclass ``str``, so the values they replaced keep working.
-
-    That is the whole reason for the ``str`` base: a consumer comparing against
-    the plain string it read in the docs is not broken by the field becoming an
-    enum, and the value stays JSON-serializable for anything that reports a
-    change over a wire.
-    """
+    """Both enums subclass ``str``, so the values they replaced keep working."""
 
     def test_a_reported_outcome_compares_both_ways(self) -> None:
         author = Author.objects.create(name="a")
@@ -828,8 +796,7 @@ class TestTheOutcomeIsAnEnumThatStillReadsAsAString:
         assert json.dumps({"outcome": change.outcome}) == '{"outcome": "created"}'
 
     def test_a_plain_string_mode_is_still_accepted(self) -> None:
-        # ``mode`` predates the enum and is documented as a string, so passing
-        # one must keep working rather than becoming a construction error.
+        # ``mode`` predates the enum and is documented as a string.
         assert ChildSpec(model=Post, fk="author", mode="merge").mode == RelationMode.MERGE
         assert ChildSpec(model=Post, fk="author").mode == "replace"
 

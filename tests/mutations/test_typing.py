@@ -1,15 +1,3 @@
-"""Static typing contract for the mutation helpers.
-
-The mutation helpers thread a ``ModelT = TypeVar("ModelT", bound=Model)``
-through their signatures so callers that pass a concrete model class get a
-``ChangeResult[SomeModel]`` back instead of a bare ``ChangeResult``.
-
-We can't observe a TypeVar's resolution at runtime (it's erased to its
-bound), but we can lock in the *shape* — the return is ``ChangeResult[T]``
-parametrised by the same TypeVar declared in :mod:`change_result` — using
-``typing.get_type_hints``.
-"""
-
 from __future__ import annotations
 
 from collections.abc import Callable

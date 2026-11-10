@@ -1,15 +1,3 @@
-"""What a row's write raises, and where the caller finds it.
-
-A service in a relation slot raises about *its* row. These assert the error
-arrives under the relation that carried it — at the right position when the
-relation holds many rows, keyed by its ``int`` index — and that what the service
-actually said survives the trip. The tree itself is
-``test_relation_error_shape.py``'s business.
-
-The services here refuse the row marked ``"rude"`` and write the others, so a
-reported position is measured against rows that really did pass.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -101,8 +89,7 @@ class TestACollectionSaysWhichRow:
                     )
                 },
             )
-        # Keyed by the failing row's index in the payload, and by nothing else:
-        # the rows that passed are not listed.
+        # Keyed by the failing row's index in the payload, and by nothing else.
         assert excinfo.value.detail == {"sections": {1: _RUDE}}
 
     def test_an_update_lands_at_its_index(self) -> None:
@@ -202,8 +189,7 @@ class TestASingularRelationSaysItsName:
         assert excinfo.value.detail == {"profile": {"bio": ["Too long."]}}
 
     def test_the_parents_own_field_is_told_apart_from_the_rows(self) -> None:
-        # Without the relation's name, a service refusing a section's ``title``
-        # would arrive looking exactly like the catalog's own.
+        # Without the relation's name.
         with pytest.raises(ServiceValidationError) as excinfo:
             create_from_input(
                 Catalog,
@@ -245,8 +231,7 @@ class TestTheNamesNest:
         assert excinfo.value.detail == {"sections": {0: {"items": {1: {"label": ["No."]}}}}}
 
     def test_the_primary_key_guard_is_not_named_twice(self) -> None:
-        # It addresses its own refusal, so the row writer leaves it alone: the
-        # relation and the row once each, then the message.
+        # It addresses its own refusal, so the row writer leaves it alone.
         catalog = Catalog.objects.create(name="c")
 
         with pytest.raises(ServiceValidationError) as excinfo:
@@ -292,12 +277,7 @@ class TestTheNamesNest:
 
 @pytest.mark.django_db(transaction=True)
 class TestAnUnmatchedReferenceSaysWhichRow:
-    """The primary-key guard addresses its row the way every other row failure does.
-
-    Read through the row's ``int`` index. The row's complaint is the message
-    alone, under ``non_field_errors``: the guard names the relation once, not
-    again inside the row.
-    """
+    """The primary-key guard addresses its row the way every other row failure does."""
 
     def test_the_refused_row_is_addressed_by_its_index(self) -> None:
         catalog = Catalog.objects.create(name="c")
@@ -332,8 +312,7 @@ class TestAnUnmatchedReferenceSaysWhichRow:
         assert message.startswith(f"references Section [{stranger.pk}], which this write")
 
     def test_a_key_outside_scope_is_addressed_by_its_index(self) -> None:
-        # The other refusal of the library's own that a row can earn: a scoped
-        # kind's match key naming nothing it may write.
+        # The other refusal of the library's own that a row can earn.
         catalog = Catalog.objects.create(name="c")
         section = Section.objects.create(catalog=catalog, title="s")
 
@@ -381,13 +360,7 @@ def _missed(detail: Any, relation: str, model: str, key: Any, index: int | None 
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.usefixtures("unstated_ranges")
 class TestAKeyPastItsColumnNamesNoRow:
-    """A scoped kind's key past its integer column's range is a key no row holds.
-
-    Django answers an exact lookup past the range with no rows where the
-    backend states it, from 5.0; where it states none, as Django 4.2's SQLite
-    backend does, the lookup handed the key to the driver, which raised
-    ``OverflowError``. Refused as any key matching nothing in scope is.
-    """
+    """A scoped kind's key past its integer column's range is a key no row holds."""
 
     @_PAST
     def test_a_forward_key(self, key: Any) -> None:
@@ -436,8 +409,7 @@ class TestAKeyPastItsColumnNamesNoRow:
     def test_a_key_on_a_foreign_key_is_held_to_the_column_it_points_at(
         self, match_key: str
     ) -> None:
-        # The foreign key's column holds the other row's key, so its range is
-        # that key's, by the field's name or by its column's.
+        # The foreign key's column holds the other row's key, so its range is that key's.
         catalog = Catalog.objects.create(name="c")
         with pytest.raises(ServiceValidationError) as excinfo:
             create_from_input(
@@ -510,8 +482,7 @@ class TestAKeyPastItsColumnNamesNoRow:
 @pytest.mark.django_db
 @pytest.mark.usefixtures("unstated_ranges")
 class TestAKeyAtItsColumnsEndsNamesItsRow:
-    # Not in a transactional test: SQLite's key sequence would keep the
-    # largest key past the flush, and no later row could be given one.
+    # Not in a transactional test: SQLite's key sequence would keep the largest key past the flush.
     def test_the_keys_at_either_end_of_the_column_s_range_are_matched(self) -> None:
         ends = [Author.objects.create(pk=pk, name="end") for pk in (-(2**63), 2**63 - 1)]
         for end in ends:
@@ -536,8 +507,7 @@ class TestWhatTheServiceSaidSurvives:
                     )
                 },
             )
-        # A message about the row rather than a field of it: under
-        # ``non_field_errors`` inside the row, as a one-item list.
+        # A message about the row rather than a field of it.
         assert excinfo.value.detail == {"sections": {0: {"non_field_errors": ["Too rude."]}}}
 
     def test_a_list_detail_is_the_rows_own_messages(self) -> None:
@@ -557,8 +527,7 @@ class TestWhatTheServiceSaidSurvives:
         assert excinfo.value.detail == {"profile": {"non_field_errors": ["Too long.", "Too loud."]}}
 
     def test_invalid_arguments_from_a_row_service_stays_invalid_arguments(self) -> None:
-        # A row service that validates its row refuses the arguments, and naming
-        # the relation is no reason to turn that into a business refusal.
+        # A row service that validates its row refuses the arguments.
         def service(**_: Any) -> None:
             raise InvalidArguments({"title": ["Too rude."]})
 
@@ -650,12 +619,7 @@ class TestTheAsyncPathReportsIdentically:
 
 @pytest.mark.django_db
 class TestDjangosOwnWriteFailuresRefuseTheArguments:
-    """What Django raises when a row's data cannot be written, on the helper path.
-
-    None of it carries a tree, so each becomes a refusal of the arguments with
-    Django's message as the row's own; the ``ValueError`` arm is pinned in
-    ``test_matched_row_shaping.py``.
-    """
+    """What Django raises when a row's data cannot be written, on the helper path."""
 
     def test_a_key_the_model_has_no_field_for_is_named_at_its_row(self) -> None:
         # ``TypeError`` from the model's constructor.
@@ -671,9 +635,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         assert "bogus" in message
 
     def test_a_value_the_field_cannot_coerce_is_named_by_its_message(self) -> None:
-        # A ``ValidationError`` with no field, from the field's ``to_python``,
-        # read for its messages rather than for the repr of the list ``str()``
-        # would give, and keeping Django's code.
+        # A ``ValidationError`` with no field, from the field's ``to_python``.
         with pytest.raises(InvalidArguments) as excinfo:
             create_from_input(
                 Author,
@@ -687,8 +649,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         assert code == "invalid"
 
     def test_a_field_keyed_validation_error_keeps_its_fields(self) -> None:
-        # A model whose ``save()`` runs ``full_clean()`` names the field, and the
-        # row's tree addresses it the way a validator would.
+        # A model whose ``save()`` runs ``full_clean()`` names the field.
         refusal = ValidationError({"title": ["Not this one."]})
 
         with (
@@ -707,15 +668,11 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         "field",
         [
             pytest.param("title", id="keyed-by-field"),
-            # Built from a list, as ``Model.clean()`` raises one: the row's own
-            # complaint.
+            # Built from a list, as ``Model.clean()`` raises one: the row's own complaint.
             pytest.param("non_field_errors", id="with-no-field"),
         ],
     )
     def test_a_validation_error_keeps_each_message_s_own_code(self, field: str) -> None:
-        # Django's code, which is DRF's for the same mistake; a message
-        # raised with none is ``invalid``, as DRF's ValidationError's is. Each
-        # message is rendered with its params.
         messages: list[Any] = [
             ValidationError("Too long.", code="max_length"),
             ValidationError("Not %(word)s.", code="blocked", params={"word": "this"}),
@@ -777,8 +734,7 @@ class TestDjangosOwnWriteFailuresRefuseTheArguments:
         assert coded(excinfo.value.detail) == {"sections": {0: {"title": [("Taken.", "unique")]}}}
 
     def test_an_integrity_error_is_left_alone(self) -> None:
-        # A constraint is a conflict with rows that exist rather than a shape,
-        # and the backend's message can quote another row's values.
+        # A constraint is a conflict with rows that exist rather than a shape.
         conflict = IntegrityError("UNIQUE constraint failed")
 
         with (
@@ -807,14 +763,7 @@ def _nested_items(**item_spec: Any) -> dict[str, ChildSpec]:
 
 @pytest.mark.django_db
 class TestCallerCodeIsNeverTranslated:
-    """A bug in caller code two levels down is not the outer row's data failing.
-
-    Every helper-path row translates Django's write failures, and a nested row's
-    caller code raises into the ``try`` of every row above it. Each test puts the
-    caller code one level below a row the helpers write, which is the only place
-    the translation could reach it, and asserts the caller gets back the very
-    exception it raised.
-    """
+    """A bug in caller code two levels down is not the outer row's data failing."""
 
     def test_a_create_service_under_a_created_row(self) -> None:
         bug = TypeError("a bug in my service")
@@ -927,8 +876,7 @@ class TestTheAsyncPathLeavesCallerCodeAlone:
         assert excinfo.value is bug
 
     async def test_djangos_own_failure_is_still_translated(self) -> None:
-        # The mark is what separates the two, so the async helper path must
-        # still translate what nobody marked.
+        # The mark is what separates the two.
         with pytest.raises(InvalidArguments) as excinfo:
             await acreate_from_input(
                 Catalog,

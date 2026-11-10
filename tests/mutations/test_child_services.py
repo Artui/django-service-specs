@@ -1,10 +1,3 @@
-"""Per-child service slots on ``ChildSpec``.
-
-The spec owns reconciliation, the service owns the row: these assert what the
-service actually receives, that the loop's own seeds win over the caller
-context, and that a nested service never opens a savepoint of its own.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -48,9 +41,7 @@ class TestCreateService:
         assert seen["user"] == _USER  # from the caller context
         assert seen["progress"] == "reporter"
         assert seen["parent"] == catalog
-        # The spec, not the service, links the row to its parent.
         assert seen["data"] == {"title": "s", "catalog": catalog}
-        # A create pool never fakes an ``instance``; that is the update shape.
         assert "instance" not in seen
         assert catalog.sections.get().title == "s"
         assert result.get_child_change("sections").created == (catalog.sections.get().pk,)
@@ -70,8 +61,7 @@ class TestCreateService:
         )
         assert seen["data"] == {"title": "s", "catalog": result.instance}
         assert seen["parent"] == result.instance
-        # ``instance`` is not a create seed, so the context value survives —
-        # the rule is that the loop's own values win, not that context is scrubbed.
+        # ``instance`` is not a create seed.
         assert seen["instance"] == "hijacked"
 
     def test_service_receives_only_what_it_declares(self) -> None:
@@ -206,10 +196,8 @@ class TestDeleteService:
         assert seen["parent"] == catalog
         orphan.refresh_from_db()
         assert orphan.body == "archived"
-        assert orphan.catalog_id == catalog.pk  # the service, not the unlink rule, ran
+        assert orphan.catalog_id == catalog.pk
         change = result.get_child_change("notes")
-        # The loop can no longer tell an unlink from a delete, so it reports
-        # neither: "removed" is the one thing it still knows to be true.
         assert change.removed == (orphan.pk,)
         assert change.deleted == ()
         assert change.unlinked == ()
@@ -233,7 +221,7 @@ class TestDeleteService:
         # Grandchildren are still the spec's business — removed before the row.
         assert not Item.objects.filter(pk=item.pk).exists()
         assert archived == [(section.pk, catalog, _USER)]
-        assert Section.objects.filter(pk=section.pk).exists()  # the service kept it
+        assert Section.objects.filter(pk=section.pk).exists()
         assert deltas[0].removed == (section.pk,)
         assert deltas[0].deleted == ()
 
@@ -286,10 +274,7 @@ class TestAsyncChildServices:
         assert await catalog.sections.acount() == 1
 
     async def test_nested_service_runs_without_a_transaction_of_its_own(self) -> None:
-        # An async service sees its own connection object, so ``in_atomic_block``
-        # reads the same either way and cannot decide this. Rollback can: with
-        # ``atomic=True`` the row this service wrote before raising would be
-        # rolled back, and there is no outer transaction here to hide that.
+        # An async service sees its own connection object.
         async def create_section(*, data: Any) -> Section:
             await Section.objects.acreate(**data)
             raise RuntimeError("boom")
@@ -369,13 +354,7 @@ class TestAsyncChildServices:
 
 @pytest.mark.django_db(transaction=True)
 class TestTheAsyncLoopRefusesASyncSlot:
-    """A slot the async loop cannot await is refused by name, before it runs.
-
-    Handed through, a sync slot that queries fails with
-    ``SynchronousOnlyOperation`` and one that does not runs its whole body first
-    and then fails with ``TypeError`` on awaiting its ``None`` -- neither naming
-    the relation or the slot, and the second after the body's side effects.
-    """
+    """A slot the async loop cannot await is refused by name, before it runs."""
 
     async def test_a_create_service_that_never_queries(self) -> None:
         ran: list[Any] = []

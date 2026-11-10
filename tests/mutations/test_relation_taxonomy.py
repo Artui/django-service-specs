@@ -1,10 +1,3 @@
-"""The relation taxonomy: one map, one ordering rule, one driver.
-
-``relations=`` is the one map for every kind, and the order rows are written in
-comes off the spec *class* — never off the order the mapping happens to be
-spelled in.
-"""
-
 from __future__ import annotations
 
 from typing import Any
