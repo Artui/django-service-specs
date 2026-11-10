@@ -1,11 +1,3 @@
-"""``clean_held_to_their_columns`` leaves the form as found, whether validation returned or raised.
-
-What it refuses is held where its readers are tested: here in
-``tests/adapters/forms/test_form_validator.py``, and in django-spec-html's
-tests of ``add_argument_errors``. These hold what it puts back, and how it
-reads a key sent more than once, which no reader in this package binds.
-"""
-
 from __future__ import annotations
 
 from typing import Any
@@ -92,9 +84,7 @@ class _Several(forms.Form):
 @pytest.mark.django_db
 @pytest.mark.parametrize("prefix", [None, "pick"], ids=["unprefixed", "prefixed"])
 def test_a_list_s_key_past_its_column_is_refused_once(prefix: str | None) -> None:
-    # Bound as a view binds ``request.POST``: a ``QueryDict``, whose item is
-    # only the last of a key's values, and here that one is a row. Read
-    # through the widget, every value is held to the column.
+    # Bound as a view binds ``request.POST``: a ``QueryDict``.
     book = Book.objects.create(author=Author.objects.create(name="Ada"), title="Notes", price=1)
     name = "rows" if prefix is None else f"{prefix}-rows"
     form = _Several(data=QueryDict(f"{name}={_BEYOND_THE_COLUMN}&{name}={book.pk}"), prefix=prefix)

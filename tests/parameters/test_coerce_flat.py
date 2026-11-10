@@ -49,9 +49,7 @@ def test_parses_integers_numbers_and_booleans() -> None:
 def test_a_number_is_what_a_json_decoder_makes_of_the_same_digits(
     value: str, number: float
 ) -> None:
-    # An integer literal decodes to an exact ``int`` and anything with a point
-    # or an exponent to a ``float``, so the flat ``"3"`` reaches the Validator
-    # as the JSON ``3`` does. Read through ``float``, 2**53 + 1 was 2**53.
+    # An integer literal decodes to an exact ``int``, a point or exponent to a ``float``.
     coerced = coerce_flat(FLAT, {"ratio": value})["ratio"]
     assert coerced == number
     assert type(coerced) is type(number)
@@ -64,9 +62,7 @@ LIMITED = getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0
 
 
 def test_an_integer_literal_past_int_s_digit_limit_is_refused_never_rounded() -> None:
-    # Digits alone spell an integer, so where ``int`` refuses them they spell
-    # no number at all, rather than the float neighbour 2**53 that
-    # ``float`` makes of them. A Python with no digit limit reads them exactly.
+    # Digits alone spell an integer, so where ``int`` refuses them they spell no number at all.
     if LIMITED:
         assert refusal(FLAT, {"ratio": PADDED}) == {"ratio": ["Enter a number."]}
     else:
@@ -91,8 +87,7 @@ def test_every_other_boolean_spelling_is_refused(spelling: str) -> None:
 
 @pytest.mark.parametrize("value", ["3.5", "5.05", "three", "", ".0", "5.0.0", "1e3"])
 def test_an_integer_must_be_a_whole_number(value: str) -> None:
-    # ``.0`` and ``5.0.0`` lose their trailing zeros and still do not parse,
-    # as in Django's IntegerField; ``1e3`` is no decimal spelling at all.
+    # ``.0`` and ``5.0.0`` lose their trailing zeros and still do not parse.
     assert refusal(FLAT, {"count": value}) == {"count": ["Enter a whole number."]}
 
 
@@ -100,17 +95,14 @@ def test_an_integer_must_be_a_whole_number(value: str) -> None:
     ("value", "number"), [("5.0", 5), ("5.", 5), ("-3.000", -3), (" 7.0 ", 7), ("0.0", 0)]
 )
 def test_an_integral_decimal_spelling_is_an_integer(value: str, number: int) -> None:
-    # Django's IntegerField strips ``.0*`` and trailing space before ``int``,
-    # and so does DRF's, so both read each of these as a whole number. The
-    # field itself is asked, so the two readings cannot drift apart unseen.
+    # Django's IntegerField strips ``.0*`` and trailing space before ``int``, and so does DRF's.
     coerced = coerce_flat(FLAT, {"count": value})
     assert coerced == {"count": number} == {"count": forms.IntegerField().clean(value)}
     assert type(coerced["count"]) is int
 
 
 def test_an_arrays_integer_elements_read_an_integral_decimal_alike() -> None:
-    # A repeated query-string key arrives as a list of strings, and each element
-    # is read as the parameter of its ``items`` type would be.
+    # A repeated query-string key arrives as a list of strings.
     assert coerce_flat(FLAT, {"ids": ["5.0", "6.", "7"]}) == {"ids": [5, 6, 7]}
     assert refusal(FLAT, {"ids": ["5.0", "5.5"]}) == {"ids": {1: ["Enter a whole number."]}}
 
@@ -122,9 +114,7 @@ _NON_ASCII_NUMBERS = ["\u0665", "\uff15", "\u0665.0", "\u00a05"]
 
 @pytest.mark.parametrize("value", _NON_ASCII_NUMBERS)
 def test_a_number_spelled_outside_ascii_is_refused(value: str) -> None:
-    # Django's form fields read each of these as 5, and pydantic and JSON read
-    # none of them; refused here, in each type's own words, so a query string
-    # never hands a Validator a number its caller did not spell in digits.
+    # Django's form fields read each of these as 5, and pydantic and JSON read none of them.
     assert refusal(FLAT, {"count": value, "ratio": value}) == {
         "count": ["Enter a whole number."],
         "ratio": ["Enter a number."],
@@ -144,8 +134,7 @@ def test_a_decimal_a_date_time_and_a_date_stay_strings_for_the_validator() -> No
 
 @pytest.mark.parametrize("raw", ["null", "undefined", "project_pk"])
 def test_a_uuid_stays_a_string_and_the_shape_check_refuses_a_nullish_one(raw: str) -> None:
-    # Argv and a query string reach the same refusal a JSON body does: the
-    # flat reading leaves the string alone, and the shape check reads it.
+    # Argv and a query string reach the same refusal a JSON body does.
     flat = Parameters.of(Parameter("project_pk", "string", format="uuid"))
     assert coerce_flat(flat, {"project_pk": raw}) == {"project_pk": raw}
     with pytest.raises(InvalidArguments) as refused:
@@ -172,8 +161,7 @@ def test_an_array_addresses_a_failing_element_by_index() -> None:
 
 
 def test_none_is_not_wrapped_into_an_array() -> None:
-    # Holds the ``value is None`` condition in ``coerce_flat``. An option
-    # argparse never received is absent, not a list holding a null.
+    # Holds the ``value is None`` condition in ``coerce_flat``.
     assert coerce_flat(FLAT, {"ids": None}) == {"ids": None}
 
 
@@ -225,8 +213,7 @@ def test_each_uuid_element_of_a_string_array_is_spelled_back(
 
 
 def test_check_arguments_alone_still_refuses_a_uuid() -> None:
-    # The spelling back is ``coerce_flat``'s: a typed caller handing the shape
-    # check a ``UUID`` for a string is still refused.
+    # The spelling back is ``coerce_flat``'s.
     with pytest.raises(InvalidArguments) as refused:
         check_arguments(Parameters.of(Parameter("pk", "string")), {"pk": ROUTE_UUID})
     assert coded(refused.value.detail) == {"pk": [("Expected a string.", "invalid")]}
@@ -240,8 +227,7 @@ def test_check_arguments_alone_still_refuses_a_uuid() -> None:
     ],
 )
 def test_a_uuid_for_a_parameter_that_is_no_string_is_left_alone(parameter: Parameter) -> None:
-    # The first condition of the arm in ``_coerce_one``: an ``any`` declares no
-    # type to spell it as, so the Validator sees what the route decoded.
+    # The first condition of the arm in ``_coerce_one``: an ``any`` declares no type to spell it as.
     assert coerce_flat(Parameters.of(parameter), {"pk": ROUTE_UUID}) == {"pk": ROUTE_UUID}
 
 
@@ -253,8 +239,7 @@ def test_a_uuid_in_an_array_declaring_no_items_is_left_alone() -> None:
 
 
 def test_an_integer_for_a_string_stays_refused_by_the_shape_check() -> None:
-    # The second condition of the arm in ``_coerce_one``: only a ``UUID`` is
-    # spelled back. Spelling every value would turn this refusal into a ``"3"``.
+    # The second condition of the arm in ``_coerce_one``: only a ``UUID`` is spelled back.
     parameters = Parameters.of(Parameter("title", "string"))
     coerced = coerce_flat(parameters, {"title": 3})
     assert coerced == {"title": 3}
@@ -310,8 +295,7 @@ def test_an_any_parameter_keeps_the_string_it_arrived_as() -> None:
 
 
 def test_an_array_past_its_maximum_is_refused_whole_before_any_element_is_read() -> None:
-    # Every element is malformed and none is addressed: the length is read
-    # first, so a long flat list costs no per-element parse.
+    # Every element is malformed and none is addressed: the length is read first.
     detail = refusal(FLAT, {"ids": ["x"] * 1001})
     assert detail == {"ids": ["Ensure this field has no more than 1000 elements."]}
     assert "Enter a whole number." not in str(detail)

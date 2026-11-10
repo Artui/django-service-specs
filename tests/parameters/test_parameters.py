@@ -20,8 +20,7 @@ ROW = Parameters.of(Parameter("title", "string", required=True))
 
 
 def test_only_the_name_and_the_type_are_positional() -> None:
-    # Every other field is keyword-only, so a field added among them shifts no
-    # call written positionally, and their order is not part of the contract.
+    # Every other field is keyword-only.
     kinds = {name: param.kind for name, param in inspect.signature(Parameter).parameters.items()}
     positional = [
         name for name, kind in kinds.items() if kind is not inspect.Parameter.KEYWORD_ONLY
@@ -49,9 +48,7 @@ def test_defaults() -> None:
 
 
 def test_reflected_is_compared_and_hashed_and_never_in_the_schema() -> None:
-    # Two declarations differing only in it dispatch differently, so they are
-    # two keys; and it says where a declaration came from, not what a caller
-    # sends, so no schema states it.
+    # Two declarations differing only in it dispatch differently, so they are two keys.
     written, reflected = (
         Parameter("tenant", "string"),
         Parameter("tenant", "string", reflected=True),
@@ -68,9 +65,7 @@ def test_choices_are_normalized_to_a_tuple() -> None:
 
 @pytest.mark.parametrize("default", [[1, 2], {"sizes": [1]}, [], UNSET, None])
 def test_a_parameter_is_hashable_whatever_its_default(default: Any) -> None:
-    # A list default reaches a Parameter from the pydantic adapter, which
-    # reports a field's default as given, and a transport caching a tool's
-    # schema by its Parameters hashes every one, nested ones included.
+    # A list default reaches a Parameter from the pydantic adapter.
     def declared() -> Parameter:
         return Parameter("sizes", "array", items="integer", default=copy.deepcopy(default))
 
@@ -86,8 +81,7 @@ def test_a_parameter_is_hashable_whatever_its_default(default: Any) -> None:
 
 
 def test_a_default_still_tells_two_parameters_apart() -> None:
-    # Out of the hash, not out of equality: two declarations differing only by
-    # default share a hash and stay two keys.
+    # Out of the hash, not out of equality.
     one, other = Parameter("n", "integer", default=[1]), Parameter("n", "integer", default=[2])
     assert hash(one) == hash(other)
     assert one != other
@@ -104,8 +98,7 @@ def test_a_default_still_tells_two_parameters_apart() -> None:
         ({"type": "string", "items": "string"}, "items describes an array's element"),
         ({"type": "array", "items": "str"}, "items 'str' is not a JSON type"),
         ({"type": "array", "fields": ROW}, "fields describes an object's own parameters"),
-        # An undeclared element admits anything, null included, so saying so
-        # again describes nothing a reader could act on.
+        # An undeclared element admits anything, null included.
         ({"type": "array", "items_nullable": True}, "items_nullable describes a declared element"),
     ],
 )
@@ -137,8 +130,7 @@ def test_an_arrays_declared_element_may_be_nullable() -> None:
 
 
 def test_a_file_is_a_parameter_type_and_an_element_type() -> None:
-    # Not a JSON type: only a multipart body or a Python caller carries one,
-    # and the output side, which shares the JSON types, never returns one.
+    # Not a JSON type: only a multipart body or a Python caller carries one, and the output side.
     assert Parameter("notes", "file").type == "file"
     assert Parameter("notes", "array", items="file").items == "file"
 
@@ -204,8 +196,7 @@ def test_a_decimal_string_takes_a_bound() -> None:
 
 
 def test_a_decimal_array_reads_each_element_as_a_bounded_decimal() -> None:
-    # A django-filter CSV number filter: each element is the decimal its
-    # string spells, bounded as a scalar number filter is.
+    # A django-filter CSV number filter: each element is the decimal its string spells.
     p = Parameter("pks", "array", items="string", format="decimal", minimum=-1e50, maximum=1e50)
     assert (p.items, p.format, p.minimum, p.maximum) == ("string", "decimal", -1e50, 1e50)
 
@@ -234,8 +225,7 @@ def test_a_bound_on_an_array_of_numbers_bounds_each_element(items: str) -> None:
             {"items": "string", "format": "date-time"},
             "an array's element takes no format but 'decimal'",
         ),
-        # A list of identifiers is a list of strings: only a decimal is read per
-        # element, so the refusal names the one an element takes.
+        # A list of identifiers is a list of strings: only a decimal is read per element.
         ({"items": "string", "format": "uuid"}, "an array's element takes no format but 'decimal'"),
     ],
     ids=["no-items", "number", "rows", "date", "date-time", "uuid"],
@@ -290,8 +280,7 @@ def test_a_length_describes_an_array(side: str) -> None:
 
 @pytest.mark.parametrize("side", ["min_length", "max_length"])
 def test_a_length_may_stand_alone_and_be_zero(side: str) -> None:
-    # Zero is a count, so a falsy check in place of ``is not None`` would
-    # refuse it as no length or take it as none.
+    # Zero is a count.
     param = Parameter("ids", "array", **{side: 0})
     assert getattr(param, side) == 0
 
@@ -315,8 +304,7 @@ def test_choice_labels_are_none_unless_declared() -> None:
     ids=["mapping", "pairs"],
 )
 def test_choice_labels_are_normalized_to_pairs(labels: Any) -> None:
-    # A mapping is how a reader writes it and a list of pairs is how Django
-    # spells ``choices``, so both are read, and stored as a tuple of pairs.
+    # A mapping is how a reader writes it and a list of pairs is how Django spells ``choices``.
     status = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
     assert status.choice_labels == (("draft", "Draft"), ("live", "Published"))
     twin = Parameter("status", "string", choices=("draft", "live"), choice_labels=labels)
@@ -325,9 +313,7 @@ def test_choice_labels_are_normalized_to_pairs(labels: Any) -> None:
 
 
 def test_a_lazy_label_is_compared_and_never_hashed() -> None:
-    # Out of the hash, as ``default`` is: a lazy translation renders when it is
-    # hashed, and a hash taken at import, before the apps are ready, would raise.
-    # Equality still compares the labels, and equal Parameters still hash equal.
+    # Out of the hash, as ``default`` is: a lazy translation renders when it is hashed.
     renders: list[str] = []
 
     def rendered(text: str) -> str:
@@ -439,8 +425,7 @@ class TestJsonSchemaExtra:
         assert Parameter("code", "string").json_schema_extra is None
 
     def test_it_is_kept_as_a_copy_of_its_own(self) -> None:
-        """Copied deeply, so a mapping the caller changes later, at any depth,
-        leaves the declaration as it was written."""
+        """Copied deeply, so a mapping the caller changes later, at any depth."""
         given = {"pattern": "^[A-Z]{3}$", "examples": [["GBP"]]}
         param = Parameter("code", "string", json_schema_extra=given)
         given["pattern"] = "changed"
@@ -449,9 +434,7 @@ class TestJsonSchemaExtra:
         assert type(param.json_schema_extra) is dict
 
     def test_a_parameter_carrying_one_is_hashable_and_compared_by_it(self) -> None:
-        """Out of the hash, as ``default`` is, since a dict cannot be hashed;
-        still in equality, so two declarations advertising different schemas
-        are two declarations."""
+        """Out of the hash, as ``default`` is, since a dict cannot be hashed; still in equality."""
         one = Parameter("code", "string", json_schema_extra={"pattern": "^a"})
         assert hash(one) == hash(Parameter("code", "string"))
         assert one != Parameter("code", "string", json_schema_extra={"pattern": "^b"})
@@ -494,9 +477,7 @@ class TestJsonSchemaExtra:
     def test_a_keyword_a_field_states_is_refused_whatever_the_parameter_declares(
         self, keyword: str, owner: str
     ) -> None:
-        """Refused from the declaration, not from one build of it: this
-        parameter states none of these, and each is still the field's to
-        state, so the author is sent to the field."""
+        """Refused from the declaration, not from one build of it."""
         with pytest.raises(ImproperlyConfigured) as refused:
             Parameter("code", "string", json_schema_extra={"pattern": "^a", keyword: "x"})
         assert str(refused.value).startswith(
@@ -522,10 +503,7 @@ class TestJsonSchemaExtra:
     def test_a_value_json_cannot_carry_is_refused_naming_its_key(
         self, extra: dict[str, Any]
     ) -> None:
-        """Every transport encodes the schema as JSON, so such a value would
-        stop the operation being listed at all rather than describe it worse.
-        Sized with a keyword no field states, so this check is the one that
-        answers."""
+        """Every transport encodes the schema as JSON."""
         with pytest.raises(ImproperlyConfigured) as refused:
             Parameter("code", "string", json_schema_extra={"pattern": "^a", **extra})
         message = str(refused.value)

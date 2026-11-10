@@ -89,8 +89,7 @@ def test_a_required_parameter_is_refused_when_absent() -> None:
 
 
 def test_an_optional_parameter_may_be_absent_and_stays_absent() -> None:
-    # Holds the ``param.required`` condition in ``_check_object``. No default
-    # is declared, so the other conjunct cannot be what lets it through.
+    # Holds the ``param.required`` condition in ``_check_object``.
     assert check_arguments(one(Parameter("pk", "integer")), {}) == {}
 
 
@@ -99,8 +98,7 @@ def test_an_optional_parameter_may_be_absent_and_stays_absent() -> None:
     [pytest.param("draft", id="a-string"), pytest.param(None, id="none-is-a-real-default")],
 )
 def test_a_required_parameter_with_a_default_is_not_refused_when_absent(default: Any) -> None:
-    # Holds the ``default is UNSET`` condition. The default is not applied
-    # either: that is the Validator's library's behaviour to report.
+    # Holds the ``default is UNSET`` condition.
     params = one(Parameter("status", "string", required=True, default=default))
     assert check_arguments(params, {}) == {}
 
@@ -149,18 +147,14 @@ def test_accepts_a_value_of_its_json_type(json_type: str, value: Any) -> None:
 def test_an_integral_float_is_an_integer_and_is_handed_on_as_an_int(
     value: float, number: int
 ) -> None:
-    # JSON Schema counts 5.0 as an integer, so the {"type": "integer"} the
-    # kernel advertises admits it. 1e16 is one too, although a field reading
-    # ``str(value)`` sees "1e+16" and refuses it.
+    # JSON Schema counts 5.0 as an integer, so the {"type".
     cleaned = check_arguments(one(Parameter("count", "integer")), {"count": value})
     assert cleaned == {"count": number}
     assert type(cleaned["count"]) is int
 
 
 def test_a_field_reading_str_refuses_at_an_exponent_what_the_check_hands_on() -> None:
-    # The divergence the check's docstring states, against the real field:
-    # Django's IntegerField reads ``str(value)`` as DRF's does, so 1e16 raw is
-    # "1e+16" and refused, while the int the check hands on is taken.
+    # The divergence the check's docstring states, against the real field.
     field = forms.IntegerField()
     with pytest.raises(ValidationError):
         field.clean(1e16)
@@ -215,16 +209,13 @@ def test_a_choice_refused_after_the_conversion_names_the_int() -> None:
 def test_a_float_nothing_declares_an_integer_stays_a_float(
     parameter: Parameter, value: Any
 ) -> None:
-    # Holds ``json_type == "integer"`` in the conversion: a number keeps the
-    # float the caller sent, and what an undeclared element or a free-form
-    # object holds is the caller's, for its Validator.
+    # Holds ``json_type == "integer"`` in the conversion: a number keeps the float the caller sent.
     assert repr(check_arguments(one(parameter), {"x": value})["x"]) == repr(value)
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_a_non_finite_float_is_still_no_integer(value: float) -> None:
-    # Neither is integral, so neither is converted, and the type check
-    # refuses it as no integer.
+    # Neither is integral, so neither is converted, and the type check refuses it as no integer.
     assert refusal(one(Parameter("count", "integer")), {"count": value}) == {
         "count": ["Expected an integer."]
     }
@@ -275,10 +266,6 @@ def test_the_validator_reads_the_int_so_its_own_type_and_bounds_apply() -> None:
 def test_a_numeric_string_is_read_and_the_number_handed_on(
     json_type: str, value: str, number: float
 ) -> None:
-    # Django's forms read every one of these strings as the number, and
-    # pydantic's lax mode all but the integer "-4.", so refusing them would be
-    # stricter than every library behind the check. The parsed number is what
-    # goes on: a dataclass Validator refuses the string "3" for an ``int``.
     cleaned = check_arguments(one(Parameter("x", json_type)), {"x": value})
     assert cleaned == {"x": number}
     assert type(cleaned["x"]) is type(number)
@@ -298,9 +285,7 @@ def test_a_numeric_string_is_read_and_the_number_handed_on(
 def test_a_string_that_is_no_number_is_refused_as_its_type(
     json_type: str, value: str, message: str
 ) -> None:
-    # The refusal is the type's: a string that does not read as the
-    # number is a string, which is not the declared type. "1e3" is no integer
-    # to Django's forms or pydantic, although both read it as a number.
+    # The refusal is the type's: a string that does not read as the number is a string.
     assert refusal(one(Parameter("x", json_type)), {"x": value}) == {"x": [message]}
 
 
@@ -312,8 +297,7 @@ def test_a_string_that_is_no_number_is_refused_as_its_type(
 def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
     json_type: str, value: str
 ) -> None:
-    # One rule for both, input for input, so a query string and a JSON body
-    # carrying the same string reach the Validator as the same value.
+    # One rule for both, input for input.
     params = one(Parameter("x", json_type))
     try:
         flat: Any = coerce_flat(params, {"x": value})
@@ -328,8 +312,7 @@ def test_a_numeric_string_is_accepted_exactly_where_coerce_flat_accepts_it(
 
 @pytest.mark.parametrize("value", ["\u0665", "\uff15", "\u0665.0", "\u00a05"])
 def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: str) -> None:
-    # Python's ``int`` and ``float`` read Arabic-Indic and fullwidth digits, and
-    # a no-break space around them, and pydantic's lax mode reads none of them.
+    # Python's ``int`` and ``float`` read Arabic-Indic and fullwidth digits.
     assert refusal(
         Parameters.of(Parameter("count", "integer"), Parameter("ratio", "number")),
         {"count": value, "ratio": value},
@@ -343,18 +326,14 @@ def test_a_numeric_string_spelled_outside_ascii_is_refused_as_its_type(value: st
 def test_a_number_s_string_is_handed_on_as_a_json_decoder_reads_its_digits(
     value: str, number: float
 ) -> None:
-    # A JSON body carrying the literal 9007199254740993 hands on that exact
-    # ``int``; the same digits sent as a string are read the same way, not
-    # rounded through ``float`` to their neighbour.
+    # A JSON body carrying the literal 9007199254740993 hands on that exact ``int``.
     checked = check_arguments(one(Parameter("x", "number")), {"x": value})["x"]
     assert checked == number
     assert type(checked) is type(number)
 
 
 def test_a_number_s_string_past_int_s_digit_limit_is_refused_never_rounded() -> None:
-    # Zero-padded past the 4300 digits ``int`` reads from Python 3.10.7 on,
-    # these digits are still a finite ``float``, 2**53: refused as no number
-    # rather than handed on as that neighbour. With no limit they are exact.
+    # Zero-padded past the 4300 digits ``int`` reads from Python 3.10.7 on.
     padded = "0" * 4300 + str(2**53 + 1)
     params = one(Parameter("x", "number"))
     if getattr(sys, "get_int_max_str_digits", lambda: 0)() != 0:
@@ -369,11 +348,7 @@ def test_a_number_s_string_past_int_s_digit_limit_is_refused_never_rounded() -> 
 
 @pytest.mark.parametrize("value", ["12.50", "\u0665", "\uff15", "\u0661\u0662.\u0665", " 5 "])
 def test_a_decimal_string_is_read_as_decimal_reads_it_in_any_digit_script(value: str) -> None:
-    # Not a number's reading: a decimal is checked as Python's ``Decimal``
-    # parses it, which takes Arabic-Indic and fullwidth digits, and is handed
-    # on unchanged. Deliberately: Django's ``DecimalField``, DRF's and
-    # pydantic's ``Decimal`` each hand the string to ``Decimal`` and take them,
-    # so refusing them would be stricter than every Validator behind the check.
+    # Not a number's reading: a decimal is checked as Python's ``Decimal`` parses it.
     params = one(Parameter("price", "string", format="decimal"))
     assert check_arguments(params, {"price": value}) == {"price": value}
 
@@ -409,9 +384,7 @@ def test_a_numeric_string_is_read_wherever_the_declaration_reaches() -> None:
     ids=["string", "decimal", "untyped-element", "free-form-object"],
 )
 def test_a_string_nothing_declares_a_number_stays_a_string(parameter: Parameter) -> None:
-    # Holds the type condition of the reading: a decimal is decoded by its
-    # Validator from the string, and what an undeclared element or a
-    # free-form object holds is the caller's.
+    # Holds the type condition of the reading.
     value: Any = {"string": "3", "array": ["3"], "object": {"n": "3"}}[parameter.type]
     assert repr(check_arguments(one(parameter), {"x": value})["x"]) == repr(value)
 
@@ -435,17 +408,14 @@ def test_a_free_form_object_is_passed_through_as_the_callers() -> None:
     ids=["uploaded", "content"],
 )
 def test_a_file_takes_a_django_file_and_hands_on_the_same_object(value: Any) -> None:
-    # An upload is a ``File``, and so is the ``ContentFile`` a command or a task
-    # builds, so a Python caller sends a file the way a request's body does.
+    # An upload is a ``File``, and so is the ``ContentFile`` a command or a task builds.
     cleaned = check_arguments(one(Parameter("notes", "file")), {"notes": value})
     assert cleaned["notes"] is value
 
 
 @pytest.mark.parametrize("value", ["notes.txt", b"A file.", {"name": "notes.txt"}, 3])
 def test_a_file_refuses_anything_that_is_not_a_file(value: Any) -> None:
-    # No JSON value is a file: a path or the file's bytes sent as a string is
-    # the caller's mistake, refused at its name rather than handed to the
-    # Validator to fail on.
+    # No JSON value is a file: a path or the file's bytes sent as a string is the caller's mistake.
     assert refusal(one(Parameter("notes", "file")), {"notes": value}) == {
         "notes": ["Expected a file."]
     }
@@ -477,8 +447,7 @@ def test_a_decimal_accepts_a_string_or_a_json_number(value: Any) -> None:
 
 @pytest.mark.parametrize("value", [True, ["9.99"]])
 def test_a_decimal_refuses_what_is_neither_a_string_nor_a_number(value: Any) -> None:
-    # A boolean would parse - Decimal(True) is 1 - so the type message, not the
-    # parse message, is what proves the type check answered.
+    # A boolean would parse - Decimal(True) is 1 - so the type message, not the parse message.
     message = "Expected a decimal string or a number."
     assert refusal(DECIMAL, {"price": value}) == {"price": [message]}
     assert message != NOT_A_NUMBER
@@ -493,23 +462,19 @@ def test_a_decimal_must_spell_a_finite_number(value: Any) -> None:
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
 def test_a_number_must_be_finite(value: float) -> None:
-    # No JSON value is one, and Python's decoder reads an overflowing literal
-    # such as 1e400 as an infinity.
+    # No JSON value is one.
     assert refusal(one(Parameter("ratio", "number")), {"ratio": value}) == {"ratio": [NOT_A_NUMBER]}
 
 
 def test_an_untyped_element_must_be_finite_too() -> None:
-    # Whatever the declaration leaves open, it cannot be a value JSON has no
-    # spelling for.
+    # Whatever the declaration leaves open, it cannot be a value JSON has no spelling for.
     assert refusal(one(Parameter("tags", "array")), {"tags": ["a", float("inf")]}) == {
         "tags": {1: [NOT_A_NUMBER]}
     }
 
 
 def test_a_non_finite_value_inside_a_free_form_object_is_its_validators() -> None:
-    # Nothing is declared inside it, so the type rule has nothing to reach, as
-    # no other rule does; an object or array element of an untyped array, and
-    # an array element of an array of arrays, are the same.
+    # Nothing is declared inside it, so the type rule has nothing to reach, as no other rule does.
     blob, row = {"ratio": float("nan")}, [float("nan")]
     assert check_arguments(one(Parameter("x", "object")), {"x": blob})["x"] is blob
     assert check_arguments(one(Parameter("xs", "array")), {"xs": [blob]})["xs"][0] is blob
@@ -536,8 +501,7 @@ def test_a_date_or_a_date_time_is_what_djangos_parser_reads(fmt: str, value: str
     ("fmt", "value", "message"),
     [
         ("date-time", "yesterday", "Enter a valid date/time."),
-        # Well-formed and impossible: Django raises ValueError for this one
-        # rather than returning None, and it must be a refusal, not a crash.
+        # Well-formed and impossible.
         ("date-time", "2024-02-30T10:00:00", "Enter a valid date/time."),
         ("date", "soon", "Enter a valid date."),
         ("date", "2024-02-30", "Enter a valid date."),
@@ -589,9 +553,7 @@ PADDED_UUIDS = [f" {CANONICAL_UUID}", f"{CANONICAL_UUID} ", f"{CANONICAL_UUID}\n
 @pytest.mark.parametrize("value", VALID_UUIDS)
 def test_a_uuid_is_handed_on_in_its_canonical_spelling(value: str) -> None:
     checked = check_arguments(project_pk(), {"project_pk": value})
-    # One spelling for every reader - the permission check, the selector, a
-    # cache key - and still a string, never a ``uuid.UUID``, as a date stays
-    # the string the Validator or the lookup decodes.
+    # One spelling for every reader - the permission check, the selector, a cache key.
     assert checked == {"project_pk": CANONICAL_UUID}
     assert type(checked["project_pk"]) is str
 
@@ -611,9 +573,7 @@ def _django_reads(read: Any, value: str) -> bool:
 
 @pytest.mark.parametrize("value", VALID_UUIDS + INVALID_UUIDS + PADDED_UUIDS)
 def test_a_uuid_is_refused_exactly_when_the_model_field_refuses_it(value: str) -> None:
-    # ``models.UUIDField.to_python`` is what a lookup on a UUID column runs, so
-    # the shape check cannot pass what the ORM then raises on, nor refuse what
-    # it accepts.
+    # ``models.UUIDField.to_python`` is what a lookup on a UUID column runs.
     try:
         check_arguments(project_pk(), {"project_pk": value})
     except InvalidArguments:
@@ -625,15 +585,13 @@ def test_a_uuid_is_refused_exactly_when_the_model_field_refuses_it(value: str) -
 
 @pytest.mark.parametrize("value", PADDED_UUIDS)
 def test_the_form_field_strips_what_the_model_field_refuses(value: str) -> None:
-    # Why the model field is the reference and the form field is not: the two
-    # disagree on surrounding whitespace, and the lookup is what raises.
+    # Why the model field is the reference and the form field is not.
     assert _django_reads(forms.UUIDField().clean, value)
     assert not _django_reads(models.UUIDField().to_python, value)
 
 
 def test_a_uuid_object_is_refused_as_a_date_object_is() -> None:
-    # A Python caller holding ``row.pk`` sends its string, as one holding a
-    # ``date`` does: the declaration is a string's, on every route.
+    # A Python caller holding ``row.pk`` sends its string, as one holding a ``date`` does.
     value = uuid.UUID(VALID_UUIDS[0])
     assert refusal(project_pk(), {"project_pk": value}) == {"project_pk": ["Expected a string."]}
 
@@ -680,8 +638,7 @@ class TestUuidChoices:
         assert listed(UPPER_UUID, OTHER_UUID).choices == (CANONICAL_UUID, OTHER_UUID)
 
     def test_a_label_follows_its_choice_into_the_canonical_spelling(self) -> None:
-        # Labelled in the spelling it was listed in, and never refused as a
-        # label for a choice the list no longer spells that way.
+        # Labelled in the spelling it was listed in.
         param = listed(UPPER_UUID, choice_labels={UPPER_UUID: "Ada"})
         assert param.choice_labels == ((CANONICAL_UUID, "Ada"),)
 
@@ -702,8 +659,7 @@ class TestUuidChoices:
         assert Parameter("ref", "string", choices=["a", "a"]).choices == ("a", "a")
 
     def test_a_choice_no_uuid_spells_is_kept_as_listed(self) -> None:
-        # Not refused: such a choice matches nothing, since the format
-        # refuses the value first.
+        # Not refused: such a choice matches nothing, since the format refuses the value first.
         assert listed("legacy").choices == ("legacy",)
 
     def test_a_choice_that_is_no_string_is_kept_as_listed(self) -> None:
@@ -716,8 +672,7 @@ class TestUuidChoices:
 
 
 def test_a_refused_uuid_is_translated_by_djangos_own_catalog() -> None:
-    # Spelled as Django's ``forms.UUIDField`` spells it, so the catalog that
-    # translates that field translates this.
+    # Spelled as Django's ``forms.UUIDField`` spells it.
     with translation.override("de"):
         detail = refusal(project_pk(), {"project_pk": "null"})
         expected = translation.gettext("Enter a valid UUID.")
@@ -741,8 +696,7 @@ def test_a_value_among_the_choices_is_accepted() -> None:
 
 
 def test_the_type_check_answers_before_the_choices() -> None:
-    # True == 1 in Python, so ``True in (1, 2)`` holds and only the type check
-    # stands between a boolean and an integer choice.
+    # True == 1 in Python, so ``True in (1.
     params = one(Parameter("rank", "integer", choices=(1, 2)))
     detail = refusal(params, {"rank": True})
     assert detail == {"rank": ["Expected an integer."]}
@@ -765,9 +719,7 @@ def test_null_is_a_value_for_a_nullable_parameter_even_a_required_one() -> None:
 
 
 def test_a_flat_array_checks_each_element_and_addresses_only_the_failures() -> None:
-    # Holds the ``rows is not None`` condition in ``_check_value``: an element's
-    # message stays a bare list at its index, where a row's own goes under
-    # non_field_errors.
+    # Holds the ``rows is not None`` condition in ``_check_value``.
     params = one(Parameter("ids", "array", items="integer"))
     assert refusal(params, {"ids": [1, "two", 3, True, None]}) == {
         "ids": {
@@ -787,9 +739,7 @@ def test_an_arrays_choices_constrain_each_element() -> None:
 
 
 def test_a_null_element_is_kept_where_the_element_is_nullable() -> None:
-    # A gap in the list, as ``list[int | None]`` holds one: kept at its index
-    # and read against neither the element's type nor its choices, while every
-    # other element still is.
+    # A gap in the list, as ``list[int | None]`` holds one.
     params = one(Parameter("ids", "array", items="integer", items_nullable=True, choices=(1, 2)))
     assert check_arguments(params, {"ids": [1, None, 2]}) == {"ids": [1, None, 2]}
     assert refusal(params, {"ids": [None, "two", 3]}) == {
@@ -816,8 +766,7 @@ def test_an_array_with_no_items_accepts_any_element() -> None:
 
 
 def test_rows_are_addressed_by_int_index_and_only_the_failing_ones() -> None:
-    # Holds the ``isinstance(detail, list)`` condition in ``_check_value``: a
-    # row's field errors are a tree already and are not wrapped again.
+    # Holds the ``isinstance(detail, list)`` condition in ``_check_value``.
     books = [{"title": "Lathe"}, {"isbn": "123"}, {"title": "Dispossessed"}]
     assert refusal(AUTHOR, {"name": "Le Guin", "books": books}) == {
         "books": {1: {"title": [REQUIRED]}}
@@ -872,9 +821,7 @@ def test_arguments_that_are_not_a_mapping_are_refused_at_the_root() -> None:
 
 
 def test_a_partial_call_may_leave_out_a_required_parameter_at_every_depth() -> None:
-    # An update that sends only what changes, as DRF reads ``partial``: a
-    # field that is absent is skipped, whether at the top, inside a nested
-    # object or inside a row.
+    # An update that sends only what changes, as DRF reads ``partial``.
     books = [{"isbn": "1", "publisher": {}}]
     assert check_arguments(AUTHOR, {"books": books}, partial=True) == {"books": books}
     assert check_arguments(AUTHOR, {}, partial=True) == {}
@@ -897,8 +844,7 @@ def test_a_partial_call_still_refuses_an_unknown_key_at_every_level() -> None:
 
 
 def test_a_call_is_not_partial_by_default() -> None:
-    # Holds ``not partial`` in the presence guard alongside
-    # test_a_required_parameter_is_refused_when_absent.
+    # Holds ``not partial`` in the presence guard alongside the required-parameter test.
     assert refusal(AUTHOR, {"books": [{}]}, partial=False) == {
         "name": [REQUIRED],
         "books": {0: {"title": [REQUIRED]}},
@@ -960,8 +906,7 @@ def test_the_policy_may_be_given_by_value_and_an_unknown_one_is_a_programming_er
 
 @pytest.mark.parametrize("policy", [UnknownArguments.PASSTHROUGH, "passthrough"])
 def test_passthrough_is_refused_where_the_policy_is_normalized(policy: Any) -> None:
-    # Sized so the policy is what answers: an undeclared key the IGNORE branch
-    # would drop and return, so a member let through to the walk passes.
+    # Sized so the policy is what answers.
     with pytest.raises(ValueError, match=r"UnknownArguments\.PASSTHROUGH is refused"):
         check_arguments(AUTHOR, {"name": "Le Guin", "tenant": "acme"}, unknown_arguments=policy)
 
@@ -1011,8 +956,7 @@ def test_an_integer_past_a_bound_is_refused_in_django_s_words(value: Any, messag
 
 
 def test_a_bound_may_stand_alone() -> None:
-    # Each value sits inside the one bound declared, so the side left open is
-    # compared too: read against ``None`` it would raise.
+    # Each value sits inside the one bound declared, so the side left open is compared too.
     floor = one(Parameter("n", "number", minimum=0))
     ceiling = one(Parameter("n", "number", maximum=0))
     assert check_arguments(floor, {"n": 5.5}) == {"n": 5.5}
@@ -1028,8 +972,7 @@ def test_a_bound_may_stand_alone() -> None:
         ("-1e50", None),
         (" 12.5 ", None),
         (1e49, None),
-        # Read by exponent, never built as the integer it names. A cheap one
-        # all the same: a regression elsewhere must fail here, not hang.
+        # Read by exponent, never built as the integer it names.
         ("1e400", [ABOVE % "1e+50"]),
         ("-1e400", [BELOW % "-1e+50"]),
         ("1.0000000000000001e50", [ABOVE % "1e+50"]),
@@ -1059,15 +1002,13 @@ def _decimals() -> Parameters:
 
 
 def test_each_element_of_a_decimal_array_is_handed_on_as_it_was_sent() -> None:
-    # Exact: a string stays the string it spells, never a float on the way, and
-    # a JSON number is taken as a scalar decimal takes one.
+    # Exact: a string stays the string it spells, never a float on the way.
     sent = ["1", 2, FORTY_DIGITS, " 12.5 ", 1.5, "1e50", "-1e50"]
     assert check_arguments(_decimals(), {"pks": sent}) == {"pks": sent}
 
 
 def test_an_element_past_its_bound_is_refused_at_its_index_with_django_s_code() -> None:
-    # Compared by exponent, so a billion-digit integer is never built: a
-    # regression must fail here rather than hang the suite.
+    # Compared by exponent, so a billion-digit integer is never built.
     detail = refusal(_decimals(), {"pks": ["1", "1E+999999999", "-1E+999999999", 1e60]})
     assert coded(detail) == {
         "pks": {
@@ -1134,15 +1075,13 @@ IDS = one(Parameter("ids", "array", items="integer"))
 
 
 def test_an_array_takes_a_thousand_elements_and_no_more_by_default() -> None:
-    # The boundary pair, so the default itself is held: 1000 is Django's own
-    # DATA_UPLOAD_MAX_NUMBER_FIELDS, the line a form body already stops at.
+    # The boundary pair, so the default itself is held.
     assert check_arguments(IDS, {"ids": list(range(1000))}) == {"ids": list(range(1000))}
     assert refusal(IDS, {"ids": list(range(1001))}) == {"ids": [TOO_MANY % 1000]}
 
 
 def test_an_array_past_its_maximum_is_refused_before_any_element_is_read() -> None:
-    # Every element is malformed, and none is addressed: the list is refused
-    # whole, so a long list costs no per-element work.
+    # Every element is malformed, and none is addressed: the list is refused whole.
     detail = refusal(IDS, {"ids": ["x"] * 1001})
     assert detail == {"ids": [TOO_MANY % 1000]}
 
@@ -1184,8 +1123,7 @@ def test_a_declared_minimum_is_inclusive() -> None:
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
 def test_a_minimum_past_the_default_maximum_with_no_maximum_of_its_own_is_refused_loudly() -> None:
-    # No call could pass, and the setting is read only at the call, so this is
-    # where the declaration is found wrong rather than every call refused.
+    # No call could pass, and the setting is read only at the call.
     params = one(Parameter("ids", "array", min_length=4))
     with pytest.raises(ImproperlyConfigured, match="min_length 4 is past the default maximum 3"):
         check_arguments(params, {"ids": [1, 2, 3, 4]})
@@ -1193,8 +1131,7 @@ def test_a_minimum_past_the_default_maximum_with_no_maximum_of_its_own_is_refuse
 
 @override_settings(SERVICE_SPECS_MAX_ARRAY_LENGTH=3)
 def test_a_minimum_at_the_default_maximum_is_met_by_a_list_of_exactly_that_many() -> None:
-    # The default bounds inclusively, so a minimum equal to it is meetable:
-    # only one past it is refused as a declaration no call could pass.
+    # The default bounds inclusively, so a minimum equal to it is meetable.
     params = one(Parameter("ids", "array", min_length=3))
     assert check_arguments(params, {"ids": [1, 2, 3]}) == {"ids": [1, 2, 3]}
     assert refusal(params, {"ids": [1, 2]}) == {"ids": [TOO_FEW % 3]}
@@ -1208,10 +1145,7 @@ def test_a_minimum_past_the_default_is_taken_beside_its_own_maximum() -> None:
 
 
 def test_a_length_message_is_spelled_as_drf_spells_it() -> None:
-    # No Django catalog entry counts a list's elements (MaxLengthValidator
-    # counts characters), so the wording is DRF's ListField's, which its own
-    # catalog translates wherever DRF is installed and which a
-    # djangorestframework-services caller already reads.
+    # No Django catalog entry counts a list's elements (MaxLengthValidator counts characters).
     params = one(Parameter("ids", "array", min_length=1, max_length=1))
     assert refusal(params, {"ids": []}) == {"ids": ["Ensure this field has at least 1 elements."]}
     assert refusal(params, {"ids": [1, 2]}) == {
@@ -1229,8 +1163,7 @@ def test_messages_are_translated_when_raised_through_djangos_own_catalog() -> No
         expected = translation.gettext(REQUIRED)
     assert expected != REQUIRED
     assert detail == {"pk": [expected]}
-    # Translated now, not a lazy proxy, which is no ``str``: the message is a
-    # ``CodedMessage``, so a ``str`` holding the translated words.
+    # Translated now, not a lazy proxy, which is no ``str``: the message is a ``CodedMessage``.
     assert all(isinstance(message, str) for message in detail["pk"])
 
 
@@ -1250,8 +1183,7 @@ class TestAny:
         assert type(cleaned["pk"]) is type(value)
 
     def test_a_python_callers_value_of_no_json_type_is_handed_on_too(self) -> None:
-        # No type is declared, so nothing is checked against one: a Django
-        # ``File`` a multipart part carries under the name is handed on as well.
+        # No type is declared, so nothing is checked against one.
         upload = ContentFile(b"x", name="x.txt")
 
         assert check_arguments(Parameters.of(Parameter("pk", "any")), {"pk": upload}) == {
@@ -1416,8 +1348,7 @@ def test_arguments_that_are_no_mapping_are_refused_as_a_serializer_refuses_them(
 
 def test_a_coded_refusal_is_its_plain_message_to_everything_but_its_code() -> None:
     detail = refusal(AUTHOR, {"name": "Ursula", "books": [{"title": None}]})
-    # Equal to, and serialized as, the plain strings a tree without codes holds,
-    # so the wire a transport writes is unchanged by them.
+    # Equal to, and serialized as, the plain strings a tree without codes holds.
     assert detail == {"books": {0: {"title": [NULL]}}}
     assert json.dumps(detail) == json.dumps({"books": {0: {"title": [NULL]}}})
     assert NULL in {detail["books"][0]["title"][0]}

@@ -109,8 +109,7 @@ def test_missing_does_not_reach_into_a_nested_object_or_a_row() -> None:
 
 
 def test_missing_leaves_out_a_many_call_s_row_field() -> None:
-    # Held by name: the top-level argument ``items`` is present, only a row's
-    # ``title`` is not, and the row's field is no argument of the call.
+    # Held by name: the top-level argument ``items`` is present, only a row's ``title`` is not.
     spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())
 
     with pytest.raises(InvalidArguments) as caught:
@@ -121,8 +120,7 @@ def test_missing_leaves_out_a_many_call_s_row_field() -> None:
 
 
 def test_missing_reads_the_code_and_not_the_words() -> None:
-    # A Validator's own message is a plain ``str``, and another mistake's code
-    # is no absence, whatever the words say.
+    # A Validator's own message is a plain ``str``, and another mistake's code is no absence.
     refused = InvalidArguments(
         {
             "plain": ["This field is required."],
