@@ -152,7 +152,7 @@ class CheckKeywords:
     seeds: dict[str, Any] = field(default_factory=dict)
 
     def offered(self) -> dict[str, Any]:
-        """The keywords each ``authorize`` function is handed to offer: the context and the seeds."""
+        """The keywords each ``authorize`` function is offered: the context and the seeds."""
         return {"call_context": self.call_context, "seeds": self.seeds}
 
 
@@ -382,7 +382,7 @@ def _requires(provider: Callable[..., Any] | None) -> frozenset[str]:
 def read_seats(
     spec: ServiceSpec | SelectorSpec,
 ) -> list[tuple[Callable[..., Any] | None, Parameters]]:
-    """Each selector or service seat of ``spec``: the ``kwargs`` provider, and the reads its values reach."""
+    """Each selector or service seat of ``spec``: its ``kwargs`` provider and the reads it feeds."""
     if isinstance(spec, SelectorSpec):
         return [(spec.kwargs, spec.reads)]
     seats: list[tuple[Callable[..., Any] | None, Parameters]] = [(spec.kwargs, spec.reads)]

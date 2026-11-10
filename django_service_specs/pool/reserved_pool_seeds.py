@@ -28,8 +28,8 @@ a ``kwargs`` or ``input_data`` provider, a selector and its
 ``extend_queryset``, an affordance condition,
 a precondition, the service, the run's ``progress_reporter`` - receives as
 the same object by naming it, and never through ``**kwargs``. Never a copy,
-and the kernel writes nothing to it. Seed resolvers do not see it: a seed is resolved before anything the
-call adds. ``shapes`` is what the caller sent for the spec's declared
+and the kernel writes nothing to it. Seed resolvers do not see it: a seed resolves before
+anything the call adds. ``shapes`` is what the caller sent for the spec's declared
 ``shapes``, keyed by shape name and read-only: the mapping
 ``PresentationContext.shapes`` holds, so a selector that eager-loads by the
 query its presenter renders reads the value the presenter reads. It is in
@@ -49,8 +49,8 @@ row services', and like it, not in a seed resolver's or a ``filter_set``'s
 test_a_seed_resolver_naming_the_shapes_is_handed_none,
 test_a_filter_naming_the_shapes_is_handed_none; a helper's row services
 are handed its ``**kwargs``, which
-test_a_catch_all_is_never_handed_the_shapes keeps free of the seed). The seven besides those two are the names
-``djangorestframework-services`` seeds for the same values, so a callable
+test_a_catch_all_is_never_handed_the_shapes keeps free of the seed). The seven besides those two
+are the names ``djangorestframework-services`` seeds for the same values, so a callable
 written for it runs under this kernel unchanged.
 
 ``progress`` is in every pool, and live only where there is work to report on:

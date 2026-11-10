@@ -150,7 +150,7 @@ class TestTheThreeShapes:
         assert check.questions() == [CLASS, SCOPE]
 
     def test_a_read_is_not_asked_the_scope_of_nothing(self) -> None:
-        """Fails without the predicate's first conjunct: a selector spec has no target selector to ask about."""
+        """Fails without the predicate's first conjunct: a selector spec has no target to ask."""
         check = _Asked(scope=False)
         spec = _read(check)
         principal = object()
@@ -159,7 +159,7 @@ class TestTheThreeShapes:
 
     @pytest.mark.parametrize("build", [_on_a_set, _on_a_row], ids=["collection", "instance"])
     def test_a_write_with_a_target_is_not_asked_the_scope_of_nothing(self, build: Any) -> None:
-        """Fails without the predicate's second conjunct: its scope is a row or set only arguments name."""
+        """Fails without the second conjunct: its scope is a row or set only arguments name."""
         check = _Asked(scope=False)
         spec = build(check)
         principal = object()

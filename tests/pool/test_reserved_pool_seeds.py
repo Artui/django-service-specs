@@ -103,7 +103,7 @@ def test_a_seed_named_shapes_is_refused_with_the_rename() -> None:
 def test_a_provider_or_overlay_naming_shapes_is_refused(
     provider: Any, extra: dict[str, Any] | None, django_user_model: Any
 ) -> None:
-    """Neither may stand in for the seed: the selector would read the author's value as the call's."""
+    """Neither may stand in for the seed: the selector would read the author's as the call's."""
     spec = SelectorSpec(
         kind=SelectorKind.LIST,
         selector=lambda: [],

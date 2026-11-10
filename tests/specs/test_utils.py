@@ -171,7 +171,7 @@ class TestAnAsyncPresenterIsRefused:
 
 
 def _seat(where: str, name: str, *, reflected: bool = False) -> Any:
-    """A spec declaring ``name`` in ``where``, built: a read or a shape, on either spec or a target."""
+    """A spec declaring ``name`` in ``where``, built: a read or shape, on the spec or a target."""
     declared = Parameters.of(Parameter(name, "string", reflected=reflected))
     if where == "selector-read":
         return SelectorSpec(kind=SelectorKind.LIST, selector=_selector, reads=declared)
@@ -198,7 +198,7 @@ _LABELS = {
 
 
 class TestAParameterNamedForTheCallsOwnSeat:
-    """``request`` and ``view`` are the call's on every mount, so a service spec's unmarked one is refused.
+    """``request`` and ``view`` are the call's on every mount; a service's unmarked one is refused.
 
     Each refused case is one ``dispatch`` refused on every call before the
     build did, with or without a seed registered under the name.
@@ -222,7 +222,7 @@ class TestAParameterNamedForTheCallsOwnSeat:
     @pytest.mark.parametrize("name", ["request", "view"])
     @pytest.mark.parametrize("where", ["selector-read", "selector-shape"])
     def test_a_selector_spec_s_own_builds(self, where: str, name: str) -> None:
-        """Built as an output selector or for ``shape_queryset``, where its parameters are no call's.
+        """Built as an output selector or for ``shape_queryset``, its parameters being no call's.
 
         Dispatched on its own it is refused by dispatch, as before
         (``tests/pool/test_call_seeds.py``'s test_a_parameter_named_either_is_refused).

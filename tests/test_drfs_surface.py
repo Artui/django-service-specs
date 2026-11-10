@@ -716,7 +716,7 @@ def _resolve(base: str | type) -> type:
 
 
 def _rows(facet: str) -> list[str]:
-    """The names whose row pins ``facet``, which is every row whose value differs from a bare pin's."""
+    """The names whose row pins ``facet``: every row whose value differs from a bare pin's."""
     unpinned = getattr(Pin(""), facet)
     return [name for name, pin in SURFACE.items() if getattr(pin, facet) != unpinned]
 

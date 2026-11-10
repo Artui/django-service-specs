@@ -421,7 +421,7 @@ class TestTheCallSRequestAndView:
 
 
 class TestCombinators:
-    """A combinator is asked as any check is, and hands each check inside it what that check declares."""
+    """A combinator is asked as any check is, and hands each check inside it what it declares."""
 
     def test_a_child_s_arguments_and_context_reach_it(self) -> None:
         arguing, offered = Arguing(), Offered()
@@ -452,7 +452,7 @@ SEEDS_REFUSED = "The seeds do not cover this spec, principal and call context."
 
 
 class TestCarriedSeeds:
-    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for any other."""
+    """``seeds=`` a ``CallSeeds``: taken as they are for the call it covers, refused for others."""
 
     def _minted(self) -> tuple[Any, SeedPerQuestion, Any, list[str], dict[str, Any]]:
         check = SeedPerQuestion()
@@ -471,7 +471,7 @@ class TestCarriedSeeds:
         assert check.handed == [("has_permission", "club of ada")]
 
     def test_a_carrier_under_its_registry_resolves_nothing(self) -> None:
-        """``pool_seeds=`` beside a carrier is the registry it is matched against, not a resolver."""
+        """``pool_seeds=`` beside a carrier is the registry matched against, not a resolver."""
         spec, check, carrier, resolved, context = self._minted()
         authorize(spec, "ada", seeds=carrier, pool_seeds=carrier.pool_seeds, call_context=context)
         assert resolved == []

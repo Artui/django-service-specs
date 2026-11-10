@@ -1,4 +1,4 @@
-"""``unreceived_fields``: the Validator fields a service is never handed, answered rather than refused.
+"""``unreceived_fields``: the Validator fields a service is never handed, answered, not refused.
 
 Each answer is tested beside what ``dispatch`` does with the spec, so the
 claim that a field's value is validated and then reaches the service by no
@@ -196,7 +196,7 @@ def test_a_field_validated_under_its_alias_reaches_its_own_name_and_is_not() -> 
 
 
 class TestAFieldNamedLikeASeed:
-    """The name in the pool is the seed's, so the field reaches the service through ``data`` alone."""
+    """The pool name is the seed's, so the field reaches the service through ``data`` alone."""
 
     def test_a_service_taking_it_by_name_only_is_answered(self) -> None:
         seen: list[Any] = []

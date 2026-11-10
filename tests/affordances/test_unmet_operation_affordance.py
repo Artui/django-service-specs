@@ -176,7 +176,7 @@ def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_context() 
 
 
 def test_the_call_context_passed_else_the_pool_s_else_a_fresh_one() -> None:
-    """A pool carrying the call's context is the call's own; a parameter naming the same is welcome."""
+    """A pool carrying the call's context is the call's own; a parameter naming it is welcome."""
     handed: list[Any] = []
     held: dict[str, Any] = {}
     pool = {**base_pool(user=None), "call_context": held}

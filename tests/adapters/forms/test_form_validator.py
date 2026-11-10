@@ -325,7 +325,7 @@ def _node(form_class: type[forms.BaseForm], name: str) -> dict[str, Any]:
 
 
 def _checked_then_validated(form_class: type[forms.BaseForm], arguments: dict[str, Any]) -> Any:
-    """What a transport's call comes to: the shape check, then the form, refused by whichever answers."""
+    """A transport's call: the shape check, then the form, refused by whichever answers."""
     validator = FormValidator(form_class)
     try:
         checked = check_arguments(validator.parameters(), arguments)

@@ -106,7 +106,7 @@ def untyped() -> dict[str, Any]:
 
 
 def requires_project(*, project: int) -> dict[str, Any]:
-    """An untyped provider taking the read ``project`` by name, which only the caller can hand it."""
+    """An untyped provider taking the read ``project`` by name, only the caller can hand it."""
     return {}
 
 

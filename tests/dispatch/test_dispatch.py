@@ -2692,7 +2692,7 @@ def _project_provider(project_pk: Any = 7) -> tuple[Callable[[], _ServerProjectP
 
 
 def _pk_provider(pk: Any) -> tuple[Callable[[], _ServerPk], list[None]]:
-    """A selector's ``kwargs`` provider annotated to fill ``pk``, and the list its calls append to."""
+    """A selector's ``kwargs`` provider annotated for ``pk``, and the list its calls append to."""
     calls: list[None] = []
 
     def server() -> _ServerPk:
@@ -4940,7 +4940,7 @@ class _WatchedForTheTransportKey(dict[str, Any]):
 
 
 def _every_stage(saw: _Saw, presenter: Any) -> ServiceSpec:
-    """An update declaring every stage dispatch resolves, each recording the context it is handed."""
+    """An update declaring every stage dispatch resolves, each recording the context it gets."""
 
     def instance(*, pk: int, call_context: Any) -> Any:
         saw("instance_selector", call_context)
@@ -5632,7 +5632,7 @@ class _SawShapes:
 
 
 class TestShapesReachThePool:
-    """The ``shapes`` seed: what ``PresentationContext.shapes`` holds, for any callable naming it."""
+    """The ``shapes`` seed: ``PresentationContext.shapes``, for any callable naming it."""
 
     @_ENTRIES
     def test_a_selector_spec_s_callables_receive_the_shapes_the_presenter_is_handed(
@@ -6189,7 +6189,7 @@ class TestEarlySeeds:
     def test_a_seed_registered_as_arguments_resolves_as_it_would_unnamed(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """A check naming ``arguments`` is handed the call's, so it opts into no seed of that name."""
+        """A check naming ``arguments`` gets the call's, so it opts into no seed of that name."""
         note = Note.objects.create(title="n", owner=ada)
         events = _Events()
 
@@ -6471,7 +6471,7 @@ class TestEarlySeeds:
     def test_a_carrier_from_a_prelude_handed_no_context_covers_only_its_own_dict(
         self, entry: Callable[..., Any], ada: Any
     ) -> None:
-        """Its prelude ran with a dict of its own: a call handed none, or a fresh one, is refused."""
+        """Its prelude used a dict of its own: a call handed none, or a fresh one, is refused."""
         note = Note.objects.create(title="n", owner=ada)
         tenancy = Tenancy()
         spec = tenancy.spec()
@@ -6562,7 +6562,7 @@ class TestEarlySeeds:
 
     @_ENTRIES
     def test_a_refused_carrier_resolves_nothing(self, entry: Callable[..., Any], ada: Any) -> None:
-        """Refused before the class-level check: the grant, which covers nothing here, is never read."""
+        """Refused before the class-level check: the grant, covering nothing here, is never read."""
         note = Note.objects.create(title="n", owner=ada)
         tenancy = Tenancy()
         spec, other, context = tenancy.spec(), tenancy.spec(), {}
@@ -6809,7 +6809,7 @@ def test_a_dispatch_handed_no_dict_hands_every_ask_the_one_it_makes(ada: Any, ca
 
 
 def _nesting(inner: ServiceSpec, *, forwarding: bool) -> tuple[ServiceSpec, AskedWith]:
-    """A spec whose service dispatches ``inner`` for its own principal, forwarding its dict or not."""
+    """A spec whose service dispatches ``inner`` for its principal, forwarding its dict or not."""
 
     def service(*, user: Any, call_context: dict[str, Any]) -> None:
         dispatch(

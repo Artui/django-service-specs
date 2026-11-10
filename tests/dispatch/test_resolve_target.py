@@ -736,7 +736,7 @@ class TestCarriedSeeds:
         assert found.seeds.values["tenant"] is tenancy.resolved[0]
 
     def test_a_carrier_needs_no_grant(self, ada: Any) -> None:
-        """One from ``resolve_seeds`` comes with none: the class-level check is asked on its values."""
+        """One from ``resolve_seeds`` has none: the class-level check is asked on its values."""
         note = Note.objects.create(title="n", owner=ada)
         tenancy = Tenancy()
         spec, context = tenancy.spec(), {}

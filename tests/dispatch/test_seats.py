@@ -98,7 +98,7 @@ def _tenant(**kwargs: Any) -> Parameters:
 
 
 class Fields(Validator):
-    """Declares the parameters it is given and returns what it is handed, through the base ``validated()``."""
+    """Declares the parameters given and returns what it is handed, via the base ``validated()``."""
 
     def __init__(self, *parameters: Parameter) -> None:
         self._parameters = Parameters.of(*parameters)

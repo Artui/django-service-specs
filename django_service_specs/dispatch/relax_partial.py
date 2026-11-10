@@ -27,7 +27,7 @@ def relax_partial(spec: ServiceSpec | SelectorSpec, parameters: Parameters) -> P
 
 
 def _optional(param: Parameter) -> Parameter:
-    """``param`` and everything declared below it made optional, as a partial serializer reads it."""
+    """``param`` and all declared below it made optional, as a partial serializer reads it."""
     return replace(_below(param), required=False)
 
 

@@ -294,7 +294,7 @@ class TestAParameterASeedOccupies:
     def test_a_selector_spec_s_own_named_for_the_call_s_seat_is_refused_as_dispatch_refuses_it(
         self, where: str
     ) -> None:
-        """Built, since a selector spec is also built where its parameters are no call's, and refused here."""
+        """Built, as a selector spec is built where its parameters are no call's; refused here."""
         spec = SelectorSpec(
             kind=SelectorKind.LIST,
             selector=lambda **_: [],
@@ -1125,7 +1125,7 @@ class TestTheSeatsTheFifthRefusalSkips:
         assert found == sorted(found)
 
     def test_input_data_is_named_before_the_spec_s_kwargs(self) -> None:
-        """``input_data`` runs before the Validator, and ``kwargs`` after it, before the conditions."""
+        """``input_data`` runs before the Validator; ``kwargs`` after it, but before conditions."""
         spec = _service(
             lambda **_: None,
             instance_selector_spec=_retrieve(lambda *, a1, tenant_id: 1, kwargs=_scoped_by("a0")),
@@ -1154,7 +1154,7 @@ class TestTheSeatsTheFifthRefusalSkips:
 
 
 class TestWhatEachSeatTheFifthSkipsIsHanded:
-    """Each keyword the check counts as filled on a seat the fifth refusal skips, dispatched and seen to arrive.
+    """Each keyword counted as filled on a seat the fifth refusal skips: dispatched, seen arriving.
 
     The guard against refusing a spec that runs: the check passes each of
     these (test_a_keyword_something_fills_is_not), so each must reach its
@@ -1183,7 +1183,7 @@ class TestWhatEachSeatTheFifthSkipsIsHanded:
     async def test_adispatch_hands_it_on_an_async_selector(
         self, build: Callable[..., Any], name: str, ada: Any
     ) -> None:
-        """Through ``_open_selector`` and ``_settle_and_conclude``, which a sync selector never reaches."""
+        """Via ``_open_selector`` and ``_settle_and_conclude``, unreached by a sync selector."""
         seen: dict[str, Any] = {}
         spec = build(name, seen)
         arguments = {param.name: _SAMPLES[param.type] for param in spec.parameters()}
@@ -1207,7 +1207,7 @@ def _unreadable_run() -> Callable[..., Any]:
 
 
 class TestAProviderSeat:
-    """A provider is bound from a pool of its own, refused as any seat is, and never derived from its callable's."""
+    """A provider binds from its own pool, refused as any seat is, never from its callable's."""
 
     @pytest.mark.parametrize(
         ("build", "name"),
@@ -1254,7 +1254,7 @@ class TestAProviderSeat:
     def test_a_progress_reporter_beside_a_run_taking_no_progress_is_not_read(
         self, run: Callable[..., Any]
     ) -> None:
-        """Dispatch calls it only where the run takes ``progress``, so it requires nothing of the rest.
+        """Dispatch calls it only where the run takes ``progress``, so it requires nothing else.
 
         Dispatched to hold the claim: the reporter requiring ``tenant``,
         unregistered, is never called.
@@ -1299,7 +1299,7 @@ class TestAProviderSeat:
         assert "progress_reporter" not in refused
 
     def test_a_typed_provider_is_handed_what_its_seat_names(self) -> None:
-        """The probe: refused without the seed, and the seed reaches the provider and its callable."""
+        """The probe: refused without the seed; the seed reaches the provider and its callable."""
         spec = _service(lambda *, tenant_id: tenant_id, kwargs=_scope)
         assert _refusal(spec).startswith(
             f"ServiceSpec.kwargs requires the keyword(s) ['tenant'], {_NOTHING_FILLS}: "
@@ -1588,7 +1588,7 @@ _POSITIONAL_BESIDE = [
 
 
 class TestAPositionalOnlyParameterOnTheOtherSeats:
-    """The second refusal on a precondition, a condition, the output selector and an ``extend_queryset``."""
+    """The second refusal on a precondition, condition, output selector and ``extend_queryset``."""
 
     @pytest.mark.parametrize(("build", "name", "label"), _POSITIONAL_SEATS)
     def test_dispatch_fails_every_call_with_it(
@@ -1771,7 +1771,7 @@ _TWO_OPTIONAL = Parameters.of(Parameter("limit", "integer"), Parameter("after", 
 
 
 class TestAnOptionalReadOnTheOtherSeats:
-    """The fourth refusal on a precondition and an ``extend_queryset``, the seats that are handed reads.
+    """The fourth refusal on a precondition and an ``extend_queryset``, the seats handed reads.
 
     A condition and the output selector are handed none, so there is nothing
     for it to find on them.
@@ -1804,7 +1804,7 @@ class TestAnOptionalReadOnTheOtherSeats:
     async def test_adispatch_refuses_a_call_leaving_it_out_on_an_async_selector(
         self, build: Callable[[], Any], ada: Any
     ) -> None:
-        """The same refusal through ``_settle_and_conclude``, the route only an async selector takes.
+        """The same refusal through ``_settle_and_conclude``, the route only async selectors take.
 
         An ``extend_queryset`` binds there with the reads ``adispatch`` was
         given; a RETRIEVE's precondition takes its ``fillable`` from
@@ -1854,7 +1854,7 @@ class TestAnOptionalReadOnTheOtherSeats:
         assert seen["limit"] == 5
 
     def test_it_names_every_one_sorted(self) -> None:
-        """Both offenders, ``after`` before ``limit``, whichever order the callable declares them."""
+        """Both offenders, ``after`` before ``limit``, in whichever order it declares them."""
         spec = _retrieve(
             _found,
             reads=_TWO_OPTIONAL,
@@ -1880,7 +1880,7 @@ class TestAnOptionalReadOnTheOtherSeats:
 
 
 class TestTheFifthRefusalIsNotRunOnThem:
-    """An array read with no ``items`` is refused on the callable it fills, not on a precondition, an ``extend_queryset`` or a provider.
+    """An array read with no ``items`` is refused on the callable it fills, not on any other seat.
 
     A ``progress_reporter`` has no case: its seat reads nothing, so the
     refusal would find nothing on it either way.
@@ -2163,7 +2163,7 @@ class TestAnArrayReadWithNoItems:
         assert f"ServiceSpec.service reads the array(s) ['ids'] {_NO_ITEMS}" in refused
 
     def test_only_the_seat_the_read_fills_is_read(self) -> None:
-        """A service's read never reaches its target selector, whose keyword of that name is its own."""
+        """A service's read never reaches its target selector; its namesake keyword is its own."""
         spec = _service(
             lambda *, pks: pks,
             reads=Parameters.of(_PKS),
@@ -2232,7 +2232,7 @@ def test_no_seed_resolves_and_no_provider_is_called() -> None:
 
 
 def _unreadable_by_a_bad_signature() -> Callable[..., Any]:
-    """A function whose ``__signature__`` is no ``Signature``: ``inspect.signature`` raises ``TypeError``."""
+    """A ``__signature__`` that is no ``Signature``: ``inspect.signature`` raises ``TypeError``."""
 
     def fn(**_: Any) -> None: ...
 
