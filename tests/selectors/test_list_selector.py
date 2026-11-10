@@ -1,5 +1,3 @@
-"""``ListSelector``: a ``LIST`` selector returning its rows, every keyword through ``**extras``."""
-
 from __future__ import annotations
 
 from typing import Any

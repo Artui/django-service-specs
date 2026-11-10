@@ -1,5 +1,3 @@
-"""Tests for ``shape_queryset`` — the five shaping fields, ``filter_set`` last."""
-
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -142,9 +140,7 @@ class TestExtendQueryset:
         assert result.count() == 0
 
     def test_a_read_the_pool_lacks_is_the_callable_s_own_error(self) -> None:
-        """A transport shaping rows itself bound no arguments, so no caller
-        could have sent ``title``, read or not: asking for it as a missing
-        argument would ask for a value nobody can send."""
+        """A transport shaping rows itself bound no arguments."""
         spec = SelectorSpec(
             kind=SelectorKind.LIST,
             selector=_bare_selector,
@@ -264,13 +260,7 @@ class _ByView(django_filters.FilterSet):
 @pytest.mark.django_db
 class TestFilterSet:
     def test_a_filter_named_view_builds_and_shapes(self) -> None:
-        """A selector spec is built outside dispatch, so a filter of the call's names is a filter.
-
-        As a transport shaping its own list builds one from a consumer's
-        FilterSet: the build refuses a read of either name on a service
-        spec, where it would be a call parameter, and never on a selector
-        spec's own construction.
-        """
+        """A selector spec is built outside dispatch."""
         _three_notes()
         spec = _filtered(_ByView)
         assert "view" in spec.reads.names()
@@ -289,16 +279,14 @@ class TestFilterSet:
         assert _titles(rows) == ["draft", "final", "other"]
 
     def test_a_pool_s_data_is_not_the_filters_data(self) -> None:
-        # The filters read only the names they declare, never a mapping a
-        # pool happens to carry under ``data``.
+        # The filters read only the names they declare.
         _three_notes()
         pool = {"data": {"title": "draft"}}
         rows = shape_queryset(Note.objects.all(), _filtered(TitleFilter), pool, source_label="x")
         assert _titles(rows) == ["draft", "final", "other"]
 
     def test_a_value_the_filterset_refuses_is_refused_rather_than_ignored(self) -> None:
-        # Read without ``is_valid()``, a non-strict FilterSet answers the
-        # unfiltered rows for a value it cannot use.
+        # Read without ``is_valid()``.
         _three_notes()
         with pytest.raises(InvalidArguments) as caught:
             shape_queryset(
@@ -325,9 +313,7 @@ class TestFilterSet:
         }
 
     def test_a_range_filter_s_refusal_is_keyed_by_the_filter_s_name(self) -> None:
-        # Its arguments are ``pk_range_min`` and ``pk_range_max``, and
-        # django-filter validates the two as one form field, called ``pk_range``.
-        # Called directly, so the shape check is not there to answer first.
+        # Its arguments are ``pk_range_min`` and ``pk_range_max``.
         with pytest.raises(InvalidArguments) as caught:
             shape_queryset(
                 Note.objects.all(),
@@ -385,8 +371,7 @@ class TestFilterSet:
         assert _titles(rows) == ["draft"]
 
     def test_a_filter_naming_the_shapes_is_handed_none(self) -> None:
-        # A FilterSet is handed ``request`` and its filters' values, never
-        # the ``shapes`` seed, even from a pool carrying one.
+        # A FilterSet is handed ``request`` and its filters' values, never the ``shapes`` seed.
         handed: list[Any] = []
         not_handed = object()
 
@@ -404,9 +389,7 @@ class TestFilterSet:
         assert handed == [not_handed]
 
     def test_it_runs_after_extend_queryset(self) -> None:
-        # ``extend_queryset`` sees the declaratively shaped rows and no filter,
-        # so a slice or an ordering it applies is never made over filtered rows
-        # it did not ask for.
+        # ``extend_queryset`` sees the declaratively shaped rows and no filter.
         _three_notes()
         received: list[QuerySet[Any]] = []
 
@@ -420,8 +403,7 @@ class TestFilterSet:
         assert _titles(received[0]) == ["draft", "final", "other"]
 
     def test_it_alone_refuses_a_return_that_is_not_a_queryset(self) -> None:
-        # The fifth condition of the nothing-to-shape guard: without it, a
-        # list met by a filter would be returned unfiltered.
+        # The fifth condition of the nothing-to-shape guard: without it.
         with pytest.raises(ImproperlyConfigured, match="not a Django QuerySet"):
             shape_queryset([{"id": 1}], _filtered(TitleFilter), {}, source_label="x")
 
@@ -439,17 +421,14 @@ class _Recorded(NoteFilters):
 @pytest.mark.django_db
 class TestFilterData:
     def test_a_csv_filter_s_list_reaches_it_as_the_string_it_splits(self) -> None:
-        # At django-filter's declared floor the CSV widget calls ``.split`` on
-        # what it is handed, so a list would raise there. A multiple choice
-        # reads a list as a list, and is handed one.
+        # At django-filter's declared floor the CSV widget calls ``.split`` on what it is handed.
         _Recorded.seen.clear()
         pool = {"pks": [1, 2], "kinds": ["draft", "final"]}
         shape_queryset(Note.objects.all(), _filtered(_Recorded), pool, source_label="x")
         assert _Recorded.seen == [{"pks": "1,2", "kinds": ["draft", "final"]}]
 
     def test_a_csv_filter_sent_a_string_is_handed_it_unchanged(self) -> None:
-        # A transport shaping rows itself may hand over the query string's own
-        # spelling, which is already what the widget splits.
+        # A transport shaping rows itself may hand over the query string's own spelling.
         _Recorded.seen.clear()
         shape_queryset(Note.objects.all(), _filtered(_Recorded), {"pks": "1,2"}, source_label="x")
         assert _Recorded.seen == [{"pks": "1,2"}]
@@ -471,15 +450,12 @@ class TestFilterSetThroughDispatch:
         }
 
     def test_a_value_only_the_filterset_can_judge_is_refused_by_it(self) -> None:
-        # The shape check accepts any string for a related row's key; the
-        # FilterSet is the one that knows no such row exists, and its message,
-        # not the shape check's, is the one that comes back.
+        # The shape check accepts any string for a related row's key.
         ada = _three_notes()
         with pytest.raises(InvalidArguments) as caught:
             dispatch(_filtered(NoteFilters), principal=ada, arguments={"owner": "0"})
         [message] = caught.value.detail["owner"]
         assert message == "Select a valid choice. That choice is not one of the available choices."
-        # The shape check's own wording names the value it refused.
         assert "0 is not one of" not in message
 
     def test_a_retrieve_is_filtered_before_it_collapses_to_its_row(self) -> None:
@@ -491,9 +467,7 @@ class TestFilterSetThroughDispatch:
 
 @pytest.mark.django_db
 def test_a_query_string_s_values_reach_the_filters_through_coerce_flat() -> None:
-    # What a FilterSet is mostly for: ``?archived=false``, every value a
-    # string, coerced against the spec's Parameters as a transport reading a
-    # query string coerces it, then dispatched.
+    # What a FilterSet is mostly for: ``?archived=false``, every value a string.
     ada = _three_notes()
     spec = _filtered(NoteFilters)
     arguments = coerce_flat(spec.parameters(), {"archived": "false", "kinds": ["draft", "final"]})
@@ -521,9 +495,7 @@ async def test_adispatch_filters_an_async_selector_s_rows() -> None:
 
 @pytest.mark.django_db
 def test_a_csv_filter_s_key_past_two_to_the_fifty_third_matches_its_own_row() -> None:
-    # Read through ``float``, 2**53 + 1 would become 2**53 and match the
-    # neighbour's row. A CSV filter's numbers are decimal strings, handed on
-    # with every digit they were sent with.
+    # Read through ``float``, 2**53 + 1 would become 2**53 and match the neighbour's row.
     ada = make_user("ada")
     Note.objects.create(pk=2**53, owner=ada, title="neighbour")
     Note.objects.create(pk=2**53 + 1, owner=ada, title="mine")
@@ -560,15 +532,7 @@ def _outcome(call: Any) -> Any:
 
 @pytest.mark.django_db
 class TestAFilterValuePastItsColumn:
-    """A number no integer column can hold, sent to a filter on one.
-
-    Refused at the argument that carried it, in the words and with the code of
-    Django's own range validators, rather than handed to the driver, which
-    raises ``OverflowError``: for ``in`` and ``range`` on every Django, and
-    for every lookup on 4.2's SQLite, which states no range. Each value sits
-    far inside the 1e50 bound the shape check and django-filter hold a number
-    filter to, so the column's range is the one that answers.
-    """
+    """A number no integer column can hold, sent to a filter on one."""
 
     @pytest.mark.parametrize(
         ("filter_set", "arguments", "detail"),
@@ -632,8 +596,7 @@ class TestAFilterValuePastItsColumn:
         assert _titles(rows) == ["draft", "final", "other"]
 
     def test_a_lookup_reading_the_value_as_text_is_left_to_it(self) -> None:
-        # ``contains`` matches the column's digits and never converts the
-        # value, so no integer is too large for it.
+        # ``contains`` matches the column's digits and never converts the value.
         ada = _three_notes()
         rows = dispatch(
             _filtered(NoteKeyFilters), principal=ada, arguments={"pk_digits": _PAST_TOP}
@@ -641,8 +604,7 @@ class TestAFilterValuePastItsColumn:
         assert list(rows.value) == []
 
     def test_a_filter_with_a_method_is_left_to_its_method(self) -> None:
-        # The method decides what the value means; this one reads a key no
-        # note can have as every note.
+        # The method decides what the value means.
         ada = _three_notes()
         rows = dispatch(
             _filtered(NoteKeyFilters), principal=ada, arguments={"pk_or_any": _PAST_TOP}
@@ -650,8 +612,7 @@ class TestAFilterValuePastItsColumn:
         assert _titles(rows.value) == ["draft", "final", "other"]
 
     def test_a_related_row_is_matched_as_its_key(self) -> None:
-        # A model choice filter's value is the row, which no integer column
-        # reads as a number: the lookup reads it as the row's own key.
+        # A model choice filter's value is the row, which no integer column reads as a number.
         ada = _three_notes()
         rows = dispatch(_filtered(NoteFilters), principal=ada, arguments={"owner": str(ada.pk)})
         assert _titles(rows.value) == ["draft", "final", "other"]
@@ -687,16 +648,13 @@ class TestAFilterValuePastItsColumn:
         assert _titles(rows.value) == ["draft", "final", "other"]
 
     def test_a_relation_over_several_columns_leaves_a_call_sending_nothing_alone(self) -> None:
-        # A FilterSet declaring a filter on it is asked about every filter it
-        # declares, on every call: a relation comparing two columns with a
-        # value has no one column's range, and must not raise for asking.
+        # A FilterSet declaring a filter on it is asked about every filter it declares.
         Placement.objects.create(title="t", shelf_row=5, shelf_position=1)
         rows = shape_queryset(Placement.objects.all(), _shelved(), {}, source_label="x")
         assert [row.title for row in rows] == ["t"]
 
     def test_a_number_sent_to_a_relation_over_several_columns_is_the_database_s(self) -> None:
-        # Answered as the FilterSet alone answers it, which is Django's to
-        # decide and differs by version: so the oracle is django-filter's own.
+        # Answered as the FilterSet alone answers it.
         Placement.objects.create(title="t", shelf_row=5, shelf_position=1)
         queryset = Placement.objects.all()
         expected = _outcome(lambda: [row.title for row in _Shelved({"shelf": "5"}, queryset).qs])
@@ -772,11 +730,7 @@ def _users_filtered(filter_set: Any) -> SelectorSpec:
 
 @pytest.mark.django_db
 class TestAKeyReachedThroughAnyRelation:
-    """A many-to-many and a reverse foreign key compare the related row's key.
-
-    So the number is held to that key's column, as a foreign key's is: past
-    it, the driver raises ``OverflowError`` on every Django version.
-    """
+    """A many-to-many and a reverse foreign key compare the related row's key."""
 
     @pytest.mark.parametrize(
         ("arguments", "detail"),
@@ -823,14 +777,7 @@ def _no_choice_in_list(key: str) -> tuple[str, str]:
 @pytest.mark.django_db
 @pytest.mark.usefixtures("unstated_ranges")
 class TestARelatedRowsKeyPastItsColumn:
-    """A model choice filter's key past the range of the column its rows are matched on.
-
-    Its form field matches the key with a query before the FilterSet has
-    cleaned anything, which would hand the key to the driver: ``OverflowError``
-    for a list on every Django version, and for one key where the backend
-    states no range, as Django 4.2's SQLite does. No row holds such a key, so
-    it is no choice, refused in the form field's own words.
-    """
+    """A model choice filter's key past the range of the column its rows are matched on."""
 
     @pytest.mark.parametrize(
         ("arguments", "detail"),
@@ -920,13 +867,7 @@ _UNDER_ZERO = "-1"
 
 @pytest.mark.django_db
 class TestANumberInsideSixtyFourBitsIsTheDatabases:
-    """A filter value a signed 64-bit integer holds is answered, whatever the column's type states.
-
-    A positive column states no negative number on Django 5.0 and later, and
-    none at all on 4.2's SQLite; ``-1`` is a value the driver binds either way,
-    and ``gte=-1`` means every row. Each case runs with the range the backend
-    states and with none, so it has one answer on every version.
-    """
+    """A filter value a signed 64-bit integer holds is answered."""
 
     @pytest.fixture(params=["stated", "unstated"])
     def ranges(self, request: pytest.FixtureRequest) -> None:

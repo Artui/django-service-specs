@@ -1,5 +1,3 @@
-"""``AsyncSelector``: an ``async def`` selector, which ``adispatch`` awaits."""
-
 from __future__ import annotations
 
 from typing import Any
