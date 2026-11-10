@@ -1,11 +1,3 @@
-"""Models for the adapter_app tests.
-
-Rows a Presenter reads by attribute rather than dataclass instances, so the
-adapter is shown rendering what a selector actually returns: a foreign key
-that is a row, a reverse relation that is a manager, a decimal column, and a
-choice column that holds a plain ``str``.
-"""
-
 from __future__ import annotations
 
 from django.db import models
@@ -36,11 +28,7 @@ class Book(models.Model):
 
 
 class Document(models.Model):
-    """A row with an optional file and a required one.
-
-    The optional one is what a ``ClearableFileInput`` can clear, and the
-    required one is what it never offers to.
-    """
+    """A row with an optional file and a required one."""
 
     title = models.CharField(max_length=100)
     attachment = models.FileField(upload_to="documents", blank=True)
@@ -51,14 +39,7 @@ class Document(models.Model):
 
 
 class Photo(models.Model):
-    """A row whose image stores its dimensions in two columns of its own.
-
-    ``ImageField`` writes ``w`` and ``h`` on the instance whenever the file is
-    set, so a save narrowed to the image column leaves the stored dimensions
-    behind. ``thumbnail`` declares no dimension columns, so clearing it writes
-    nothing else. ``book`` lets a nested write reach a photo; no test needs
-    Pillow, since a cleared image has no dimensions to read.
-    """
+    """A row whose image stores its dimensions in two columns of its own."""
 
     book = models.ForeignKey(Book, on_delete=models.CASCADE, null=True, related_name="photos")
     image = models.ImageField(upload_to="photos", blank=True, width_field="w", height_field="h")
@@ -71,12 +52,7 @@ class Photo(models.Model):
 
 
 class Edition(models.Model):
-    """A printing of a book, one per number, held by a ``UniqueConstraint``.
-
-    The constraint rather than ``unique_together``, because a ModelForm checks
-    the two by different calls, and an update that sends one of the pair must
-    be refused by either.
-    """
+    """A printing of a book, one per number, held by a ``UniqueConstraint``."""
 
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="editions")
     number = models.PositiveIntegerField()
@@ -100,11 +76,7 @@ class Shelf(models.Model):
 
 
 class Placement(models.Model):
-    """A book on a shelf, related to it by both of the shelf's numbers.
-
-    A ``ForeignObject`` over two columns: a relation that compares no single
-    column with a value, so no integer range is its.
-    """
+    """A book on a shelf, related to it by both of the shelf's numbers."""
 
     title = models.CharField(max_length=100)
     shelf_row = models.IntegerField()
