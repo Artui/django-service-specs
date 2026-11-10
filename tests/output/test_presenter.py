@@ -29,8 +29,7 @@ def test_a_complete_presenter_instantiates() -> None:
 
 
 def test_by_default_a_value_is_presented_whatever_the_call() -> None:
-    """``presented()`` is what dispatch's ``present`` asks for; a presenter that
-    reads nothing of the call overrides ``present()`` alone."""
+    """``presented()`` is what dispatch's ``present`` asks for."""
 
     class _Doubling(Presenter):
         def output(self) -> Output:
@@ -44,8 +43,7 @@ def test_by_default_a_value_is_presented_whatever_the_call() -> None:
 
 
 def test_by_default_a_list_is_each_of_its_rows_presented_with_the_one_context() -> None:
-    """``presented_rows()`` is what dispatch's ``present`` asks for a list; a
-    presenter that batches nothing overrides ``present()`` or ``presented()``."""
+    """``presented_rows()`` is what dispatch's ``present`` asks for a list."""
 
     class _Tagging(Presenter):
         def output(self) -> Output:

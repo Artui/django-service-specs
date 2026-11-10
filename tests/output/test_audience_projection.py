@@ -16,8 +16,7 @@ def test_a_default_projection_is_empty() -> None:
     assert AudienceProjection().is_empty()
 
 
-# ``is_empty`` is one ``or``-chain, so each term is held by its own case: the
-# term a case names is the only one that is set in it.
+# ``is_empty`` is one ``or``-chain, so each term is held by its own case.
 @pytest.mark.parametrize(
     "projection",
     [
@@ -63,8 +62,7 @@ class TestFormatter:
         assert projection.formatter("id") is None
 
     def test_a_handle_has_none_however_it_was_declared(self) -> None:
-        """The second condition of the suppression: a handle is another
-        tool's input, and a formatted identifier is a broken one."""
+        """The second condition of the suppression: a handle is another tool's input."""
         projection = AudienceProjection(
             fields={"id": FieldMarking(FieldAudience.HANDLE, formatter=MONEY)}
         )

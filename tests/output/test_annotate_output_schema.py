@@ -104,15 +104,13 @@ class TestDescriptions:
     }
 
     def test_an_unlabelled_handle_says_nothing_by_default(self) -> None:
-        """What a reader should do with an identifier depends on the reader, so
-        the wording is the transport's to supply."""
+        """What a reader should do with an identifier depends on the reader."""
         projection = AudienceProjection(fields={"id": FieldMarking.handle()})
 
         assert annotate(self.SCHEMA, projection)["properties"]["id"] == {"type": "integer"}
 
     def test_an_unlabelled_handle_takes_the_wording_supplied(self) -> None:
-        """The second condition of the marking's own wording: a marking that
-        declares none falls back to the handle wording."""
+        """The second condition of the marking's own wording."""
         projection = AudienceProjection(fields={"id": FieldMarking.handle()})
 
         annotated = annotate(self.SCHEMA, projection, handle_description="Pass it on.")
@@ -127,8 +125,7 @@ class TestDescriptions:
         assert annotated["properties"]["id"]["description"] == "The invoice handle."
 
     def test_the_handle_wording_is_for_handles_only(self) -> None:
-        """The first condition of the marking's own wording: an unmarked field
-        has none, and is not a handle either."""
+        """The first condition of the marking's own wording: an unmarked field has none."""
         projection = AudienceProjection(fields={"id": FieldMarking.handle()})
 
         annotated = annotate(self.SCHEMA, projection, handle_description="Pass it on.")
@@ -157,8 +154,7 @@ class TestChoices:
                 {"type": "string", "enum": ["Awaiting review", "X"]},
                 id="enum",
             ),
-            # The shape an ``X | None`` reaches a schema in from elsewhere: each
-            # member is rewritten, and the null one passes through.
+            # The shape an ``X | None`` reaches a schema in from elsewhere.
             pytest.param(
                 {"anyOf": [{"enum": ["PENDING_REVIEW"]}, {"type": "null"}]},
                 {"anyOf": [{"enum": ["Awaiting review"]}, {"type": "null"}]},
@@ -202,11 +198,7 @@ class TestChoices:
 
 
 class TestRestatedType:
-    """A display is a string, so a stated type follows the values it now describes.
-
-    Left as it was, an integer choice spoken as ``"Low"`` is described as an
-    integer, and the projected payload fails the projected schema.
-    """
+    """A display is a string, so a stated type follows the values it now describes."""
 
     def test_an_integer_spoken_whole_is_a_string(self) -> None:
         assert spoken({"type": "integer", "oneOf": [{"const": 1, "title": "Low"}]}) == {
@@ -228,9 +220,7 @@ class TestRestatedType:
         assert spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
 
     def test_null_is_kept_where_the_stated_type_admitted_it(self) -> None:
-        """Here the null is admitted by an entry with no constant rather than
-        listed as one, and it is still served, so the restated type must not
-        refuse it."""
+        """Here the null is admitted by an entry with no constant rather than listed as one."""
         subschema = {
             "type": ["integer", "null"],
             "oneOf": [{"const": 1, "title": "Low"}, {"type": "null"}],
@@ -239,9 +229,7 @@ class TestRestatedType:
         assert spoken(subschema)["type"] == ["string", "null"]
 
     def test_a_null_spoken_as_a_label_is_not_named(self) -> None:
-        """Django's ``(None, "Unknown")``: the stated type admitted a null, and
-        the payload serves ``"Unknown"`` in its place, so the restated type
-        names no null it never serves."""
+        """Django's ``(None, "Unknown")``: the stated type admitted a null."""
         subschema = {
             "type": ["integer", "null"],
             "oneOf": [{"const": 1, "title": "Low"}, {"const": None, "title": "Unknown"}],
@@ -253,15 +241,13 @@ class TestRestatedType:
         }
 
     def test_a_type_stated_as_null_alone_still_admits_it(self) -> None:
-        """A scalar ``"null"`` is a stated type admitting null, as a list
-        naming it is."""
+        """A scalar ``"null"`` is a stated type admitting null, as a list naming it is."""
         subschema = {"type": "null", "enum": [None, 1]}
 
         assert spoken(subschema) == {"type": ["string", "null"], "enum": [None, "Low"]}
 
     def test_a_type_that_refused_null_still_refuses_it(self) -> None:
-        """The restated type admits what the stated one did, in display terms,
-        and nothing more: a ``None`` the type refused was never served."""
+        """The restated type admits what the stated one did, in display terms, and nothing more."""
         subschema = {"type": "integer", "enum": [1, None]}
 
         assert spoken(subschema) == {"type": "string", "enum": ["Low", None]}
@@ -287,8 +273,7 @@ class TestRestatedType:
         assert spoken(subschema) == subschema
 
     def test_only_a_null_left_to_type_leaves_the_type_as_stated(self) -> None:
-        """Nothing but ``None`` is listed and the stated type refused it, so
-        there is no type to restate it as."""
+        """Nothing but ``None`` is listed and the stated type refused it."""
         subschema = {"type": "integer", "enum": [None]}
 
         assert spoken(subschema) == subschema
@@ -299,20 +284,13 @@ class TestRestatedType:
         assert spoken(subschema) == subschema
 
     def test_a_choice_listing_nothing_keeps_its_type(self) -> None:
-        """Nothing listed to restate the type from. Nullable, so that restating
-        it from nothing would leave ``"null"`` alone in place of the type."""
+        """Nothing listed to restate the type from."""
         subschema = {"type": ["string", "null"], "enum": []}
 
         assert spoken(subschema) == subschema
 
     def test_an_entry_admitting_more_than_its_constants_keeps_the_type(self) -> None:
-        """An entry with no ``const`` admits values the displays say nothing
-        about, so narrowing the type to the displays' would refuse them: ``7``
-        matches ``minimum`` and is an integer, and narrowed to ``"string"``
-        the type would no longer admit it. Left as written, the type refuses
-        the display ``"Low"`` a row holding ``1`` is served, so that row still
-        fails this schema; only a schema written by hand reaches this shape,
-        and narrowing would refuse ``7`` and the null as well."""
+        """An entry with no ``const`` admits values the displays say nothing about."""
         subschema = {
             "type": ["integer", "null"],
             "oneOf": [{"const": 1, "title": "Low"}, {"minimum": 5}],
@@ -329,11 +307,7 @@ class TestRestatedType:
 
 
 class TestServedNull:
-    """``"null"`` is named exactly where the projected payload can still serve one.
-
-    A nullable field's ``None`` is served as its display where the choices give
-    it one, and as a null where they do not.
-    """
+    """``"null"`` is named exactly where the projected payload can still serve one."""
 
     @staticmethod
     def projected(choices: tuple[tuple[Any, str], ...]) -> tuple[Any, Any]:
@@ -356,12 +330,7 @@ class TestServedNull:
 
 
 class TestSharedDisplays:
-    """Django lets two values share one display, and a reader is told it once.
-
-    Listed twice, a ``oneOf`` matches a row served that display under both
-    entries, and ``oneOf`` admits only a value valid under exactly one, so
-    every such row would fail the schema it is advertised under.
-    """
+    """Django lets two values share one display, and a reader is told it once."""
 
     CHOICES = (("legacy", "Draft"), ("draft", "Draft"), ("live", "Published"))
     STAGE_LABELS: dict[Any, str] = dict(CHOICES)
@@ -378,8 +347,7 @@ class TestSharedDisplays:
 
         for value, _ in self.CHOICES:
             served = project_payload({"status": value}, projection)["status"]
-            # ``oneOf`` of ``const`` entries as JSON Schema reads it: the row
-            # is valid only if exactly one entry names its value.
+            # ``oneOf`` of ``const`` entries as JSON Schema reads it.
             assert [entry for entry in one_of if entry.get("const") == served] == [
                 {"const": served}
             ]
@@ -404,9 +372,7 @@ class TestSharedDisplays:
         assert annotate(schema, projection)["properties"]["s"] == {"enum": ["Published", "Draft"]}
 
     def test_an_array_of_shared_displays_stops_claiming_unique_items(self) -> None:
-        """``uniqueItems`` held for the stored values and not for their
-        displays: two values selected together are served as one display
-        twice, and the payload keeps both because both are selected."""
+        """``uniqueItems`` held for the stored values and not for their displays."""
         schema = {"type": "object", "properties": {"s": self.ARRAY_OF_STAGES}}
         projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
 
@@ -416,8 +382,7 @@ class TestSharedDisplays:
         }
 
     def test_an_array_of_distinct_displays_keeps_unique_items(self) -> None:
-        """The condition of the drop: no two values collapsed, so the displays
-        served for distinct values are distinct too."""
+        """The condition of the drop: no two values collapsed."""
         subschema = {"type": "array", "items": {"enum": ["legacy", "live"]}, "uniqueItems": True}
         schema = {"type": "object", "properties": {"s": subschema}}
         projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
@@ -429,8 +394,7 @@ class TestSharedDisplays:
         }
 
     def test_an_array_of_a_nullable_union_counts_across_its_members(self) -> None:
-        """An element stated as ``anyOf`` lists its values in a member, and the
-        collapse is counted there too."""
+        """An element stated as ``anyOf`` lists its values in a member."""
         subschema = {
             "type": "array",
             "items": {"anyOf": [{"enum": ["legacy", "draft"]}, {"type": "null"}]},
@@ -442,8 +406,7 @@ class TestSharedDisplays:
         assert "uniqueItems" not in annotate(schema, projection)["properties"]["s"]
 
     def test_two_selected_values_sharing_a_display_meet_their_schema(self) -> None:
-        """End to end: ``["legacy", "draft"]`` is served as ``["Draft",
-        "Draft"]``, and the schema it is advertised under admits that."""
+        """End to end: ``["legacy", "draft"]`` is served as ``["Draft", "Draft"]``."""
         schema = {"type": "object", "properties": {"s": self.ARRAY_OF_STAGES}}
         projection = AudienceProjection(choice_labels={"s": self.STAGE_LABELS})
         served = project_payload({"s": ["legacy", "draft"]}, projection)["s"]
@@ -451,20 +414,17 @@ class TestSharedDisplays:
 
         assert served == ["Draft", "Draft"]
         assert all(item in stages["items"]["enum"] for item in served)
-        # ``uniqueItems`` as JSON Schema reads it: a repeat fails the array.
         assert not stages.get("uniqueItems") or len(set(served)) == len(served)
 
     def test_a_boolean_is_not_the_number_python_says_it_equals(self) -> None:
-        """The second condition of a repeat: ``True == 1`` in Python and not in
-        JSON, so both stay listed and a row served either still matches."""
+        """The second condition of a repeat: ``True == 1`` in Python and not in JSON."""
         schema = {"type": "object", "properties": {"s": {"enum": [True, 1, "x"]}}}
         projection = AudienceProjection(choice_labels={"s": {"x": "Ex"}})
 
         assert annotate(schema, projection)["properties"]["s"] == {"enum": [True, 1, "Ex"]}
 
     def test_a_boolean_and_the_number_it_equals_stay_two_constants(self) -> None:
-        """The ``oneOf`` spelling of the test above, the one a duplicate would
-        break: a row served ``1`` matches the entry naming ``1``."""
+        """The ``oneOf`` spelling of the test above, the one a duplicate would break."""
         subschema = {"oneOf": [{"const": True}, {"const": 1}, {"const": "x", "title": "Ex"}]}
         schema = {"type": "object", "properties": {"s": subschema}}
         projection = AudienceProjection(choice_labels={"s": {"x": "Ex"}})
@@ -483,8 +443,7 @@ class TestFormatters:
         marking: FieldMarking | None = None,
         **projection: Any,
     ) -> Any:
-        """``subschema`` as the property ``due``, annotated; formatted as a
-        timestamp unless another marking is given."""
+        """``subschema`` as the property ``due``, annotated."""
         fields = {"due": marking or FieldMarking.formatted(TIMESTAMP)}
         schema = {"type": "object", "properties": {"due": subschema}, "required": ["due"]}
         return annotate(schema, AudienceProjection(fields=fields, **projection))["properties"][
@@ -530,9 +489,7 @@ class TestFormatters:
         }
 
     def test_a_formatter_wins_over_the_choice_displays(self) -> None:
-        """The mirror of the payload's order: no display is listed, and the
-        type is the one the formatter produces rather than one restated from
-        the displays."""
+        """The mirror of the payload's order: no display is listed."""
         subschema = {"type": "integer", "oneOf": [{"const": 1, "title": "Low"}]}
         marking = FieldMarking.formatted(ValueFormatter(str, produces="number"))
 
@@ -541,8 +498,7 @@ class TestFormatters:
         }
 
     def test_the_formatters_own_values_are_not_spoken(self) -> None:
-        """What the formatter declares is what it produces, so the displays of
-        the stored values are never applied to it."""
+        """What the formatter declares is what it produces."""
         produced = ValueFormatter(str, produces="string", schema={"enum": ["a", "b"]})
         marking = FieldMarking.formatted(produced)
 
@@ -551,9 +507,7 @@ class TestFormatters:
         ) == {"type": "string", "enum": ["a", "b"]}
 
     def test_a_hidden_field_is_dropped_whatever_formats_it(self) -> None:
-        """The schema's mirror of the payload test of that name: hidden is
-        answered before the formatter is asked, so the property and its
-        ``required`` entry both go."""
+        """The schema's mirror of the payload test of that name."""
         schema = {
             "type": "object",
             "properties": {"id": {"type": "integer"}, "due": {"type": "string"}},
@@ -582,25 +536,16 @@ class TestFormatters:
     @pytest.mark.parametrize(
         "subschema",
         [
-            # A null is never formatted, so the projected payload still carries
-            # one where the field allowed it.
+            # A null is never formatted.
             pytest.param({"type": ["string", "null"], "format": "date-time"}, id="type-list"),
             pytest.param({"type": "null"}, id="null-alone"),
-            # The shape a dataclass field typed ``datetime | None`` is described
-            # as: the null is a member of a union, not a word in a type.
             pytest.param(
                 {"anyOf": [{"type": "string", "format": "date-time"}, {"type": "null"}]},
                 id="any-of-member",
             ),
-            # The shape ``ChoiceField(allow_null=True)`` is described as: untyped,
-            # because its values are of two types, with the null among them.
             pytest.param({"enum": ["a", "b", None]}, id="enum"),
-            # The enum lists the null the server serves, so it is read even
-            # beside a type that does not name one.
             pytest.param({"type": "string", "enum": ["a", None]}, id="enum-beside-a-type"),
             pytest.param({"const": None}, id="const"),
-            # A labelled nullable choice: the null is an entry of its own, as a
-            # constant or as a type.
             pytest.param(
                 {"oneOf": [{"const": "a", "title": "Alpha"}, {"const": None}]},
                 id="one-of-const",
@@ -609,7 +554,6 @@ class TestFormatters:
                 {"oneOf": [{"const": "a", "title": "Alpha"}, {"type": "null"}]},
                 id="one-of-type",
             ),
-            # A member is read as a property is: its own type list, its own enum.
             pytest.param(
                 {"anyOf": [{"type": ["string", "null"]}, {"type": "integer"}]},
                 id="inside-an-any-of-member-type",
@@ -618,7 +562,6 @@ class TestFormatters:
                 {"anyOf": [{"enum": ["a", None]}, {"type": "integer"}]},
                 id="inside-an-any-of-member-enum",
             ),
-            # ``true`` and ``{}`` admit anything, null included.
             pytest.param({"anyOf": [{"type": "string"}, True]}, id="any-of-true"),
             pytest.param({"anyOf": [{"type": "string"}, {}]}, id="any-of-empty"),
             pytest.param({"oneOf": [{"type": "string"}, True]}, id="one-of-true"),
@@ -637,8 +580,6 @@ class TestFormatters:
             pytest.param({"oneOf": [{"const": "a"}, {"const": "b"}]}, id="one-of"),
             pytest.param({"enum": ["a", "b"]}, id="enum"),
             pytest.param({"type": "string", "const": "a"}, id="const"),
-            # ``false`` admits nothing, and an entry that is no schema at all is
-            # not read.
             pytest.param({"anyOf": [{"type": "string"}, False]}, id="any-of-false"),
             pytest.param({"anyOf": [{"type": "string"}, "string"]}, id="any-of-no-schema"),
             pytest.param({"oneOf": [{"type": "string"}, False]}, id="one-of-false"),
@@ -651,9 +592,7 @@ class TestFormatters:
         assert self.formatted(subschema) == LOCAL_TIME
 
     def test_a_schema_stating_nothing_about_its_value_still_admits_null(self) -> None:
-        """An ``any`` field is described as ``{}``, which admits every value and
-        the null with it, so a formatter over one keeps serving the null it
-        passes through unformatted. A title says nothing about the value."""
+        """An ``any`` field is described as ``{}``."""
         for subschema in ({}, {"title": "Extra"}):
             assert self.formatted(subschema)["type"] == ["string", "null"]
 
@@ -671,8 +610,7 @@ class TestFormatters:
         ],
     )
     def test_an_annotation_alone_states_nothing_about_the_value(self, keyword: str) -> None:
-        """Each annotation keyword describes the field, not its value, so a
-        schema carrying only it still admits the null an ``any`` field passes."""
+        """Each annotation keyword describes the field, not its value."""
         assert self.formatted({keyword: "x"})["type"] == ["string", "null"]
 
     @pytest.mark.parametrize(
@@ -691,17 +629,13 @@ class TestFormatters:
     def test_a_schema_stating_its_value_another_way_admits_no_null(
         self, subschema: dict[str, Any]
     ) -> None:
-        """A reference, a composition, a negation or a shape says something
-        about the value, so only the spellings above admit a null: a formatter
-        over one serves a string, as it did before ``any`` existed."""
+        """A reference, a composition, a negation or a shape says something about the value."""
         assert self.formatted(subschema)["type"] == "string"
 
     @pytest.mark.parametrize(
         ("declared", "subschema", "expected"),
         [
-            # The type now admits a null, so an ``enum`` the formatter lists
-            # beside it must too, or the schema would refuse the null it just
-            # admitted.
+            # The type now admits a null, so an ``enum`` the formatter lists beside it must too.
             pytest.param(
                 {"enum": ("a", "b")},
                 {"type": ["string", "null"]},
@@ -720,16 +654,12 @@ class TestFormatters:
                 {"enum": ["a", "b"], "type": "string"},
                 id="enum-on-a-field-admitting-no-null",
             ),
-            # A ``const`` is a one-value ``enum``: restated as the ``enum`` of
-            # that value and a null, the smallest statement that still admits
-            # both.
             pytest.param(
                 {"const": "n/a"},
                 {"type": ["string", "null"]},
                 {"enum": ["n/a", None], "type": ["string", "null"]},
                 id="const",
             ),
-            # Both must hold, so the values left are the constant alone.
             pytest.param(
                 {"const": "a", "enum": ["a", "b"]},
                 {"type": ["string", "null"]},
@@ -756,7 +686,6 @@ class TestFormatters:
         produced = ValueFormatter(str, produces="string", schema=deepcopy(declared))
 
         assert self.formatted(subschema, FieldMarking.formatted(produced)) == expected
-        # The declaration itself is never modified.
         assert produced.schema == declared
 
     def test_every_projected_row_meets_the_projected_schema(self) -> None:
