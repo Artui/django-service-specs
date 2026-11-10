@@ -70,8 +70,6 @@ def retrieve_re_read(**kwargs: Any) -> SelectorSpec:
             NULLABLE_ITEM,
             id="a-retrieve-allowing-none-admits-null",
         ),
-        # Its selector's ``None`` is presented as the empty list, so ``"null"``
-        # is never stated.
         pytest.param(
             listing(selector=nothing, presenter=NoteTitle(), allow_none=True),
             ARRAY,
@@ -97,14 +95,11 @@ def retrieve_re_read(**kwargs: Any) -> SelectorSpec:
             NULLABLE_ITEM,
             id="a-service-allowing-none-admits-null",
         ),
-        # The re-read already admits null, declared or not; undeclared is
-        # test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow_none.
         pytest.param(
             service(output_selector_spec=retrieve_re_read(presenter=NoteTitle()), allow_none=True),
             NULLABLE_ITEM,
             id="allow-none-changes-nothing-beside-a-retrieve-re-read",
         ),
-        # The re-read's rows are what is presented, never the service's ``None``.
         pytest.param(
             service(
                 output_selector_spec=listing(
@@ -152,28 +147,20 @@ def test_a_service_whose_output_selector_is_a_retrieve_admits_null_without_allow
 
 
 class TestReturnsMany:
-    """A service declaring ``returns_many`` presents its own return as an array of the item.
-
-    Built inside each test rather than in ``test_the_shape_around_the_item``'s
-    table, so a tree without the field fails each case on its own rather than
-    the module's collection.
-    """
+    """A service declaring ``returns_many`` presents its own return as an array of the item."""
 
     @pytest.mark.parametrize("paginate", [False, True], ids=["bare", "paginate-asked"])
     @pytest.mark.parametrize(
         ("allow_none", "expected"),
         [
             pytest.param(False, ARRAY, id="strict"),
-            # The ``many`` service's rule: a ``None`` return is presented as
-            # ``None``, so ``"null"`` wraps the whole array.
+            # The ``many`` service's rule: a ``None`` return is presented as ``None``.
             pytest.param(True, allow_null(ARRAY), id="allowing-none-admits-null-for-the-array"),
         ],
     )
     def test_an_array_of_the_item_never_paged(
         self, allow_none: bool, expected: dict[str, Any], paginate: bool
     ) -> None:
-        # Never paged: dispatch hands back every row the service returned, so
-        # there is no page to describe, whatever a transport asks for.
         spec = service(presenter=NoteTitle(), returns_many=True, allow_none=allow_none)
 
         assert spec_output_schema(spec, paginate=paginate) == expected
@@ -223,9 +210,7 @@ class TestWhatDispatchPresents:
 
     @pytest.mark.parametrize("allow_none", [False, True])
     def test_a_service_that_returns_nothing_presents_null(self, allow_none: bool) -> None:
-        """Presented as ``None`` either way; only a declared ``allow_none`` says so,
-        because whether a service may return nothing is not otherwise in its
-        declaration."""
+        """Presented as ``None`` either way; only a declared ``allow_none`` says so."""
         spec = service(presenter=NoteTitle(), allow_none=allow_none)
 
         result = dispatch(spec, principal=make_user("ada"), arguments={})
@@ -284,8 +269,7 @@ class TestPaging:
     def test_paging_changes_nothing_that_is_not_a_list(
         self, spec: ServiceSpec | SelectorSpec, expected: dict[str, Any]
     ) -> None:
-        """One row has no pages: the flag describes how a list is served, and
-        a transport may pass it for every spec it lists."""
+        """One row has no pages: the flag describes how a list is served."""
         assert spec_output_schema(spec, paginate=True) == expected
 
     def test_a_spec_with_no_output_is_still_none_when_paged(self) -> None:
@@ -330,8 +314,7 @@ class TestProjection:
         assert schema == {"type": "array", "items": PROJECTED_SCHEMA}
 
     def test_the_projection_lands_on_a_pages_items_and_never_on_the_envelope(self) -> None:
-        """The envelope's keys belong to no ``Output``: a mount hiding a field
-        that happens to be called ``page`` hides it from the rows alone."""
+        """The envelope's keys belong to no ``Output``."""
         spec = listing(presenter=InvoicePresenter())
         projection = audience_projection_for_spec(spec, overrides={"page": FieldMarking.hidden()})
 
@@ -421,8 +404,7 @@ class TestAffordances:
         assert spec_output_schema(spec) == {**answered(ITEM), "type": ["object", "null"]}
 
     def test_a_projected_item_declares_the_same_answers_reason_included(self) -> None:
-        # After the projection, which walks declared fields and has nothing to
-        # say about a key no Output declares; an agent reads the reason too.
+        # After the projection.
         spec = retrieve(presenter=InvoicePresenter(), affordances=AFFORDANCES)
 
         schema = projected(spec)
@@ -540,11 +522,7 @@ def item_of(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 class TestShapes:
-    """A spec declaring ``shapes`` promises no field of a row, at any depth.
-
-    A shape reaches the presenter alone, and a ``fields`` selection there
-    leaves keys out, so no field the presenter declares can be promised.
-    """
+    """A spec declaring ``shapes`` promises no field of a row, at any depth."""
 
     @pytest.mark.parametrize(
         ("spec", "paginate"),
@@ -588,8 +566,7 @@ class TestShapes:
 
         item = item_of(schema)
         assert requirements(item) == []
-        # Every field is still described, nested ones included: only the
-        # promise is gone.
+        # Every field is still described, nested ones included: only the promise is gone.
         assert set(item["properties"]) == {"title", "author", "editor", "tags"}
         assert item["properties"]["editor"]["type"] == ["object", "null"]
         assert set(item["properties"]["editor"]["properties"]) == {"name"}

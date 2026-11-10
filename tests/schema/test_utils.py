@@ -24,8 +24,7 @@ class TestAllowNull:
         assert widened is not schema
 
     def test_an_untyped_node_admits_null_already_and_is_copied_as_it_is(self) -> None:
-        # A file's node, and an array's undeclared element: neither states a
-        # type, so null is among the values it admits without a word added.
+        # A file's node, and an array's undeclared element: neither states a type.
         schema = {"description": "The minutes."}
 
         widened = allow_null(schema)

@@ -291,10 +291,7 @@ def _row(schema: Mapping[str, Any], name: str = "items") -> dict[str, Any]:
 def test_a_many_spec_s_list_is_offered_and_required_beside_an_untyped_provider(
     seat: str,
 ) -> None:
-    # Dispatch demands the list from the caller, and no provider reaches it: a
-    # typed provider annotated to fill its name is refused when the spec is
-    # built (tests/specs), and an untyped one names no key, so the list is
-    # still offered and required.
+    # Dispatch demands the list from the caller, and no provider reaches it.
     spec = _many(**{seat: lambda: {"items": [1]}})
 
     assert "items" not in server_owned_keys(spec)
@@ -306,9 +303,7 @@ def test_a_many_spec_s_list_is_offered_and_required_beside_an_untyped_provider(
 
 
 def test_a_many_spec_s_list_is_offered_where_a_mount_registers_a_seed_of_its_name() -> None:
-    # The seed makes ``server_owned_keys`` list the name, and dispatch refuses
-    # such a spec outright (a parameter must never meet a seed), so no call
-    # reaches this; the schema alone still never withholds the list for it.
+    # The seed makes ``server_owned_keys`` list the name.
     spec = _many(many_argument="tenant")
 
     assert "tenant" in server_owned_keys(spec, pool_seeds=TENANT_SEEDS)
@@ -327,8 +322,7 @@ def test_a_read_a_typed_kwargs_fills_is_not_offered() -> None:
 
 
 def test_a_reflected_read_named_for_a_registered_seed_is_withheld_only_under_those_seeds() -> None:
-    # Builds whatever the seeds: ``reflected`` is read against the call's own
-    # ``pool_seeds``, and an unregistered name is the caller's argument.
+    # Builds whatever the seeds: ``reflected`` is read against the call's own ``pool_seeds``.
     spec = _service(reads=Parameters.of(_required("tenant", reflected=True)))
 
     assert spec_caller_input_schema(spec)["required"] == ["tenant"]
@@ -392,18 +386,14 @@ def test_a_selector_spec_s_reads_beside_an_untyped_kwargs_are_offered_and_none_r
     ],
 )
 def test_a_read_a_provider_requires_itself_stays_required(case: str, required: list[str]) -> None:
-    # The provider may fill it, but is handed only the caller's reads, so the
-    # caller is asked for it. Beside it, what the provider is not handed stays
-    # relaxed: the spec's ``project`` an untyped ``kwargs`` may fill, and the
-    # Validator's fields an untyped ``input_data`` may.
+    # The provider may fill it, but is handed only the caller's reads.
     spec, seeds = _build(REQUIRING, case)
 
     assert sorted(spec_caller_input_schema(spec, pool_seeds=seeds)["required"]) == required
 
 
 def test_a_key_the_spec_s_kwargs_may_decline_leaves_the_target_s_read_required() -> None:
-    # Per seat: the spec's ``kwargs`` reaches the spec's reads, never the
-    # lookup's, so its declinable ``pk`` relaxes nothing there.
+    # Per seat: the spec's ``kwargs`` reaches the spec's reads, never the lookup's.
     spec = _service(kwargs=declines_pk, instance_selector_spec=_target())
 
     assert spec_caller_input_schema(spec)["required"] == ["pk"]
@@ -458,8 +448,7 @@ def test_beside_an_untyped_input_data_a_row_requires_nothing() -> None:
 
 
 def test_a_row_s_relaxing_stays_out_of_the_top_level() -> None:
-    # ``input_data`` reaches the rows alone: a read sharing a row field's name
-    # stays required, and so does the list.
+    # ``input_data`` reaches the rows alone: a read sharing a row field's name stays required.
     schema = spec_caller_input_schema(_many(reads=OWNER, input_data=untyped))
 
     assert schema["required"] == ["owner", "items"]
@@ -477,8 +466,7 @@ def test_a_read_bound_by_the_server_leaves_a_row_field_of_its_name_offered() -> 
 
 
 def test_a_registered_seed_leaves_a_row_field_of_its_name_offered() -> None:
-    # Builds: ``server_owned_keys`` keeps the seed's name on a ``many`` spec,
-    # and no seed check reads a row, whose field of that name is the caller's.
+    # Builds: ``server_owned_keys`` keeps the seed's name on a ``many`` spec.
     spec = _many(validator=Fields(_required("tenant"), _required("title")))
 
     schema = spec_caller_input_schema(spec, pool_seeds=TENANT_SEEDS)
@@ -488,8 +476,7 @@ def test_a_registered_seed_leaves_a_row_field_of_its_name_offered() -> None:
 
 
 def test_an_untyped_kwargs_leaves_every_row_as_declared() -> None:
-    # It may fill the read ``owner``, which a row field shares, and reaches
-    # the service's pool alone: the row's ``owner`` stays required.
+    # It may fill the read ``owner``, which a row field shares.
     spec = _many(reads=OWNER, kwargs=untyped)
 
     schema = spec_caller_input_schema(spec)
@@ -526,8 +513,7 @@ def test_the_unknown_argument_policy_closes_both_levels_or_neither(
 
 @pytest.mark.parametrize("many", [False, True], ids=["flat", "many"])
 def test_a_spec_source_is_described_as_the_spec_it_compiles_to(many: bool) -> None:
-    # A ``many`` one too: its rows are read off the compiled spec, which a
-    # declaration of another library's is not.
+    # A ``many`` one too: its rows are read off the compiled spec.
     spec = _many(input_data=fills_owner) if many else _service(reads=PROJECT, kwargs=fills_project)
 
     assert spec_caller_input_schema(Foreign(spec)) == spec_caller_input_schema(spec)
@@ -542,9 +528,7 @@ def test_spec_input_schema_still_lists_what_the_server_fills() -> None:
 
 
 def test_a_many_spec_whose_input_data_fills_a_read_is_refused() -> None:
-    # Why ``server_owned_keys`` may name ``input_data``'s keys at a ``many``
-    # spec's top level: none of them can be a read there, so withholding them
-    # withholds nothing dispatch demands. Refused when the spec is built.
+    # Why ``server_owned_keys`` may name ``input_data``'s keys at a ``many`` spec's top level.
     with pytest.raises(ImproperlyConfigured, match=r"input_data is annotated to fill \['owner'\]"):
         _many(reads=OWNER, input_data=fills_owner)
 
@@ -619,8 +603,7 @@ def answers_every_row_field() -> dict[str, Any]:
 def test_a_row_omitting_a_relaxed_field_is_dispatched_and_one_omitting_a_required_field_is_refused(
     provider: Callable[..., Any] | None,
 ) -> None:
-    # Each offered field left out of the second row alone: dispatch refuses
-    # it there, at its index, exactly when the row's schema requires it.
+    # Each offered field left out of the second row alone: dispatch refuses it there, at its index.
     spec = _many(input_data=provider)
     row = _row(spec_caller_input_schema(spec))
     whole = {"title": "a", "owner": 2}
@@ -637,8 +620,7 @@ def test_a_row_omitting_a_relaxed_field_is_dispatched_and_one_omitting_a_require
 def _refused_in_row_zero(
     spec: ServiceSpec, pool_seeds: PoolSeeds, unknown_arguments: UnknownArguments
 ) -> set[str]:
-    # A row is checked once the top level passes, so the reads dispatch
-    # demands are answered (each is an integer here) and the one row is empty.
+    # A row is checked once the top level passes.
     top = spec_caller_input_schema(spec, pool_seeds=pool_seeds).get("required", [])
     arguments = {name: 1 for name in top if name != spec.many_argument}
     arguments[spec.many_argument] = [{}]
@@ -689,11 +671,7 @@ def mcp_reference(
     unknown_arguments: UnknownArguments,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
 ) -> dict[str, Any]:
-    """django-spec-mcp's tool input schema, less its paging.
-
-    ``django_spec_mcp/schema/kernel_tool_input_schema.py`` at ``b1e3904``,
-    lines 58-69 and 79-84.
-    """
+    """django-spec-mcp's tool input schema, less its paging."""
     schema = dict(spec_input_schema(spec, unknown_arguments=unknown_arguments))
     withheld = server_arguments.names() | server_owned_keys(spec, pool_seeds=pool_seeds)
     properties = {n: f for n, f in (schema.get("properties") or {}).items() if n not in withheld}
@@ -712,12 +690,7 @@ def agents_reference(
     unknown_arguments: UnknownArguments,
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
 ) -> dict[str, Any]:
-    """django-spec-agents' tool schema of a spec, less its pagination and schema fragment.
-
-    ``django_spec_agents/spec_tools/spec_toolset.py`` at ``72effcb``:
-    ``_caller_schema`` (:2294), with ``_without(schema, server_names)``
-    applied last as at :2246.
-    """
+    """django-spec-agents' tool schema of a spec, less its pagination and schema fragment."""
     compiled = kernel_spec(spec)
     schema = _agents_without(
         spec_input_schema(compiled, unknown_arguments=unknown_arguments),
@@ -769,13 +742,7 @@ def _agents_validator_seats(
 
 
 def rest_reference(spec: ServiceSpec | SelectorSpec) -> dict[str, Any]:
-    """django-spec-rest's OPTIONS description of a spec, on a route capturing nothing.
-
-    ``django_spec_rest/views/spec_options.py`` at ``51e429d``: ``_described``
-    (:134) over ``spec.parameters()``, its ``declared`` (:111), with an empty
-    ``view.kwargs``, the default seeds and the edge's ``UNKNOWN_ARGUMENTS``,
-    ``IGNORE`` (``dispatch/kernel_edge.py:120``).
-    """
+    """django-spec-rest's OPTIONS description of a spec, on a route capturing nothing."""
     owned = server_owned_keys(spec, pool_seeds=DEFAULT_POOL_SEEDS)
     target = spec.target_selector_spec() if isinstance(spec, ServiceSpec) else None
     if target is not None:
@@ -830,8 +797,7 @@ def test_on_a_many_spec_the_transports_readings_part_from_it_only_in_the_rows(ca
         spec, server_names=frozenset(), unknown_arguments=UnknownArguments.REJECT, pool_seeds=seeds
     )
 
-    # Neither transport reads a row: each leaves the rows as declared, and so
-    # asks for a field ``input_data`` fills.
+    # Neither transport reads a row: each leaves the rows as declared.
     assert _row(mcp) == _row(agents) == _row(spec_input_schema(spec))
     as_declared = {**schema["properties"], "items": mcp["properties"]["items"]}
     assert {**schema, "properties": as_declared} == mcp == agents
@@ -863,10 +829,7 @@ def _less_the_target(schema: dict[str, Any], spec: ServiceSpec | SelectorSpec) -
 def test_where_no_provider_may_decline_and_nothing_is_partial_it_is_the_rest_reading(
     case: str,
 ) -> None:
-    # Less the target's parameters, which the route reads off the URL. A
-    # provider that only fills leaves both alike, since both withhold what it
-    # fills; on a ``many`` spec here no ``input_data`` reaches a row, which
-    # ``_described`` never reads.
+    # Less the target's parameters, which the route reads off the URL.
     spec, _ = _build({**FLAT, **MANY}, case)
 
     schema = spec_caller_input_schema(spec, unknown_arguments=UnknownArguments.IGNORE)
@@ -901,11 +864,7 @@ def test_the_rest_reading_requires_what_a_provider_may_fill_and_a_partial_spec_s
 
 
 class _ToOneTransport(Validator):
-    """Declares a required ``title``, and ``extra`` only to a call a ``cli`` transport stamped.
-
-    Keyed on the stamp the way a Validator declaring a field for one transport
-    is, so a test reading ``extra`` proves that transport's own dict reached the ask.
-    """
+    """Declares a required ``title``, and ``extra`` only to a call a ``cli`` transport stamped."""
 
     def __init__(self, *extra: Parameter) -> None:
         self.extra = extra
@@ -980,8 +939,7 @@ def test_a_field_declared_to_one_transport_is_not_offered_under_any_other_contex
 
 
 def test_with_no_call_context_the_schema_is_the_declaration_made_to_no_call() -> None:
-    # Literal, so the pin is the schema itself and not this function's own
-    # answer to an explicit None.
+    # Literal, so the pin is the schema itself, not this function's answer to None.
     assert spec_caller_input_schema(_service(validator=_ToOneTransport(_EXTRA))) == _TITLE_ONLY
     assert spec_caller_input_schema(_many(validator=_ToOneTransport(_EXTRA))) == {
         "type": "object",
@@ -996,9 +954,7 @@ def test_with_no_call_context_the_schema_is_the_declaration_made_to_no_call() ->
 def test_a_seed_named_field_declared_only_to_a_transport_is_the_caller_s_under_its_context() -> (
     None
 ):
-    # The ``server_owned_keys`` ask: the mount's seed owns the name in the
-    # declaration made to no call, so without the context the field would be
-    # listed by the base and withheld here.
+    # The ``server_owned_keys`` ask.
     spec = _service(validator=_ToOneTransport(Parameter("tenant", "string")))
 
     schema = spec_caller_input_schema(
@@ -1009,8 +965,7 @@ def test_a_seed_named_field_declared_only_to_a_transport_is_the_caller_s_under_i
 
 
 def test_a_field_declared_only_to_a_transport_input_data_may_fill_is_not_required() -> None:
-    # The ``provider_reached`` ask: an untyped ``input_data`` reaches every field,
-    # the one declared to this transport among them.
+    # The ``provider_reached`` ask: an untyped ``input_data`` reaches every field.
     spec = _service(validator=_ToOneTransport(_EXTRA), input_data=_answers_extra)
 
     schema = spec_caller_input_schema(spec, call_context=build_call_context("cli"))
@@ -1054,8 +1009,7 @@ def test_a_partial_spec_requires_no_field_declared_only_to_a_transport() -> None
 def test_a_validator_declaring_no_call_context_is_asked_as_before_under_one(
     build: Callable[..., ServiceSpec],
 ) -> None:
-    # A keyword handed to one that never declared it raises TypeError, so each
-    # ask goes through the reader that reads the signature.
+    # A keyword handed to one that never declared it raises TypeError.
     spec = build(validator=_title_and_owner(), input_data=_answers_extra)
 
     assert spec_caller_input_schema(
@@ -1090,10 +1044,7 @@ def test_a_validator_declaring_no_call_context_is_asked_as_before_under_one(
 def test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks(
     field: Parameter, declared: dict[str, Any], refusal: str
 ) -> None:
-    # ``check_seeds`` asks with no context, so what only the ``cli`` stamp
-    # declares is never assembled there: the registration passes, the schema
-    # asked with no context passes, and the first ask under the stamp raises.
-    # A schema's ask and dispatch's are one assembly.
+    # ``check_seeds`` asks with no context.
     spec = _service(validator=_ToOneTransport(field), **declared)
 
     assert check_seeds(spec) is None

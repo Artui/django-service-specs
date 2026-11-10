@@ -1,5 +1,3 @@
-"""Helpers the schema tests share: a presenter, the services and selectors it presents, a walk."""
-
 from __future__ import annotations
 
 from typing import Any
