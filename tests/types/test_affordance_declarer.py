@@ -1,5 +1,3 @@
-"""``AffordanceDeclarer``: the spec a ``SelectorSpec``'s ``affordances`` maps a name to."""
-
 from __future__ import annotations
 
 from dataclasses import fields
@@ -31,9 +29,7 @@ def test_a_selector_spec_is_not_one_though_it_has_affordances_of_its_own() -> No
 
 
 def test_it_adds_no_field_to_a_service_spec() -> None:
-    # A read-only property and no value: the base declares what is read, and
-    # ``ServiceSpec`` keeps its own ``affordances`` field and default, which
-    # shadows the property on the class and on every instance.
+    # A read-only property and no value: the base declares what is read.
     assert isinstance(vars(AffordanceDeclarer)["affordances"], property)
     (field,) = (field for field in fields(ServiceSpec) if field.name == "affordances")
     assert field.default is None

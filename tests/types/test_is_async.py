@@ -1,5 +1,3 @@
-"""Tests for ``is_async`` — the callable-kind predicate."""
-
 from __future__ import annotations
 
 import functools

@@ -1,5 +1,3 @@
-"""The helpers ``types/`` shares with the specs and the affordance phase."""
-
 from __future__ import annotations
 
 import dataclasses
@@ -30,14 +28,7 @@ from tests.dispatch_app.models import Note
 
 
 def test_the_per_call_names_and_the_ambient_seeds_partition_the_reserved_names() -> None:
-    # ``types/`` cannot import ``pool/``, so the per-call names are written out
-    # rather than derived. This is what holds the two lists together: a name
-    # reserved later has to be placed on one side or the other, deliberately.
-    # ``serializer`` is the one exception: the DRF adapter's per-call name,
-    # which this kernel never seeds and so never reserves. ``call_context`` is
-    # ambient: the transport's dict outlives the call, and an affordance
-    # condition may read it as it reads a seed. ``shapes`` is per call: what
-    # the caller sent is no surrounding of the call.
+    # ``types/`` cannot import ``pool/``, so the per-call names are written out rather than derived.
     assert PER_CALL_POOL_NAMES - {"serializer"} <= RESERVED_POOL_SEEDS
     ambient = RESERVED_POOL_SEEDS - PER_CALL_POOL_NAMES
     assert ambient == {"user", "progress", "call_context"}
@@ -62,8 +53,7 @@ def test_an_orm_expression_is_a_row_condition_and_a_callable_is_not() -> None:
 
 
 def test_an_alias_cannot_shadow_a_model_field() -> None:
-    # Django refuses ``__`` in a field name, so a double-underscored alias is
-    # never one.
+    # Django refuses ``__`` in a field name, so a double-underscored alias is never one.
     assert affordance_alias("rename", "note_archived") == "affordance__rename__note_archived"
 
 
@@ -107,8 +97,7 @@ class TestSchemaKeywords:
     def test_every_owner_named_is_a_field_of_the_declaration(
         self, keywords: Any, declaration: Any
     ) -> None:
-        """The refusal sends an author to these names, so each must be one
-        they can set."""
+        """The refusal sends an author to these names, so each must be one they can set."""
         fields = {field.name for field in dataclasses.fields(declaration)}
         owners = {owner for named in keywords.values() for owner in named}
         assert owners <= fields
@@ -119,7 +108,6 @@ class TestSchemaKeywords:
 
 
 def test_gettext_noop_returns_the_msgid_unchanged_and_reads_no_setting() -> None:
-    # Unlike Django's public marker, which reads USE_I18N when called; the
-    # fresh-interpreter half is test_marking_a_msgid_reads_no_setting.
+    # Unlike Django's public marker, which reads USE_I18N when called.
     message = "Not found."
     assert gettext_noop(message) is message

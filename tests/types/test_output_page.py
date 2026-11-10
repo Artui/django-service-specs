@@ -19,8 +19,7 @@ def test_the_envelope_is_the_shape_the_paged_schema_states() -> None:
 
 
 def test_the_envelope_carries_the_rendered_rows_and_not_the_slice() -> None:
-    """The projection lands on the rows; the envelope's own keys belong to no
-    declaration, so the caller presents the slice and hands the result back."""
+    """The projection lands on the rows; the envelope's own keys belong to no declaration."""
     page = OutputPage(items=["a row"], page=1, limit=2, total=1)
 
     assert page.envelope([{"id": 1}])["items"] == [{"id": 1}]

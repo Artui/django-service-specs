@@ -1,5 +1,3 @@
-"""``NoInput``: a name for an empty ``InputT``, which carries nothing at run time."""
-
 from __future__ import annotations
 
 from django_service_specs.services.delete_service import DeleteService

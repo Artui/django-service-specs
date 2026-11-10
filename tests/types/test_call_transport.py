@@ -1,5 +1,3 @@
-"""``call_transport``, which hands back what a transport stamped and invents nothing."""
-
 from __future__ import annotations
 
 from types import MappingProxyType
@@ -13,8 +11,7 @@ def test_it_returns_a_known_transport_s_stamp() -> None:
 
 
 def test_it_returns_a_third_party_transport_s_own_string_unconverted() -> None:
-    # The values are not a closed set: the reader must not narrow a stamp to a
-    # list it knows, since the docs allow a transport's own string.
+    # The values are not a closed set: the reader must not narrow a stamp to a list it knows.
     assert call_transport({TRANSPORT_KEY: "worker"}) == "worker"
 
 
@@ -23,8 +20,7 @@ def test_a_missing_key_reads_as_none() -> None:
 
 
 def test_a_context_outside_a_call_reads_as_none() -> None:
-    # A Validator's ``parameters(call_context=None)`` is handed ``None`` on every
-    # ask outside a call, so the reader answers rather than raises there.
+    # A Validator's ``parameters(call_context=None)`` is handed ``None`` outside a call.
     assert call_transport(None) is None
 
 
