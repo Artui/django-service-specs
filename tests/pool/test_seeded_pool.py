@@ -1,5 +1,3 @@
-"""Tests for ``seeded_pool``."""
-
 from __future__ import annotations
 
 from typing import Any
@@ -53,8 +51,7 @@ def test_progress_defaults_to_the_no_op_reporter() -> None:
 
 
 def test_a_seed_beside_a_spread_entry_still_raises_from_base_pool() -> None:
-    # The refusal this exists to stay clear of, not one it lifts: the same registry
-    # and the same request, spread rather than read off the context.
+    # The refusal this exists to stay clear of, not one it lifts.
     request = object()
     seeds = DEFAULT_POOL_SEEDS.extend(request=lambda: "registered")
     with pytest.raises(TypeError, match="'request'"):

@@ -1,5 +1,3 @@
-"""``combine_progress``: one report handed to every sink, each sink's failure its own."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping

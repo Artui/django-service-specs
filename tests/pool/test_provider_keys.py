@@ -1,15 +1,3 @@
-"""Tests for ``provider_keys``: what a ``kwargs=`` provider says it fills, before it runs.
-
-The reader and these tests are djangorestframework-services', where both spec
-transports' copies of it were folded into one, carried here unchanged so a
-provider reads the same in both packages. Each asserts on the reader's answer,
-which is what a transport's schema is built from.
-
-Three readings both earlier copies got wrong have tests of their own, each in
-its own section: a container holding ``UnsetType``, an annotation that does not
-resolve, and a generic ``TypedDict``'s arguments.
-"""
-
 from __future__ import annotations
 
 import sys
@@ -84,15 +72,12 @@ _unresolvable_provider.__annotations__ = {"return": "NoSuchScope"}
 
 
 def test_a_spec_without_a_provider_fills_nothing() -> None:
-    # Nothing, which is not the "cannot tell" of an untyped provider: a
-    # transport requires every parameter without a default beside this one,
-    # and none beside that one.
+    # Nothing, which is not the "cannot tell" of an untyped provider.
     assert provider_keys(None) == (_NOTHING, _NOTHING)
 
 
 def test_every_key_of_a_typed_dict_is_filled_optional_ones_included() -> None:
-    # ``region`` is optional in the ``TypedDict``, but the provider owns it, so
-    # it is filled as much as ``tenant`` is.
+    # ``region`` is optional in the ``TypedDict``, but the provider owns it.
     assert provider_keys(_typed_provider) == (frozenset({"tenant", "region"}), _NOTHING)
 
 
@@ -236,9 +221,7 @@ def _noneable_provider() -> _NoneableScope:
 def test_the_answer_names_its_two_sets_and_still_unpacks(
     provider: Any, filled: frozenset[str], declinable: frozenset[str]
 ) -> None:
-    # The Pydantic-AI toolset reads the two sets by name and the MCP server
-    # unpacks them, so one answer serves both call sites. One case per return
-    # statement, so neither can go back to a bare tuple.
+    # The Pydantic-AI toolset reads the two sets by name and the MCP server unpacks them.
     keys = provider_keys(provider)
 
     assert isinstance(keys, ProviderKeys)
@@ -248,8 +231,7 @@ def test_the_answer_names_its_two_sets_and_still_unpacks(
 
 
 def test_a_union_that_does_not_admit_unset_is_still_filled() -> None:
-    # Having arguments is not enough: ``str | None`` is a union, and ``None`` is
-    # a value the provider fills the key with, not a refusal to.
+    # Having arguments is not enough: ``str | None`` is a union.
     assert provider_keys(_noneable_provider) == (frozenset({"tenant", "region"}), _NOTHING)
 
 
@@ -286,9 +268,7 @@ def _hidden_parameter_provider(*, request: HttpRequest) -> _Scope:
 
 
 def test_a_parameter_type_imported_only_for_type_checking_leaves_the_keys_readable() -> None:
-    # A parameter's annotation says nothing about the keys. Beside a selector
-    # ``(*, pk, tenant, region)`` this provider still fills ``tenant`` and
-    # ``region``, so ``pk`` is the one name left for the caller, and required.
+    # A parameter's annotation says nothing about the keys.
     assert provider_keys(_hidden_parameter_provider) == (frozenset({"tenant", "region"}), _NOTHING)
 
 
@@ -302,9 +282,7 @@ def _hidden_value_provider() -> _HiddenValueScope:
 
 
 def test_a_value_type_that_does_not_resolve_makes_only_its_key_declinable() -> None:
-    # The keys need no hints, so they are still read. Whether ``tenant`` may be
-    # declined cannot be, so it is counted as a key the provider may decline:
-    # left for the caller to send, never required. ``region`` stays filled.
+    # The keys need no hints, so they are still read.
     assert provider_keys(_hidden_value_provider) == (frozenset({"region"}), frozenset({"tenant"}))
 
 
@@ -322,8 +300,7 @@ def _hand_built_provider() -> _HandBuiltScope:
 
 
 def test_a_forward_reference_without_a_module_resolves_where_the_typed_dict_was_defined() -> None:
-    # Resolved, ``regions`` is a list and filled; unresolved, it would read as
-    # one the provider may decline.
+    # Resolved, ``regions`` is a list and filled; unresolved.
     assert provider_keys(_hand_built_provider) == (frozenset({"regions"}), _NOTHING)
 
 
@@ -362,14 +339,7 @@ def _nested_union_generic_provider() -> _NestedGenericScope[str | UnsetType]:
     ],
 )
 def test_a_generic_typed_dicts_arguments_decide_which_keys_may_be_declined(provider: Any) -> None:
-    # ``tenant: _T`` read off the origin is the bare type variable. The alias
-    # says what it stands for, at whatever depth it appears, and what it stands
-    # for is walked in turn: in ``union-argument-inside-a-union`` the argument
-    # is itself a union, met inside ``_T | None``, so it is not enough to ask
-    # whether a substituted argument *is* ``UnsetType``. ``decorated-elsewhere``
-    # is the first case behind a wrapper from another module, whose globals
-    # know no ``_GenericScope``: the annotation resolves in the decorated
-    # function's.
+    # ``tenant: _T`` read off the origin is the bare type variable.
     assert provider_keys(provider) == (_NOTHING, frozenset({"tenant"}))
 
 
@@ -471,9 +441,7 @@ _DECLINABLE_TENANT = (frozenset({"region"}), frozenset({"tenant"}))
 def test_a_subclass_binding_decides_which_keys_may_be_declined(
     provider: Any, keys: tuple[frozenset[str], frozenset[str]]
 ) -> None:
-    # Reading ``tenant: _T`` as free in any of these would count it filled, and
-    # a provider returning ``UNSET`` for it would then leave a parameter nobody
-    # was asked for: the call fails with a ``TypeError``.
+    # Reading ``tenant: _T`` as free in any of these would count it filled.
     assert provider_keys(provider) == keys
 
 
@@ -489,10 +457,7 @@ def _free_relaying_provider() -> _RelayScope:  # the bare alias, under test
     "provider", [_free_generic_provider, _free_relaying_provider], ids=["bare-alias", "bare-relay"]
 )
 def test_a_type_variable_nothing_binds_is_filled(provider: Any) -> None:
-    # Whether a free ``_T`` may be ``UNSET`` is not written anywhere. Filled
-    # hides the key from the caller, and the provider decides it. Declinable
-    # would let a transport whose caller's value wins put that value where the
-    # provider was meant to decide, such as a tenant.
+    # Whether a free ``_T`` may be ``UNSET`` is not written anywhere.
     filled, declinable = provider_keys(provider) or (_NOTHING, _NOTHING)
 
     assert "tenant" in filled
@@ -571,11 +536,7 @@ def _diamond_provider() -> _BothScope:
 def test_each_key_is_read_with_the_bindings_of_the_class_that_declared_it(
     provider: Any, keys: tuple[frozenset[str], frozenset[str]]
 ) -> None:
-    # One ``_T`` bound at several levels. Read with any one level's binding,
-    # ``shadow`` would fill ``extra``, which the provider may decline, and
-    # ``reverse`` would let a caller's value into ``extra``, which the provider
-    # always fills. ``two-bindings-one-key`` binds ``tenant`` one way through
-    # each base, and filled is the reading that keeps it with the provider.
+    # One ``_T`` bound at several levels.
     assert provider_keys(provider) == keys
 
 
@@ -618,10 +579,7 @@ def _annotated_relay_provider() -> _AnnotatedRelayScope[str | UnsetType]:
     ids=["alias", "class-base", "inside-a-union", "relayed"],
 )
 def test_annotated_around_a_binding_is_read_as_what_it_annotates(provider: Any) -> None:
-    # A key's own value is resolved, which strips ``Annotated`` at any depth,
-    # and so is an alias's argument, as ``alias`` shows. A class statement's
-    # base is not: ``__orig_bases__`` keeps ``Annotated`` around ``tenant``'s
-    # binding, and the binding reads as a declinable type only through it.
+    # A key's own value is resolved, which strips ``Annotated`` at any depth.
     assert provider_keys(provider) == (_NOTHING, frozenset({"tenant"}))
 
 
@@ -660,24 +618,17 @@ def _redeclaring_provider() -> _RedeclaringScope[str]:
 
 
 def test_a_key_a_subclass_redeclares_is_read_with_its_bases_bindings() -> None:
-    # Read as this class declares it, ``tenant`` would be filled. Every
-    # supported Python merges a ``TypedDict``'s hints and key sets from its
-    # bases and keeps no record of which class wrote a key, so ``tenant`` reads
-    # as the base's: ``_T`` bound to ``str | UnsetType``.
+    # Read as this class declares it, ``tenant`` would be filled.
     assert provider_keys(_redeclaring_provider) == (_NOTHING, frozenset({"tenant"}))
 
 
 def test_a_type_variables_default_is_not_consulted() -> None:
-    # PEP 696 says what ``_D`` stands for when nothing binds it. The reader
-    # does not ask, so ``tenant`` is filled as for any type variable nothing
-    # binds, though the default would have it declinable.
+    # PEP 696 says what ``_D`` stands for when nothing binds it.
     assert provider_keys(_defaulted_provider) == (frozenset({"tenant"}), _NOTHING)
 
 
 def test_a_base_that_cannot_be_substituted_leaves_the_provider_untyped() -> None:
-    # ``_Box`` has a parameter of its own, which nothing in ``_BoxedScope``
-    # binds, so ``tenant``'s binding cannot be written in the terms of the
-    # return annotation.
+    # ``_Box`` has a parameter of its own, which nothing in ``_BoxedScope`` binds.
     assert provider_keys(_boxed_provider) is None
 
 
@@ -709,9 +660,7 @@ def provider(*, request: HttpRequest) -> Scope:
 def test_lazily_evaluated_annotations_are_read_one_at_a_time(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Compiled without this module's postponed annotations, so the provider and
-    # its ``TypedDict`` keep 3.14's lazily evaluated ones, where reading them all
-    # at once raises for the one ``HttpRequest`` names.
+    # Compiled without this module's postponed annotations.
     module = types.ModuleType("lazy_providers")
     monkeypatch.setitem(sys.modules, module.__name__, module)
     exec(compile(_LAZY_SOURCE, module.__name__, "exec", dont_inherit=True), module.__dict__)
@@ -772,17 +721,7 @@ def test_a_pep_695_type_parameter_is_read_as_the_class_declares_it(
     annotation: str,
     keys: tuple[frozenset[str], frozenset[str]],
 ) -> None:
-    # ``T`` lives in ``Scope.__type_params__``, never in the module, so the
-    # string ``"T"`` a postponed annotation leaves resolves only beside them.
-    # ``tags: list[T]`` is always filled with a list once ``T`` resolves, and a
-    # value that does not resolve reads as declinable, so ``tags`` filled is
-    # what shows the keys were read by resolution rather than by failing to.
-    # Compiled afresh for each case: up to 3.13 a forward reference can keep
-    # the value it last resolved to, and one case must not answer for the next.
-    # ``same-name-rebound`` has two parameters named ``T``; the one that
-    # declares ``tenant`` is ``Scope``'s, bound to ``str | UnsetType``.
-    # ``own-key`` is the other way round: ``extra``'s ``"T"`` is ``Shadow``'s,
-    # bound to ``str | UnsetType``, where ``Scope``'s is bound to a list.
+    # ``T`` lives in ``Scope.__type_params__``, never in the module.
     module = types.ModuleType("pep_695_providers")
     monkeypatch.setitem(sys.modules, module.__name__, module)
     source = _PEP_695_SOURCE.format(annotation=annotation)
@@ -791,10 +730,7 @@ def test_a_pep_695_type_parameter_is_read_as_the_class_declares_it(
     assert provider_keys(module.provider) == keys
 
 
-# The priming read below is the stdlib's own, and before 3.12.4 ``get_type_hints``
-# cannot read a PEP 695 class's hints at all: it raises ``NameError`` on the type
-# parameter. So the stale value this test guards against cannot be left behind
-# there, and the release job's system 3.12.3 is where that showed.
+# The priming read below is the stdlib's own.
 @pytest.mark.skipif(
     sys.version_info < (3, 12, 4),
     reason="get_type_hints reads a PEP 695 class's hints from 3.12.4",
@@ -802,11 +738,6 @@ def test_a_pep_695_type_parameter_is_read_as_the_class_declares_it(
 def test_a_type_parameter_resolved_elsewhere_first_does_not_decide_the_answer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # ``Scope`` and ``Recurring`` share one forward reference ``"T"``, and up
-    # to 3.13 it answers with the value it last resolved to whenever it is
-    # resolved again in one namespace. Resolving ``Recurring``'s hints first leaves
-    # ``Recurring``'s ``T`` there, which nothing binds under ``Scope[...]``, so
-    # a reader that let it answer would count ``tenant`` filled.
     module = types.ModuleType("pep_695_primed_providers")
     monkeypatch.setitem(sys.modules, module.__name__, module)
     source = _PEP_695_SOURCE.format(annotation="Scope[str | UnsetType]")
