@@ -1,9 +1,3 @@
-"""The quickstart: one write, declared once, dispatched and presented.
-
-``README.md`` carries the section between the markers verbatim, and
-``tests/docs/test_examples.py`` holds the two to each other.
-"""
-
 from __future__ import annotations
 
 # --8<-- [start:quickstart]

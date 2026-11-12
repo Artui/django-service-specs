@@ -1,5 +1,3 @@
-"""A transport's answer to every outcome of one dispatch, in the two error families."""
-
 from __future__ import annotations
 
 # --8<-- [start:transport]
@@ -21,18 +19,15 @@ from django_service_specs import (
 
 
 def answer(spec: ServiceSpec, principal: Any, arguments: dict[str, Any]) -> tuple[int, Any]:
-    """One HTTP-shaped answer per outcome. Another transport maps the same types its own way."""
+    """One HTTP-shaped answer per outcome."""
     try:
         result = dispatch(spec, principal=principal, arguments=arguments)
-    # Dispatch refused, before the operation ran.
     except InvalidArguments as refused:
         return 400, refused.detail
     except (NotPermitted, PrincipalUnavailable) as refused:
         return 403, {"detail": refused.message}
-    # The base may be raised bare, so it is answered below its subclasses.
     except DispatchError as refused:
         return 400, {"detail": refused.message}
-    # The operation refused. The subclasses first: each is also a ServiceError.
     except ServiceValidationError as refused:
         return 400, field_map(refused.detail)
     except ServiceNotFound as refused:

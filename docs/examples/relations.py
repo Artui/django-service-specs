@@ -1,5 +1,3 @@
-"""A nested write: an author and its books, created and then reconciled."""
-
 from __future__ import annotations
 
 # --8<-- [start:write]

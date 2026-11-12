@@ -1,5 +1,3 @@
-"""A Presenter that batches one lookup over every row it presents."""
-
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -40,8 +38,6 @@ class BooksWithEditions(Presenter):
         return self.presented(value, None)
 
     def presented(self, value: Book, context: PresentationContext | None) -> dict[str, Any]:
-        # One book alone, as a retrieve presents it, is a batch of one, under
-        # the same context a page's rows would be presented with.
         return self.presented_rows((value,), context)[0]
 
     def presented_rows(
@@ -77,7 +73,6 @@ books_spec = SelectorSpec(
 def first_page(user: Any, limit: int) -> list[dict[str, Any]]:
     result = dispatch(books_spec, principal=user, arguments={})
     page = paginate_output(result.value, limit=limit)
-    # presented_rows is handed the page's rows, never the whole catalogue.
     return present(books_spec, replace(result, value=page.items))
 
 

@@ -1,5 +1,3 @@
-"""A refusal class from a library the kernel cannot name, re-rooted under the row that raised it."""
-
 from __future__ import annotations
 
 from typing import Any

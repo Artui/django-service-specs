@@ -1,5 +1,3 @@
-"""A transport's own outcome for each refusal, and the test that holds the map total."""
-
 from __future__ import annotations
 
 # --8<-- [start:outcomes]

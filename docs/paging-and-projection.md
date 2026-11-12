@@ -157,6 +157,9 @@ docs/examples/paging_and_projection.py:call
 --8<--
 ```
 
+`page` and `limit` are the tool's own arguments, not the spec's: they never
+reach `dispatch`, whose argument set is closed.
+
 [`paginate_output`][django_service_specs.dispatch.paginate_output.paginate_output]
 slices a list result's value into one
 [`OutputPage`][django_service_specs.types.output_page.OutputPage]. `page`

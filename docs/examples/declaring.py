@@ -1,5 +1,3 @@
-"""Declaring operations: a read with its own Parameters, and a write's dataclasses."""
-
 from __future__ import annotations
 
 # --8<-- [start:selector]

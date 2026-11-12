@@ -108,6 +108,10 @@ docs/examples/dispatching.py:overlays
 --8<--
 ```
 
+The view's hook resolved `source` and `channel`: the provider's `channel` wins,
+and the hook's `source` fills the gap. A value for the Validator goes into
+`arguments` instead, where the permission checks read it too.
+
 `extra_kwargs` is the lowest of three tiers: beneath the spec's `kwargs`
 provider, so **the spec's own provider wins on a clash**, and beneath what the
 spec's Validator computed or bound. It is read as the provider's return is:
@@ -175,6 +179,9 @@ have no status codes for the kernel to choose from.
 docs/examples/dispatching.py:list
 --8<--
 ```
+
+A list's `result.kind` is `"list"` and its `value` the shaped queryset, not yet
+read; `present` reads it into one dict per row, in order.
 
 ```python
 --8<--
@@ -311,6 +318,10 @@ docs/examples/dispatching.py:checks_read_arguments
 --8<--
 ```
 
+A listing has no arguments to give a check that declares them, so it neither
+asks that check nor guesses its answer: such a spec is decided at the call,
+which has them.
+
 To ask the checks rather than read their declarations,
 [`authorize_without_arguments`][django_service_specs.dispatch.authorize_without_arguments.authorize_without_arguments]
 asks a spec what a call with no arguments is asked: `authorize`, then, for a
@@ -331,6 +342,9 @@ whose arguments failed their shape is the transport's decision:
 docs/examples/dispatching.py:authorize_without_arguments
 --8<--
 ```
+
+Hiding a refused operation is this listing's policy, not the kernel's, and a
+spec whose checks read the arguments is left to the call.
 
 **A check can read the call's context and a registered seed the same way.** A
 keyword `call_context` is handed the one dict every stage of the call shares
@@ -482,6 +496,14 @@ docs/examples/dispatching.py:admit
 --8<--
 ```
 
+The registry is built per request, from what the route captured, and the club
+is resolved once for the call, so `InClub` and the service see one value. The
+page authorizes before the form, so a principal the class-level check refuses
+never sees it: `NotPermitted` for anyone outside the club. On the GET the form
+is built as dispatch will build it, with `form_keywords`. When the POST fails
+validation, the page renders the form again, bound to what was posted, with
+the keywords dispatch bound it with and the dict dispatch ran with.
+
 `resolve_seeds` resolves the seeds a check of the spec names at any of its
 three questions, the class-level, object-level and scope ones, for the
 principal as `user`, exactly as dispatch resolves them before its own
@@ -577,6 +599,13 @@ does.
 docs/examples/dispatching.py:resolve_target
 --8<--
 ```
+
+On the GET the page shows the row the form will act on: a missing one is the
+not-found answer dispatch would give, and `NotPermitted` was raised already for
+anyone else. The POST acts on the row already found and checked, so it looks
+nothing up a second time; the grant says `has_object_permission` was asked,
+and a seed a check named is not resolved again. The lookup and the call it
+checked share one `call_context` dict.
 
 It returns `(target, grant)`: the row, the set, or `None` for a create, and a
 grant covering the spec and the principal with `target_checked` set. Both go
@@ -687,6 +716,9 @@ docs/examples/dispatching.py:check_call
 --8<--
 ```
 
+The call is refused here, before anything is queued, by the steps dispatch runs
+first; the job carries what was sent, and the worker dispatches it.
+
 It returns the checked arguments and the grant, which `dispatch` honours for
 the same spec and principal in the same process; a grant is not serializable,
 so it never crosses a queue. The pair is a
@@ -731,6 +763,10 @@ step:
 docs/examples/dispatching.py:checked_seeds
 --8<--
 ```
+
+`club` reads the club off the request, and a resolver asked twice may answer
+twice differently, so the call asks it once: the club `InClub` admitted is the
+club the form and the service are handed.
 
 Only the seeds a check names travel; every other seed resolves in each pool as
 it always does, from the `pool_seeds` dispatch is handed. The carrier is bound
@@ -1016,9 +1052,11 @@ docs/examples/async_dispatch.py:async
 --8<--
 ```
 
-`adispatch` takes exactly one of `principal` and `principal_id`. An identifier
-is resolved with `resolve_principal` inside the hop, since resolving it is a
-query. A grant never covers a principal resolved there, because a grant is
+`adispatch` takes exactly one of `principal` and `principal_id`. A queue
+carries an identifier, not a user, so a worker passes `principal_id`; it is
+resolved with `resolve_principal` inside the hop, since resolving it is a
+query, and a missing or deactivated user is refused with
+`PrincipalUnavailable`. A grant never covers a principal resolved there, because a grant is
 bound to the principal object it was made for, and neither do
 [seeds handed on from a prelude](#seeds-handed-on-from-the-prelude), which
 `adispatch(seeds=)` takes as `dispatch` does on every route, refusing a

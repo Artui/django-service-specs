@@ -1,5 +1,3 @@
-"""Typing a service: a Protocol stated with ``implements``, checked by a type checker."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -1,5 +1,3 @@
-"""The registry: one named, tagged set of operations that several transports read."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
