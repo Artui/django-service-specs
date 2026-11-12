@@ -7,7 +7,14 @@ from django_service_specs.dispatch.grant import Grant
 
 
 class ResolvedTarget(tuple[Any, Grant]):
-    """``(target, grant)``, as ``resolve_target`` has always returned, carrying the call's seeds."""
+    """``(target, grant)``, as ``resolve_target`` has always returned, carrying the call's seeds.
+
+    Still a 2-tuple, so ``target, grant = resolve_target(...)`` reads as it
+    did. ``seeds`` is the
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] the
+    class-level check and the checks on the target were offered, for
+    ``dispatch(target=target, grant=grant, seeds=found.seeds)``.
+    """
 
     _seeds: CallSeeds
 

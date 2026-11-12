@@ -19,7 +19,46 @@ nor does a value its comma-free choices list. See ``_splits``."""
 
 
 def flat_arguments(parameters: Parameters, source: MultiValueDict) -> dict[str, Any]:
-    """A flat source of strings and lists of strings; blanks are read as absent."""
+    """A flat source as strings and lists of strings, read by ``parameters``, blanks read as absent.
+
+    A flat source is a query string or a form's fields: Django's ``QueryDict``,
+    or any ``MultiValueDict``, where every value is a string and a key may
+    repeat. A transport reading one calls this, merges its route's kwargs into
+    what comes back, and hands the result to
+    [`coerce_flat`][django_service_specs.parameters.coerce_flat.coerce_flat],
+    so every transport reading a flat wire reads it by the same rules. Nothing
+    is coerced here.
+
+    **A flat source is read by the declaration.** A parameter of type
+    ``array`` takes every value its key was sent with, and anything else takes
+    the last, as ``QueryDict`` reads a repeated key. **An array of numbers,
+    integers, booleans or decimal strings also reads a value holding commas
+    as its elements**, ``?ids=1,2`` as ``["1", "2"]`` with the space around a
+    part trimmed, because a comma cannot be part of such a value and it is
+    the spelling a django-filter CSV filter advertises; repeated keys and
+    commas may mix. An empty part (``?ids=1,,2``) is not dropped as a blank
+    element is: it is kept, for ``coerce_flat`` to refuse at its index as any
+    malformed element is. A string array is split only where its choices
+    hold no comma, as an ordering's do, so ``?o=title,-pk`` is
+    ``["title", "-pk"]``; otherwise it is never split, since a comma is part
+    of a string. **An array is read no further than one element past the
+    most it takes** - its ``max_length``, or the
+    ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's default - so ``coerce_flat``
+    refuses a list over it at its name as a whole, without a million commas
+    becoming a million elements first; Django's
+    ``DATA_UPLOAD_MAX_NUMBER_FIELDS`` counts keys, and a comma list is one.
+    **A blank value is absent unless** ``""`` **is one the parameter can
+    take**: a plain string can, and a number, a boolean, a date, a decimal,
+    or a string whose choices leave the blank out cannot. A flat wire has no
+    other spelling of "left blank", and an empty ``?count=`` or ``?since=``
+    from a filter form is not a refusal to count or a malformed date. Each
+    blank element of an array is read by the same rule, the whole array
+    absent once nothing is left. Django's ``csrfmiddlewaretoken``, the field
+    ``{% csrf_token %}`` renders into a form, is dropped: no Django transport
+    takes it as an argument. A key ``parameters`` do not declare is kept as
+    it is, so the closed argument set in dispatch stays the one place that
+    refuses it, under the caller's policy.
+    """
     raw: dict[str, Any] = {}
     for key in source:
         if key == _CSRF_FIELD:
