@@ -21,7 +21,100 @@ _UNIONS: tuple[Any, ...] = (Union, UnionType)
 def provider_keys(
     provider: Callable[..., Any] | None,
 ) -> ProviderKeys | None:
-    """The names ``provider`` fills and those it may decline, or ``None`` if it does not say."""
+    """The names ``provider`` fills and those it may decline, or ``None`` if it does not say.
+
+    The static half of the ``kwargs=`` provider contract, whose runtime half is
+    how dispatch calls the provider. ``ServiceSpec.kwargs`` and
+    ``SelectorSpec.kwargs`` return a mapping, and one annotated to return a
+    ``TypedDict`` says, before it runs, which names it fills. A
+    transport reads that here to build a schema that does not ask the caller
+    for them, and to know which calls to refuse before dispatch, rather than
+    keeping a copy of this reader.
+
+    Returns a
+    [`ProviderKeys`][django_service_specs.types.provider_keys.ProviderKeys],
+    ``(filled, declinable)``: two disjoint sets that together are every key of
+    the ``TypedDict``, the keys the provider always answers for and the keys
+    whose value admits ``UnsetType``, which it may decline with ``UNSET``. It
+    unpacks as a pair and names each set, so ``keys.filled`` reads as well as
+    ``filled, declinable = keys``.
+
+    ``ProviderKeys(frozenset(), frozenset())`` for ``provider=None``: a spec with
+    no provider fills nothing. ``None`` when the provider says nothing about its
+    keys -- no return annotation, a plain ``dict``, a lambda, or a return
+    annotation that does not resolve -- so it may fill any name, and a transport
+    requires none of them for lacking a default. Held by
+    ``test_a_spec_without_a_provider_fills_nothing`` and
+    ``test_a_provider_whose_return_says_nothing_is_untyped``.
+
+    **Each annotation costs only what it says.** The return annotation is
+    resolved on its own, in the globals of the function a decorator wrapped
+    rather than the wrapper's (``decorated-elsewhere`` in
+    ``test_a_generic_typed_dicts_arguments_decide_which_keys_may_be_declined``),
+    so a parameter annotation naming a type imported only under
+    ``TYPE_CHECKING`` leaves the keys readable
+    (``test_a_parameter_type_imported_only_for_type_checking_leaves_the_keys_readable``).
+    The keys are read off the ``TypedDict`` without hints, and each value is
+    resolved on its own, so one that does not resolve makes only its own key
+    declinable: whether the provider may decline it cannot be read, and
+    declinable is the reading that neither hides the name from the caller nor
+    requires it (``test_a_value_type_that_does_not_resolve_makes_only_its_key_declinable``).
+    Python 3.14's lazily evaluated annotations are read the same way, in the
+    format that leaves an unresolvable name as a forward reference rather than
+    raising (``test_lazily_evaluated_annotations_are_read_one_at_a_time``).
+    That format is why ``typing-extensions`` is floored at 4.14: on 3.14, 4.13
+    hands the standard library's ``annotationlib`` a format number it reserves
+    for internal use, which raises, and every typed provider would read as
+    untyped.
+
+    **A generic ``TypedDict`` is read with whatever binds its parameters.**
+    ``Scope[str | UnsetType]`` does not relay ``__required_keys__``, so the keys
+    come off ``Scope``, where a value annotated ``T`` is the bare type variable.
+    What ``T`` stands for is substituted wherever it appears in a value, a union
+    included, whether an alias's arguments bind it
+    (``test_a_generic_typed_dicts_arguments_decide_which_keys_may_be_declined``)
+    or a class statement does, as ``class Declining(Scope[str | UnsetType])``
+    does, and a subclass handing its own parameter on to ``Scope``
+    (``test_a_subclass_binding_decides_which_keys_may_be_declined``). An
+    argument that does not admit ``UNSET`` still fills the key
+    (``test_a_parameterised_typed_dict_is_read_off_its_origin``), and one
+    wrapped in ``Annotated`` is read as what it wraps
+    (``test_annotated_around_a_binding_is_read_as_what_it_annotates``). A PEP 695
+    ``class Scope[T](TypedDict)`` is read the same way under postponed
+    annotations, where the ``"T"`` a value leaves resolves only beside the
+    class's ``__type_params__``
+    (``test_a_pep_695_type_parameter_is_read_as_the_class_declares_it``).
+
+    **Each key is read with the bindings of the class that declared it**, so
+    one ``T`` reused at every level reads as each class binds it:
+    ``class Shadow(Scope[list[T]], Generic[T])`` with ``extra: T``, returned
+    as ``Shadow[str | UnsetType]``, fills ``tenant`` with a list and may
+    decline ``extra``
+    (``test_each_key_is_read_with_the_bindings_of_the_class_that_declared_it``).
+    A key reached through two bases that bind it differently is filled if
+    either reading fills it.
+
+    **A type variable nothing binds counts as filled**, as in a bare
+    ``-> Scope`` (``test_a_type_variable_nothing_binds_is_filled``). Whether it
+    may be ``UNSET`` is written nowhere, and filled keeps the decision with the
+    provider by hiding the key from the caller. Declinable would let a
+    transport whose caller's value wins put that value in a key the provider
+    was meant to decide, such as a tenant.
+
+    Three readings stay as they are, each held by a test:
+
+    - A PEP 696 default on a type variable is not consulted
+      (``test_a_type_variables_default_is_not_consulted``).
+    - A base that cannot be substituted makes the provider read as untyped
+      (``test_a_base_that_cannot_be_substituted_leaves_the_provider_untyped``).
+    - A key a subclass redeclares is read with its base's bindings, since no
+      runtime record says which class wrote it
+      (``test_a_key_a_subclass_redeclares_is_read_with_its_bases_bindings``).
+
+    Duck-typed on the keys a ``TypedDict`` class carries rather than
+    ``is_typeddict``, because the standard library's answers ``False`` for a
+    ``typing_extensions.TypedDict`` on the older Pythons this package supports.
+    """
     if provider is None:
         return ProviderKeys(frozenset(), frozenset())
     try:

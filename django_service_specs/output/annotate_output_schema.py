@@ -49,7 +49,62 @@ def annotate_output_schema(
     *,
     handle_description: str | None = None,
 ) -> dict[str, Any] | None:
-    """Apply to a schema the ``project_payload`` projection applies to the payload."""
+    """Apply to a schema the projection
+    [`project_payload`][django_service_specs.output.project_payload.project_payload] applies to the
+    payload.
+
+    Four changes, each the mirror of one the payload undergoes:
+
+    - hidden properties are removed, and dropped from ``required``, which is
+      left out when nothing in it remains;
+    - a marking's ``description`` becomes the property's ``"description"``, so
+      a handle says what it is for in the schema a model reads without that
+      wording reaching any other reader;
+    - a field with labelled choices is restated in its **displays**, because
+      that is what the projected payload carries: an ``enum``'s values are
+      replaced, and a ``oneOf``'s ``const``s are, each losing the ``title``
+      that annotated the value it now equals. A ``"type"`` stated beside them
+      is restated as the types of the values now listed, so a display string
+      is never described as the integer it replaced, with ``"null"`` named
+      last where the stated type admitted it and a null is still served -
+      not where the choices give ``None`` a display, which is served in its
+      place - and left as written beside a ``oneOf`` entry that admits more
+      than its constants. A display two
+      values share is listed once, so a row served it matches one ``oneOf``
+      entry rather than two, and an array of such choices no longer claims
+      ``uniqueItems``. Not on a ``HANDLE``, which keeps its values on both
+      sides: a field another tool takes as input should be marked one.
+    - a formatted field is restated as the type its
+      [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
+      says it produces, plus whatever that declaration adds about the shape of
+      the produced value, in place of everything the property said about the
+      value before, choices included. Its ``title`` and ``description`` are
+      kept, and so is a ``null`` the property admitted - however it stated one,
+      as a type, an ``anyOf`` member, ``None`` in an ``enum`` or a ``oneOf``
+      entry for a labelled choice - since a null is never formatted. The type is written from
+      ``produces`` rather than
+      taken from the fragment, so a renderer cannot contradict its own
+      advertisement, and a fragment's ``enum`` lists the null too, and its
+      ``const`` becomes an ``enum`` of that value and a null, where the
+      property admitted one. Not on a ``HANDLE`` either.
+
+    Generating both sides from one declaration is the point: a schema that
+    advertises a field the payload no longer carries is worse than either
+    behaviour on its own.
+
+    ``handle_description`` is the wording for a ``HANDLE`` whose marking
+    declares none, and defaults to **nothing**. Telling a reader what to do
+    with an identifier is advice for one kind of reader, and the kernel does
+    not know which kind is reading. The transport that knows its audience
+    supplies the sentence.
+
+    Takes the **item** schema; an array's ``items`` are annotated and the
+    array kept. A caller wrapping items in an envelope of its own annotates the
+    item and wraps it afterwards, as
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    does. ``None``, or a projection with nothing in it, returns ``schema``
+    itself; anything else returns a new schema and never modifies ``schema``.
+    """
     if schema is None or projection.is_empty():
         return schema
     return _annotate(schema, projection, handle_description)
