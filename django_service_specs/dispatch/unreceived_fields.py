@@ -15,7 +15,45 @@ from django_service_specs.specs.spec_source import SpecSource
 def unreceived_fields(
     spec: ServiceSpec | SelectorSpec | SpecSource, *, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
 ) -> frozenset[str]:
-    """The Validator fields of ``spec`` that its service takes by no route."""
+    """The Validator fields of ``spec`` its service takes neither by name, nor through ``data``, nor
+    through ``**kwargs``.
+
+    A value a caller sends for one is validated and then reaches the service
+    by no route, on a mount registering ``pool_seeds``. A top-level field
+    named like a registered seed or the call's ``request`` or ``view``
+    reaches the service through ``data`` alone, since the name in the pool
+    is the seed's, so a service taking it by name only never receives it. A
+    ``many`` spec's rows reach the service as the list under
+    ``many_argument``, or in ``data``, so its one field is that list. A
+    service taking ``**kwargs`` is handed ``data`` with the rest, and so
+    receives every field.
+
+    **An answer, not a refusal**, because such a spec runs, and may be meant
+    to: a Validator checking that ``password`` and ``confirm`` agree returns
+    ``password`` alone, and its service never takes ``confirm`` on purpose.
+    A transport decides what a non-empty answer means for it - refusing the
+    spec where it registers it, warning, or advertising the field anyway.
+
+    **What it cannot see, and so never answers.** A Validator may return a
+    field under a name other than its parameter's - a pydantic field
+    validated by its alias comes back under its own name - so a service
+    taking a keyword nothing declared explains is answered for none of its
+    fields
+    (test_a_field_validated_under_its_alias_reaches_its_own_name_and_is_not).
+    A ``kwargs`` provider whose return says nothing about its keys explains
+    every keyword the same way. Nothing runs: no seed resolves and no
+    provider is called.
+
+    **Describe-time**: for a transport registering the spec, it reads the
+    Validator's fields as it declares them to no call, handing one that
+    declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none), so a field declared only to a
+    call is not answered.
+
+    ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
+    it compiles to; a selector spec, and a service spec with no Validator,
+    have no fields, and are answered with none.
+    """
     spec = kernel_spec(spec)
     if not isinstance(spec, ServiceSpec) or spec.validator is None:
         return frozenset()

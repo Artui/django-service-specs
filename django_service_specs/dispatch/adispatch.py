@@ -59,7 +59,97 @@ async def adispatch(
     extra_kwargs: Mapping[str, Any] | None = None,
     call_context: dict[str, Any] | None = None,
 ) -> DispatchResult:
-    """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals."""
+    """Run ``spec`` from async code: ``dispatch``'s steps, order and refusals.
+
+    **Every concept is sync-only**, and so is every spec-carried callable but
+    one. A permission check, a Validator, a selector nested in a service spec,
+    ``extend_queryset``, a seed's resolver, a spec's providers and its
+    preconditions may each query, so each runs in
+    Django's thread-sensitive executor, never on the event loop. Only the run
+    may be ``async def`` - the service, or a selector spec's own selector -
+    because it is the one callable no phase shares: a spec is written once for
+    both entry points, and a concept written ``async def`` could not be called
+    from ``dispatch``.
+
+    So the phases run in **one** ``sync_to_async(thread_sensitive=True)`` hop,
+    and the run's shape decides only what else joins it:
+
+    Every refusal before the run is made inside that hop, an affordance and
+    a service spec's precondition included: a condition on the row is a
+    query. A selector spec's preconditions run on what its selector found,
+    so after an ``async def`` one they join the hop that shapes its return.
+
+    - A sync run joins the hop, so a sync spec costs exactly one.
+    - An atomic ``async def`` service joins it too, through the bridge in
+      [`run_service`][django_service_specs.services.run_service.run_service]:
+      ``transaction.atomic`` is sync-only, so the transaction is opened on the
+      executor thread and the coroutine is driven from inside it, where its own
+      thread-sensitive ORM calls come back to the connection holding it.
+    - A non-atomic ``async def`` run is awaited on the loop after the hop.
+      Holding the executor thread while it awaits - a network call, say -
+      would stall every thread-sensitive call queued behind it. What follows it
+      (an output selector; a selector spec's shaping, row and object-level
+      check) takes a second hop, and only when there is such a thing to do.
+
+    Exactly one of ``principal`` and ``principal_id``. ``principal_id`` is
+    resolved with
+    [`resolve_principal`][django_service_specs.authorization.resolve_principal.resolve_principal]
+    inside the hop, because resolving it is itself a query; taking only the
+    row would push that query into a hop of the caller's. A ``grant`` never
+    covers a principal resolved here, since a grant is bound to the principal
+    object it was minted for. A deactivated row is refused there, with its
+    identifier in the message; a deactivated ``principal`` is refused by
+    ``dispatch``'s own check, which reads the same rule, so the two cannot
+    disagree about who may act.
+
+    ``progress`` reaches the run as it does under ``dispatch``, including an
+    ``async def`` one awaited on the loop, so a reporter must be safe to call
+    from either: the executor thread for a sync run, and an event loop for an
+    ``async def`` one, atomic or not. A spec's ``progress_reporter`` is never
+    called on the loop: for an ``async def`` run it is resolved inside the
+    hop, once nothing before the run can refuse the call.
+
+    ``target`` is ``dispatch``'s: a service spec's target the caller resolved,
+    standing in for the lookup inside the one hop, and checked there unless
+    ``grant`` says ``target_checked``; without ``target``, checked whatever
+    the grant says. A selector spec and a ``many`` spec
+    refuse it before any hop, and a selector spec's row or list is checked
+    whatever the grant says, as ``dispatch``'s is.
+
+    ``extra_kwargs`` is ``dispatch``'s overlay, copied on entry, merged
+    beneath the spec's ``kwargs`` provider inside the hop, on every path, and
+    refused there where it names a declared parameter; beneath the
+    Validator's computed and bound values too, as in ``dispatch``, on both
+    hops (test_a_value_the_validator_computed_outranks_the_overlay_on_both_hops).
+    That refusal and the read of whether a check declares ``arguments`` both run off the loop
+    (test_the_overlay_refusal_and_a_check_s_signature_are_read_off_the_loop).
+
+    ``call_context`` is ``dispatch``'s: the transport's dict, handed to every
+    stage that declares it as the same object, on every path and across
+    every hop; with none, one fresh dict for the call, made here on entry, so
+    the stages of each hop share it.
+
+    ``seeds`` is ``dispatch``'s, handed on with the grant from ``check_call``,
+    ``resolve_target`` or ``authorize`` (after ``resolve_seeds``) and taken
+    on every route, and refused as ``dispatch`` refuses it, the wrong type or no
+    ``grant`` on the loop before any hop. Like a grant, a carrier never covers a principal resolved
+    here
+    from ``principal_id``, which is not the object its prelude was handed, so
+    such a call is a ``TypeError`` on the loop too, before any hop; pass the
+    ``principal`` the prelude was handed.
+
+    A ``many`` spec checks, validates and writes its rows as ``dispatch``
+    does, every row inside the one hop.
+
+    Raises:
+        TypeError: both or neither of ``principal`` and ``principal_id``;
+            ``target`` or ``seeds`` where ``dispatch`` refuses it, or ``seeds``
+            with ``principal_id``.
+        PrincipalUnavailable: ``principal_id`` names no principal who may act,
+            or ``principal`` is deactivated.
+        InvalidArguments, NotPermitted, ImproperlyConfigured: as ``dispatch``.
+        ActionUnavailable, ServiceNotFound: as ``dispatch``, from its affordances.
+    """
     if (principal is None) == (principal_id is None):
         raise TypeError("adispatch() takes exactly one of principal= and principal_id=.")
     spec = kernel_spec(spec)

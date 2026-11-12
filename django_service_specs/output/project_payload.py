@@ -8,7 +8,36 @@ from django_service_specs.types.field_audience import FieldAudience
 
 
 def project_payload(payload: Any, projection: AudienceProjection) -> Any:
-    """Drop plumbing, speak choice displays and format values, at any depth."""
+    """Drop plumbing, speak choice displays and format values, at any depth.
+
+    Three changes, each driven by the declaration that shapes the schema in
+    [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema],
+    so the two cannot disagree:
+
+    - fields marked ``HIDDEN`` are **removed**. Removed rather than moved under
+      some reserved key: a payload a model reads is read in full either way, so
+      moving a field costs its keys again and hides nothing. What an agent must
+      never use should not be there.
+    - a field's choice value is replaced by its display, so a person is not
+      read ``PENDING_REVIEW``. **Not** on a ``HANDLE``, which another tool
+      takes as input. An array of choices is substituted member by member
+      rather than looked up whole.
+    - a field whose marking carries a
+      [`ValueFormatter`][django_service_specs.types.value_formatter.ValueFormatter]
+      is rendered through it: a date-time read as a local date-time rather
+      than raw ISO-8601, an amount with its currency. It wins over the choice
+      display, being the transform an author wrote by hand, and over a nested
+      output's projection. Also **not** on a ``HANDLE``, for the same reason,
+      and a null is never formatted.
+
+    A payload that is neither an object nor a list of them is returned as it
+    is, and so is every key the projection has nothing to say about, including
+    one a transport added beside the declared fields.
+
+    Apply this where a payload becomes an agent's **answer**, not where it
+    feeds the next step of a chain, which still needs the handles. Returns a
+    new payload and never modifies ``payload``.
+    """
     if projection.is_empty():
         return payload
     return _project(payload, projection)

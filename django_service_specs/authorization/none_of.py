@@ -15,7 +15,19 @@ from django_service_specs.authorization.utils import (
 
 class NoneOf(_Combinator):
     """Passes when none of its checks passes ``has_permission``: ``NoneOf(IsSuspended(),
-    message=...)``."""
+    message=...)``.
+
+    It inverts the class-level question alone, asking each check in order
+    and refusing at the first that passes; its row and scope questions allow,
+    as a ``PermissionCheck``'s do by default. So a check judging rows or a
+    scope has no place inside it - the opposite of "may act on this row" is
+    no rule a call can be refused by - and one whose ``has_object_permission``
+    or ``has_scope_permission`` is its own, at any depth, is refused when
+    this is built (test_none_of_refuses_a_row_level_child).
+
+    ``message`` is what ``NotPermitted`` says when it refuses; ``None`` keeps
+    the generic wording.
+    """
 
     _asks = {
         CLASS_LEVEL[0]: (CLASS_LEVEL,),

@@ -108,7 +108,130 @@ def _uuid_spelling(fmt: str | None, choice: Any) -> str | None:
 
 @dataclass(frozen=True)
 class Parameter:
-    """One thing an operation takes, as a declaration every transport reads."""
+    """One thing an operation takes, as a declaration every transport reads.
+
+    JSON Schema, argv, the closed argument set and the shape check are all
+    derived from it, so a transport describes itself from the declaration
+    rather than from whichever validation library the spec happens to use.
+
+    ``name`` and ``type`` are positional because every declaration has both;
+    everything else is keyword-only.
+
+    ``items`` is an array's element: a JSON type name for a flat list, or the
+    ``Parameters`` of the object each element is. ``fields`` is the same for a
+    parameter whose own type is ``object``. Nesting is what lets a relation
+    write declare its rows: an author with its books says what a book is, where
+    a flat ``items="object"`` would say nothing and let a malformed row through.
+
+    ``nullable`` is the parameter's own: whether the argument may be ``null``.
+    ``items_nullable`` is its element's: whether a ``null`` may stand in the
+    array where an element would, as in ``list[int | None]``. The two are
+    independent, because a list that may be absent and a list that may hold
+    gaps are different declarations, and an array with no declared ``items``
+    admits a ``null`` element already.
+
+    ``type`` is a JSON type or ``file``, which an array's ``items`` may name
+    too. A file is a Django ``File``, an upload included, and has no
+    ``choices``: it is matched by nothing a declaration could list.
+
+    ``type`` may also be ``any``, for a parameter that declares no type, as an
+    unannotated argument does: ``3`` and ``"abc"`` are both one. Its value is
+    handed on exactly as it arrived, never read as a number or a boolean, so
+    a query string's ``"3"`` stays the string ``"3"``; ``null`` is accepted
+    only where ``nullable`` says so, as for every other type. Having no type,
+    it describes nothing a type would - no ``choices``, ``format``, ``fields``,
+    ``items`` or bound - and an array's ``items`` never name it, since an
+    array that declares no ``items`` takes any element already.
+
+    ``choice_labels`` names the choices for a reader: a mapping of a choice to
+    its label, or Django's ``choices`` spelling, pairs of the two, which keeps
+    apart the ``1`` and ``True`` a mapping's keys would merge. A choice may go
+    unlabelled. The labels constrain nothing, so the shape check reads only
+    ``choices``; the schema carries them as titles. They are stored as a tuple
+    of pairs, and a label may be a lazy translation, rendered when the schema
+    is built.
+
+    ``default`` is [`UNSET`][django_service_specs.types.unset.UNSET] when none is
+    declared, so a default of ``None`` stays a real default. It is reported, not
+    applied: whether an omitted argument arrives as the default, as ``None`` or
+    not at all is the validating library's behaviour, and each adapter reports
+    what its library does. It takes no part in the hash, so a declaration with
+    a list or dict default is as hashable as any other, while equality still
+    tells two defaults apart.
+
+    ``minimum`` and ``maximum`` bound a number, inclusively: an ``integer``, a
+    ``number``, or a ``decimal`` string, which is compared as the decimal it
+    spells, so ``"1E+999999999"`` is past a bound of ``1e50`` without ever
+    being built as the integer it names. Each is an ``int`` or a finite
+    ``float``, a JSON number. The schema states them on an ``integer`` and a
+    ``number`` and not on a decimal string, where JSON Schema gives them no
+    meaning; the shape check enforces all three. They exist for the bound a
+    reader needs before any Validator runs: a filter whose form field has none
+    hands the value to the database's integer conversion, which builds every
+    digit. Any other bound - a string's length, a Validator's ``max_value`` -
+    is still the Validator's alone.
+
+    **On an array,** ``format``, ``minimum`` **and** ``maximum`` **describe
+    each element**, as ``choices`` do: an array of ``integer`` or ``number``
+    takes a bound, and an array of ``string`` takes ``format="decimal"`` and
+    then a bound too, which is what a django-filter CSV number filter
+    declares. A decimal is the one format an element takes: a number element
+    is read as a float on the way, which rounds a fraction past a float's
+    precision, where a decimal string is compared and handed on as it was
+    sent. Any other format on an array, and a format or a bound on an
+    element that cannot carry it, is refused. The list's own count is
+    ``min_length`` and ``max_length``'s, so an array may carry both pairs.
+
+    ``min_length`` and ``max_length`` bound how many elements an ``array``
+    takes, inclusively, and are refused on anything else: each a
+    non-negative ``int``. They are checked on the list whole, before any
+    element is read, so a list past its maximum costs no per-element work.
+    **An array that declares no** ``max_length`` **is still bounded**, by the
+    ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the project sets
+    another count or ``None``: a list a caller controls the length of is a
+    cost the caller controls, and the setting is read at the call, so it
+    applies to a declaration built before settings were configured. A
+    declared ``max_length`` outranks it either way, wider or narrower.
+    ``min_length`` has no default: an empty list is taken unless one says
+    otherwise.
+
+    ``json_schema_extra`` carries the JSON Schema keywords no field of a
+    Parameter spells - a ``pattern``, a string's ``maxLength``,
+    ``uniqueItems`` - as a mapping of keyword to value, held as a deep copy of
+    its own. It is how an adapter whose library declares more than a
+    Parameter carries keeps it on every route rather than on its own.
+    [`parameters_schema`][django_service_specs.schema.parameters_schema.parameters_schema]
+    adds its keys to this parameter's node. A keyword a field states there is
+    refused here, naming the field, whether or not this parameter sets it:
+    ``type``, ``format`` (so a custom format is refused too: ``format`` is a
+    field), ``default``, the choices' ``enum``, ``anyOf`` and ``const``, the
+    bounds, ``minItems`` and ``maxItems``, ``items``, ``description`` from
+    ``help``, and ``properties``, ``required`` and ``additionalProperties``
+    from ``fields``. Either side winning would advertise what the declaration
+    does not say or drop what was written, and refusing the keyword only when
+    one build stated it would make the same declaration valid until the array
+    cap came on or a spec moved to ``REJECT``. A value JSON cannot carry - a
+    ``Decimal``, a lazy translation, at any depth - is refused too, naming its
+    key. It is advertised, not enforced: the shape check never reads it, so
+    what it states holds only where the spec's Validator enforces it
+    (test_it_is_advertised_and_not_enforced_by_the_shape_check).
+    It takes no part in the hash, as ``default`` does not, and still in equality.
+
+    ``reflected`` says the parameter was read off a callable's signature
+    rather than written by an author, as djangorestframework-services reads a
+    selector's, a target lookup's or a spread service's parameters into
+    ``reads``. It counts on a ``reads`` parameter alone - a selector spec's,
+    a target selector's or a service spec's - and only at dispatch: a
+    reflected read named like a seed the call's ``pool_seeds`` registers
+    leaves that call's argument set, and the seed fills it, where an unmarked
+    one is refused as a configuration error
+    (test_a_reflected_read_a_registered_seed_is_named_like_is_the_seed_s).
+    On a Validator field or a shape it changes nothing. No schema carries it,
+    since it describes where a declaration came from rather than what a caller
+    sends; it takes part in equality and the hash, because two declarations
+    that differ in it dispatch differently
+    (test_reflected_is_compared_and_hashed_and_never_in_the_schema).
+    """
 
     name: str
     type: str
@@ -281,7 +404,18 @@ class Parameter:
 
 @dataclass(frozen=True)
 class Parameters:
-    """An ordered set of [`Parameter`][django_service_specs.parameters.parameters.Parameter]."""
+    """An ordered set of [`Parameter`][django_service_specs.parameters.parameters.Parameter].
+
+    A spec's Parameters are assembled from several sources - its target
+    selector's ``reads``, its Validator's ``parameters()`` - and ``+`` is how.
+    **A name declared twice is refused**, at construction and at ``+`` alike:
+    two sources claiming one argument is a spec bug, and a last-wins merge
+    would hide which of the two declarations a transport describes and which
+    one the argument reaches.
+
+    Any iterable of parameters is accepted and stored as a tuple, so the
+    declaration stays hashable and ordered.
+    """
 
     items: tuple[Parameter, ...] = ()
 

@@ -14,7 +14,36 @@ from django_service_specs.parameters.utils import (
 
 
 def clean_held_to_their_columns(form: forms.BaseForm) -> None:
-    """Validate a bound ``form`` as ``full_clean()`` does, refusing out-of-range integers."""
+    """Validate a bound ``form`` as its ``full_clean()`` does, refusing a number no integer column
+    holds.
+
+    Django's own validation hands such a number to the database driver in two
+    places, and SQLite's raises ``OverflowError`` for one past 64 bits: a
+    model choice field matching its key, and a ``ModelForm``'s uniqueness
+    checks and constraints querying with a value. Each is answered first, in
+    the words of the check Django would have made:
+
+    - a model choice field sent a key its column cannot hold is taken off the
+      form while it validates and given the field's own ``invalid_choice``
+      refusal after, so the form's ``clean()`` and its other errors are found
+      as Django finds them with the field refused;
+    - a ``ModelForm``'s value its integer column cannot hold is refused as the
+      model's validation step starts, before its uniqueness checks and
+      constraints query with it, with the ``min_value`` or ``max_value``
+      refusal of Django's model integer field.
+
+    Shared by ``FormValidator``, which validates its form so, and by
+    django-spec-html's ``add_argument_errors``, which finds a form's own
+    errors so before it places a refusal beside them.
+
+    The form is left as it was found, whether its validation returned or
+    raised: every field it had, in its order, and its own ``_post_clean``,
+    the class's or one the form carried itself. Only its errors and what it
+    cleaned are new.
+
+    Public so that a transport in a distribution of its own, validating a
+    project's form, holds it to the same columns with the same words.
+    """
     beyond = choices_past_their_columns(form)
     fields = form.fields
     own = {name: value for name, value in vars(form).items() if name == "_post_clean"}

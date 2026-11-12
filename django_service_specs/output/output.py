@@ -20,7 +20,48 @@ _OUTPUT_TYPES = JSON_TYPES | {"any"}
 
 @dataclass(frozen=True)
 class OutputField:
-    """One field of an operation's output, declared without rendering anything."""
+    """One field of an operation's output, declared without rendering anything.
+
+    The output-side counterpart of
+    [`Parameter`][django_service_specs.parameters.parameters.Parameter],
+    carrying what a reader needs that names and types alone do not give:
+
+    - ``label``: a readable header. Libraries disagree here (one invents ``Id``
+      from ``id``, others give nothing), so the adapter supplies what its
+      library has and ``None`` means it has none.
+    - ``choices``: **value-and-display pairs**, because a table shows the
+      display and a schema states it as a title, and a bare value list gives
+      neither.
+    - ``always_present``: whether the key is in every rendered row. A rendering
+      rule rather than a type - one library drops a read-only key it cannot
+      read where another always emits it - so the adapter supplies it, and a
+      schema lists only always-present keys as required. The schema of a spec
+      declaring shapes requires none of a row's keys, whatever this says.
+    - ``marking``: how an agent audience is shown the field.
+
+    ``fields`` and ``items`` describe a nested object and an array's element,
+    and ``items_nullable`` whether a ``null`` may stand in for an element, as on
+    ``Parameter``.
+
+    ``type`` is one of the JSON types, or ``any`` for a value whose JSON type
+    is open - a computed field, a JSON column - which a schema then describes
+    with no ``type`` at all rather than as a string it may not be. As on
+    ``Parameter``, ``any`` lists no choices, since a list of values says what
+    type they are, and an array of any element declares no ``items`` rather
+    than ``items="any"``.
+
+    ``json_schema_extra`` carries the JSON Schema keywords no field of an
+    OutputField spells, as on ``Parameter``: a mapping of keyword to value,
+    held as a deep copy of its own, which
+    [`output_schema`][django_service_specs.schema.output_schema.output_schema]
+    adds to this field's node. A keyword a field states there is refused
+    here, naming the field, whether or not this field sets it: ``type``,
+    ``format``, ``items``, the choices' ``enum``, ``oneOf`` and ``const``,
+    ``title`` from ``label``, and ``properties`` and ``required`` from
+    ``fields``; so is a value JSON cannot carry. It describes what the
+    presenter renders and constrains nothing.
+    Out of the hash and in equality, as on ``Parameter``.
+    """
 
     name: str
     type: str
@@ -87,7 +128,16 @@ class OutputField:
 
 @dataclass(frozen=True)
 class Output:
-    """The ordered fields of an operation's output, read without rendering anything."""
+    """The ordered fields of an operation's output, read without rendering anything.
+
+    Readers that never render: an agent tool's output schema, a capability
+    manifest, a command's table header when there are no rows, a confirmation
+    page's target display. Ordered, because a table's columns are, and the
+    order is declaration order.
+
+    Paired with [`Parameters`][django_service_specs.parameters.parameters.Parameters]:
+    that is what goes in, this is what comes out.
+    """
 
     fields: tuple[OutputField, ...] = ()
 

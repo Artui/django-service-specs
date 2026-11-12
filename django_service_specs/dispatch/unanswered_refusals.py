@@ -58,7 +58,64 @@ def unanswered_refusals(
     *,
     unanswered: object = None,
 ) -> tuple[RefusalFinding, ...]:
-    """What a transport's map from the kernel's refusals to its outcomes leaves unanswered."""
+    """What a transport's map from the kernel's refusals to its outcomes leaves unanswered.
+
+    A [`RefusalFinding`][django_service_specs.types.refusal_finding.RefusalFinding]
+    per finding, and none for a map that answers every one of
+    [`REFUSALS`][django_service_specs.dispatch.refusals.REFUSALS], so a transport
+    holds its map from its own test suite with
+    ``assert unanswered_refusals(...) == ()``; pytest's failure shows the
+    first finding, and ``-v`` lists them all. A transport that leaves a gap on purpose
+    filters the findings by ``refusal`` or ``kind``, never by their words,
+    which ``str()`` gives and which are free to change. Each transport keeps
+    its own vocabulary - an exit code, a status, a run state - and this checks
+    only that the vocabulary is total.
+
+    ``answers`` is the map in one of two shapes:
+
+    - **An ordered table of ``(refusal class, outcome)`` rows**, read top to
+      bottom by ``isinstance`` with the first match winning, which is how the
+      kernel's own maps are written. A refusal is answered with the outcome
+      of the first row whose class it is an instance of, so a row for a base
+      answers every refusal under it, and a catch-all row of ``Exception``
+      answers them all. A row whose outcome is ``unanswered`` is no answer:
+      a refusal it catches first stays unanswered whatever a later row says,
+      as for the callable below. Pass the table itself.
+    - **A callable**, given one instance of each refusal and answering with its
+      outcome, for a map written as branches. A refusal is unanswered when the
+      callable returns ``unanswered`` (compared with ``==``, so a falsy
+      outcome such as ``0`` is still an answer). Whatever it raises
+      propagates: a map that cannot answer a refusal without raising is
+      broken in a way this should not hide. A mapping looked up by the
+      error's exact class passes ``lambda error: table.get(type(error))``,
+      since reading it as ordered rows would let a base's key answer for a
+      subclass the lookup never reaches.
+
+    Three kinds of finding, each a
+    [`RefusalFindingKind`][django_service_specs.types.refusal_finding_kind.RefusalFindingKind],
+    shown here as ``str()`` words them:
+
+    - ``UNANSWERED``, ``nothing in the map answers NotPermitted``: a refusal
+      no row, or no call, answers.
+    - ``BARE_BASE``, ``nothing in the map answers DispatchError itself, though
+      it answers every refusal under it, and DispatchError may be raised
+      bare``: the map looks complete and is not. Either family base may be raised bare: the
+      kernel raises neither itself, but a project's own code may, and
+      ``ServiceConflict`` is a base too.
+    - ``SHADOWED_ROW``, ``the row for ServiceConflict never answers: the row
+      for ServiceError above it answers every ServiceConflict first``: the
+      precedence trap of an ordered table, a subclass's row below its base's.
+      Its ``refusal`` is the dead row's class and its ``shadowed_by`` the
+      earlier row's. Reported for every row, a transport's own refusal's
+      included, since a row nothing reaches is dead whoever's refusal it
+      names.
+
+    The precedence trap is reported for a table only. A callable written as
+    branches orders them in code, and a branch for a subclass below its
+    base's is a body that never runs, which the transport's own branch
+    coverage reports; a table's order is data, which coverage reads as one
+    expression.
+    """
     if callable(answers):
         answered = {kind for kind in REFUSALS if answers(_BUILDERS.get(kind, kind)()) != unanswered}
         shadowed: list[RefusalFinding] = []

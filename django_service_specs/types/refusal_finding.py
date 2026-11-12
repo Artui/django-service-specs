@@ -7,7 +7,19 @@ from django_service_specs.types.refusal_finding_kind import RefusalFindingKind
 
 @dataclass(frozen=True)
 class RefusalFinding:
-    """One finding of ``unanswered_refusals``: the refusal, its kind, and any shadowing row."""
+    """One finding of
+    [`unanswered_refusals`][django_service_specs.dispatch.unanswered_refusals.unanswered_refusals]:
+    the refusal it is about, which kind of finding it is, and for a shadowed
+    row, the row that shadows it.
+
+    A value, so a transport holds its map with ``== ()`` and allows a gap it
+    means by filtering on ``refusal`` or ``kind``, never on the words, which
+    ``str()`` gives and which are free to change.
+
+    The classes are typed as any exception rather than as the kernel's two
+    families, because a shadowed row may name a transport's own refusal, or a
+    catch-all ``Exception`` above it.
+    """
 
     refusal: type[BaseException]
     kind: RefusalFindingKind

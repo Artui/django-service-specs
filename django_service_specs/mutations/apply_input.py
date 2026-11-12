@@ -15,7 +15,14 @@ def apply_input(
     field_map: dict[str, str] | None = None,
     exclude_fields: list[str] | None = None,
 ) -> ChangeResult:
-    """Set attributes from ``data`` onto ``instance`` without saving."""
+    """Set attributes from ``data`` onto ``instance`` without saving.
+
+    Returns a [`ChangeResult`][django_service_specs.mutations.change_result.ChangeResult]
+    describing fields whose value actually changed. Useful when a service wants to
+    inspect what the input would change before deciding whether to persist.
+
+    A file field is set as ``update_from_input`` writes it: ``None`` keeps the
+    file, and ``False`` leaves none."""
     new_values = filter_input(
         coerce_to_dict(data), field_map=field_map, exclude_fields=exclude_fields
     )

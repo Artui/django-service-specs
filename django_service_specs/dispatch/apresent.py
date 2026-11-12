@@ -12,5 +12,15 @@ from django_service_specs.specs.spec_source import SpecSource
 
 
 async def apresent(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResult) -> Any:
-    """[`present`][django_service_specs.dispatch.present.present] in one executor hop."""
+    """[`present`][django_service_specs.dispatch.present.present] in one executor hop.
+
+    A presenter is sync-only and may query - reading a relation off a row the
+    selector did not prefetch, or evaluating a list's queryset - and the kernel
+    cannot tell in advance which, so the whole of ``present`` runs on Django's
+    thread-sensitive executor rather than on the event loop. What comes back is
+    plain data, safe to use on the loop.
+
+    Raises:
+        ValueError: ``kind="not_found"``, as ``present``.
+    """
     return await sync_to_async(present, thread_sensitive=True)(spec, result)

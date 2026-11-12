@@ -7,7 +7,13 @@ from django_service_specs.dispatch.grant import Grant
 
 
 class CheckedCall(tuple[dict[str, Any], Grant]):
-    """``(arguments, grant)``, as ``check_call`` has always returned, carrying the call's seeds."""
+    """``(arguments, grant)``, as ``check_call`` has always returned, carrying the call's seeds.
+
+    Still a 2-tuple, so ``arguments, grant = check_call(...)`` reads as it
+    did. ``seeds`` is the
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] the
+    checks were offered, for ``dispatch(grant=grant, seeds=checked.seeds)``.
+    """
 
     _seeds: CallSeeds
 

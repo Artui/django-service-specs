@@ -64,7 +64,115 @@ def check_arguments(
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
     partial: bool = False,
 ) -> dict[str, Any]:
-    """The shape check: what a caller can get wrong that the declaration can see."""
+    """The shape check: what a caller can get wrong that the declaration can see.
+
+    Presence, JSON type, format, bounds, length, choices and nullability, at every
+    level of nesting, with no query. It is what runs at enqueue time and in front of an
+    untrusted caller's Validator, so a malformed call is refused before it costs
+    a row lookup, and **it is no stricter than the libraries behind it**, with
+    three exceptions named below: ASCII digits, a declared bound, and the
+    length of an array. So a
+    decimal accepts a JSON number as well as a string, because every decimal
+    validator does, and a check stricter than the worker refuses what would
+    have run.
+
+    - A required parameter with a declared default is not refused when absent,
+      because the Validator will supply the default. The default is not
+      applied here: whether an omitted argument arrives as its default is the
+      validating library's behaviour, not the shape check's.
+    - **Under** ``partial=True`` **no absent parameter is refused**, at any
+      depth: a partial update sends only what changes, and DRF skips an absent
+      field anywhere below a partial serializer. A value that is present is
+      checked as it would be otherwise, and an unknown key is still refused.
+    - **A string is read as the number it spells** where an ``integer`` or a
+      ``number`` is declared, wherever the declaration reaches, and the number
+      is handed on: ``"3"`` is 3, ``"3.0"`` and ``" 3 "`` are 3 too, and a
+      number's ``"1e3"`` is 1000.0. Django's forms and pydantic's lax mode
+      both read these strings so, and the reading is the one ``coerce_flat``
+      makes, which this shares. Where the two differ it is Django's: an
+      integer's ``"5."`` and ``"5 .0"`` are 5, which pydantic's ``int``
+      refuses, so this is looser than pydantic there. **The exception** is a
+      string outside ASCII for an ``integer`` or a ``number``, not a
+      ``decimal``: Django's fields read Arabic-Indic or fullwidth
+      digits and Unicode spaces as Python's ``int`` does, and this refuses
+      them, as pydantic and JSON do. A string that spells no such number is
+      refused as the type it is not. The number goes on rather than the
+      string because a Validator stricter than those two, the dataclass
+      adapter's, refuses ``"3"`` for an ``int``.
+    - ``bool`` is neither an ``integer`` nor a ``number``, although Python
+      makes it an ``int``: a JSON ``true`` sent for a count is a caller's
+      mistake, not the number one.
+    - A ``file`` is a Django ``File``, and nothing else is one: no JSON value
+      can be, so a JSON caller's string for it is refused at its name.
+    - **An** ``any`` **is handed on as it arrived**: no type is declared, so
+      nothing is read as a number, and ``"3"`` stays the string ``"3"``. A
+      ``null`` is still refused unless it is ``nullable``, and NaN and the
+      infinities are still no JSON value. A container is not walked, as an
+      undeclared array element's is not, and a value of no JSON type - a
+      Python caller's, or a multipart upload sent under its name - is handed
+      on too.
+    - **An integral float is an** ``integer``, and is handed on as an ``int``
+      wherever the declaration reaches. JSON Schema counts ``5.0`` as an
+      integer, so the ``{"type": "integer"}`` this kernel advertises admits
+      it, and a Validator never sees ``5.0`` for an integer: its own type
+      check and its bounds read the ``int``. ``5.5`` is still refused, and so
+      are NaN and the infinities, which no integer is. A ``number`` keeps the
+      float it was sent. **DRF reads it differently at an exponent**: its
+      ``IntegerField`` reads ``str(value)``, as Django's form field does, so
+      given ``1e16`` raw, both read ``"1e+16"`` and refuse it, where this
+      check follows JSON Schema and hands on ``10000000000000000``, which
+      either field then takes.
+    - NaN and the infinities are refused wherever the declaration reaches.
+      JSON has no spelling for either, so they are outside the ``number``
+      type, and this is a type rule rather than a stricter check - although
+      pydantic's ``float`` and the dataclass adapter's both take one.
+    - ``minimum`` and ``maximum`` bound a number inclusively, in the words
+      Django's ``MinValueValidator`` and ``MaxValueValidator`` use. **The
+      second exception**: a bound is the declaration's, and may be stricter
+      than the library behind it. ``filter_set_parameters`` draws
+      django-filter's ``1e50`` below zero and on a range's bounds too, where
+      django-filter draws none, because past it an integer column's
+      conversion builds every digit of the value. A decimal string is
+      compared as the decimal it spells, which reads its exponent and builds
+      none of its digits, so ``"1E+999999999"`` is refused as fast as ``"2"``
+      is taken. An array's bounds bound each element, refused at its index.
+    - **An array's length** is read before any of its elements: within its
+      ``min_length`` and ``max_length``, and where it declares no maximum,
+      within the ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 unless the
+      project says otherwise. **The third exception**, since that default is
+      the kernel's and may be stricter than the library behind it: a list is
+      a cost its caller controls the size of, one Validator run per row of a
+      ``many`` call and one query variable per value of an ``in`` filter.
+      The refusal is the list's own, at its name, in DRF's words.
+    - ``choices`` constrain the value, and an array's choices constrain each of
+      its elements, since an array is never one of a list of scalars. So do
+      an array's ``format`` and bounds: a ``decimal`` array's elements are
+      each read as a decimal is, and handed on as they were sent.
+    - An ``object`` with no ``fields`` is free-form: its type is checked and
+      its contents are not, because nothing is declared inside it to check
+      against. An array with no ``items`` takes any element, and each is
+      still one of the array's values: its choices and the finiteness rule
+      reach it, while an element that is itself an object or an array is not
+      walked.
+
+    **The closed argument set applies at every level**, inside each row and
+    each nested object as well as at the top. Closed only at the top, an
+    unknown key in a row would reach the row's constructor and come back as a
+    ``TypeError`` naming no row. ``REJECT`` refuses the key where it appeared;
+    ``IGNORE`` drops it from the returned copy.
+
+    Returns a cleaned copy and never modifies ``arguments``. The containers it
+    walks are new - the top-level mapping, each declared object, each array -
+    while a value it does not look inside, such as a free-form object, is
+    passed through as the caller's. The values it replaces are the two it
+    reads as numbers: an integral float declared an integer, and a numeric
+    string declared either.
+
+    Raises:
+        InvalidArguments: carrying **every** problem found as one tree
+            addressed by path, rather than the first; the tree's shape is
+            documented on ``InvalidArguments``.
+    """
     policy = unknown_arguments_policy(unknown_arguments)
     if not isinstance(arguments, Mapping):
         raise InvalidArguments({NON_FIELD_ERRORS: [expected_type_refusal("object")]})

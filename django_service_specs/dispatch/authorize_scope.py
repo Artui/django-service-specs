@@ -33,7 +33,74 @@ def authorize_scope(
     seeds: Mapping[str, Any] | CallSeeds | None = None,
     pool_seeds: PoolSeeds | None = None,
 ) -> None:
-    """Run ``spec``'s scope-level permission checks against ``scope``."""
+    """Run ``spec``'s scope-level permission checks against ``scope``.
+
+    The counterpart of
+    [`authorize_target`][django_service_specs.dispatch.authorize_target.authorize_target]
+    for a call that resolves no single row: ``scope`` is the resolved set of a
+    bulk or collection call, or ``None`` for a create. Every check's
+    ``has_scope_permission`` must pass, in order, and the first refusal raises
+    [`PermissionCheckDenied`][django_service_specs.authorization.permission_check_denied.PermissionCheckDenied],
+    a ``NotPermitted`` naming the check and the spec, with that check's own message. An answer still
+    to be awaited raises
+    ``ImproperlyConfigured`` rather than being read as a pass. A
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    checked as the spec it compiles to.
+
+    ``grant.target_checked`` skips the checks here as it does there: a
+    transport that already ran the target-level checks has claimed them.
+    Dispatch honours it, as there, only for a service spec's target handed
+    in as ``target=``, so never on the list a selector spec reads.
+
+    ``arguments`` is handed to each check's method that declares a keyword
+    of that name, and to no other, so a check that declares none is asked
+    without it. Dispatch passes the call's
+    shape-checked arguments as a read-only mapping, whose values are the
+    call's own and must not be mutated; ``None`` when the caller has none to
+    hand.
+
+    ``call_context`` and ``seeds`` are offered the same way, by name: a
+    method declaring ``call_context`` is handed the call's context - the dict
+    the transport handed dispatch, a fresh one when it handed none or this is
+    called without one - and a method naming a registered seed is handed that
+    seed's value from ``seeds``, which dispatch resolves for the call only
+    when one of the spec's checks names one. A parameter the call fills by
+    position is never read as an opt-in, whatever its name.
+
+    ``pool_seeds`` is for a transport that calls this itself and has the
+    registry rather than the values: the
+    [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] it would
+    hand dispatch. Only the registered seeds a check's ``has_scope_permission`` names
+    are resolved, once, for ``principal`` as ``user``, and offered as
+    ``seeds`` would be; a seed only another question names, or one no check
+    names, is never resolved, and nothing is when ``grant.target_checked`` answers
+    first. A resolver raising - ``PrincipalUnavailable`` for one - ends the
+    call before any check is asked, as in dispatch. Handing ``seeds`` too
+    raises ``TypeError``, since one would silently outrank the other, even when
+    the call is answered before a check is asked.
+
+    A deactivated ``principal`` handed with ``pool_seeds`` raises
+    ``PrincipalUnavailable`` before any seed is resolved, as dispatch refuses
+    one before anything else - grant or no grant, so a grant that checked the target
+    does not stand in for it. Without ``pool_seeds`` nothing is resolved, and the call
+    is asked exactly as before the keyword existed.
+
+    ``seeds`` may instead be a carrier: the
+    [`CallSeeds`][django_service_specs.dispatch.call_seeds.CallSeeds] that
+    [`resolve_seeds`][django_service_specs.dispatch.resolve_seeds.resolve_seeds]
+    returns, or ``check_call``'s or ``resolve_target``'s ``.seeds``. Its values
+    are offered as they are and nothing is resolved here, so every step of a
+    call admitted before its row is found sees one value of each seed. It is
+    taken only for the call it
+    [`covers`][django_service_specs.dispatch.call_seeds.CallSeeds.covers]:
+    this spec, ``principal``, the very ``call_context`` dict it was bound to
+    (``None`` is never that dict: pass ``seeds.call_context``) and its
+    registry, which is ``pool_seeds`` when handed and ``DEFAULT_POOL_SEEDS``
+    otherwise; beside a carrier, ``pool_seeds`` is only the registry it is
+    matched against. One that does not cover the call raises ``NotPermitted``,
+    and a deactivated ``principal`` ``PrincipalUnavailable``, first of all,
+    before ``grant.target_checked`` can answer and before any check is asked.
+    """
     if isinstance(seeds, CallSeeds):
         refuse_deactivated(principal)
         registry = DEFAULT_POOL_SEEDS if pool_seeds is None else pool_seeds
