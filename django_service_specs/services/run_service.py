@@ -16,7 +16,17 @@ def run_service(
     *,
     atomic: bool,
 ) -> Any:
-    """Call ``fn(**kwargs)`` from sync code, optionally inside ``transaction.atomic()``."""
+    """Call ``fn(**kwargs)`` from sync code, optionally inside ``transaction.atomic()``.
+
+    An ``async def`` service is bridged transparently via ``async_to_sync``. The
+    bridge is **not** optional politeness: without it an async service returns its
+    coroutine object to the caller un-awaited — no exception, and under
+    ``atomic=True`` the transaction commits before the body would have run.
+
+    Async services under ``atomic=True`` route through
+    [`arun_service`][django_service_specs.services.arun_service.arun_service], which
+    owns the thread-sensitivity rule that keeps the ORM connection holding the open
+    transaction the same one the inner async DB calls use."""
     if is_async(fn):
         return async_to_sync(arun_service)(fn, kwargs, atomic=atomic)
     if atomic:

@@ -8,7 +8,56 @@ from django_service_specs.types.utils import is_json_native
 
 
 def output_schema(output: Output) -> dict[str, Any]:
-    """The JSON Schema object of one presented item, read from ``output``."""
+    """The JSON Schema object of one presented item, read from ``output``.
+
+    One item: whether the operation returns a list of them, or may return
+    ``None`` instead, is the spec's to say, and
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    wraps this accordingly. The dialect is the input side's, with the
+    differences a description of what came back needs:
+
+    - **An object** is ``{"type": "object", "properties": {...}}``, with
+      ``"required"`` listing the fields whose ``always_present`` is true, in
+      declaration order, and left out when there are none. ``required`` says
+      the key is there, not that its value is non-null.
+    - **No ``additionalProperties``.** Output is not a closed set a caller can
+      get wrong, and a transport may add keys of its own to what it sends.
+    - **A field** states its type, ``[t, "null"]`` when nullable, its
+      ``"format"`` when it declares one, and ``"title"`` from its ``label``
+      when it has one. Adapters set a label only where the author wrote one,
+      so a title is never a field name restated in worse English. Its
+      ``json_schema_extra`` joins the node last, holding only keywords no
+      field states, since the field refused the rest when it was declared. An ``any``
+      field states no type, nullable or not, since ``{}`` admits every value
+      and the null with it.
+    - **Nesting** is as on input: ``fields`` make an object schema, an
+      object with none is ``{"type": "object"}``, and an array's ``items`` are
+      ``{"type": t}``, a nested item's object schema, or ``{}`` when undeclared.
+      ``items_nullable`` makes the item's type ``[t, "null"]``.
+    - **Choices** are ``(value, display)`` pairs. When every display is just
+      ``str(value)`` they are an ``"enum"`` of the values, since a title
+      restating the constant teaches nothing. Otherwise they are a ``"oneOf"``
+      of ``{"const": value, "title": display}``, so the human phrasing travels
+      with each value; ``title`` constrains nothing, and the accepted set stays
+      exactly the constants. The ``"type"`` is stated either way. A nullable
+      field adds ``None`` (``{"const": None}`` in a ``oneOf``) when its choices
+      do not list it, because both forms claim the whole set of values. On an
+      array the choices describe each element and go on ``items``, widened
+      by ``items_nullable`` rather than the array's own nullability. A choice
+      set holding a value JSON cannot carry is left out whole.
+
+    ``marking`` is **not** emitted, and a ``HIDDEN`` field is described here
+    like any other: this is the whole declaration, which is what a caller
+    naming no audience is presented. Showing a field to an agent audience, or
+    leaving it out, is a projection over this schema, which
+    [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema]
+    applies and
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    composes for a caller that passes one.
+
+    As on input: no ``$defs`` or ``$ref``, no ``$schema`` key, and a new
+    schema on every call.
+    """
     schema: dict[str, Any] = {
         "type": "object",
         "properties": {field.name: _field_schema(field) for field in output},

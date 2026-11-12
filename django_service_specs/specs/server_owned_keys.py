@@ -19,7 +19,79 @@ def server_owned_keys(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     call_context: dict[str, Any] | None = None,
 ) -> frozenset[str]:
-    """Every name ``spec``'s dispatch fills from the server, whatever the caller sends."""
+    """Every name ``spec``'s dispatch fills from the server, whatever the caller sends.
+
+    For a transport building an input schema of its own, beside the one
+    ``parameters()`` describes: subtract this set from what it lists, so it
+    asks the caller for no key the server answers anyway. The union of:
+
+    - the names the pool seeds carry: the dispatcher's own (``user``,
+      ``data``, ``instance`` and the rest) and every seed ``pool_seeds``
+      registers, but a registered seed's name that the spec's Validator
+      declares as a top-level field. Such a field is the caller's to send:
+      dispatch validates it into ``data`` and leaves the service's parameter
+      of its name to the seed, so a transport subtracting this set still
+      asks for it
+      (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it).
+      A read marked ``reflected`` and named like a registered seed is here,
+      since the seed fills it and the call takes no argument of its name;
+    - a read marked ``reflected`` and named ``request`` or ``view``, on any
+      mount: dispatch fills it from the call's context and refuses a caller's
+      argument of its name
+      (test_server_owned_keys_owns_a_reflected_read_named_either);
+    - the keys each provider the dispatch runs is annotated to fill, as
+      [`provider_keys`][django_service_specs.pool.provider_keys.provider_keys]
+      reads them: the spec's ``kwargs`` and, on a service spec, its
+      ``input_data`` and its target selector's ``kwargs``. Dispatch drops the
+      caller's value for a key a provider fills once it has been checked, so
+      the key holds the author's value whatever the caller sent. When the
+      provider leaves it out or returns ``UNSET``, a parameter declared
+      required is refused where the provider's answer is merged, and one
+      that is not is absent.
+
+    **No name here is a parameter dispatch demands of the caller**, so a key
+    a provider fills is the server's for the whole call. Each provider's
+    values reach one seat - a selector's ``kwargs`` that selector's reads, a
+    service spec's ``kwargs`` its ``reads``, ``input_data`` its Validator's
+    fields - and dispatch does not demand a parameter there that the provider
+    fills. A filled key that a parameter in any other seat declares is
+    refused when the spec is built, or, for a Validator field, when
+    ``parameters()`` is assembled. A ``many`` spec's list, named by
+    ``many_argument``, is such a seat for every provider, since dispatch
+    always demands it of the caller: a key naming it is refused, filled or
+    declinable, even beside a Validator field of that name. A key no
+    parameter declares is the server's alone.
+
+    A key a provider may decline with ``UNSET`` is not here, nor is any key
+    of a provider whose return says nothing about its keys, which may fill
+    any name and so names none. Dispatch does not demand either of the
+    caller, since the provider may fill it, and keeps the caller's value
+    beneath the provider's answer, so the caller's is the one the callable
+    receives when the provider declines. Less a read a provider requires
+    itself, by name with no default, which only the caller can send and
+    dispatch demands. A transport that asks the caller for neither reads
+    them off [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached],
+    which leaves such a read out, or
+    [`spec_caller_input_schema`][django_service_specs.schema.spec_caller_input_schema.spec_caller_input_schema],
+    which keeps it in ``required``.
+
+    **Static per spec, but for the Validator's fields.** Those are read as
+    the Validator declares them to ``call_context``: a transport subtracting
+    this set during a call hands the call's dict, so a seed-named field the
+    Validator declares only to that call is still asked for
+    (test_a_seed_named_field_declared_only_to_a_call_is_the_caller_s_in_that_call),
+    and a reader describing the spec outside any call leaves it ``None``. A
+    transport that also answers some declared
+    parameters itself, per mount or per toolset, describes them with a
+    [`ServerArguments`][django_service_specs.types.server_arguments.ServerArguments]
+    and subtracts its ``names()`` beside this set: those are parameters the
+    spec declares and the caller is still not asked for.
+
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] owns
+    what the spec it compiles to owns. djangorestframework-services' own
+    reading adds the keys its reflected
+    input markers hide, which this package does not read.
+    """
     spec = kernel_spec(spec)
     owned: set[str] = set(pool_seeds.reserved)
     if isinstance(spec, ServiceSpec) and spec.validator is not None and not spec.many:

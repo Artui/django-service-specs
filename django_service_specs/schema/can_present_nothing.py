@@ -8,7 +8,44 @@ from django_service_specs.types.selector_kind import SelectorKind
 
 
 def can_present_nothing(spec: ServiceSpec | SelectorSpec | SpecSource) -> bool:
-    """Whether a successful dispatch of ``spec`` may present ``None`` as its result."""
+    """Whether a successful dispatch of ``spec`` may present ``None`` as its result.
+
+    The question an output schema answers before it admits ``"null"``, asked in
+    one place so that
+    [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+    and every transport advertising an output schema of its own give the same
+    answer:
+
+    - **A ``SelectorSpec``**: a ``RETRIEVE`` declaring ``allow_none``, which
+      presents ``None`` for a missing row. Without ``allow_none`` a missing row
+      is not-found, which a transport answers in its own terms and never
+      presents. A ``LIST`` presents its rows, ``[]`` for none, and never
+      ``None``, whatever ``allow_none`` says.
+    - **A ``ServiceSpec`` with an ``output_selector_spec``**: a ``RETRIEVE``
+      re-read, whatever ``allow_none`` says, because once the service has run
+      a re-read that finds nothing is ``None`` rather than not-found, and
+      reporting not-found would tell the caller a committed write did not
+      happen. A ``LIST`` re-read presents rows and never ``None``.
+    - **Any other ``ServiceSpec``** presents the service's own return, and
+      answers its own ``allow_none``. That is a declaration rather than an
+      observation: an undeclared ``None`` is still presented, against a schema
+      that does not admit it.
+
+    ``many`` and ``returns_many`` are not read. Each decides whether the result
+    is a list of what the service returned, not whether it may be ``None``: a
+    ``None`` return from either is presented as ``None`` too, so its
+    ``allow_none`` answers as any other service's, and a ``many`` spec's
+    re-read answers by its kind as above. ``returns_many`` is refused beside a
+    re-read, so it never has one.
+
+    It answers whether ``None`` *may* come back, not whether a schema exists: a
+    spec with no presenter has no output schema to widen, whatever this says.
+
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] answers
+    as the spec it compiles to, never by attributes of its own that share these
+    names: its kinds are another library's, and none of them is this one's
+    ``RETRIEVE``.
+    """
     spec = kernel_spec(spec)
     if isinstance(spec, SelectorSpec):
         return spec.kind is SelectorKind.RETRIEVE and spec.allow_none
