@@ -99,7 +99,241 @@ of one side combine: the larger minimum and the smaller maximum hold."""
 
 
 class FormValidator(Validator):
-    """A Validator whose declaration is a Django form class."""
+    """A Validator whose declaration is a Django form class.
+
+    ``parameters()`` reads the form's class-level fields, ``base_fields``, in
+    declaration order; ``validate()`` binds the arguments to a new form and
+    returns what it cleaned. Every rule the form states stays the form's to
+    enforce - its fields' validators, ``clean_<field>()``, ``clean()`` and, on
+    a ``ModelForm``, the model's own validation and uniqueness checks - and the
+    shape check in front of it enforces what the declaration can see.
+
+    The fields it reads, and what each declares, the first match winning:
+
+    - ``BooleanField`` and ``NullBooleanField``: a ``boolean``.
+    - ``DecimalField``: a ``string`` in the ``decimal`` format, which takes a
+      JSON number as well, and an integer whatever its digits. ``FloatField``:
+      a ``number``, and an integer past a float's range is refused as the
+      field refuses an infinity, ``invalid`` in its own words.
+      ``IntegerField``: an ``integer``. On a ``ModelForm``, a value the form
+      cleans to an integer past the range of the model's integer column is
+      refused in the words and with the code of the validator Django's model
+      field carries from 5.0, ``max_value`` or ``min_value``, before a
+      uniqueness check or a constraint queries with it: Django 4.2 states no
+      range for SQLite, whose driver raises ``OverflowError`` for one. It is
+      judged where Django 5.0 and later judge it, after the field, its
+      ``clean_<field>()`` and the form's ``clean()``, so each of those answers
+      first, and a value a ``clean_<field>()`` brings inside the range is
+      taken. Only a column Django validates is judged: a value ``clean()``
+      sets for a column the form has no field for, and a field declared over
+      a column ``Meta.fields`` leaves out or ``Meta.exclude`` names, are the
+      form's, as Django never writes them onto the row.
+    - ``DateTimeField`` and ``DateField``: a ``string`` in the ``date-time`` or
+      ``date`` format. ``TimeField`` and ``DurationField``: a ``string``.
+    - ``ChoiceField``: choices, with the empty choice dropped and option
+      groups flattened. A plain one cleans with ``str`` and matches the
+      string against each choice's ``str``, so it takes a ``string`` and its
+      choices are declared as strings, whatever type they were written in. A
+      ``TypedChoiceField`` takes the JSON type all of its values share. A
+      choice set given as a callable is computed per form and may query, so
+      it is not read: the field is a ``string`` with no choices, which every
+      choice field accepts, and the form checks the choice.
+    - ``MultipleChoiceField`` and ``TypedMultipleChoiceField``: an array of
+      that, whose choices constrain each element.
+    - ``ModelChoiceField``: the JSON type of the model field it matches rows
+      on - its ``to_field_name``, or the primary key - and no choices, since
+      they are rows and reading them would query. ``ModelMultipleChoiceField``:
+      an array of that, so one matching rows on a ``DecimalField`` takes an
+      array of ``decimal`` strings, and a query string's
+      ``?rows=12.50,9.99`` is two of them. Django matches each against the
+      column's own spelling, so ``"12.50"`` names a row a two-place column
+      holds and ``12.5`` names none. A date or a
+      date-time key is an array of strings, since an element takes no other
+      format. They validate to the row, and to a queryset of rows. A key
+      past the range of the integer column rows are matched on names no row,
+      and is refused as the field refuses a key no row holds,
+      ``invalid_choice`` in its own words, before the form queries: Django
+      hands a ``ModelMultipleChoiceField``'s keys to the database driver,
+      which raises ``OverflowError`` for one, and so does a
+      ``ModelChoiceField``'s on Django 4.2.
+    - No choice field declares a length, since Django's have none, so the
+      shape check in front of this Validator holds a list to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default.
+    - any other ``CharField`` (email, URL, slug, UUID, regex, IP address): a
+      ``string``.
+    - every ``CharField``, those above included, declares the limit of a
+      ``MaxLengthValidator`` on it as ``json_schema_extra``'s ``maxLength``,
+      and a required one a ``MinLengthValidator``'s as ``minLength``, so a
+      schema advertises them: the validator ``max_length`` and ``min_length``
+      append, or one a project appends by hand, the tightest winning; a
+      ``ModelForm``'s carries its column's, which Django puts on the field.
+      Only those two are read, by exact type, so a ``SimpleArrayField``,
+      whose ``max_length`` counts its items with subclasses of them,
+      declares no length, and neither does a callable limit. The shape check
+      enforces neither, and the form refuses a string past one in its own
+      words, beside its other refusals. An optional field's minimum is not
+      declared, since the form takes ``""`` whatever it says, and a length
+      counts on the value the form cleans: stripped unless ``strip=False``,
+      and a ``URLField``'s with the scheme it adds.
+    - No ``IntegerField`` or ``FloatField`` declares its ``min_value`` or
+      ``max_value``. The shape check enforces a declared ``minimum`` or
+      ``maximum`` before the form runs, in its own words, so declaring them
+      would replace a field's ``error_messages`` for the bound and keep the
+      form's other refusals from coming back beside it.
+    - ``FileField`` and ``ImageField``: a ``file``, which no JSON caller can
+      send. A multipart request carries one, and a Python caller hands a
+      Django ``File``; the form is bound with it as its ``files``, where a
+      file field reads, and the form's own checks run on it. A ``ContentFile``
+      built with no name is refused by the form, which needs one.
+    - an optional file field whose widget is a ``ClearableFileInput``, as a
+      ``FileField``'s and an ``ImageField``'s are by default, declares its
+      clear checkbox as well: a ``boolean`` named as the widget names it,
+      ``<name>-clear``, right after the file. Checked with no upload, the
+      form cleans the field to ``False``, its own value for a cleared file,
+      which ``validate()`` returns under the field's name and a
+      ``ModelForm`` writes as no file through the model field's
+      ``save_form_data``; checked beside an upload, the form refuses the
+      pair. It is the only way to clear one, since ``null`` keeps the file
+      a row holds and ``false`` is not a file. A required file field, or one
+      whose widget has no checkbox, declares none, and a field named as a
+      checkbox is refused.
+
+    Every choice field's choices carry their labels, as ``choice_labels``,
+    for a schema to show beside each value: the label Django displays, keyed
+    by the value as the caller sends it, so a plain ``ChoiceField``'s are
+    keyed by the string. A lazy label stays lazy until a schema renders it.
+
+    Refused with ``ImproperlyConfigured``, naming the form, the field and its
+    class: a ``JSONField``, a
+    ``MultiValueField`` such as ``SplitDateTimeField``, a ``ComboField``, any
+    field the list does not cover, and a ``ModelChoiceField`` with no queryset
+    or matching rows on a model field with no JSON type. The declaration is read at
+    construction, so a form that cannot be described fails where the spec is
+    written; nothing in it queries or needs a translation, so building a spec
+    at import time is safe. ``help`` is the exception, and is read from
+    ``help_text`` on each ``parameters()`` call, in the language active then.
+
+    What the Parameters say about presence is what the form does:
+
+    - ``required`` is the field's own ``required``. For a ``BooleanField`` that
+      is a statement about presence too: an absent checkbox cleans to
+      ``False``, which a required one refuses, as it refuses ``false``.
+      A ``NullBooleanField`` is never required, whatever it says, because its
+      validation is empty and it takes an absent value as ``None``.
+    - ``nullable`` is ``not required``, and always true for a
+      ``NullBooleanField``. A form reads ``None`` as an empty value for every
+      field, so an optional field takes ``null`` and cleans it to its empty
+      value, and a required one refuses it. A clear checkbox is no field:
+      it is optional and never ``null``, since unchecked and absent are
+      the one answer the widget reads.
+    - ``default`` is always
+      [`UNSET`][django_service_specs.types.unset.UNSET]: a field's ``initial``
+      is what an unbound form displays, and a bound form cleans an absent
+      optional field to its empty value, never to its initial.
+
+    **The types are JSON's, and do not cross.** A form reads its data as an
+    HTML post's strings, so it also takes a value of another type through
+    ``str`` - a number for a ``CharField``, ``1`` for the choice ``"1"`` -
+    and the shape check refuses one, as it does for every declaration: a
+    caller sends the declared type. The empty choice is the other case: an
+    optional choice field reads ``""`` as no value, and a caller sends
+    ``null`` for that instead.
+
+    **An argument is in its wire form, which no locale touches.** A number
+    field reads a string through the active locale when it is localized, and
+    under one whose thousands separator is a dot that reads ``"1.500"`` as
+    fifteen hundred. So a string argument for an ``IntegerField``,
+    ``FloatField`` or ``DecimalField`` is bound as the ``Decimal`` it spells,
+    which the field reads as the number it is, localized or not.
+
+    **Declare the fields on the class.** A field a form adds or changes in its
+    own ``__init__`` is not in ``base_fields``, so it is not described, and
+    under ``UnknownArguments.REJECT`` the closed argument set refuses its key
+    before the form is built. A field declared ``disabled`` is not a
+    parameter either: the form ignores what a caller sends for it and cleans
+    its ``initial``, which ``validate()`` returns with the rest on a whole
+    call.
+
+    **A partial call binds only the fields the caller sent.** When the
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    says ``partial``, every field the arguments do not name is taken off the
+    bound form before it validates, so it is neither required nor cleaned,
+    and ``validate()`` returns no key for it: an absent ``BooleanField`` does
+    not come back ``False``, nor an absent ``CharField`` ``''``, which an
+    update would write over the row. A value that is sent is checked exactly
+    as on a whole call, so a required field may be left out but not sent
+    empty. A checked clear checkbox sends its file field, and an unchecked
+    one is what an absent one is. On a ``ModelForm`` the fields left out keep the target's values,
+    and each one's own model check skips them, as Django skips any model
+    field a form does not have. **Its uniqueness checks and constraints do
+    not**: they run over the row as it would be saved, what was sent on top
+    of the target's values, leaving out only the model fields the form never
+    declares, as a whole call does. So an update that sends one field of a
+    ``unique_together`` pair or a ``UniqueConstraint`` and collides is refused
+    as the whole call would be, under ``non_field_errors``, rather than
+    failing with an ``IntegrityError`` when the row is saved. That needs a
+    target row: a partial call bound as a create checks only what was sent,
+    since the rest would be the model's defaults, which nothing writes.
+    ``clean()``
+    sees only what was sent, so it
+    reads ``cleaned_data`` with ``get``, as Django advises for a field that
+    failed. ``parameters()`` is the same for both calls: ``required`` says
+    what a whole call needs.
+
+    **A ``ModelForm`` is bound to a copy of the target.** When the
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    carries a row of the form's model, the form is built with
+    ``instance=`` a shallow copy of it, so its uniqueness checks exclude the
+    row being updated. It is a copy because a ``ModelForm`` writes the cleaned
+    values onto its instance while it validates: handed the target itself, it
+    would change the row the service receives before the service runs, and a
+    helper that saves only what changed, such as
+    [`update_from_input`][django_service_specs.mutations.update_from_input.update_from_input],
+    would find nothing to save. Any other target - the queryset a collection
+    selector resolves, or none - binds the form as a create.
+
+    **A form whose ``__init__`` takes more is handed it by ``form_kwargs``.**
+    It is a callable returning a mapping of extra constructor keywords, such
+    as a queryset scoped by the caller's tenant, and it binds through the
+    pool as a selector or a service does, naming what it wants: ``user``,
+    ``progress``, every registered seed, and the target under the name the
+    service receives it by, from the context's ``resolved``: ``instance``
+    for a spec with an instance selector, ``None`` when one that allows none
+    finds no row, ``collection`` for one with a collection selector, and
+    neither for a create. It is the target itself, never the copy the form
+    edits. ``user`` is the context's principal on every path, and
+    ``progress`` is ``null_progress`` wherever the context carries no
+    reporter. In ``bind_arguments`` handed ``pool_seeds``, it is handed
+    every seed of the registry, as on dispatch. In ``bind_arguments`` handed
+    none, or with a
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    built by hand, the context holds no seeds, so a callable naming one
+    gives it a default or meets Python's own ``TypeError``;
+    [`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords]
+    is the path off dispatch for building the form itself, and resolves the
+    seeds it names. It is called on
+    every ``validate()``, on the thread the call runs on, which under
+    ``adispatch`` is the one its synchronous phases share, so it may query;
+    on a ``many`` call that is once per row, so a query belongs in a seed,
+    which resolves once per call.
+    What it returns is passed beside ``data``, ``files`` and ``instance``,
+    and returning one of those three, for a plain form as for a
+    ``ModelForm``, is refused with ``ImproperlyConfigured`` naming it, as is
+    returning anything but a mapping. ``parameters()`` still reads only the
+    class: a field ``__init__`` adds from those keywords is not a parameter.
+    The callable is kept as ``form_kwargs``. A transport building the form
+    itself, for a page, builds it the same way with
+    [`form_keywords`][django_service_specs.adapters.forms.form_keywords.form_keywords],
+    which calls it from the pool dispatch would, the seeds it names included.
+
+    A refusal is one
+    [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments]
+    carrying the form's own errors and messages, ``{field: [messages]}``, with
+    the form-wide ones Django keeps under ``"__all__"`` moved to
+    ``non_field_errors``, the key every other refusal uses. An argument no
+    field declares is ignored by the form, as Django ignores any key it has
+    no field for: the closed argument set in front of it is what refuses one.
+    """
 
     def __init__(
         self,
@@ -143,7 +377,14 @@ class FormValidator(Validator):
         return Parameters(tuple(declared))
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
-        """The form's ``cleaned_data``, or ``InvalidArguments`` carrying its errors."""
+        """The form's ``cleaned_data``, or ``InvalidArguments`` carrying its errors.
+
+        A ``ModelChoiceField`` cleans to the row and a
+        ``ModelMultipleChoiceField`` to a queryset, which is what the service
+        receives. On a partial call, only the fields the caller sent are
+        bound, and so only those are returned; a ``ModelForm``'s uniqueness
+        checks still read the whole row, as the class docstring says.
+        """
         fields = {parameter.name: field for parameter, field in self._declared}
         data: dict[str, Any] = {}
         files: MultiValueDict[str, Any] = MultiValueDict()

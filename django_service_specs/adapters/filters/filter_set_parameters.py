@@ -24,7 +24,58 @@ django-filter counterpart, because the cost is the same on either side.
 
 
 def filter_set_parameters(filter_set: Any) -> Parameters:
-    """The arguments a ``FilterSet`` reads, as the Parameters a caller sends."""
+    """The arguments a ``FilterSet`` reads, as the Parameters a caller sends.
+
+    This is what lets a filter be a read like any other: the schema describes
+    it, the closed argument set admits it, the shape check judges it and each
+    transport accepts it, all from the declaration rather than from
+    django-filter. ``SelectorSpec`` puts these after its own ``reads``.
+
+    **Named as django-filter reads them**, because a Parameter describes what a
+    caller sends and the FilterSet is what receives it. A range filter
+    (``RangeFilter``, ``DateFromToRangeFilter`` and the rest) reads one key per
+    bound - ``price_min`` and ``price_max``, ``joined_after`` and
+    ``joined_before`` - so it is one Parameter per bound, never an object
+    called ``price`` that no FilterSet reads. A CSV filter (``BaseInFilter``,
+    ``BaseRangeFilter``) reads one key holding several values, and is an array;
+    its widget takes a list as it takes ``"1,2"``. A choice filter offers its
+    values, flattened out of any group, as ``integer`` when every value is an
+    ``int`` and otherwise as the strings Django's ``ChoiceField`` compares, each
+    with the label it was declared with as its ``choice_labels``, so the schema
+    names it for a reader; a choice set built by a callable, and a related row's
+    key, offer only ``string``. Every other filter is its scalar: ``boolean``, a ``date`` or
+    ``date-time`` string, and ``string`` for the rest. **A number filter, and
+    each bound of a numeric range, is a** ``decimal`` **string**, because its
+    form field is a ``DecimalField`` and reads one exactly, where a float read
+    on the way loses a key past ``2**53``; a JSON number is still taken. **So
+    is each value of a CSV number filter**: an array whose ``format`` and
+    bounds describe each element, as its choices would, so a fraction keeps
+    every digit it was sent with and ``?pks=1,2`` still splits over HTTP,
+    since no decimal holds a comma. **Each decimal is bounded**,
+    ``minimum=-1e50`` and ``maximum=1e50``, a CSV filter's values each: the
+    line django-filter's number filter draws above, drawn below too and on a
+    range's bounds, which it leaves open. A value past it is refused by the
+    shape check, at its index in a CSV filter's list, before it reaches the
+    database's integer conversion, which builds every digit of
+    ``"1E+999999999"``.
+
+    **Every one is optional**, because a filter narrows a read and never
+    stands between a caller and it. ``help`` is the author's ``help_text`` when
+    there is one; otherwise it says what the filter matches when the
+    argument's name does not (``min_pk`` is ``pk`` with ``gte``), and for a
+    bound, which bound of which field it is.
+
+    Two filters that read one key - a range ``joined`` and a filter called
+    ``joined_after`` - are refused, as any two Parameters of one name are,
+    because django-filter would hand one value to both.
+
+    An object whose ``base_filters`` is missing, empty or ``None`` declares
+    nothing, and is read without django-filter. A
+    [`SelectorSpec`][django_service_specs.specs.selector_spec.SelectorSpec]
+    refuses one as its ``filter_set`` unless it is a django-filter
+    ``FilterSet`` class, since none of the caller's data would be handed to
+    it. Reading any filter needs the ``[filter]`` extra.
+    """
     base_filters: dict[str, Any] = dict(getattr(filter_set, "base_filters", None) or {})
     if not base_filters:
         return Parameters()

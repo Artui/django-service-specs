@@ -36,7 +36,89 @@ _T = TypeVar("_T")
 
 
 class DataclassValidator(Validator):
-    """A Validator whose declaration is a standard-library dataclass."""
+    """A Validator whose declaration is a standard-library dataclass.
+
+    The reference adapter: what any adapter owes the kernel, done with nothing
+    but the standard library and Django. ``parameters()`` reads the fields and
+    their annotations; ``validate()`` decodes JSON-like arguments into those
+    types and builds the instance, nested dataclasses included.
+
+    The annotations it reads, and what each declares:
+
+    - ``str``, ``int``, ``float``, ``bool``: their JSON types. ``float`` takes an
+      integer as well, since JSON writes ``2.0`` as ``2``; nothing else crosses
+      types, so ``true`` is not an ``int``. An integer past a float's range
+      is refused as no number, in the words the shape check refuses a
+      non-finite one in, since no finite float stands for it.
+    - ``Decimal``, ``datetime``, ``date``: a string, with the format it decodes
+      from. A decimal takes a JSON number too, as every decimal validator does,
+      and an integer exactly, whatever its digits.
+    - ``X | None``: nullable. Inside a list, ``list[X | None]``, it is the
+      element that is, declared as ``items_nullable`` and not as the array's
+      own nullability.
+    - ``Literal[...]`` and an ``Enum`` (Django's ``TextChoices`` and
+      ``IntegerChoices`` included): choices, of the JSON type the values
+      share. An ``Enum`` decodes to the member.
+    - ``list[X]``: an array; ``list[SomeDataclass]`` is an array of rows, each
+      declared as nested Parameters. For any other element, ``Parameter.items``
+      holds its JSON type, and what else describes the element is declared on
+      the array, where it constrains each element: a list of choices declares
+      them there, and ``list[Decimal]`` the ``decimal`` format, so each
+      element is read as a scalar decimal is, a JSON number included, and a
+      query string's ``?prices=1.5,2.25`` is two of them. A list of dates or
+      date-times is an array of strings, since an element takes no other
+      format, and is decoded here.
+    - A list declares no length, since a dataclass has no way to state one,
+      so the shape check in front of this Validator holds it to the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting, 1000 by default. A list a
+      caller may send more of is declared with a Validator that states its
+      length, such as a pydantic model's ``Field(max_length=...)``, or under
+      a larger setting.
+    - a dataclass: an object, with its own fields as nested Parameters.
+    - ``dict[str, X]``, for any ``X`` above: an object with no declared
+      fields, as the pydantic adapter declares one, since Parameters cannot
+      say "every value is an X". Each value is decoded as ``X``, and refused
+      under its own key. Only a str key, because a JSON object has no other.
+    - ``X | UnsetType``: the argument may be left out, with or without a
+      default, and the field then holds ``UNSET`` rather than a value a
+      service would act on. It adds no JSON type, since no wire can send it.
+
+    A field with a default, or a ``default_factory``, is optional, and one with
+    neither is required. Only a plain default is reported as the Parameter's
+    ``default``: a factory's value is computed per instance, so it is not a
+    declaration a transport could print. A field declared ``init=False`` is
+    the dataclass's to compute, so it is neither taken nor returned.
+    ``Annotated`` is looked through, and an annotation outside this list is
+    refused with ``ImproperlyConfigured`` naming the field, never read as a
+    string.
+
+    **A row that updates must declare its key.** A relation write matches an
+    incoming row to an existing one by its primary key, so a row dataclass used
+    for an update needs ``pk: int | None = None``: present for a row that
+    exists, absent for a new one. Without it no incoming row matches an
+    existing one, and every update replaces every row. Nothing fails when that
+    happens, which is why it is written down here.
+
+    **Time zones follow Django's forms**, not pydantic: an offset-less
+    date-time is made aware in the current time zone when ``USE_TZ`` is on,
+    so a date-time means the same thing whichever library validated it.
+
+    **Every failure is reported, not the first**, as one ``InvalidArguments``
+    whose detail is addressed by path: ``{"books": {1: {"title": [...]}}}``
+    for a field inside the second row, only the rows that failed, and a message
+    about a row itself under ``non_field_errors`` inside it. A ``ValueError``
+    or Django ``ValidationError`` raised by the dataclass's own
+    ``__post_init__`` is a message about that object, and lands there too.
+
+    It is correct without the shape check in front of it, for a caller that
+    uses it directly: a wrong JSON type is a refusal, not a crash, and an
+    argument no field declares is refused as the dataclass's own constructor
+    would refuse it.
+
+    The annotations are read on first use rather than at construction, for
+    the reason a spec's parameters are: specs are built at import time, and an
+    annotation may name a class its module cannot resolve yet.
+    """
 
     supports_partial = False
 
@@ -53,11 +135,32 @@ class DataclassValidator(Validator):
         return _parameters(self._fields)
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
-        """The built instance's ``__init__`` fields, by name, or ``InvalidArguments``."""
+        """The built instance's ``__init__`` fields, by name, or ``InvalidArguments``.
+
+        Nested values stay dataclass instances, which is what the mutation
+        helpers read a row from. A partial call is refused: see ``validated()``.
+        """
         return self._validated(arguments, context).values
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
-        """The built instance as the call's ``data``, and its ``__init__`` fields as the values."""
+        """The built instance as the call's ``data``, and its ``__init__`` fields as the values.
+
+        A service declaring ``data`` receives the instance, typed as the
+        dataclass; one declaring the fields by name receives them. The values
+        are the instance's own attributes, so ``data.title`` and ``title`` are
+        one object.
+
+        **A partial call is refused** with ``ImproperlyConfigured``, because a
+        dataclass instance holds every field and a partial call may leave any
+        out. Building one anyway would mean a value the field's annotation does
+        not admit standing in for each field not sent, or no instance and no
+        ``__post_init__`` at all. A field an update may leave out is declared
+        ``X | UnsetType``, which every call honours; a spec whose calls are
+        partial uses a Validator that can return only what was sent.
+        ``supports_partial`` is ``False``, so a ``ServiceSpec`` declaring
+        ``partial=True`` over this Validator is refused when it is built, and
+        this refusal answers only a caller using it directly.
+        """
         return self._validated(arguments, context)
 
     def _validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
