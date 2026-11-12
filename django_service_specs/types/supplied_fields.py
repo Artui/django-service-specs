@@ -15,7 +15,21 @@ class _DataclassInstance(Protocol):
 
 
 def supplied_fields(data: _DataclassInstance | Mapping[str, object]) -> dict[str, Any]:
-    """Return ``data``'s fields whose value is not ``UNSET``, in their order."""
+    """Return ``data``'s fields whose value is not ``UNSET``, in their order.
+
+    ``data`` is a dataclass instance or a mapping. A dataclass gives its
+    ``__init__`` fields only, as the mutation helpers read it: a field declared
+    ``init=False`` is the dataclass's to compute, never the caller's to send.
+    ``None`` is a supplied value and is kept.
+
+    Shallow: a value is returned as it is, so a nested dataclass, a list of
+    rows or a model instance is the caller's own object, its ``UNSET`` fields
+    untouched. The values are typed ``Any`` because each is its own field's
+    type, which no dict annotation can spell per key.
+
+    Raises:
+        TypeError: ``data`` is neither, a dataclass class among them.
+    """
     if isinstance(data, Mapping):
         return {key: value for key, value in data.items() if value is not UNSET}
     if is_dataclass(data) and not isinstance(data, type):

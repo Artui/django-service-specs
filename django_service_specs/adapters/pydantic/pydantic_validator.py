@@ -27,7 +27,94 @@ from django_service_specs.validation.validator import Validator
 
 
 class PydanticValidator(Validator):
-    """A Validator whose declaration is a pydantic model."""
+    """A Validator whose declaration is a pydantic model.
+
+    ``parameters()`` reads the model's fields into Parameters, and
+    ``validate()`` hands the arguments to the model: pydantic builds the
+    instance, nested models included, and its own validators run as they would
+    for any other caller.
+
+    The annotations are read as
+    [`DataclassValidator`][django_service_specs.adapters.dataclass.dataclass_validator.DataclassValidator]
+    reads them, from one shared table, so a model and a dataclass declaring
+    the same field declare the same parameter: ``str``, ``int``, ``float``,
+    ``bool``; ``Decimal``, ``datetime`` and ``date`` as strings with their
+    format; ``X | None`` as nullable; ``Literal[...]`` and an ``Enum`` as
+    choices; ``Annotated`` looked through; and ``list[X]`` of any of these,
+    where ``list[X | None]`` makes the element nullable and not the array
+    and ``list[Decimal]`` declares each element a ``decimal``. On top of
+    those:
+
+    - a list's length, however the model states it - ``Field(min_length=,
+      max_length=)``, ``conlist``, ``annotated_types``' ``Len``, ``MinLen``
+      and ``MaxLen`` - is the parameter's ``min_length`` and ``max_length``,
+      so a list the model allows more of than ``SERVICE_SPECS_MAX_ARRAY_LENGTH``
+      is not held to it. Where a field states one twice, the last pydantic
+      applies is the one declared, as it is the one pydantic enforces. A
+      number's bounds are not declared: ``gt`` and ``lt`` are exclusive,
+      which a parameter cannot state, and the model keeps every bound in
+      its own words rather than some in the kernel's;
+
+    - a nested model is an object with its own fields as nested Parameters,
+      and ``list[SomeModel]`` an array of rows;
+    - ``dict[str, X]`` is an object with no declared fields, whose values are
+      pydantic's to validate;
+    - a model that contains itself is described four times on one path
+      (``MAX_APPEARANCES`` in the adapter's ``utils``), and deeper levels as
+      an object with no fields. pydantic still validates every level.
+
+    ``Any``, a union of two types, ``UnsetType``, a ``RootModel`` and anything
+    else without one JSON type is refused with ``ImproperlyConfigured`` naming
+    the model and the field, never read as a string.
+
+    **Names.** A parameter is named for the key pydantic validates by: the
+    field's ``validation_alias`` when it is a string, else its ``alias``, else
+    its name (the name alone when the model sets ``validate_by_alias=False``).
+    An ``AliasPath`` or ``AliasChoices`` is not one name, and is refused.
+    ``validate()`` returns the values keyed by the **field name** whatever the
+    wire called them, because that is the keyword the service is called with.
+
+    ``required`` is pydantic's own ``is_required()``. The default is reported
+    when JSON carries it as itself; a ``default_factory``, or a default such
+    as a ``Decimal`` or a date, is not reported, and the field is optional
+    all the same. ``help`` is the field's ``description``.
+
+    **A row that updates must declare its key**, as with the dataclass
+    adapter: ``pk: int | None = None`` on the row's model, or no incoming row
+    matches an existing one and every update replaces every row.
+
+    **Refusals keep pydantic's words**, addressed by path into the kernel's
+    tree: ``{"books": {1: {"title": ["..."]}}}``, with a row's index as an
+    ``int``. A message about a model itself - its ``model_validator`` refusing
+    - sits under ``non_field_errors`` inside that model, or at the top for the
+    model being validated. The kernel's shape check runs first and refuses a
+    wrong JSON type, and a list past its declared length, in the kernel's
+    words, under the code pydantic's would carry; pydantic's are what a
+    caller reads for the model's other rules: bounds, patterns, validators.
+
+    **Each message carries a code**, the one a DRF field gives the same
+    mistake where pydantic's error type has one: ``missing`` is
+    ``"required"``, a ``None`` refused by a type is ``"null"``, a string or a
+    list too long or too short ``"max_length"`` or ``"min_length"``, a number
+    past a bound ``"max_value"`` or ``"min_value"`` (an exclusive bound too,
+    which no DRF field has), a ``Literal`` or an ``Enum`` ``"invalid_choice"``,
+    a list's type ``"not_a_list"``, a decimal's digits ``"max_digits"``,
+    ``"max_decimal_places"`` and ``"max_whole_digits"``, and a forbidden extra
+    key the kernel's ``"unknown"``. Any other of pydantic's own types is
+    ``"invalid"``, DRF's code for a value it cannot take, and a
+    ``ValueError`` or an ``assert`` in a validator is too, as DRF says for a
+    message raised with no code. A ``PydanticCustomError``'s type is the
+    author's code, and is kept, as a Django ``ValidationError``'s is.
+
+    **Time zones are pydantic's**: an offset-less date-time stays naive, where
+    ``DataclassValidator`` makes it aware as Django's forms do. Declare the
+    offset, or convert in the service.
+
+    The declaration is read at construction, so an unmappable field fails
+    where the spec is written. A model whose annotations named a class not yet
+    defined when it was built is completed first, as pydantic completes it on
+    first use.
+    """
 
     supports_partial = False
 
@@ -42,11 +129,37 @@ class PydanticValidator(Validator):
         return self._parameters
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
-        """Every field's validated value, keyed by field name, or ``InvalidArguments``."""
+        """Every field's validated value, keyed by field name, or ``InvalidArguments``.
+
+        The context reaches pydantic's validators as ``info.context``, a dict
+        with ``"principal"``, ``"target"`` and ``"call_context"``, the call's
+        context as the very dict the transport passed, so a validator can check
+        a value against the caller or the row being updated, and read or write
+        what the call's other stages share. Nested values stay
+        model instances, which is what the mutation helpers read a row from.
+
+        **A partial call is refused** with ``ImproperlyConfigured``. pydantic
+        validates a model whole: a required field not sent is missing, and a
+        ``model_validator`` is written against every field being there, so
+        there is no partial validation to hand the call to. Validating only
+        the fields sent, one by one, would skip the model's own rules; a spec
+        whose calls are partial uses a Validator that can return only what was
+        sent. ``supports_partial`` is ``False``, so a ``ServiceSpec``
+        declaring ``partial=True`` over this Validator is refused when it is
+        built, and this refusal answers only a caller using it directly.
+        """
         return self._validated(arguments, context).values
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
-        """The validated instance as the call's ``data``, and its fields as the values."""
+        """The validated instance as the call's ``data``, and its fields as the values.
+
+        A service declaring ``data`` receives the model instance, as it
+        receives the dataclass instance from ``DataclassValidator``, so a
+        service written for ``data.title`` reads the same whichever of the two
+        validated it. One declaring the fields by name receives them, as
+        ``validate()`` returns them; they are the instance's own attributes,
+        so ``data.title`` and ``title`` are one object.
+        """
         return self._validated(arguments, context)
 
     def _validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:

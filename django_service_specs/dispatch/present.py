@@ -17,7 +17,66 @@ from django_service_specs.specs.spec_source import SpecSource
 
 
 def present(spec: ServiceSpec | SelectorSpec | SpecSource, result: DispatchResult) -> Any:
-    """Render ``result.value`` as JSON-like data, the way ``spec`` declares it."""
+    """Render ``result.value`` as JSON-like data, the way ``spec`` declares it.
+
+    The presenter is a selector spec's own, or a service spec's
+    ``presenter_for_output()``: its own, or its output selector's when it
+    declares none.
+
+    - ``kind="list"``: every item through the presenter's ``presented_rows()``
+      in one call, which presents each in turn unless the presenter batches
+      over them. To serve a page, hand ``present`` a result holding the page's
+      rows, and those are the rows it receives. With no
+      presenter the items are returned as they are, but still in a list: a
+      queryset is evaluated here rather than handed back lazily, because
+      ``apresent``'s caller is on the event loop, where the first iteration of
+      an unevaluated queryset is a query Django refuses to run.
+    - ``kind="instance"``: the value through the presenter. With no presenter,
+      or a value of ``None`` - an ``allow_none`` retrieve that found nothing, a
+      service that returned nothing - the value as it is. ``None`` is not a
+      row, and asking a presenter to render one produces either a crash or an
+      object of blank fields indistinguishable from a real row.
+
+    **Affordances.** When the selector spec presented through declares
+    ``affordances`` - a selector spec's own, or a service spec's output
+    selector's, never a service spec's own, which are what its call is checked
+    against - each presented object gains an ``affordances`` key: per declared
+    name, ``{"available": true}``, or ``{"available": false, "code": ...,
+    "reason": ...}`` naming the first condition the row does not meet, or a
+    bare ``{"available": false}`` for a row deleted before its answers were
+    asked, which fails no condition and so has no sentence to report. ``None``
+    is not a row and carries none. The answers are read off the rows as the
+    selector's dispatch left them - annotations on a queryset's rows, or the
+    answers it attached to rows a selector returned directly - so presenting
+    them costs no query. A spec declaring none presents what its presenter
+    answers, untouched.
+
+    **The call's context.** Each value is handed to the presenter's
+    ``presented()``, or a list's to its ``presented_rows()``, with
+    ``result.context``, the
+    [`PresentationContext`][django_service_specs.output.presentation_context.PresentationContext]
+    dispatch built for the call, or ``None`` on a result it did not build.
+    ``presented()`` is ``present()`` unless overridden, so a Presenter that
+    reads nothing of the call needs only ``present()``. Every value of one
+    result is handed the same context, so a list's rows, and a nested
+    presenter a presenter hands it on to, share its ``call_context`` - the
+    dict the transport created for the call - and read the arguments that
+    shape the output from its ``shapes``. A spec declaring no ``shapes`` and
+    a presenter reading neither present exactly as before.
+
+    Raises:
+        ValueError: ``kind="not_found"``. Presenting nothing as a success is the
+            bug this refuses; the transport answers a not-found in its own
+            terms (a 404, an exit code, a tool error) and never presents it.
+        ImproperlyConfigured: The spec declares ``affordances`` and no presenter
+            to present them through; a presented row is not an object, or
+            already has an ``affordances`` key; or a row carries no answer,
+            because it did not come through the selector that declares them.
+            Also a presenter answering with a coroutine or an async generator,
+            which is never awaited, so it is refused rather than handed back
+            as the payload; and a ``presented_rows()`` answering with anything
+            but a list of one presented value per row.
+    """
     spec = kernel_spec(spec)
     if result.kind == "not_found":
         raise ValueError(
