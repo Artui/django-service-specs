@@ -5,7 +5,12 @@ from typing import final
 
 @final
 class UnsetType:
-    """Singleton sentinel type."""
+    """Singleton sentinel type. Always falsy; identity-equal to itself only.
+
+    Don't instantiate this directly — use the module-level ``UNSET`` singleton.
+    ``UnsetType()`` returns that same instance, but the sentinel is the value
+    you compare against and ``UnsetType`` is only useful as a type annotation.
+    """
 
     _instance: UnsetType | None = None
 

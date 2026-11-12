@@ -4,7 +4,21 @@ from enum import Enum
 
 
 class RelationOutcome(str, Enum):
-    """The single fact a ``RelatedObjectChange`` reports."""
+    """The single fact a
+    [`RelatedObjectChange`][django_service_specs.mutations.related_object_change.RelatedObjectChange]
+    reports.
+
+    A collection reports five tuples of primary keys, which is the honest shape
+    for many rows and a poor one for a relation that holds exactly one: every
+    tuple would be empty or a one-tuple, and "which of the five is non-empty" is
+    a worse way to say what happened than saying it. So only the one-row kinds
+    report an outcome — a forward relation and a reverse one-to-one — and a
+    collection, many-to-many included, reports its tuples.
+
+    Inheriting from ``str`` keeps the value JSON-serializable and lets a caller
+    compare against the plain string, matching
+    [`SelectorKind`][django_service_specs.types.selector_kind.SelectorKind].
+    """
 
     UNTOUCHED = "untouched"
     """Nothing was written to the relation.

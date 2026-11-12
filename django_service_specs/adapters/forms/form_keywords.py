@@ -25,7 +25,54 @@ def form_keywords(
     target: Any = None,
     call_context: dict[str, Any] | None = None,
 ) -> Mapping[str, Any]:
-    """What ``spec``'s FormValidator's ``form_kwargs`` returns."""
+    """What ``spec``'s FormValidator's ``form_kwargs`` returns, for a transport building the form.
+
+    A page shows the form before the call runs, so it builds the form itself,
+    and a form whose ``__init__`` takes a keyword of its own needs what
+    dispatch would hand it. This calls ``form_kwargs`` from the pool dispatch
+    binds it from, through the same code
+    [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
+    calls it with, so the returned mapping is checked as there: one that is
+    not a mapping, or that returns ``data``, ``files`` or ``instance``, which
+    the bind sets itself, is refused with ``ImproperlyConfigured``. Spread it
+    beside those three: ``form_class(data=..., **form_keywords(...))``.
+
+    The pool holds:
+
+    - ``user``, the principal;
+    - ``progress``, the no-op reporter, since no call is running;
+    - the registered seeds of ``pool_seeds`` that ``form_kwargs`` would be
+      handed, resolved once for the principal, and no other: the seeds it
+      names, or every seed for one taking ``**kwargs``, as on dispatch;
+    - ``call_context``, the dict handed here, or a fresh one; a page hands the
+      dict it will hand dispatch, so what the two calls write is shared;
+    - ``request`` and ``view``, read off that context, ``None`` for a key it
+      lacks, as in every pool dispatch builds, unless ``pool_seeds`` registers
+      the name, whose seed is the value then; and a seed's resolver may declare
+      either;
+    - ``target`` under the name dispatch hands it by: ``instance`` for a spec
+      with an instance selector, ``collection`` for one with a collection
+      selector, and nothing for a create.
+
+    A deactivated principal resolves no seed, as on dispatch, which refuses one
+    before any resolver runs: where a seed would be resolved for one, this raises
+    ``PrincipalUnavailable`` first. A call that resolves none - no ``pool_seeds``,
+    or a ``form_kwargs`` naming no registered seed - is asked as ever.
+
+    A spec whose Validator is not a ``FormValidator`` is refused with
+    ``TypeError``, as ``resolve_target`` refuses a spec it cannot answer for:
+    a page wired to a spec it cannot build a form for is the caller's mistake,
+    and an empty answer would hide it. A ``FormValidator`` with no
+    ``form_kwargs`` returns ``{}``, resolving nothing.
+
+    It neither authorizes nor resolves the target: a page admits the
+    principal with
+    [`authorize`][django_service_specs.dispatch.authorize.authorize] and
+    finds the row with
+    [`resolve_target`][django_service_specs.dispatch.resolve_target.resolve_target]
+    first. It is sync, and ``form_kwargs`` may query, so an async caller hops
+    once with ``sync_to_async``.
+    """
     spec = kernel_spec(spec)
     if not (isinstance(spec, ServiceSpec) and isinstance(spec.validator, FormValidator)):
         found = getattr(spec, "validator", None)

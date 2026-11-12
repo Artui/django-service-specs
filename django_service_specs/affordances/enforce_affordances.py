@@ -28,7 +28,67 @@ def enforce_affordances(
     reserved: frozenset[str],
     call_context: dict[str, Any] | None = None,
 ) -> None:
-    """Refuse the call if one of the spec's ``affordances`` is not met."""
+    """Refuse the call if one of the spec's ``affordances`` is not met.
+
+    [`dispatch`][django_service_specs.dispatch.dispatch.dispatch] and
+    [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] call this
+    themselves for a service spec, with the pool the service is about to
+    receive and the pool seeds' ``reserved`` set. A transport that runs a
+    service **without** them - a chain that owns the transaction and hands each
+    step its own pool, say - must call it too, exactly as it calls
+    [`authorize`][django_service_specs.dispatch.authorize.authorize], or a
+    condition the direct path refuses is skipped on that one. Neither entry
+    point calls it for a selector spec, whose ``affordances`` are answers about
+    each row rather than a refusal of the read.
+
+    ``pool`` is the keyword pool the service is about to receive and
+    ``instance`` its resolved target, ``None`` for an operation with none. It
+    raises
+    [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable]
+    carrying the unmet affordance's ``reason`` and ``code``.
+
+    Callers must invoke this **after** object-level authorization and
+    validation, and **before** the service: class-level authorization -> target
+    resolution -> object-level authorization -> validation -> affordances ->
+    service. After access because a refusal describes the row's state, and
+    telling a caller who may not see the row what state it is in is a
+    disclosure. Dispatch calls it before an atomic service's transaction opens,
+    so a refusal never opens one.
+
+    Declaration order decides which refusal a caller sees, and nothing past the
+    first unmet condition runs. Every condition on the row is answered together
+    by one query the first time one is reached. A callable condition sees the
+    seeds of ``pool`` - never the call's target, input or client arguments - so
+    a ``**kwargs`` catch-all is held to the same rule the declaration enforces on
+    a named parameter. ``reserved`` is this call's seed set, registered seeds
+    included: ``seeds.reserved`` for the
+    [`PoolSeeds`][django_service_specs.pool.pool_seeds.PoolSeeds] the pool was
+    built with, the mount's ``pool_seeds.reserved``. It is required, with no
+    default, because a default would ask a condition with none of the registered
+    seeds, and one reading a registered seed (a tenant, a frozen flag) would fail
+    on a transport running a service without dispatch though dispatch serves it.
+    A callable's result is read for truth, so one that returns
+    nothing refuses rather than allows.
+
+    ``spec`` may be a declaration with ``as_kernel_spec()``, read as the
+    service spec it compiles to.
+
+    ``call_context`` is the call's context, handed to a callable condition
+    that names it and never to one taking ``**kwargs`` for the rest: the dict
+    passed, else the one ``pool`` carries, else a fresh one the conditions of
+    this call share. A ``call_context`` passed beside a different one in
+    ``pool`` raises ``ImproperlyConfigured`` (``with_call_context``).
+
+    Raises:
+        ActionUnavailable: An affordance is not met.
+        ServiceNotFound: A condition on the row was reached and the row is gone:
+            resolved a moment ago, and there is now nothing to do it to.
+        ImproperlyConfigured: A condition on the row was reached and
+            ``instance`` is not a model instance.
+        TypeError: ``spec`` is, or compiles to, a ``SelectorSpec``, whose
+            ``affordances`` name other operations rather than conditions on
+            this one.
+    """
     compiled = kernel_spec(spec)
     if not isinstance(compiled, ServiceSpec):
         raise TypeError(

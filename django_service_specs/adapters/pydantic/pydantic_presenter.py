@@ -22,7 +22,46 @@ _MISSING = object()
 
 
 class PydanticPresenter(Presenter):
-    """An operation's output declared as a pydantic model, rendered by that model."""
+    """An operation's output declared as a pydantic model, rendered by that model.
+
+    ``output()`` reads the fields as
+    [`PydanticValidator`][django_service_specs.adapters.pydantic.pydantic_validator.PydanticValidator]
+    does, so one model declares the same types going in and coming out, and
+    adds what only the output side has:
+
+    - each field is named for the key ``model_dump(by_alias=True)`` emits:
+      its ``serialization_alias``, else its ``alias``, else its name;
+    - fields declared ``exclude=True`` are not output, and each
+      ``computed_field`` is, after the fields, typed by its return annotation;
+    - every field is ``always_present``, because ``model_dump`` emits every
+      key, except one with an ``exclude_if``, which may be dropped;
+    - ``label`` is the field's ``title`` when the author set one, and ``None``
+      otherwise: pydantic invents no label, and a reader can title-case a
+      name as well as an adapter;
+    - choices are (value, display) pairs: a Django ``Choices`` enum supplies
+      its label, translated when ``output()`` is called, and a plain ``Enum``
+      or a ``Literal`` has no display of its own, so the value's ``str``
+      stands in;
+    - a ``FieldMarking`` is declared in the field's ``Annotated`` metadata:
+      ``id: Annotated[int, FieldMarking.handle()]``.
+
+    ``present(value)`` renders with the model itself, so its serializers and
+    its JSON encoding are what a caller receives. The value may be an instance
+    of the model, a model row, any object carrying the same names, or a
+    mapping keyed by field name. Anything but an instance is read one declared
+    field at a time, by attribute or by key, and the model validates what was
+    read: a related collection may be a manager, read through ``.all()`` so a
+    prefetch is used when there is one, where pydantic's own
+    ``from_attributes`` would fail on it. A field the value does not carry is
+    left to the model's default.
+
+    A value that does not fit the model raises pydantic's ``ValidationError``
+    as it is. What is presented is the operation's own value rather than a
+    caller's, so a mismatch is a defect in the operation, not a refusal to
+    report.
+
+    The declaration is read at construction, as the validator's is.
+    """
 
     def __init__(self, model: type[BaseModel]) -> None:
         check_model(model, label="PydanticPresenter")
@@ -34,7 +73,11 @@ class PydanticPresenter(Presenter):
         return _output(fields_of(self._shape))
 
     def present(self, value: Any) -> Any:
-        """One value, validated by the model and dumped as JSON data by alias."""
+        """One value, validated by the model and dumped as JSON data by alias.
+
+        ``None`` is presented as ``None``: it is JSON's null, not a row whose
+        every attribute is missing.
+        """
         if value is None:
             return None
         instance = self.model.model_validate(_gather(self._shape, value))

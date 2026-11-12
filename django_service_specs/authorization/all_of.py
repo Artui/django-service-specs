@@ -12,7 +12,15 @@ from django_service_specs.authorization.utils import (
 
 
 class AllOf(_Combinator):
-    """Passes when every check passes: ``AllOf(IsStaff(), InTenant(), message=...)``."""
+    """Passes when every check passes: ``AllOf(IsStaff(), InTenant(), message=...)``.
+
+    What a spec's ``permissions=`` list already means, as one check, so it can
+    stand inside ``AnyOf`` or ``NoneOf``. Each of the three questions asks
+    every check the same question, in order, and stops at the first that
+    fails (test_all_of_does_not_ask_past_the_first_refusal). ``message`` is
+    what ``NotPermitted`` says when it refuses; ``None`` keeps the generic
+    wording.
+    """
 
     _asks = {method: ((method, filled),) for method, filled in QUESTIONS}
 
