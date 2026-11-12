@@ -13,7 +13,79 @@ from django_service_specs.types.utils import PER_CALL_POOL_NAMES, is_row_conditi
 
 @dataclass(frozen=True)
 class Affordance:
-    """What can be done to this object right now, declared once on the operation."""
+    """What can be done to this object right now, declared once on the operation.
+
+    A condition on a
+    [`ServiceSpec`][django_service_specs.specs.service_spec.ServiceSpec] saying
+    whether the operation is possible **as a fact about the world**: an order
+    that shipped cannot be cancelled, a draft with no title cannot be published,
+    refunds are closed while the books are. Not a fact about the caller - that is
+    ``permissions``, which refuses with
+    [`NotPermitted`][django_service_specs.authorization.not_permitted.NotPermitted]
+    and is always checked first. An affordance refuses with
+    [`ActionUnavailable`][django_service_specs.services.action_unavailable.ActionUnavailable],
+    a conflict.
+
+    ```python
+    ServiceSpec(
+        service=cancel_order,
+        affordances=[
+            Affordance(
+                code="order_shipped",
+                reason="A shipped order cannot be cancelled.",
+                when=~Q(status="shipped"),
+            ),
+        ],
+    )
+    ```
+
+    ``when`` is true when the action **is** available, and its type decides what
+    kind of condition it is - derived, never declared, so it cannot drift from
+    what it describes:
+
+    - **An ORM boolean expression** - a ``Q``, an ``Exists``, a lookup - is a
+      condition on the row. It reads exactly as ``Model.objects.filter(when)``
+      does, relations included, and is evaluated in SQL: one query for a single
+      object, however many conditions it declares. A row is available only when
+      the condition is true; a ``NULL`` is not true.
+    - **A callable** is a condition on nothing in particular - "refunds are
+      closed during month-end". It is resolved through the keyword pool like any
+      other spec callable and returns a ``bool``. It is sync-only, declared
+      with ``def``: it is never awaited, so an ``async def`` one is refused
+      when the affordance is declared. It sees the pool's seeds
+      only: ``user``, ``progress`` and any registered pool seed, an HTTP
+      adapter's ``request`` among them. Never the call's target or input, and
+      never a client argument - the caller does not get to decide whether the
+      operation is available.
+
+    **A Python callable over the row is refused, and that refusal is the design.**
+    A predicate the ORM cannot read has to run once per row, which turns every
+    list that reports availability into one query per row, and prefetching does
+    not fix it: a prefetched relation answers some reads from its cache and
+    silently re-queries for others. A rule that cannot be computed for fifty rows
+    in one query is not an affordance - it stays in the service, where it is
+    enforced and never advertised.
+
+    Attributes:
+        code: Stable and machine-readable: it names the rule, never the state
+            that tripped it, and it does not change when the sentence is
+            reworded. What a transport or a client branches on.
+        reason: The sentence people and models both read - in a rendered
+            answer, and as the message of the ``ActionUnavailable`` a refused
+            call raises. Write it for them: say what is not possible and, where
+            it helps, what would make it possible, and keep internal state out
+            of it, since every reader of the operation reads it.
+        when: The condition, as above.
+
+    Raises:
+        ImproperlyConfigured: ``code`` or ``reason`` is not a non-empty string;
+            ``when`` is an ORM expression that is not boolean; ``when`` is a
+            callable naming ``data``, ``instance``, ``collection``, ``result``
+            or ``queryset``; ``when`` is an async callable - an ``async
+            def``, an object whose ``__call__`` is one, or an async generator
+            function - since a condition is never awaited; or ``when`` is
+            neither an expression nor a callable.
+    """
 
     code: str
     reason: str

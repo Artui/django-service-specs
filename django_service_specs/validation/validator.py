@@ -13,25 +13,137 @@ from django_service_specs.validation.validation_context import ValidationContext
 
 
 class Validator(abc.ABC):
-    """The kernel's validation contract."""
+    """The kernel's validation contract.
+
+    ``parameters()`` declares what the Validator takes, and ``validate()``
+    turns JSON-like primitives into validated values or raises
+    [`InvalidArguments`][django_service_specs.parameters.invalid_arguments.InvalidArguments].
+    An adapter reads its library's own declaration into ``parameters()``, and
+    must not query doing it: a transport describes a spec before any call.
+
+    **Nominal on purpose.** An adapter subclasses this, and subclassing is the
+    opt-in. A structural check on a method name is the gate that lets stock
+    classes through by accident: an ``is_valid`` protocol matches a Django form
+    and a DRF serializer, and a ``validate`` protocol matches a DRF serializer
+    and a pydantic model class, none of which was written to this contract.
+
+    No ``instance`` and no ``many`` keyword: the row a call acts on is target
+    resolution, and a ``many`` spec's list is handed to ``validated_many()``,
+    a method of its own. ``partial`` arrives in the
+    [`ValidationContext`][django_service_specs.validation.validation_context.ValidationContext]
+    rather than as a keyword, because it is the spec's statement about the
+    call, not the Validator's: a partial call may leave out any field, and a
+    Validator returns only the fields the caller sent, or refuses a partial
+    call with ``ImproperlyConfigured`` when what it builds needs every field.
+    Ignoring the flag is the one wrong answer, since the omitted fields would
+    come back cleaned to blanks and an update would write them.
+
+    ``supports_partial`` says which of the two a Validator does, so a spec
+    learns it when it is declared rather than on its first call: a
+    ``ServiceSpec`` declaring ``partial=True`` over a Validator whose
+    ``supports_partial`` is ``False`` is refused when it is built. ``True``
+    by default; ``DataclassValidator`` and ``PydanticValidator`` set it
+    ``False`` as a class attribute, since each builds every field, and a
+    subclass of either that does handle a partial call sets it back. An
+    adapter whose answer depends on what it was built over sets it on the
+    instance in ``__init__`` instead, and the spec reads the instance. The
+    refusal at the call stays, for a Validator called directly.
+
+    ``unsendable`` names the fields the Validator requires that its
+    ``parameters()`` leaves out. No caller can send such a field, since a
+    transport offers only what ``parameters()`` declares, so a transport can
+    read it where it registers a spec and refuse the spec there rather than
+    on every call. Empty by default, which is the right answer for a Validator
+    that declares every field it requires, as the kernel's own adapters do. An
+    adapter whose library can require a field it does not declare, such as a
+    DRF serializer requiring one named like a seed, overrides it with a
+    property, which may read what the instance was built over. The default is
+    a property with no setter, so unlike ``supports_partial`` an instance of a
+    class that inherits it, or overrides it with a property, cannot assign it
+    (test_an_instance_cannot_assign_unsendable). A plain class attribute also
+    answers a reader, but the type checker does not hold its type, and an
+    instance can then assign it
+    (test_an_instance_can_assign_a_class_attribute_override).
+
+    **Sync-only.** A Validator may query - a uniqueness check does - so dispatch
+    runs it in the executor on the async path, and it must not be ``async def``.
+
+    ``validate()`` receives only the arguments its own ``parameters()``
+    declare: the caller's, through the shape check, with the spec's
+    ``input_data`` merged over them. Through dispatch every required field
+    is among them, whoever filled it, since one nobody filled is refused in
+    the shape check's words before ``validate()`` runs
+    (test_a_required_field_nobody_filled_is_refused_before_the_validator_runs).
+    ``bind_arguments`` runs no provider, so there a field ``input_data``
+    fills or may fill can arrive absent, and is the Validator's to refuse
+    (test_a_field_input_data_fills_is_left_to_the_validator_which_runs_no_provider).
+    It returns the values the
+    operation receives, keyed by name; a nested row may come back as whatever
+    the library builds (a dataclass instance, a model instance), since the
+    mutation helpers read either.
+
+    ``validated()`` is the call's whole result, and what dispatch asks for: the
+    values, the call's ``data``, and any value the Validator binds for the
+    call. An adapter overrides it where its ``data`` is not the mapping
+    ``validate()`` returns, as the dataclass and pydantic adapters' is the
+    instance they build, or where the library leaves an object the service
+    may want; the rest need not touch it.
+
+    ``validated_many()`` is what dispatch asks of a ``many`` spec instead: the
+    whole list at once. By default it is ``validated()`` on each row, which
+    serves a Validator whose library validates one row at a time. An adapter
+    whose library validates a list as one, running list-level checks and
+    binding one object for the call, overrides it.
+    """
 
     supports_partial: bool = True
 
     @property
     def unsendable(self) -> frozenset[str]:
-        """The required fields ``parameters()`` leaves out, which no caller can send."""
+        """The required fields ``parameters()`` leaves out, which no caller can send.
+
+        Empty by default. A transport can refuse a spec over a Validator that
+        names any, where it registers the spec. An override is a property,
+        which may read what the instance was built over, or a class attribute.
+        """
         return frozenset()
 
     @abc.abstractmethod
     def parameters(self) -> Parameters:
-        """What this Validator takes, as a declaration."""
+        """What this Validator takes, as a declaration. Never queries.
+
+        A Validator may opt into the call it is asked for by declaring
+        ``parameters(self, *, call_context=None)``: every ask inside one call
+        then hands it that call's ``call_context``, the same dict its
+        ``ValidationContext`` carries, so a transport describing a serializer
+        under its own request can tell its own call from a ``dispatch`` the
+        service makes inside it. It is ``None`` outside a call - at
+        registration, for a schema handed no context, or for any other reader
+        describing the spec - and the declaration must hold there too. Opted
+        in or not, it never queries. A Validator declaring no keyword is asked
+        as before, as is one whose ``parameters`` takes only ``**kwargs`` or is
+        a ``functools.wraps`` wrapper that does not name the keyword itself:
+        the method's own signature decides. The helpers a transport calls
+        during a call - ``apply_server_arguments``,
+        ``check_requested_input``, ``server_owned_keys`` - take the call's
+        dict as ``call_context=`` and ask with it. So do those it describes a
+        spec with - ``spec_caller_input_schema``, ``spec_input_schema``,
+        ``provider_reached`` - which also take a transport's stamped dict with
+        no call under way, where ``request`` and ``view`` are ``None``, so a
+        declaration read under one must hold without them.
+        """
 
     @abc.abstractmethod
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
         """Validated values, or ``InvalidArguments``. May query; never ``async def``."""
 
     def validated(self, arguments: Mapping[str, Any], context: ValidationContext) -> Validated:
-        """``validate()``'s values, as the call's ``data`` too, with nothing else bound."""
+        """``validate()``'s values, as the call's ``data`` too, with nothing else bound.
+
+        One ``validate()`` call, so a Validator that queries queries once. An
+        override returns the same ``values`` its ``validate()`` would, and may
+        hand an object as ``data`` and bind values in ``pool``.
+        """
         values = self.validate(arguments, context)
         return Validated(values=values, data=values)
 
@@ -42,7 +154,35 @@ class Validator(abc.ABC):
         *,
         many_argument: str,
     ) -> Validated:
-        """A ``many`` call's rows, validated as one call: what dispatch asks of a ``many`` spec."""
+        """A ``many`` call's rows, validated as one call: what dispatch asks of a ``many`` spec.
+
+        ``rows`` maps each row's index in the caller's list to its arguments,
+        already through the shape check, with the spec's ``input_data`` merged
+        over each and only the keys ``parameters()`` declares, as on a single
+        call. A row the shape check refused, or one dispatch refused for a
+        required field nobody filled, is not among them, so the indices
+        may have gaps: an override validating a list maps its library's
+        positions back through ``list(rows)``, and a list-level verdict it
+        reaches sees only the rows handed to it.
+
+        Returns the call's ``Validated``: ``values`` holds the rows' values as
+        a list under ``many_argument`` and nothing else, since a row's fields
+        are never spread into the service's keywords; ``data`` is the list a
+        service declaring ``data`` receives; ``pool`` is what the Validator
+        binds once for the whole call.
+
+        Refuses with ``InvalidArguments`` whose ``detail`` is the list's own
+        node: each failing row's tree under its ``int`` index, and a message
+        about the list as a whole under ``non_field_errors``. Dispatch puts
+        the shape check's refusals beside it and raises the whole under
+        ``many_argument``, so every failing row is reported at once.
+
+        By default, ``validated()`` on each row in order, every refusal
+        collected before any is raised, and each row's ``data`` and values in
+        a list. A value a row binds is refused with ``ImproperlyConfigured``:
+        the service runs once for every row, so a value bound for one has
+        nowhere to go. An override that binds for the call binds once.
+        """
         errors: dict[Any, Any] = {}
         values: list[dict[str, Any]] = []
         data: list[Any] = []
