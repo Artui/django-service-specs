@@ -1,5 +1,3 @@
-"""JSON Schema from a spec's declarations: what it takes, returns, and keywords no field spells."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -48,7 +46,7 @@ def archive_oldest(*, user: Any) -> Note | None:
     if note is not None:
         note.archived = True
         note.save(update_fields=["archived"])
-    return note  # None once there is nothing left to archive
+    return note
 
 
 archive_oldest_spec = ServiceSpec(

@@ -1,5 +1,3 @@
-"""The pydantic adapter: a nested write declared as models, its names, and a tree."""
-
 from __future__ import annotations
 
 # --8<-- [start:write]

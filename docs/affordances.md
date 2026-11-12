@@ -149,6 +149,10 @@ docs/examples/affordances.py:enforce
 --8<--
 ```
 
+`rename_step` is one step of a chain that resolved its row itself and runs the
+service in hand: it builds the pool the service will receive, the call's
+arguments included, and enforces the affordances against that pool.
+
 A transport running a service from an event loop awaits
 [`aenforce_affordances`][django_service_specs.affordances.aenforce_affordances.aenforce_affordances],
 which refuses and lets through as `enforce_affordances` does, `reserved=`

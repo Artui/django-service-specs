@@ -1,5 +1,3 @@
-"""Arguments and refusals: the shape check's tree, the closed set, and flat transports."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -81,7 +79,7 @@ def left_out(arguments: dict[str, Any]) -> tuple[str, ...]:
     try:
         check_arguments(AUTHOR, arguments)
     except InvalidArguments as refused:
-        return refused.missing  # sorted names, for "you did not send ..."
+        return refused.missing
     return ()
 
 

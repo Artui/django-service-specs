@@ -272,6 +272,9 @@ docs/examples/arguments.py:codes
 --8<--
 ```
 
+`codes` walks a refusal's tree and puts each message's code in its place, and
+`"invalid"` where a message carries none.
+
 | Refusal | Code | Raised by |
 | --- | --- | --- |
 | A required argument is absent | `required` | the shape check |
@@ -431,7 +434,8 @@ docs/examples/transport.py:transport
 ```
 
 The subclasses of `ServiceError` are matched before `ServiceError` itself, or
-the base class swallows them. A transport that has never heard of
+the base class swallows them, and `DispatchError`, which may be raised bare,
+is matched below its own subclasses for the same reason. A transport that has never heard of
 `ServiceConflict` still handles it as a `ServiceError`.
 
 Every 400 is a field map, whichever family refused: a service's string or

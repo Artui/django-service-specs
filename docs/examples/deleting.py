@@ -1,5 +1,3 @@
-"""A delete that cascades through the same map the writes use."""
-
 from __future__ import annotations
 
 # --8<-- [start:delete]
@@ -18,8 +16,6 @@ from tests.adapter_app.models import Author
 
 
 def delete_author(*, instance: Author) -> tuple[int, ...]:
-    # The database would take the books with the author and say nothing about
-    # them. Cascading first, through the map the writes use, names each one.
     cascade = delete_relations(instance, relations=BOOKS)
     instance.delete()
     books = cascade.get_child_change("books")

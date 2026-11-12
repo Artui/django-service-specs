@@ -1,5 +1,3 @@
-"""The async entry point: only the run may be ``async def``."""
-
 from __future__ import annotations
 
 # --8<-- [start:async]
@@ -29,8 +27,6 @@ arename_note_spec = ServiceSpec(
 
 
 async def rename_from_a_worker(user_id: Any, arguments: dict[str, Any]) -> Any:
-    # A queue carries an identifier, not a user: adispatch resolves it, and a
-    # missing or deactivated user is refused with PrincipalUnavailable.
     result = await adispatch(arename_note_spec, principal_id=user_id, arguments=arguments)
     if result.kind == "not_found":
         return None

@@ -485,6 +485,10 @@ docs/examples/declaring_writes.py:required_read
 --8<--
 ```
 
+`project_scope` is untyped, so it may fill any key. It is handed the caller's
+reads and never another provider's answer, so `project` can only come from the
+caller.
+
 [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
 gathers what every provider of a spec fills, with the seeds' names, and
 [`provider_reached`][django_service_specs.dispatch.provider_reached.provider_reached]

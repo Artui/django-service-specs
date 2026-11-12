@@ -1,5 +1,3 @@
-"""Reading a partial input: what its caller supplied, narrowed for the type checker."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

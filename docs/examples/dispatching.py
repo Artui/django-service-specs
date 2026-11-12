@@ -1,5 +1,3 @@
-"""Dispatching: results, not-found, grants, admitting, binding outside dispatch, seeds, progress."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
@@ -59,8 +57,7 @@ from tests.dispatch_app.models import Note
 # --8<-- [start:list]
 def list_notes(user: Any) -> list[dict[str, Any]]:
     result = dispatch(list_notes_spec, principal=user, arguments={"ordering": "-title"})
-    # result.kind is "list", and result.value the shaped queryset, not yet read.
-    return present(list_notes_spec, result)  # one dict per row, in order
+    return present(list_notes_spec, result)
 
 
 # --8<-- [end:list]
@@ -88,8 +85,6 @@ def show_note(user: Any, pk: int) -> tuple[int, Any]:
 
 # --8<-- [start:grant]
 def rename_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
-    # The view's own permission machinery has already run for this user and
-    # this operation, so it says so rather than paying for the check twice.
     grant = Grant(spec=rename_note_spec, principal=user)
     return dispatch(rename_note_spec, principal=user, arguments=arguments, grant=grant)
 
@@ -104,14 +99,10 @@ class NotLocked(PermissionCheck):
     def __init__(self, *locked: int) -> None:
         self.locked = frozenset(locked)
 
-    # Declaring ``arguments`` asks for the call's shape-checked arguments; a
-    # check that does not declare it is asked as it always was.
     def has_permission(
         self, principal: Any, spec: Any, *, arguments: Mapping[str, Any] | None = None
     ) -> bool:
         if arguments is None:
-            # A transport called ``authorize()`` without ``arguments=``: there
-            # is no pk to judge, so this check refuses rather than allowing.
             return False
         return arguments.get("pk") not in self.locked
 
@@ -180,10 +171,7 @@ stamp_spec = ServiceSpec(
 
 
 def stamp_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
-    # What the view's per-request hook resolved, beneath the spec's provider:
-    # the provider's ``channel`` wins, and the hook's ``source`` fills the gap.
-    # A value for the Validator goes into ``arguments``, where the permission
-    # checks read it too.
+    # What the view's per-request hook resolved, beneath the spec's provider.
     return dispatch(
         stamp_spec,
         principal=user,
@@ -197,8 +185,6 @@ def stamp_from_a_view(user: Any, arguments: dict[str, Any]) -> DispatchResult:
 
 # --8<-- [start:bind]
 def bind_rename(user: Any, note: Note, arguments: dict[str, Any]) -> dict[str, Any]:
-    # A transport that binds input itself authorizes and resolves first, then
-    # runs the same shape check and Validator dispatch would have run.
     return bind_arguments(rename_note_spec, arguments, principal=user, target=note)
 
 
@@ -207,8 +193,6 @@ def bind_rename(user: Any, note: Note, arguments: dict[str, Any]) -> dict[str, A
 
 # --8<-- [start:check_call]
 def enqueue_rename(user: Any, arguments: dict[str, Any], queue: list[Any]) -> None:
-    # Refused here, before anything is queued, by the steps dispatch runs
-    # first; the job carries what was sent, and the worker dispatches it.
     check_call(rename_note_spec, principal=user, arguments=arguments)
     queue.append((user.pk, arguments))
 
@@ -224,9 +208,6 @@ def spend_a_call_on_the_admitted(
         checked, _ = check_call(add_notes_spec, principal=user, arguments=arguments)
     except InvalidArguments as refused:
         if refused.after_authorize:
-            # The class-level check passed and only rows are wrong: the caller
-            # is admitted, so the call is charged and the checks are not asked
-            # again. A refused call (anything else) was not admitted.
             charge()
         return refused.detail
     charge()
@@ -252,9 +233,6 @@ owned_note_spec = SelectorSpec(
 
 
 def listed_before_any_call(specs: list[SelectorSpec]) -> list[SelectorSpec]:
-    # A listing has no arguments to give a check that declares them, so it
-    # neither asks that check nor guesses its answer: such a spec is decided
-    # at the call, which has them.
     return [spec for spec in specs if not checks_read_arguments(spec)]
 
 
@@ -279,9 +257,6 @@ add_note_spec = ServiceSpec(service=add_untitled_note, permissions=[UnderQuota()
 
 
 def offered_to(principal: Any, specs: list[Any]) -> list[Any]:
-    # Each spec is asked what a call with no arguments is asked. The kernel
-    # catches nothing: hiding a refused operation is this listing's policy,
-    # and a spec whose checks read the arguments is left to the call.
     offered = []
     for spec in specs:
         if not checks_read_arguments(spec):
@@ -386,10 +361,8 @@ notes_by_spec = SelectorSpec(
 
 
 def notes_tool(user: Any) -> Callable[[Mapping[str, Any]], DispatchResult]:
-    # The signed-in user's own notes, in the server's order: the caller is
-    # offered neither name, and whatever it sends for either is dropped.
+    # The signed-in user's own notes, in the server's order: neither name is the caller's.
     server = ServerArguments(values={"author_pk": user.pk}, withheld=frozenset({"ordering"}))
-    # Once, where the tool is built, so a binding that cannot work fails here.
     check_server_arguments(notes_by_spec, server)
 
     def call(arguments: Mapping[str, Any]) -> DispatchResult:
@@ -446,23 +419,20 @@ club_note_spec = ServiceSpec(
 
 # --8<-- [start:admit]
 def club_seeds(club: str) -> PoolSeeds:
-    # Built per request, from what the route captured.
     return DEFAULT_POOL_SEEDS.extend(club=lambda: club)
 
 
 def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
     pool_seeds = club_seeds(club)
-    context: dict[str, Any] = {}  # handed to every step, and to the form re-rendered if it refuses
-    # The club, resolved once for the call: InClub and the service see one value.
+    context: dict[str, Any] = {}
     seeds = resolve_seeds(
         club_note_spec, principal=user, pool_seeds=pool_seeds, call_context=context
     )
-    # Before the form: a principal the class-level check refuses never sees
-    # it. NotPermitted for anyone outside the club.
+    # Before the form: a principal the class-level check refuses never sees it.
     grant = authorize(
         club_note_spec, user, seeds=seeds, pool_seeds=pool_seeds, call_context=context
     )
-    if title is None:  # the GET: the form, built as dispatch will build it
+    if title is None:
         extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
         return ClubNoteForm(**extra)
     try:
@@ -476,8 +446,6 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
             call_context=context,
         )
     except InvalidArguments:
-        # The POST failed validation: the form again, bound to what was posted,
-        # with the keywords dispatch bound it with and the dict dispatch ran with.
         extra = form_keywords(club_note_spec, user, pool_seeds=pool_seeds, call_context=context)
         return ClubNoteForm(data={"title": title}, **extra)
 
@@ -487,8 +455,6 @@ def club_note_page(user: Any, club: str, title: str | None = None) -> Any:
 
 # --8<-- [start:seeded_bind]
 def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
-    # A page checking the form as the member types, before it posts: bound as
-    # dispatch will bind it, so the form's __init__ gets the club seed.
     pool_seeds = club_seeds(club)
     authorize(club_note_spec, user, pool_seeds=pool_seeds)
     return bind_arguments(club_note_spec, {"title": title}, principal=user, pool_seeds=pool_seeds)
@@ -499,18 +465,15 @@ def check_club_note(user: Any, club: str, title: str) -> dict[str, Any]:
 
 # --8<-- [start:resolve_target]
 def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
-    context: dict[str, Any] = {}  # one dict, for the lookup and the call it checked
+    context: dict[str, Any] = {}
     found = resolve_target(
         rename_note_spec, principal=user, arguments={"pk": pk}, call_context=context
     )
     if isinstance(found, DispatchResult):
-        return None  # not found: the answer dispatch would give
-    note, grant = found  # NotPermitted was raised already for anyone else
+        return None
+    note, grant = found
     if title is None:
-        return note  # the GET: the row the form will act on
-    # The POST acts on the row already found and checked: no second lookup,
-    # the grant says has_object_permission was asked, and a seed a check named
-    # is not resolved again.
+        return note
     result = dispatch(
         rename_note_spec,
         principal=user,
@@ -528,10 +491,8 @@ def rename_page(user: Any, pk: int, title: str | None = None) -> Any:
 
 # --8<-- [start:checked_seeds]
 def post_to_a_club_checked_first(user: Any, club: Callable[[], str], title: str) -> DispatchResult:
-    # ``club`` reads the club off the request: a resolver asked twice may
-    # answer twice differently, so the call asks it once.
     pool_seeds = DEFAULT_POOL_SEEDS.extend(club=club)
-    context: dict[str, Any] = {}  # one dict, for the prelude and the call it checked
+    context: dict[str, Any] = {}
     checked = check_call(
         club_note_spec,
         principal=user,
@@ -540,7 +501,6 @@ def post_to_a_club_checked_first(user: Any, club: Callable[[], str], title: str)
         call_context=context,
     )
     _, grant = checked
-    # The club InClub admitted is the club the form and the service are handed.
     return dispatch(
         club_note_spec,
         principal=user,
@@ -640,9 +600,6 @@ request_seeds = DEFAULT_POOL_SEEDS.extend(request=lambda *, request: request.MET
 
 
 def pool_for(user: Any, request: Any) -> dict[str, Any]:
-    # ``base_pool(request=request, seeds=request_seeds)`` is refused: a seed cannot
-    # silently outrank what the caller spread in. The context carries the request
-    # instead, the seed's resolver reads it, and the context is not in the pool.
     return seeded_pool(user=user, seeds=request_seeds, call_context={"request": request})
 
 
@@ -679,8 +636,6 @@ def retitle_all_reporting(user: Any, title: str, report: ProgressReporter) -> in
 class FromBackOffice(PermissionCheck):
     message = "Only the back office may archive a note."
 
-    # A keyword named ``call_context`` asks for the call's context, as
-    # ``arguments`` asks for its arguments.
     def has_permission(self, principal: Any, spec: Any, *, call_context: dict[str, Any]) -> bool:
         return call_context.get("client") == "back-office"
 
@@ -714,7 +669,6 @@ def archive_from_back_office(user: Any, pk: int) -> dict[str, Any]:
 # --8<-- [start:call_transport]
 def note_heading(*, user: Any, pk: int, call_context: dict[str, Any]) -> str:
     note = Note.objects.get(owner=user, pk=pk)
-    # A missing key reads as ``None``, so a caller in process gets the full heading.
     if call_transport(call_context) == "agent":
         return note.title
     return f"Note: {note.title}"
@@ -728,8 +682,6 @@ note_heading_spec = ServiceSpec(
 
 
 def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
-    # What a transport does as it builds the call's context: its own name goes
-    # in last, as the plain string, over anything already there.
     context: dict[str, Any] = {"client": "back-office"}
     context[TRANSPORT_KEY] = "agent"
     result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
@@ -743,8 +695,6 @@ def heading_for_an_agent(user: Any, pk: int) -> tuple[str, dict[str, Any]]:
 def heading_for_a_tool_call(
     user: Any, pk: int, run_context: dict[str, Any]
 ) -> tuple[str, dict[str, Any]]:
-    # One new dict per call: the run's entries, what the transport knows of this
-    # call, and its own name stamped last, over a ``transport`` the run carried.
     context = build_call_context("agent", base=run_context, action="note_heading")
     result = dispatch(note_heading_spec, principal=user, arguments={"pk": pk}, call_context=context)
     return result.value, context

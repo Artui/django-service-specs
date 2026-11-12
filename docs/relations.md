@@ -245,7 +245,7 @@ docs/examples/deleting.py:delete
 ```
 
 The database's own cascade would remove these books as well, and report
-nothing. The helper matters where the database will not cascade, or should
+nothing; cascading first, through the map the writes use, names each one. The helper matters where the database will not cascade, or should
 not be the one to:
 
 - **A `PROTECT` foreign key**, which refuses the parent's delete while a child

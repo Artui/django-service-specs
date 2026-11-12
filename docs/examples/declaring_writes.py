@@ -1,5 +1,3 @@
-"""Writes: many rows at once, a service returning rows, a provider filling a server-owned field."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -111,8 +109,6 @@ record_review_spec = ServiceSpec(
 
 # --8<-- [start:required_read]
 def project_scope(*, project: str) -> dict[str, Any]:
-    # Untyped, so it may fill any key. It is handed the caller's reads and
-    # never another provider's answer, so `project` can only come from the caller.
     return {"project": project.strip().lower()}
 
 

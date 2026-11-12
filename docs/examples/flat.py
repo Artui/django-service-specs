@@ -1,5 +1,3 @@
-"""Reading a flat source: a filter form's query string, read, merged and coerced."""
-
 from __future__ import annotations
 
 from typing import Any

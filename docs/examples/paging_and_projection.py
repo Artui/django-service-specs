@@ -1,5 +1,3 @@
-"""Serving a long list to an agent: one page at a time, shaped for its reader."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -84,8 +82,6 @@ output_schema = spec_output_schema(
 def list_books_tool(
     user: Any, *, page: int | None = None, limit: int | None = None, **arguments: Any
 ) -> dict[str, Any]:
-    # page and limit are this tool's arguments, not the spec's: they never
-    # reach dispatch, whose argument set is closed.
     result = dispatch(list_books_spec, principal=user, arguments=arguments)
     shaped = paginate_output(result.value, page=page, limit=limit, max_page_size=MAX_PAGE_SIZE)
     rows = present_for_audience(
@@ -116,7 +112,6 @@ def books_with_authors_tool(user: Any) -> Any:
 
 # --8<-- [start:unprojected]
 def books_over_http(user: Any) -> Any:
-    # A caller naming no audience is presented every field, unprojected.
     return present(list_books_spec, dispatch(list_books_spec, principal=user, arguments={}))
 
 
@@ -131,9 +126,7 @@ class ChosenFields(Presenter):
         return Output(
             (
                 OutputField("id", "integer"),
-                # Left out of a row whose caller did not choose them. The
-                # schema of a spec declaring shapes requires no field of a row
-                # anyway, since a selection can leave out any of them.
+                # Left out of a row whose caller did not choose them.
                 OutputField("title", "string", always_present=False),
                 OutputField("price", "string", always_present=False),
             )
@@ -194,14 +187,12 @@ class ChosenFieldsAndAuthor(Presenter):
             # Read only when chosen: the author is a row of its own.
             "author": lambda: value.author.name,
         }
-        names = fields if chosen is None else chosen  # not sent: every field
+        names = fields if chosen is None else chosen
         return {"id": value.pk, **{name: fields[name]() for name in names}}
 
 
 def catalogue_for(*, user: Any, shapes: Mapping[str, Any]) -> QuerySet[Book]:
     books = Book.objects.order_by("pk")
-    # What the presenter will render decides what is worth joining: the
-    # author's row only when the caller chose it, or chose nothing.
     if "author" in shapes.get("fields", ["author"]):
         books = books.select_related("author")
     return books

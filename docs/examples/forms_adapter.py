@@ -1,6 +1,3 @@
-"""The forms adapter: a plain form as a Validator, a ModelForm behind an update, a form
-built with keywords of its own, and a form Validator writing to the call's context."""
-
 from __future__ import annotations
 
 # --8<-- [start:form]
@@ -67,8 +64,6 @@ class IsThemselves(PermissionCheck):
 
 
 def rename_user(*, instance: Any, data: dict[str, Any]) -> Any:
-    # Saves only the fields whose value changed, which is why the form never
-    # writes to ``instance`` itself: it validates against a copy.
     return update_from_input(instance, data).instance
 
 
@@ -115,8 +110,6 @@ class RememberingBookValidator(FormValidator):
 
     def validate(self, arguments: Mapping[str, Any], context: ValidationContext) -> dict[str, Any]:
         cleaned = super().validate(arguments, context)
-        # One key of this Validator's own, made by the first validation of the
-        # call and added to by each after it: every row of a ``many`` call.
         matched = context.call_context.setdefault("forms_adapter.authors", {})
         matched[cleaned["author"].pk] = cleaned["author"]
         return cleaned

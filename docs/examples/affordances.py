@@ -1,5 +1,3 @@
-"""Affordances: what can be done right now, declared once on the operation."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -32,7 +30,6 @@ from docs.examples.quickstart import IsOwner, NoteOut, Rename, rename_note, rena
 from tests.dispatch_app.models import Note
 
 # --8<-- [start:declare]
-# An ambient fact a condition may read, registered like any other pool seed.
 seeds = DEFAULT_POOL_SEEDS.extend(
     read_only=lambda: getattr(settings, "NOTES_READ_ONLY", False),
 )
@@ -66,7 +63,7 @@ OPERATIONS = {"list_notes": list_notes_spec, "rename_note": rename_spec}
 
 def tools_for(user: Any) -> dict[str, str | None]:
     """Each operation a transport could offer, with the code of what withholds it."""
-    pool = base_pool(user=user, seeds=seeds)  # the seeds a call would be handed
+    pool = base_pool(user=user, seeds=seeds)
     tools: dict[str, str | None] = {}
     for name, spec in OPERATIONS.items():
         unmet = unmet_operation_affordance(spec, pool, reserved=seeds.reserved)
@@ -79,8 +76,6 @@ def tools_for(user: Any) -> dict[str, str | None]:
 
 # --8<-- [start:dispatch]
 def rename(user: Any, pk: int, title: str) -> Note:
-    # dispatch answers the affordances itself, after the object-level check and
-    # the Validator: an archived note is refused before the service runs.
     result = dispatch(
         rename_spec, principal=user, arguments={"pk": pk, "title": title}, pool_seeds=seeds
     )
@@ -97,7 +92,7 @@ def rename_step(user: Any, note: Note, title: str) -> Note:
     authorize_target(rename_spec, user, note, grant=grant)
     data = bind_arguments(rename_spec, {"pk": note.pk, "title": title}, principal=user, target=note)
     pool = base_pool(user=user, seeds=seeds)
-    pool.update({**data, "data": data, "instance": note})  # the pool the service receives
+    pool.update({**data, "data": data, "instance": note})
     enforce_affordances(rename_spec, pool, instance=note, reserved=seeds.reserved)
     return rename_spec.service(**resolve_callable_kwargs(rename_spec.service, pool))
 
@@ -139,9 +134,6 @@ def purge(user: Any, arguments: dict[str, Any]) -> int:
 
 # --8<-- [start:check_asked]
 def check_the_question() -> None:
-    # What a transport calls before it renders the question: `confirmed` is a
-    # declared boolean, so a form can ask it. A key the spec does not declare
-    # would raise ImproperlyConfigured naming it.
     check_requested_input(purge_spec, {"confirmed": {"type": "boolean"}})
 
 
@@ -149,15 +141,12 @@ def check_the_question() -> None:
 
 
 # --8<-- [start:selector]
-# The list, declaring which operations' answers its rows are asked for.
 list_notes_with_answers_spec = replace(list_notes_spec, affordances={"rename": rename_spec})
 # --8<-- [end:selector]
 
 
 # --8<-- [start:rows]
 def list_notes(user: Any) -> list[dict[str, Any]]:
-    # dispatch answers every row's affordances as it runs the selector, in the
-    # one query the list costs; present adds them to each row it presents.
     result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
     return present(list_notes_with_answers_spec, result)
 
@@ -167,9 +156,6 @@ def list_notes(user: Any) -> list[dict[str, Any]]:
 
 # --8<-- [start:row]
 def rename_offered(user: Any) -> dict[int, bool]:
-    # A page holds the rows themselves - model instances here, a table's
-    # records elsewhere - and reads each one's answer from the spec that
-    # declared it, without presenting anything.
     result = dispatch(list_notes_with_answers_spec, principal=user, arguments={}, pool_seeds=seeds)
     return {
         note.pk: row_affordance_answers(list_notes_with_answers_spec, note)["rename"]["available"]
