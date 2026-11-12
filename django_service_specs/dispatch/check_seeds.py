@@ -104,7 +104,177 @@ _PROVIDER_RAISES: Final = "fails with the provider's own TypeError"
 def check_seeds(
     spec: ServiceSpec | SelectorSpec | SpecSource, *, pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS
 ) -> None:
-    """Refuse a declaration that cannot hold as written on a mount registering ``pool_seeds``."""
+    """Refuse a declaration that cannot hold as written on a mount registering ``pool_seeds``.
+
+    Five of them, below: a parameter a seed or the call's own value would
+    meet, a positional-only parameter dispatch cannot pass, a keyword nothing
+    fills, an optional read over a keyword that requires it, and an array
+    read with no ``items`` over a keyword annotated with its element. The
+    first fails every call, the second and third every call that reaches the
+    callable, the fourth every call leaving the read out, which the
+    declaration says a caller may, and the fifth hands the callable any
+    element a caller sends. Each is decided by the spec and the
+    mount's registered seeds alone, so a transport registering a kernel spec
+    can refuse it where it registers it rather than list a tool or a route
+    whose calls fail in a way the declaration already settled. The spec does
+    not refuse these itself when it is built because the seeds are the
+    mount's, and a keyword one mount fills is unfilled on another. Nothing
+    runs: no seed resolves, no provider is called and no query is made.
+    Every refusal it finds is named in one ``ImproperlyConfigured``, each
+    offender in a sorted list such as ``['tenant']``.
+
+    1. **A parameter a registered seed is named like**, or ``request`` or
+       ``view``, that dispatch refuses on every call: a read nobody marked
+       ``reflected``, a shape, a ``many`` spec's list
+       ([`seed_named_parameters`][django_service_specs.dispatch.seed_named_parameters.seed_named_parameters]'s
+       second set), in the words dispatch refuses it in. A selector spec's
+       own read or shape of either call name is one, refused here and by
+       dispatch rather than when it is built.
+    2. **A positional-only parameter with no default**, of the service, the
+       selector or the target selector, and of each callable the third reads
+       below: a precondition, a callable condition, the output selector, an
+       ``extend_queryset``, a ``kwargs`` or ``input_data`` provider and a
+       ``progress_reporter``. Dispatch calls each by keyword, so nothing
+       fills one, a read of its name included.
+    3. **A keyword the callable requires that nothing fills**: by name, with
+       no default, and in none of the places dispatch fills a keyword from
+       - what every pool carries (``user``, ``progress``, ``call_context``,
+       ``shapes``, ``request``, ``view``), a seed ``pool_seeds`` registers,
+       a read of the callable's own seat, a key the seat's typed ``kwargs``
+       provider names, and for a service ``data``, and ``instance`` or
+       ``collection`` where a target selector resolves one. The kernel
+       seeds ``data`` for a service only, so a selector requiring it is
+       refused as any unfilled keyword is. A service is handed its spec's
+       reads, never its target selector's or its shapes, which reach it as
+       ``shapes``. It reads these callables, each against what dispatch
+       hands that one:
+
+       - the service, the selector and the target selector, as above;
+       - a service spec's ``preconditions``, handed the service's pool, and
+         a selector spec's, handed the selector's with the rows as
+         ``collection`` (a LIST) or the row as ``instance`` (a RETRIEVE);
+       - each callable ``Affordance`` condition, the spec's own and those
+         a selector's ``affordances`` map to, handed only the call's seeds:
+         ``user``, ``progress``, ``call_context``, ``request``, ``view``
+         and a seed ``pool_seeds`` registers, never an argument
+         (``ambient_pool``); a condition on the row binds nothing;
+       - the output selector, handed the service's return as ``instance``
+         and ``result`` and what every pool carries, never an argument nor
+         its own reads;
+       - each selector's ``extend_queryset``, handed its selector's pool
+         with the ``queryset``;
+       - each ``kwargs`` provider - the spec's own and its target
+         selector's - and a service spec's ``input_data``, handed what
+         every pool carries, a seed ``pool_seeds`` registers and its seat's
+         reads less those the seat's typed ``kwargs`` provider fills, whose
+         caller's value dispatch drops; for a service, ``instance`` or
+         ``collection`` where a target selector resolves one. Never
+         ``data``, a Validator's value or a provider's answer: ``input_data``
+         runs before the Validator, and ``kwargs`` is called from the same
+         pool. A provider's own keys fill nothing it is handed, so its seat
+         is read whether it is typed or not, and beside a Validator too;
+       - a spec's ``progress_reporter``, where its run takes ``progress`` by
+         name or through ``**kwargs``, which is where dispatch may call it:
+         before an ``async def`` run, or on a sync run's first report. It is
+         refused either way, though a sync run that never reports never
+         calls it. It is handed only what every pool carries and a seed
+         ``pool_seeds`` registers. A run taking no ``progress`` never calls
+         it, so it is not read there.
+
+       Each is named as the spec names it, such as
+       ``ServiceSpec.affordances[0] ('frozen').when``,
+       ``SelectorSpec.preconditions[0] (owns_it)`` or
+       ``ServiceSpec.instance_selector_spec.kwargs``, in the order a call
+       reaches it.
+    4. **A keyword the callable requires that only an optional read fills**:
+       a read the shape check does not demand - declared ``required=False``,
+       or declaring a ``default``, which is reported and never applied - over
+       a keyword with no default, that no seed and no provider fills. A call
+       sending it runs, and one leaving it out is refused as missing
+       (``call_keywords``), or on a provider fails with its own
+       ``TypeError``, so a caller reading the declaration is told the read
+       is optional and refused for omitting it. It reads every callable the
+       third does that sees reads: a precondition, an ``extend_queryset``
+       and a ``kwargs`` or ``input_data`` provider as well as the service,
+       the selector and the target selector. A condition, the output
+       selector and a ``progress_reporter`` are handed none of their spec's
+       reads, so it finds nothing on them.
+    5. **An array read with no ``items`` over a keyword annotated with its
+       element**: a read of ``type="array"`` declaring no ``items``, over
+       the keyword it fills on its own seat, annotated ``list[X]``,
+       ``tuple[X, ...]`` or ``Sequence[X]``, or one of those ``| None``,
+       where ``X`` is neither ``Any``, ``object`` nor a type variable. Such
+       a read takes any
+       element, so a callable annotated ``pks: list[int]`` is handed a
+       query string's strings, and the message says to declare ``items``.
+       It derives none from the annotation: a signature is not a
+       declaration. As with the third and fourth, it never guesses: a
+       keyword a provider fills or may fill is not one - a typed
+       provider's key, declinable or not, and any keyword of a seat whose
+       provider is untyped - and nor is a keyword a seed fills, as a
+       ``reflected`` read's.
+
+    **A callable whose signature cannot be read** is refused too, ahead of
+    these for its seat: any callable the third reads, such as a builtin type
+    like ``dict``, which dispatch cannot bind a keyword to and so fails on
+    for every call reaching it. The second to fifth need that signature, so
+    such a seat is answered by this refusal alone, and the other seats are
+    still checked.
+
+    A Validator field the service never receives is not among them, because
+    such a spec runs and may mean to:
+    [`unreceived_fields`][django_service_specs.dispatch.unreceived_fields.unreceived_fields]
+    answers it, and the transport decides.
+
+    **What it cannot see, and so never refuses.** A provider whose return says
+    nothing about its keys may fill any keyword of the callable it provides
+    for, so that callable's keywords are left to dispatch (the third and
+    fourth); the provider's own are read as any seat's. An annotation that
+    does not resolve, as a forward reference to a name not importable where the
+    callable was defined, is not read, and leaves alone only its own keyword
+    (the fifth); so is a bare ``list``, an element of ``Any`` or ``object``, a
+    fixed-length ``tuple``, a union of two sequences and an unannotated
+    keyword. A Validator may return a value it does not declare, or bind one,
+    so a service beside a Validator is not judged by the third and fourth
+    either (test_a_service_beside_a_validator_is_left_to_dispatch). A transport
+    handing ``dispatch`` an ``extra_kwargs`` overlay fills keywords this cannot
+    see, and should not call it for such a spec. Only the fifth refusal is not
+    run on a precondition, a condition, the output selector, an
+    ``extend_queryset``, a provider or a ``progress_reporter``. A precondition beside a Validator,
+    or one or an
+    ``extend_queryset`` beside an untyped provider, is left to dispatch by the
+    third and fourth as the callable beside it is, never by the second. A
+    callable taking ``**kwargs`` requires nothing, so one forwarding into a
+    stricter callable is not judged by what that callable requires. Nor is the
+    pool a transport builds itself to answer a condition at describe time
+    (``unmet_operation_affordance``): this reads the pool dispatch builds. Nor
+    does it read a ``filter_set``, a form's ``form_kwargs`` or a seed's
+    resolver: dispatch binds each by keyword, and this is not asked of any.
+
+    **Describe-time**: run where a transport registers the spec, it reads
+    the spec as it declares itself to no call, handing a Validator that
+    declares ``call_context`` ``None``
+    (test_describe_time_readers_hand_none).
+    It takes no ``call_context``, unlike the input schemas, because none of
+    its five refusals reads a Validator's field: what it refuses is a read, a
+    shape, a ``many`` spec's list and a callable's keywords, a top-level
+    Validator field is in neither of ``seed_named_parameters``' sets, and a
+    service beside a Validator is left to dispatch
+    (test_a_validator_field_is_the_caller_s_and_fills_the_service_s_keyword).
+    Assembling ``spec.parameters()`` still refuses a seat dispatch seeds
+    itself, a name two sources declare and a field a typed ``kwargs`` fills.
+    So a field declared only to one transport with such a shape is not refused
+    here, and raises at the first ask under that stamp, a schema's as well as
+    dispatch's
+    (test_a_declaration_only_a_transport_makes_is_refused_when_that_transport_asks).
+
+    ``spec`` may be a declaration with ``as_kernel_spec()``, read as the spec
+    it compiles to.
+
+    Raises:
+        ImproperlyConfigured: any of the five, or a callable whose
+            signature cannot be read, every one found.
+    """
     spec = kernel_spec(spec)
     problems: list[str] = []
     _, taken = split_seed_named(spec, spec.parameters(), pool_seeds)

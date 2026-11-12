@@ -18,7 +18,63 @@ def apply_server_arguments(
     *,
     call_context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """``arguments`` with the server values added under ``server``, in a new dict."""
+    """``arguments`` as dispatch should receive them under ``server``: a new dict, the input
+    untouched.
+
+    For a transport to call on every call, before
+    [`dispatch`][django_service_specs.dispatch.dispatch.dispatch] or
+    [`adispatch`][django_service_specs.dispatch.adispatch.adispatch], which
+    take the result as their ``arguments``; both run the same prelude over
+    it, so one applied mapping answers the same through either. Dispatch
+    takes no binding of its own: this is the whole of the rule, and a
+    transport path that does not call it is unbound.
+
+    1. **The caller's value for every bound or withheld name is dropped**,
+       before anything reads it. A value the caller sends for a name it was
+       never offered - ``"null"`` for an integer it could not see - therefore
+       never reaches the shape check and cannot refuse the call. Held by
+       test_a_malformed_value_for_a_withheld_name_never_reaches_the_shape_check.
+    2. **The bound values are laid over what is left**, so a bound name
+       holds the server's value whatever the caller sent, and a withheld one
+       is absent. Held by test_a_bound_value_outranks_the_caller_s, which
+       fails if the two steps swap.
+
+    Every other key is left as sent, for the shape check to read under the
+    transport's ``unknown_arguments``, so a name nobody declared is still
+    refused under ``REJECT``.
+
+    The bound values are checked against their own parameters, as
+    ``check_server_arguments`` checked them when the transport was built, and
+    handed on as the shape check reads them: a ``uuid`` in its canonical
+    spelling, an integral float declared an integer as the int. **One that fails is the server's
+    mistake**,
+    raised as ``ImproperlyConfigured`` with the refusal as its cause, never
+    as ``InvalidArguments``: a client refusal would ask the caller to fix a
+    value it neither sent nor can see. This is where the rule parts from
+    django-spec-html's
+    [`route_arguments`](https://artui.github.io/django-spec-html/reference/#django_spec_html.http.route_arguments.route_arguments),
+    whose bad value is a client's 400, because a client chose the URL and
+    nobody but the server chose a bound value. A bound name the spec does not
+    declare, which
+    [`check_server_arguments`][django_service_specs.dispatch.check_server_arguments.check_server_arguments]
+    refuses when the transport is built, is refused here the same way.
+
+    Every refusal names the spec's kind and its callable, so a transport
+    binding many tools can say which one is misconfigured.
+
+    ``call_context`` is the call's dict, the one the transport hands
+    ``dispatch``: the bound values are checked against what the spec declares
+    to that call, so a Validator declaring a bound key only to a call binds it
+    (test_handed_the_call_s_context_the_key_is_bound), and a value its
+    declaration to no call takes is refused where the call's does not
+    (test_a_bound_value_is_checked_against_the_call_s_own_declaration). Left ``None``, they are
+    checked against the declaration the spec makes to no call, as
+    ``check_server_arguments`` reads it.
+
+    Raises:
+        ImproperlyConfigured: a bound value that fails its declaration, or a
+            bound name the spec does not declare.
+    """
     names = server.names()
     applied = {key: value for key, value in arguments.items() if key not in names}
     if server.values:

@@ -40,7 +40,71 @@ def check_requested_input(
     pool_seeds: PoolSeeds = DEFAULT_POOL_SEEDS,
     call_context: dict[str, Any] | None = None,
 ) -> None:
-    """Refuse an ``AdditionalInputRequired.schema`` no route can ask or hear answered."""
+    """Refuse an ``AdditionalInputRequired.schema`` some route could not ask, or could not hear
+    answered.
+
+    ``schema`` is what a service raised
+    [`AdditionalInputRequired`][django_service_specs.services.additional_input_required.AdditionalInputRequired]
+    with, read against ``spec``: a transport calls this before it renders the
+    question, so a service asks the same question on every route or on none.
+    ``None``, a raise that carries no schema, asks nothing and passes.
+
+    It reads the spec's top-level ``parameters()`` and the schema, runs no
+    query and returns nothing. Each key is refused, by name, with
+    ``ImproperlyConfigured``, in this order:
+
+    - **A key no top-level parameter declares.** The answer comes back as an
+      ordinary argument, so a key the closed argument set refuses could never
+      carry it. On a ``many`` spec the top level is the list and the spec's
+      ``reads``, so a value asked once for the whole call is a ``reads``
+      parameter, and a key declared only inside a row is refused.
+    - **A key the server fills**: one a provider the dispatch runs is
+      annotated to fill, or a seed ``pool_seeds`` registers - a ``reflected``
+      read the seed fills among them - as
+      [`server_owned_keys`][django_service_specs.specs.server_owned_keys.server_owned_keys]
+      reads them. Dispatch drops the caller's value for such a key, so the
+      answer would never reach the service. ``pool_seeds`` is the call's, as
+      ``dispatch`` takes it. A top-level Validator field named like a
+      registered seed may be asked for, since the answer reaches the
+      Validator and ``data``
+      (test_server_owned_keys_leaves_such_a_field_out_and_a_service_may_ask_for_it),
+      and so may a key a provider may decline or one an untyped provider's
+      values reach, whose caller's value stands when the provider declines.
+    - **A fragment that is not a schema object**: a ``dict``, as JSON carries
+      one.
+    - **A shape some transport cannot render.** The narrowest is an MCP
+      elicitation form, which takes a ``string``, ``number``, ``integer`` or
+      ``boolean``, or an ``array`` whose ``items`` list enum values, untitled
+      (``enum``) or titled (``anyOf``). A ``type`` list, an ``object``, a
+      fragment naming no type and an array of anything else are refused.
+    - **A** ``type`` **the declared parameter does not take**, since the
+      answering call would fail the shape check whatever was answered. The
+      answer must be of a type the parameter takes: an ``integer`` question
+      may fill a ``number`` parameter and not the reverse, any question may
+      fill an ``any``, and a number may fill a ``decimal`` string, as
+      ``check_arguments`` reads one. An array question fills an ``array``
+      whose element takes its values, which are strings unless its ``items``
+      name a type, as both of MCP's multi-select shapes are; the rows of a
+      ``many`` list are objects, which no list of values fills. The ``type``
+      is compared and nothing finer: a ``format``, ``choices`` or a bound the
+      parameter declares still checks the answer when it arrives.
+
+    ``call_context`` is the dict of the call whose service raised: the spec's
+    parameters and the keys the server owns are read as the spec declares
+    itself to that call, so a Validator declaring an asked key only to a call
+    can ask for it
+    (test_handed_the_call_s_context_the_key_is_answerable, and
+    test_the_server_owned_keys_are_read_with_the_call_s_context_too for the
+    keys owned). Left ``None``, both are read as the spec declares itself to
+    no call.
+
+    A [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    read as the spec it compiles to.
+
+    Raises:
+        ImproperlyConfigured: naming the first key refused, or for a
+            ``schema`` that is no mapping at all.
+    """
     spec = kernel_spec(spec)
     if schema is None:
         return
