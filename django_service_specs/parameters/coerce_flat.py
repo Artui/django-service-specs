@@ -28,7 +28,53 @@ set a flag the caller meant to clear."""
 
 
 def coerce_flat(parameters: Parameters, raw: Mapping[str, Any]) -> dict[str, Any]:
-    """Flat strings to the JSON-like primitives a typed caller would have sent."""
+    """Flat strings to the JSON-like primitives a typed caller would have sent.
+
+    Every flat-string transport - argv, a query string - needs this, and needs
+    it to agree, so it is the kernel's rather than each transport's: validation
+    libraries read strings differently from one another, and after this every
+    Validator sees an argv call exactly as it would see typed JSON. It is
+    directed by the declaration: an ``integer`` or a ``number`` is parsed, a
+    ``boolean`` is parsed from exactly four spellings, and everything else is
+    left as the string it arrived as. **A decimal, a date-time, a date and a
+    UUID stay strings**, for the Validator to decode, exactly as they would
+    arrive off a JSON wire, and the shape check reads each format after this:
+    ``"null"`` for a ``uuid`` is refused there, on every route alike.
+    **So does an** ``any``: it declares no type to read the string as, so a
+    query string's ``"3"`` reaches the shape check and the Validator as
+    ``"3"``.
+
+    - An integer is read as Django's ``IntegerField`` reads one: ``"5.0"`` and
+      ``"5."`` are 5, and ``"5.5"`` is refused. An array's integer elements
+      are read the same way, a repeated query-string key's included. A string
+      outside ASCII spells no integer or number, Arabic-Indic or fullwidth digits
+      included, although Django's fields read them: see ``parse_number``.
+    - **An array longer than it takes is refused whole**, at its name, before
+      any element is read: the shape check's own length rule, which this
+      shares, so a flat list of a million malformed values costs one message.
+    - An array's elements are each coerced by its ``items`` type, and a single
+      value becomes a one-element list, since a flat transport sends a
+      one-element list as a bare value. ``None`` is not wrapped: an option
+      argparse never received is absent, not a list holding a null.
+    - **A parameter with nested Parameters is refused by name**: an object, or
+      an array of objects, has no flat spelling, and passing its strings through
+      would leave the refusal to a type error that does not say why.
+    - A key the parameters do not declare passes through untouched, so the
+      closed argument set in ``check_arguments`` stays the one place that
+      refuses it, under the caller's policy.
+    - **A** ``uuid.UUID`` **for a** ``string`` **is spelled back**, an element of a
+      ``string`` array's too: Django's ``<uuid:pk>`` path converter decodes one
+      before the kernel sees it, and a string is what the declaration says, so
+      the shape check reads it as it would read the same id off a JSON wire.
+    - Any other value that is not a string passes through untouched: it has
+      already been decoded by someone, and this does not second-guess them. An
+      ``any``, and an array declaring no ``items``, takes a ``uuid.UUID`` as it
+      came, since neither says it is a string.
+
+    Raises:
+        InvalidArguments: every refusal at once, a parameter's at its name and
+            an array element's at its index: ``{"ids": {1: ["..."]}}``.
+    """
     coerced: dict[str, Any] = {}
     errors: dict[Any, Any] = {}
     for key, value in raw.items():

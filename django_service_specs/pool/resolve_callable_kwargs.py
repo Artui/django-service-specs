@@ -11,7 +11,19 @@ def resolve_callable_kwargs(
     fn: Callable[..., Any],
     pool: dict[str, Any],
 ) -> dict[str, Any]:
-    """Pick the subset of ``pool`` matching ``fn``'s declared parameters."""
+    """Pick the subset of ``pool`` matching ``fn``'s declared parameters.
+
+    Every pool-resolved callable in the kernel — a seed's resolver, a spec's
+    ``selector``, ``extend_queryset``, a service — binds through this one rule,
+    so a callable written for one entry point runs unchanged on another: it
+    names what it wants and gets exactly that, or takes ``**kwargs`` for the
+    rest of the pool, which is every entry but the call's context.
+
+    If ``fn`` declares ``**kwargs``, the entire pool is passed, except a name
+    handed by name only (``BY_NAME_ONLY_POOL_NAMES``, the call's context),
+    which reaches a catch-all only where it also names it. Otherwise only
+    parameters present in the signature are forwarded.
+    """
     params = inspect.signature(fn).parameters.values()
     named = [
         param.name

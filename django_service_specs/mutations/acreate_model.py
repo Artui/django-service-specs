@@ -17,7 +17,14 @@ def acreate_model(
     m2m: Mapping[str, Any] | Callable[[Any], Mapping[str, Any]] | None = None,
     relations: Mapping[str, RelationSpec] | None = None,
 ) -> Callable[..., Awaitable[ModelT]]:
-    """The async twin of ``create_model``."""
+    """The async twin of [`create_model`][django_service_specs.mutations.create_model.create_model].
+
+    An ``async def`` service over
+    [`acreate_from_input`][django_service_specs.mutations.acreate_from_input.acreate_from_input],
+    so [`adispatch`][django_service_specs.dispatch.adispatch.adispatch] awaits it
+    rather than bridging it. Every row service its ``relations`` declare is an
+    ``async def`` too, which the async helpers check.
+    """
 
     async def _service(
         *, data: Any, call_context: dict[str, Any] | None = None, **kwargs: Any
