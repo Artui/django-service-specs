@@ -26,7 +26,70 @@ def spec_output_schema(
     projection: AudienceProjection | None = None,
     handle_description: str | None = None,
 ) -> dict[str, Any] | None:
-    """The JSON Schema of what ``present`` returns for ``spec``."""
+    """The JSON Schema of what [`present`][django_service_specs.dispatch.present.present] returns
+    for ``spec``.
+
+    ``None`` when ``spec.output()`` is ``None``: a spec with no presenter
+    declares nothing about what it returns, and a shape invented for it would
+    be a guess every client then trusts. A
+    [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] is
+    described as the spec it compiles to.
+
+    Otherwise the item's [`output_schema`][django_service_specs.schema.output_schema.output_schema],
+    shaped by what dispatch returns for this kind of spec:
+
+    - **A LIST selector spec**, or a service spec whose output selector is a
+      LIST, presents every row: ``{"type": "array", "items": <item>}``.
+    - **A RETRIEVE selector spec with ``allow_none``** presents ``None`` for a
+      missing row, so the item's type gains ``"null"``. Without ``allow_none``
+      a missing row is not-found, which a transport answers in its own terms
+      and never presents, so the item stays as it is.
+    - **A service spec whose output selector is a RETRIEVE** gains ``"null"``
+      whatever its ``allow_none`` says: once the service has run, a re-read
+      that finds nothing is ``None`` rather than not-found, because reporting
+      not-found would tell the caller a committed write did not happen.
+    - **A ``many`` service spec with no output selector**, or a
+      ``returns_many`` one, which never has one, presents the rows its service
+      returned as ``{"type": "array", "items": <item>}``, never paged, which
+      gains ``"null"`` when the spec declares ``allow_none``.
+    - **A service spec with no output selector** presents what the service
+      returned, described by its presenter as the item, which gains
+      ``"null"`` when the spec declares ``allow_none``. Undeclared, a ``None``
+      is not stated and the item stays strict: whether a service may return
+      one is not otherwise in its declaration.
+
+    Where ``"null"`` is admitted is
+    [`can_present_nothing`][django_service_specs.schema.can_present_nothing.can_present_nothing]'s
+    answer, which a transport writing a schema of its own asks too.
+
+    ``paginate`` describes a list served one page at a time, as
+    [`paginate_output`][django_service_specs.dispatch.paginate_output.paginate_output]
+    and [`OutputPage.envelope`][django_service_specs.types.output_page.OutputPage.envelope]
+    shape it: ``{"items": [...], "page": n, "totalPages": n, "hasNext": b}``,
+    every key required. It changes only a list's schema, since one row has no
+    pages, so a transport may pass it for every spec it serves paged.
+
+    ``projection`` describes what
+    [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]
+    hands back rather than what ``present`` does, through
+    [`annotate_output_schema`][django_service_specs.output.annotate_output_schema.annotate_output_schema]:
+    hidden fields left out, labelled choices restated in their displays, and a
+    marking's wording as a field's ``"description"``. It lands on the
+    **item**, wherever the item sits, because the array and the paging
+    envelope are this function's own shapes and belong to no ``Output``. Omit
+    it, as every caller naming no audience does, and the schema is the full
+    declaration. ``handle_description`` is the wording for a handle whose
+    marking declares none, and defaults to none: what a reader should do with
+    an identifier depends on the reader, and the transport is what knows.
+
+    **A spec declaring ``shapes`` promises no field of a row.** A shape
+    reaches the presenter alone, and a ``fields`` selection there leaves keys
+    out, which nothing in the presenter's declaration can say for every value
+    a caller may send. So the item lists no ``required`` at any depth, wherever
+    it sits, while the ``affordances`` object dispatch adds to each row and the
+    paging envelope keep theirs. A spec declaring none is described with the
+    ``required`` its presenter's ``always_present`` states.
+    """
     compiled = kernel_spec(spec)
     output = compiled.output()
     if output is None:

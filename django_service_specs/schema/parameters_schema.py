@@ -16,7 +16,122 @@ def parameters_schema(
     *,
     unknown_arguments: UnknownArguments = UnknownArguments.REJECT,
 ) -> dict[str, Any]:
-    """The JSON Schema object an argument set must satisfy, read from ``parameters``."""
+    """The JSON Schema object an argument set must satisfy, read from ``parameters``.
+
+    One dialect whichever library declared the parameters, because every
+    adapter reads its library into
+    [`Parameters`][django_service_specs.parameters.parameters.Parameters]
+    and this reads only that. The policy is **precise**: never false, and not
+    incomplete where the declaration knows. What it still leaves out is what a
+    Parameter does not carry, and a decimal's bound, which JSON Schema has no
+    way to state on a string.
+
+    - **An object** is ``{"type": "object", "properties": {...}}``, with
+      ``"required"`` listing, in declaration order, the names the shape check
+      refuses when absent - a required parameter with no declared default,
+      since one with a default is not refused - and left out when there are none.
+    - **``"additionalProperties": false`` is emitted under ``REJECT`` only**, and
+      at exactly the levels
+      [`check_arguments`][django_service_specs.parameters.check_arguments.check_arguments]
+      closes: the top, every object parameter that declares ``fields``, and
+      every row of an array whose ``items`` are Parameters - an empty
+      declaration included, since it refuses every key. Under ``IGNORE`` an
+      undeclared key is accepted and dropped, so stating ``false`` there
+      would refuse a call that runs.
+    - **An object parameter with no ``fields``** is ``{"type": "object"}``: what
+      is still known, constraining nothing a valid call could fail. It is also
+      the node an adapter truncates a recursive declaration to.
+    - **An array** is ``{"type": "array", "items": ...}``: a type name's
+      ``{"type": t}``, the object schema of its rows, or ``{}`` for an array
+      that declares no ``items`` and accepts any element. The array's
+      ``format`` and bounds describe each element, so they go on ``items``,
+      as its choices do: a CSV number filter's are ``{"type": "string",
+      "format": "decimal"}``, and an array of ``integer`` bounded at 1 has
+      ``{"type": "integer", "minimum": 1}``.
+    - **A file** is ``{}``. No JSON value is one, so any JSON type stated here
+      would be false, and JSON Schema has no keyword for a multipart part.
+      What is still known is the rest: whether it is required, its
+      ``"description"``. An array of files has ``{}`` for its items.
+    - **An** ``any`` is ``{}`` too, since every JSON value is one; its
+      ``"default"`` and ``"description"`` are stated as on any other node.
+    - **A scalar** is ``{"type": t}`` with its ``"format"`` when it declares one.
+      A decimal is therefore ``{"type": "string", "format": "decimal"}``: the
+      form every decimal validator reads without a binary float's rounding.
+      The shape check also accepts a JSON number, which this does not advertise.
+      An identifier is ``{"type": "string", "format": "uuid"}``, JSON
+      Schema's own format name, and the shape check refuses a string that
+      spells no UUID.
+    - **An array's length** is ``"minItems"`` as declared, and ``"maxItems"``
+      as in force: the declared ``max_length``, or where none is declared the
+      ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting's, 1000 unless the project
+      sets another. The shape check refuses past it either way, so a client
+      told nothing would send a call that cannot run; under a setting of
+      ``None`` an array that declares no maximum states none.
+    - **Bounds** are ``"minimum"`` and ``"maximum"``, inclusive, as declared,
+      on an ``integer`` and a ``number``. **A decimal string states neither**:
+      JSON Schema applies them to a number instance only, so on a string a
+      validating client ignores both and a strict one may flag them. The shape
+      check still enforces them, as it does for every bound.
+    - **Nullable** makes the type ``[t, "null"]``, on objects and arrays too,
+      and ``items_nullable`` does the same to an array's ``items``. A file's
+      node and an ``any``'s state no type, so they admit null already and
+      gain nothing; a non-nullable one's ``null`` is refused by the shape
+      check alone.
+    - **Choices** are an ``"enum"`` beside the ``"type"`` the parameter
+      declares. On an array they go on ``items``, because the shape check
+      applies them to each element. A nullable parameter's enum gains ``None``
+      when its choices do not list it, since an enum claims the whole set of
+      accepted values. An array's items do so by ``items_nullable`` alone,
+      whether or not the array itself may be null.
+    - **Labelled choices** are an ``"anyOf"`` of ``{"const": value, "title":
+      label}`` in its place, where some label says more than its value does;
+      labels that only repeat their values keep the ``"enum"``. A choice with
+      no label is a bare ``{"const": value}``. A ``None`` is ``{"type":
+      "null"}`` instead, titled when it is labelled, and so is the ``None`` a
+      nullable parameter gains. A choice declared twice is listed once, so
+      the entries are disjoint and each value has one title; ``True`` and
+      ``1`` are two values to JSON, although Python finds them equal.
+      ``anyOf`` rather than ``oneOf``, which admits the same values over
+      disjoint entries: an OpenAI strict schema refuses ``oneOf``, and Gemini
+      refuses it too, where pydantic-ai rewrites it only on a node with no
+      ``"type"``. And ``{"type": "null"}`` rather than ``{"const": null}``,
+      which Google's transform empties into ``{}``, a schema every value
+      matches. A title is ``str()`` of the label, so a lazy one is rendered in
+      the language active now, and it constrains nothing.
+    - **A default** is emitted when one is declared and survives JSON encoding;
+      a ``Decimal``, a date or a callable is left out rather than misstated. So
+      is a choice set holding such a value, since listing only some of the
+      accepted values would be false.
+    - **``help``** becomes ``"description"``.
+    - **``json_schema_extra``** joins the parameter's node last, at any
+      depth: the keywords the declaration has no field for, such as a
+      ``pattern`` or a string's ``maxLength``. The Parameter refused every
+      keyword a field states here when it was declared, a custom ``format``
+      included, so the extra never restates or contradicts the declaration.
+      What it states is advertised and not enforced by the shape check; it
+      holds where the spec's Validator enforces it.
+
+    Nothing else, deliberately. No ``title`` on a property, because a Parameter
+    has no label of its own; a ``title`` is only ever a choice's.
+    No ``$defs`` or ``$ref`` ever: most MCP clients refuse a schema with a
+    reference in it, so every schema is flat and self-contained, however deep
+    the declaration nests. No ``$schema`` key, which a transport adds if its
+    wire wants one. And no bound the shape check does not enforce
+    (``maxLength``, a Validator's ``max_value``) unless a ``json_schema_extra``
+    states it, for a Validator that enforces it.
+    The one stated without being declared is an array's default maximum,
+    because the shape check enforces it. The one enforced without being
+    stated is a decimal's bound, because a string has no keyword for it.
+
+    Every call builds a new schema, so a transport may add its own keys to the
+    result without reaching the declaration or another transport's copy.
+    Defaults, choice values and ``json_schema_extra`` values are placed in it
+    as declared, not copied.
+
+    ``unknown_arguments`` accepts the policy's plain value as well, and a value
+    that is neither, or the kept ``PASSTHROUGH`` member, raises ``ValueError``
+    here rather than quietly describing one policy or the other.
+    """
     return _object_schema(parameters, unknown_arguments_policy(unknown_arguments))
 
 

@@ -44,7 +44,200 @@ _VALIDATOR_METHODS = ("validate", "validated", "validated_many")
 
 @dataclass(frozen=True, kw_only=True)
 class ServiceSpec(AffordanceDeclarer):
-    """A write: what it takes, who may run it, what it acts on, what it returns."""
+    """A write: what it takes, who may run it, what it acts on, what it returns.
+
+    Dispatch runs it in a fixed order, once a deactivated principal has been
+    refused: the shape check and the closed argument set, class-level
+    authorization, target resolution, object-level authorization, validation
+    with the target in the Validator's context, the ``affordances``, the
+    ``preconditions``, the service, then the output selector.
+
+    Attributes:
+        service: The operation. Called with the keywords it declares: the
+            principal (``user``), the validated values (``data``, and each one
+            spread by name), the resolved target (``instance`` or
+            ``collection``), and any registered pool seed. It may be
+            ``async def``; the kernel bridges it into ``atomic`` either way.
+        permissions: The checks a principal must pass. ``None`` means none were
+            declared, which registration and dispatch both refuse; an open
+            operation says ``[Unrestricted()]``. An empty sequence is refused
+            when the spec is built, since no checks would pass everyone. This
+            spec's checks are the only ones run: a selector spec nested in
+            it, as its instance, collection or output selector, may declare
+            none, and is refused when it does.
+        reads: The arguments the service, its providers and its preconditions
+            read with no Validator in front of them - the ``project_pk`` a
+            create's ``kwargs`` provider scopes by - as a selector spec's
+            ``reads`` are. Part of ``parameters()``, after the target selector's
+            and before the Validator's, so the schema, the closed argument set
+            and the shape check cover them; never handed to the Validator. A
+            name the target selector also reads is refused at construction,
+            and one the Validator declares when ``parameters()`` is assembled.
+        shapes: The arguments that shape what the presenter renders rather
+            than what the service does - which fields, a query over the
+            result - as a Parameters group of their own, as a selector spec's
+            ``shapes`` are. Part of ``parameters()``, after the ``reads`` and
+            before the Validator's (on a ``many`` spec, before the list), so
+            the schema, the closed argument set and the shape check cover them
+            as any argument; never handed to the Validator, a provider, a
+            selector or the service. What the caller sent for them reaches the
+            presenter alone, on
+            [`PresentationContext.shapes`][django_service_specs.output.presentation_context.PresentationContext],
+            whether the presenter is this spec's or its output selector's. A
+            name a read, the target selector or the ``many`` list also
+            declares is refused at construction, and one the Validator
+            declares when ``parameters()`` is assembled, as is one dispatch
+            seeds; so is a key a provider is annotated to fill, since no
+            provider's values reach them. A nested selector declaring its own
+            is refused: this spec's call is the one its presenter renders.
+        partial: Whether a call may leave out any of the Validator's
+            parameters, as an HTTP ``PATCH`` does: the shape check does not
+            refuse an absent one, at any depth, and the Validator is told
+            through ``ValidationContext.partial``. The spec's ``reads`` and its
+            target selector's stay required as declared, so a partial update
+            still names its row, unless a ``kwargs`` provider fills them. On a
+            ``many`` spec it holds inside every row, and the list itself stays
+            required. Declared with a ``validator`` whose ``supports_partial``
+            is true, such as a ``FormValidator``: with no Validator it would
+            relax nothing, and over a Validator that builds every field, as
+            ``DataclassValidator`` and ``PydanticValidator`` do, every call
+            would be refused, so both are refused when the spec is built.
+        many: Whether the call carries a list of rows, each validated by the
+            ``validator``, under the one argument ``many_argument`` names, for
+            one run of the service over all of them. The service receives the
+            validated rows as ``data``, a list, and the validated values as
+            ``many_argument``, a list of their mappings; neither is spread by
+            field. Every row is checked and validated before the service runs,
+            and every failing row is refused in one ``InvalidArguments``,
+            addressed by its ``int`` index under ``many_argument``. Declared
+            with a ``validator``, since the rows are the arguments it validates,
+            and with no target selector, since a list of rows resolves no
+            target.
+        many_argument: The argument a ``many`` spec's list travels under, an
+            ASCII identifier. ``"items"`` by default. Beside it a ``many``
+            spec takes its ``reads`` and nothing else, so an argument asked
+            once for the whole call - a confirmation - is a read. Naming
+            anything but the default on a spec that is not ``many`` is
+            refused, since nothing would read it.
+        many_min_length: The fewest rows a ``many`` call may carry, as the
+            list's own ``min_length``. ``None`` by default, so an empty list
+            runs the service on no rows; ``1`` is how a spec refuses an empty
+            one. A list short of it is refused at ``many_argument``, as a
+            whole, before any row is checked.
+        many_max_length: The most rows a ``many`` call may carry, as the
+            list's own ``max_length``. Where it is ``None``, as by default, the
+            ``SERVICE_SPECS_MAX_ARRAY_LENGTH`` setting bounds the list, 1000
+            unless the project sets another, since every row is one Validator
+            run inside one transaction. A list past it is refused at
+            ``many_argument``, as a whole, before any row is checked. Each of
+            the two is refused on a spec that is not ``many``, and a pair no
+            list could meet when the spec is built.
+        validator: Validates the arguments its own ``parameters()`` declare. A
+            [`Validator`][django_service_specs.validation.validator.Validator]
+            instance; ``None`` for an operation that takes no arguments beyond
+            its target.
+        instance_selector_spec: A ``RETRIEVE`` resolving the one row the service
+            acts on, from the arguments its ``reads`` declare. A missing row is
+            not-found and the service never runs.
+        collection_selector_spec: A ``LIST`` resolving the rows a bulk operation
+            acts on. At most one of the two target selectors.
+        output_selector_spec: Re-reads what the service produced, with its
+            return value in the pool as both ``result`` and ``instance`` - the
+            way to return a row with fresh annotations, or a list after a bulk
+            write. ``instance`` there is the return, never the resolved target.
+        presenter: Renders the dispatch value. When ``None``, the output
+            selector's presenter is used; declaring both is refused.
+        allow_none: Declares that a service with no output selector may
+            present nothing: its return may be ``None``, and
+            [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+            then admits ``"null"``. Declaration-only, as on a selector spec's
+            schema: dispatch presents a ``None`` the service returned whatever
+            this says, because whether a service may return one is not
+            otherwise in its declaration. Left ``False``, the item stays the
+            strict object its presenter declares. Beside an output selector it
+            changes nothing: a ``RETRIEVE`` re-read admits ``"null"`` already,
+            and a ``LIST`` one presents its rows rather than the service's
+            return.
+        returns_many: Declares that the service's own return is a list of
+            rows, each presented by the ``presenter``, for a service that takes
+            one set of arguments and hands back rows. The output half of
+            ``many``, and it leaves the input alone: the call's arguments are
+            declared as they would be without it. Dispatch presents a return
+            that is not ``None`` as a list, row by row (a return that is not
+            rows, such as a mapping, ``str``, ``bytes`` or a non-iterable, is
+            ``ImproperlyConfigured`` after the service has run), and
+            [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
+            describes an array of the item, never paged. A ``None`` return
+            stays one value, presented as ``None``, as a ``many`` service's
+            is, so ``allow_none`` still decides whether the schema admits
+            ``"null"``. Refused beside ``many``, which presents its return as
+            a list already, and beside an ``output_selector_spec``, whose kind
+            decides what is presented.
+        affordances: What must be true for this operation to be possible right
+            now, as a sequence of ``Affordance`` declarations, kept as a tuple
+            in declaration order. ``enforce_affordances`` answers them at the
+            call: the first one not met refuses it with an
+            ``ActionUnavailable`` carrying its ``code``, and the service does
+            not run. Every condition on the row is answered by **one** query,
+            however many are declared. A condition on the row needs a single
+            resolved row, so it is refused beside a
+            ``collection_selector_spec``. It is a check at the moment of the
+            call, not a lock: the service still re-validates whatever it relies
+            on. ``None`` declares nothing and costs nothing - no query, no call.
+            Codes must be unique within a spec, because the code is how a
+            reader tells the conditions apart.
+        atomic: Run the service inside ``transaction.atomic()``.
+        idempotent: Whether repeating the call with the same arguments leaves
+            the same state as making it once. Declaration-only: nothing in this
+            package reads it, because idempotency is a property of the service
+            the author writes, not something a dispatcher can arrange. It is
+            here so the fact is stated once, on the spec, and every transport
+            reads the same answer - a retry policy, a queue's redelivery
+            handling, an agent tool annotation. ``None`` means **undeclared**
+            and is the default: a transport that turns the signal into a
+            published annotation must be able to tell "nothing was said" from a
+            declared ``False``, or every spec ever written starts claiming it is
+            not idempotent. ``atomic`` is a different question: it says a single
+            call is all-or-nothing, not that a second call is a no-op.
+        preconditions: Raise-to-abort rules, a sequence of callables each called
+            with the keywords it declares from the service's pool, after the
+            ``affordances`` and before the service, outside its transaction. The
+            return value is ignored, unless it is still to be awaited - a
+            coroutine from a decorated ``async def`` - which refuses the call
+            with ``ImproperlyConfigured``. Kept as a tuple in declaration order.
+        kwargs: A provider of extra pool entries: called with the keywords it
+            declares from the call's pool, it returns a mapping merged into the
+            pool the service is called from after the caller's arguments, so a
+            key it answers is the author's value whatever the caller sent. A
+            value of ``UNSET`` declines its key. Annotate its return as a
+            ``TypedDict`` and ``provider_keys`` reads which keys it fills
+            before it runs: a read it fills is not demanded of the caller,
+            and is the server's even when the provider does not answer it,
+            since the caller's value for it is dropped once checked; and a
+            filled key that a target selector's read or a Validator field
+            declares is refused, since its values never reach either.
+        input_data: A provider of server-owned input: called with the keywords
+            it declares from the call's pool, the resolved target among them,
+            it returns a mapping merged onto the caller's arguments before the
+            Validator sees them, after the caller's, so its keys are the
+            author's values. A value of ``UNSET`` declines its key. Annotated to
+            return a ``TypedDict``, a field it fills is the server's: the
+            caller's value for it is dropped once checked, in each row of a
+            ``many`` call too. A Validator field it fills is not demanded
+            of the caller, and a filled key a read declares is refused, since
+            its values reach only the Validator. Declared with a ``validator``,
+            since the Validator is what consumes it and the service is handed
+            none of it directly; a spec with no Validator is refused when it
+            is built, and ``kwargs`` is the provider for a value the service
+            reads.
+        progress_reporter: A provider of a
+            [`ProgressReporter`][django_service_specs.types.progress_reporter.ProgressReporter]
+            sink the service reports to beside the transport's - a task record,
+            an audit trail - called with the keywords it declares from the base
+            pool. Resolved on first use, so a call refused before its run never
+            calls it, and a provider returning ``None`` declines.
+        metadata: A project's own per-operation facts, stored as given.
+    """
 
     service: Callable[..., Any]
     permissions: Sequence[PermissionCheck] | None = None
@@ -128,7 +321,28 @@ class ServiceSpec(AffordanceDeclarer):
         check_metadata(self.metadata, label=label)
 
     def derive(self, **changes: object) -> Self:
-        """A new spec of this class with the named fields replaced."""
+        """A new spec of this class with the named fields replaced, and every other one this spec's.
+
+        Built through the constructor, so every check a fresh declaration
+        passes runs again on the result, the combinations included: a change
+        that is valid alone and refused beside the fields it keeps is refused
+        here. The spec it is called on is never changed, and the fields not
+        named are the same objects, not copies.
+
+        A field is replaced, never extended: ``reads=`` is the new spec's whole
+        ``reads``. Name the base's value to keep it and add to it,
+        ``reads=base.reads + Parameters.of(...)``.
+
+        The result is another spec, by identity: a
+        [`Grant`][django_service_specs.dispatch.grant.Grant] minted for this
+        one does not cover it.
+
+        Raises:
+            TypeError: a name in ``changes`` is not one of the spec's own
+                fields, such as a method's name or a private field's.
+            ImproperlyConfigured: the result is refused as a fresh declaration
+                with the same fields would be.
+        """
         check_changes(fields(self), changes, label=type(self).__name__)
         return replace(self, **changes)
 
@@ -137,11 +351,39 @@ class ServiceSpec(AffordanceDeclarer):
         return self.instance_selector_spec or self.collection_selector_spec
 
     def as_kernel_spec(self) -> Self:
-        """This spec, as its own compiled form."""
+        """This spec, as its own compiled form.
+
+        What makes a spec a
+        [`SpecSource`][django_service_specs.specs.spec_source.SpecSource] like
+        any declaration of another library's, and how
+        [`kernel_spec`][django_service_specs.specs.kernel_spec.kernel_spec]
+        tells the two apart: a spec compiles to itself, and is never cached.
+        """
         return self
 
     def parameters(self, *, call_context: dict[str, Any] | None = None) -> Parameters:
-        """Everything this spec takes: its selector's reads, its shapes, and its Validator's."""
+        """Everything this spec takes: its target selector's reads, its own, its shapes, then its
+        Validator's.
+
+        On a ``many`` spec the Validator's parameters are each row's, so the
+        top level is the spec's ``reads``, its ``shapes`` and then the list itself: a
+        required array under ``many_argument`` whose rows are the Validator's
+        parameters. A row's field is no top-level argument, so it may share a
+        read's name.
+
+        Assembled on every call rather than at construction, because a
+        Validator reading a model-backed declaration may need the app registry,
+        and specs are commonly built at import time. A name two sources declare
+        is refused here, as is one dispatch seeds itself; the three that need no
+        Validator, the target's reads, the spec's and its shapes, were refused
+        at construction already.
+
+        ``call_context`` is the call's dict when a call asks, and ``None``
+        when a reader outside one does, unless a transport describing the spec
+        hands a stamped dict with no call under way; it is handed on to a
+        Validator whose ``parameters`` declares the keyword (see
+        ``Validator.parameters``).
+        """
         own = (
             validator_parameters(self.validator, call_context=call_context)
             if self.validator is not None
