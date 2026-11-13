@@ -3679,6 +3679,27 @@ class TestMany:
         assert call["data"] == [{"title": "a"}, {"title": "b"}]
         assert [list(context.target) for _, context in validator.calls] == [[mine], [mine]]
 
+    def test_a_named_set_reaches_each_row_s_form_kwargs_as_collection(self, ada: Any) -> None:
+        mine = Note.objects.create(owner=ada, title="mine")
+        seen: list[Any] = []
+
+        class Row(forms.Form):
+            title = forms.CharField()
+
+            def __init__(self, *args: Any, collection: Any, **kwargs: Any) -> None:
+                seen.append(list(collection))
+                super().__init__(*args, **kwargs)
+
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            many=True,
+            validator=FormValidator(Row, form_kwargs=lambda collection: {"collection": collection}),
+            collection_selector_spec=nested(LIST, selector=notes_of),
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        assert seen == [[mine], [mine]]
+
     def test_a_named_set_out_of_scope_is_refused_before_any_row(self, ada: Any) -> None:
         check, service, validator = Scoped(refuse_scope=True), Record(), Titled()
         spec = ServiceSpec(

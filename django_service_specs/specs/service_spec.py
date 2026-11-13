@@ -111,8 +111,10 @@ class ServiceSpec(AffordanceDeclarer):
             and every failing row is refused in one ``InvalidArguments``,
             addressed by its ``int`` index under ``many_argument``. Declared
             with a ``validator``, since the rows are the arguments it validates,
-            and with no target selector, since a list of rows resolves no
-            target.
+            and with no ``instance_selector_spec``, since a list of rows edits
+            no single row. A ``collection_selector_spec`` names the set the rows
+            edit: the service receives it as ``collection``, and
+            ``validated_many()`` as the context's ``target``.
         many_argument: The argument a ``many`` spec's list travels under, an
             ASCII identifier. ``"items"`` by default. Beside it a ``many``
             spec takes its ``reads`` and nothing else, so an argument asked
