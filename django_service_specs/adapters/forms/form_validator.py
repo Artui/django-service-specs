@@ -370,9 +370,10 @@ class FormValidator(Validator):
     form. The bound formset is in the call's ``pool`` as ``formset``. A
     formset validates whole rows, so the validator's ``supports_partial`` is
     ``False``. Under ``can_delete``, ``parameters()`` declares ``DELETE``, a
-    ``boolean``: a row sent with it ``true`` skips its form's errors, as
-    Django's formset skips them, and reaches the service with ``DELETE``
-    true. A row left out is left alone.
+    ``boolean`` (not for a plain formset with ``can_delete_extra=False``,
+    whose forms are all extra ones and carry none): a row sent with it
+    ``true`` skips its form's errors, as Django's formset skips them, and
+    reaches the service with ``DELETE`` true. A row left out is left alone.
 
     A ``BaseModelFormSet`` edits the call's collection target, a queryset of
     its model, which a collection selector resolves; a call with none is
@@ -648,7 +649,7 @@ def _formset_parameters(
         added.append(
             Parameter(model._meta.pk.name, json_type, format=fmt, required=False, nullable=True)
         )
-    if formset_class.can_delete:
+    if formset_class.can_delete and (added or formset_class.can_delete_extra):
         added.append(Parameter(DELETION_FIELD_NAME, "boolean"))
     for parameter in added:
         if parameter.name in form_class.base_fields:

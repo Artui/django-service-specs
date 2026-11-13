@@ -2659,6 +2659,11 @@ class TestAFormsetParameters:
         names = [p.name for p in FormValidator(_Line, formset_class=_LineSet).parameters()]
         assert names == ["title", "count"]
 
+    def test_no_marker_where_no_form_could_carry_it(self) -> None:
+        # Every form of a plain formset is an extra one, and can_delete_extra=False gives none.
+        kept = forms.formset_factory(_Line, can_delete=True, can_delete_extra=False)
+        assert FormValidator(_Line, formset_class=kept).parameters().get("DELETE") is None
+
     def test_can_delete_declares_the_marker(self) -> None:
         declared = FormValidator(_Line, formset_class=_DeletableLineSet).parameters()
         assert [p.name for p in declared] == ["title", "count", "DELETE"]
@@ -2925,3 +2930,19 @@ class TestAModelFormsetThroughDispatch:
         rows = [{"book": book.pk, "number": 1}]
         with pytest.raises(ImproperlyConfigured, match="collection of Edition rows"):
             dispatch(self._spec(None), principal=None, arguments={"items": rows})
+
+    def test_the_service_may_ask_for_the_bound_formset(self) -> None:
+        book = Book.objects.create(author=Author.objects.create(name="Ada"), title="N", price=1)
+        spec = ServiceSpec(
+            service=lambda formset: formset,
+            permissions=[Unrestricted()],
+            many=True,
+            validator=FormValidator(_EditionSet.form, formset_class=_EditionSet),
+            collection_selector_spec=SelectorSpec(
+                kind=SelectorKind.LIST, selector=lambda: Edition.objects.filter(book=book)
+            ),
+        )
+        rows = [{"book": book.pk, "number": 1}]
+        formset = dispatch(spec, principal=None, arguments={"items": rows}).value
+        assert isinstance(formset, _EditionSet)
+        assert formset.is_bound
