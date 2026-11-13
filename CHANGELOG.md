@@ -44,8 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bound formset is in the pool as `formset`. Every row sent is validated, even one equal
   to the fields' initials. `form_kwargs` is called once for the call and may not return
   `prefix` or `empty_permitted`. Such a validator's `supports_partial` is `False`. An
-  inline formset and one with `can_order` are refused at construction. Without
-  `formset_class`, each row is validated by a form of its own, as before.
+  inline formset and one with `can_order` are refused at construction, and a call on a
+  spec that is not `many` with `ImproperlyConfigured`, since its parameters would offer
+  a key and `DELETE` no single-row call honours. Without `formset_class`, each row is
+  validated by a form of its own, as before.
 - **A model formset edits the call's collection target.** With a `BaseModelFormSet`,
   `parameters()` declares the model's key (optional) and, under `can_delete`, a
   `DELETE` boolean. The formset is bound to a fresh copy of the collection a collection
@@ -54,8 +56,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refused with `ImproperlyConfigured`. A key outside the collection is refused as
   `invalid_choice` under the row's key, where Django's own formset would take any row of
   the model as a new one, and two rows naming one key are refused under
-  `non_field_errors`. A row marked `DELETE` skips its form's checks and is still sent
-  whole.
+  `non_field_errors`. A row marked `DELETE` skips its form's checks and reaches the
+  service with its key, the marker and only the fields that cleaned.
 
 ### Changed
 - **`Presenter.output()` may answer `None`**, for a presenter whose result has no JSON
