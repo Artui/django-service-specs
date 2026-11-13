@@ -309,7 +309,8 @@ class FormValidator(Validator):
     **A plain form that declares ``instance`` is handed the target.** When a
     plain form's ``__init__`` names a parameter ``instance`` (a bare
     ``**kwargs`` does not count), the form is built with ``instance=`` the
-    context's target itself, not a copy, ``None`` when there is none; a plain
+    context's target itself, whatever it is and never a copy (a collection
+    selector's queryset too), ``None`` when there is none; a plain
     form that declares none is built from ``data`` and ``files`` alone.
 
     **A form whose ``__init__`` takes more is handed it by ``form_kwargs``.**
@@ -542,10 +543,10 @@ def _spelled(field: forms.Field | None, value: Any) -> str:
     """One value as a browser spells it, a localized number field's in the active locale."""
     if isinstance(value, bool):
         return str(value)
-    if isinstance(field, forms.IntegerField) and field.localize:
-        return _localized(value)
     if isinstance(value, int):
         return str(Decimal(value))
+    if isinstance(field, forms.IntegerField) and field.localize:
+        return _localized(value)
     if isinstance(value, dt.date | dt.time):
         return value.isoformat()
     if isinstance(value, dt.timedelta):
@@ -559,7 +560,7 @@ def _localized(value: Any) -> str:
         return formats.localize_input(value)
     try:
         number = Decimal(value)
-    except (InvalidOperation, TypeError, ValueError):
+    except (InvalidOperation, TypeError):
         return str(value)
     return formats.localize_input(number) if number.is_finite() else str(value)
 

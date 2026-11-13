@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterator
+from types import SimpleNamespace
 from typing import Any
 from unittest import mock
 
@@ -717,7 +718,9 @@ class TestARowObject:
         )
 
     @pytest.mark.parametrize(
-        "found", ["a string", {"id": 1}, Note(title="unsaved")], ids=["str", "mapping", "unsaved"]
+        "found",
+        ["a string", {"id": 1}, Note(title="unsaved"), SimpleNamespace(pk=1)],
+        ids=["str", "mapping", "unsaved", "pk-not-model"],
     )
     def test_an_object_that_is_not_a_saved_instance_is_refused_naming_row_object(
         self, ada: Any, found: Any

@@ -299,9 +299,11 @@ Any other target - the queryset a collection selector resolves, or none for a
 create - builds the form as a create.
 
 A plain form that edits an object of its own - a form over a dataclass, or
-one that saves through a service - takes it the same way when its `__init__`
-declares a parameter named `instance`: the form is built with `instance=` the
-call's target itself, not a copy, and `None` when there is none. A bare
+one that saves through a service - is handed the target too when its
+`__init__` declares a parameter named `instance`, but differently: the form is
+built with `instance=` the call's target itself, whatever it is and never a
+copy, so the queryset a collection selector resolves arrives as that
+queryset, and `None` when there is none. A bare
 `**kwargs` does not count as declaring it, so a plain form that names no
 `instance` is built from `data` and `files` alone, as before.
 

@@ -192,7 +192,9 @@ class TestARowThatIsNotThere:
 
 
 class TestARowThatCarriesNoAnswer:
-    @pytest.mark.parametrize("row", [object(), {"id": 1}], ids=["instance", "mapping"])
+    @pytest.mark.parametrize(
+        "row", [object(), {"id": 1}, None], ids=["instance", "mapping", "none-with-no-row-object"]
+    )
     def test_it_is_refused_naming_the_missing_answer(self, row: Any) -> None:
         with pytest.raises(ImproperlyConfigured) as caught:
             row_affordance_answers(listing(affordances={"rename": RENAME}), row)

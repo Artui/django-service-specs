@@ -1044,8 +1044,20 @@ class TestTheWireFormIsNotLocalized:
             (forms.FloatField(localize=True), 1500.5, 1500.5),
             (forms.DecimalField(localize=True), Decimal("1500.5"), Decimal("1500.5")),
             (forms.DecimalField(localize=True), 10**5000, Decimal(10**5000)),
+            (forms.IntegerField(localize=True), 10**250, 10**250),
+            (forms.DecimalField(localize=True, decimal_places=2), 0.1, Decimal("0.1")),
+            (forms.DecimalField(), Decimal("1500.5"), Decimal("1500.5")),
         ],
-        ids=["int", "digits", "float", "decimal", "past-str-s-digits"],
+        ids=[
+            "int",
+            "digits",
+            "float",
+            "decimal",
+            "past-str-s-digits",
+            "past-scientific-digits",
+            "float-for-decimal",
+            "not-localized",
+        ],
     )
     def test_a_typed_number_is_posted_as_the_locale_spells_it(
         self, german: Any, field: forms.Field, value: Any, cleaned: Any
@@ -1053,7 +1065,7 @@ class TestTheWireFormIsNotLocalized:
         form_class = _form("Priced", price=field)
         assert FormValidator(form_class).validate({"price": value}, CONTEXT) == {"price": cleaned}
 
-    @pytest.mark.parametrize("value", ["cheap", "NaN", "Infinity"])
+    @pytest.mark.parametrize("value", ["cheap", "NaN", "Infinity", {"n": 1}])
     def test_a_localized_string_that_is_no_finite_number_is_refused_by_the_field(
         self, german: Any, value: str
     ) -> None:
@@ -1262,6 +1274,13 @@ class TestAPlainFormTakingAnInstance:
         _BUILT.clear()
         context = ValidationContext(principal=None, target=target)
         assert FormValidator(form_class).validate({"name": "Ada"}, context) == {"name": "Ada"}
+        assert _BUILT[-1].instance is target  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.django_db
+    def test_a_collection_target_is_handed_as_it_is(self) -> None:
+        _BUILT.clear()
+        target = Author.objects.all()
+        FormValidator(_Edits).validate({"name": "Ada"}, ValidationContext(None, target))
         assert _BUILT[-1].instance is target  # ty: ignore[unresolved-attribute]
 
     def test_with_no_target_it_is_handed_none(self) -> None:

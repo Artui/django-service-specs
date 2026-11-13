@@ -354,7 +354,7 @@ def _check_row_object(spec: SelectorSpec) -> None:
     row_object: Any = spec.row_object
     if row_object is None or (isinstance(row_object, str) and row_object):
         return
-    if isinstance(row_object, str | bytes) or not callable(row_object):
+    if not callable(row_object):
         raise ImproperlyConfigured(
             "SelectorSpec.row_object must be an attribute name or a callable taking the row "
             f"and returning its model instance; got {row_object!r}."
