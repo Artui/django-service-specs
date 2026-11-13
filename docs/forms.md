@@ -405,21 +405,9 @@ every row into one formset instead, and the formset's `clean()` is the
 rule over the set:
 
 ```python
-class Lines(forms.BaseFormSet):
-    def clean(self):
-        titles = [form.cleaned_data.get("title") for form in self.forms]
-        if len(titles) != len(set(titles)):
-            raise ValidationError("Each title once.", code="repeated")
-
-
-LineSet = forms.formset_factory(LineForm, formset=Lines)
-
-spec = ServiceSpec(
-    service=add_lines,
-    permissions=[Unrestricted()],
-    many=True,
-    validator=FormValidator(LineForm, formset_class=LineSet),
-)
+--8<--
+docs/examples/forms_adapter.py:formset
+--8<--
 ```
 
 The formset's `form` must be the validator's form, so for a factory that
@@ -432,7 +420,7 @@ Every row sent is validated, even one equal to the fields' initials, which a
 formset on a page would skip as an unchanged extra form. `form_kwargs` is
 called once for the call, not once per row, and the bound formset is in the
 pool as `formset`. A formset validates whole rows, so such a spec cannot be
-`partial`.
+`partial`, and a spec that is not `many` is refused when it is called.
 
 ### Editing an existing set
 
@@ -448,8 +436,9 @@ the formset class says `can_delete`.
   a new one, and the kernel holds the field to the collection.
 - A row with no key, or a `null` one, is a new row.
 - A row sent with `DELETE: true` skips its form's checks, as a formset does,
-  and reaches the service with its key and the marker. It is still a whole
-  row: dispatch's shape check runs before the formset and refuses one
+  and reaches the service with its key, the marker and the fields that
+  cleaned: a field its form refused is missing from it, so it is not a whole
+  row. Dispatch's shape check runs before the formset and refuses a row
   missing a required field. A row left out of the call is left alone.
 - Two rows naming one key are refused under `non_field_errors`.
 

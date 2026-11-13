@@ -373,7 +373,8 @@ class FormValidator(Validator):
     ``boolean`` (not for a plain formset with ``can_delete_extra=False``,
     whose forms are all extra ones and carry none): a row sent with it
     ``true`` skips its form's errors, as Django's formset skips them, and
-    reaches the service with ``DELETE`` true. A row left out is left alone.
+    reaches the service with ``DELETE`` true and only the fields that
+    cleaned. A row left out is left alone.
 
     A ``BaseModelFormSet`` edits the call's collection target, a queryset of
     its model, which a collection selector resolves; a call with none is
@@ -456,8 +457,15 @@ class FormValidator(Validator):
         ``ModelMultipleChoiceField`` to a queryset, which is what the service
         receives. On a partial call, only the fields the caller sent are
         bound, and so only those are returned; a ``ModelForm``'s uniqueness
-        checks still read the whole row, as the class docstring says.
+        checks still read the whole row, as the class docstring says. Under a
+        ``formset_class`` it raises ``ImproperlyConfigured``: a formset
+        validates a ``many`` call's rows, and one call is not that.
         """
+        if self.formset_class is not None:
+            raise ImproperlyConfigured(
+                f"{self.formset_class.__qualname__}: a formset validates a many call's rows, "
+                "and this spec is not many; declare many=True, or drop the formset_class."
+            )
         extra = extra_keywords(self.form_class, self.form_kwargs, context)
         prefix = extra.get("prefix")
         if prefix is None:

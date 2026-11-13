@@ -226,3 +226,17 @@ class TestCallContext:
 
         assert present(spec, result) == {"authors": ["Ursula K. Le Guin"]}
         assert call_context == {"forms_adapter.authors": {author.pk: author}}
+
+
+@pytest.mark.django_db
+class TestFormset:
+    def test_the_set_is_one_rule_over_every_row(self) -> None:
+        rows = [{"title": "A"}, {"title": "A"}]
+        with pytest.raises(InvalidArguments) as refused:
+            dispatch(forms_adapter.add_lines_spec, principal=None, arguments={"items": rows})
+        assert refused.value.detail == {"items": {"non_field_errors": ["Each title once."]}}
+
+    def test_distinct_rows_reach_the_service(self) -> None:
+        rows = [{"title": "A"}, {"title": "B"}]
+        result = dispatch(forms_adapter.add_lines_spec, principal=None, arguments={"items": rows})
+        assert result.value == rows

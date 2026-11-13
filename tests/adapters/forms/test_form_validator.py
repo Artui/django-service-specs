@@ -2605,6 +2605,8 @@ class TestAFormsetConstruction:
     def test_anything_but_a_formset_class_is_refused(self) -> None:
         with pytest.raises(ImproperlyConfigured, match="takes a Django formset class"):
             FormValidator(_Line, formset_class=_Line)  # ty: ignore[invalid-argument-type]
+        with pytest.raises(ImproperlyConfigured, match="takes a Django formset class"):
+            FormValidator(_Line, formset_class=object())  # ty: ignore[invalid-argument-type]
 
     def test_a_formset_over_another_form_is_refused(self) -> None:
         with pytest.raises(
@@ -2735,11 +2737,10 @@ class TestAFormset:
         assert calls == [None]
         assert [form.label_suffix for form in formset.forms] == [";", ";"]
 
-    def test_form_kwargs_returning_a_prefix_is_refused(self) -> None:
-        validator = FormValidator(
-            _Line, form_kwargs=lambda: {"prefix": "p"}, formset_class=_LineSet
-        )
-        with pytest.raises(ImproperlyConfigured, match="'prefix'"):
+    @pytest.mark.parametrize("keyword", ["prefix", "empty_permitted"])
+    def test_form_kwargs_returning_a_prefix_is_refused(self, keyword: str) -> None:
+        validator = FormValidator(_Line, form_kwargs=lambda: {keyword: "p"}, formset_class=_LineSet)
+        with pytest.raises(ImproperlyConfigured, match=f"'{keyword}'"):
             _many(validator, [{"title": "a"}])
 
     def test_a_formsets_own_prefix_spells_the_rows(self) -> None:
@@ -2929,6 +2930,16 @@ class TestAModelFormsetThroughDispatch:
             {"book": book, "number": 1, "id": kept, "DELETE": False},
         ]
         assert list(collection) == [kept]
+
+    def test_a_formset_on_a_spec_that_is_not_many_is_refused_at_the_call(self) -> None:
+        book = Book.objects.create(author=Author.objects.create(name="Ada"), title="N", price=1)
+        spec = ServiceSpec(
+            service=lambda book, number: (book, number),
+            permissions=[Unrestricted()],
+            validator=FormValidator(_EditionSet.form, formset_class=_EditionSet),
+        )
+        with pytest.raises(ImproperlyConfigured, match="validates a many call's rows"):
+            dispatch(spec, principal=None, arguments={"book": book.pk, "number": 3, "DELETE": True})
 
     def test_a_spec_with_no_collection_is_refused_at_the_call(self) -> None:
         book = Book.objects.create(author=Author.objects.create(name="Ada"), title="N", price=1)
