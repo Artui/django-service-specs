@@ -2663,6 +2663,11 @@ class TestAFormsetParameters:
         # Every form of a plain formset is an extra one, and can_delete_extra=False gives none.
         kept = forms.formset_factory(_Line, can_delete=True, can_delete_extra=False)
         assert FormValidator(_Line, formset_class=kept).parameters().get("DELETE") is None
+        existing = forms.modelformset_factory(
+            Edition, fields=("number",), can_delete=True, can_delete_extra=False
+        )
+        validator = FormValidator(existing.form, formset_class=existing)
+        assert validator.parameters().get("DELETE") == Parameter("DELETE", "boolean")
 
     def test_can_delete_declares_the_marker(self) -> None:
         declared = FormValidator(_Line, formset_class=_DeletableLineSet).parameters()
