@@ -248,7 +248,7 @@ class FormValidator(Validator):
     ``QueryDict`` holding each argument as the strings a browser would post
     for it, so a form or widget written for HTML reads it as it reads
     ``request.POST``: ``getlist`` on a list, ``.isdigit()`` on an id. A list
-    is one string per element, a boolean ``"true"`` or ``"false"``, a date,
+    is one string per element, a boolean ``"True"`` or ``"False"``, a date,
     time or datetime its ISO spelling, a duration Django's own, and ``null``
     an absent key; any other value is its ``str``. A file stays in ``files``.
 
@@ -541,7 +541,7 @@ def _posted(field: forms.Field | None, value: Any) -> list[str]:
 def _spelled(field: forms.Field | None, value: Any) -> str:
     """One value as a browser spells it, a localized number field's in the active locale."""
     if isinstance(value, bool):
-        return "true" if value else "false"
+        return str(value)
     if isinstance(field, forms.IntegerField) and field.localize:
         return _localized(value)
     if isinstance(value, int):

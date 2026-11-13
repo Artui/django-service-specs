@@ -1150,10 +1150,10 @@ class TestTheFormIsBoundToAPost:
     @pytest.mark.parametrize(
         ("field", "value", "spelled", "cleaned"),
         [
-            (forms.BooleanField(required=False), True, "true", True),
-            (forms.BooleanField(required=False), False, "false", False),
-            (forms.NullBooleanField(), True, "true", True),
-            (forms.NullBooleanField(), False, "false", False),
+            (forms.BooleanField(required=False), True, "True", True),
+            (forms.BooleanField(required=False), False, "False", False),
+            (forms.NullBooleanField(), True, "True", True),
+            (forms.NullBooleanField(), False, "False", False),
             (forms.IntegerField(), 3, "3", 3),
             (forms.FloatField(), 1.5, "1.5", 1.5),
             (forms.FloatField(), 2, "2", 2.0),
@@ -1197,6 +1197,15 @@ class TestTheFormIsBoundToAPost:
         validator = FormValidator(form_class)
         assert validator.validate({"teams": [1], "value": value}, CONTEXT)["value"] == cleaned
         assert _BUILT[-1].data.getlist("value") == [spelled]
+
+    def test_a_boolean_choice_is_posted_as_its_option_renders(self) -> None:
+        field = forms.TypedMultipleChoiceField(
+            choices=[(True, "yes"), (False, "no")], coerce=lambda v: v == "True"
+        )
+        cleaned = FormValidator(_form("Marked", marks=field)).validate(
+            {"marks": [True, False]}, CONTEXT
+        )
+        assert cleaned == {"marks": [True, False]}
 
     @pytest.mark.parametrize("value", [None, False], ids=["none", "false"])
     def test_a_null_boolean_left_unanswered_or_false_cleans_as_before(self, value: Any) -> None:

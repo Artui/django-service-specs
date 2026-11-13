@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   browser would post for it, rather than a dict of the typed arguments, so a form or
   widget written for HTML that reads `self.data.getlist(...)` or calls `.isdigit()` on
   an id validates instead of raising `AttributeError`. A list is one string per
-  element, a boolean `"true"` or `"false"`, a date, time or datetime its ISO
+  element, a boolean `"True"` or `"False"`, a date, time or datetime its ISO
   spelling, a duration Django's own, `null` an absent key, and any other value its
   `str()`; files stay in `files`. A localized number field is posted its number as
   its widget renders it in the active locale. The shape check stays typed and the

@@ -50,8 +50,8 @@ The form is bound to a post: its `data` is an immutable `QueryDict` holding
 each argument as the strings a browser would post for it, so a form or widget
 written for HTML reads it as it reads `request.POST`, with `getlist()` for a
 list and `.isdigit()` on an id. A list is one string per element, a boolean
-`"true"` or `"false"` (which `CheckboxInput` and `NullBooleanSelect` both
-read), a date, time or datetime its ISO spelling, a duration Django's own
+`"True"` or `"False"` (which `CheckboxInput` and `NullBooleanSelect` both
+read, and which a choice of `True` or `False` renders as its option), a date, time or datetime its ISO spelling, a duration Django's own
 spelling, and `null` an absent key; any other value is its `str()`. A
 localized number field is posted its number as its widget renders it in the
 active locale, which the field reads back as the same number. The shape check
