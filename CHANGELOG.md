@@ -25,8 +25,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a name refused when it is built if it is empty, `.` or `..`, or holds a path separator,
   a NUL or any other control character. `size` is read from `bytes` or a Django `File`
   when not given. `read(max_bytes=None)` returns the bytes and closes the content; past
-  the ceiling it closes it and raises `FileTooLarge`, which names the ceiling, having
-  read at most one byte past it. `FilePresenter(content_type, *, filename=None,
+  the ceiling it closes it and raises `FileTooLarge`, which names the ceiling. A file
+  object is never asked for more than the ceiling plus one byte in all, however short
+  its reads run; an iterable's chunks are taken whole, so reading stops at the first
+  chunk past the ceiling. `FilePresenter(content_type, *, filename=None,
   render=None)` declares the file in the presenter seat: a `FileResult` passes through
   with its type filled, and any other value is rendered and wrapped under `filename`, a
   string or a callable of the value. Its `output()` is `None`, so `spec_output_schema`
