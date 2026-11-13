@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **A `FormValidator` binds its form to a `QueryDict` of posted spellings.** The
+  form's `data` is now an immutable `QueryDict` holding each argument as the strings a
+  browser would post for it, rather than a dict of the typed arguments, so a form or
+  widget written for HTML that reads `self.data.getlist(...)` or calls `.isdigit()` on
+  an id validates instead of raising `AttributeError`. A list is one string per
+  element, a boolean `"true"` or `"false"`, a date, time or datetime its ISO
+  spelling, a duration Django's own, `null` an absent key, and any other value its
+  `str()`; files stay in `files`. A localized number field is posted its number as
+  its widget renders it in the active locale. The shape check stays typed and the
+  cleaned values are unchanged; spec-rest's form-body route and spec-html's pages
+  reach the same bind.
+
 ## [0.31.0] — 2026-11-09
 
 ### Added

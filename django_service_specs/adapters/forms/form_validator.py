@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import dataclasses
+import datetime as dt
 from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
@@ -11,7 +12,10 @@ from django.core.exceptions import NON_FIELD_ERRORS as FORM_NON_FIELD_ERRORS
 from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.core.validators import BaseValidator, MaxLengthValidator, MinLengthValidator
 from django.db import models
+from django.http import QueryDict
+from django.utils import formats
 from django.utils.datastructures import MultiValueDict
+from django.utils.duration import duration_string
 
 from django_service_specs.adapters.forms.utils import extra_keywords
 from django_service_specs.adapters.utils import element_format, shared_scalar_type
@@ -239,12 +243,21 @@ class FormValidator(Validator):
     optional choice field reads ``""`` as no value, and a caller sends
     ``null`` for that instead.
 
-    **An argument is in its wire form, which no locale touches.** A number
-    field reads a string through the active locale when it is localized, and
-    under one whose thousands separator is a dot that reads ``"1.500"`` as
-    fifteen hundred. So a string argument for an ``IntegerField``,
-    ``FloatField`` or ``DecimalField`` is bound as the ``Decimal`` it spells,
-    which the field reads as the number it is, localized or not.
+    **The form is bound to a post.** Its ``data`` is an immutable
+    ``QueryDict`` holding each argument as the strings a browser would post
+    for it, so a form or widget written for HTML reads it as it reads
+    ``request.POST``: ``getlist`` on a list, ``.isdigit()`` on an id. A list
+    is one string per element, a boolean ``"true"`` or ``"false"``, a date,
+    time or datetime its ISO spelling, a duration Django's own, and ``null``
+    an absent key; any other value is its ``str``. A file stays in ``files``.
+
+    **An argument is in its wire form, which no locale touches.** A
+    localized number field reads its post through the active locale, and
+    under one whose thousands separator is a dot reads ``"1.500"`` as fifteen
+    hundred. So a number, or a string spelling one, for a localized
+    ``IntegerField``, ``FloatField`` or ``DecimalField`` is posted as its
+    widget renders it in that locale, which the field reads back as the
+    number it is.
 
     **Declare the fields on the class.** A field a form adds or changes in its
     own ``__init__`` is not in ``base_fields``, so it is not described, and
@@ -386,14 +399,14 @@ class FormValidator(Validator):
         checks still read the whole row, as the class docstring says.
         """
         fields = {parameter.name: field for parameter, field in self._declared}
-        data: dict[str, Any] = {}
+        data: dict[str, list[str]] = {}
         files: MultiValueDict[str, Any] = MultiValueDict()
         for name, value in arguments.items():
             field = fields.get(name)
             if isinstance(field, forms.FileField):
                 files[name] = value
-            else:
-                data[name] = value if field is None else _as_bound(field, value)
+            elif value is not None:
+                data[name] = _posted(field, value)
         extra = extra_keywords(self.form_class, self.form_kwargs, context)
         data, files = self._prefixed(data, files, extra)
         form, row = self._bind(data, files, context.target, extra)
@@ -412,10 +425,10 @@ class FormValidator(Validator):
 
     def _prefixed(
         self,
-        data: dict[str, Any],
+        data: dict[str, list[str]],
         files: MultiValueDict[str, Any],
         extra: Mapping[str, Any],
-    ) -> tuple[dict[str, Any], MultiValueDict[str, Any]]:
+    ) -> tuple[dict[str, list[str]], MultiValueDict[str, Any]]:
         """``data`` and ``files`` keyed as the bound form reads them."""
         prefix = extra.get("prefix")
         if prefix is None:
@@ -443,12 +456,16 @@ class FormValidator(Validator):
 
     def _bind(
         self,
-        data: dict[str, Any],
+        posted: dict[str, list[str]],
         files: MultiValueDict[str, Any],
         target: Any,
         extra: Mapping[str, Any],
     ) -> tuple[forms.BaseForm, models.Model | None]:
         """The bound form, and the copy of the target it edits, or ``None`` for no row."""
+        data = QueryDict(mutable=True)
+        for key, spellings in posted.items():
+            data.setlist(key, spellings)
+        data._mutable = False
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
             return form_class(data=data, files=files, **extra), None
@@ -496,16 +513,37 @@ def _check_unique_as_whole(instance: models.Model, names: frozenset[str]) -> Non
         raise InvalidArguments(_detail(errors))
 
 
-def _as_bound(field: forms.Field, value: Any) -> Any:
-    """``value`` as the form's data: a number field's string bound as the ``Decimal`` it spells."""
-    if isinstance(field, forms.FloatField | forms.DecimalField) and type(value) is int:
-        return Decimal(value)
-    if not (isinstance(field, forms.IntegerField) and isinstance(value, str)):
-        return value
+def _posted(field: forms.Field | None, value: Any) -> list[str]:
+    """``value`` as the strings a browser posts for it, one per element of a list."""
+    if isinstance(value, list | tuple):
+        return [_spelled(field, element) for element in value]
+    return [_spelled(field, value)]
+
+
+def _spelled(field: forms.Field | None, value: Any) -> str:
+    """One value as a browser spells it, a localized number field's in the active locale."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(field, forms.IntegerField) and field.localize:
+        return _localized(value)
+    if isinstance(value, int):
+        return str(Decimal(value))
+    if isinstance(value, dt.date | dt.time):
+        return value.isoformat()
+    if isinstance(value, dt.timedelta):
+        return duration_string(value)
+    return str(value)
+
+
+def _localized(value: Any) -> str:
+    """A number as a localized field's widget renders it, which its field reads back."""
+    if isinstance(value, float):
+        return formats.localize_input(value)
     try:
-        return Decimal(value)
-    except InvalidOperation:
-        return value
+        number = Decimal(value)
+    except (InvalidOperation, TypeError, ValueError):
+        return str(value)
+    return formats.localize_input(number) if number.is_finite() else str(value)
 
 
 def _check_model(form_class: type[forms.BaseForm]) -> None:

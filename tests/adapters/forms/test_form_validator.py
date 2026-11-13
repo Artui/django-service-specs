@@ -20,6 +20,7 @@ from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.validators import MaxLengthValidator, MinLengthValidator
 from django.db.models import QuerySet
+from django.http import QueryDict
 from django.test import override_settings
 from django.utils import translation
 from django.utils.translation import gettext_lazy
@@ -1035,6 +1036,32 @@ class TestTheWireFormIsNotLocalized:
         cleaned = FormValidator(form_class).validate({"price": "1.500"}, CONTEXT)
         assert cleaned == {"price": Decimal("1.500")}
 
+    @pytest.mark.parametrize(
+        ("field", "value", "cleaned"),
+        [
+            (forms.IntegerField(localize=True), 1500, 1500),
+            (forms.IntegerField(localize=True), "1500", 1500),
+            (forms.FloatField(localize=True), 1500.5, 1500.5),
+            (forms.DecimalField(localize=True), Decimal("1500.5"), Decimal("1500.5")),
+            (forms.DecimalField(localize=True), 10**5000, Decimal(10**5000)),
+        ],
+        ids=["int", "digits", "float", "decimal", "past-str-s-digits"],
+    )
+    def test_a_typed_number_is_posted_as_the_locale_spells_it(
+        self, german: Any, field: forms.Field, value: Any, cleaned: Any
+    ) -> None:
+        form_class = _form("Priced", price=field)
+        assert FormValidator(form_class).validate({"price": value}, CONTEXT) == {"price": cleaned}
+
+    @pytest.mark.parametrize("value", ["cheap", "NaN", "Infinity"])
+    def test_a_localized_string_that_is_no_finite_number_is_refused_by_the_field(
+        self, german: Any, value: str
+    ) -> None:
+        form_class = _form("Priced", price=forms.DecimalField(localize=True))
+        assert coded(_refusal(form_class, {"price": value})) == {
+            "price": [("Bitte eine Zahl eingeben.", "invalid")]
+        }
+
     def test_a_field_that_is_not_a_number_is_bound_as_it_came(self, german: Any) -> None:
         # A postcode spells a number and is not one: made a Decimal, it lost its leading zero.
         form_class = _form("Addressed", postcode=forms.CharField(localize=True))
@@ -1052,6 +1079,130 @@ class TestTheWireFormIsNotLocalized:
         with pytest.raises(InvalidArguments) as refused:
             FormValidator(form_class).validate({"price": "cheap"}, CONTEXT)
         assert refused.value.detail == {"price": ["Enter a number."]}
+
+
+class _Teams(forms.Form):
+    """A form written for HTML: its ``__init__`` reads the post as ``request.POST``."""
+
+    teams = forms.TypedMultipleChoiceField(choices=[(1, "One"), (2, "Two")], coerce=int)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.picked = [t for t in self.data.getlist(self.add_prefix("teams")) if t.isdigit()]
+
+
+class _Kept(forms.Form):
+    """A form that keeps the instance it was built with, to read back."""
+
+    teams = forms.TypedMultipleChoiceField(choices=[(1, "One"), (2, "Two")], coerce=int)
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        _BUILT.append(self)
+
+
+_BUILT: list[forms.BaseForm] = []
+
+
+def _bound_data(form_class: type[forms.BaseForm], arguments: dict[str, Any]) -> Any:
+    """The data the form was bound with, for ``_Kept`` subclasses."""
+    _BUILT.clear()
+    FormValidator(form_class).validate(arguments, CONTEXT)
+    return _BUILT[-1].data
+
+
+class TestTheFormIsBoundToAPost:
+    """The form reads its data as a ``QueryDict`` of the strings a browser would post."""
+
+    def test_a_form_reading_the_post_s_lists_validates(self) -> None:
+        cleaned = FormValidator(_Teams).validate({"teams": [1, 2]}, CONTEXT)
+        assert cleaned == {"teams": [1, 2]}
+
+    def test_a_form_reading_the_post_s_lists_binds_through_bind_arguments(self) -> None:
+        spec = ServiceSpec(
+            service=lambda **kwargs: None,
+            permissions=[Unrestricted()],
+            validator=FormValidator(_Teams),
+        )
+        assert bind_arguments(spec, {"teams": [2]}, principal=None) == {"teams": [2]}
+
+    def test_the_data_is_an_immutable_query_dict(self) -> None:
+        data = _bound_data(_Kept, {"teams": [1, 2]})
+        assert isinstance(data, QueryDict)
+        assert data.getlist("teams") == ["1", "2"]
+        with pytest.raises(AttributeError):
+            data["teams"] = "1"
+
+    def test_a_none_argument_is_an_absent_key(self) -> None:
+        form_class = type("Kept", (_Kept,), {"note": forms.CharField(required=False)})
+        data = _bound_data(form_class, {"teams": [1], "note": None})
+        assert "note" not in data
+
+    def test_an_argument_no_field_declares_is_spelled_too(self) -> None:
+        data = _bound_data(_Kept, {"teams": [1], "colour": 7})
+        assert data.getlist("colour") == ["7"]
+
+    def test_a_prefixed_form_is_keyed_by_its_prefix(self) -> None:
+        form_class = type("Kept", (_Kept,), {"prefix": "p"})
+        data = _bound_data(form_class, {"teams": [1, 2]})
+        assert data.getlist("p-teams") == ["1", "2"]
+
+    @pytest.mark.parametrize(
+        ("field", "value", "spelled", "cleaned"),
+        [
+            (forms.BooleanField(required=False), True, "true", True),
+            (forms.BooleanField(required=False), False, "false", False),
+            (forms.NullBooleanField(), True, "true", True),
+            (forms.NullBooleanField(), False, "false", False),
+            (forms.IntegerField(), 3, "3", 3),
+            (forms.FloatField(), 1.5, "1.5", 1.5),
+            (forms.FloatField(), 2, "2", 2.0),
+            (forms.DecimalField(), Decimal("12.50"), "12.50", Decimal("12.50")),
+            (forms.DateField(), dt.date(2024, 6, 1), "2024-06-01", dt.date(2024, 6, 1)),
+            (
+                forms.DateTimeField(),
+                dt.datetime(2024, 6, 1, 12, 30, tzinfo=dt.timezone.utc),
+                "2024-06-01T12:30:00+00:00",
+                dt.datetime(2024, 6, 1, 12, 30, tzinfo=dt.timezone.utc),
+            ),
+            (forms.TimeField(), dt.time(9, 15, 30), "09:15:30", dt.time(9, 15, 30)),
+            (
+                forms.DurationField(),
+                dt.timedelta(days=1, seconds=5),
+                "1 00:00:05",
+                dt.timedelta(days=1, seconds=5),
+            ),
+            (forms.CharField(), "Ada", "Ada", "Ada"),
+        ],
+        ids=[
+            "true",
+            "false",
+            "null-true",
+            "null-false",
+            "int",
+            "float",
+            "int-float",
+            "decimal",
+            "date",
+            "datetime",
+            "time",
+            "duration",
+            "str",
+        ],
+    )
+    def test_each_value_is_spelled_as_posted_and_cleans_as_before(
+        self, field: forms.Field, value: Any, spelled: str, cleaned: Any
+    ) -> None:
+        form_class = type("Kept", (_Kept,), {"value": field})
+        validator = FormValidator(form_class)
+        assert validator.validate({"teams": [1], "value": value}, CONTEXT)["value"] == cleaned
+        assert _BUILT[-1].data.getlist("value") == [spelled]
+
+    @pytest.mark.parametrize("value", [None, False], ids=["none", "false"])
+    def test_a_null_boolean_left_unanswered_or_false_cleans_as_before(self, value: Any) -> None:
+        form_class = _form("Asked", maybe=forms.NullBooleanField())
+        expected = None if value is None else False
+        assert FormValidator(form_class).validate({"maybe": value}, CONTEXT) == {"maybe": expected}
 
 
 class _Viewed(forms.ModelForm):

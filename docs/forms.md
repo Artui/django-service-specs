@@ -46,6 +46,18 @@ for `author`. The rule `clean()` states is the form's to enforce, and its
 message comes back about the whole call:
 `{"non_field_errors": ["A published book needs its publication date."]}`.
 
+The form is bound to a post: its `data` is an immutable `QueryDict` holding
+each argument as the strings a browser would post for it, so a form or widget
+written for HTML reads it as it reads `request.POST`, with `getlist()` for a
+list and `.isdigit()` on an id. A list is one string per element, a boolean
+`"true"` or `"false"` (which `CheckboxInput` and `NullBooleanSelect` both
+read), a date, time or datetime its ISO spelling, a duration Django's own
+spelling, and `null` an absent key; any other value is its `str()`. A
+localized number field is posted its number as its widget renders it in the
+active locale, which the field reads back as the same number. The shape check
+in front of the form stays typed: only the bind speaks the post's strings, on
+every transport.
+
 The form is read when `FormValidator` is built, so a field it cannot describe
 fails on that line, naming the form, the field and the field's class. Nothing
 in the reading queries: a `ModelChoiceField`'s rows are never listed. The one
