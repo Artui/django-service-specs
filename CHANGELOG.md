@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A `many` spec may name the set its rows edit** with a `collection_selector_spec`.
+  Dispatch resolves it and asks the scope check of it before any row is validated, as
+  for any spec acting on a collection; the service receives it as `collection`, and
+  `validated_many()` as the context's `target`, so a Validator can bind each row to a
+  member of the set. `target=` on `dispatch` and `adispatch` stands in for its lookup,
+  and `resolve_target` resolves it ahead of the call, its reads taken from the top
+  level beside the list. An `instance_selector_spec` on a `many` spec is still refused,
+  and so is a condition on the row among its `affordances`. A `many` spec without a
+  collection behaves as before: `target=` is refused, and `resolve_target` raises
+  `ImproperlyConfigured`.
+
 ## [0.32.0] — 2026-11-13
 
 ### Added

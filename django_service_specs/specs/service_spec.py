@@ -458,13 +458,12 @@ def _check_many(spec: ServiceSpec) -> None:
             "ServiceSpec declares many=True with no validator. Each row is validated by "
             "the spec's Validator, which also declares what a row is; declare one."
         )
-    for role in ("instance", "collection"):
-        if getattr(spec, f"{role}_selector_spec") is not None:
-            raise ImproperlyConfigured(
-                f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
-                "resolves no target, so dispatch would never run the lookup; remove it, or "
-                "drop many=True."
-            )
+    if spec.instance_selector_spec is not None:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares an instance_selector_spec with many=True. A list of rows "
+            "edits no single row, so dispatch would never run the lookup; declare the set the "
+            "rows edit as a collection_selector_spec, or drop many=True."
+        )
     try:
         the_list = _the_list(spec)
     except ImproperlyConfigured as refused:

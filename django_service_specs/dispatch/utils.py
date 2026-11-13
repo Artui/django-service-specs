@@ -328,7 +328,7 @@ def shape_check(
         fields, fields_reached = reach(
             spec.input_data, validator_parameters(spec.validator, call_context=call_context)
         )
-        if spec.many:
+        if spec.many and spec.many_argument in parameters.names():
             return _check_bulk(
                 _relaxed(parameters, reached),
                 arguments,
@@ -854,10 +854,10 @@ def refuse_target(spec: ServiceSpec | SelectorSpec, target: Any) -> None:
             "target= is a ServiceSpec's, standing in for its target selector's lookup; "
             "a SelectorSpec's selector is its run."
         )
-    if spec.many:
+    if spec.many and spec.collection_selector_spec is None:
         raise TypeError(
-            "target= stands in for a target selector's lookup, and a many spec resolves no "
-            "target: its rows are the call's arguments."
+            "target= stands in for a target selector's lookup, and a many spec with no "
+            "collection_selector_spec resolves no target: its rows are the call's arguments."
         )
 
 

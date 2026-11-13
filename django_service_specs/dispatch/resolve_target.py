@@ -106,8 +106,10 @@ def resolve_target(
             permissions or a parameter a registered seed occupies that is
             neither a ``reflected`` read nor a top-level Validator field,
             though this checks no Validator field's value.
-        ImproperlyConfigured: also a ``many`` spec, which declares no lookup:
-            its rows are the call's arguments, and none is found ahead of it.
+        ImproperlyConfigured: also a ``many`` spec with no
+            ``collection_selector_spec``: its rows are the call's arguments, and
+            nothing is found ahead of it. One naming the set its rows edit
+            resolves that set.
         TypeError: a ``SelectorSpec``, whose selector is its run rather than
             a lookup in front of one.
         TypeError: ``seeds`` that are anything but a ``CallSeeds``.
@@ -125,10 +127,10 @@ def resolve_target(
             "SelectorSpec's selector is its run: dispatch it."
         )
     spec = compiled
-    if spec.many:
+    if spec.many and spec.collection_selector_spec is None:
         raise ImproperlyConfigured(
-            "resolve_target() was handed a many spec, which declares no target selector: its "
-            "rows are the call's arguments, and there is no target to find ahead of it."
+            "resolve_target() was handed a many spec that declares no collection_selector_spec: "
+            "its rows are the call's arguments, and there is no target to find ahead of it."
         )
     target_spec = spec.target_selector_spec()
     parameters = target_spec.parameters() if target_spec is not None else Parameters()

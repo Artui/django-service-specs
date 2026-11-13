@@ -423,8 +423,60 @@ def test_a_many_spec_is_refused_before_anything_runs(
     with django_assert_num_queries(0), pytest.raises(ImproperlyConfigured) as refused:
         resolve_target(spec, principal=ada, arguments={"items": []})
     assert str(refused.value).startswith(
-        "resolve_target() was handed a many spec, which declares no target selector"
+        "resolve_target() was handed a many spec that declares no collection_selector_spec"
     )
+
+
+def test_a_many_spec_naming_its_set_resolves_it_and_dispatch_runs_on_it(ada: Any) -> None:
+    mine = Note.objects.create(owner=ada, title="mine")
+    check, service, validator = Scoped(), Record(), Titled()
+    spec = ServiceSpec(
+        service=service,
+        permissions=[check],
+        many=True,
+        validator=validator,
+        collection_selector_spec=SelectorSpec(kind=SelectorKind.LIST, selector=notes_of),
+    )
+    found = resolve_target(spec, principal=ada, arguments={"items": []})
+    assert isinstance(found, ResolvedTarget)
+    collection, grant = found
+    assert list(collection) == [mine]
+    assert check.scopes == [[mine]]
+    dispatch(
+        spec,
+        principal=ada,
+        arguments={"items": [{"title": "a"}]},
+        target=collection,
+        grant=grant,
+    )
+    # The grant says the set was checked, so the scope check is not asked again.
+    assert check.scopes == [[mine]]
+    assert service.calls[0]["collection"] is collection
+    assert [context.target for _, context in validator.calls] == [collection]
+
+
+class _RowForm(forms.Form):
+    pk = forms.IntegerField()
+
+
+def test_a_row_field_named_after_the_set_s_read_leaves_the_read_to_the_set(ada: Any) -> None:
+    mine = Note.objects.create(owner=ada, title="mine")
+    spec = ServiceSpec(
+        service=Record(),
+        permissions=OPEN,
+        many=True,
+        validator=FormValidator(_RowForm),
+        input_data=lambda: {},
+        collection_selector_spec=SelectorSpec(
+            kind=SelectorKind.LIST, selector=lambda pk: Note.objects.filter(pk=pk), reads=PK
+        ),
+    )
+    collection, _ = _found(resolve_target(spec, principal=ada, arguments={"pk": mine.pk}))
+    assert list(collection) == [mine]
+    # The row's pk, which the provider may fill, leaves the set's own read required.
+    with pytest.raises(InvalidArguments) as refused:
+        resolve_target(spec, principal=ada, arguments={})
+    assert refused.value.detail == {"pk": ["This field is required."]}
 
 
 # --- handed on to dispatch --------------------------------------------------------------

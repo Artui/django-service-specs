@@ -1220,7 +1220,9 @@ async def test_a_many_spec_refuses_a_pre_resolved_target_before_any_hop(
     ada: Any, hops: list[str]
 ) -> None:
     spec = ServiceSpec(service=print, permissions=OPEN, many=True, validator=Titled())
-    with pytest.raises(TypeError, match="a many spec resolves no target"):
+    with pytest.raises(
+        TypeError, match="a many spec with no collection_selector_spec resolves no target"
+    ):
         await adispatch(spec, principal=ada, arguments={"items": []}, target=None)
     assert hops == []
 

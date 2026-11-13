@@ -366,9 +366,14 @@ run inside one transaction. A list outside either is refused at
 200 elements."]}`, before any row is checked, beside the top level's other
 refusals. Either is refused on a spec that is not `many`.
 
-A `many` spec must declare a Validator and no target selector, since a list of
-rows resolves no target, and a condition on the row among its `affordances` is
-refused. With no output selector its result is `kind="list"`, unless the
+A `many` spec must declare a Validator, and no `instance_selector_spec`, since
+a list of rows edits no single row. It may declare a `collection_selector_spec`:
+the set its rows edit. Dispatch resolves and scope-checks it as for any spec
+acting on a collection, and `target=` stands in for it. The service receives it
+as `collection`, and `validated_many()` as the context's `target`, so a
+Validator binding each row to a member of the set can read it. Without one the
+call resolves no target, and `target=` is refused. A condition on the row among
+its `affordances` is refused either way. With no output selector its result is `kind="list"`, unless the
 service returned `None`, and the service must return the rows: a mapping, a
 `str`, `bytes` or anything else that does not iterate is refused as
 `ImproperlyConfigured`, naming the service and what it returned. It is the
