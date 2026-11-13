@@ -1065,7 +1065,7 @@ class TestTheWireFormIsNotLocalized:
         form_class = _form("Priced", price=field)
         assert FormValidator(form_class).validate({"price": value}, CONTEXT) == {"price": cleaned}
 
-    @pytest.mark.parametrize("value", ["cheap", "NaN", "Infinity", {"n": 1}])
+    @pytest.mark.parametrize("value", ["cheap", "NaN", "Infinity", {"n": 1}, [[1, 2]]])
     def test_a_localized_string_that_is_no_finite_number_is_refused_by_the_field(
         self, german: Any, value: str
     ) -> None:

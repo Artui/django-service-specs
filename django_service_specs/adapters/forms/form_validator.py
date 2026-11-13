@@ -560,7 +560,7 @@ def _localized(value: Any) -> str:
         return formats.localize_input(value)
     try:
         number = Decimal(value)
-    except (InvalidOperation, TypeError):
+    except (InvalidOperation, TypeError, ValueError):
         return str(value)
     return formats.localize_input(number) if number.is_finite() else str(value)
 
