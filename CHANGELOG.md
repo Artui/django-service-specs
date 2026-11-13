@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **A plain form that declares `instance` is handed the call's target.** When a plain
+  `Form`'s `__init__` names a parameter `instance` (a bare `**kwargs` does not count),
+  `FormValidator` builds it with `instance=` the target itself, not a copy, and `None`
+  when there is none. A plain form that declares none is built as before. `form_kwargs`
+  still may not return `instance` for any form, and its refusal now says so truly for
+  a plain form too: only the bind may set `data`, `files` and `instance`.
+
 ### Changed
 - **A `FormValidator` binds its form to a `QueryDict` of posted spellings.** The
   form's `data` is now an immutable `QueryDict` holding each argument as the strings a

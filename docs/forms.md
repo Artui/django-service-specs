@@ -298,10 +298,17 @@ which saves only the fields whose value changed, would find nothing to save.
 Any other target - the queryset a collection selector resolves, or none for a
 create - builds the form as a create.
 
+A plain form that edits an object of its own - a form over a dataclass, or
+one that saves through a service - takes it the same way when its `__init__`
+declares a parameter named `instance`: the form is built with `instance=` the
+call's target itself, not a copy, and `None` when there is none. A bare
+`**kwargs` does not count as declaring it, so a plain form that names no
+`instance` is built from `data` and `files` alone, as before.
+
 ## A form with keywords of its own
 
 The adapter builds the form from `data=` and `files=`, with `instance=` for a
-`ModelForm`. A form whose `__init__` takes anything more, such as a queryset
+`ModelForm` or a plain form that declares it. A form whose `__init__` takes anything more, such as a queryset
 scoped to the caller's tenant, is handed it by `form_kwargs`, a callable
 returning those keywords:
 
@@ -354,8 +361,8 @@ every validation, and a `many` call validates each row, so it runs once per
 row: a query every row shares belongs in a seed, which resolves once per
 call.
 
-The bind sets `data`, `files` and `instance` itself, so a callable returning
-one of them - naming `instance` to read the row is another matter - for a plain form as for a `ModelForm`, is refused with
+Only the bind may set `data`, `files` and `instance`, so a callable returning
+one of them - naming `instance` to read the row is another matter - for a plain form as for a `ModelForm`, whether or not the form takes an `instance`, is refused with
 `ImproperlyConfigured` naming the key, as is one returning anything but a
 mapping. `FormValidator(form_class, form_kwargs=...)` refuses a `form_kwargs`
 that is not callable when it is built, and keeps the callable as its

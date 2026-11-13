@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import dataclasses
 import datetime as dt
+import inspect
 from collections.abc import Callable, Iterator, Mapping
 from decimal import Decimal, InvalidOperation
 from typing import Any, cast
@@ -305,6 +306,12 @@ class FormValidator(Validator):
     would find nothing to save. Any other target - the queryset a collection
     selector resolves, or none - binds the form as a create.
 
+    **A plain form that declares ``instance`` is handed the target.** When a
+    plain form's ``__init__`` names a parameter ``instance`` (a bare
+    ``**kwargs`` does not count), the form is built with ``instance=`` the
+    context's target itself, not a copy, ``None`` when there is none; a plain
+    form that declares none is built from ``data`` and ``files`` alone.
+
     **A form whose ``__init__`` takes more is handed it by ``form_kwargs``.**
     It is a callable returning a mapping of extra constructor keywords, such
     as a queryset scoped by the caller's tenant, and it binds through the
@@ -373,6 +380,7 @@ class FormValidator(Validator):
             for name, field in fields.items()
             if not field.disabled
         )
+        self._takes_instance = _declares_instance(form_class)
         self._clears: dict[str, str] = {
             parameter.name: clear
             for parameter, field in self._declared
@@ -468,9 +476,19 @@ class FormValidator(Validator):
         data._mutable = False
         form_class = self.form_class
         if not issubclass(form_class, forms.BaseModelForm):
-            return form_class(data=data, files=files, **extra), None
+            edits = {"instance": target} if self._takes_instance else {}
+            return form_class(data=data, files=files, **edits, **extra), None
         instance = copy.copy(target) if isinstance(target, form_class._meta.model) else None
         return form_class(data=data, files=files, instance=instance, **extra), instance
+
+
+def _declares_instance(form_class: type[forms.BaseForm]) -> bool:
+    """Whether the form's ``__init__`` names an ``instance`` parameter, a catch-all aside."""
+    parameter = inspect.signature(form_class.__init__).parameters.get("instance")
+    return parameter is not None and parameter.kind in _NAMED
+
+
+_NAMED = (inspect.Parameter.POSITIONAL_OR_KEYWORD, inspect.Parameter.KEYWORD_ONLY)
 
 
 def _clear_checkbox(form_class: type[forms.BaseForm], name: str, field: forms.Field) -> str | None:

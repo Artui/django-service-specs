@@ -1205,6 +1205,79 @@ class TestTheFormIsBoundToAPost:
         assert FormValidator(form_class).validate({"maybe": value}, CONTEXT) == {"maybe": expected}
 
 
+class _Edits(forms.Form):
+    """A plain form that takes the object it edits as ``instance``."""
+
+    name = forms.CharField()
+
+    def __init__(self, *args: Any, instance: Any = None, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.instance = instance
+        _BUILT.append(self)
+
+
+class _EditsPositionally(forms.Form):
+    name = forms.CharField()
+
+    def __init__(self, data: Any = None, files: Any = None, instance: Any = None) -> None:
+        super().__init__(data, files)
+        self.instance = instance
+        _BUILT.append(self)
+
+
+class _TakesAnything(forms.Form):
+    name = forms.CharField()
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        _BUILT.append(self)
+
+
+class _CollectsKeywords(forms.Form):
+    """Its keywords' catch-all is spelled ``instance``, which names no parameter."""
+
+    name = forms.CharField()
+
+    def __init__(self, *args: Any, **instance: Any) -> None:
+        super().__init__(*args, **instance)
+        self.keywords = instance
+        _BUILT.append(self)
+
+
+class TestAPlainFormTakingAnInstance:
+    """A plain form whose ``__init__`` declares ``instance`` is handed the call's target."""
+
+    @pytest.mark.parametrize("form_class", [_Edits, _EditsPositionally], ids=["kw", "positional"])
+    def test_it_is_handed_the_target_itself(self, form_class: type[forms.Form]) -> None:
+        target = object()
+        _BUILT.clear()
+        context = ValidationContext(principal=None, target=target)
+        assert FormValidator(form_class).validate({"name": "Ada"}, context) == {"name": "Ada"}
+        assert _BUILT[-1].instance is target  # ty: ignore[unresolved-attribute]
+
+    def test_with_no_target_it_is_handed_none(self) -> None:
+        _BUILT.clear()
+        FormValidator(_Edits).validate({"name": "Ada"}, CONTEXT)
+        assert _BUILT[-1].instance is None  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.parametrize("form_class", [_TakesAnything, _CollectsKeywords])
+    def test_a_form_declaring_no_instance_is_built_as_before(
+        self, form_class: type[forms.Form]
+    ) -> None:
+        _BUILT.clear()
+        context = ValidationContext(principal=None, target=object())
+        assert FormValidator(form_class).validate({"name": "Ada"}, context) == {"name": "Ada"}
+        assert "instance" not in getattr(_BUILT[-1], "keywords", {})
+
+    @pytest.mark.parametrize("form_class", [_Edits, BookForm], ids=["plain", "model"])
+    def test_form_kwargs_returning_instance_is_still_refused(
+        self, form_class: type[forms.BaseForm]
+    ) -> None:
+        validator = FormValidator(form_class, form_kwargs=lambda: {"instance": None})
+        with pytest.raises(ImproperlyConfigured, match="returned 'instance', which only the bind"):
+            validator.validate({"name": "Ada"}, CONTEXT)
+
+
 class _Viewed(forms.ModelForm):
     class Meta:
         model = Post

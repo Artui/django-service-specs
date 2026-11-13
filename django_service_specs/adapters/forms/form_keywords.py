@@ -34,7 +34,7 @@ def form_keywords(
     [`FormValidator`][django_service_specs.adapters.forms.form_validator.FormValidator]
     calls it with, so the returned mapping is checked as there: one that is
     not a mapping, or that returns ``data``, ``files`` or ``instance``, which
-    the bind sets itself, is refused with ``ImproperlyConfigured``. Spread it
+    only the bind may set, is refused with ``ImproperlyConfigured``. Spread it
     beside those three: ``form_class(data=..., **form_keywords(...))``.
 
     The pool holds:
