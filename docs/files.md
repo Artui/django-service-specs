@@ -78,8 +78,10 @@ a `None` is answered as the transport answers nothing for any other spec.
 `read(max_bytes=)` gives the whole content and closes it. Past the ceiling it
 closes the content and raises
 [`FileTooLarge`][django_service_specs.types.file_too_large.FileTooLarge], which
-names the ceiling, without reading more than one byte past it. A transport that
-refuses after presenting calls `close()`.
+names the ceiling. A file object is never asked for more than the ceiling plus
+one byte in all, however short its reads run; an iterable's chunks are taken
+whole, so reading stops at the first chunk past the ceiling, and that chunk is
+in memory. A transport that refuses after presenting calls `close()`.
 
 [`present`][django_service_specs.dispatch.present.present],
 [`present_for_audience`][django_service_specs.dispatch.present_for_audience.present_for_audience]

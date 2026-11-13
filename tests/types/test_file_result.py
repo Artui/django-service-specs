@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from collections.abc import AsyncIterator, Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -19,6 +20,15 @@ class Recording(io.BytesIO):
     def read(self, size: int | None = -1) -> bytes:
         self.asked.append(-1 if size is None else size)
         return super().read(size)
+
+
+class Trickle(Recording):
+    given = 0
+
+    def read(self, size: int | None = -1) -> bytes:
+        data = super().read(min(3, -1 if size is None else size))
+        self.given += len(data)
+        return data
 
 
 class Unsized:
@@ -45,6 +55,11 @@ class TestContent:
 
     def test_a_given_size_is_kept(self) -> None:
         assert FileResult(ContentFile(b"abcd"), filename="a.txt", size=9).size == 9
+
+    def test_a_size_that_is_not_an_int_is_none(self) -> None:
+        content = SimpleNamespace(read=lambda size=-1: b"", size=lambda: 3)
+
+        assert FileResult(content, filename="a.txt").size is None
 
     @pytest.mark.parametrize(
         "content",
@@ -137,6 +152,14 @@ class TestRead:
 
         assert (raised.value.max_bytes, content.closed, content.asked) == (4, True, [5])
 
+    def test_short_reads_never_take_more_than_the_ceiling_plus_one_byte(self) -> None:
+        content = Trickle(b"x" * 1000)
+
+        with pytest.raises(FileTooLarge):
+            FileResult(content, filename="a.txt").read(max_bytes=10)
+
+        assert (content.given, content.asked) == (11, [3, 3, 3, 2])
+
     def test_a_declared_size_past_the_ceiling_is_refused_unread(self) -> None:
         content = Recording(b"abcdef")
 
@@ -171,6 +194,21 @@ class TestRead:
     def test_an_iterable_chunk_that_is_not_bytes_is_refused(self) -> None:
         with pytest.raises(TypeError, match="gave a int"):
             FileResult([b"a", 1], filename="a.txt").read()
+
+
+class TestIterableCeiling:
+    def test_an_iterable_stops_at_the_first_chunk_past_the_ceiling(self) -> None:
+        taken: list[int] = []
+
+        def stream() -> Iterator[bytes]:
+            for part in (b"x" * 5, b"y" * 100, b"z" * 100):
+                taken.append(len(part))
+                yield part
+
+        with pytest.raises(FileTooLarge):
+            FileResult(stream(), filename="a.txt").read(max_bytes=10)
+
+        assert taken == [5, 100]
 
 
 class TestClose:

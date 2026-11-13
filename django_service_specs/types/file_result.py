@@ -50,7 +50,9 @@ class FileResult:
         Raises:
             FileTooLarge: The content is longer than ``max_bytes``, by its
                 declared ``size`` or once that many bytes and one more have
-                been read. Nothing past the ceiling plus one byte is read.
+                been read. A file object is never asked for more than the
+                ceiling plus one byte in all; an iterable's chunks are taken
+                whole, and reading stops at the first chunk past the ceiling.
             TypeError: An iterable yielded something other than ``bytes``.
         """
         try:
@@ -122,7 +124,11 @@ def _chunks(content: Any, max_bytes: int | None) -> Iterator[bytes]:
         return
     if hasattr(content, "read"):
         reader: Any = content
-        while chunk := reader.read(_CHUNK if max_bytes is None else min(_CHUNK, max_bytes + 1)):
+        taken = 0
+        while chunk := reader.read(
+            _CHUNK if max_bytes is None else min(_CHUNK, max_bytes + 1 - taken)
+        ):
+            taken += len(chunk)
             yield _bytes(chunk)
         return
     for chunk in content:
