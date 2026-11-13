@@ -2879,3 +2879,49 @@ class TestAModelFormset:
         rows = {0: {"book": book.pk, "number": _BEYOND_THE_COLUMN}}
         detail = _many_refusal(validator, rows, _collection(Edition.objects.all()))
         assert coded(detail) == {0: {"number": _PAST_THE_COLUMN}}
+
+
+@pytest.mark.django_db
+class TestAModelFormsetThroughDispatch:
+    @staticmethod
+    def _spec(book: Book | None) -> ServiceSpec:
+        listing = SelectorSpec(
+            kind=SelectorKind.LIST, selector=lambda: Edition.objects.filter(book=book)
+        )
+        return ServiceSpec(
+            service=lambda items, collection: (items, collection),
+            permissions=[Unrestricted()],
+            many=True,
+            validator=FormValidator(_EditionSet.form, formset_class=_EditionSet),
+            **({"collection_selector_spec": listing} if book is not None else {}),
+        )
+
+    def test_the_rows_edit_the_set_the_selector_resolves(self) -> None:
+        author = Author.objects.create(name="Ada")
+        book = Book.objects.create(author=author, title="Notes", price=Decimal("9.99"))
+        other = Book.objects.create(author=author, title="Other", price=Decimal("1.00"))
+        kept = Edition.objects.create(book=book, number=1)
+        elsewhere = Edition.objects.create(book=other, number=1)
+        spec = self._spec(book)
+        with pytest.raises(InvalidArguments) as caught:
+            dispatch(
+                spec,
+                principal=None,
+                arguments={"items": [{"book": book.pk, "number": 2, "id": elsewhere.pk}]},
+            )
+        assert coded(caught.value.detail) == {
+            "items": {0: {"id": [(_NOT_A_CHOICE, "invalid_choice")]}}
+        }
+        rows = [{"book": book.pk, "number": 2}, {"id": kept.pk, "book": book.pk, "number": 1}]
+        items, collection = dispatch(spec, principal=None, arguments={"items": rows}).value
+        assert items == [
+            {"book": book, "number": 2, "id": None, "DELETE": False},
+            {"book": book, "number": 1, "id": kept, "DELETE": False},
+        ]
+        assert list(collection) == [kept]
+
+    def test_a_spec_with_no_collection_is_refused_at_the_call(self) -> None:
+        book = Book.objects.create(author=Author.objects.create(name="Ada"), title="N", price=1)
+        rows = [{"book": book.pk, "number": 1}]
+        with pytest.raises(ImproperlyConfigured, match="collection of Edition rows"):
+            dispatch(self._spec(None), principal=None, arguments={"items": rows})
