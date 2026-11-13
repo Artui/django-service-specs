@@ -111,8 +111,10 @@ class ServiceSpec(AffordanceDeclarer):
             and every failing row is refused in one ``InvalidArguments``,
             addressed by its ``int`` index under ``many_argument``. Declared
             with a ``validator``, since the rows are the arguments it validates,
-            and with no target selector, since a list of rows resolves no
-            target.
+            and with no ``instance_selector_spec``, since a list of rows edits
+            no single row. A ``collection_selector_spec`` names the set the rows
+            edit: the service receives it as ``collection``, and
+            ``validated_many()`` as the context's ``target``.
         many_argument: The argument a ``many`` spec's list travels under, an
             ASCII identifier. ``"items"`` by default. Beside it a ``many``
             spec takes its ``reads`` and nothing else, so an argument asked
@@ -458,13 +460,12 @@ def _check_many(spec: ServiceSpec) -> None:
             "ServiceSpec declares many=True with no validator. Each row is validated by "
             "the spec's Validator, which also declares what a row is; declare one."
         )
-    for role in ("instance", "collection"):
-        if getattr(spec, f"{role}_selector_spec") is not None:
-            raise ImproperlyConfigured(
-                f"ServiceSpec declares a {role}_selector_spec with many=True. A list of rows "
-                "resolves no target, so dispatch would never run the lookup; remove it, or "
-                "drop many=True."
-            )
+    if spec.instance_selector_spec is not None:
+        raise ImproperlyConfigured(
+            "ServiceSpec declares an instance_selector_spec with many=True. A list of rows "
+            "edits no single row, so dispatch would never run the lookup; declare the set the "
+            "rows edit as a collection_selector_spec, or drop many=True."
+        )
     try:
         the_list = _the_list(spec)
     except ImproperlyConfigured as refused:

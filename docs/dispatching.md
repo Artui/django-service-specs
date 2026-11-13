@@ -621,8 +621,8 @@ row up itself and runs the checks on it. A missing row that `allow_none` does no
 let through comes back as `DispatchResult(kind="not_found")`, so it is never
 mistaken for the `None` it lets through, and so does a collection selector
 raising `Http404`. A read, whose selector is its run,
-raises `TypeError`, and a `many` write, which has no target,
-`ImproperlyConfigured`. It is sync; an async caller hops once with
+raises `TypeError`, and a `many` write declaring no
+`collection_selector_spec`, which has no target, `ImproperlyConfigured`. It is sync; an async caller hops once with
 `sync_to_async`.
 
 `target=` on `dispatch` and `adispatch` takes any target the caller resolved -

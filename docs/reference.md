@@ -70,6 +70,15 @@ output format is `SPEC_CLI_OUTPUT`, read by
 ::: django_service_specs.output.project_payload.project_payload
 ::: django_service_specs.output.annotate_output_schema.annotate_output_schema
 
+## Files
+
+A spec whose result is a file, as [presenting a file](files.md) describes it.
+
+::: django_service_specs.types.file_result.FileResult
+::: django_service_specs.types.file_too_large.FileTooLarge
+::: django_service_specs.output.file_presenter.FilePresenter
+::: django_service_specs.schema.file_output.file_output
+
 ## JSON Schema
 
 ::: django_service_specs.schema.spec_input_schema.spec_input_schema

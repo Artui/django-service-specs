@@ -117,3 +117,26 @@ class RememberingBookValidator(FormValidator):
 
 remembering_validator = RememberingBookValidator(BookForm)
 # --8<-- [end:call_context]
+
+
+# --8<-- [start:formset]
+class LineForm(forms.Form):
+    title = forms.CharField(max_length=100)
+
+
+class Lines(forms.BaseFormSet):
+    def clean(self) -> None:
+        titles = [form.cleaned_data.get("title") for form in self.forms]
+        if len(titles) != len(set(titles)):
+            raise forms.ValidationError("Each title once.", code="repeated")
+
+
+LineSet = forms.formset_factory(LineForm, formset=Lines)
+
+add_lines_spec = ServiceSpec(
+    service=lambda *, items: items,
+    permissions=[Unrestricted()],
+    many=True,
+    validator=FormValidator(LineForm, formset_class=LineSet),
+)
+# --8<-- [end:formset]

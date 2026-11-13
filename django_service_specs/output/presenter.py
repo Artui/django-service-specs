@@ -48,8 +48,8 @@ class Presenter(abc.ABC):
     """
 
     @abc.abstractmethod
-    def output(self) -> Output:
-        """What ``present`` returns, as a declaration. Never queries."""
+    def output(self) -> Output | None:
+        """What ``present`` returns, as a declaration; ``None`` for no JSON shape. Never queries."""
 
     @abc.abstractmethod
     def present(self, value: Any) -> Any:

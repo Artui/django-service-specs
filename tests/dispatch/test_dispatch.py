@@ -3302,6 +3302,16 @@ def writes_then_returns(owner: Any, returned: Any) -> Callable[..., Any]:
     return write_the_note
 
 
+def test_a_plain_spec_s_field_named_like_the_list_is_one_value(ada: Any) -> None:
+    class Order(forms.Form):
+        items = forms.CharField()
+
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=FormValidator(Order))
+    dispatch(spec, principal=ada, arguments={"items": "x"})
+    assert service.calls[0]["data"] == {"items": "x"}
+
+
 class TestMany:
     """A ``many`` spec: a list of rows, each checked and validated, then one run."""
 
@@ -3656,9 +3666,82 @@ class TestMany:
         with pytest.raises(TypeError) as refused:
             dispatch(spec, principal=ada, arguments={"items": []}, target=target)
         assert str(refused.value).startswith(
-            "target= stands in for a target selector's lookup, and a many spec resolves no target:"
+            "target= stands in for a target selector's lookup, and a many spec with no "
+            "collection_selector_spec resolves no target:"
         )
         assert check.scopes == []
+
+    def test_a_named_set_is_resolved_scope_checked_and_handed_on(self, ada: Any, bob: Any) -> None:
+        mine = Note.objects.create(owner=ada, title="mine")
+        Note.objects.create(owner=bob, title="theirs")
+        check, service, validator = Scoped(), Record(), Titled()
+        spec = ServiceSpec(
+            service=service,
+            permissions=[check],
+            many=True,
+            validator=validator,
+            collection_selector_spec=nested(LIST, selector=notes_of),
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        assert check.scopes == [[mine]]
+        [call] = service.calls
+        assert list(call["collection"]) == [mine]
+        assert call["data"] == [{"title": "a"}, {"title": "b"}]
+        assert [list(context.target) for _, context in validator.calls] == [[mine], [mine]]
+
+    def test_a_named_set_reaches_each_row_s_form_kwargs_as_collection(self, ada: Any) -> None:
+        mine = Note.objects.create(owner=ada, title="mine")
+        seen: list[Any] = []
+
+        class Row(forms.Form):
+            title = forms.CharField()
+
+            def __init__(self, *args: Any, collection: Any, **kwargs: Any) -> None:
+                seen.append(list(collection))
+                super().__init__(*args, **kwargs)
+
+        spec = ServiceSpec(
+            service=Record(),
+            permissions=OPEN,
+            many=True,
+            validator=FormValidator(Row, form_kwargs=lambda collection: {"collection": collection}),
+            collection_selector_spec=nested(LIST, selector=notes_of),
+        )
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}, {"title": "b"}]})
+        assert seen == [[mine], [mine]]
+
+    def test_a_named_set_out_of_scope_is_refused_before_any_row(self, ada: Any) -> None:
+        check, service, validator = Scoped(refuse_scope=True), Record(), Titled()
+        spec = ServiceSpec(
+            service=service,
+            permissions=[check],
+            many=True,
+            validator=validator,
+            collection_selector_spec=nested(LIST, selector=notes_of),
+        )
+        with pytest.raises(NotPermitted, match="Not within your scope."):
+            dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]})
+        assert validator.calls == []
+        assert service.calls == []
+
+    def test_a_pre_resolved_target_stands_in_for_the_named_set(self, ada: Any) -> None:
+        looked_up: list[None] = []
+        check, service, validator = Scoped(), Record(), Titled()
+        spec = ServiceSpec(
+            service=service,
+            permissions=[check],
+            many=True,
+            validator=validator,
+            collection_selector_spec=nested(
+                LIST, selector=lambda: looked_up.append(None) or Note.objects.all()
+            ),
+        )
+        handed = Note.objects.none()
+        dispatch(spec, principal=ada, arguments={"items": [{"title": "a"}]}, target=handed)
+        assert looked_up == []
+        assert check.scopes == [[]]
+        assert service.calls[0]["collection"] is handed
+        assert [context.target for _, context in validator.calls] == [handed]
 
     def test_arguments_that_are_no_mapping_are_refused_by_the_shape_check(self, ada: Any) -> None:
         spec = ServiceSpec(service=Record(), permissions=OPEN, many=True, validator=Titled())

@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.33.0] — 2026-11-13
+
+### Added
+- **A `many` spec may name the set its rows edit** with a `collection_selector_spec`.
+  Dispatch resolves it and asks the scope check of it before any row is validated, as
+  for any spec acting on a collection; the service receives it as `collection`, and
+  `validated_many()` as the context's `target`, so a Validator can bind each row to a
+  member of the set. `target=` on `dispatch` and `adispatch` stands in for its lookup,
+  and `resolve_target` resolves it ahead of the call, its reads taken from the top
+  level beside the list. An `instance_selector_spec` on a `many` spec is still refused,
+  and so is a condition on the row among its `affordances`. A `many` spec without a
+  collection behaves as before: `target=` is refused, and `resolve_target` raises
+  `ImproperlyConfigured`.
+- **A spec whose result is a file.** `FileResult(content, filename, content_type=None,
+  size=None)` is the file: `bytes`, a binary file object or an iterable of `bytes`, under
+  a name refused when it is built if it is empty, `.` or `..`, or holds a path separator,
+  a NUL or any other control character. `size` is read from `bytes` or a Django `File`
+  when not given. `read(max_bytes=None)` returns the bytes and closes the content; past
+  the ceiling it closes it and raises `FileTooLarge`, which names the ceiling. A file
+  object is never asked for more than the ceiling plus one byte in all, however short
+  its reads run; an iterable's chunks are taken whole, so reading stops at the first
+  chunk past the ceiling. `FilePresenter(content_type, *, filename=None,
+  render=None)` declares the file in the presenter seat: a `FileResult` passes through
+  with its type filled, and any other value is rendered and wrapped under `filename`, a
+  string or a callable of the value. Its `output()` is `None`, so `spec_output_schema`
+  describes no JSON for a file spec. `file_output(spec)` answers the `FilePresenter` a
+  spec presents through, for a transport to read at registration, and refuses a file
+  under a `LIST` selector or re-read, a `many` or `returns_many` service, or presented
+  affordances. `present`, `present_for_audience` and `project_payload` hand a
+  `FileResult` on untouched. The docs gain a page, presenting a file.
+- **`FormValidator(..., formset_class=...)` validates a `many` call as one formset.**
+  Every row is bound into one formset of that class, whose `form` must be the
+  validator's form; each form and the formset's `clean()` run, a row's errors come back
+  under the caller's index and `non_form_errors()` under `non_field_errors`, and the
+  bound formset is in the pool as `formset`. Every row sent is validated, even one equal
+  to the fields' initials. `form_kwargs` is called once for the call and may not return
+  `prefix` or `empty_permitted`. Such a validator's `supports_partial` is `False`. An
+  inline formset and one with `can_order` are refused at construction, and a call on a
+  spec that is not `many` with `ImproperlyConfigured`, since its parameters would offer
+  a key and `DELETE` no single-row call honours. Without `formset_class`, each row is
+  validated by a form of its own, as before.
+- **A model formset edits the call's collection target.** With a `BaseModelFormSet`,
+  `parameters()` declares the model's key (optional) and, under `can_delete`, a
+  `DELETE` boolean. The formset is bound to a fresh copy of the collection a collection
+  selector resolves, rows sending a key first as its existing rows, each form bound to
+  its row so its uniqueness checks exclude it; a call with no collection target is
+  refused with `ImproperlyConfigured`. A key outside the collection is refused as
+  `invalid_choice` under the row's key, where Django's own formset would take any row of
+  the model as a new one, and two rows naming one key are refused under
+  `non_field_errors`. A row marked `DELETE` skips its form's checks and reaches the
+  service with its key, the marker and only the fields that cleaned.
+
+### Changed
+- **`Presenter.output()` may answer `None`**, for a presenter whose result has no JSON
+  shape. Every reader already took `spec.output()` as possibly `None`.
+
 ## [0.32.0] — 2026-11-13
 
 ### Added
@@ -2721,7 +2777,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.32.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.33.0...HEAD
+[0.33.0]: https://github.com/Artui/django-service-specs/compare/v0.32.0...v0.33.0
 [0.32.0]: https://github.com/Artui/django-service-specs/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Artui/django-service-specs/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/Artui/django-service-specs/compare/v0.29.0...v0.30.0

@@ -100,4 +100,5 @@ nav:
   - The pydantic adapter: pydantic.md
   - JSON Schema: schema.md
   - Paging and projection: paging-and-projection.md
+  - Presenting a file: files.md
   - API reference: reference.md
