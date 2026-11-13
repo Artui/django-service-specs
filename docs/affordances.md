@@ -29,6 +29,30 @@ with three fields:
 Not a fact about the caller: that is `permissions`, which is always checked
 first, so a principal who may not see a row is never told what state it is in.
 
+### A translated reason
+
+A translated project declares its sentences at import time, before any request
+has a language, so `reason` also takes a lazy string:
+
+```python
+from django.utils.translation import gettext_lazy as _
+
+Affordance(
+    code="note_archived",
+    reason=_("An archived note cannot be renamed. Restore it first."),
+    when=Q(archived=False),
+)
+```
+
+It is kept unevaluated on the declaration and resolved wherever the kernel hands
+an answer out - the answers for each row, the refusal a call raises, the
+affordance `unmet_operation_affordance` returns - in the language active there,
+so every reason a caller receives is a `str` and no transport translates.
+`code` stays a plain string: it is what clients branch on, in every language.
+A lazy reason that resolves to an empty string is refused with
+`ImproperlyConfigured` where it is handed out, since it cannot be refused before
+it has a language.
+
 ## Two kinds of condition
 
 `when`'s type decides which kind it is. It is derived, never declared, so it
@@ -61,7 +85,8 @@ Every mistake below raises `ImproperlyConfigured` when the spec is built, so it
 fails at import rather than on the first call through a transport that never
 asked:
 
-- a `code` or `reason` that is not a non-empty string;
+- a `code` that is not a non-empty string, or a `reason` that is neither a
+  non-empty string nor a lazy one;
 - an ORM expression that is not boolean, such as `F("title")`;
 - a callable naming `data`, `instance`, `collection`, `result` or `queryset`,
   the names dispatch seeds per call;
@@ -330,6 +355,40 @@ against and are never presented, so they count for nothing here; declare the
 mapping on the selector that returns the rows. A row that carries no answer for
 a name whose spec declares a condition is refused; a name with no conditions
 reads no flag, so every row is available for it.
+
+### Rows that wrap the instance
+
+A tree node, a dataclass row or a table cell builder wraps the model instance
+rather than being it, so its answers have nothing to be set on. The selector's
+`row_object` says where the instance is: an attribute name, or a callable
+taking the row and returning the instance.
+
+```python
+@dataclass(frozen=True)
+class NoteNode:
+    note: Note
+    children: tuple[NoteNode, ...] = ()
+
+
+SelectorSpec(
+    kind=SelectorKind.LIST,
+    selector=note_tree,
+    permissions=[Unrestricted()],
+    affordances={"rename": rename_note},
+    row_object="note",  # or row_object=lambda node: node.note
+)
+```
+
+The answers are set on the instance as they are on a model row, one query per
+model for the whole list, and each row comes back unchanged, so a frozen wrapper
+works; `present` and `row_affordance_answers` read them through the same
+`row_object`. Set, it applies to every row, model and mapping rows included. It
+must find a saved instance, or `None` for a row with no object, which answers
+`{"available": false}` for every name with a condition; anything else is refused
+with `ImproperlyConfigured` naming `row_object`. A selector returning a
+`QuerySet` beside it is refused, since a queryset's rows are answered in SQL as
+the model itself. A `row_object` that is neither a non-empty string nor a sync
+callable is refused when the spec is built.
 
 [`spec_output_schema`][django_service_specs.schema.spec_output_schema.spec_output_schema]
 describes the object on each item, with or without a projection, and with each

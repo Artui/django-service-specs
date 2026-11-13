@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 from asgiref.sync import sync_to_async
 from django.db.models import Q
+from django.utils import translation
 
 from django_service_specs.affordances.aenforce_affordances import aenforce_affordances
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
@@ -17,7 +18,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import count_hops
+from tests.affordances.utils import count_hops, language_reason
 from tests.dispatch.utils import make_user
 from tests.dispatch_app.models import Note
 from tests.specs.utils import Foreign
@@ -217,3 +218,13 @@ async def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_cont
         spec, base_pool(user=None), instance=None, call_context={}, reserved=RESERVED_POOL_SEEDS
     )
     assert seen == [{"user", "progress"}]
+
+
+async def test_a_lazy_reason_refuses_as_text_in_the_language_active_at_the_call() -> None:
+    spec = ServiceSpec(
+        service=print,
+        affordances=[Affordance(code="c", reason=language_reason(), when=lambda: False)],
+    )
+    with translation.override("fr"), pytest.raises(ActionUnavailable) as refused:
+        await aenforce_affordances(spec, _pool(), instance=None, reserved=RESERVED_POOL_SEEDS)
+    assert (type(refused.value.message), refused.value.message) == (str, "fr")

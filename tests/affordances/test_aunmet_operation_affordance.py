@@ -7,6 +7,7 @@ from typing import Any, cast
 import pytest
 from asgiref.sync import sync_to_async
 from django.db.models import Q
+from django.utils import translation
 
 from django_service_specs.affordances.aunmet_operation_affordance import (
     aunmet_operation_affordance,
@@ -20,7 +21,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import count_hops
+from tests.affordances.utils import count_hops, language_reason
 from tests.dispatch.utils import OPEN as OPEN_PERMISSIONS
 from tests.dispatch.utils import make_user, notes_of
 from tests.dispatch_app.models import Note
@@ -193,3 +194,12 @@ async def test_a_catch_all_condition_is_handed_the_seeds_and_never_the_call_cont
         spec, base_pool(user=None), call_context={}, reserved=RESERVED_POOL_SEEDS
     )
     assert seen == [{"user", "progress"}]
+
+
+async def test_a_lazy_reason_is_text_in_the_language_active_at_the_call() -> None:
+    unmet = Affordance(code="c", reason=language_reason(), when=lambda: False)
+    spec = ServiceSpec(service=print, affordances=[unmet])
+    with translation.override("fr"):
+        answer = await aunmet_operation_affordance(spec, _pool(), reserved=RESERVED_POOL_SEEDS)
+    assert answer is not None
+    assert (type(answer.reason), answer.reason) == (str, "fr")

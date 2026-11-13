@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.core.exceptions import ImproperlyConfigured
+from django.utils.functional import Promise
 
 from django_service_specs.types.is_async import is_async
 from django_service_specs.types.utils import PER_CALL_POOL_NAMES, is_row_condition
@@ -74,11 +75,16 @@ class Affordance:
             answer, and as the message of the ``ActionUnavailable`` a refused
             call raises. Write it for them: say what is not possible and, where
             it helps, what would make it possible, and keep internal state out
-            of it, since every reader of the operation reads it.
+            of it, since every reader of the operation reads it. A lazy string
+            (``gettext_lazy``) is accepted and kept unevaluated: the kernel
+            resolves it in the language active where it hands an answer out, so
+            every reason a caller receives is a ``str``.
         when: The condition, as above.
 
     Raises:
-        ImproperlyConfigured: ``code`` or ``reason`` is not a non-empty string;
+        ImproperlyConfigured: ``code`` is not a non-empty string, or ``reason``
+            is neither a non-empty string nor a lazy one (a lazy reason that
+            resolves empty is refused where it is handed out);
             ``when`` is an ORM expression that is not boolean; ``when`` is a
             callable naming ``data``, ``instance``, ``collection``, ``result``
             or ``queryset``; ``when`` is an async callable - an ``async
@@ -88,13 +94,15 @@ class Affordance:
     """
 
     code: str
-    reason: str
+    reason: str | Promise
     when: Any
 
     def __post_init__(self) -> None:
-        # Refuses anything but a non-empty string name; each disjunct has its own test.
+        # A lazy reason is never evaluated here: its text depends on the language at hand-out.
         for field_name in ("code", "reason"):
             value: Any = getattr(self, field_name)
+            if field_name == "reason" and isinstance(value, Promise):
+                continue
             if not isinstance(value, str) or not value:
                 raise ImproperlyConfigured(
                     f"Affordance.{field_name} must be a non-empty string; got {value!r}."

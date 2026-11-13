@@ -627,6 +627,12 @@ def settle(
     constants: dict[str, bool] = {}
     queryset = is_queryset(raw)
     if selector_spec.affordances is not None:
+        if queryset and selector_spec.row_object is not None:
+            raise ImproperlyConfigured(
+                f"{source} returned a QuerySet, whose rows are answered in SQL as the model "
+                "itself, and SelectorSpec.row_object is declared. Return the wrapped rows, or "
+                "drop row_object."
+            )
         row_conditions, constants = split_affordances(
             selector_spec.affordances, pool, reserved=reserved
         )
@@ -658,6 +664,7 @@ def settle(
             row_conditions=row_conditions,
             constants=constants,
             source_label=source,
+            row_object=selector_spec.row_object,
         )
     if selector_spec.kind is SelectorKind.RETRIEVE:
         return materialize_retrieve(shaped)

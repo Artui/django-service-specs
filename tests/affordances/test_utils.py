@@ -10,12 +10,14 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import BooleanField, Count, Q, QuerySet, Value
 from django.test.utils import CaptureQueriesContext
+from django.utils import translation
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
     affordance_expression,
     ambient_pool,
     answer_operation_condition,
+    with_affordances,
 )
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -27,7 +29,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import books_closed
+from tests.affordances.utils import Card, books_closed, language_reason
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
     EDIT,
@@ -631,3 +633,129 @@ class TestRowsASelectorReturnsDirectly:
             "affordances are declared on a LIST spec but SelectorSpec.selector returned "
             f"{type(result).__name__}, which is neither a QuerySet nor an iterable of rows."
         )
+
+
+def test_with_affordances_projects_a_lazy_reason_as_text_in_the_active_language() -> None:
+    rename = ServiceSpec(
+        service=print, affordances=[Affordance(code="c", reason=language_reason(), when=Q())]
+    )
+    with translation.override("fr"):
+        (presented,) = with_affordances(
+            [{"id": 1}], [{"affordance__rename__c": False}], {"rename": rename}, many=True
+        )
+    reason = presented["affordances"]["rename"]["reason"]
+    assert (type(reason), reason) == (str, "fr")
+
+
+@pytest.mark.django_db
+class TestARowObject:
+    """Rows that wrap the model instance, unwrapped by the selector's ``row_object``."""
+
+    def cards(self, ada: Any) -> list[Card]:
+        return [Card(note) for note in notes_of(user=ada).order_by("pk")]
+
+    @pytest.mark.parametrize("row_object", ["obj", lambda card: card.obj], ids=["name", "call"])
+    def test_each_wrapped_instance_is_answered_and_the_wrappers_come_back(
+        self, ada: Any, two_notes: Any, row_object: Any
+    ) -> None:
+        cards = self.cards(ada)
+
+        rows = rows_of(listing(lambda: cards, row_object=row_object), ada)
+
+        assert all(row is card for row, card in zip(rows, cards, strict=True))
+        assert [first_unmet(card.obj) for card in rows] == [None, "note_archived"]
+        assert [first_unmet(card.obj) for card in rows] == [refusal(ada, n) for n in two_notes]
+
+    def test_without_one_a_wrapper_row_is_refused(self, ada: Any, two_notes: Any) -> None:
+        with pytest.raises(ImproperlyConfigured, match="returned a row of type Card"):
+            rows_of(listing(lambda: self.cards(ada)), ada)
+
+    def test_the_answers_cost_one_query_whatever_the_row_count(self, ada: Any) -> None:
+        def counted(size: int) -> int:
+            Note.objects.all().delete()
+            for index in range(size):
+                Note.objects.create(owner=ada, title=str(index))
+            cards = self.cards(ada)
+            with CaptureQueriesContext(connection) as ctx:
+                rows_of(listing(lambda: cards, row_object="obj"), ada)
+            return len(ctx.captured_queries)
+
+        assert counted(2) == counted(7) == 1
+
+    def test_one_query_per_model_class(self, ada: Any) -> None:
+        note = Note.objects.create(owner=ada, title="n")
+        live = LiveNote.objects.create(owner=ada, title="l")
+        cards = [Card(note), Card(live), Card(note)]
+        spec = listing(lambda: cards, row_object="obj", affordances={"rename": RENAME})
+
+        with CaptureQueriesContext(connection) as ctx:
+            rows_of(spec, ada)
+
+        assert len(ctx.captured_queries) == 2
+        assert first_unmet(note) is None and first_unmet(live) is None
+
+    def test_it_applies_to_mapping_rows_too(self, ada: Any, two_notes: Any) -> None:
+        rows = [{"note": note} for note in two_notes]
+
+        answered = rows_of(listing(lambda: rows, row_object=lambda row: row["note"]), ada)
+
+        assert answered == rows and all(a is r for a, r in zip(answered, rows, strict=True))
+        assert [first_unmet(note) for note in two_notes] == [None, "note_archived"]
+
+    def test_it_applies_to_model_rows_too(self, ada: Any, two_notes: Any) -> None:
+        post = Post.objects.create(title="p")
+        rows = rows_of(listing(lambda: [post], row_object=lambda _: two_notes[1]), ada)
+
+        assert rows == [post] and not hasattr(post, "affordance__rename__note_archived")
+        assert first_unmet(two_notes[1]) == "note_archived"
+
+    def test_an_attribute_the_row_lacks_is_refused_naming_row_object(self, ada: Any) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            rows_of(listing(lambda: [{"obj": 1}], row_object="obj"), ada)
+        assert str(refused.value) == (
+            "SelectorSpec.row_object is 'obj', and a row of type dict has no attribute 'obj'."
+        )
+
+    @pytest.mark.parametrize(
+        "found", ["a string", {"id": 1}, Note(title="unsaved")], ids=["str", "mapping", "unsaved"]
+    )
+    def test_an_object_that_is_not_a_saved_instance_is_refused_naming_row_object(
+        self, ada: Any, found: Any
+    ) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            rows_of(listing(lambda: [Card(found)], row_object="obj"), ada)
+        assert str(refused.value).startswith(
+            f"SelectorSpec.row_object answered {found!r} for a row of type Card. It must "
+            "answer a saved model instance, or None for a row with no object."
+        )
+
+    def test_a_row_with_no_object_is_passed_through_unanswered(
+        self, ada: Any, two_notes: Any
+    ) -> None:
+        cards = [Card(None), Card(two_notes[1])]
+
+        rows = rows_of(listing(lambda: cards, row_object="obj"), ada)
+
+        assert rows == cards
+        assert first_unmet(two_notes[1]) == "note_archived"
+
+    def test_a_queryset_result_is_refused_naming_row_object(self, ada: Any) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            rows_of(listing(row_object="obj"), ada)
+        assert str(refused.value).startswith(
+            "SelectorSpec.selector returned a QuerySet, whose rows are answered in SQL as the "
+            "model itself, and SelectorSpec.row_object is declared."
+        )
+
+    def test_a_retrieve_unwraps_its_one_row(self, ada: Any, two_notes: Any) -> None:
+        card = Card(two_notes[1])
+        spec = SelectorSpec(
+            kind=SelectorKind.RETRIEVE,
+            selector=lambda: card,
+            permissions=OPEN,
+            affordances={"rename": RENAME},
+            row_object="obj",
+        )
+
+        assert rows_of(spec, ada) is card
+        assert first_unmet(two_notes[1]) == "note_archived"

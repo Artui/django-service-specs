@@ -115,6 +115,21 @@ class SelectorSpec:
             ``annotations``, or between two entries, is refused at
             construction, because a generated answer silently replacing a
             project's own annotation is the worst way for this to fail.
+        row_object: How to find the model instance in a row that wraps one - a
+            tree node, a dataclass row, a table cell builder - so its
+            ``affordances`` can be answered: an attribute name, read with
+            ``getattr``, or a sync callable taking the row and returning the
+            instance. ``None``, the default, answers model and mapping rows as
+            they are. Set, it applies to every row, model and mapping rows
+            included: the answers are set as attributes on the instance it
+            finds, one query per model for the whole list as for model rows,
+            and the row itself comes back unchanged, so a frozen wrapper works.
+            It must find a saved model instance, or ``None`` for a row with no
+            object, which is answered as a row the answers query did not find;
+            anything else is refused at dispatch. A ``QuerySet`` result is
+            refused beside it, since its rows are answered in SQL as the model
+            itself. Anything but a non-empty string or a callable is refused at
+            construction, and so is an async callable.
         kwargs: A provider of extra pool entries: called with the keywords it
             declares from the selector's pool, it returns a mapping merged into
             that pool after the caller's arguments, so a key it answers is the
@@ -170,6 +185,7 @@ class SelectorSpec:
     extend_queryset: Callable[..., QuerySet[Any]] | None = None
     filter_set: Any = None
     affordances: Mapping[str, AffordanceDeclarer] | None = None
+    row_object: str | Callable[[Any], Any] | None = None
     kwargs: Callable[..., Mapping[str, Any]] | None = None
     preconditions: Sequence[Callable[..., None]] | None = None
     progress_reporter: Callable[..., Any] | None = None
@@ -218,6 +234,7 @@ class SelectorSpec:
         if self.extend_queryset is not None:
             check_callable(self.extend_queryset, label=f"{label}.extend_queryset", sync=True)
         _check_affordances(self)
+        _check_row_object(self)
         check_providers(self, ("kwargs", "progress_reporter"), label=label)
         _check_shapes_unfilled(self)
         object.__setattr__(
@@ -330,6 +347,19 @@ def _check_shapes_unfilled(spec: SelectorSpec) -> None:
             f"demand {stray} of the caller. No provider fills SelectorSpec.shapes, whose values "
             "reach only the presenter; rename the key."
         )
+
+
+def _check_row_object(spec: SelectorSpec) -> None:
+    """Refuse a ``row_object`` that is neither an attribute name nor a sync callable."""
+    row_object: Any = spec.row_object
+    if row_object is None or (isinstance(row_object, str) and row_object):
+        return
+    if isinstance(row_object, str | bytes) or not callable(row_object):
+        raise ImproperlyConfigured(
+            "SelectorSpec.row_object must be an attribute name or a callable taking the row "
+            f"and returning its model instance; got {row_object!r}."
+        )
+    check_callable(row_object, label="SelectorSpec.row_object", sync=True)
 
 
 def _check_affordances(spec: SelectorSpec) -> None:

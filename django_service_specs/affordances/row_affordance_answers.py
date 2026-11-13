@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from django_service_specs.affordances.utils import answer_row_affordances, rendered_affordances
+from django_service_specs.affordances.utils import answer_row_affordances, rendering_selector
 from django_service_specs.specs.kernel_spec import kernel_spec
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
@@ -30,6 +30,11 @@ def row_affordance_answers(
     stops there. It is the same reading ``present`` and ``with_affordances``
     make of a row, because they call the same function.
 
+    A row that wraps its model instance is read through the presenting
+    selector's ``row_object``, as dispatch answered it; a row whose
+    ``row_object`` is ``None`` answers ``{"available": False}`` for every name
+    with a condition, there being no object to have met it.
+
     A spec that presents no affordances answers ``{}``, as ``present`` leaves
     the ``affordances`` key out of what it presents. A caller asking about a name
     the answer does not hold must treat it as not declared; the answer cannot
@@ -41,4 +46,7 @@ def row_affordance_answers(
             declaring them. A name whose spec declares no conditions reads no
             flag, and is available for any row.
     """
-    return answer_row_affordances(row, rendered_affordances(kernel_spec(spec)) or {})
+    selector = rendering_selector(kernel_spec(spec))
+    if selector is None:
+        return {}
+    return answer_row_affordances(row, selector.affordances or {}, selector.row_object)

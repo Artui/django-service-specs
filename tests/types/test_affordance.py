@@ -6,8 +6,13 @@ from typing import Any
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import BooleanField, Exists, ExpressionWrapper, F, OuterRef, Q, Value
+from django.utils.functional import lazy
+from django.utils.translation import gettext_lazy
 
+from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch_app.models import Note
 
 
@@ -65,6 +70,33 @@ class TestCodeAndReason:
         assert str(refused.value) == (
             f"Affordance.{field_name} must be a non-empty string; got {value!r}."
         )
+
+
+class TestALazyReason:
+    def test_a_gettext_lazy_reason_is_accepted_as_given(self) -> None:
+        reason = gettext_lazy("A shipped order cannot be cancelled.")
+        assert Affordance(code="c", reason=reason, when=Q(archived=False)).reason is reason
+
+    def test_it_is_not_evaluated_by_the_declarations_that_hold_it(self) -> None:
+        calls: list[str] = []
+
+        def text() -> str:
+            calls.append("resolved")
+            return "Closed."
+
+        affordance = Affordance(code="c", reason=lazy(text, str)(), when=Q(archived=False))
+        service_spec = ServiceSpec(service=print, affordances=[affordance])
+        SelectorSpec(kind=SelectorKind.LIST, selector=print, affordances={"x": service_spec})
+        assert calls == []
+
+    def test_a_lazy_code_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"^Affordance\.code must be a non-empty"):
+            Affordance(code=gettext_lazy("c"), reason="r", when=Q(archived=False))
+
+    @pytest.mark.parametrize("reason", [7, b"bytes", None], ids=["int", "bytes", "none"])
+    def test_neither_text_nor_a_lazy_string_is_refused(self, reason: Any) -> None:
+        with pytest.raises(ImproperlyConfigured, match=r"^Affordance\.reason must be a non-empty"):
+            Affordance(code="c", reason=reason, when=Q(archived=False))
 
 
 class TestWhen:
