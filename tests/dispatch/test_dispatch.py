@@ -3302,6 +3302,16 @@ def writes_then_returns(owner: Any, returned: Any) -> Callable[..., Any]:
     return write_the_note
 
 
+def test_a_plain_spec_s_field_named_like_the_list_is_one_value(ada: Any) -> None:
+    class Order(forms.Form):
+        items = forms.CharField()
+
+    service = Record()
+    spec = ServiceSpec(service=service, permissions=OPEN, validator=FormValidator(Order))
+    dispatch(spec, principal=ada, arguments={"items": "x"})
+    assert service.calls[0]["data"] == {"items": "x"}
+
+
 class TestMany:
     """A ``many`` spec: a list of rows, each checked and validated, then one run."""
 
