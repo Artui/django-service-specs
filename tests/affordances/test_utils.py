@@ -10,12 +10,14 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db import connection
 from django.db.models import BooleanField, Count, Q, QuerySet, Value
 from django.test.utils import CaptureQueriesContext
+from django.utils import translation
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.affordances.utils import (
     affordance_expression,
     ambient_pool,
     answer_operation_condition,
+    with_affordances,
 )
 from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.parameters.parameters import Parameter, Parameters
@@ -27,7 +29,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import books_closed
+from tests.affordances.utils import books_closed, language_reason
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
     EDIT,
@@ -631,3 +633,15 @@ class TestRowsASelectorReturnsDirectly:
             "affordances are declared on a LIST spec but SelectorSpec.selector returned "
             f"{type(result).__name__}, which is neither a QuerySet nor an iterable of rows."
         )
+
+
+def test_with_affordances_projects_a_lazy_reason_as_text_in_the_active_language() -> None:
+    rename = ServiceSpec(
+        service=print, affordances=[Affordance(code="c", reason=language_reason(), when=Q())]
+    )
+    with translation.override("fr"):
+        (presented,) = with_affordances(
+            [{"id": 1}], [{"affordance__rename__c": False}], {"rename": rename}, many=True
+        )
+    reason = presented["affordances"]["rename"]["reason"]
+    assert (type(reason), reason) == (str, "fr")

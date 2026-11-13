@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from django_service_specs.affordances.operation_affordances import operation_affordances
-from django_service_specs.affordances.utils import answer_operation_condition, with_call_context
+from django_service_specs.affordances.utils import (
+    answer_operation_condition,
+    resolved,
+    with_call_context,
+)
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.specs.spec_source import SpecSource
@@ -71,9 +75,13 @@ def unmet_operation_affordance(
     passed, else the one ``pool`` carries, else a fresh one the conditions of
     this call share. A ``call_context`` passed beside a different one in
     ``pool`` raises ``ImproperlyConfigured`` (``with_call_context``).
+
+    A lazy ``reason`` is answered as text in the language active at the call,
+    on a copy of the declared affordance; one declared as text is returned as
+    declared.
     """
     pool = with_call_context(pool, call_context)
     for affordance in operation_affordances(spec):
         if not answer_operation_condition(affordance.when, pool, reserved=reserved):
-            return affordance
+            return resolved(affordance)
     return None

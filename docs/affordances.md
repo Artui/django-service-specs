@@ -29,6 +29,30 @@ with three fields:
 Not a fact about the caller: that is `permissions`, which is always checked
 first, so a principal who may not see a row is never told what state it is in.
 
+### A translated reason
+
+A translated project declares its sentences at import time, before any request
+has a language, so `reason` also takes a lazy string:
+
+```python
+from django.utils.translation import gettext_lazy as _
+
+Affordance(
+    code="note_archived",
+    reason=_("An archived note cannot be renamed. Restore it first."),
+    when=Q(archived=False),
+)
+```
+
+It is kept unevaluated on the declaration and resolved wherever the kernel hands
+an answer out - the answers for each row, the refusal a call raises, the
+affordance `unmet_operation_affordance` returns - in the language active there,
+so every reason a caller receives is a `str` and no transport translates.
+`code` stays a plain string: it is what clients branch on, in every language.
+A lazy reason that resolves to an empty string is refused with
+`ImproperlyConfigured` where it is handed out, since it cannot be refused before
+it has a language.
+
 ## Two kinds of condition
 
 `when`'s type decides which kind it is. It is derived, never declared, so it
@@ -61,7 +85,8 @@ Every mistake below raises `ImproperlyConfigured` when the spec is built, so it
 fails at import rather than on the first call through a transport that never
 asked:
 
-- a `code` or `reason` that is not a non-empty string;
+- a `code` that is not a non-empty string, or a `reason` that is neither a
+  non-empty string nor a lazy one;
 - an ORM expression that is not boolean, such as `F("title")`;
 - a callable naming `data`, `instance`, `collection`, `result` or `queryset`,
   the names dispatch seeds per call;

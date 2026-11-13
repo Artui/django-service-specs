@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import replace
 from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
@@ -10,6 +11,7 @@ from django.db.models import Exists, Model, OuterRef
 from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import (
@@ -49,6 +51,21 @@ def with_call_context(
             "one context: pass it once, or pass the same dict the pool carries."
         )
     return {**pool, CALL_CONTEXT: call_context}
+
+
+def resolved_reason(affordance: Affordance) -> str:
+    """``affordance.reason`` as text in the active language, refused when it reads empty."""
+    reason = str(affordance.reason)
+    if not reason:
+        raise ImproperlyConfigured(f"Affordance.reason must be a non-empty string; got {reason!r}.")
+    return reason
+
+
+def resolved(affordance: Affordance) -> Affordance:
+    """``affordance`` itself when its reason is text, else a copy carrying it resolved."""
+    if isinstance(affordance.reason, str):
+        return affordance
+    return replace(affordance, reason=resolved_reason(affordance))
 
 
 def answer_operation_condition(
@@ -247,7 +264,11 @@ def answer_row_affordances(
                 answer = {"available": False}
                 break
             if not flag:
-                answer = {"available": False, "code": affordance.code, _REASON: affordance.reason}
+                answer = {
+                    "available": False,
+                    "code": affordance.code,
+                    _REASON: resolved_reason(affordance),
+                }
                 break
         answers[name] = answer
     return answers

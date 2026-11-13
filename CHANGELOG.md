@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **An `Affordance`'s `reason` may be a lazy string.** `reason=gettext_lazy(...)` is
+  accepted at declaration and never evaluated there, so a translated project declares
+  its sentences at import time. The kernel resolves it in the language active where it
+  hands an answer out: the answers for each row (`row_affordance_answers` and the
+  presented `affordances` object), the message of the `ActionUnavailable` that
+  `enforce_affordances` and `aenforce_affordances` raise, and the affordance
+  `unmet_operation_affordance` and `aunmet_operation_affordance` return, a copy whose
+  `reason` is the `str`. Every reason a caller receives is text, so no transport
+  changes. A lazy reason that resolves empty is refused there with
+  `ImproperlyConfigured`; `code` stays a plain, non-empty `str`.
+
 ### Changed
 - **A `FormValidator` binds its form to a `QueryDict` of posted spellings.** The
   form's `data` is now an immutable `QueryDict` holding each argument as the strings a

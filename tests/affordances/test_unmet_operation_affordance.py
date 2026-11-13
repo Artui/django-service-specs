@@ -6,6 +6,7 @@ from typing import Any, cast
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.utils import translation
 
 from django_service_specs.affordances.unmet_operation_affordance import (
     unmet_operation_affordance,
@@ -17,7 +18,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import books_closed
+from tests.affordances.utils import books_closed, empty_reason, language_reason
 from tests.dispatch.utils import TENANT_SEEDS, make_user
 from tests.specs.utils import Foreign
 
@@ -243,3 +244,20 @@ class TestTheCallSRequestAndView:
             call_context={"request": "context"},
         )
         assert seen == ["registered"]
+
+
+class TestALazyReason:
+    def test_the_answer_carries_it_as_text_in_the_language_active_at_the_call(self) -> None:
+        unmet = Affordance(code="c", reason=language_reason(), when=lambda: False)
+        spec = ServiceSpec(service=print, affordances=[unmet])
+        with translation.override("fr"):
+            answer = unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS)
+        assert answer is not None
+        assert (type(answer.reason), answer.reason, answer.code) == (str, "fr", "c")
+
+    def test_one_that_resolves_empty_is_refused(self) -> None:
+        unmet = Affordance(code="c", reason=empty_reason(), when=lambda: False)
+        spec = ServiceSpec(service=print, affordances=[unmet])
+        with pytest.raises(ImproperlyConfigured) as refused:
+            unmet_operation_affordance(spec, {}, reserved=RESERVED_POOL_SEEDS)
+        assert str(refused.value) == "Affordance.reason must be a non-empty string; got ''."

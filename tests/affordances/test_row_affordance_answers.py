@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from django.core.exceptions import ImproperlyConfigured
+from django.utils import translation
 
 from django_service_specs.affordances.row_affordance_answers import row_affordance_answers
 from django_service_specs.affordances.utils import rendered_affordances
@@ -12,7 +13,9 @@ from django_service_specs.dispatch.dispatch import dispatch
 from django_service_specs.dispatch.present import present
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
+from tests.affordances.utils import empty_reason, language_reason
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
     BOOKS_OPEN,
@@ -242,3 +245,24 @@ class TestASpecThatPresentsNoAffordances:
 
         assert rendered_affordances(spec) == {}
         assert row_affordance_answers(spec, object()) == {}
+
+
+class TestALazyReason:
+    def spec_with(self, reason: Any) -> SelectorSpec:
+        rename = ServiceSpec(
+            service=print, affordances=[Affordance(code="c", reason=reason, when=lambda: False)]
+        )
+        return listing(affordances={"rename": rename})
+
+    def test_the_answer_carries_it_as_text_in_the_language_active_at_the_call(self) -> None:
+        with translation.override("fr"):
+            answers = row_affordance_answers(
+                self.spec_with(language_reason()), {"affordance__rename__c": False}
+            )
+        reason = answers["rename"]["reason"]
+        assert (type(reason), reason) == (str, "fr")
+
+    def test_one_that_resolves_empty_is_refused(self) -> None:
+        spec = self.spec_with(empty_reason())
+        with pytest.raises(ImproperlyConfigured, match="^Affordance.reason must be a non-empty"):
+            row_affordance_answers(spec, {"affordance__rename__c": False})
