@@ -20,6 +20,7 @@ from django_service_specs.dispatch.dispatch_result import DispatchResult
 from django_service_specs.dispatch.paginate_output import paginate_output
 from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
+from django_service_specs.output.file_presenter import FilePresenter
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presentation_context import PresentationContext
 from django_service_specs.output.presenter import Presenter
@@ -27,6 +28,7 @@ from django_service_specs.selectors.shape_queryset import shape_queryset
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
+from django_service_specs.types.file_result import FileResult
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch.utils import (
     BOOKS_CLOSED,
@@ -869,3 +871,19 @@ class TestPresentedRows:
 
         assert rendered == {"id": 1, "title": "a"}
         assert presenter.calls == []
+
+
+@pytest.mark.parametrize(
+    "spec",
+    [
+        pytest.param(selector_spec(presenter=FilePresenter("text/csv")), id="selector"),
+        pytest.param(
+            ServiceSpec(service=print, permissions=OPEN, presenter=FilePresenter("text/csv")),
+            id="service",
+        ),
+    ],
+)
+def test_a_file_result_passes_through(spec: Any) -> None:
+    result = FileResult(b"a,b", filename="a.csv", content_type="text/csv")
+
+    assert present(spec, DispatchResult("instance", result)) is result

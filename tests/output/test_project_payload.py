@@ -13,6 +13,7 @@ from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.types.field_audience import FieldAudience
+from django_service_specs.types.file_result import FileResult
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.value_formatter import ValueFormatter
 from tests.dispatch.utils import OPEN, notes_of
@@ -168,3 +169,9 @@ def test_a_uuid_choice_is_spoken_for_the_spelling_a_model_presents() -> None:
     assert project_payload({"project": CANONICAL_UUID}, projection) == {"project": "Ada"}
     upper = CANONICAL_UUID.upper()
     assert project_payload({"project": upper}, projection) == {"project": upper}
+
+
+def test_a_file_result_passes_through_a_projection() -> None:
+    result = FileResult(b"a,b", filename="a.csv")
+
+    assert project_payload(result, invoice_projection()) is result

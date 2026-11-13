@@ -624,6 +624,13 @@ NOT_REEXPORTED_BY_DRFS = frozenset(
         "seeded_pool",
         # This package's version, which no importer reads as an API.
         "__version__",
+        # A spec whose result is a file, which each transport reads at registration
+        # and answers in its own terms: djangorestframework-services neither wraps
+        # nor re-exports them.
+        "FilePresenter",
+        "FileResult",
+        "FileTooLarge",
+        "file_output",
     }
 )
 

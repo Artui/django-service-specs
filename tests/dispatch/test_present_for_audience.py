@@ -15,10 +15,12 @@ from django_service_specs.dispatch.present import present
 from django_service_specs.dispatch.present_for_audience import present_for_audience
 from django_service_specs.output.audience_projection import AudienceProjection
 from django_service_specs.output.field_marking import FieldMarking
+from django_service_specs.output.file_presenter import FilePresenter
 from django_service_specs.output.output import Output, OutputField
 from django_service_specs.output.presenter import Presenter
 from django_service_specs.output.project_payload import project_payload
 from django_service_specs.specs.selector_spec import SelectorSpec
+from django_service_specs.types.file_result import FileResult
 from django_service_specs.types.selector_kind import SelectorKind
 from tests.dispatch.utils import (
     EDIT,
@@ -191,3 +193,10 @@ async def test_from_async_code_the_presented_value_is_projected_on_the_loop() ->
     )
 
     assert rendered == [{"id": note.pk, "title": "Draft"}]
+
+
+def test_a_file_result_passes_through() -> None:
+    spec = spec_of(FilePresenter("text/csv"), SelectorKind.RETRIEVE)
+    result = FileResult(b"a,b", filename="a.csv", content_type="text/csv")
+
+    assert present_for_audience(spec, DispatchResult("instance", result)) is result
