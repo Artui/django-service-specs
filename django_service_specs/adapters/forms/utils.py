@@ -12,9 +12,9 @@ from django_service_specs.types.utils import CALL_CONTEXT
 from django_service_specs.validation.validation_context import ValidationContext
 
 BOUND_KEYWORDS = frozenset({"data", "files", "instance"})
-"""The constructor keywords the bind sets itself, which ``form_kwargs`` may not
-return: ``instance`` too for a plain form, so a callable's keywords mean one
-thing whichever kind of form it serves."""
+"""The constructor keywords only the bind may set, which ``form_kwargs`` may not
+return: ``instance`` too for a plain form that takes none, so a callable's
+keywords mean one thing whichever kind of form it serves."""
 
 
 def extra_keywords(
@@ -41,7 +41,8 @@ def extra_keywords(
     for key in extra:
         if key in BOUND_KEYWORDS:
             raise ImproperlyConfigured(
-                f"{form_class.__qualname__}: form_kwargs returned {key!r}, which the bind "
-                "sets itself from the call; return only the form's own keywords."
+                f"{form_class.__qualname__}: form_kwargs returned {key!r}, which only the "
+                "bind may set: it sets data and files from the call, and instance where the "
+                "form takes one; return only the form's own keywords."
             )
     return extra

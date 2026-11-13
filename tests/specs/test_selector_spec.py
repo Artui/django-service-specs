@@ -641,3 +641,30 @@ def test_selector_spec_parameters_takes_and_ignores_call_context() -> None:
     assert spec.parameters(call_context={}) == spec.parameters() == PK + shapes
     bare = SelectorSpec(kind=SelectorKind.LIST, selector=list, reads=PK)
     assert bare.parameters(call_context={}) is bare.reads
+
+
+async def _unwrap(row: Any) -> Any:
+    return row
+
+
+class TestRowObject:
+    def test_it_defaults_to_none(self) -> None:
+        assert SelectorSpec(kind=SelectorKind.LIST, selector=list).row_object is None
+
+    @pytest.mark.parametrize("row_object", ["obj", repr], ids=["attribute", "callable"])
+    def test_an_attribute_name_or_a_callable_is_kept_as_given(self, row_object: Any) -> None:
+        spec = SelectorSpec(kind=SelectorKind.LIST, selector=list, row_object=row_object)
+        assert spec.row_object is row_object
+
+    @pytest.mark.parametrize("row_object", [3, "", b"obj"], ids=["int", "empty", "bytes"])
+    def test_anything_else_is_refused(self, row_object: Any) -> None:
+        with pytest.raises(ImproperlyConfigured) as refused:
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, row_object=row_object)
+        assert str(refused.value) == (
+            "SelectorSpec.row_object must be an attribute name or a callable taking the row "
+            f"and returning its model instance; got {row_object!r}."
+        )
+
+    def test_an_async_callable_is_refused(self) -> None:
+        with pytest.raises(ImproperlyConfigured, match="row_object is _unwrap, an async callable"):
+            SelectorSpec(kind=SelectorKind.LIST, selector=list, row_object=_unwrap)

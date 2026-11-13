@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.32.0] — 2026-11-13
+
+### Added
+- **An `Affordance`'s `reason` may be a lazy string.** `reason=gettext_lazy(...)` is
+  accepted at declaration and never evaluated there, so a translated project declares
+  its sentences at import time. The kernel resolves it in the language active where it
+  hands an answer out: the answers for each row (`row_affordance_answers` and the
+  presented `affordances` object), the message of the `ActionUnavailable` that
+  `enforce_affordances` and `aenforce_affordances` raise, and the affordance
+  `unmet_operation_affordance` and `aunmet_operation_affordance` return, a copy whose
+  `reason` is the `str`. Every reason a caller receives is text, so no transport
+  changes. A lazy reason that resolves empty is refused there with
+  `ImproperlyConfigured`; `code` stays a plain, non-empty `str`.
+- **`SelectorSpec.row_object`**, for rows that wrap their model instance: a tree node,
+  a dataclass row, a table cell builder. An attribute name or a sync callable taking
+  the row and returning the instance; anything else is refused at declaration. Set,
+  it applies to every row: the affordance answers are set on the instance it finds,
+  one query per model for the whole list, and the row comes back unchanged, so a
+  frozen wrapper works. `present` and `row_affordance_answers(spec, row)` read through
+  it. An instance that is not saved, or anything but a model instance or `None`, is
+  refused naming `row_object`; `None` is a row with no object, unavailable for every
+  name with a condition. A `QuerySet` result beside it is refused.
+- **A plain form that declares `instance` is handed the call's target.** When a plain
+  `Form`'s `__init__` names a parameter `instance` (a bare `**kwargs` does not count),
+  `FormValidator` builds it with `instance=` the target itself, not a copy, and `None`
+  when there is none. A plain form that declares none is built as before. `form_kwargs`
+  still may not return `instance` for any form, and its refusal now says so truly for
+  a plain form too: only the bind may set `data`, `files` and `instance`.
+
+### Changed
+- **A `FormValidator` binds its form to a `QueryDict` of posted spellings.** The
+  form's `data` is now an immutable `QueryDict` holding each argument as the strings a
+  browser would post for it, rather than a dict of the typed arguments, so a form or
+  widget written for HTML that reads `self.data.getlist(...)` or calls `.isdigit()` on
+  an id validates instead of raising `AttributeError`. A list is one string per
+  element, a boolean `"True"` or `"False"`, a date, time or datetime its ISO
+  spelling, a duration Django's own, `null` an absent key, and any other value its
+  `str()`; files stay in `files`. A localized number field is posted its number as
+  its widget renders it in the active locale. The shape check stays typed and the
+  cleaned values are unchanged; spec-rest's form-body route and spec-html's pages
+  reach the same bind.
+
 ## [0.31.0] — 2026-11-09
 
 ### Added
@@ -2679,7 +2721,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SpecRegistry`: a named, taggable set of specs for a project exposing
   operations over more than one transport.
 
-[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.31.0...HEAD
+[Unreleased]: https://github.com/Artui/django-service-specs/compare/v0.32.0...HEAD
+[0.32.0]: https://github.com/Artui/django-service-specs/compare/v0.31.0...v0.32.0
 [0.31.0]: https://github.com/Artui/django-service-specs/compare/v0.30.0...v0.31.0
 [0.30.0]: https://github.com/Artui/django-service-specs/compare/v0.29.0...v0.30.0
 [0.29.0]: https://github.com/Artui/django-service-specs/compare/v0.28.0...v0.29.0

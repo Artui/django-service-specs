@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from types import ModuleType
 from typing import Any
 
 import pytest
 from asgiref.sync import sync_to_async
+from django.utils import translation
+from django.utils.functional import Promise, lazy
 
 
 async def books_closed() -> bool:
@@ -22,3 +25,28 @@ def count_hops(monkeypatch: pytest.MonkeyPatch, module: ModuleType) -> list[str]
 
     monkeypatch.setattr(module, "sync_to_async", counting)
     return sent
+
+
+def language_reason() -> Promise:
+    """A lazy reason reading as the language active when it is resolved."""
+    return lazy(translation.get_language, str)()
+
+
+def empty_reason() -> Promise:
+    """A lazy reason that resolves to the empty string."""
+    return lazy(str, str)()
+
+
+@dataclass(frozen=True)
+class Card:
+    """A frozen row wrapping the note it shows, as a tree node or a table cell does."""
+
+    obj: Any
+
+    @property
+    def pk(self) -> Any:
+        return self.obj.pk
+
+    @property
+    def title(self) -> str:
+        return self.obj.title

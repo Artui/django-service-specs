@@ -6,6 +6,7 @@ from typing import Any, cast
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q
+from django.utils import translation
 
 from django_service_specs.affordances.enforce_affordances import enforce_affordances
 from django_service_specs.authorization.unrestricted import Unrestricted
@@ -20,7 +21,7 @@ from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
 from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.selector_kind import SelectorKind
-from tests.affordances.utils import books_closed
+from tests.affordances.utils import books_closed, empty_reason, language_reason
 from tests.dispatch.utils import PK, TENANT_SEEDS, make_user, note_by_pk
 from tests.dispatch_app.models import LiveNote, Note
 from tests.specs.utils import Foreign
@@ -423,3 +424,23 @@ def test_a_condition_reads_the_call_s_request_and_view_from_its_context() -> Non
         reserved=RESERVED_POOL_SEEDS,
     )
     assert seen == [(request, view)]
+
+
+class TestALazyReason:
+    def test_the_refusal_carries_it_as_text_in_the_language_active_at_the_call(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            affordances=[Affordance(code="c", reason=language_reason(), when=lambda: False)],
+        )
+        with translation.override("fr"), pytest.raises(ActionUnavailable) as refused:
+            enforce_affordances(spec, {}, instance=None, reserved=RESERVED_POOL_SEEDS)
+        assert (type(refused.value.message), refused.value.message) == (str, "fr")
+        assert str(refused.value) == "fr"
+
+    def test_one_that_resolves_empty_is_refused(self) -> None:
+        spec = ServiceSpec(
+            service=print,
+            affordances=[Affordance(code="c", reason=empty_reason(), when=lambda: False)],
+        )
+        with pytest.raises(ImproperlyConfigured, match="^Affordance.reason must be a non-empty"):
+            enforce_affordances(spec, {}, instance=None, reserved=RESERVED_POOL_SEEDS)

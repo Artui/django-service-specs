@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import replace
 from typing import Any, Final
 
 from django.core.exceptions import ImproperlyConfigured
@@ -10,6 +11,7 @@ from django.db.models import Exists, Model, OuterRef
 from django_service_specs.pool.utils import pool_kwargs
 from django_service_specs.specs.selector_spec import SelectorSpec
 from django_service_specs.specs.service_spec import ServiceSpec
+from django_service_specs.types.affordance import Affordance
 from django_service_specs.types.affordance_declarer import AffordanceDeclarer
 from django_service_specs.types.selector_kind import SelectorKind
 from django_service_specs.types.utils import (
@@ -49,6 +51,21 @@ def with_call_context(
             "one context: pass it once, or pass the same dict the pool carries."
         )
     return {**pool, CALL_CONTEXT: call_context}
+
+
+def resolved_reason(affordance: Affordance) -> str:
+    """``affordance.reason`` as text in the active language, refused when it reads empty."""
+    reason = str(affordance.reason)
+    if not reason:
+        raise ImproperlyConfigured(f"Affordance.reason must be a non-empty string; got {reason!r}.")
+    return reason
+
+
+def resolved(affordance: Affordance) -> Affordance:
+    """``affordance`` itself when its reason is text, else a copy carrying it resolved."""
+    if isinstance(affordance.reason, str):
+        return affordance
+    return replace(affordance, reason=resolved_reason(affordance))
 
 
 def answer_operation_condition(
@@ -94,6 +111,25 @@ def split_affordances(
     return row_conditions, constants
 
 
+def row_object_of(row: Any, row_object: str | Callable[[Any], Any]) -> Model | None:
+    """The saved model instance ``row`` wraps, found through ``row_object``, or ``None``."""
+    if isinstance(row_object, str):
+        found: Any = getattr(row, row_object, _MISSING)
+        if found is _MISSING:
+            raise ImproperlyConfigured(
+                f"SelectorSpec.row_object is {row_object!r}, and a row of type "
+                f"{type(row).__name__} has no attribute {row_object!r}."
+            )
+    else:
+        found = row_object(row)
+    if found is None or (isinstance(found, Model) and found.pk is not None):
+        return found
+    raise ImproperlyConfigured(
+        f"SelectorSpec.row_object answered {found!r} for a row of type {type(row).__name__}. "
+        "It must answer a saved model instance, or None for a row with no object."
+    )
+
+
 def rows_with_affordances(
     result: Any,
     *,
@@ -101,18 +137,19 @@ def rows_with_affordances(
     row_conditions: Mapping[str, Any],
     constants: Mapping[str, bool],
     source_label: str,
+    row_object: str | Callable[[Any], Any] | None = None,
 ) -> Any:
     """A selector's non-``QuerySet`` result, with each row carrying its answers."""
     if kind is SelectorKind.RETRIEVE:
         if result is None:
             return None
-        return _answer_rows([result], row_conditions, constants, source_label)[0]
+        return _answer_rows([result], row_conditions, constants, source_label, row_object)[0]
     if isinstance(result, Mapping | str | bytes) or not isinstance(result, Iterable):
         raise ImproperlyConfigured(
             f"affordances are declared on a LIST spec but {source_label} returned "
             f"{type(result).__name__}, which is neither a QuerySet nor an iterable of rows."
         )
-    return _answer_rows(list(result), row_conditions, constants, source_label)
+    return _answer_rows(list(result), row_conditions, constants, source_label, row_object)
 
 
 def _answer_rows(
@@ -120,7 +157,14 @@ def _answer_rows(
     row_conditions: Mapping[str, Any],
     constants: Mapping[str, bool],
     source_label: str,
+    row_object: str | Callable[[Any], Any] | None,
 ) -> list[Any]:
+    if row_object is not None:
+        found = (row_object_of(row, row_object) for row in rows)
+        _answer_rows(
+            [obj for obj in found if obj is not None], row_conditions, constants, source_label, None
+        )
+        return rows
     by_model: dict[type[Model], list[Any]] = {}
     for row in rows:
         if isinstance(row, Model):
@@ -186,23 +230,34 @@ def _row_condition_answers(
     }
 
 
+def rendering_selector(spec: ServiceSpec | SelectorSpec) -> SelectorSpec | None:
+    """The selector spec ``spec`` presents through: itself, or its output selector."""
+    return spec if isinstance(spec, SelectorSpec) else spec.output_selector_spec
+
+
 def rendered_affordances(
     spec: ServiceSpec | SelectorSpec,
 ) -> Mapping[str, AffordanceDeclarer] | None:
     """The ``affordances`` mapping on whichever selector spec ``spec`` presents through."""
-    if isinstance(spec, SelectorSpec):
-        return spec.affordances
-    nested = spec.output_selector_spec
-    return nested.affordances if nested is not None else None
+    selector = rendering_selector(spec)
+    return selector.affordances if selector is not None else None
 
 
 def with_affordances(
-    payload: Any, value: Any, affordances: Mapping[str, AffordanceDeclarer], *, many: bool
+    payload: Any,
+    value: Any,
+    affordances: Mapping[str, AffordanceDeclarer],
+    *,
+    many: bool,
+    row_object: str | Callable[[Any], Any] | None = None,
 ) -> Any:
     """``payload`` with each presented object carrying its row's answers."""
     if not many:
-        return _with_answers(payload, value, affordances)
-    return [_with_answers(item, row, affordances) for item, row in zip(payload, value, strict=True)]
+        return _with_answers(payload, value, affordances, row_object)
+    return [
+        _with_answers(item, row, affordances, row_object)
+        for item, row in zip(payload, value, strict=True)
+    ]
 
 
 def affordance_schema(affordances: Mapping[str, AffordanceDeclarer]) -> dict[str, Any]:
@@ -219,7 +274,10 @@ def affordance_schema(affordances: Mapping[str, AffordanceDeclarer]) -> dict[str
 
 
 def _with_answers(
-    item: Any, row: Any, affordances: Mapping[str, AffordanceDeclarer]
+    item: Any,
+    row: Any,
+    affordances: Mapping[str, AffordanceDeclarer],
+    row_object: str | Callable[[Any], Any] | None,
 ) -> dict[str, Any]:
     if not isinstance(item, Mapping):
         raise ImproperlyConfigured(
@@ -231,23 +289,31 @@ def _with_answers(
             f"The presented object already has an {AFFORDANCES_KEY!r} key, which the declared "
             "affordances would overwrite. Rename the output field."
         )
-    return {**item, AFFORDANCES_KEY: answer_row_affordances(row, affordances)}
+    return {**item, AFFORDANCES_KEY: answer_row_affordances(row, affordances, row_object)}
 
 
 def answer_row_affordances(
-    row: Any, affordances: Mapping[str, AffordanceDeclarer]
+    row: Any,
+    affordances: Mapping[str, AffordanceDeclarer],
+    row_object: str | Callable[[Any], Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Each declared name's answer for ``row``, walking its conditions in order."""
+    """Each declared name's answer for ``row``, or its ``row_object``, walking them in order."""
+    found = row if row_object is None else row_object_of(row, row_object)
     answers: dict[str, dict[str, Any]] = {}
     for name, service_spec in affordances.items():
         answer: dict[str, Any] = {"available": True}
         for affordance in service_spec.affordances or ():
-            flag = _flag(row, affordance_alias(name, affordance.code))
+            alias = affordance_alias(name, affordance.code)
+            flag = None if found is None and row_object is not None else _flag(found, alias)
             if flag is None:
                 answer = {"available": False}
                 break
             if not flag:
-                answer = {"available": False, "code": affordance.code, _REASON: affordance.reason}
+                answer = {
+                    "available": False,
+                    "code": affordance.code,
+                    _REASON: resolved_reason(affordance),
+                }
                 break
         answers[name] = answer
     return answers

@@ -9,6 +9,7 @@ from django.db.models import Model
 from django_service_specs.affordances.utils import (
     affordance_expression,
     answer_operation_condition,
+    resolved_reason,
     with_call_context,
 )
 from django_service_specs.services.action_unavailable import ActionUnavailable
@@ -108,7 +109,7 @@ def enforce_affordances(
         else:
             available = answer_operation_condition(affordance.when, pool, reserved=reserved)
         if not available:
-            raise ActionUnavailable(affordance.reason, code=affordance.code)
+            raise ActionUnavailable(resolved_reason(affordance), code=affordance.code)
 
 
 def _row_affordance_flags(instance: Any, affordances: Sequence[Affordance]) -> dict[int, bool]:
